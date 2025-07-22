@@ -1,0 +1,72 @@
+name: intelia-expert-api
+region: nyc1
+
+services:
+- name: api
+  source_dir: /
+  github:
+    repo: your-username/intelia-expert
+    branch: main
+    deploy_on_push: true
+  
+  dockerfile_path: Dockerfile
+  
+  http_port: 8000
+  
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 30
+    period_seconds: 30
+    timeout_seconds: 10
+    success_threshold: 1
+    failure_threshold: 3
+  
+  routes:
+  - path: /
+  
+  env:
+  - key: PORT
+    value: "8000"
+  - key: ENVIRONMENT
+    value: "production"
+  - key: DEBUG
+    value: "false"
+  - key: PYTHONUNBUFFERED
+    value: "1"
+  
+  # Secrets from GitHub repository secrets
+  # These will be set via GitHub Actions or DigitalOcean console
+  envs:
+  - key: OPENAI_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: SECRET_KEY
+    scope: RUN_TIME  
+    type: SECRET
+  - key: RAG_ENABLED
+    value: "true"
+    scope: RUN_TIME
+  - key: DEFAULT_MODEL
+    value: "gpt-4o"
+    scope: RUN_TIME
+
+alerts:
+- rule: CPU_UTILIZATION
+  operator: GREATER_THAN
+  value: 80
+  window: FIVE_MINUTES
+- rule: MEM_UTILIZATION
+  operator: GREATER_THAN
+  value: 80
+  window: FIVE_MINUTES
+
+# Optional: Database (can be added later)
+# databases:
+# - name: intelia-db
+#   engine: PG
+#   version: "13"
+#   size: basic-xxs
+#   num_nodes: 1
