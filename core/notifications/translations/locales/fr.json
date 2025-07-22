@@ -1,0 +1,373 @@
+{
+  "languages": {
+    "en": "Anglais",
+    "fr": "Français", 
+    "es": "Espagnol"
+  },
+  "ai": {
+    "prompts": {
+      "system_role": "Vous êtes un vétérinaire avicole expert et spécialiste en gestion de poulets de chair.",
+      "analysis_instruction": "Analysez les données de performance des poulets de chair suivantes et fournissez des informations complètes.",
+      "barn_info_header": "INFORMATIONS DU BÂTIMENT :",
+      "performance_metrics_header": "MÉTRIQUES DE PERFORMANCE :",
+      "environmental_header": "CONDITIONS ENVIRONNEMENTALES :",
+      "analysis_requirements": [
+        "Fournir une évaluation complète des performances",
+        "Identifier les problèmes critiques affectant la croissance",
+        "Générer des recommandations spécifiques et réalisables", 
+        "Créer un plan d'action priorisé"
+      ],
+      "language_instruction": "Rédigez TOUTE votre réponse en {language_name}.",
+      "structure_request": "Structurez votre réponse avec des sections claires : Aperçu des Performances, Conclusions Principales, Recommandations Détaillées, Actions Prioritaires."
+    }
+  },
+  "pdf": {
+    "title": "RAPPORT D'ANALYSE EXPERTE\nDES PERFORMANCES DES POULETS",
+    "barn_label": "BÂTIMENT",
+    "report_info": "■ Informations du Rapport",
+    "report_date": "Date du Rapport :",
+    "flock_age": "Âge du Lot :",
+    "breed": "Souche :",
+    "insights": "■ Analyse Experte",
+    "status_overview": "■ Aperçu du Statut",
+    "overview": {
+      "title": "■ Aperçus",
+      "performance": "Basé sur les métriques de performance fournies pour le Bâtiment {barn_id}, les poulets montrent un ratio de gain de {ratio}",
+      "weight": "À cet âge, le poids actuel de {current}g vs objectif de {target}g indique le statut de performance",
+      "environment": "Les conditions environnementales avec une température moyenne de {temp}°C sont surveillées"
+    },
+    "status": {
+      "weight": "Poids : {weight}g (Objectif : {target}g)",
+      "deviation": "Déviation : {deviation}g",
+      "gain": "Performance de Gain : {ratio}",
+      "temperature": "Température : {temp}°C"
+    },
+    "sections": {
+      "performance": "■ Métriques de Performance",
+      "environment": "■ Conditions Environnementales",
+      "recommendations": "■ Recommandations"
+    },
+    "weight": "Poids",
+    "gain": "Gain",
+    "ratio": "Ratio",
+    "temperature": "Température",
+    "humidity": "Humidité",
+    "external": "Externe",
+    "ai_analysis": "■ Analyse IA",
+    "current_weight": "Poids Actuel",
+    "daily_gain": "Gain Quotidien",
+    "performance_ratio": "Ratio de Performance",
+    "barn_temperature": "Température du Bâtiment",
+    "barn_humidity": "Humidité du Bâtiment",
+    "external_temperature": "Température Externe",
+    "insights_templates": {
+      "underperforming_template": "Basé sur les métriques de performance fournies pour le Bâtiment {barn_id}, les poulets de chair sont en sous-performance significative.",
+      "weight_status_template": "À {age} jours d'âge, le poids actuel de {observed_weight:.1f}g est en dessous du poids attendu de {expected_weight:.1f}g, et le gain quotidien de {observed_gain:.1f}g est acceptable.",
+      "intervention_needed": "Le ratio de performance de {gain_ratio:.2f} et le statut {status} indiquent qu'une intervention immédiate est nécessaire."
+    },
+    "status_templates": {
+      "weight_action_needed": "Statut du Poids : Action nécessaire",
+      "weight_deviation": "Déviation : {deviation:+.0f}g",
+      "growth_poor": "Performance de Croissance : Faible ({ratio:.2f})",
+      "temperature_hot": "Température : Trop chaude ({temp:.1f}°C vs {optimal_min:.0f}-{optimal_max:.0f}°C recommandé)"
+    },
+    "header": {
+      "company": "Logo de l'Entreprise",
+      "logo": "Page de Contact"
+    },
+    "footer": {
+      "contact": "www.intelia.com | support@intelia.com",
+      "page": "Page {page}/3"
+    },
+    "generated": "Généré par : Assistant IA Expert d'Intelia | Horodatage : {timestamp}",
+    "report_id": "ID du Rapport : BPA-{barn_id}-{timestamp}",
+    "copyright": "© 2025 Intelia Technologies. Tous droits réservés",
+    "disclaimer": "Avertissement : Ce rapport est généré automatiquement par analyse IA. Il ne remplace pas le jugement d'un professionnel avicole qualifié. Si vous rencontrez des problèmes ou des résultats anormaux, nous recommandons fortement de consulter un vétérinaire ou un conseiller avicole avant de prendre des décisions critiques.",
+    "monitoring": {
+      "section_title": "Statut de Surveillance",
+      "performance_excellent": "Performance optimale - maintenir les pratiques actuelles",
+      "water_optimal": "Qualité de l'eau excellente - poursuivre la gestion actuelle",
+      "temperature_optimal": "Température dans la plage idéale - contrôle environnemental efficace",
+      "ventilation_optimal": "Ventilation adéquate - maintenir les paramètres actuels",
+      "hygiene_maintained": "Hygiène satisfaisante - continuer les protocoles établis",
+      "health_good": "Santé du troupeau excellente - surveillance préventive",
+      "continue_surveillance": "Poursuivre la surveillance régulière des indicateurs clés"
+    },
+    "recommendations": {
+      "feed": "Réviser le programme d'alimentation pour une croissance optimale",
+      "water": "Assurer une qualité et disponibilité d'eau adéquates",
+      "temperature": "Ajuster la température pour de meilleures conditions",
+      "monitoring": "Augmenter la fréquence de surveillance",
+      "ventilation": "Optimiser les systèmes de ventilation",
+      "hygiene": "Maintenir les protocoles d'hygiène",
+      "health": "Surveiller étroitement la santé du troupeau",
+      "feed_detailed": "Réviser la formulation alimentaire pour optimiser le gain de poids",
+      "water_detailed": "Vérifier la qualité et la disponibilité de l'eau potable",
+      "temperature_detailed": "Ajuster la température pour améliorer les conditions d'élevage",
+      "ventilation_detailed": "Optimiser la ventilation pour une meilleure qualité d'air",
+      "hygiene_detailed": "Renforcer les protocoles d'hygiène et de nettoyage",
+      "health_detailed": "Intensifier la surveillance sanitaire du troupeau",
+      "monitoring_detailed": "Augmenter la fréquence des contrôles de performance",
+      "health_management": "Gestion Sanitaire :",
+      "health_items": [
+        "Surveillance des Maladies : Effectuer un contrôle sanitaire approfondi pour éliminer toute maladie ou infection sous-jacente qui pourrait affecter la croissance. Rechercher des signes de problèmes respiratoires, de maladies entériques ou d'autres préoccupations sanitaires.",
+        "Vaccination et Médication : Réviser le programme de vaccination et de médication pour s'assurer qu'il est à jour et efficace. Administrer rapidement tout traitement nécessaire."
+      ],
+      "environmental_title": "Conditions Environnementales :",
+      "environmental_items": [
+        "Température et Ventilation : S'assurer que la température du bâtiment est dans la plage optimale pour les poulets de chair à cet âge (environ 21-24°C). Une ventilation appropriée est cruciale pour maintenir la qualité de l'air et prévenir les problèmes respiratoires.",
+        "Gestion de la Litière : Vérifier l'état de la litière. Une litière humide ou tassée peut entraîner des problèmes de santé. Assurer un nettoyage et un remplacement réguliers pour maintenir un environnement sec et confortable."
+      ],
+      "management_title": "Pratiques de Gestion :",
+      "management_item": "Densité de Peuplement : Évaluer la densité de peuplement pour s'assurer qu'elle n'est pas trop élevée, car la surpopulation peut entraîner du stress et une performance réduite.",
+      "water_item": "Qualité et Disponibilité de l'Eau : S'assurer que de l'eau propre et fraîche est disponible en permanence. Vérifier les conduites d'eau pour tout blocage ou contamination.",
+      "nutrition_title": "Programme Nutritionnel :",
+      "nutrition_items": [
+        "Évaluation de la Qualité des Aliments : Effectuer une analyse immédiate de la composition et du contenu nutritionnel des aliments pour identifier les déficiences potentielles.",
+        "Surveillance de la Consommation Alimentaire : Augmenter la fréquence de surveillance de la consommation alimentaire pour assurer des niveaux d'apport adéquats.",
+        "Consultation avec un Nutritionniste : Engager un nutritionniste avicole pour réviser et ajuster le programme d'alimentation basé sur les métriques de performance actuelles."
+      ]
+    },
+    "env": {
+      "optimal_temp_range": "20-26°C",
+      "optimal_humidity_range": "50-70%",
+      "external_temp_placeholder": "22,0°C",
+      "average_period": "24h"
+    },
+    "status_text": {
+      "excellent": "Excellent",
+      "good": "Bon",
+      "warning": "Attention",
+      "critical": "Critique"
+    },
+    "date_format": {
+      "fr": "%d %B %Y à %H:%M"
+    },
+    "filename_template": "rapport_poulet_{barn_id}_{language}_{timestamp}.pdf",
+    "fallback": {
+      "title": "RAPPORT D'ANALYSE DE PERFORMANCE DES POULETS",
+      "barn_label": "Bâtiment",
+      "summary_title": "Résumé de Performance :",
+      "age_label": "- Âge",
+      "breed_label": "- Race",
+      "weight_label": "- Poids Actuel",
+      "gain_label": "- Gain Quotidien",
+      "ratio_label": "- Ratio de Performance",
+      "temp_label": "- Température",
+      "humidity_label": "- Humidité",
+      "ai_title": "Analyse IA :",
+      "generated_label": "Généré",
+      "note": "Format texte de secours",
+      "filename_template": "rapport_poulet_{barn_id}_{language}_{timestamp}.txt",
+      "content_template": "{title}\n{separator}\n\n{barn_label} : {barn_id}\n\n{summary_title}\n{age_label} : {age:.0f} {days}\n{breed_label} : {breed}\n{weight_label} : {weight:.0f}g ({target} : {target_weight:.0f}g)\n{gain_label} : {gain:.0f}g ({target} : {target_gain:.0f}g)\n{ratio_label} : {ratio:.2f}\n{temp_label} : {temp:.1f}°C\n{humidity_label} : {humidity:.0f}%\n\n{ai_title}\n{ai_analysis}\n\n{generated_label} : {timestamp}"
+    },
+    "error": {
+      "title": "Erreur de Génération PDF",
+      "barn_label": "ID Bâtiment",
+      "language_label": "Langue",
+      "error_label": "Erreur",
+      "timestamp_label": "Horodatage",
+      "contact_message": "Veuillez contacter le support pour assistance.",
+      "filename_template": "erreur_rapport_{barn_id}_{language}_{timestamp}.txt",
+      "content_template": "{title}\n\n{barn_label} : {barn_id}\n{language_label} : {language}\n{error_label} : {error}\n{timestamp_label} : {timestamp}\n\n{contact_message}"
+    },
+    "legal": {
+      "generated_by": "Généré par : Assistant IA Expert d'Intelia | Horodatage : {timestamp}",
+      "report_id": "ID du Rapport : BPA-{barn_id}-{timestamp}",
+      "copyright": "© 2025 Intelia Technologies. Tous droits réservés",
+      "warning": "Avertissement : Ce rapport est généré par analyse IA avec base de connaissances experte. Bien qu'il soit basé sur une documentation technique complète, il ne remplace pas le jugement d'un professionnel avicole qualifié. Si vous rencontrez des problèmes ou des résultats anormaux, nous recommandons fortement de consulter un vétérinaire ou un conseiller avicole avant de prendre des décisions critiques."
+    }
+  },
+  "email": {
+    "subject": {
+      "broiler_analysis": "Rapport d'Analyse de Performance des Poulets - Bâtiment {barn_id} - {date}"
+    },
+    "greeting": {
+      "dear": "Cher"
+    },
+    "content": {
+      "intro": "Veuillez trouver ci-joint votre dernier rapport d'analyse de performance des poulets. Cette évaluation complète comprend les métriques de performance actuelles, les recommandations d'experts et les stratégies de gestion adaptées aux conditions météorologiques.",
+      "pdf_note": "Le rapport détaillé est joint en format PDF. Veuillez examiner les recommandations et mettre en œuvre les ajustements de gestion suggérés pour des performances optimales.",
+      "support": "Si vous avez des questions concernant cette analyse ou besoin d'un soutien supplémentaire, n'hésitez pas à contacter notre équipe technique.",
+      "tagline": "Des données aux décisions — Intelia apporte l'innovation à votre ferme."
+    },
+    "closing": {
+      "regards": "Cordialement"
+    },
+    "signature": {
+      "team": "Équipe de Gestion Avicole Intelia"
+    },
+    "footer": {
+      "generated": "Rapport généré le"
+    }
+  },
+  "alert": {
+    "barn": "Poulailler",
+    "sensor": "Capteur",
+    "value": "Valeur",
+    "level": "Niveau",
+    "timestamp": "Heure",
+    "weather_context": "CONTEXTE MÉTÉOROLOGIQUE",
+    "outdoor_temp": "Extérieur",
+    "condition": "Condition",
+    "evaluation": "Évaluation",
+    "recommendations": "ACTIONS RECOMMANDÉES",
+    "expert_warnings": "AVERTISSEMENTS D'EXPERTS",
+    "expert_validated": "Validé par Expert",
+    "thermal": {
+      "good_cooling": "Bon refroidissement malgré la canicule",
+      "acceptable_hot": "Acceptable par temps chaud",
+      "poor_cooling": "Refroidissement insuffisant - vérifier ventilation",
+      "good_heating": "Bon chauffage par temps froid",
+      "acceptable_cold": "Chauffage acceptable par temps froid",
+      "poor_heating": "Chauffage insuffisant - vérifier système",
+      "normal": "Contrôle température normal",
+      "unusual": "Écart de température inhabituel"
+    },
+    "rec": {
+      "immediate_action": "ACTION IMMÉDIATE REQUISE",
+      "check_ventilation": "Vérifier système de ventilation",
+      "monitor_birds": "Surveiller comportement des volailles",
+      "adjust_ventilation": "Ajuster paramètres de ventilation",
+      "check_equipment": "Vérifier équipement de climatisation",
+      "monitor_trend": "Surveiller tendance température",
+      "increase_ventilation": "Augmenter taux de ventilation",
+      "check_air_quality": "Vérifier systèmes qualité air",
+      "reduce_humidity": "Réduire niveaux d'humidité",
+      "increase_humidity": "Augmenter niveaux d'humidité"
+    }
+  },
+  "common": {
+    "age": "Âge",
+    "weight": "Poids",
+    "gain": "Gain Quotidien",
+    "performance": "Performance",
+    "temperature": "Température",
+    "humidity": "Humidité",
+    "breed": "Souche",
+    "barn": "Bâtiment",
+    "house": "Maison",
+    "date": "Date",
+    "time": "Heure",
+    "status": "Statut",
+    "good": "Bon",
+    "attention": "Attention", 
+    "critical": "Critique",
+    "excellent": "Excellent",
+    "grams": "g",
+    "celsius": "°C",
+    "percent": "%",
+    "days": "jours",
+    "deviation": "Dév",
+    "range": "Plage",
+    "average": "Moyenne",
+    "target": "Objectif",
+    "bullet": "•",
+    "average_24h": "moyenne 24h"
+  },
+  "status": {
+    "levels": {
+      "excellent": "Excellent",
+      "good": "Bon", 
+      "attention": "Attention",
+      "critical": "Critique"
+    },
+    "weight": {
+      "excellent": "Performance de poids excellente - oiseaux dépassant les objectifs",
+      "good": "Poids dans la fourchette attendue - continuer le programme actuel",
+      "attention": "Poids sous l'objectif - surveiller le programme d'alimentation",
+      "critical": "Déficit de poids significatif - intervention immédiate requise"
+    },
+    "gain": {
+      "excellent": "Gain quotidien dépassant les attentes - performance excellente",
+      "good": "Gain quotidien sur objectif - maintenir la gestion actuelle",
+      "attention": "Gain quotidien sous l'objectif - réviser la stratégie d'alimentation", 
+      "critical": "Faible gain quotidien - révision urgente de la gestion nécessaire"
+    }
+  },
+  "weather": {
+    "conditions": {
+      "sunny": "Ensoleillé",
+      "cloudy": "Nuageux",
+      "rainy": "Pluvieux",
+      "stormy": "Orageux",
+      "foggy": "Brumeux",
+      "snowy": "Neigeux"
+    },
+    "impact": {
+      "low": "Impact faible",
+      "moderate": "Impact modéré", 
+      "high": "Impact élevé",
+      "severe": "Impact sévère"
+    },
+    "recommendations": {
+      "ventilation": "Ajuster les paramètres de ventilation",
+      "heating": "Augmenter le chauffage",
+      "cooling": "Améliorer les systèmes de refroidissement",
+      "humidity_control": "Surveiller les niveaux d'humidité",
+      "feeding_schedule": "Ajuster l'horaire d'alimentation"
+    }
+  },
+  "errors": {
+    "analysis_unavailable": "Analyse temporairement indisponible",
+    "data_incomplete": "Données incomplètes fournies",
+    "api_error": "Service temporairement indisponible",
+    "translation_error": "Erreur du service de traduction",
+    "weather_unavailable": "Données météorologiques indisponibles",
+    "barn_not_found": "Bâtiment non trouvé",
+    "invalid_data": "Format de données invalide",
+    "analysis_failed": "Échec de la génération d'analyse"
+  },
+  "ui": {
+    "loading": "Chargement...",
+    "processing": "Traitement des données...",
+    "generating": "Génération du rapport...",
+    "complete": "Terminé",
+    "error": "Erreur",
+    "retry": "Réessayer",
+    "download": "Télécharger",
+    "send_email": "Envoyer Email",
+    "view_report": "Voir le Rapport"
+  },
+  "rag": {
+    "ui": {
+      "performance_analysis": "Analyse de Performance",
+      "environmental_management": "Gestion Environnementale",
+      "comprehensive_analysis": "Analyse Complète", 
+      "expert_recommendations": "Recommandations d'Expert",
+      "context_building": "Construction du contexte expert...",
+      "search_complete": "Recherche dans la base de connaissances terminée",
+      "confidence_score": "Score de Confiance"
+    },
+    "weather_context_template": "\nCONTEXTE MÉTÉOROLOGIQUE :\n- Température extérieure : {temperature}°C\n- Humidité extérieure : {humidity}%\n- Conditions : {condition}\n- Impact météo : {impact_score:.1f}/100\n",
+    "weather_unavailable": "Données météorologiques non disponibles pour cette localisation.",
+    "weather_error": "Erreur lors de la récupération des informations météo.",
+    "context_unavailable": "Contexte de connaissance expert non disponible.",
+    "search_error": "Erreur de recherche dans la base de connaissances",
+    "fallback_mode": "Base de connaissances RAG indisponible. Utilisation de l'expertise générale OpenAI.",
+    "status": {
+      "initializing": "Initialisation du système RAG...",
+      "connected": "Connecté à la base de connaissances",
+      "unavailable": "Base de connaissances indisponible",
+      "error": "Erreur du système RAG", 
+      "query_sent": "Requête envoyée à la base de connaissances",
+      "response_received": "Réponse d'expert reçue",
+      "processing": "Traitement des recommandations d'expert..."
+    },
+    "errors": {
+      "retriever_init": "Échec de l'initialisation du récupérateur de connaissances",
+      "search_failed": "Échec de la recherche dans la base de connaissances",
+      "context_build": "Échec de la construction du contexte expert",
+      "translation_missing": "Service de traduction indisponible",
+      "api_key_missing": "Clé API OpenAI requise pour le système RAG"
+    },
+    "debug": {
+      "query_language": "Langue de Requête",
+      "response_language": "Langue de Réponse",
+      "sources_found": "Sources Trouvées", 
+      "confidence_level": "Niveau de Confiance",
+      "search_time": "Temps de Recherche",
+      "cache_status": "État du Cache"
+    }
+  }
+}
