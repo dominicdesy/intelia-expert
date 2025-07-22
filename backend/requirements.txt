@@ -1,4 +1,28 @@
+# FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-pydantic==2.9.2
+pydantic==2.5.0
+
+# Security and auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Utilities
+python-dotenv==1.0.0
+httpx==0.25.2
+aiofiles==23.2.1
+
+# TOML support for secrets.toml
+toml>=0.10.2
+
+# AI and RAG
+openai>=1.0.0
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+
+# Existing dependencies
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+python-dateutil>=2.8.0
