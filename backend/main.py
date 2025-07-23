@@ -1,5 +1,5 @@
 """
-Intelia Expert API - Complete with CORRECTED RAG Integration
+Intelia Expert API - CORRECTED RAG Path
 File: backend/app/main.py
 """
 from fastapi import FastAPI, HTTPException
@@ -13,12 +13,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# CORRECTED: Add RAG system to path with proper relative path
+# CORRECTED: RAG path calculation for DigitalOcean workspace structure
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# Go up from backend/app/ to project root, then to rag/
-rag_path = os.path.join(current_dir, '..', '..', 'rag')
-rag_path = os.path.abspath(rag_path)
+logger.info(f"🔍 Current backend app directory: {current_dir}")
 
+# DigitalOcean structure: /workspace/backend/app/ -> /workspace/rag/
+# Go up 2 levels: backend/app/ -> backend/ -> workspace/, then to rag/
+workspace_root = os.path.join(current_dir, '..', '..')
+workspace_root = os.path.abspath(workspace_root)
+rag_path = os.path.join(workspace_root, 'rag')
+
+logger.info(f"🔍 Calculated workspace root: {workspace_root}")
 logger.info(f"🔍 Looking for RAG system at: {rag_path}")
 
 if os.path.exists(rag_path):
@@ -27,12 +32,24 @@ if os.path.exists(rag_path):
     
     # List RAG files for debugging
     try:
-        rag_files = os.listdir(rag_path)
-        logger.info(f"📁 RAG directory contents: {rag_files}")
+        rag_files = [f for f in os.listdir(rag_path) if f.endswith('.py')]
+        logger.info(f"📁 RAG Python files found: {rag_files}")
     except Exception as e:
         logger.error(f"❌ Cannot list RAG directory: {e}")
 else:
     logger.error(f"❌ RAG directory not found at: {rag_path}")
+    # Try alternative paths
+    alternative_paths = [
+        "/workspace/rag",
+        os.path.join(os.getcwd(), "rag"),
+        os.path.join(os.getcwd(), "..", "rag")
+    ]
+    for alt_path in alternative_paths:
+        if os.path.exists(alt_path):
+            logger.info(f"🔍 Found RAG at alternative path: {alt_path}")
+            rag_path = alt_path
+            sys.path.insert(0, rag_path)
+            break
 
 # FastAPI app
 app = FastAPI(
@@ -107,6 +124,11 @@ def read_root():
         "status": "Production Ready - RAG Integration",
         "version": "0.1.0",
         "rag_status": rag_modules_available,
+        "workspace_info": {
+            "workspace_root": workspace_root,
+            "rag_path": rag_path,
+            "rag_exists": os.path.exists(rag_path)
+        },
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
@@ -129,14 +151,40 @@ def health_check():
 # Debug endpoint for RAG system
 @app.get("/api/v1/debug/rag")
 def debug_rag():
-    """Debug RAG system status"""
+    """Debug RAG system status with detailed path info"""
+    
+    # Check multiple possible RAG locations
+    possible_paths = [
+        rag_path,
+        "/workspace/rag",
+        os.path.join(os.getcwd(), "rag"),
+        os.path.join(os.getcwd(), "..", "rag"),
+        os.path.join(os.getcwd(), "..", "..", "rag")
+    ]
+    
+    path_status = {}
+    for path in possible_paths:
+        path_status[path] = {
+            "exists": os.path.exists(path),
+            "files": []
+        }
+        if os.path.exists(path):
+            try:
+                files = [f for f in os.listdir(path) if f.endswith('.py')]
+                path_status[path]["files"] = files
+            except:
+                path_status[path]["files"] = ["error_reading_directory"]
+    
     return {
         "rag_path": rag_path,
         "rag_path_exists": os.path.exists(rag_path),
         "rag_modules_status": rag_modules_available,
         "sys_path_rag": rag_path in sys.path,
         "current_working_directory": os.getcwd(),
-        "backend_app_directory": current_dir
+        "backend_app_directory": current_dir,
+        "workspace_root": workspace_root,
+        "all_possible_paths": path_status,
+        "sys_path": sys.path[:5]  # First 5 entries
     }
 
 # Include API routers with error handling
@@ -165,9 +213,15 @@ def detailed_status():
             "api_status": "running",
             "rag_system": {
                 "path": rag_path,
+                "exists": os.path.exists(rag_path),
                 "available": rag_modules_available,
                 "total_modules": len(rag_modules_available),
                 "working_modules": sum(rag_modules_available.values())
+            },
+            "workspace": {
+                "root": workspace_root,
+                "current_dir": os.getcwd(),
+                "backend_dir": current_dir
             },
             "endpoints_loaded": {
                 "expert": "/api/v1/expert/ask",
@@ -203,6 +257,9 @@ async def not_found_handler(request, exc):
 async def startup_event():
     logger.info("🚀 Intelia Expert API starting up...")
     logger.info(f"📊 RAG system diagnostics:")
+    logger.info(f"   - Current directory: {os.getcwd()}")
+    logger.info(f"   - Backend app directory: {current_dir}")
+    logger.info(f"   - Workspace root: {workspace_root}")
     logger.info(f"   - RAG path: {rag_path}")
     logger.info(f"   - RAG path exists: {os.path.exists(rag_path)}")
     logger.info(f"   - Available modules: {rag_modules_available}")
