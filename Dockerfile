@@ -44,14 +44,15 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy application code INCLUDING RAG
 COPY backend/ ./backend/
 COPY core/ ./core/
+COPY rag/ ./rag/
+COPY rag_index/ ./rag_index/
 COPY .streamlit/ ./.streamlit/
 
-# Create necessary directories
-RUN mkdir -p /app/rag_index && \
-    chown -R appuser:appuser /app
+# Create necessary directories and set permissions
+RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
@@ -64,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:$PORT/health || exit 1
 
 # Start command
-CMD ["sh", "-c", "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"].
+CMD ["sh", "-c", "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
