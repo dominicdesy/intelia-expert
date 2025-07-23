@@ -1,0 +1,6 @@
+{
+  "hybrid_search_enabled": true,
+  "total_documents": 935,
+  "vector_store_available": true,
+  "bm25_index_available": true
+}
