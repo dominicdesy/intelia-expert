@@ -3,15 +3,20 @@ region: nyc1
 
 services:
 - name: api
-  source_dir: /
+  source_dir: /backend
   github:
-    repo: your-username/intelia-expert
+    repo: dominicdesy/intelia-expert
     branch: main
     deploy_on_push: true
   
-  dockerfile_path: Dockerfile
+  # Utiliser buildpack Python
+  environment_slug: python
   
-  http_port: 8000
+  # Port correct pour FastAPI
+  http_port: 8080
+  
+  # Commande pour démarrer l'application
+  run_command: python -m app.main
   
   instance_count: 1
   instance_size_slug: basic-xxs
@@ -27,32 +32,34 @@ services:
   routes:
   - path: /
   
-  env:
+  # Variables d'environnement publiques
+  envs:
   - key: PORT
-    value: "8000"
+    value: "8080"
   - key: ENVIRONMENT
     value: "production"
   - key: DEBUG
     value: "false"
+  - key: LOG_LEVEL
+    value: "INFO"
+  - key: RAG_INDEX_PATH
+    value: "/tmp/rag_index"
+  - key: RAG_DOCUMENTS_PATH
+    value: "/tmp/documents"
+  - key: ALLOWED_ORIGINS
+    value: "*"
   - key: PYTHONUNBUFFERED
     value: "1"
   
-  # Secrets from GitHub repository secrets
-  # These will be set via GitHub Actions or DigitalOcean console
-  envs:
+  # Secrets (à configurer dans l'interface DigitalOcean)
   - key: OPENAI_API_KEY
     scope: RUN_TIME
     type: SECRET
   - key: SECRET_KEY
     scope: RUN_TIME  
     type: SECRET
-  - key: RAG_ENABLED
-    value: "true"
-    scope: RUN_TIME
-  - key: DEFAULT_MODEL
-    value: "gpt-4o"
-    scope: RUN_TIME
 
+# Alertes pour monitoring
 alerts:
 - rule: CPU_UTILIZATION
   operator: GREATER_THAN
@@ -62,11 +69,3 @@ alerts:
   operator: GREATER_THAN
   value: 80
   window: FIVE_MINUTES
-
-# Optional: Database (can be added later)
-# databases:
-# - name: intelia-db
-#   engine: PG
-#   version: "13"
-#   size: basic-xxs
-#   num_nodes: 1
