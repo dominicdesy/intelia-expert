@@ -15,7 +15,8 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Import de notre gestionnaire de configuration sécurisé
-from core.config.config import config_manager, validate_startup, get_config
+from app.core.config.config import config_manager, validate_startup, get_config
+
 
 # Ajouter le répertoire backend au path pour accéder aux modules rag et core
 backend_dir = Path(__file__).parent.parent  # backend/app/ -> backend/
