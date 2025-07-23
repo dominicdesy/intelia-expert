@@ -1,7 +1,0 @@
-{
-  "build_time": "2025-07-03 08:47:35",
-  "total_documents": 207,
-  "embedding_dimension": 1536,
-  "embedding_method": "OpenAI",
-  "index_type": "FlatIP"
-}
