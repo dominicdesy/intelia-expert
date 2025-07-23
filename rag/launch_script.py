@@ -31,6 +31,13 @@ def setup_logging():
 
 def load_environment():
     """Load environment variables from multiple sources with intelligent fallback"""
+    
+    # CLOUD DEPLOYMENT CHECK - Add this at the start
+    if os.getenv('OPENAI_API_KEY'):
+        print("✅ Configuration loaded from: Cloud Environment Variables")
+        return True
+    
+    # Original code continues here...
     config_loaded = False
     config_source = None
     
@@ -251,7 +258,7 @@ def setup_directories():
 def create_sample_documents():
     """Create sample documents if documents folder is empty"""
     # Find documents directory
-    docs_paths = [Path('documents'), Path('../documents')]
+    docs_paths = [Path('/workspace/documents'), Path('documents'), Path('../documents')]
     docs_path = None
     
     for path in docs_paths:
@@ -506,8 +513,8 @@ def run_full_pipeline():
         print(f"   🔍 Hybrid search: {embedder.search_engine is not None}")
         
         # Determine paths
-        docs_paths = [Path('documents'), Path('../documents')]
-        index_paths = [Path('rag_index'), Path('../rag_index')]
+        docs_paths = [Path('/workspace/documents'), Path('documents'), Path('../documents')]
+        index_paths = [Path('/workspace/rag_index'), Path('rag_index'), Path('../rag_index')]
         
         documents_path = None
         for path in docs_paths:
