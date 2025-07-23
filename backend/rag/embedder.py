@@ -1,6 +1,6 @@
 """
-RAG Embedder Complet avec Support Index Existant
-Version finale corrigée pour Intelia Expert
+RAG Embedder Corrigé - Version Sécurisée
+Fix des problèmes de dimension et dépendances
 """
 
 import os
@@ -8,30 +8,59 @@ import time
 import logging
 import pickle
 from typing import Optional, List, Dict, Any
-from functools import lru_cache
-
-# Imports optimisés
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Vérification des dépendances avec fallback gracieux
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ sentence-transformers not available")
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    SentenceTransformer = None
+
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ faiss not available")
+    FAISS_AVAILABLE = False
+    faiss = None
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ numpy not available")
+    NUMPY_AVAILABLE = False
+    np = None
+
 class FastRAGEmbedder:
-    """Version optimisée du RAG Embedder avec support index existant"""
+    """Version sécurisée du RAG Embedder avec vérifications"""
     
     def __init__(self, api_key: Optional[str] = None, **kwargs):
         """
-        Constructeur compatible avec l'ancienne signature
-        
-        Args:
-            api_key: Clé API (récupérée automatiquement depuis l'env si non fournie)
-            **kwargs: Autres paramètres pour compatibilité
+        Constructeur avec vérifications de sécurité
         """
         # Configuration avec variables d'environnement
         self.api_key = api_key or os.getenv('OPENAI_API_KEY')
-        self.model_name = os.getenv('RAG_EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
-        self.dimension = int(os.getenv('RAG_DIMENSION', '384'))
+        
+        # CORRECTION: Mapping correct modèle → dimension
+        model_name = os.getenv('RAG_EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+        self.model_name = model_name
+        
+        # Auto-détection dimension selon le modèle
+        if 'text-embedding-3-small' in model_name:
+            self.dimension = 1536
+        elif 'text-embedding-ada-002' in model_name:
+            self.dimension = 1536
+        elif 'all-MiniLM-L6-v2' in model_name:
+            self.dimension = 384
+        else:
+            # Fallback sur variable d'environnement
+            self.dimension = int(os.getenv('RAG_DIMENSION', '384'))
+        
         self.cache_size = int(os.getenv('RAG_EMBEDDING_CACHE_SIZE', '1000'))
         
         # Lazy loading attributes
@@ -45,16 +74,32 @@ class FastRAGEmbedder:
         self.cache_enabled = os.getenv('RAG_CACHE_EMBEDDINGS', 'true').lower() == 'true'
         self.memory_cache = os.getenv('RAG_MEMORY_CACHE', 'true').lower() == 'true'
         
+        # Vérification disponibilité
+        self.dependencies_available = (
+            SENTENCE_TRANSFORMERS_AVAILABLE and 
+            FAISS_AVAILABLE and 
+            NUMPY_AVAILABLE
+        )
+        
         logger.info("✅ FastRAGEmbedder initialized with compatible signature")
         logger.info(f"   Model: {self.model_name}")
+        logger.info(f"   Dimension: {self.dimension}")
+        logger.info(f"   Dependencies available: {self.dependencies_available}")
         logger.info(f"   Lazy loading: {self.lazy_loading}")
         logger.info(f"   Cache enabled: {self.cache_enabled}")
+        
+        if not self.dependencies_available:
+            logger.warning("⚠️ Some dependencies missing - limited functionality")
     
     @property
-    def sentence_model(self) -> SentenceTransformer:
-        """Lazy loading du modèle sentence-transformers"""
+    def sentence_model(self):
+        """Lazy loading du modèle sentence-transformers avec vérifications"""
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            logger.error("❌ sentence-transformers not available")
+            return None
+            
         if self._sentence_model is None:
-            if not self.lazy_loading:
+            try:
                 start_time = time.time()
                 logger.info(f"🔄 Loading sentence model: {self.model_name}")
                 
@@ -62,35 +107,49 @@ class FastRAGEmbedder:
                 
                 load_time = time.time() - start_time
                 logger.info(f"✅ Model loaded in {load_time:.2f}s")
-            else:
-                logger.info("⚡ Lazy loading enabled - model will load on first use")
-                self._sentence_model = SentenceTransformer(self.model_name)
+                
+                # Vérification dimension
+                test_embedding = self._sentence_model.encode(["test"])
+                actual_dim = test_embedding.shape[1]
+                
+                if actual_dim != self.dimension:
+                    logger.warning(f"⚠️ Dimension mismatch: expected {self.dimension}, got {actual_dim}")
+                    self.dimension = actual_dim  # Correction automatique
+                    
+            except Exception as e:
+                logger.error(f"❌ Error loading model: {e}")
+                return None
         
         return self._sentence_model
     
     @property
-    def faiss_index(self) -> faiss.Index:
-        """Lazy loading de l'index FAISS"""
+    def faiss_index(self):
+        """Lazy loading de l'index FAISS avec vérifications"""
+        if not FAISS_AVAILABLE:
+            logger.error("❌ faiss not available")
+            return None
+            
         if self._faiss_index is None:
-            logger.info(f"🔄 Creating FAISS index (dimension: {self.dimension})")
-            
-            # Index simple pour performance
-            self._faiss_index = faiss.IndexFlatL2(self.dimension)
-            
-            logger.info("✅ FAISS index created")
+            try:
+                logger.info(f"🔄 Creating FAISS index (dimension: {self.dimension})")
+                
+                # Index simple pour performance
+                self._faiss_index = faiss.IndexFlatL2(self.dimension)
+                
+                logger.info("✅ FAISS index created")
+                
+            except Exception as e:
+                logger.error(f"❌ Error creating FAISS index: {e}")
+                return None
         
         return self._faiss_index
     
     def load_index(self, index_path: str) -> bool:
-        """
-        Charger un index FAISS existant
-        
-        Args:
-            index_path: Chemin vers le dossier contenant index.faiss et index.pkl
+        """Charger un index FAISS existant avec vérifications"""
+        if not self.dependencies_available:
+            logger.error("❌ Dependencies not available for index loading")
+            return False
             
-        Returns:
-            bool: True si chargement réussi
-        """
         try:
             faiss_file = os.path.join(index_path, 'index.faiss')
             pkl_file = os.path.join(index_path, 'index.pkl')
@@ -103,6 +162,11 @@ class FastRAGEmbedder:
             logger.info(f"🔄 Loading FAISS index from {faiss_file}")
             self._faiss_index = faiss.read_index(faiss_file)
             
+            # Vérifier dimension
+            if self._faiss_index.d != self.dimension:
+                logger.warning(f"⚠️ Index dimension {self._faiss_index.d} != expected {self.dimension}")
+                self.dimension = self._faiss_index.d  # Correction automatique
+            
             # Charger les documents
             logger.info(f"🔄 Loading documents from {pkl_file}")
             with open(pkl_file, 'rb') as f:
@@ -111,6 +175,7 @@ class FastRAGEmbedder:
             logger.info(f"✅ Index loaded successfully:")
             logger.info(f"   📊 {self._faiss_index.ntotal} vectors")
             logger.info(f"   📚 {len(self._documents)} documents")
+            logger.info(f"   🔢 Dimension: {self._faiss_index.d}")
             
             return True
             
@@ -118,99 +183,52 @@ class FastRAGEmbedder:
             logger.error(f"❌ Error loading index from {index_path}: {e}")
             return False
     
-    def save_index(self, index_path: str) -> bool:
-        """
-        Sauvegarder l'index FAISS
-        
-        Args:
-            index_path: Chemin où sauvegarder
-            
-        Returns:
-            bool: True si sauvegarde réussie
-        """
-        try:
-            os.makedirs(index_path, exist_ok=True)
-            
-            faiss_file = os.path.join(index_path, 'index.faiss')
-            pkl_file = os.path.join(index_path, 'index.pkl')
-            
-            # Sauvegarder l'index FAISS
-            faiss.write_index(self._faiss_index, faiss_file)
-            
-            # Sauvegarder les documents
-            with open(pkl_file, 'wb') as f:
-                pickle.dump(self._documents, f)
-            
-            logger.info(f"✅ Index saved to {index_path}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Error saving index to {index_path}: {e}")
-            return False
-    
     def has_search_engine(self) -> bool:
-        """
-        Vérifier si le moteur de recherche est disponible
-        
-        Returns:
-            bool: True si l'index est chargé et utilisable
-        """
-        return (self._faiss_index is not None and 
+        """Vérifier si le moteur de recherche est disponible"""
+        return (self.dependencies_available and
+                self._faiss_index is not None and 
                 self._faiss_index.ntotal > 0 and 
                 len(self._documents) > 0)
     
     @property
     def search_engine(self) -> bool:
-        """
-        Propriété pour compatibilité avec l'ancien code
-        
-        Returns:
-            bool: True si le moteur de recherche est disponible
-        """
+        """Propriété pour compatibilité avec l'ancien code"""
         return self.has_search_engine()
     
-    def embed_text(self, text: str) -> np.ndarray:
-        """Embedding avec cache optionnel"""
+    def embed_text(self, text: str):
+        """Embedding avec gestion d'erreurs"""
+        if not NUMPY_AVAILABLE:
+            return None
+            
         if not text.strip():
             return np.zeros(self.dimension)
         
-        # Cache check si activé
-        if self.cache_enabled:
-            text_hash = hash(text)
-            if text_hash in self._embeddings_cache:
-                return self._embeddings_cache[text_hash]
-        
-        # Generate embedding
-        embedding = self.sentence_model.encode([text])[0]
-        
-        # Cache result si activé
-        if self.cache_enabled and len(self._embeddings_cache) < self.cache_size:
-            self._embeddings_cache[text_hash] = embedding
-        
-        return embedding
-    
-    def add_documents(self, documents: List[str]) -> None:
-        """Ajouter des documents à l'index"""
-        if not documents:
-            return
-        
-        logger.info(f"🔄 Adding {len(documents)} documents to index")
-        start_time = time.time()
-        
-        # Générer embeddings en batch pour performance
-        embeddings = self.sentence_model.encode(documents, show_progress_bar=True)
-        
-        # Ajouter à l'index FAISS
-        self.faiss_index.add(embeddings.astype('float32'))
-        
-        # Stocker les documents
-        self._documents.extend(documents)
-        
-        process_time = time.time() - start_time
-        logger.info(f"✅ Documents added in {process_time:.2f}s")
+        model = self.sentence_model
+        if model is None:
+            return None
+            
+        try:
+            # Cache check si activé
+            if self.cache_enabled:
+                text_hash = hash(text)
+                if text_hash in self._embeddings_cache:
+                    return self._embeddings_cache[text_hash]
+            
+            # Generate embedding
+            embedding = model.encode([text])[0]
+            
+            # Cache result si activé
+            if self.cache_enabled and len(self._embeddings_cache) < self.cache_size:
+                self._embeddings_cache[text_hash] = embedding
+            
+            return embedding
+            
+        except Exception as e:
+            logger.error(f"❌ Error embedding text: {e}")
+            return None
     
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
-        """Recherche rapide dans l'index"""
+        """Recherche avec gestion d'erreurs"""
         if not query.strip():
             return []
         
@@ -218,26 +236,35 @@ class FastRAGEmbedder:
             logger.warning("❌ Search engine not available - no documents indexed")
             return []
         
-        # Embed query
-        query_embedding = self.embed_text(query).reshape(1, -1).astype('float32')
-        
-        # Search FAISS
-        scores, indices = self._faiss_index.search(query_embedding, k)
-        
-        # Format results
-        results = []
-        for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
-            if idx >= 0 and idx < len(self._documents):
-                results.append({
-                    'text': self._documents[idx],
-                    'score': float(score),
-                    'rank': i + 1
-                })
-        
-        return results
+        try:
+            # Embed query
+            query_embedding = self.embed_text(query)
+            if query_embedding is None:
+                return []
+                
+            query_embedding = query_embedding.reshape(1, -1).astype('float32')
+            
+            # Search FAISS
+            scores, indices = self._faiss_index.search(query_embedding, k)
+            
+            # Format results
+            results = []
+            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+                if idx >= 0 and idx < len(self._documents):
+                    results.append({
+                        'text': self._documents[idx],
+                        'score': float(score),
+                        'rank': i + 1
+                    })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Error during search: {e}")
+            return []
     
     def get_stats(self) -> Dict[str, Any]:
-        """Statistiques du système"""
+        """Statistiques du système avec état des dépendances"""
         return {
             'model_name': self.model_name,
             'dimension': self.dimension,
@@ -247,46 +274,24 @@ class FastRAGEmbedder:
             'model_loaded': self._sentence_model is not None,
             'index_created': self._faiss_index is not None,
             'search_engine_available': self.has_search_engine(),
+            'dependencies_available': self.dependencies_available,
+            'sentence_transformers': SENTENCE_TRANSFORMERS_AVAILABLE,
+            'faiss': FAISS_AVAILABLE,
+            'numpy': NUMPY_AVAILABLE,
             'lazy_loading': self.lazy_loading,
             'cache_enabled': self.cache_enabled
         }
-    
-    def get_index_stats(self) -> Dict[str, Any]:
-        """
-        Statistiques détaillées de l'index
-        
-        Returns:
-            Dict: Statistiques de l'index
-        """
-        if not self.has_search_engine():
-            return {
-                'status': 'not_loaded',
-                'vectors_count': 0,
-                'documents_count': 0,
-                'index_size_mb': 0
-            }
-        
-        return {
-            'status': 'loaded',
-            'vectors_count': self._faiss_index.ntotal,
-            'documents_count': len(self._documents),
-            'index_dimension': self._faiss_index.d,
-            'index_type': type(self._faiss_index).__name__,
-            'cache_size': len(self._embeddings_cache),
-            'cache_enabled': self.cache_enabled
-        }
 
-# Alias pour compatibilité avec l'ancien code
+# Alias pour compatibilité
 class EnhancedDocumentEmbedder(FastRAGEmbedder):
     """Wrapper pour compatibilité avec l'ancien nom"""
     pass
 
-# Alias pour compatibilité RAGEmbedder
 class RAGEmbedder(FastRAGEmbedder):
     """Wrapper pour compatibilité avec RAGEmbedder"""
     pass
 
-# Instance globale pour réutilisation
+# Instance globale
 _global_embedder: Optional[FastRAGEmbedder] = None
 
 def get_embedder() -> FastRAGEmbedder:
