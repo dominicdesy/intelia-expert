@@ -1,0 +1,9 @@
+{
+    "created": "2025-06-30T15:52:58.374828",
+    "status": "initialized",
+    "mode": "fallback_ready",
+    "path": "C:\broiler_agent\rag_index",
+    "subdirectories": ['index', 'documents', 'embeddings', 'cache'],
+    "config_file": "config.ini",
+    "ready_for_documents": true
+}
