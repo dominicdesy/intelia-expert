@@ -1,11 +1,12 @@
 """
-Fix pour la classe FastRAGEmbedder - Signature compatible
-Remplacer dans backend/rag/embedder.py
+RAG Embedder Complet avec Support Index Existant
+Version finale corrigée pour Intelia Expert
 """
 
 import os
 import time
 import logging
+import pickle
 from typing import Optional, List, Dict, Any
 from functools import lru_cache
 
@@ -17,7 +18,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 class FastRAGEmbedder:
-    """Version optimisée du RAG Embedder avec signature compatible"""
+    """Version optimisée du RAG Embedder avec support index existant"""
     
     def __init__(self, api_key: Optional[str] = None, **kwargs):
         """
@@ -80,6 +81,94 @@ class FastRAGEmbedder:
         
         return self._faiss_index
     
+    def load_index(self, index_path: str) -> bool:
+        """
+        Charger un index FAISS existant
+        
+        Args:
+            index_path: Chemin vers le dossier contenant index.faiss et index.pkl
+            
+        Returns:
+            bool: True si chargement réussi
+        """
+        try:
+            faiss_file = os.path.join(index_path, 'index.faiss')
+            pkl_file = os.path.join(index_path, 'index.pkl')
+            
+            if not os.path.exists(faiss_file) or not os.path.exists(pkl_file):
+                logger.warning(f"❌ Index files missing in {index_path}")
+                return False
+            
+            # Charger l'index FAISS
+            logger.info(f"🔄 Loading FAISS index from {faiss_file}")
+            self._faiss_index = faiss.read_index(faiss_file)
+            
+            # Charger les documents
+            logger.info(f"🔄 Loading documents from {pkl_file}")
+            with open(pkl_file, 'rb') as f:
+                self._documents = pickle.load(f)
+            
+            logger.info(f"✅ Index loaded successfully:")
+            logger.info(f"   📊 {self._faiss_index.ntotal} vectors")
+            logger.info(f"   📚 {len(self._documents)} documents")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error loading index from {index_path}: {e}")
+            return False
+    
+    def save_index(self, index_path: str) -> bool:
+        """
+        Sauvegarder l'index FAISS
+        
+        Args:
+            index_path: Chemin où sauvegarder
+            
+        Returns:
+            bool: True si sauvegarde réussie
+        """
+        try:
+            os.makedirs(index_path, exist_ok=True)
+            
+            faiss_file = os.path.join(index_path, 'index.faiss')
+            pkl_file = os.path.join(index_path, 'index.pkl')
+            
+            # Sauvegarder l'index FAISS
+            faiss.write_index(self._faiss_index, faiss_file)
+            
+            # Sauvegarder les documents
+            with open(pkl_file, 'wb') as f:
+                pickle.dump(self._documents, f)
+            
+            logger.info(f"✅ Index saved to {index_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving index to {index_path}: {e}")
+            return False
+    
+    def has_search_engine(self) -> bool:
+        """
+        Vérifier si le moteur de recherche est disponible
+        
+        Returns:
+            bool: True si l'index est chargé et utilisable
+        """
+        return (self._faiss_index is not None and 
+                self._faiss_index.ntotal > 0 and 
+                len(self._documents) > 0)
+    
+    @property
+    def search_engine(self) -> bool:
+        """
+        Propriété pour compatibilité avec l'ancien code
+        
+        Returns:
+            bool: True si le moteur de recherche est disponible
+        """
+        return self.has_search_engine()
+    
     def embed_text(self, text: str) -> np.ndarray:
         """Embedding avec cache optionnel"""
         if not text.strip():
@@ -125,11 +214,15 @@ class FastRAGEmbedder:
         if not query.strip():
             return []
         
+        if not self.has_search_engine():
+            logger.warning("❌ Search engine not available - no documents indexed")
+            return []
+        
         # Embed query
         query_embedding = self.embed_text(query).reshape(1, -1).astype('float32')
         
         # Search FAISS
-        scores, indices = self.faiss_index.search(query_embedding, k)
+        scores, indices = self._faiss_index.search(query_embedding, k)
         
         # Format results
         results = []
@@ -150,10 +243,36 @@ class FastRAGEmbedder:
             'dimension': self.dimension,
             'documents_count': len(self._documents),
             'cache_size': len(self._embeddings_cache),
-            'index_size': self.faiss_index.ntotal if self._faiss_index else 0,
+            'index_size': self._faiss_index.ntotal if self._faiss_index else 0,
             'model_loaded': self._sentence_model is not None,
             'index_created': self._faiss_index is not None,
+            'search_engine_available': self.has_search_engine(),
             'lazy_loading': self.lazy_loading,
+            'cache_enabled': self.cache_enabled
+        }
+    
+    def get_index_stats(self) -> Dict[str, Any]:
+        """
+        Statistiques détaillées de l'index
+        
+        Returns:
+            Dict: Statistiques de l'index
+        """
+        if not self.has_search_engine():
+            return {
+                'status': 'not_loaded',
+                'vectors_count': 0,
+                'documents_count': 0,
+                'index_size_mb': 0
+            }
+        
+        return {
+            'status': 'loaded',
+            'vectors_count': self._faiss_index.ntotal,
+            'documents_count': len(self._documents),
+            'index_dimension': self._faiss_index.d,
+            'index_type': type(self._faiss_index).__name__,
+            'cache_size': len(self._embeddings_cache),
             'cache_enabled': self.cache_enabled
         }
 
