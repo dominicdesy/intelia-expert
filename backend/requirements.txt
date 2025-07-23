@@ -1,10 +1,10 @@
-# FastAPI and server
+# FastAPI Core
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
 
-# Security and auth
+# Security and Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
@@ -12,17 +12,29 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 httpx==0.25.2
 aiofiles==23.2.1
-
-# TOML support for secrets.toml
 toml>=0.10.2
 
-# AI and RAG
+# AI and RAG - DÉPENDANCES MANQUANTES CRITIQUES
 openai>=1.0.0
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
+langchain-text-splitters>=0.1.0
 sentence-transformers>=2.2.0
 faiss-cpu>=1.7.0
+tiktoken>=0.5.0
+rank-bm25>=0.2.2
 
-# Existing dependencies
-streamlit>=1.28.0
-pandas>=2.0.0
+# Data Processing
 numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.0.0
 python-dateutil>=2.8.0
+
+# Document Processing
+pypdf>=3.0.0
+python-docx>=0.8.11
+openpyxl>=3.1.0
+
+# Optional - Remove if not needed
+streamlit>=1.28.0

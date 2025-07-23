@@ -461,7 +461,7 @@ if __name__ == "__main__":
     )
     
     success = manager.register_tenant(test_tenant)
-    print(f"   Tenant registration: {'�u2705 Success' if success else '\u274c Failed'}")
+    print(f"   Tenant registration: {'Success' if success else 'Failed'}")
     
     # Test tenant listing
     print("\n📋 Testing Tenant Listing:")
