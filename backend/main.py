@@ -1,5 +1,5 @@
 """
-Intelia Expert API - Complete with RAG Integration
+Intelia Expert API - Complete with CORRECTED RAG Integration
 File: backend/app/main.py
 """
 from fastapi import FastAPI, HTTPException
@@ -13,10 +13,26 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add RAG system to path
-rag_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../rag'))
-if rag_path not in sys.path:
-    sys.path.append(rag_path)
+# CORRECTED: Add RAG system to path with proper relative path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Go up from backend/app/ to project root, then to rag/
+rag_path = os.path.join(current_dir, '..', '..', 'rag')
+rag_path = os.path.abspath(rag_path)
+
+logger.info(f"🔍 Looking for RAG system at: {rag_path}")
+
+if os.path.exists(rag_path):
+    sys.path.insert(0, rag_path)
+    logger.info(f"✅ RAG path added to sys.path: {rag_path}")
+    
+    # List RAG files for debugging
+    try:
+        rag_files = os.listdir(rag_path)
+        logger.info(f"📁 RAG directory contents: {rag_files}")
+    except Exception as e:
+        logger.error(f"❌ Cannot list RAG directory: {e}")
+else:
+    logger.error(f"❌ RAG directory not found at: {rag_path}")
 
 # FastAPI app
 app = FastAPI(
@@ -30,32 +46,73 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import routers
+# Test RAG imports with detailed error handling
+rag_modules_available = {}
+
+def test_rag_import(module_name):
+    """Test individual RAG module import"""
+    try:
+        if module_name == "intelligent_retriever":
+            from intelligent_retriever import IntelligentRetriever
+            rag_modules_available[module_name] = True
+            logger.info(f"✅ Successfully imported {module_name}")
+            return True
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not import {module_name}: {e}")
+        rag_modules_available[module_name] = False
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error importing {module_name}: {e}")
+        rag_modules_available[module_name] = False
+        return False
+
+def test_rag_launch_script():
+    """Test RAG launch script import"""
+    try:
+        from launch_script import RAGSystem
+        rag_modules_available["launch_script"] = True
+        logger.info("✅ Successfully imported launch_script")
+        return True
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not import launch_script: {e}")
+        rag_modules_available["launch_script"] = False
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error importing launch_script: {e}")
+        rag_modules_available["launch_script"] = False
+        return False
+
+# Test all RAG imports
+test_rag_import("intelligent_retriever")
+test_rag_launch_script()
+
+# Import routers with better error handling
 try:
     from app.api.v1 import expert, auth, admin, health, system
-    logger.info("✅ All routers imported successfully")
+    logger.info("✅ All API routers imported successfully")
 except ImportError as e:
     logger.error(f"❌ Router import error: {e}")
-    # Continue without failing - we'll add basic endpoints
 
 # Basic endpoints
 @app.get("/")
 def read_root():
     return {
         "message": "Intelia Expert API",
-        "status": "Production Ready - RAG Enabled",
+        "status": "Production Ready - RAG Integration",
         "version": "0.1.0",
+        "rag_status": rag_modules_available,
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
             "expert": "/api/v1/expert/ask",
-            "system": "/api/v1/system/health"
+            "system": "/api/v1/system/health",
+            "rag_debug": "/api/v1/debug/rag"
         }
     }
 
@@ -64,71 +121,54 @@ def health_check():
     return {
         "status": "healthy", 
         "service": "intelia-expert-backend",
-        "rag_system": "enabled",
+        "rag_system": "checking",
+        "rag_modules": rag_modules_available,
         "timestamp": "2025-07-23"
     }
 
-# Include API routers
-try:
-    # Expert endpoints (RAG)
-    app.include_router(
-        expert.router,
-        prefix="/api/v1/expert",
-        tags=["Expert RAG System"]
-    )
-    logger.info("✅ Expert RAG router included")
-except Exception as e:
-    logger.error(f"❌ Expert router error: {e}")
+# Debug endpoint for RAG system
+@app.get("/api/v1/debug/rag")
+def debug_rag():
+    """Debug RAG system status"""
+    return {
+        "rag_path": rag_path,
+        "rag_path_exists": os.path.exists(rag_path),
+        "rag_modules_status": rag_modules_available,
+        "sys_path_rag": rag_path in sys.path,
+        "current_working_directory": os.getcwd(),
+        "backend_app_directory": current_dir
+    }
 
-try:
-    # Auth endpoints
-    app.include_router(
-        auth.router,
-        prefix="/api/v1/auth",
-        tags=["Authentication"]
-    )
-    logger.info("✅ Auth router included")
-except Exception as e:
-    logger.error(f"❌ Auth router error: {e}")
+# Include API routers with error handling
+def include_router_safely(router, prefix, tags, name):
+    """Safely include router with error handling"""
+    try:
+        app.include_router(router, prefix=prefix, tags=tags)
+        logger.info(f"✅ {name} router included successfully")
+        return True
+    except Exception as e:
+        logger.error(f"❌ {name} router error: {e}")
+        return False
 
-try:
-    # Admin endpoints  
-    app.include_router(
-        admin.router,
-        prefix="/api/v1/admin",
-        tags=["Administration"]
-    )
-    logger.info("✅ Admin router included")
-except Exception as e:
-    logger.error(f"❌ Admin router error: {e}")
-
-try:
-    # System endpoints
-    app.include_router(
-        system.router,
-        prefix="/api/v1/system",
-        tags=["System"]
-    )
-    logger.info("✅ System router included")
-except Exception as e:
-    logger.error(f"❌ System router error: {e}")
+# Include routers
+include_router_safely(expert.router, "/api/v1/expert", ["Expert RAG System"], "Expert")
+include_router_safely(auth.router, "/api/v1/auth", ["Authentication"], "Auth")
+include_router_safely(admin.router, "/api/v1/admin", ["Administration"], "Admin")
+include_router_safely(system.router, "/api/v1/system", ["System"], "System")
 
 # Health check with detailed status
 @app.get("/api/v1/status")
 def detailed_status():
-    """Detailed system status"""
+    """Detailed system status including RAG diagnostics"""
     try:
-        # Check RAG system availability
-        rag_status = "unknown"
-        try:
-            from intelligent_retriever import IntelligentRetriever
-            rag_status = "available"
-        except ImportError:
-            rag_status = "not_found"
-        
         return {
             "api_status": "running",
-            "rag_system": rag_status,
+            "rag_system": {
+                "path": rag_path,
+                "available": rag_modules_available,
+                "total_modules": len(rag_modules_available),
+                "working_modules": sum(rag_modules_available.values())
+            },
             "endpoints_loaded": {
                 "expert": "/api/v1/expert/ask",
                 "feedback": "/api/v1/expert/feedback", 
@@ -136,8 +176,11 @@ def detailed_status():
                 "auth": "/api/v1/auth/login",
                 "admin": "/api/v1/admin/dashboard"
             },
-            "environment": os.getenv("ENVIRONMENT", "development"),
-            "debug": os.getenv("DEBUG", "false") == "true"
+            "environment": {
+                "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
+                "claude_key_set": bool(os.getenv("CLAUDE_API_KEY")),
+                "working_directory": os.getcwd()
+            }
         }
     except Exception as e:
         logger.error(f"Status check error: {e}")
@@ -151,39 +194,25 @@ async def not_found_handler(request, exc):
         content={
             "error": "Endpoint not found",
             "message": "Check /docs for available endpoints",
-            "available_endpoints": [
-                "/api/v1/expert/ask",
-                "/api/v1/expert/feedback",
-                "/api/v1/auth/login",
-                "/health"
-            ]
+            "debug": "Try /api/v1/debug/rag for RAG diagnostics"
         }
     )
 
-@app.exception_handler(500)
-async def internal_error_handler(request, exc):
-    logger.error(f"Internal server error: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "message": "Please check logs or contact support"
-        }
-    )
-
-# Startup event
+# Startup event with detailed RAG diagnostics
 @app.on_event("startup")
 async def startup_event():
     logger.info("🚀 Intelia Expert API starting up...")
-    logger.info("📊 Checking RAG system availability...")
+    logger.info(f"📊 RAG system diagnostics:")
+    logger.info(f"   - RAG path: {rag_path}")
+    logger.info(f"   - RAG path exists: {os.path.exists(rag_path)}")
+    logger.info(f"   - Available modules: {rag_modules_available}")
     
-    # Try to initialize RAG system
-    try:
-        # Test RAG imports
-        from intelligent_retriever import IntelligentRetriever
-        logger.info("✅ RAG system imports successful")
-    except ImportError as e:
-        logger.warning(f"⚠️ RAG system import warning: {e}")
+    if os.path.exists(rag_path):
+        try:
+            files = [f for f in os.listdir(rag_path) if f.endswith('.py')]
+            logger.info(f"   - Python files in RAG: {files}")
+        except Exception as e:
+            logger.error(f"   - Error reading RAG directory: {e}")
     
     logger.info("🎯 Intelia Expert API ready!")
 
