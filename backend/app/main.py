@@ -1,6 +1,6 @@
 """
 Intelia Expert - API Backend Main
-Version optimisée avec RAG automatique et gestion d'erreurs robuste
+Version complètement réécrite - Simple et Robuste
 """
 
 import os
@@ -75,32 +75,29 @@ class FeedbackRequest(BaseModel):
     feedback: Optional[str] = Field(None, max_length=500)
 
 # =============================================================================
-# RAG SYSTEM INITIALIZATION
+# RAG SYSTEM INITIALIZATION - SIMPLIFIED
 # =============================================================================
 
 async def initialize_rag_system():
-    """Initialize RAG system with automatic index loading"""
+    """Initialize RAG system - Version simplifiée et robuste"""
     global rag_embedder
     
+    logger.info("🚀 Starting Intelia Expert API...")
+    logger.info("🔧 Initializing RAG system...")
+    
     try:
-        logger.info("🔧 Initializing RAG system...")
-        
         # Import RAG embedder
-        try:
-            from rag.embedder import EnhancedDocumentEmbedder
-        except ImportError as e:
-            logger.error(f"❌ Cannot import RAG embedder: {e}")
-            return False
+        from rag.embedder import FastRAGEmbedder
+        logger.info("✅ RAG embedder imported successfully")
         
         # Create embedder instance
-        embedder = EnhancedDocumentEmbedder(
-            api_key=os.getenv('OPENAI_API_KEY')
-        )
+        embedder = FastRAGEmbedder(api_key=os.getenv('OPENAI_API_KEY'))
+        logger.info("✅ RAG embedder instance created")
         
-        # Search for existing index in multiple locations
+        # Search for existing index
         index_paths = [
             '/workspace/backend/rag_index',
-            './rag_index',
+            './rag_index', 
             '/tmp/rag_index',
             os.path.join(backend_dir, 'rag_index')
         ]
@@ -108,80 +105,66 @@ async def initialize_rag_system():
         logger.info(f"🔍 Searching for RAG index in paths: {index_paths}")
         
         index_loaded = False
-        
         for index_path in index_paths:
             if os.path.exists(index_path):
-                logger.info(f"📁 Found index directory: {index_path}")
-                
-                # Check required files
                 faiss_file = os.path.join(index_path, 'index.faiss')
                 pkl_file = os.path.join(index_path, 'index.pkl')
                 
-                files_status = []
-                if os.path.exists(faiss_file):
+                if os.path.exists(faiss_file) and os.path.exists(pkl_file):
+                    logger.info(f"📁 Found complete index in: {index_path}")
                     logger.info(f"   ✅ Found: index.faiss")
-                    files_status.append(True)
-                else:
-                    logger.warning(f"   ❌ Missing: index.faiss")
-                    files_status.append(False)
-                    
-                if os.path.exists(pkl_file):
                     logger.info(f"   ✅ Found: index.pkl")
-                    files_status.append(True)
-                else:
-                    logger.warning(f"   ❌ Missing: index.pkl")
-                    files_status.append(False)
-                
-                # Try to load index if both files exist
-                if all(files_status):
                     logger.info(f"🔄 Attempting to load index from {index_path}")
                     
+                    # Try to load the index
                     if embedder.load_index(index_path):
-                        stats = embedder.get_stats()
                         logger.info(f"✅ Successfully loaded RAG index from {index_path}")
-                        logger.info(f"   📊 Vectors: {stats.get('index_size', 0)}")
-                        logger.info(f"   📚 Documents: {stats.get('documents_count', 0)}")
-                        logger.info(f"   🔢 Dimension: {stats.get('dimension', 0)}")
-                        logger.info(f"   🔍 Search engine available: {stats.get('search_engine_available', False)}")
+                        
+                        # Get basic info safely
+                        try:
+                            vectors_count = embedder._faiss_index.ntotal if embedder._faiss_index else 0
+                            docs_count = len(embedder._documents) if hasattr(embedder, '_documents') else 0
+                            dimension = embedder._faiss_index.d if embedder._faiss_index else embedder.dimension
+                            
+                            logger.info(f"   📊 Vectors: {vectors_count}")
+                            logger.info(f"   📚 Documents: {docs_count}")
+                            logger.info(f"   🔢 Dimension: {dimension}")
+                            logger.info(f"   🔍 Search engine available: {embedder.has_search_engine()}")
+                        except Exception as info_error:
+                            logger.warning(f"⚠️ Could not get detailed info: {info_error}")
+                            logger.info("   📊 Index loaded successfully (details unavailable)")
+                        
                         index_loaded = True
                         break
                     else:
                         logger.warning(f"❌ Failed to load index from {index_path}")
-                else:
-                    missing_files = []
-                    if not os.path.exists(faiss_file):
-                        missing_files.append('index.faiss')
-                    if not os.path.exists(pkl_file):
-                        missing_files.append('index.pkl')
-                    logger.warning(f"⚠️ Index incomplete in {index_path}: missing {missing_files}")
         
-        # Set global embedder
+        # Set global embedder regardless of index loading success
         rag_embedder = embedder
         
-        # Log final status
+        # Final status
         if index_loaded and embedder.has_search_engine():
             logger.info("✅ RAG system fully initialized with document search capabilities")
             return True
         else:
-            logger.warning("⚠️ No valid RAG index found - will run in fallback mode")
-            logger.warning("⚠️ RAG system using OpenAI direct mode")
+            logger.warning("⚠️ RAG system initialized but no valid index found")
+            logger.info("🔄 Will run in fallback mode (direct OpenAI)")
             return False
             
     except Exception as e:
         logger.error(f"❌ Error initializing RAG system: {e}")
-        logger.error(f"Stack trace: {traceback.format_exc()}")
-        logger.warning("⚠️ RAG system initialization failed - using fallback mode")
+        logger.error(f"Full error: {traceback.format_exc()}")
         
-        # Try to create minimal embedder for fallback
+        # Try minimal fallback
         try:
-            from rag.embedder import EnhancedDocumentEmbedder
-            rag_embedder = EnhancedDocumentEmbedder(api_key=os.getenv('OPENAI_API_KEY'))
+            from rag.embedder import FastRAGEmbedder
+            rag_embedder = FastRAGEmbedder(api_key=os.getenv('OPENAI_API_KEY'))
             logger.info("✅ Fallback RAG embedder created successfully")
-            return False
         except Exception as fallback_error:
             logger.error(f"❌ Even fallback embedder failed: {fallback_error}")
             rag_embedder = None
-            return False
+        
+        return False
 
 # =============================================================================
 # LIFESPAN MANAGEMENT
@@ -191,12 +174,9 @@ async def initialize_rag_system():
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
-    logger.info("🚀 Starting Intelia Expert API...")
-    
-    # Initialize RAG system
     rag_success = await initialize_rag_system()
     
-    # Log startup status
+    # Log final status
     logger.info("✅ Application created successfully")
     logger.info(f"📊 Configuration source: {os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)')}")
     logger.info(f"🌍 Environment: {os.getenv('ENV', 'production')}")
@@ -265,59 +245,68 @@ def get_rag_status() -> str:
         return "fallback"
 
 async def process_question_with_rag(question: str, language: str = "fr") -> Dict[str, Any]:
-    """Process question using RAG system"""
+    """Process question using RAG system - Version simplifiée"""
     start_time = time.time()
     
     try:
+        logger.info(f"🔍 Processing question: {question[:50]}...")
+        
         # Check if RAG embedder is available
         if not rag_embedder:
-            raise HTTPException(status_code=503, detail="RAG system not available")
-        
-        logger.info(f"🔍 Processing question: {question[:50]}...")
+            raise Exception("RAG system not available")
         
         # Determine processing mode
         if rag_embedder.has_search_engine():
-            # Use RAG with document search
             logger.info("🔄 Using optimized mode - RAG with document search")
             
             # Search for relevant documents
-            search_results = rag_embedder.search(question, k=5)
-            
-            if search_results:
-                # Construct context from search results
-                context = "\n".join([result['text'] for result in search_results[:3]])
+            try:
+                search_results = rag_embedder.search(question, k=5)
+                logger.info(f"🔍 Search completed: {len(search_results)} results found")
                 
-                # Use OpenAI with RAG context
-                import openai
-                openai.api_key = os.getenv('OPENAI_API_KEY')
-                
-                system_prompt = f"""Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
-                
+                if search_results:
+                    # Construct context from search results
+                    context_parts = []
+                    for i, result in enumerate(search_results[:3]):
+                        context_parts.append(f"Document {i+1}: {result['text'][:500]}...")
+                    
+                    context = "\n\n".join(context_parts)
+                    
+                    # Use OpenAI with RAG context
+                    import openai
+                    openai.api_key = os.getenv('OPENAI_API_KEY')
+                    
+                    system_prompt = f"""Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
+                    
 Utilise les informations suivantes pour répondre à la question:
+
 {context}
 
-Réponds en {language} de manière précise et pratique."""
+Réponds en {language} de manière précise et pratique, en te basant sur les documents fournis."""
 
-                response = openai.chat.completions.create(
-                    model=os.getenv('DEFAULT_MODEL', 'gpt-4o'),
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": question}
-                    ],
-                    temperature=0.7,
-                    max_tokens=1000
-                )
-                
-                answer = response.choices[0].message.content
-                mode = "rag_enhanced"
-                note = f"Réponse basée sur la recherche documentaire ({len(search_results)} documents trouvés)"
-                
-            else:
-                # No relevant documents found, use fallback
-                logger.info("🔄 No relevant documents found - using fallback")
+                    response = openai.chat.completions.create(
+                        model=os.getenv('DEFAULT_MODEL', 'gpt-4o'),
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": question}
+                        ],
+                        temperature=0.7,
+                        max_tokens=1000
+                    )
+                    
+                    answer = response.choices[0].message.content
+                    mode = "rag_enhanced"
+                    note = f"Réponse basée sur la recherche documentaire ({len(search_results)} documents trouvés)"
+                    
+                else:
+                    logger.info("🔄 No relevant documents found - using fallback")
+                    answer, mode, note = await fallback_openai_response(question, language)
+                    
+            except Exception as search_error:
+                logger.error(f"❌ Search error: {search_error}")
+                logger.info("🔄 Search failed - using fallback")
                 answer, mode, note = await fallback_openai_response(question, language)
         else:
-            # Use fallback mode
             logger.info("🔄 Using fallback mode - direct OpenAI")
             answer, mode, note = await fallback_openai_response(question, language)
         
@@ -462,10 +451,22 @@ async def get_system_stats():
     }
     
     if rag_embedder:
-        rag_stats = rag_embedder.get_stats()
-        stats.update({
-            "rag_stats": rag_stats
-        })
+        try:
+            # Try to get stats safely
+            if hasattr(rag_embedder, 'get_stats'):
+                rag_stats = rag_embedder.get_stats()
+                stats["rag_stats"] = rag_stats
+            else:
+                # Basic stats without get_stats method
+                stats["rag_stats"] = {
+                    "embedder_available": True,
+                    "search_engine_available": rag_embedder.has_search_engine(),
+                    "model_name": getattr(rag_embedder, 'model_name', 'unknown'),
+                    "dimension": getattr(rag_embedder, 'dimension', 0)
+                }
+        except Exception as stats_error:
+            logger.warning(f"⚠️ Could not get RAG stats: {stats_error}")
+            stats["rag_stats"] = {"error": "Stats unavailable"}
     
     return stats
 
@@ -544,4 +545,5 @@ if __name__ == "__main__":
         port=port,
         log_level="info"
     )
-# Deploy trigger: 07/23/2025 20:14:18
+
+# Deploy trigger: 07/24/2025 02:30:00
