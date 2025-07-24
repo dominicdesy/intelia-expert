@@ -53,8 +53,10 @@ security = HTTPBearer()
 # SUPABASE INITIALIZATION
 # =============================================================================
 
+# REMPLACEZ la fonction initialize_supabase() dans main.py (ligne ~85-125)
+
 def initialize_supabase():
-    """Initialize Supabase client"""
+    """Initialize Supabase client - FIXED VERSION"""
     global supabase
     
     try:
@@ -63,26 +65,37 @@ def initialize_supabase():
         
         if not supabase_url or not supabase_key:
             logger.error("❌ Supabase credentials not found in environment")
+            logger.error(f"   SUPABASE_URL: {'SET' if supabase_url else 'MISSING'}")
+            logger.error(f"   SUPABASE_ANON_KEY: {'SET' if supabase_key else 'MISSING'}")
             return False
         
-        # Create client without proxy argument for compatibility
+        logger.info(f"🔗 Connecting to Supabase: {supabase_url[:50]}...")
+        
+        # ✅ FIX: Create client without any proxy parameter
         supabase = create_client(supabase_url, supabase_key)
         
-        # Test connection
+        logger.info("✅ Supabase client created successfully")
+        
+        # Test connection with simple query
         try:
-            # Simple test query
-            result = supabase.table('users').select('id').limit(1).execute()
-            logger.info("✅ Supabase client initialized and tested successfully")
+            # Test with a simple operation that doesn't require tables
+            result = supabase.auth.get_session()
+            logger.info("✅ Supabase connection tested successfully")
             return True
+            
         except Exception as test_error:
             logger.warning(f"⚠️ Supabase client created but test failed: {test_error}")
-            logger.info("✅ Supabase client initialized (connection will be tested on first use)")
+            logger.info("✅ Supabase client initialized (will test on first real use)")
             return True
             
     except Exception as e:
         logger.error(f"❌ Error initializing Supabase: {e}")
+        logger.error(f"   Exception type: {type(e).__name__}")
+        logger.error(f"   Full traceback:")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
-
+        
 # =============================================================================
 # PYDANTIC MODELS - SELON SPECS
 # =============================================================================

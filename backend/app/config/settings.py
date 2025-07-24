@@ -43,10 +43,26 @@ class Settings:
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "intelia-expert-dev-key"
     
-    # Database config
-    DATABASE_URL: Optional[str] = None
-    SUPABASE_URL: Optional[str] = None
-    SUPABASE_ANON_KEY: Optional[str] = None
+    # ✅ FIX: Database config avec environment variables
+    @property
+    def database_url(self) -> Optional[str]:
+        """Get database URL from environment."""
+        return self._get_secret("DATABASE_URL")
+    
+    @property 
+    def supabase_url(self) -> Optional[str]:
+        """Get Supabase URL from environment."""
+        return self._get_secret("SUPABASE_URL")
+    
+    @property
+    def supabase_anon_key(self) -> Optional[str]:
+        """Get Supabase anon key from environment."""
+        return self._get_secret("SUPABASE_ANON_KEY")
+    
+    @property
+    def supabase_jwt_secret(self) -> Optional[str]:
+        """Get Supabase JWT secret from environment."""
+        return self._get_secret("SUPABASE_JWT_SECRET")
     
     # CORS config
     BACKEND_CORS_ORIGINS: list = [
@@ -58,12 +74,17 @@ class Settings:
     @property
     def openai_api_key(self) -> Optional[str]:
         """Get OpenAI API key from secrets."""
-        return self._get_secret("openai_key")
+        return self._get_secret("openai_key") or self._get_secret("OPENAI_API_KEY")
     
     @property
     def is_openai_configured(self) -> bool:
         """Check if OpenAI is configured."""
         key = self.openai_api_key
         return bool(key and len(key) > 10)
+    
+    @property
+    def is_supabase_configured(self) -> bool:
+        """Check if Supabase is configured."""
+        return bool(self.supabase_url and self.supabase_anon_key)
 
 settings = Settings()
