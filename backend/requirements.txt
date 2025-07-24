@@ -1,26 +1,25 @@
-# Intelia Expert API - Alternative avec Supabase plus récent
-# ============================================================================
-# FASTAPI CORE
-# ============================================================================
+# 🔧 REQUIREMENTS.TXT - VERSIONS COMPATIBLES CORRIGÉES
+
+# Core FastAPI
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
 
-# ============================================================================
-# SUPABASE & AUTHENTICATION - Version plus récente
-# ============================================================================
+# Supabase - VERSIONS COMPATIBLES FIXÉES
 supabase==2.9.1
-httpx==0.24.1
-gotrue==2.4.2
+gotrue>=2.9.0,<3.0.0
+httpx>=0.24.0,<1.0.0
+
+# Auth & Security  
 PyJWT==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
-# ============================================================================
-# AI & RAG SYSTEM - Versions compatibles
-# ============================================================================
+# OpenAI
 openai==1.3.0
+
+# RAG System - Versions stables
 huggingface_hub==0.17.3
 sentence-transformers==2.2.2
 transformers==4.35.2
@@ -28,19 +27,15 @@ torch==2.1.1
 faiss-cpu==1.7.4
 numpy==1.24.3
 
-# ============================================================================
-# UTILITIES
-# ============================================================================
+# Utils
 python-dotenv==1.0.0
 aiofiles==23.2.1
 
-# ============================================================================
-# DÉPENDANCES POUR SENTENCE-TRANSFORMERS
-# ============================================================================
+# Optional ML libs (pour RAG avancé)
 scikit-learn==1.3.2
 scipy==1.11.4
 tqdm==4.66.1
 pillow==10.1.0
 
-
-
+# Requests
+requests==2.31.0
