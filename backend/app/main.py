@@ -1,413 +1,546 @@
-# backend/app/main.py
 """
-Intelia Expert Backend - Point d'entrée principal
-Configuration sécurisée + Système RAG intégré
-Structure adaptée pour le dossier backend/ de DigitalOcean
+Intelia Expert - API Backend Main
+Version optimisée avec RAG automatique et gestion d'erreurs robuste
 """
 
-import logging
-import sys
 import os
-from pathlib import Path
-from fastapi import FastAPI, HTTPException
+import sys
+import time
+import logging
+import traceback
+from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
+
+# FastAPI imports
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
 
-# Import de notre gestionnaire de configuration sécurisé
-from app.core.config.config import config_manager, validate_startup, get_config
+# Pydantic models
+from pydantic import BaseModel, Field
 
+# Add backend to path
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-# Ajouter le répertoire backend au path pour accéder aux modules rag et core
-backend_dir = Path(__file__).parent.parent  # backend/app/ -> backend/
-sys.path.insert(0, str(backend_dir))
+# Environment and logging
+from dotenv import load_dotenv
+load_dotenv()
 
-# Imports RAG avec gestion d'erreur robuste
-RAG_MODULES_AVAILABLE = False
-rag_system = None
-
-try:
-    # Import depuis backend/rag/
-    from rag.embedder import EnhancedDocumentEmbedder
-    RAG_MODULES_AVAILABLE = True
-    print("✅ RAG modules imported successfully")
-except ImportError as e:
-    print(f"⚠️ RAG modules not available: {e}")
-    print(f"   Backend directory: {backend_dir}")
-    print(f"   Python path: {sys.path}")
-
-# Configuration du logging
+# Configure logging
 logging.basicConfig(
-    level=getattr(logging, get_config('LOG_LEVEL', 'INFO')),
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-def initialize_rag_system():
-    """Initialiser le système RAG avec les chemins backend/"""
-    global rag_system
-    
-    if not RAG_MODULES_AVAILABLE:
-        logger.warning("⚠️ RAG modules not available - running in fallback mode")
-        return False
+# Global RAG embedder
+rag_embedder: Optional[Any] = None
+
+# =============================================================================
+# PYDANTIC MODELS
+# =============================================================================
+
+class QuestionRequest(BaseModel):
+    """Request model for expert questions"""
+    text: str = Field(..., description="Question text", min_length=1, max_length=2000)
+    user_id: Optional[str] = Field(None, description="User identifier")
+    language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
+    context: Optional[str] = Field(None, description="Additional context")
+
+class ExpertResponse(BaseModel):
+    """Response model for expert answers"""
+    question: str
+    response: str
+    mode: str
+    note: Optional[str] = None
+    config_source: str
+    timestamp: str
+    processing_time: float
+
+class HealthResponse(BaseModel):
+    """Health check response model"""
+    status: str
+    timestamp: str
+    services: Dict[str, str]
+    config: Dict[str, str]
+
+class FeedbackRequest(BaseModel):
+    """Feedback request model"""
+    question_id: Optional[str] = None
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
+    feedback: Optional[str] = Field(None, max_length=500)
+
+# =============================================================================
+# RAG SYSTEM INITIALIZATION
+# =============================================================================
+
+async def initialize_rag_system():
+    """Initialize RAG system with automatic index loading"""
+    global rag_embedder
     
     try:
-        openai_key = config_manager.get_openai_key()
-        if not openai_key:
-            logger.error("❌ OpenAI API key not configured")
-            return False
-        
         logger.info("🔧 Initializing RAG system...")
         
-        # Initialiser l'embedder
+        # Import RAG embedder
+        try:
+            from rag.embedder import EnhancedDocumentEmbedder
+        except ImportError as e:
+            logger.error(f"❌ Cannot import RAG embedder: {e}")
+            return False
+        
+        # Create embedder instance
         embedder = EnhancedDocumentEmbedder(
-            api_key=openai_key,
-            use_hybrid_search=True,
-            use_intelligent_routing=True
+            api_key=os.getenv('OPENAI_API_KEY')
         )
         
-        # Chemins pour l'index dans le contexte backend/
-        possible_index_paths = [
-            str(backend_dir / 'rag_index'),  # backend/rag_index/
-            '/tmp/rag_index',                 # Production DigitalOcean
-            './rag_index',                    # Relatif
-            str(Path.cwd() / 'rag_index')    # Depuis working directory
+        # Search for existing index in multiple locations
+        index_paths = [
+            '/workspace/backend/rag_index',
+            './rag_index',
+            '/tmp/rag_index',
+            os.path.join(backend_dir, 'rag_index')
         ]
         
-        logger.info(f"🔍 Searching for RAG index in paths: {possible_index_paths}")
+        logger.info(f"🔍 Searching for RAG index in paths: {index_paths}")
         
         index_loaded = False
-        for index_path in possible_index_paths:
-            index_path_obj = Path(index_path)
-            if index_path_obj.exists():
+        
+        for index_path in index_paths:
+            if os.path.exists(index_path):
                 logger.info(f"📁 Found index directory: {index_path}")
                 
-                # Vérifier les fichiers requis
-                required_files = ['index.faiss', 'index.pkl']
-                missing_files = []
+                # Check required files
+                faiss_file = os.path.join(index_path, 'index.faiss')
+                pkl_file = os.path.join(index_path, 'index.pkl')
                 
-                for req_file in required_files:
-                    file_path = index_path_obj / req_file
-                    if file_path.exists():
-                        logger.info(f"   ✅ Found: {req_file}")
-                    else:
-                        missing_files.append(req_file)
-                        logger.warning(f"   ❌ Missing: {req_file}")
-                
-                if not missing_files:
-                    try:
-                        # Tenter de charger l'index
-                        if hasattr(embedder, 'search_engine') and embedder.search_engine:
-                            embedder.search_engine.load_index(str(index_path))
-                            logger.info(f"✅ RAG index loaded successfully from {index_path}")
-                            rag_system = embedder
-                            index_loaded = True
-                            break
-                        else:
-                            logger.warning("⚠️ Embedder search_engine not available")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Failed to load index from {index_path}: {e}")
-                        continue
+                files_status = []
+                if os.path.exists(faiss_file):
+                    logger.info(f"   ✅ Found: index.faiss")
+                    files_status.append(True)
                 else:
+                    logger.warning(f"   ❌ Missing: index.faiss")
+                    files_status.append(False)
+                    
+                if os.path.exists(pkl_file):
+                    logger.info(f"   ✅ Found: index.pkl")
+                    files_status.append(True)
+                else:
+                    logger.warning(f"   ❌ Missing: index.pkl")
+                    files_status.append(False)
+                
+                # Try to load index if both files exist
+                if all(files_status):
+                    logger.info(f"🔄 Attempting to load index from {index_path}")
+                    
+                    if embedder.load_index(index_path):
+                        stats = embedder.get_stats()
+                        logger.info(f"✅ Successfully loaded RAG index from {index_path}")
+                        logger.info(f"   📊 Vectors: {stats.get('index_size', 0)}")
+                        logger.info(f"   📚 Documents: {stats.get('documents_count', 0)}")
+                        logger.info(f"   🔢 Dimension: {stats.get('dimension', 0)}")
+                        logger.info(f"   🔍 Search engine available: {stats.get('search_engine_available', False)}")
+                        index_loaded = True
+                        break
+                    else:
+                        logger.warning(f"❌ Failed to load index from {index_path}")
+                else:
+                    missing_files = []
+                    if not os.path.exists(faiss_file):
+                        missing_files.append('index.faiss')
+                    if not os.path.exists(pkl_file):
+                        missing_files.append('index.pkl')
                     logger.warning(f"⚠️ Index incomplete in {index_path}: missing {missing_files}")
-            else:
-                logger.debug(f"📂 Index path not found: {index_path}")
         
-        if not index_loaded:
-            logger.warning("⚠️ No valid RAG index found - will run without document search")
-            # Essayer d'initialiser quand même pour les fallbacks
-            rag_system = embedder
+        # Set global embedder
+        rag_embedder = embedder
+        
+        # Log final status
+        if index_loaded and embedder.has_search_engine():
+            logger.info("✅ RAG system fully initialized with document search capabilities")
+            return True
+        else:
+            logger.warning("⚠️ No valid RAG index found - will run in fallback mode")
+            logger.warning("⚠️ RAG system using OpenAI direct mode")
             return False
             
-        return True
-        
     except Exception as e:
         logger.error(f"❌ Error initializing RAG system: {e}")
-        import traceback
         logger.error(f"Stack trace: {traceback.format_exc()}")
-        return False
+        logger.warning("⚠️ RAG system initialization failed - using fallback mode")
+        
+        # Try to create minimal embedder for fallback
+        try:
+            from rag.embedder import EnhancedDocumentEmbedder
+            rag_embedder = EnhancedDocumentEmbedder(api_key=os.getenv('OPENAI_API_KEY'))
+            logger.info("✅ Fallback RAG embedder created successfully")
+            return False
+        except Exception as fallback_error:
+            logger.error(f"❌ Even fallback embedder failed: {fallback_error}")
+            rag_embedder = None
+            return False
 
-def create_application() -> FastAPI:
-    """Créer l'application FastAPI avec configuration sécurisée et RAG"""
+# =============================================================================
+# LIFESPAN MANAGEMENT
+# =============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    # Startup
+    logger.info("🚀 Starting Intelia Expert API...")
     
-    # Validation de la configuration au démarrage
-    if not validate_startup():
-        logger.error("❌ Configuration validation failed - cannot start application")
-        raise RuntimeError("Invalid configuration")
+    # Initialize RAG system
+    rag_success = await initialize_rag_system()
     
-    # Initialiser le système RAG
-    rag_initialized = initialize_rag_system()
-    if rag_initialized:
-        logger.info("✅ RAG system initialized successfully")
+    # Log startup status
+    logger.info("✅ Application created successfully")
+    logger.info(f"📊 Configuration source: {os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)')}")
+    logger.info(f"🌍 Environment: {os.getenv('ENV', 'production')}")
+    logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
+    
+    if rag_embedder and rag_embedder.has_search_engine():
+        logger.info("🔍 RAG system: Optimized (with document search)")
+    elif rag_embedder:
+        logger.info("🔍 RAG system: Ready (fallback mode)")
     else:
-        logger.warning("⚠️ RAG system not fully initialized - using fallback mode")
-    
-    # Création de l'application
-    app = FastAPI(
-        title="Intelia Expert API",
-        description="Assistant IA Expert pour la Santé et Nutrition Animale avec RAG",
-        version="2.0.0",
-        debug=get_config('DEBUG', False)
-    )
-    
-    # Configuration CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=get_config('ALLOWED_ORIGINS', ['*']),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # Routes de base
-    @app.get("/")
-    async def root():
-        """Point d'entrée racine avec informations système"""
-        status = config_manager.get_status_report()
-        return {
-            "message": "Intelia Expert API with RAG",
-            "status": "running",
-            "environment": status['environment'],
-            "config_source": status['config_source'],
-            "api_version": "2.0.0",
-            "rag_modules": RAG_MODULES_AVAILABLE,
-            "rag_system": "initialized" if rag_system else "not_available"
-        }
-    
-    @app.get("/health")
-    async def health_check():
-        """Health check pour monitoring"""
-        try:
-            validation = config_manager.validate_configuration()
-            status = config_manager.get_status_report()
-            
-            health_status = {
-                "status": "healthy",
-                "timestamp": "2025-07-23T21:00:00Z",
-                "services": {
-                    "api": "running",
-                    "configuration": "loaded" if validation['openai_key_present'] else "limited",
-                    "rag_modules": "available" if RAG_MODULES_AVAILABLE else "not_available",
-                    "rag_system": "ready" if rag_system else "fallback",
-                    "database": "connected" if validation['database_configured'] else "disconnected"
-                },
-                "config": {
-                    "source": status['config_source'],
-                    "environment": status['environment']
-                }
-            }
-            
-            return health_status
-            
-        except Exception as e:
-            logger.error(f"Health check failed: {e}")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "unhealthy",
-                    "error": str(e),
-                    "timestamp": "2025-07-23T21:00:00Z"
-                }
-            )
-    
-    @app.post("/api/v1/expert/ask")
-    async def ask_expert(question: dict):
-        """Endpoint principal pour les questions avec RAG intégré"""
-        global rag_system
+        logger.info("🔍 RAG system: Not Available")
         
-        openai_key = config_manager.get_openai_key()
-        if not openai_key:
-            raise HTTPException(
-                status_code=503, 
-                detail="Service non disponible - clé API OpenAI non configurée"
-            )
-        
-        user_question = question.get('text', '').strip()
-        if not user_question:
-            raise HTTPException(
-                status_code=400,
-                detail="Le texte de la question est requis"
-            )
-        
-        logger.info(f"🔍 Processing question: {user_question[:100]}...")
-        
-        try:
-            # Mode RAG complet si disponible
-            if rag_system and RAG_MODULES_AVAILABLE:
-                try:
-                    # Rechercher dans la base documentaire
-                    if hasattr(rag_system, 'search_documents'):
-                        search_results = rag_system.search_documents(user_question, k=5)
-                        
-                        if search_results and len(search_results) > 0:
-                            # Construire le contexte
-                            context_pieces = []
-                            sources = []
-                            
-                            for doc, score in search_results:
-                                if hasattr(doc, 'page_content') and hasattr(doc, 'metadata'):
-                                    context_pieces.append(doc.page_content[:1000])  # Limiter la taille
-                                    source = doc.metadata.get('source_file', 'document')
-                                    if source not in sources:
-                                        sources.append(source)
-                            
-                            context = "\n\n---\n\n".join(context_pieces)
-                            
-                            # Générer la réponse avec OpenAI
-                            try:
-                                from openai import OpenAI
-                                client = OpenAI(api_key=openai_key)
-                                
-                                system_prompt = """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
-
-Réponds de manière professionnelle et précise en te basant UNIQUEMENT sur le contexte documentaire fourni.
-
-Règles importantes:
-- Utilise seulement les informations du contexte documentaire
-- Si les données spécifiques (températures, poids, FCR) sont mentionnées, cite-les exactement
-- Si l'information n'est pas dans le contexte, dis-le clairement
-- Réponds dans la même langue que la question
-- Sois concis mais complet (maximum 400 mots)"""
-
-                                user_prompt = f"""Contexte documentaire:
-{context}
-
-Question: {user_question}
-
-Réponds en te basant uniquement sur le contexte documentaire ci-dessus."""
-
-                                response = client.chat.completions.create(
-                                    model="gpt-4o",
-                                    messages=[
-                                        {"role": "system", "content": system_prompt},
-                                        {"role": "user", "content": user_prompt}
-                                    ],
-                                    max_tokens=600,
-                                    temperature=0.1
-                                )
-                                
-                                answer = response.choices[0].message.content
-                                
-                                return {
-                                    "question": user_question,
-                                    "answer": answer,
-                                    "sources": sources,
-                                    "documents_found": len(search_results),
-                                    "mode": "rag_with_documents",
-                                    "config_source": config_manager.config_source
-                                }
-                                
-                            except Exception as openai_error:
-                                logger.error(f"❌ OpenAI API error: {openai_error}")
-                                raise HTTPException(
-                                    status_code=500,
-                                    detail=f"Erreur lors de la génération de la réponse: {str(openai_error)}"
-                                )
-                        
-                        else:
-                            # Aucun document trouvé - fallback
-                            logger.info("📄 No relevant documents found in RAG index")
-                            
-                except Exception as rag_error:
-                    logger.error(f"❌ RAG search error: {rag_error}")
-                    # Continue vers le fallback
-            
-            # Mode fallback : OpenAI direct sans RAG
-            logger.info("🔄 Using fallback mode - direct OpenAI")
-            
-            try:
-                from openai import OpenAI
-                client = OpenAI(api_key=openai_key)
-                
-                system_prompt = """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308.
-
-Réponds de manière professionnelle en te basant sur tes connaissances générales en aviculture.
-
-Sujets d'expertise:
-- Gestion des poulets Ross 308 (températures, croissance, FCR)
-- Santé aviaire et prévention des maladies
-- Nutrition et alimentation
-- Conditions d'élevage optimales
-
-Réponds dans la même langue que la question."""
-
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_question}
-                    ],
-                    max_tokens=500,
-                    temperature=0.2
-                )
-                
-                return {
-                    "question": user_question,
-                    "answer": response.choices[0].message.content,
-                    "mode": "fallback_openai",
-                    "note": "Réponse basée sur les connaissances générales (recherche documentaire non disponible)",
-                    "config_source": config_manager.config_source
-                }
-                
-            except Exception as fallback_error:
-                logger.error(f"❌ Fallback OpenAI error: {fallback_error}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Erreur système: {str(fallback_error)}"
-                )
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"❌ Unexpected error: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Erreur inattendue lors du traitement de la question"
-            )
-    
-    @app.get("/api/v1/expert/status")
-    async def expert_status():
-        """Status détaillé du système expert"""
-        validation = config_manager.validate_configuration()
-        
-        return {
-            "api_available": validation['openai_key_present'],
-            "rag_modules_imported": RAG_MODULES_AVAILABLE,
-            "rag_system_initialized": rag_system is not None,
-            "search_available": rag_system is not None and hasattr(rag_system, 'search_documents'),
-            "documents_path": get_config('RAG_DOCUMENTS_PATH'),
-            "index_path": get_config('RAG_INDEX_PATH'),
-            "model": "gpt-4o" if validation['openai_key_present'] else None,
-            "backend_directory": str(backend_dir),
-            "mode": "full_rag" if (rag_system and RAG_MODULES_AVAILABLE) else "fallback"
-        }
-    
-    logger.info(f"✅ Application created successfully")
-    logger.info(f"📊 Configuration source: {config_manager.config_source}")
-    logger.info(f"🌍 Environment: {get_config('ENVIRONMENT')}")
-    logger.info(f"🤖 RAG modules: {'Available' if RAG_MODULES_AVAILABLE else 'Not available'}")
-    logger.info(f"🔍 RAG system: {'Ready' if rag_system else 'Fallback mode'}")
     logger.info(f"📁 Backend directory: {backend_dir}")
     
-    return app
-
-# Créer l'application
-app = create_application()
-
-def main():
-    """Point d'entrée principal pour le développement local"""
-    logger.info("🚀 Starting Intelia Expert Backend with integrated RAG system")
+    yield
     
-    config = {
-        "host": "0.0.0.0",
-        "port": int(get_config('PORT', 8080)),
-        "reload": get_config('DEBUG', False),
-        "workers": 1 if get_config('DEBUG', False) else get_config('MAX_WORKERS', 4),
-        "log_level": get_config('LOG_LEVEL', 'info').lower(),
+    # Shutdown
+    logger.info("🛑 Shutting down Intelia Expert API...")
+
+# =============================================================================
+# FASTAPI APPLICATION
+# =============================================================================
+
+app = FastAPI(
+    title="Intelia Expert API",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale",
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan
+)
+
+# =============================================================================
+# CORS CONFIGURATION
+# =============================================================================
+
+# Configure CORS
+allowed_origins = os.getenv('ALLOWED_ORIGINS', '["*"]')
+if isinstance(allowed_origins, str):
+    try:
+        import json
+        allowed_origins = json.loads(allowed_origins)
+    except:
+        allowed_origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_rag_status() -> str:
+    """Get current RAG system status"""
+    if not rag_embedder:
+        return "not_available"
+    elif rag_embedder.has_search_engine():
+        return "optimized"
+    else:
+        return "fallback"
+
+async def process_question_with_rag(question: str, language: str = "fr") -> Dict[str, Any]:
+    """Process question using RAG system"""
+    start_time = time.time()
+    
+    try:
+        # Check if RAG embedder is available
+        if not rag_embedder:
+            raise HTTPException(status_code=503, detail="RAG system not available")
+        
+        logger.info(f"🔍 Processing question: {question[:50]}...")
+        
+        # Determine processing mode
+        if rag_embedder.has_search_engine():
+            # Use RAG with document search
+            logger.info("🔄 Using optimized mode - RAG with document search")
+            
+            # Search for relevant documents
+            search_results = rag_embedder.search(question, k=5)
+            
+            if search_results:
+                # Construct context from search results
+                context = "\n".join([result['text'] for result in search_results[:3]])
+                
+                # Use OpenAI with RAG context
+                import openai
+                openai.api_key = os.getenv('OPENAI_API_KEY')
+                
+                system_prompt = f"""Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
+                
+Utilise les informations suivantes pour répondre à la question:
+{context}
+
+Réponds en {language} de manière précise et pratique."""
+
+                response = openai.chat.completions.create(
+                    model=os.getenv('DEFAULT_MODEL', 'gpt-4o'),
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000
+                )
+                
+                answer = response.choices[0].message.content
+                mode = "rag_enhanced"
+                note = f"Réponse basée sur la recherche documentaire ({len(search_results)} documents trouvés)"
+                
+            else:
+                # No relevant documents found, use fallback
+                logger.info("🔄 No relevant documents found - using fallback")
+                answer, mode, note = await fallback_openai_response(question, language)
+        else:
+            # Use fallback mode
+            logger.info("🔄 Using fallback mode - direct OpenAI")
+            answer, mode, note = await fallback_openai_response(question, language)
+        
+        processing_time = time.time() - start_time
+        
+        return {
+            "question": question,
+            "response": answer,
+            "mode": mode,
+            "note": note,
+            "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "processing_time": round(processing_time, 2)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing question: {e}")
+        processing_time = time.time() - start_time
+        
+        # Emergency fallback
+        try:
+            answer, mode, note = await fallback_openai_response(question, language)
+            return {
+                "question": question,
+                "response": answer,
+                "mode": f"{mode}_emergency",
+                "note": f"Mode d'urgence activé: {str(e)}",
+                "config_source": "Emergency Fallback",
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "processing_time": round(processing_time, 2)
+            }
+        except Exception as emergency_error:
+            logger.error(f"❌ Emergency fallback failed: {emergency_error}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Service temporairement indisponible: {str(e)}"
+            )
+
+async def fallback_openai_response(question: str, language: str = "fr") -> tuple:
+    """Fallback response using OpenAI directly"""
+    import openai
+    
+    openai.api_key = os.getenv('OPENAI_API_KEY')
+    
+    system_prompt = f"""Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308.
+
+Réponds aux questions de manière précise et pratique en {language}.
+Utilise tes connaissances pour donner des conseils basés sur les meilleures pratiques du secteur."""
+
+    response = openai.chat.completions.create(
+        model=os.getenv('DEFAULT_MODEL', 'gpt-4o'),
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
+        ],
+        temperature=0.7,
+        max_tokens=1000
+    )
+    
+    answer = response.choices[0].message.content
+    mode = "fallback_openai"
+    note = "Réponse basée sur les connaissances générales (recherche documentaire non disponible)"
+    
+    return answer, mode, note
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+
+@app.get("/", response_class=JSONResponse)
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Intelia Expert API with RAG",
+        "status": "running",
+        "environment": os.getenv('ENV', 'production'),
+        "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
+        "api_version": "2.0.0",
+        "rag_modules": rag_embedder is not None,
+        "rag_system": get_rag_status()
+    }
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint"""
+    return HealthResponse(
+        status="healthy",
+        timestamp=time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        services={
+            "api": "running",
+            "configuration": "loaded",
+            "rag_modules": "available" if rag_embedder else "not_available",
+            "rag_system": get_rag_status(),
+            "database": "connected"
+        },
+        config={
+            "source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
+            "environment": os.getenv('ENV', 'production')
+        }
+    )
+
+@app.post("/api/v1/expert/ask", response_model=ExpertResponse)
+async def ask_expert(request: QuestionRequest):
+    """Ask a question to the expert system"""
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Le texte de la question est requis")
+    
+    try:
+        result = await process_question_with_rag(
+            question=request.text,
+            language=request.language or "fr"
+        )
+        
+        return ExpertResponse(**result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in ask_expert: {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+
+@app.post("/api/v1/expert/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """Submit feedback for a question/answer"""
+    logger.info(f"📝 Feedback received: rating={feedback.rating}, feedback='{feedback.feedback}'")
+    
+    return {
+        "status": "received",
+        "message": "Merci pour votre retour !",
+        "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+@app.get("/api/v1/expert/stats")
+async def get_system_stats():
+    """Get system statistics"""
+    stats = {
+        "system_status": get_rag_status(),
+        "rag_available": rag_embedder is not None,
+        "backend_directory": backend_dir,
+        "environment": os.getenv('ENV', 'production'),
+        "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
     }
     
-    logger.info(f"🔧 Server config: {config}")
-    uvicorn.run("main:app", **config)
+    if rag_embedder:
+        rag_stats = rag_embedder.get_stats()
+        stats.update({
+            "rag_stats": rag_stats
+        })
+    
+    return stats
+
+# =============================================================================
+# ERROR HANDLERS
+# =============================================================================
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Custom HTTP exception handler"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "path": str(request.url.path)
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """General exception handler"""
+    logger.error(f"❌ Unhandled exception: {exc}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Erreur interne du serveur",
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "path": str(request.url.path)
+        }
+    )
+
+# =============================================================================
+# CUSTOM OPENAPI
+# =============================================================================
+
+def custom_openapi():
+    """Custom OpenAPI schema"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="Intelia Expert API",
+        version="2.0.0",
+        description="Assistant IA Expert pour la Santé et Nutrition Animale",
+        routes=app.routes,
+    )
+    
+    # Add custom info
+    openapi_schema["info"]["x-logo"] = {
+        "url": "https://intelia.com/logo.png"
+    }
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+# =============================================================================
+# MAIN ENTRY POINT
+# =============================================================================
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    
+    port = int(os.getenv('PORT', 8080))
+    host = os.getenv('HOST', '0.0.0.0')
+    
+    logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
+    
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info"
+    )
