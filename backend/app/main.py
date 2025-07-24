@@ -1,6 +1,7 @@
 """
-Intelia Expert - API Backend Complète - OPTIMIZED VERSION
-Multi-langue + Performance Boost
+Intelia Expert - API Backend Complète
+Multi-langue + Performance + Sécurité + Tous Endpoints
+Version 2.1.0 - Complete
 """
 
 import os
@@ -48,7 +49,7 @@ supabase: Optional[Client] = None
 security = HTTPBearer()
 
 # =============================================================================
-# MULTI-LANGUAGE SUPPORT - PROMPTS OPTIMISÉS
+# MULTI-LANGUAGE SUPPORT - 7 LANGUES
 # =============================================================================
 
 LANGUAGE_PROMPTS = {
@@ -146,11 +147,11 @@ def get_user_context_prompt(user_type: str, language: str) -> str:
     return contexts[lang].get(user_type, "")
 
 # =============================================================================
-# SUPABASE INITIALIZATION - SAME AS BEFORE
+# SUPABASE INITIALIZATION
 # =============================================================================
 
 def initialize_supabase():
-    """Initialize Supabase client - FIXED VERSION"""
+    """Initialize Supabase client"""
     global supabase
     
     try:
@@ -182,7 +183,7 @@ def initialize_supabase():
         return False
 
 # =============================================================================
-# PYDANTIC MODELS - SAME AS BEFORE
+# PYDANTIC MODELS
 # =============================================================================
 
 class UserProfile(BaseModel):
@@ -195,7 +196,7 @@ class UserProfile(BaseModel):
     preferences: Optional[Dict[str, Any]] = {}
 
 class QuestionRequest(BaseModel):
-    """Request model for expert questions - ENHANCED"""
+    """Request model for expert questions"""
     text: str = Field(..., description="Question text", min_length=1, max_length=2000)
     language: Optional[str] = Field("fr", description="Response language (fr, en, es, pt, de, nl, pl)")
     context: Optional[str] = Field(None, description="Additional context")
@@ -213,6 +214,25 @@ class ExpertResponse(BaseModel):
     processing_time: float
     language: str
 
+class HistoryResponse(BaseModel):
+    """Response model for conversation history"""
+    conversations: List[Dict[str, Any]]
+    total_count: int
+    page: int
+    per_page: int
+
+class TopicsResponse(BaseModel):
+    """Response model for suggested topics"""
+    topics: List[Dict[str, str]]
+    popular_keywords: List[str]
+    user_type_specific: bool
+
+class SuggestionsResponse(BaseModel):
+    """Response model for question suggestions"""
+    suggestions: List[str]
+    context_aware: bool
+    based_on_history: bool
+
 class HealthResponse(BaseModel):
     """Health check response model"""
     status: str
@@ -222,8 +242,26 @@ class HealthResponse(BaseModel):
     database_status: str
     rag_status: str
 
+class FeedbackRequest(BaseModel):
+    """Feedback request model"""
+    question_id: Optional[str] = None
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
+    feedback: Optional[str] = Field(None, max_length=500)
+
+class AuthRequest(BaseModel):
+    """Authentication request"""
+    email: str = Field(..., description="User email")
+    password: str = Field(..., description="User password")
+
+class RegisterRequest(BaseModel):
+    """Registration request"""
+    email: str = Field(..., description="User email")
+    password: str = Field(..., description="User password", min_length=8)
+    user_type: str = Field(..., description="'producer' or 'professional'")
+    full_name: Optional[str] = Field(None, description="User full name")
+
 # =============================================================================
-# AUTHENTICATION & AUTHORIZATION - SAME AS BEFORE
+# AUTHENTICATION & AUTHORIZATION
 # =============================================================================
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserProfile:
@@ -278,8 +316,19 @@ async def get_optional_user(request: Request) -> Optional[UserProfile]:
     except:
         return None
 
+def require_user_type(allowed_types: List[str]):
+    """Decorator to require specific user types"""
+    def decorator(user: UserProfile = Depends(get_current_user)):
+        if user.user_type not in allowed_types:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Access denied. Required user type: {', '.join(allowed_types)}"
+            )
+        return user
+    return decorator
+
 # =============================================================================
-# RAG SYSTEM INITIALIZATION - OPTIMIZED
+# RAG SYSTEM INITIALIZATION
 # =============================================================================
 
 async def initialize_rag_system():
@@ -346,7 +395,79 @@ async def initialize_rag_system():
         return False
 
 # =============================================================================
-# OPTIMIZED QUESTION PROCESSING - MULTI-LANGUAGE + PERFORMANCE
+# DATABASE FUNCTIONS
+# =============================================================================
+
+async def save_conversation(user_id: str, question: str, response: str, mode: str, sources: List[Dict] = None):
+    """Save conversation to database"""
+    if not supabase:
+        return
+    
+    try:
+        conversation_data = {
+            'user_id': user_id,
+            'question': question,
+            'response': response,
+            'mode': mode,
+            'sources': sources or [],
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('conversations').insert(conversation_data).execute()
+        logger.info("✅ Conversation saved to database")
+    except Exception as e:
+        logger.error(f"❌ Error saving conversation: {e}")
+
+async def get_user_conversations(user_id: str, page: int = 1, per_page: int = 20) -> Dict[str, Any]:
+    """Get user conversation history"""
+    if not supabase:
+        return {"conversations": [], "total_count": 0}
+    
+    try:
+        # Get total count
+        count_result = supabase.table('conversations').select('id', count='exact').eq('user_id', user_id).execute()
+        total_count = count_result.count or 0
+        
+        # Get paginated conversations
+        start = (page - 1) * per_page
+        result = supabase.table('conversations')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .range(start, start + per_page - 1)\
+            .execute()
+        
+        return {
+            "conversations": result.data or [],
+            "total_count": total_count,
+            "page": page,
+            "per_page": per_page
+        }
+    except Exception as e:
+        logger.error(f"❌ Error getting conversations: {e}")
+        return {"conversations": [], "total_count": 0}
+
+async def save_feedback(user_id: str, question_id: Optional[str], rating: int, feedback: Optional[str]):
+    """Save user feedback"""
+    if not supabase:
+        return
+    
+    try:
+        feedback_data = {
+            'user_id': user_id,
+            'question_id': question_id,
+            'rating': rating,
+            'feedback': feedback,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('feedback').insert(feedback_data).execute()
+        logger.info("✅ Feedback saved to database")
+    except Exception as e:
+        logger.error(f"❌ Error saving feedback: {e}")
+
+# =============================================================================
+# OPTIMIZED QUESTION PROCESSING
 # =============================================================================
 
 async def process_question_with_rag(
@@ -473,7 +594,7 @@ async def process_question_with_rag(
         
         # Emergency fallback
         try:
-            config = performance_config.get("fast", {"model": "gpt-3.5-turbo", "max_tokens": 300, "timeout": 8})
+            config = {"model": "gpt-3.5-turbo", "max_tokens": 300, "timeout": 8}
             answer, mode, note = await fallback_openai_response(question, user, language, config)
             return {
                 "question": question,
@@ -531,31 +652,7 @@ async def fallback_openai_response(question: str, user: Optional[UserProfile] = 
     return answer, mode, note
 
 # =============================================================================
-# DATABASE FUNCTIONS - SAME AS BEFORE
-# =============================================================================
-
-async def save_conversation(user_id: str, question: str, response: str, mode: str, sources: List[Dict] = None):
-    """Save conversation to database"""
-    if not supabase:
-        return
-    
-    try:
-        conversation_data = {
-            'user_id': user_id,
-            'question': question,
-            'response': response,
-            'mode': mode,
-            'sources': sources or [],
-            'created_at': datetime.utcnow().isoformat()
-        }
-        
-        supabase.table('conversations').insert(conversation_data).execute()
-        logger.info("✅ Conversation saved to database")
-    except Exception as e:
-        logger.error(f"❌ Error saving conversation: {e}")
-
-# =============================================================================
-# LIFESPAN MANAGEMENT - SAME AS BEFORE
+# LIFESPAN MANAGEMENT
 # =============================================================================
 
 @asynccontextmanager
@@ -567,8 +664,8 @@ async def lifespan(app: FastAPI):
     rag_success = await initialize_rag_system()
     
     logger.info("✅ Application created successfully")
-    logger.info(f"📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
-    logger.info(f"⚡ Performance modes: fast, balanced, quality")
+    logger.info("📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
+    logger.info("⚡ Performance modes: fast, balanced, quality")
     logger.info(f"🗄️ Database: {'Available' if supabase_success else 'Not Available'}")
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
     
@@ -619,7 +716,7 @@ def get_rag_status() -> str:
         return "fallback"
 
 # =============================================================================
-# API ENDPOINTS - ENHANCED WITH MULTI-LANGUAGE + PERFORMANCE
+# API ENDPOINTS - ROOT & HEALTH
 # =============================================================================
 
 @app.get("/", response_class=JSONResponse)
@@ -660,7 +757,101 @@ async def health_check():
     )
 
 # =============================================================================
-# EXPERT SYSTEM ENDPOINTS - ENHANCED
+# AUTHENTICATION ENDPOINTS
+# =============================================================================
+
+@app.post("/api/v1/auth/register")
+async def register(request: RegisterRequest):
+    """Register new user"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Register with Supabase Auth
+        auth_response = supabase.auth.sign_up({
+            "email": request.email,
+            "password": request.password
+        })
+        
+        if auth_response.user:
+            # Create user profile
+            user_data = {
+                "email": request.email,
+                "user_type": request.user_type,
+                "full_name": request.full_name,
+                "auth_user_id": auth_response.user.id,
+                "created_at": datetime.utcnow().isoformat(),
+                "preferences": {}
+            }
+            
+            result = supabase.table('users').insert(user_data).execute()
+            
+            return {
+                "message": "User registered successfully",
+                "user_id": result.data[0]['id'],
+                "email": request.email,
+                "user_type": request.user_type
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Registration failed")
+            
+    except Exception as e:
+        logger.error(f"❌ Registration error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/auth/login")
+async def login(request: AuthRequest):
+    """User login"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Login with Supabase Auth
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": request.email,
+            "password": request.password
+        })
+        
+        if auth_response.user and auth_response.session:
+            # Get user profile
+            result = supabase.table('users').select('*').eq('id', auth_response.user.id).execute()
+            
+            if result.data:
+                user_data = result.data[0]
+                return {
+                    "access_token": auth_response.session.access_token,
+                    "token_type": "bearer",
+                    "user": user_data
+                }
+            else:
+                raise HTTPException(status_code=404, detail="User profile not found")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+    except Exception as e:
+        logger.error(f"❌ Login error: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+@app.post("/api/v1/auth/logout")
+async def logout(user: UserProfile = Depends(get_current_user)):
+    """User logout"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        supabase.auth.sign_out()
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        logger.error(f"❌ Logout error: {e}")
+        return {"message": "Logged out"}
+
+@app.get("/api/v1/auth/profile")
+async def get_profile(user: UserProfile = Depends(get_current_user)):
+    """Get user profile"""
+    return user
+
+# =============================================================================
+# EXPERT SYSTEM ENDPOINTS
 # =============================================================================
 
 @app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
@@ -710,6 +901,138 @@ async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_c
     except Exception as e:
         logger.error(f"❌ Unexpected error in ask_expert: {e}")
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+
+@app.get("/api/v1/expert/history", response_model=HistoryResponse)
+async def get_history(
+    page: int = 1, 
+    per_page: int = 20,
+    user: UserProfile = Depends(get_current_user)
+):
+    """Get conversation history"""
+    try:
+        history_data = await get_user_conversations(user.id, page, per_page)
+        return HistoryResponse(**history_data)
+    except Exception as e:
+        logger.error(f"❌ Error getting history: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération de l'historique")
+
+@app.get("/api/v1/expert/topics", response_model=TopicsResponse)
+async def get_topics(user: UserProfile = Depends(get_current_user)):
+    """Get suggested topics"""
+    try:
+        # Topics based on user type
+        if user.user_type == "professional":
+            topics = [
+                {"title": "Protocoles de vaccination avancés", "category": "sante"},
+                {"title": "Diagnostic différentiel maladies", "category": "diagnostic"},
+                {"title": "Analyse performance comparative", "category": "performance"},
+                {"title": "Résistance aux antibiotiques", "category": "medicaments"},
+                {"title": "Nutrition de précision", "category": "nutrition"}
+            ]
+            keywords = ["diagnostic", "protocole", "analyse", "résistance", "précision"]
+        else:  # producer
+            topics = [
+                {"title": "Problèmes de croissance poulets", "category": "croissance"},
+                {"title": "Conditions environnementales optimales", "category": "environnement"}, 
+                {"title": "Mortalité élevée - causes", "category": "sante"},
+                {"title": "Nutrition et alimentation", "category": "nutrition"},
+                {"title": "Ventilation et température", "category": "environnement"}
+            ]
+            keywords = ["croissance", "température", "alimentation", "mortalité", "ventilation"]
+        
+        return TopicsResponse(
+            topics=topics,
+            popular_keywords=keywords,
+            user_type_specific=True
+        )
+    except Exception as e:
+        logger.error(f"❌ Error getting topics: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des sujets")
+
+@app.get("/api/v1/expert/suggestions", response_model=SuggestionsResponse)
+async def get_suggestions(
+    context: Optional[str] = None,
+    user: UserProfile = Depends(get_current_user)
+):
+    """Get question suggestions"""
+    try:
+        # Get recent conversations for context
+        recent_convs = await get_user_conversations(user.id, 1, 5)
+        has_history = len(recent_convs["conversations"]) > 0
+        
+        # Base suggestions by user type
+        if user.user_type == "professional":
+            suggestions = [
+                "Quel protocole de vaccination recommandez-vous pour les Ross 308?",
+                "Comment diagnostiquer une entérite nécrotique?",
+                "Quels sont les standards de performance à 35 jours?",
+                "Comment gérer la résistance aux coccidiostatiques?"
+            ]
+        else:  # producer
+            suggestions = [
+                "Quelle température maintenir au jour 14?",
+                "Comment améliorer l'indice de conversion?",
+                "Mes poulets mangent moins, que faire?",
+                "Comment détecter un problème sanitaire?"
+            ]
+        
+        return SuggestionsResponse(
+            suggestions=suggestions,
+            context_aware=context is not None,
+            based_on_history=has_history
+        )
+    except Exception as e:
+        logger.error(f"❌ Error getting suggestions: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des suggestions")
+
+@app.post("/api/v1/expert/feedback")
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    user: UserProfile = Depends(get_current_user)
+):
+    """Submit feedback for a question/answer"""
+    try:
+        await save_feedback(user.id, feedback.question_id, feedback.rating, feedback.feedback)
+        
+        logger.info(f"📝 Feedback received from {user.email}: rating={feedback.rating}")
+        
+        return {
+            "status": "received",
+            "message": "Merci pour votre retour !",
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    except Exception as e:
+        logger.error(f"❌ Error saving feedback: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
+
+# =============================================================================
+# ADMIN ENDPOINTS
+# =============================================================================
+
+@app.get("/api/v1/admin/stats")
+async def get_admin_stats(user: UserProfile = Depends(require_user_type(["admin"]))):
+    """Get system statistics - Admin only"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Get basic stats
+        users_count = supabase.table('users').select('id', count='exact').execute().count or 0
+        conversations_count = supabase.table('conversations').select('id', count='exact').execute().count or 0
+        feedback_count = supabase.table('feedback').select('id', count='exact').execute().count or 0
+        
+        return {
+            "system_status": get_rag_status(),
+            "database_status": "connected",
+            "users_count": users_count,
+            "conversations_count": conversations_count,
+            "feedback_count": feedback_count,
+            "rag_available": rag_embedder is not None,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    except Exception as e:
+        logger.error(f"❌ Error getting admin stats: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des statistiques")
 
 # =============================================================================
 # ERROR HANDLERS
