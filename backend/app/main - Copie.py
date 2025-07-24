@@ -64,21 +64,11 @@ def initialize_supabase():
         if not supabase_url or not supabase_key:
             logger.error("❌ Supabase credentials not found in environment")
             return False
-        
-        # Create client without proxy argument for compatibility
-        supabase = create_client(supabase_url, supabase_key)
-        
-        # Test connection
-        try:
-            # Simple test query
-            result = supabase.table('users').select('id').limit(1).execute()
-            logger.info("✅ Supabase client initialized and tested successfully")
-            return True
-        except Exception as test_error:
-            logger.warning(f"⚠️ Supabase client created but test failed: {test_error}")
-            logger.info("✅ Supabase client initialized (connection will be tested on first use)")
-            return True
             
+        supabase = create_client(supabase_url, supabase_key)
+        logger.info("✅ Supabase client initialized")
+        return True
+        
     except Exception as e:
         logger.error(f"❌ Error initializing Supabase: {e}")
         return False
@@ -660,19 +650,19 @@ async def register(request: RegisterRequest):
         if auth_response.user:
             # Create user profile
             user_data = {
+                "id": auth_response.user.id,
                 "email": request.email,
                 "user_type": request.user_type,
                 "full_name": request.full_name,
-                "auth_user_id": auth_response.user.id,
                 "created_at": datetime.utcnow().isoformat(),
                 "preferences": {}
             }
             
-            result = supabase.table('users').insert(user_data).execute()
+            supabase.table('users').insert(user_data).execute()
             
             return {
                 "message": "User registered successfully",
-                "user_id": result.data[0]['id'],
+                "user_id": auth_response.user.id,
                 "email": request.email,
                 "user_type": request.user_type
             }
@@ -970,3 +960,4 @@ if __name__ == "__main__":
         log_level="info"
     )
 
+# Deploy trigger: 07/24/2025 03:00:00

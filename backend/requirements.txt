@@ -1,8 +1,8 @@
-# Intelia Expert API - Requirements Optimisés
-# Version: 2.0.0
+# Intelia Expert API - Requirements Corrigés
+# Versions fixées pour éviter les conflits
 
 # ============================================================================
-# FASTAPI CORE - Production Ready
+# FASTAPI CORE
 # ============================================================================
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -10,18 +10,23 @@ python-multipart==0.0.6
 pydantic==2.5.0
 
 # ============================================================================
-# SUPABASE & AUTHENTICATION
+# SUPABASE & AUTHENTICATION - Versions compatibles
 # ============================================================================
-supabase==2.3.4
+supabase==1.0.4
 PyJWT==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
 # ============================================================================
-# AI & RAG SYSTEM - Core Dependencies Only
+# AI & RAG SYSTEM - Versions compatibles fixées
 # ============================================================================
 openai==1.3.0
+# Versions compatibles de HuggingFace + sentence-transformers
+huggingface_hub==0.17.3
 sentence-transformers==2.2.2
+transformers==4.35.2
+torch==2.1.1
+# FAISS et numpy compatibles
 faiss-cpu==1.7.4
 numpy==1.24.3
 
@@ -33,31 +38,10 @@ httpx==0.25.2
 aiofiles==23.2.1
 
 # ============================================================================
-# DOCUMENT PROCESSING - Only if needed for RAG enhancement
+# ADDITIONAL DEPENDENCIES - Pour éviter les erreurs
 # ============================================================================
-# pypdf>=3.0.0
-# python-docx>=0.8.11
-# tiktoken>=0.5.0
-
-# ============================================================================
-# REMOVED DEPENDENCIES - Not needed for current implementation
-# ============================================================================
-# langchain>=0.1.0                    # Not used in current RAG implementation
-# langchain-openai>=0.1.0             # Not used
-# langchain-community>=0.1.0          # Not used
-# langchain-text-splitters>=0.1.0     # Not used
-# rank-bm25>=0.2.2                    # Not used in current search
-# pandas>=2.0.0                       # Not needed for API
-# scikit-learn>=1.0.0                 # Not used
-# python-dateutil>=2.8.0              # Already included in Python stdlib
-# openpyxl>=3.1.0                     # Not needed
-# toml>=0.10.2                        # Already included in Python 3.11+
-# streamlit>=1.28.0                   # DEFINITELY NOT NEEDED - Frontend only
-
-# ============================================================================
-# DEVELOPMENT DEPENDENCIES - Add only in dev environment
-# ============================================================================
-# pytest==7.4.3
-# pytest-asyncio==0.21.1
-# black==23.9.1
-# isort==5.12.0
+# Dépendances pour sentence-transformers
+scikit-learn==1.3.2
+scipy==1.11.4
+tqdm==4.66.1
+pillow==10.1.0
