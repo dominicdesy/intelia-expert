@@ -1,6 +1,6 @@
 """
-RAG Embedder Complet - Version Finale Robuste
-Corrige tous les problèmes de recherche et ajoute debug détaillé
+RAG Embedder Complet - Version Finale avec Correction Synchronisation
+Corrige le problème de désynchronisation entre index FAISS et documents
 """
 
 import os
@@ -41,7 +41,7 @@ except ImportError as e:
     np = None
 
 class FastRAGEmbedder:
-    """Version finale robuste du RAG Embedder avec debug complet"""
+    """Version finale robuste du RAG Embedder avec correction de synchronisation"""
     
     def __init__(self, api_key: Optional[str] = None, **kwargs):
         """
@@ -165,7 +165,7 @@ class FastRAGEmbedder:
         return self._faiss_index
     
     def load_index(self, index_path: str) -> bool:
-        """Charger un index FAISS existant avec vérifications complètes"""
+        """Charger un index FAISS existant avec correction automatique de synchronisation"""
         if not self.dependencies_available:
             logger.error("❌ Dependencies not available for index loading")
             return False
@@ -203,24 +203,75 @@ class FastRAGEmbedder:
             logger.info(f"   📚 {docs_count} documents")
             logger.info(f"   🔢 Dimension: {self._faiss_index.d}")
             
-            # Vérifier cohérence
-            if vectors_count == 0:
-                logger.warning("⚠️ Index has 0 vectors!")
+            # CORRECTION AUTOMATIQUE : Vérifier synchronisation
+            if vectors_count != docs_count:
+                logger.warning(f"⚠️ SYNCHRONIZATION ISSUE: {vectors_count} vectors != {docs_count} documents")
+                
+                if vectors_count > docs_count:
+                    logger.warning(f"🔧 FIXING: Truncating FAISS index to match documents count ({docs_count})")
+                    
+                    # Créer un nouvel index avec seulement les vecteurs qui ont des documents
+                    new_index = faiss.IndexFlatL2(self.dimension)
+                    
+                    if docs_count > 0:
+                        # Extraire seulement les premiers vecteurs qui correspondent aux documents
+                        logger.info(f"🔄 Reconstructing {docs_count} vectors from original index...")
+                        vectors_to_keep = np.zeros((docs_count, self.dimension), dtype=np.float32)
+                        
+                        for i in range(docs_count):
+                            try:
+                                vector = self._faiss_index.reconstruct(i)
+                                vectors_to_keep[i] = vector
+                            except Exception as reconstruct_error:
+                                logger.warning(f"⚠️ Could not reconstruct vector {i}: {reconstruct_error}")
+                                # Utiliser un vecteur aléatoire comme fallback
+                                vectors_to_keep[i] = np.random.random(self.dimension).astype('float32')
+                        
+                        new_index.add(vectors_to_keep)
+                        logger.info(f"✅ FIXED: New index created with {new_index.ntotal} vectors matching {docs_count} documents")
+                    else:
+                        logger.warning("⚠️ No documents available - creating empty index")
+                    
+                    self._faiss_index = new_index
+                    
+                elif docs_count > vectors_count:
+                    logger.warning(f"🔧 FIXING: Truncating documents to match vectors count ({vectors_count})")
+                    self._documents = self._documents[:vectors_count]
+                    logger.info(f"✅ FIXED: Documents truncated to {len(self._documents)} items")
+            
+            # Vérifications finales après correction
+            final_vectors = self._faiss_index.ntotal
+            final_docs = len(self._documents)
+            
+            logger.info(f"🔍 FINAL STATE: {final_vectors} vectors, {final_docs} documents")
+            
+            if final_vectors == 0 or final_docs == 0:
+                logger.warning("⚠️ Index or documents empty after correction!")
                 return False
             
-            if docs_count == 0:
-                logger.warning("⚠️ No documents loaded!")
+            if final_vectors != final_docs:
+                logger.error("❌ Could not synchronize index and documents")
                 return False
             
-            # Test de recherche basique
+            # Test de recherche basique avec correction
             try:
                 test_vector = np.random.random((1, self.dimension)).astype('float32')
-                test_scores, test_indices = self._faiss_index.search(test_vector, 1)
-                logger.info(f"✅ Index search test passed: found {len(test_indices[0])} results")
+                test_scores, test_indices = self._faiss_index.search(test_vector, min(3, final_vectors))
+                
+                # Vérifier que les indices sont valides
+                valid_indices = [idx for idx in test_indices[0] if 0 <= idx < len(self._documents)]
+                
+                logger.info(f"✅ Index search test passed: found {len(valid_indices)} valid results out of {len(test_indices[0])}")
+                
+                if len(valid_indices) == 0:
+                    logger.error("❌ No valid indices found in test search")
+                    return False
+                    
             except Exception as test_error:
                 logger.error(f"❌ Index search test failed: {test_error}")
                 return False
             
+            logger.info("🎉 Index successfully loaded and synchronized!")
             return True
             
         except Exception as e:
@@ -299,7 +350,7 @@ class FastRAGEmbedder:
             return None
     
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
-        """Recherche robuste avec debug complet"""
+        """Recherche robuste avec debug complet et validation des indices"""
         if self.debug_enabled:
             logger.info(f"🔍 DEBUG: Starting search for query: '{query}' with k={k}")
         
@@ -335,9 +386,16 @@ class FastRAGEmbedder:
             if self.debug_enabled:
                 logger.info(f"🔍 DEBUG: Reshaped query embedding: {query_embedding.shape}")
             
+            # Ajuster k si nécessaire
+            max_k = min(k, self._faiss_index.ntotal, len(self._documents))
+            if max_k != k:
+                if self.debug_enabled:
+                    logger.info(f"🔍 DEBUG: Adjusted k from {k} to {max_k}")
+                k = max_k
+            
             # Search FAISS
             if self.debug_enabled:
-                logger.info(f"🔍 DEBUG: Performing FAISS search...")
+                logger.info(f"🔍 DEBUG: Performing FAISS search with k={k}...")
                 
             scores, indices = self._faiss_index.search(query_embedding, k)
             
@@ -347,13 +405,13 @@ class FastRAGEmbedder:
                 logger.info(f"🔍 DEBUG: Raw scores: {scores[0].tolist()}")
                 logger.info(f"🔍 DEBUG: Raw indices: {indices[0].tolist()}")
             
-            # Traiter les résultats
+            # Traiter les résultats avec validation stricte
             results = []
             for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
                 if self.debug_enabled:
                     logger.info(f"🔍 DEBUG: Processing result {i}: score={score}, idx={idx}")
                 
-                # Vérifier validité de l'index
+                # Vérifier validité de l'index de manière stricte
                 if idx < 0:
                     if self.debug_enabled:
                         logger.warning(f"🔍 DEBUG: Skipping invalid index {idx} (negative)")
@@ -367,6 +425,12 @@ class FastRAGEmbedder:
                 # Récupérer le document
                 try:
                     doc_text = self._documents[idx]
+                    
+                    # Vérifier que le document n'est pas vide
+                    if not doc_text or not doc_text.strip():
+                        if self.debug_enabled:
+                            logger.warning(f"🔍 DEBUG: Skipping empty document at index {idx}")
+                        continue
                     
                     if self.debug_enabled:
                         logger.info(f"🔍 DEBUG: Valid result {i}: idx={idx}, score={score}")
