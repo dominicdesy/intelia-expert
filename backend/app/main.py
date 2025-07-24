@@ -567,7 +567,7 @@ async def lifespan(app: FastAPI):
     rag_success = await initialize_rag_system()
     
     logger.info("✅ Application created successfully")
-                logger.info(f"📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
+    logger.info(f"📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
     logger.info(f"⚡ Performance modes: fast, balanced, quality")
     logger.info(f"🗄️ Database: {'Available' if supabase_success else 'Not Available'}")
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
