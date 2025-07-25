@@ -2,6 +2,10 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+// Instance Supabase réutilisable
+const supabase = createClientComponentClient()
 
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
@@ -86,6 +90,7 @@ export default function LoginPage() {
     }
   }
 
+  // FONCTION DE CONNEXION CORRIGÉE AVEC SUPABASE
   const handleLogin = async () => {
     setError('')
     
@@ -105,28 +110,65 @@ export default function LoginPage() {
       return
     }
 
+    if (formData.password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères')
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // TODO: Intégrer avec Supabase
-      // const { data, error } = await supabase.auth.signInWithPassword({
-      //   email: formData.email,
-      //   password: formData.password
-      // })
+      console.log('🔐 Tentative de connexion avec Supabase:', formData.email)
       
-      console.log('🔐 Tentative de connexion:', {
-        email: formData.email,
-        rememberMe: formData.rememberMe
+      // CONNEXION RÉELLE AVEC SUPABASE
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email.trim(),
+        password: formData.password
       })
       
-      // Simulation de connexion
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (error) {
+        console.error('❌ Erreur Supabase:', error)
+        
+        // Messages d'erreur traduits et améliorés
+        const errorMessages: Record<string, string> = {
+          'Invalid login credentials': 'Email ou mot de passe incorrect',
+          'Email not confirmed': 'Email non confirmé. Vérifiez votre boîte mail et cliquez sur le lien de confirmation.',
+          'Too many requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
+          'User not found': 'Aucun compte trouvé avec cet email. Voulez-vous créer un compte ?',
+          'Wrong password': 'Mot de passe incorrect',
+          'Auth session missing': 'Session expirée. Veuillez vous reconnecter.',
+          'signup_disabled': 'Création de compte temporairement désactivée'
+        }
+        
+        const friendlyMessage = errorMessages[error.message] || error.message
+        setError(friendlyMessage)
+        return
+      }
+
+      if (!data.user) {
+        setError('Erreur de connexion. Veuillez réessayer.')
+        return
+      }
+
+      console.log('✅ Connexion réussie:', data.user.email)
       
-      // Redirection vers la page de chat
+      // Attendre que la session soit bien établie
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // REDIRECTION APRÈS CONNEXION RÉUSSIE
       window.location.href = '/chat'
+      
     } catch (error: any) {
-      console.error('❌ Erreur de connexion:', error)
-      setError(error.message || 'Email ou mot de passe incorrect')
+      console.error('❌ Erreur critique de connexion:', error)
+      
+      // Gestion d'erreurs réseau et autres
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setError('Problème de connexion internet. Vérifiez votre connexion et réessayez.')
+      } else if (error.message?.includes('CORS')) {
+        setError('Erreur de configuration. Contactez le support.')
+      } else {
+        setError('Erreur technique inattendue. Veuillez réessayer.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -162,18 +204,29 @@ export default function LoginPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
           
-          {/* Message d'erreur */}
+          {/* Message d'erreur amélioré */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-red-500">⚠️</span>
-                <span className="text-sm text-red-700">{error}</span>
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Erreur de connexion
+                  </h3>
+                  <div className="mt-1 text-sm text-red-700">
+                    {error}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           <div className="space-y-6">
-            {/* Email */}
+            {/* Email amélioré */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Adresse email
@@ -184,6 +237,7 @@ export default function LoginPage() {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  required
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -194,7 +248,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Mot de passe */}
+            {/* Mot de passe amélioré */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Mot de passe
@@ -205,6 +259,7 @@ export default function LoginPage() {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
+                  required
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -217,6 +272,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
                   disabled={isLoading}
+                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -259,18 +315,18 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Bouton de connexion */}
+            {/* Bouton de connexion amélioré */}
             <div>
               <button
                 type="button"
                 onClick={handleLogin}
-                disabled={isLoading}
+                disabled={isLoading || !formData.email || !formData.password}
                 className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Connexion...</span>
+                    <span>Connexion en cours...</span>
                   </div>
                 ) : (
                   'Se connecter'
