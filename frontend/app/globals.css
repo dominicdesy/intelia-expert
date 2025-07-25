@@ -1,0 +1,230 @@
+/* app/globals.css - VERSION FINALE SANS ERREURS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles avec optimisations mobile */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    height: 100%;
+  }
+  
+  body {
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    min-height: 100%;
+  }
+  
+  input, textarea, select {
+    @apply text-base;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  button {
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+  
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Utilities personnalisées */
+@layer utilities {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .touch-feedback {
+    @apply active:scale-95 transition-transform duration-150;
+  }
+  
+  .scroll-container {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  
+  .scroll-container::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 2px;
+  }
+  
+  .typing-indicator {
+    @apply animate-pulse;
+  }
+  
+  .gradient-text {
+    background: linear-gradient(135deg, theme('colors.blue.600'), theme('colors.green.600'));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .container-responsive {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .focus-visible {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
+  }
+}
+
+/* Components personnalisés - SÉPARÉS POUR ÉVITER LES ERREURS */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-primary:disabled {
+    @apply bg-gray-400 cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200;
+  }
+  
+  .input-primary {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+  
+  .message-user {
+    @apply bg-blue-600 text-white rounded-lg px-4 py-3;
+  }
+  
+  .message-assistant {
+    @apply bg-white border border-gray-200 text-gray-900 rounded-lg px-4 py-3;
+  }
+  
+  /* Topic card - SÉPARÉ EN PLUSIEURS CLASSES */
+  .topic-card {
+    @apply p-3 sm:p-4 bg-white rounded-lg border border-gray-200 transition-colors text-left;
+  }
+  
+  .topic-card:hover {
+    @apply border-blue-300 bg-blue-50;
+  }
+  
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+  }
+}
+
+/* Animations personnalisées */
+@layer utilities {
+  .animate-slide-in-bottom {
+    animation: slideInBottom 0.3s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
+  }
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Media queries spécifiques */
+@media (max-width: 640px) {
+  .container {
+    @apply px-3;
+  }
+  
+  .mobile-padding {
+    @apply p-3;
+  }
+  
+  .mobile-stack {
+    @apply flex-col space-y-2 space-x-0;
+  }
+}
+
+@media (max-width: 480px) {
+  .text-responsive {
+    @apply text-sm;
+  }
+  
+  .button-small {
+    @apply text-sm py-2 px-3;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
