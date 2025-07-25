@@ -1,257 +1,240 @@
-// lib/auth.ts - Authentification Supabase réelle
+// lib/auth.ts - VERSION PROFESSIONNELLE CORRIGÉE
 
-import { createClient } from '@supabase/supabase-js'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { User } from '@supabase/supabase-js'
+import { 
+  AuthError, 
+  AuthErrorFactory,
+  InvalidCredentialsError,
+  EmailNotConfirmedError,
+  TooManyRequestsError,
+  NetworkError 
+} from './errors/auth-errors'
 
-// Configuration Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Types pour l'authentification
-export interface AuthUser {
-  id: string
+export interface LoginCredentials {
   email: string
+  password: string
+}
+
+export interface SignUpCredentials extends LoginCredentials {
   name?: string
-  user_type?: 'producer' | 'professional'
-  language?: 'fr' | 'en' | 'es'
+  metadata?: Record<string, any>
 }
 
-export interface AuthError {
-  message: string
-  status?: number
+export interface AuthState {
+  user: User | null
+  isLoading: boolean
+  isAuthenticated: boolean
+  error: AuthError | null
 }
 
-// Service d'authentification
+/**
+ * Service d'authentification professionnel avec gestion d'erreurs robuste
+ * Architecture: Clean Code + Error Handling + Type Safety
+ */
 export class AuthService {
-  
-  // Connexion utilisateur
-  static async signIn(email: string, password: string): Promise<AuthUser> {
+  private supabase = createClientComponentClient()
+
+  /**
+   * Connexion utilisateur avec gestion d'erreurs professionnelle
+   */
+  async login(credentials: LoginCredentials): Promise<User> {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password
+      console.log('🔐 Tentative de connexion:', credentials.email)
+      
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
       })
 
+      // Gestion des erreurs Supabase
       if (error) {
-        console.error('❌ Erreur login:', error)
-        throw new AuthError(this.getErrorMessage(error.message))
+        console.error('❌ Erreur Supabase:', error)
+        throw AuthErrorFactory.fromSupabaseError(error)
       }
 
+      // Validation des données retournées
       if (!data.user) {
-        throw new AuthError('Aucun utilisateur trouvé')
+        throw new AuthError(
+          'Aucun utilisateur retourné par le serveur',
+          'NO_USER_RETURNED',
+          500
+        )
       }
 
-      // Récupérer le profil utilisateur
-      const profile = await this.getUserProfile(data.user.id)
-      
-      return {
-        id: data.user.id,
-        email: data.user.email!,
-        ...profile
+      console.log('✅ Connexion réussie:', data.user.email)
+      return data.user
+
+    } catch (error) {
+      // Si c'est déjà une AuthError, la propager
+      if (error instanceof AuthError) {
+        throw error
       }
 
-    } catch (error: any) {
-      console.error('❌ Erreur connexion:', error)
-      throw error instanceof AuthError ? error : new AuthError('Erreur de connexion')
+      // Si c'est une erreur réseau ou autre
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw AuthErrorFactory.networkError()
+      }
+
+      // Erreur inconnue
+      console.error('❌ Erreur inattendue lors de la connexion:', error)
+      throw new AuthError(
+        'Erreur inattendue lors de la connexion',
+        'UNEXPECTED_LOGIN_ERROR',
+        500
+      )
     }
   }
 
-  // Inscription utilisateur
-  static async signUp(
-    email: string, 
-    password: string, 
-    userData: {
-      name: string
-      user_type: 'producer' | 'professional'
-      language: 'fr' | 'en' | 'es'
-    }
-  ): Promise<{ needsConfirmation: boolean }> {
+  /**
+   * Inscription utilisateur
+   */
+  async signUp(credentials: SignUpCredentials): Promise<User> {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
+      console.log('📝 Tentative d\'inscription:', credentials.email)
+
+      const { data, error } = await this.supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
         options: {
           data: {
-            name: userData.name,
-            user_type: userData.user_type,
-            language: userData.language
+            name: credentials.name || '',
+            ...credentials.metadata
           }
         }
       })
 
       if (error) {
         console.error('❌ Erreur inscription:', error)
-        throw new AuthError(this.getErrorMessage(error.message))
+        throw AuthErrorFactory.fromSupabaseError(error)
       }
 
-      // Créer le profil utilisateur
-      if (data.user && !data.user.email_confirmed_at) {
-        await this.createUserProfile(data.user.id, userData)
+      if (!data.user) {
+        throw new AuthError(
+          'Échec de la création du compte',
+          'SIGNUP_FAILED',
+          500
+        )
       }
 
-      return {
-        needsConfirmation: !data.user?.email_confirmed_at
-      }
-
-    } catch (error: any) {
-      console.error('❌ Erreur inscription:', error)
-      throw error instanceof AuthError ? error : new AuthError('Erreur lors de l\'inscription')
-    }
-  }
-
-  // Réinitialisation mot de passe
-  static async resetPassword(email: string): Promise<void> {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`
-      })
-
-      if (error) {
-        console.error('❌ Erreur reset password:', error)
-        throw new AuthError(this.getErrorMessage(error.message))
-      }
-
-    } catch (error: any) {
-      console.error('❌ Erreur reset:', error)
-      throw error instanceof AuthError ? error : new AuthError('Erreur lors de la réinitialisation')
-    }
-  }
-
-  // Déconnexion
-  static async signOut(): Promise<void> {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('❌ Erreur logout:', error)
-        throw new AuthError('Erreur lors de la déconnexion')
-      }
-    } catch (error: any) {
-      console.error('❌ Erreur déconnexion:', error)
-      throw new AuthError('Erreur lors de la déconnexion')
-    }
-  }
-
-  // Récupérer session actuelle
-  static async getCurrentUser(): Promise<AuthUser | null> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session?.user) {
-        return null
-      }
-
-      const profile = await this.getUserProfile(session.user.id)
-      
-      return {
-        id: session.user.id,
-        email: session.user.email!,
-        ...profile
-      }
+      console.log('✅ Inscription réussie:', data.user.email)
+      return data.user
 
     } catch (error) {
-      console.error('❌ Erreur récupération utilisateur:', error)
+      if (error instanceof AuthError) {
+        throw error
+      }
+
+      console.error('❌ Erreur inattendue lors de l\'inscription:', error)
+      throw new AuthError(
+        'Erreur lors de la création du compte',
+        'UNEXPECTED_SIGNUP_ERROR',
+        500
+      )
+    }
+  }
+
+  /**
+   * Déconnexion utilisateur
+   */
+  async logout(): Promise<void> {
+    try {
+      console.log('🚪 Déconnexion en cours...')
+
+      const { error } = await this.supabase.auth.signOut()
+
+      if (error) {
+        console.error('❌ Erreur déconnexion:', error)
+        throw AuthErrorFactory.fromSupabaseError(error)
+      }
+
+      console.log('✅ Déconnexion réussie')
+
+    } catch (error) {
+      if (error instanceof AuthError) {
+        throw error
+      }
+
+      console.error('❌ Erreur inattendue lors de la déconnexion:', error)
+      throw new AuthError(
+        'Erreur lors de la déconnexion',
+        'UNEXPECTED_LOGOUT_ERROR',
+        500
+      )
+    }
+  }
+
+  /**
+   * Obtenir l'utilisateur actuel
+   */
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const { data: { user }, error } = await this.supabase.auth.getUser()
+
+      if (error) {
+        console.error('❌ Erreur récupération utilisateur:', error)
+        return null // Ne pas throw pour cette méthode
+      }
+
+      return user
+
+    } catch (error) {
+      console.error('❌ Erreur inattendue récupération utilisateur:', error)
       return null
     }
   }
 
-  // Créer profil utilisateur
-  private static async createUserProfile(userId: string, userData: any): Promise<void> {
+  /**
+   * Réinitialisation mot de passe
+   */
+  async resetPassword(email: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            id: userId,
-            name: userData.name,
-            user_type: userData.user_type,
-            language: userData.language,
-            created_at: new Date().toISOString()
-          }
-        ])
+      console.log('🔄 Réinitialisation mot de passe:', email)
+
+      const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
 
       if (error) {
-        console.error('❌ Erreur création profil:', error)
+        console.error('❌ Erreur réinitialisation:', error)
+        throw AuthErrorFactory.fromSupabaseError(error)
       }
+
+      console.log('✅ Email de réinitialisation envoyé')
+
     } catch (error) {
-      console.error('❌ Erreur profil:', error)
-    }
-  }
-
-  // Récupérer profil utilisateur
-  private static async getUserProfile(userId: string): Promise<Partial<AuthUser>> {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('name, user_type, language')
-        .eq('id', userId)
-        .single()
-
-      if (error || !data) {
-        return {}
+      if (error instanceof AuthError) {
+        throw error
       }
 
-      return {
-        name: data.name,
-        user_type: data.user_type,
-        language: data.language
-      }
-    } catch (error) {
-      console.error('❌ Erreur récupération profil:', error)
-      return {}
+      console.error('❌ Erreur inattendue réinitialisation:', error)
+      throw new AuthError(
+        'Erreur lors de la réinitialisation',
+        'UNEXPECTED_RESET_ERROR',
+        500
+      )
     }
   }
 
-  // Messages d'erreur traduits
-  private static getErrorMessage(error: string): string {
-    const errorMessages: { [key: string]: string } = {
-      'Invalid login credentials': 'Email ou mot de passe incorrect',
-      'Email not confirmed': 'Veuillez confirmer votre email avant de vous connecter',
-      'User already registered': 'Un compte existe déjà avec cette adresse email',
-      'Password should be at least 6 characters': 'Le mot de passe doit contenir au moins 6 caractères',
-      'Unable to validate email address: invalid format': 'Format d\'email invalide',
-      'Signup is disabled': 'Les inscriptions sont temporairement désactivées',
-      'Too many requests': 'Trop de tentatives. Veuillez patienter quelques minutes.',
-      'Invalid email': 'Adresse email invalide'
-    }
-
-    return errorMessages[error] || error || 'Une erreur est survenue'
-  }
-}
-
-// Hook pour utiliser l'authentification
-export function useAuthState() {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Récupérer utilisateur initial
-    AuthService.getCurrentUser().then(user => {
-      setUser(user)
-      setLoading(false)
+  /**
+   * Écouter les changements d'état d'authentification
+   */
+  onAuthStateChange(callback: (user: User | null) => void) {
+    return this.supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Changement d\'état auth:', event)
+      callback(session?.user || null)
     })
-
-    // Écouter les changements d'état d'auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          const profile = await AuthService.getUserProfile(session.user.id)
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            ...profile
-          })
-        } else {
-          setUser(null)
-        }
-        setLoading(false)
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  return { user, loading }
+  }
 }
+
+// Export d'une instance singleton
+export const authService = new AuthService()
+
+// Export des types d'erreurs pour l'utilisation dans les composants
+export {
+  AuthError,
+  InvalidCredentialsError,
+  EmailNotConfirmedError,
+  TooManyRequestsError,
+  NetworkError
+} from './errors/auth-errors'
