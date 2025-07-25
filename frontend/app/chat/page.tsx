@@ -2,6 +2,21 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 
+// ==================== CONFIGURATION API ====================
+const API_CONFIG = {
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app',
+  ENDPOINTS: {
+    ASK: '/api/api/v1/expert/ask',
+    ASK_PUBLIC: '/api/api/v1/expert/ask-public',
+    FEEDBACK: '/api/api/v1/expert/feedback',
+    HISTORY: '/api/api/v1/expert/history',
+    TOPICS: '/api/api/v1/expert/topics',
+    HEALTH: '/api/health'
+  },
+  TIMEOUT: 30000, // 30 secondes
+  RETRY_ATTEMPTS: 2
+}
+
 // ==================== STORES SIMULÉS ====================
 const useAuthStore = () => ({
   user: {
@@ -18,8 +33,6 @@ const useAuthStore = () => ({
   initializeSession: async () => {
     try {
       console.log('🔄 Initialisation de la session...')
-      // Logique d'initialisation de session Supabase
-      // Pour le moment, simulation d'une initialisation réussie
       await new Promise(resolve => setTimeout(resolve, 500))
       return true
     } catch (error) {
@@ -80,6 +93,129 @@ interface Message {
   isUser: boolean
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
+  processing_time?: number
+  mode?: string
+}
+
+interface APIResponse {
+  question: string
+  response: string
+  mode: string
+  note?: string
+  sources?: Array<any>
+  timestamp: string
+  processing_time: number
+  language: string
+}
+
+// ==================== UTILITAIRES API ====================
+class APIClient {
+  private static async makeRequest(
+    url: string, 
+    options: RequestInit = {},
+    retries: number = API_CONFIG.RETRY_ATTEMPTS
+  ): Promise<Response> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...options.headers
+        }
+      })
+
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      return response
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      
+      if (retries > 0 && (error.name === 'AbortError' || error.message.includes('fetch'))) {
+        console.warn(`⚠️ Tentative ${API_CONFIG.RETRY_ATTEMPTS - retries + 1} échouée, retry...`)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (API_CONFIG.RETRY_ATTEMPTS - retries + 1)))
+        return this.makeRequest(url, options, retries - 1)
+      }
+      
+      throw error
+    }
+  }
+
+  static async askQuestion(
+    question: string, 
+    language: string = 'fr',
+    useAuth: boolean = false
+  ): Promise<APIResponse> {
+    const endpoint = useAuth ? API_CONFIG.ENDPOINTS.ASK : API_CONFIG.ENDPOINTS.ASK_PUBLIC
+    const url = `${API_CONFIG.BASE_URL}${endpoint}`
+    
+    console.log('🤖 Envoi question:', { question: question.substring(0, 50), url, useAuth })
+
+    const body = JSON.stringify({
+      text: question.trim(),
+      language,
+      speed_mode: 'balanced'
+    })
+
+    const headers: Record<string, string> = {}
+    
+    // TODO: Ajouter authentification réelle quand nécessaire
+    if (useAuth) {
+      // headers['Authorization'] = `Bearer ${realToken}`
+    }
+
+    const response = await this.makeRequest(url, {
+      method: 'POST',
+      body,
+      headers
+    })
+
+    const data = await response.json()
+    console.log('✅ Réponse API reçue:', { 
+      mode: data.mode, 
+      processing_time: data.processing_time,
+      language: data.language 
+    })
+
+    return data
+  }
+
+  static async submitFeedback(messageId: string, rating: number): Promise<void> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FEEDBACK}`
+      await this.makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({
+          question_id: messageId,
+          rating: rating === 1 ? 5 : 1 // Convertir thumbs up/down en rating 1-5
+        })
+      })
+      console.log('✅ Feedback envoyé')
+    } catch (error) {
+      console.warn('⚠️ Erreur envoi feedback:', error)
+      // Ne pas bloquer l'interface pour les erreurs de feedback
+    }
+  }
+
+  static async checkHealth(): Promise<boolean> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.HEALTH}`
+      const response = await this.makeRequest(url, { method: 'GET' })
+      const data = await response.json()
+      return data.status === 'healthy'
+    } catch (error) {
+      console.error('❌ Health check failed:', error)
+      return false
+    }
+  }
 }
 
 // ==================== ICÔNES SVG ====================
@@ -131,6 +267,12 @@ const TrashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   </svg>
 )
 
+const AlertTriangleIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
+)
+
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <img 
@@ -138,6 +280,16 @@ const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
     alt="Intelia Logo" 
     className={className}
   />
+)
+
+// ==================== STATUS SYSTEM ====================
+const SystemStatus = ({ isHealthy }: { isHealthy: boolean }) => (
+  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs ${
+    isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+  }`}>
+    <div className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-green-600' : 'bg-red-600'}`} />
+    <span>{isHealthy ? 'Système opérationnel' : 'Problème système'}</span>
+  </div>
 )
 
 // ==================== MENU HISTORIQUE ====================
@@ -293,6 +445,8 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [systemHealthy, setSystemHealthy] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
 
@@ -314,115 +468,37 @@ export default function ChatInterface() {
     scrollToBottom()
   }, [messages])
 
-  // Message de bienvenue
+  // Message de bienvenue + Health check
   useEffect(() => {
-    const welcomeMessage: Message = {
-      id: '1',
-      content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
-      isUser: false,
-      timestamp: new Date()
+    const initializeChat = async () => {
+      // Health check initial
+      const isHealthy = await APIClient.checkHealth()
+      setSystemHealthy(isHealthy)
+
+      // Message de bienvenue
+      const welcomeMessage: Message = {
+        id: '1',
+        content: "Bonjour ! Je suis votre expert IA en santé et nutrition animale. Comment puis-je vous aider aujourd'hui ?",
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages([welcomeMessage])
     }
-    setMessages([welcomeMessage])
+
+    initializeChat()
   }, [])
 
-  // Générer réponse RAG
-  const generateAIResponse = async (question: string): Promise<string> => {
-    try {
-      console.log('🤖 Envoi question au RAG Intelia:', question)
-      
-      // Utiliser l'URL de l'API depuis les variables d'environnement
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/expert/ask`
-      console.log('📡 URL API:', apiUrl)
-      
-      // Headers avec authentification Supabase
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-      
-      // Ajouter le token Supabase pour l'authentification
-      const supabaseToken = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (supabaseToken) {
-        headers['Authorization'] = `Bearer ${supabaseToken}`
-        console.log('🔑 Token Supabase ajouté pour authentification')
-      }
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          question: question.trim(),
-          user_id: user?.id || 'demo_user',
-          language: user?.language || 'fr',
-          context: {
-            user_type: user?.user_type || 'producer',
-            timestamp: new Date().toISOString()
-          }
-        })
-      })
+  // Health check périodique
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const isHealthy = await APIClient.checkHealth()
+      setSystemHealthy(isHealthy)
+    }, 60000) // Chaque minute
 
-      console.log('📊 Statut réponse API:', response.status, response.statusText)
+    return () => clearInterval(interval)
+  }, [])
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Erreur API détaillée:', errorText)
-        
-        if (response.status === 403) {
-          throw new Error(`Authentification requise. Vérifiez que le token Supabase est correct. Status: ${response.status}`)
-        }
-        
-        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log('✅ Réponse RAG reçue:', data)
-      
-      if (data.answer || data.response || data.message) {
-        return data.answer || data.response || data.message
-      } else {
-        console.warn('⚠️ Structure de réponse inattendue:', data)
-        return 'Le système RAG a répondu mais dans un format inattendu.'
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erreur lors de l\'appel au RAG:', error)
-      
-      if (error.message.includes('403')) {
-        return `🔒 **Problème d'authentification avec l'API**
-
-**Solutions possibles :**
-1. Vérifiez que les variables d'environnement sont bien configurées
-2. Le token Supabase est-il valide dans votre API ?
-3. L'API attend-elle un autre type d'authentification ?
-
-**Variables d'environnement :**
-- NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || 'NON DÉFINIE'}
-- Token Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'PRÉSENT' : 'MANQUANT'}
-
-**Erreur détaillée :** ${error.message}`
-      }
-      
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        return `Erreur de connexion au serveur RAG. 
-
-🔧 **Vérifications suggérées :**
-- Le serveur ${process.env.NEXT_PUBLIC_API_URL || 'DigitalOcean'} est-il accessible ?
-- Y a-t-il des problèmes de CORS ?
-- Le service est-il en cours d'exécution ?
-
-**Erreur technique :** ${error.message}`
-      }
-      
-      return `Erreur technique avec l'API : ${error.message}
-
-**URL testée :** ${process.env.NEXT_PUBLIC_API_URL}/api/v1/expert/ask
-**Type d'erreur :** ${error.name}
-
-Consultez la console développeur (F12) pour plus de détails.`
-    }
-  }
-
-  // Envoi message
+  // Envoi message avec gestion d'erreurs robuste
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -436,38 +512,77 @@ Consultez la console développeur (F12) pour plus de détails.`
     setMessages(prev => [...prev, userMessage])
     setInputMessage('')
     setIsLoading(true)
+    setError(null)
 
     try {
-      const response = await generateAIResponse(text.trim())
+      console.log('🚀 Envoi question à l\'API Intelia Expert')
+      const startTime = Date.now()
       
+      // Utiliser l'endpoint public pour éviter les problèmes d'auth
+      const result = await APIClient.askQuestion(text.trim(), user?.language || 'fr', false)
+      
+      const processingTime = Date.now() - startTime
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response,
+        content: result.response,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        processing_time: result.processing_time || processingTime / 1000,
+        mode: result.mode
       }
 
       setMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('❌ Error generating response:', error)
-      const errorMessage: Message = {
+      
+      console.log('✅ Réponse reçue:', {
+        mode: result.mode,
+        processing_time: result.processing_time,
+        sources: result.sources?.length || 0
+      })
+
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'envoi:', error)
+      
+      let errorMessage = "Désolé, je rencontre un problème technique."
+      
+      if (error.message.includes('timeout') || error.name === 'AbortError') {
+        errorMessage = "La requête a pris trop de temps. Veuillez réessayer avec une question plus courte."
+      } else if (error.message.includes('404')) {
+        errorMessage = "Service temporairement indisponible. Nos équipes sont notifiées."
+      } else if (error.message.includes('500')) {
+        errorMessage = "Erreur serveur temporaire. Veuillez réessayer dans quelques instants."
+      } else if (!navigator.onLine) {
+        errorMessage = "Pas de connexion internet. Vérifiez votre connexion et réessayez."
+      }
+
+      const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
+        content: errorMessage,
         isUser: false,
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMessage])
+
+      setMessages(prev => [...prev, errorMsg])
+      setError(error.message)
+      setSystemHealthy(false)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Gestion feedback
-  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
+  // Gestion feedback avec API
+  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     setMessages(prev => prev.map(msg => 
       msg.id === messageId ? { ...msg, feedback } : msg
     ))
+    
     console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
+    
+    try {
+      await APIClient.submitFeedback(messageId, feedback === 'positive' ? 1 : 0)
+    } catch (error) {
+      console.warn('⚠️ Erreur feedback:', error)
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -478,10 +593,11 @@ Consultez la console développeur (F12) pour plus de détails.`
   const handleNewConversation = () => {
     setMessages([{
       id: '1',
-      content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
+      content: "Bonjour ! Je suis votre expert IA en santé et nutrition animale. Comment puis-je vous aider aujourd'hui ?",
       isUser: false,
       timestamp: new Date()
     }])
+    setError(null)
   }
 
   const getCurrentDate = () => {
@@ -494,7 +610,7 @@ Consultez la console développeur (F12) pour plus de détails.`
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
+      {/* Header avec status système */}
       <header className="bg-white border-b border-gray-100 px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Boutons à gauche */}
@@ -514,6 +630,7 @@ Consultez la console développeur (F12) pour plus de détails.`
             <InteliaLogo className="w-8 h-8" />
             <div className="text-center">
               <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              <SystemStatus isHealthy={systemHealthy} />
             </div>
           </div>
           
@@ -523,6 +640,22 @@ Consultez la console développeur (F12) pour plus de détails.`
           </div>
         </div>
       </header>
+
+      {/* Erreur système si présente */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertTriangleIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                Problème de connexion détecté. {error}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zone de messages */}
       <div className="flex-1 overflow-hidden flex flex-col">
@@ -551,6 +684,16 @@ Consultez la console développeur (F12) pour plus de détails.`
                       <p className="whitespace-pre-wrap leading-relaxed text-sm">
                         {message.content}
                       </p>
+                      
+                      {/* Info technique pour les réponses IA */}
+                      {!message.isUser && message.processing_time && (
+                        <div className="mt-2 text-xs text-gray-500 border-t pt-2">
+                          <span>⚡ {message.processing_time}s</span>
+                          {message.mode && (
+                            <span className="ml-2">🤖 {message.mode}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
                     {/* Boutons de feedback */}
@@ -625,7 +768,8 @@ Consultez la console développeur (F12) pour plus de détails.`
               <button
                 type="button"
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title="Enregistrement vocal"
+                title="Bientôt disponible"
+                disabled
               >
                 <MicrophoneIcon />
               </button>
@@ -635,9 +779,10 @@ Consultez la console développeur (F12) pour plus de détails.`
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
+                  placeholder="Posez votre question sur la santé et nutrition animale..."
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
                   disabled={isLoading}
+                  maxLength={1000}
                 />
               </div>
               
@@ -650,10 +795,10 @@ Consultez la console développeur (F12) pour plus de détails.`
               </button>
             </form>
             
-            {/* Indicateur RAG en bas */}
+            {/* Footer avec infos */}
             <div className="mt-2 text-center">
               <span className="text-xs text-gray-400">
-                🔍 Assistant IA spécialisé en santé et nutrition animale
+                🔍 Assistant IA spécialisé • API v2.1.0 • {systemHealthy ? '🟢' : '🔴'} Statut système
               </span>
             </div>
           </div>
