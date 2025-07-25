@@ -54,9 +54,9 @@ export default function ProfilePage() {
     }
 
     setFormData({
-      fullName: user.fullName,
+      fullName: user.name,           // CORRIGÉ: user.name au lieu de user.fullName
       email: user.email,
-      userType: user.userType
+      userType: user.user_type       // CORRIGÉ: user.user_type au lieu de user.userType
     })
 
     // Gérer l'onglet depuis l'URL
@@ -88,8 +88,8 @@ export default function ProfilePage() {
 
     try {
       await updateProfile({
-        fullName: formData.fullName,
-        userType: formData.userType
+        name: formData.fullName,      // CORRIGÉ: name au lieu de fullName
+        user_type: formData.userType  // CORRIGÉ: user_type au lieu de userType
       })
       setSuccess('Profil mis à jour avec succès')
     } catch (error: any) {
@@ -193,13 +193,13 @@ export default function ProfilePage() {
           <div className="px-6 py-8 border-b border-gray-200">
             <div className="flex items-center space-x-6">
               <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                {getInitials(user.fullName)}
+                {getInitials(user.name)}  {/* CORRIGÉ: user.name au lieu de user.fullName */}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{user.fullName}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>  {/* CORRIGÉ: user.name */}
                 <p className="text-gray-600">{user.email}</p>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getBadgeColor(user.userType)}`}>
-                  {getUserTypeLabel(user.userType)}
+                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getBadgeColor(user.user_type)}`}>
+                  {getUserTypeLabel(user.user_type)}  {/* CORRIGÉ: user.user_type */}
                 </div>
               </div>
             </div>
@@ -398,7 +398,7 @@ export default function ProfilePage() {
                       <h4 className="font-medium text-gray-900 mb-2">Politique de conservation</h4>
                       <p className="text-sm text-gray-600">
                         Vos données de conversation sont automatiquement supprimées après 30 jours.
-                        Dernière connexion : {new Date(user.lastLogin).toLocaleString('fr-FR')}
+                        Dernière connexion : {new Date(user.created_at).toLocaleString('fr-FR')}  {/* CORRIGÉ: user.created_at au lieu de user.lastLogin */}
                       </p>
                     </div>
                   </div>
