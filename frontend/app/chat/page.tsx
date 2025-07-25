@@ -536,34 +536,20 @@ export default function ChatInterface() {
     try {
       console.log('🤖 Envoi question au RAG Intelia:', question)
       
-      // Utiliser l'URL de l'API depuis les variables d'environnement
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/expert/ask`
+      // URL corrigée - utiliser l'endpoint public
+      const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
       console.log('📡 URL API:', apiUrl)
-      
-      // Headers avec authentification Supabase
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-      
-      // Ajouter le token Supabase pour l'authentification
-      const supabaseToken = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (supabaseToken) {
-        headers['Authorization'] = `Bearer ${supabaseToken}`
-        console.log('🔑 Token Supabase ajouté pour authentification')
-      }
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
-          question: question.trim(),
-          user_id: user?.id || 'demo_user',
+          text: question.trim(),
           language: user?.language || 'fr',
-          context: {
-            user_type: user?.user_type || 'producer',
-            timestamp: new Date().toISOString()
-          }
+          speed_mode: 'balanced'
         })
       })
 
@@ -572,19 +558,14 @@ export default function ChatInterface() {
       if (!response.ok) {
         const errorText = await response.text()
         console.error('❌ Erreur API détaillée:', errorText)
-        
-        if (response.status === 403) {
-          throw new Error(`Authentification requise. Vérifiez que le token Supabase est correct. Status: ${response.status}`)
-        }
-        
         throw new Error(`Erreur API: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
       console.log('✅ Réponse RAG reçue:', data)
       
-      if (data.answer || data.response || data.message) {
-        return data.answer || data.response || data.message
+      if (data.response || data.answer || data.message) {
+        return data.response || data.answer || data.message
       } else {
         console.warn('⚠️ Structure de réponse inattendue:', data)
         return 'Le système RAG a répondu mais dans un format inattendu.'
@@ -593,26 +574,11 @@ export default function ChatInterface() {
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'appel au RAG:', error)
       
-      if (error.message.includes('403')) {
-        return `🔒 **Problème d'authentification avec l'API**
-
-**Solutions possibles :**
-1. Vérifiez que les variables d'environnement sont bien configurées
-2. Le token Supabase est-il valide dans votre API ?
-3. L'API attend-elle un autre type d'authentification ?
-
-**Variables d'environnement :**
-- NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || 'NON DÉFINIE'}
-- Token Supabase: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'PRÉSENT' : 'MANQUANT'}
-
-**Erreur détaillée :** ${error.message}`
-      }
-      
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         return `Erreur de connexion au serveur RAG. 
 
 🔧 **Vérifications suggérées :**
-- Le serveur ${process.env.NEXT_PUBLIC_API_URL || 'DigitalOcean'} est-il accessible ?
+- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
 - Y a-t-il des problèmes de CORS ?
 - Le service est-il en cours d'exécution ?
 
@@ -621,7 +587,7 @@ export default function ChatInterface() {
       
       return `Erreur technique avec l'API : ${error.message}
 
-**URL testée :** ${process.env.NEXT_PUBLIC_API_URL}/api/v1/expert/ask
+**URL testée :** ${apiUrl}
 **Type d'erreur :** ${error.name}
 
 Consultez la console développeur (F12) pour plus de détails.`
