@@ -183,12 +183,6 @@ const ThumbDownIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 )
 
-const MicrophoneIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-  </svg>
-)
-
 const TrashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -295,13 +289,13 @@ const UserMenuButton = () => {
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   const handleContactClick = () => {
-    window.open('mailto:support@intelia.com?subject=Support Intelia Expert', '_blank')
     setIsOpen(false)
+    console.log('Contact support cliqué')
   }
 
   const handleUserInfoClick = () => {
-    alert(`Informations utilisateur:\n\nNom: ${user?.name}\nEmail: ${user?.email}\nType: ${user?.user_type}\nMembre depuis: ${new Date(user?.created_at || '').toLocaleDateString('fr-FR')}`)
     setIsOpen(false)
+    console.log('Informations utilisateur cliqué')
   }
 
   return (
@@ -417,7 +411,7 @@ export default function ChatInterface() {
     initializeChat()
   }, [])
 
-  // Envoi message - ✅ CORRIGÉ
+  // Envoi message
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -466,11 +460,6 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVEAU - Handler pour le bouton (résout l'erreur TypeScript)
-  const handleSendClick = () => {
-    handleSendMessage()
-  }
-
   // Gestion feedback
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     setMessages(prev => prev.map(msg => 
@@ -498,9 +487,10 @@ export default function ChatInterface() {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
+      {/* Header avec zone de saisie */}
       <header className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          {/* Boutons à gauche */}
           <div className="flex items-center space-x-2">
             <HistoryMenu />
             <button
@@ -512,137 +502,9 @@ export default function ChatInterface() {
             </button>
           </div>
 
-          <div className="flex-1 flex justify-center items-center space-x-3">
-            <InteliaLogo className="w-8 h-8" />
-            <div className="text-center">
-              <h1 className="text-lg font-medium text-gray-900">Intelia | Expert</h1>
-              <SystemStatus isHealthy={systemHealthy} />
-            </div>
-          </div>
-          
-          <div className="flex items-center">
-            <UserMenuButton />
-          </div>
-        </div>
-      </header>
-
-      {/* Zone de messages */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {messages.length > 0 && (
-              <div className="text-center">
-                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                  {getCurrentDate()}
-                </span>
-              </div>
-            )}
-
-            {messages.map((message, index) => (
-              <div key={message.id}>
-                <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                  {!message.isUser && (
-                    <div className="relative">
-                      <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                    </div>
-                  )}
-                  
-                  <div className="max-w-xs lg:max-w-2xl">
-                    <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                      <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                        {message.content}
-                      </p>
-                      
-                      {!message.isUser && message.processing_time && (
-                        <div className="mt-2 text-xs text-gray-500 border-t pt-2">
-                          <span>⚡ {message.processing_time}s</span>
-                          {message.mode && (
-                            <span className="ml-2">🤖 {message.mode}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {!message.isUser && index > 0 && (
-                      <div className="flex items-center space-x-2 mt-2 ml-2">
-                        <button
-                          onClick={() => handleFeedback(message.id, 'positive')}
-                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
-                          title="Réponse utile"
-                        >
-                          <ThumbUpIcon />
-                        </button>
-                        <button
-                          onClick={() => handleFeedback(message.id, 'negative')}
-                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
-                          title="Réponse non utile"
-                        >
-                          <ThumbDownIcon />
-                        </button>
-                        {message.fallback_used && (
-                          <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full" title="Système de secours utilisé">
-                            🔄 Fallback
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {message.isUser && (
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <UserIcon className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                {!message.isUser && index === 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                    {suggestedTopics.map((topic, topicIndex) => (
-                      <button
-                        key={topicIndex}
-                        onClick={() => handleSendMessage(`Tell me about ${topic.label}`)}
-                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 ${topic.color}`}
-                      >
-                        {topic.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex items-start space-x-3">
-                <div className="relative">
-                  <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                </div>
-                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Zone de saisie - ✅ CORRIGÉE */}
-        <div className="px-4 py-4 bg-white border-t border-gray-100">
-          <div className="max-w-4xl mx-auto">
+          {/* Zone de saisie centrée */}
+          <div className="flex-1 max-w-2xl mx-8">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title="Bientôt disponible"
-                disabled
-              >
-                <MicrophoneIcon />
-              </button>
-              
               <div className="flex-1 relative">
                 <input
                   type="text"
@@ -651,7 +513,7 @@ export default function ChatInterface() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      handleSendClick() // ✅ Utilise la nouvelle fonction
+                      handleSendMessage()
                     }
                   }}
                   placeholder="Posez votre question…"
@@ -662,20 +524,140 @@ export default function ChatInterface() {
               </div>
               
               <button
-                onClick={handleSendClick} // ✅ CORRIGÉ - Utilise handleSendClick au lieu de handleSendMessage
+                onClick={() => handleSendMessage()}
                 disabled={isLoading || !inputMessage.trim()}
                 className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
               >
                 <PaperAirplaneIcon />
               </button>
             </div>
-            
-            <div className="mt-2 text-center">
-              <span className="text-xs text-gray-400">
-                🔍 Assistant IA spécialisé • API v2.1.0 • {systemHealthy ? '🟢' : '🔴'} Statut système
+          </div>
+          
+          {/* Avatar utilisateur à droite */}
+          <div className="flex items-center">
+            <UserMenuButton />
+          </div>
+        </div>
+
+        {/* Logo et status en dessous */}
+        <div className="max-w-4xl mx-auto mt-3 flex justify-center items-center space-x-3">
+          <InteliaLogo className="w-8 h-8" />
+          <div className="text-center">
+            <h1 className="text-lg font-medium text-gray-900">Intelia | Expert</h1>
+            <SystemStatus isHealthy={systemHealthy} />
+          </div>
+        </div>
+      </header>
+
+      {/* Zone de messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {messages.length > 0 && (
+            <div className="text-center">
+              <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                {getCurrentDate()}
               </span>
             </div>
-          </div>
+          )}
+
+          {messages.map((message, index) => (
+            <div key={message.id}>
+              <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                {!message.isUser && (
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                )}
+                
+                <div className="max-w-xs lg:max-w-2xl">
+                  <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                    <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                      {message.content}
+                    </p>
+                    
+                    {!message.isUser && message.processing_time && (
+                      <div className="mt-2 text-xs text-gray-500 border-t pt-2">
+                        <span>⚡ {message.processing_time}s</span>
+                        {message.mode && (
+                          <span className="ml-2">🤖 {message.mode}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {!message.isUser && index > 0 && (
+                    <div className="flex items-center space-x-2 mt-2 ml-2">
+                      <button
+                        onClick={() => handleFeedback(message.id, 'positive')}
+                        className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                        title="Réponse utile"
+                      >
+                        <ThumbUpIcon />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(message.id, 'negative')}
+                        className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                        title="Réponse non utile"
+                      >
+                        <ThumbDownIcon />
+                      </button>
+                      {message.fallback_used && (
+                        <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full" title="Système de secours utilisé">
+                          🔄 Fallback
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {message.isUser && (
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <UserIcon className="w-5 h-5 text-white" />
+                  </div>
+                )}
+              </div>
+
+              {!message.isUser && index === 0 && (
+                <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                  {suggestedTopics.map((topic, topicIndex) => (
+                    <button
+                      key={topicIndex}
+                      onClick={() => handleSendMessage(`Tell me about ${topic.label}`)}
+                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 ${topic.color}`}
+                    >
+                      {topic.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex items-start space-x-3">
+              <div className="relative">
+                <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+              </div>
+              <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Footer avec informations */}
+      <div className="px-4 py-2 bg-white border-t border-gray-100">
+        <div className="max-w-4xl mx-auto text-center">
+          <span className="text-xs text-gray-400">
+            🔍 Assistant IA spécialisé • API v2.1.0 • {systemHealthy ? '🟢' : '🔴'} Statut système
+          </span>
         </div>
       </div>
     </div>
