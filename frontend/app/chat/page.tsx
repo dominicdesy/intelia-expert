@@ -189,7 +189,205 @@ const TrashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   </svg>
 )
 
-// ==================== LOGO INTELIA ====================
+// ==================== COMPOSANTS MODAL ====================
+const Modal = ({ isOpen, onClose, title, children }: {
+  isOpen: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <>
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+        onClick={onClose}
+      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+          <div className="p-6">
+            {children}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) => (
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+      <input
+        type="text"
+        defaultValue={user?.name}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+      <input
+        type="email"
+        defaultValue={user?.email}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Type d'utilisateur</label>
+      <select 
+        defaultValue={user?.user_type}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="producer">Producteur</option>
+        <option value="professional">Professionnel</option>
+      </select>
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Langue préférée</label>
+      <select 
+        defaultValue={user?.language}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+        <option value="es">Español</option>
+      </select>
+    </div>
+    <div className="flex justify-end space-x-3 pt-4">
+      <button
+        onClick={onClose}
+        className="px-4 py-2 text-gray-600 hover:text-gray-800"
+      >
+        Annuler
+      </button>
+      <button
+        onClick={() => {
+          console.log('Sauvegarde des informations utilisateur')
+          onClose()
+        }}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+      >
+        Sauvegarder
+      </button>
+    </div>
+  </div>
+)
+
+const ContactModal = ({ onClose }: { onClose: () => void }) => (
+  <div className="space-y-6">
+    {/* Chat with us */}
+    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl">💬</span>
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-900 mb-2">Chat with us</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          Get in touch with our support team via in app chat.
+        </p>
+        <button 
+          onClick={() => {
+            console.log('Chat support ouvert')
+            onClose()
+          }}
+          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+        >
+          Contact Intelia support
+        </button>
+      </div>
+    </div>
+
+    {/* Call Us */}
+    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl">📞</span>
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-900 mb-2">Call Us</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          If you can't find a solution to your problem, call us to talk directly with our support team.
+        </p>
+        <a 
+          href="tel:+18666666221"
+          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+        >
+          +1 (866) 666 6221
+        </a>
+      </div>
+    </div>
+
+    {/* Email Us */}
+    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl">📧</span>
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-900 mb-2">Email Us</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          Send us a detailed message and we'll get back to you as soon as possible.
+        </p>
+        <a 
+          href="mailto:support@intelia.com"
+          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+        >
+          support@intelia.com
+        </a>
+      </div>
+    </div>
+
+    {/* Visit our website */}
+    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl">🌐</span>
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-900 mb-2">Visit our website</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          To know more about us and the Intelia platform, visit our website.
+        </p>
+        <a 
+          href="https://www.intelia.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+        >
+          www.intelia.com
+        </a>
+      </div>
+    </div>
+
+    {/* Hours */}
+    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+      <h4 className="font-medium text-blue-900 mb-2">Support Hours</h4>
+      <p className="text-sm text-blue-700">
+        Monday - Friday: 9:00 AM - 5:00 PM (EST)<br/>
+        Saturday - Sunday: Closed
+      </p>
+    </div>
+
+    <div className="flex justify-end pt-4">
+      <button
+        onClick={onClose}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)
 const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <div className={`${className} bg-blue-600 rounded-lg flex items-center justify-center`}>
     <span className="text-white font-bold text-xs">I</span>
@@ -284,85 +482,106 @@ const HistoryMenu = () => {
 const UserMenuButton = () => {
   const { user, logout } = useAuthStore()
   const [isOpen, setIsOpen] = useState(false)
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   const handleContactClick = () => {
     setIsOpen(false)
-    console.log('Contact support cliqué')
+    setShowContactModal(true)
   }
 
   const handleUserInfoClick = () => {
     setIsOpen(false)
-    console.log('Informations utilisateur cliqué')
+    setShowUserInfoModal(true)
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
-      >
-        <span className="text-white text-xs font-medium">{userInitials}</span>
-      </button>
+    <>
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
+        >
+          <span className="text-white text-xs font-medium">{userInitials}</span>
+        </button>
 
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Membre depuis {new Date(user?.created_at || '').toLocaleDateString('fr-FR')}
-              </p>
-            </div>
-
-            <button
-              onClick={handleUserInfoClick}
-              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <span>👤</span>
-              <span>Mes informations</span>
-            </button>
-
-            <button
-              onClick={handleContactClick}
-              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <span>📞</span>
-              <span>Nous joindre</span>
-            </button>
-
-            <button
-              onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
-              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <span>⚖️</span>
-              <span>Mentions légales</span>
-            </button>
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setIsOpen(false)}
+            />
             
-            <div className="border-t border-gray-100 mt-2 pt-2">
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Membre depuis {new Date(user?.created_at || '').toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+
               <button
-                onClick={() => {
-                  logout()
-                  setIsOpen(false)
-                }}
+                onClick={handleUserInfoClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span>🚪</span>
-                <span>Déconnexion</span>
+                <span>👤</span>
+                <span>Mes informations</span>
               </button>
+
+              <button
+                onClick={handleContactClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <span>📞</span>
+                <span>Nous joindre</span>
+              </button>
+
+              <button
+                onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <span>⚖️</span>
+                <span>Mentions légales</span>
+              </button>
+              
+              <div className="border-t border-gray-100 mt-2 pt-2">
+                <button
+                  onClick={() => {
+                    logout()
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <span>🚪</span>
+                  <span>Déconnexion</span>
+                </button>
+              </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title="Mes informations"
+      >
+        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        title="Nous joindre"
+      >
+        <ContactModal onClose={() => setShowContactModal(false)} />
+      </Modal>
+    </>
   )
 }
 
@@ -487,10 +706,9 @@ export default function ChatInterface() {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header avec zone de saisie */}
+      {/* Header */}
       <header className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          {/* Boutons à gauche */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <HistoryMenu />
             <button
@@ -502,56 +720,23 @@ export default function ChatInterface() {
             </button>
           </div>
 
-          {/* Zone de saisie centrée */}
-          <div className="flex-1 max-w-2xl mx-8">
-            <div className="flex items-center space-x-3">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                  placeholder="Posez votre question…"
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                  disabled={isLoading}
-                  maxLength={1000}
-                />
-              </div>
-              
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputMessage.trim()}
-                className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
-              >
-                <PaperAirplaneIcon />
-              </button>
+          <div className="flex-1 flex justify-center items-center space-x-3">
+            <InteliaLogo className="w-8 h-8" />
+            <div className="text-center">
+              <h1 className="text-lg font-medium text-gray-900">Intelia | Expert</h1>
             </div>
           </div>
           
-          {/* Avatar utilisateur à droite */}
           <div className="flex items-center">
             <UserMenuButton />
-          </div>
-        </div>
-
-        {/* Logo et status en dessous */}
-        <div className="max-w-4xl mx-auto mt-3 flex justify-center items-center space-x-3">
-          <InteliaLogo className="w-8 h-8" />
-          <div className="text-center">
-            <h1 className="text-lg font-medium text-gray-900">Intelia | Expert</h1>
-            <SystemStatus isHealthy={systemHealthy} />
           </div>
         </div>
       </header>
 
       {/* Zone de messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
           {messages.length > 0 && (
             <div className="text-center">
               <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
@@ -617,8 +802,7 @@ export default function ChatInterface() {
                 )}
               </div>
 
-              {!message.isUser && index === 0 && (
-                <div className="mt-4 flex flex-wrap gap-2 justify-center">
+<div className="mt-4 flex flex-wrap gap-2 justify-center">
                   {suggestedTopics.map((topic, topicIndex) => (
                     <button
                       key={topicIndex}
@@ -652,12 +836,42 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      {/* Footer avec informations */}
-      <div className="px-4 py-2 bg-white border-t border-gray-100">
-        <div className="max-w-4xl mx-auto text-center">
-          <span className="text-xs text-gray-400">
-            🔍 Assistant IA spécialisé • API v2.1.0 • {systemHealthy ? '🟢' : '🔴'} Statut système
-          </span>
+      {/* Zone de saisie */}
+      <div className="px-4 py-4 bg-white border-t border-gray-100">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center space-x-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
+                placeholder="Posez votre question…"
+                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                disabled={isLoading}
+                maxLength={1000}
+              />
+            </div>
+            
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={isLoading || !inputMessage.trim()}
+              className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+            >
+              <PaperAirplaneIcon />
+            </button>
+          </div>
+          
+          <div className="mt-2 text-center">
+            <span className="text-xs text-gray-400">
+              {systemHealthy ? '🟢' : '🔴'} Statut système
+            </span>
+          </div>
         </div>
       </div>
     </div>
