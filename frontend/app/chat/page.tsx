@@ -15,6 +15,18 @@ const useAuthStore = () => ({
     consentDate: new Date('2024-01-15')
   },
   isAuthenticated: true,
+  initializeSession: async () => {
+    try {
+      console.log('🔄 Initialisation de la session...')
+      // Logique d'initialisation de session Supabase
+      // Pour le moment, simulation d'une initialisation réussie
+      await new Promise(resolve => setTimeout(resolve, 500))
+      return true
+    } catch (error) {
+      console.error('❌ Erreur initialisation session:', error)
+      return false
+    }
+  },
   logout: async () => {
     try {
       console.log('🚪 Déconnexion en cours...')
