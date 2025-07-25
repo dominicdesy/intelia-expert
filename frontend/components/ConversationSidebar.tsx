@@ -2,9 +2,25 @@
 
 import { useState, useEffect } from 'react'
 import { useChatStore } from '@/lib/stores/chat'
-import { Conversation } from '@/types'
 
-// Icônes SVG optimisées
+// SOLUTION: Utiliser les types du store directement
+type StoreConversation = {
+  id: string
+  title: string
+  messages: Array<{
+    id: string
+    content: string
+    role: 'user' | 'assistant'
+    timestamp: string
+    feedback?: 'positive' | 'negative' | null
+    sources?: Array<{ title: string; url?: string }>
+    metadata?: { response_time?: number; model_used?: string }
+  }>
+  created_at: string
+  updated_at: string
+}
+
+// Icônes SVG
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.96 2.193-.34.027-.68.052-1.021.077-1.963.144-3.926.288-5.889.288-.427 0-.854-.003-1.28-.01V12.01c0-.3.12-.586.332-.796l5.25-5.25a2.25 2.25 0 113.182 3.182L14.5 15.5" />
@@ -133,8 +149,8 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
     }
   }
 
-  // Générer un aperçu de la conversation
-  const getConversationPreview = (conversation: Conversation): string => {
+  // Générer un aperçu de la conversation - TYPES ALIGNÉS
+  const getConversationPreview = (conversation: StoreConversation): string => {
     try {
       // Vérifier si la conversation a des messages
       if (!conversation.messages || conversation.messages.length === 0) {
@@ -154,15 +170,15 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
         return content
       }
       
-      return "Conversation sans titre"
+      return conversation.title || "Conversation sans titre"
     } catch (error) {
       console.error('Erreur lors de la génération de l\'aperçu:', error)
       return "Conversation"
     }
   }
 
-  // Compter les messages de manière sécurisée
-  const getMessageCount = (conversation: Conversation): number => {
+  // Compter les messages de manière sécurisée - TYPES ALIGNÉS
+  const getMessageCount = (conversation: StoreConversation): number => {
     try {
       return conversation.messages?.length || 0
     } catch (error) {
