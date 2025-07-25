@@ -1,20 +1,4 @@
-  // Générer réponse RAG
-  const generateAIResponse = async (question: string): Promise<string> => {
-    try {
-      console.log('🤖 Envoi question au RAG Intelia:', question)
-      
-      const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
-      console.log('📡 URL API:', apiUrl)
-      
-      // Headers avec authentification
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
-      
-      // TODO: Ajouter votre token d'authentification ici
-      // Option 1: API Key dans les headers
-      // headers['X'use client'
+'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 
@@ -89,7 +73,7 @@ interface Message {
 // ==================== ICÔNES SVG ====================
 const PaperAirplaneIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0721.485 12 59.77 0 713.27 20.876L5.999 12zm0 0h7.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 0 713.27 20.876L5.999 12zm0 0h7.5" />
   </svg>
 )
 
