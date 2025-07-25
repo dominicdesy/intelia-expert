@@ -1,4 +1,4 @@
-// lib/stores/auth.ts - VERSION FINALE AVEC SÉCURITÉ + HYDRATATION
+// lib/stores/auth.ts - Store d'authentification complet avec initializeSession
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { User, RGPDConsent } from '@/types'
@@ -6,17 +6,19 @@ import { supabase, auth } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface AuthState {
+  // État
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  hasHydrated: boolean // HYDRATATION
+  hasHydrated: boolean
   
   // Actions principales
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, userData: Partial<User>) => Promise<void>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
-  setHasHydrated: (hasHydrated: boolean) => void // HYDRATATION
+  initializeSession: () => Promise<boolean>
+  setHasHydrated: (hasHydrated: boolean) => void
   
   // Actions profil
   updateProfile: (data: Partial<User>) => Promise<void>
@@ -28,21 +30,70 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
+      // État initial
       user: null,
       isLoading: false,
       isAuthenticated: false,
       hasHydrated: false,
 
-      // HYDRATATION - Marquer comme terminée
+      // Marquer l'hydratation comme terminée
       setHasHydrated: (hasHydrated: boolean) => {
         set({ hasHydrated })
       },
 
-      // 🔐 CONNEXION - Version sécurisée
+      // 🔄 INITIALISATION SESSION (fonction manquante ajoutée)
+      initializeSession: async (): Promise<boolean> => {
+        try {
+          console.log('🔄 Initialisation session...')
+          set({ isLoading: true })
+
+          const currentUser = await auth.getCurrentUser()
+
+          if (!currentUser) {
+            console.log('❌ Aucune session à initialiser')
+            set({ user: null, isAuthenticated: false, isLoading: false })
+            return false
+          }
+
+          // Mapper l'utilisateur Supabase vers notre interface User
+          const mappedUser: User = {
+            id: currentUser.id,
+            email: currentUser.email!,
+            name: currentUser.user_metadata?.name || currentUser.email!.split('@')[0],
+            user_type: currentUser.user_metadata?.user_type || 'producer',
+            language: currentUser.user_metadata?.language || 'fr',
+            avatar_url: currentUser.user_metadata?.avatar_url || undefined,
+            created_at: currentUser.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            consent_given: true,
+            consent_date: new Date().toISOString()
+          }
+
+          set({ 
+            user: mappedUser, 
+            isAuthenticated: true, 
+            isLoading: false 
+          })
+
+          console.log('✅ Session initialisée pour:', mappedUser.email)
+          return true
+
+        } catch (error: any) {
+          console.error('❌ Erreur initialisation session:', error)
+          set({ 
+            user: null, 
+            isAuthenticated: false, 
+            isLoading: false 
+          })
+          return false
+        }
+      },
+
+      // 🔐 CONNEXION
       login: async (email: string, password: string) => {
         try {
           set({ isLoading: true })
-          console.log('🔐 Connexion sécurisée pour:', email)
+          console.log('🔐 Connexion pour:', email)
 
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -52,11 +103,10 @@ export const useAuthStore = create<AuthState>()(
           if (error) {
             console.error('❌ Erreur connexion:', error.message)
             
-            // Messages d'erreur spécifiques
             const errorMessages: Record<string, string> = {
               'Invalid login credentials': 'Email ou mot de passe incorrect',
-              'Email not confirmed': 'Veuillez confirmer votre email avant de vous connecter',
-              'Too many requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
+              'Email not confirmed': 'Veuillez confirmer votre email',
+              'Too many requests': 'Trop de tentatives. Réessayez plus tard.',
               'User not found': 'Aucun compte trouvé avec cet email',
               'Invalid email': 'Format d\'email invalide'
             }
@@ -69,7 +119,6 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Aucune donnée utilisateur reçue')
           }
 
-          // Mapper vers interface User corrigée
           const user: User = {
             id: data.user.id,
             email: data.user.email!,
@@ -97,7 +146,7 @@ export const useAuthStore = create<AuthState>()(
           })
 
         } catch (error: any) {
-          console.error('❌ Erreur lors de la connexion:', error)
+          console.error('❌ Erreur connexion:', error)
           set({ 
             user: null, 
             isAuthenticated: false, 
@@ -111,13 +160,12 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📝 INSCRIPTION - Version sécurisée
+      // 📝 INSCRIPTION
       register: async (email: string, password: string, userData: Partial<User>) => {
         try {
           set({ isLoading: true })
-          console.log('📝 Création compte sécurisée pour:', email)
+          console.log('📝 Création compte pour:', email)
 
-          // Validations renforcées
           const fullName = userData.name?.trim() || ''
           
           if (fullName.length < 2) {
@@ -128,7 +176,6 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le mot de passe doit contenir au moins 8 caractères')
           }
 
-          // Validation email
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           if (!emailRegex.test(email)) {
             throw new Error('Format d\'email invalide')
@@ -171,7 +218,6 @@ export const useAuthStore = create<AuthState>()(
           
           set({ isLoading: false })
           
-          // Message adapté selon confirmation
           if (data.user.email_confirmed_at) {
             toast.success('Compte créé et confirmé ! Vous pouvez vous connecter.', {
               icon: '✅',
@@ -185,7 +231,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
         } catch (error: any) {
-          console.error('❌ Erreur lors de l\'inscription:', error)
+          console.error('❌ Erreur inscription:', error)
           set({ isLoading: false })
           toast.error(error.message || 'Erreur lors de la création du compte', {
             icon: '⚠️',
@@ -195,19 +241,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🚪 DÉCONNEXION - Version sécurisée
+      // 🚪 DÉCONNEXION
       logout: async () => {
         try {
-          console.log('🚪 Déconnexion sécurisée...')
+          console.log('🚪 Déconnexion...')
           
-          // Utiliser l'helper sécurisé
           const result = await auth.signOut()
           
           if (!result.success) {
             console.error('❌ Erreur déconnexion Supabase:', result.error)
           }
 
-          // Nettoyage state
           set({ 
             user: null, 
             isAuthenticated: false 
@@ -220,9 +264,8 @@ export const useAuthStore = create<AuthState>()(
           console.log('✅ Déconnexion terminée')
 
         } catch (error: any) {
-          console.error('❌ Erreur lors de la déconnexion:', error)
+          console.error('❌ Erreur déconnexion:', error)
           
-          // Forcer déconnexion locale
           set({ 
             user: null, 
             isAuthenticated: false 
@@ -235,10 +278,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔍 VÉRIFICATION SESSION - Version sécurisée
+      // 🔍 VÉRIFICATION SESSION
       checkAuth: async () => {
         try {
-          console.log('🔍 Vérification session sécurisée...')
+          console.log('🔍 Vérification session...')
           
           const user = await auth.getCurrentUser()
 
@@ -248,7 +291,6 @@ export const useAuthStore = create<AuthState>()(
             return
           }
 
-          // Mapper vers interface User
           const userMapped: User = {
             id: user.id,
             email: user.email!,
@@ -271,13 +313,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 👤 MISE À JOUR PROFIL - Version sécurisée
+      // 👤 MISE À JOUR PROFIL
       updateProfile: async (data: Partial<User>) => {
         try {
           const { user } = get()
           if (!user) throw new Error('Utilisateur non connecté')
 
-          console.log('👤 Mise à jour profil sécurisée:', data)
+          console.log('👤 Mise à jour profil:', data)
 
           const { error } = await supabase.auth.updateUser({
             data: {
@@ -315,15 +357,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🗑️ SUPPRESSION COMPTE - Version sécurisée
+      // 🗑️ SUPPRESSION COMPTE
       deleteUserData: async () => {
         try {
           const { user } = get()
           if (!user) throw new Error('Utilisateur non connecté')
 
-          console.log('🗑️ Suppression sécurisée compte utilisateur...')
+          console.log('🗑️ Suppression compte utilisateur...')
           
-          // Déconnexion + nettoyage
           await get().logout()
           
           toast.success('Demande de suppression enregistrée. Contactez le support pour finaliser.', {
@@ -342,13 +383,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📄 EXPORT DONNÉES - Version sécurisée
+      // 📄 EXPORT DONNÉES
       exportUserData: async () => {
         try {
           const { user } = get()
           if (!user) throw new Error('Utilisateur non connecté')
 
-          console.log('📄 Export sécurisé données utilisateur...')
+          console.log('📄 Export données utilisateur...')
 
           const supabaseUser = await auth.getCurrentUser()
 
@@ -363,7 +404,6 @@ export const useAuthStore = create<AuthState>()(
             }
           }
 
-          // Téléchargement automatique
           const blob = new Blob([JSON.stringify(exportData, null, 2)], {
             type: 'application/json'
           })
@@ -394,13 +434,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📋 MISE À JOUR CONSENTEMENTS - Version sécurisée
+      // 📋 MISE À JOUR CONSENTEMENTS
       updateConsent: async (consent: RGPDConsent) => {
         try {
           const { user } = get()
           if (!user) throw new Error('Utilisateur non connecté')
 
-          console.log('📋 Mise à jour sécurisée consentements:', consent)
+          console.log('📋 Mise à jour consentements:', consent)
 
           const updatedUser = { 
             ...user, 
@@ -429,7 +469,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'intelia-auth-storage',
       storage: createJSONStorage(() => {
-        // HYDRATATION - Vérifier côté client
         if (typeof window !== 'undefined') {
           return localStorage
         }
@@ -444,7 +483,6 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated 
       }),
       onRehydrateStorage: () => (state) => {
-        // HYDRATATION - Marquer comme terminée
         if (state) {
           state.setHasHydrated(true)
         }
