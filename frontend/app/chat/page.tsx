@@ -1,11 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import Head from 'next/head'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-
-// Instance Supabase pour déconnexion réelle
-const supabase = createClientComponentClient()
 
 // ==================== CONFIGURATION API ====================
 const API_CONFIG = {
@@ -18,7 +13,7 @@ const API_CONFIG = {
     TOPICS: '/api/api/v1/expert/topics',
     HEALTH: '/api/health'
   },
-  TIMEOUT: 30000, // 30 secondes
+  TIMEOUT: 30000,
   RETRY_ATTEMPTS: 2
 }
 
@@ -35,45 +30,10 @@ const useAuthStore = () => ({
     consentDate: new Date('2024-01-15')
   },
   isAuthenticated: true,
-  initializeSession: async () => {
-    try {
-      console.log('🔄 Initialisation de la session...')
-      await new Promise(resolve => setTimeout(resolve, 500))
-      return true
-    } catch (error) {
-      console.error('❌ Erreur initialisation session:', error)
-      return false
-    }
-  },
   logout: async () => {
-    try {
-      console.log('🚪 Déconnexion Supabase en cours...')
-      
-      // Déconnexion réelle avec Supabase
-      const { error } = await supabase.auth.signOut()
-      
-      if (error) {
-        console.error('❌ Erreur déconnexion Supabase:', error)
-      } else {
-        console.log('✅ Déconnexion Supabase réussie')
-      }
-      
-      // Redirection vers login dans tous les cas
-      window.location.href = '/auth/login'
-    } catch (error) {
-      console.error('❌ Erreur critique déconnexion:', error)
-      // Forcer la redirection même en cas d'erreur
-      window.location.href = '/auth/login'
-    }
-  },
-  exportUserData: async () => {
-    console.log('Export des données...')
-  },
-  deleteUserData: async () => {
-    console.log('Suppression des données...')
-  },
-  updateProfile: async (data: any) => {
-    console.log('Mise à jour profil:', data)
+    console.log('🚪 Déconnexion en cours...')
+    await new Promise(resolve => setTimeout(resolve, 500))
+    window.location.href = '/auth/login'
   }
 })
 
@@ -82,24 +42,17 @@ const useChatStore = () => ({
     {
       id: '1',
       title: 'Problème poulets Ross 308',
-      messages: [
-        { id: '1', role: 'user', content: 'Mes poulets Ross 308 de 25 jours pèsent 800g, est-ce normal ?' },
-        { id: '2', role: 'assistant', content: 'Selon notre base documentaire, pour les poulets Ross 308...' }
-      ],
+      messages: [],
       updated_at: '2024-01-20',
       created_at: '2024-01-20'
     }
   ],
-  currentConversation: null,
-  loadConversations: () => {},
-  loadConversation: async (id: string) => {},
   deleteConversation: async (id: string) => {
     console.log('Suppression conversation:', id)
   },
   clearAllConversations: async () => {
     console.log('Suppression toutes conversations')
-  },
-  createConversation: () => {}
+  }
 })
 
 // ==================== TYPES ====================
@@ -109,7 +62,9 @@ interface Message {
   isUser: boolean
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
+  processing_time?: number
   mode?: string
+  fallback_used?: boolean
 }
 
 interface APIResponse {
@@ -121,15 +76,12 @@ interface APIResponse {
   timestamp: string
   processing_time: number
   language: string
+  fallback_used?: boolean
 }
 
 // ==================== UTILITAIRES API ====================
 class APIClient {
-  private static async makeRequest(
-    url: string, 
-    options: RequestInit = {},
-    retries: number = API_CONFIG.RETRY_ATTEMPTS
-  ): Promise<Response> {
+  private static async makeRequest(url: string, options: RequestInit = {}): Promise<Response> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
 
@@ -153,68 +105,32 @@ class APIClient {
       return response
     } catch (error: any) {
       clearTimeout(timeoutId)
-      
-      if (retries > 0 && (error.name === 'AbortError' || error.message.includes('fetch'))) {
-        console.warn(`⚠️ Tentative ${API_CONFIG.RETRY_ATTEMPTS - retries + 1} échouée, retry...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (API_CONFIG.RETRY_ATTEMPTS - retries + 1)))
-        return this.makeRequest(url, options, retries - 1)
-      }
-      
       throw error
     }
   }
 
-  static async askQuestion(
-    question: string, 
-    language: string = 'fr',
-    useAuth: boolean = false
-  ): Promise<APIResponse> {
-    const endpoint = useAuth ? API_CONFIG.ENDPOINTS.ASK : API_CONFIG.ENDPOINTS.ASK_PUBLIC
-    const url = `${API_CONFIG.BASE_URL}${endpoint}`
+  static async askQuestion(question: string, language: string = 'fr'): Promise<APIResponse> {
+    const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ASK_PUBLIC}`
     
-    console.log('🤖 Envoi question:', { question: question.substring(0, 50), url, useAuth })
-
-    const body = JSON.stringify({
-      text: question.trim(),
-      language,
-      speed_mode: 'balanced'
-    })
-
-    const headers: Record<string, string> = {}
-    
-    if (useAuth) {
-      // headers['Authorization'] = `Bearer ${realToken}`
-    }
+    console.log('🤖 Envoi question:', question.substring(0, 50))
 
     const response = await this.makeRequest(url, {
       method: 'POST',
-      body,
-      headers
+      body: JSON.stringify({
+        text: question.trim(),
+        language,
+        speed_mode: 'balanced'
+      })
     })
 
     const data = await response.json()
     console.log('✅ Réponse API reçue:', { 
       mode: data.mode, 
-      language: data.language 
+      processing_time: data.processing_time,
+      fallback_used: data.fallback_used 
     })
 
     return data
-  }
-
-  static async submitFeedback(messageId: string, rating: number): Promise<void> {
-    try {
-      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FEEDBACK}`
-      await this.makeRequest(url, {
-        method: 'POST',
-        body: JSON.stringify({
-          question_id: messageId,
-          rating: rating === 1 ? 5 : 1
-        })
-      })
-      console.log('✅ Feedback envoyé')
-    } catch (error) {
-      console.warn('⚠️ Erreur envoi feedback:', error)
-    }
   }
 
   static async checkHealth(): Promise<boolean> {
@@ -267,133 +183,34 @@ const ThumbDownIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 )
 
+const MicrophoneIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+  </svg>
+)
+
 const TrashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
   </svg>
 )
 
-const AlertTriangleIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-  </svg>
-)
-
-const XMarkIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-  </svg>
-)
-
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={className}
-  />
+  <div className={`${className} bg-blue-600 rounded-lg flex items-center justify-center`}>
+    <span className="text-white font-bold text-xs">I</span>
+  </div>
 )
 
-// ==================== MODALES ====================
-const UserInfoModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: () => void, user: any }) => {
-  if (!isOpen) return null
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
-        
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Mes informations</h3>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Nom</label>
-                <p className="mt-1 text-sm text-gray-900">{user?.name}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <p className="mt-1 text-sm text-gray-900">{user?.email}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Type de compte</label>
-                <p className="mt-1 text-sm text-gray-900">{user?.user_type === 'producer' ? 'Producteur' : 'Professionnel'}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Membre depuis</label>
-                <p className="mt-1 text-sm text-gray-900">{new Date(user?.created_at || '').toLocaleDateString('fr-FR')}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <button
-              onClick={onClose}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const ContactModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  if (!isOpen) return null
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
-        
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Nous joindre</h3>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-900">Support technique</h4>
-                <p className="text-sm text-gray-600">support@intelia.com</p>
-                <p className="text-sm text-gray-600">1-800-123-4567</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Ventes</h4>
-                <p className="text-sm text-gray-600">ventes@intelia.com</p>
-                <p className="text-sm text-gray-600">1-800-123-4568</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Heures d'ouverture</h4>
-                <p className="text-sm text-gray-600">Lundi au vendredi: 8h00 - 17h00 EST</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <button
-              onClick={onClose}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+// ==================== STATUS SYSTEM ====================
+const SystemStatus = ({ isHealthy }: { isHealthy: boolean }) => (
+  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs ${
+    isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+  }`}>
+    <div className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-green-600' : 'bg-red-600'}`} />
+    <span>{isHealthy ? 'Système opérationnel' : 'Problème système'}</span>
+  </div>
+)
 
 // ==================== MENU HISTORIQUE ====================
 const HistoryMenu = () => {
@@ -473,11 +290,19 @@ const HistoryMenu = () => {
 const UserMenuButton = () => {
   const { user, logout } = useAuthStore()
   const [isOpen, setIsOpen] = useState(false)
-  const [showUserInfoModal, setShowUserInfoModal] = useState(false)
-  const [showContactModal, setShowContactModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+
+  const handleContactClick = () => {
+    window.open('mailto:support@intelia.com?subject=Support Intelia Expert', '_blank')
+    setIsOpen(false)
+  }
+
+  const handleUserInfoClick = () => {
+    alert(`Informations utilisateur:\n\nNom: ${user?.name}\nEmail: ${user?.email}\nType: ${user?.user_type}\nMembre depuis: ${new Date(user?.created_at || '').toLocaleDateString('fr-FR')}`)
+    setIsOpen(false)
+  }
 
   return (
     <div className="relative">
@@ -505,10 +330,7 @@ const UserMenuButton = () => {
             </div>
 
             <button
-              onClick={() => {
-                setShowUserInfoModal(true)
-                setIsOpen(false)
-              }}
+              onClick={handleUserInfoClick}
               className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <span>👤</span>
@@ -516,10 +338,7 @@ const UserMenuButton = () => {
             </button>
 
             <button
-              onClick={() => {
-                setShowContactModal(true)
-                setIsOpen(false)
-              }}
+              onClick={handleContactClick}
               className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <span>📞</span>
@@ -549,17 +368,6 @@ const UserMenuButton = () => {
           </div>
         </>
       )}
-
-      {/* Modales */}
-      <UserInfoModal 
-        isOpen={showUserInfoModal} 
-        onClose={() => setShowUserInfoModal(false)} 
-        user={user} 
-      />
-      <ContactModal 
-        isOpen={showContactModal} 
-        onClose={() => setShowContactModal(false)} 
-      />
     </div>
   )
 }
@@ -570,7 +378,6 @@ export default function ChatInterface() {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [systemHealthy, setSystemHealthy] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
 
@@ -595,11 +402,9 @@ export default function ChatInterface() {
   // Message de bienvenue + Health check
   useEffect(() => {
     const initializeChat = async () => {
-      // Health check initial
       const isHealthy = await APIClient.checkHealth()
       setSystemHealthy(isHealthy)
 
-      // Message de bienvenue
       const welcomeMessage: Message = {
         id: '1',
         content: "Bonjour ! Je suis votre expert IA en santé et nutrition animale. Comment puis-je vous aider aujourd'hui ?",
@@ -612,17 +417,7 @@ export default function ChatInterface() {
     initializeChat()
   }, [])
 
-  // Health check périodique
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const isHealthy = await APIClient.checkHealth()
-      setSystemHealthy(isHealthy)
-    }, 60000) // Chaque minute
-
-    return () => clearInterval(interval)
-  }, [])
-
-  // Envoi message avec gestion d'erreurs robuste
+  // Envoi message
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -636,76 +431,47 @@ export default function ChatInterface() {
     setMessages(prev => [...prev, userMessage])
     setInputMessage('')
     setIsLoading(true)
-    setError(null)
 
     try {
-      console.log('🚀 Envoi question à l\'API Intelia Expert')
-      
-      const result = await APIClient.askQuestion(text.trim(), user?.language || 'fr', false)
+      const startTime = Date.now()
+      const result = await APIClient.askQuestion(text.trim(), user?.language || 'fr')
+      const processingTime = Date.now() - startTime
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: result.response,
         isUser: false,
         timestamp: new Date(),
-        mode: result.mode
+        processing_time: result.processing_time || processingTime / 1000,
+        mode: result.mode,
+        fallback_used: result.fallback_used
       }
 
       setMessages(prev => [...prev, aiMessage])
-      
-      console.log('✅ Réponse reçue:', {
-        mode: result.mode,
-        sources: result.sources?.length || 0
-      })
 
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'envoi:', error)
       
-      let errorMessage = "Désolé, je rencontre un problème technique."
-      
-      if (error.message.includes('timeout') || error.name === 'AbortError') {
-        errorMessage = "La requête a pris trop de temps. Veuillez réessayer avec une question plus courte."
-      } else if (error.message.includes('404')) {
-        errorMessage = "Service temporairement indisponible. Nos équipes sont notifiées."
-      } else if (error.message.includes('500')) {
-        errorMessage = "Erreur serveur temporaire. Veuillez réessayer dans quelques instants."
-      } else if (!navigator.onLine) {
-        errorMessage = "Pas de connexion internet. Vérifiez votre connexion et réessayez."
-      }
-
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
-        content: errorMessage,
+        content: "Désolé, je rencontre un problème technique. Veuillez réessayer.",
         isUser: false,
         timestamp: new Date()
       }
 
       setMessages(prev => [...prev, errorMsg])
-      setError(error.message)
       setSystemHealthy(false)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Gestion feedback avec API
+  // Gestion feedback
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     setMessages(prev => prev.map(msg => 
       msg.id === messageId ? { ...msg, feedback } : msg
     ))
-    
     console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
-    
-    try {
-      await APIClient.submitFeedback(messageId, feedback === 'positive' ? 1 : 0)
-    } catch (error) {
-      console.warn('⚠️ Erreur feedback:', error)
-    }
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    handleSendMessage()
   }
 
   const handleNewConversation = () => {
@@ -715,7 +481,6 @@ export default function ChatInterface() {
       isUser: false,
       timestamp: new Date()
     }])
-    setError(null)
   }
 
   const getCurrentDate = () => {
@@ -727,188 +492,187 @@ export default function ChatInterface() {
   }
 
   return (
-    <>
-      <Head>
-        <title>Intelia | Expert</title>
-        <meta name="description" content="Assistant IA spécialisé en santé et nutrition animale" />
-      </Head>
-      
-      <div className="h-screen bg-gray-50 flex flex-col">
-        {/* Header simplifié */}
-        <header className="bg-white border-b border-gray-100 px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Boutons à gauche */}
-            <div className="flex items-center space-x-2">
-              <HistoryMenu />
-              <button
-                onClick={handleNewConversation}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Nouvelle conversation"
-              >
-                <PlusIcon className="w-5 h-5" />
-              </button>
-            </div>
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <HistoryMenu />
+            <button
+              onClick={handleNewConversation}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Nouvelle conversation"
+            >
+              <PlusIcon className="w-5 h-5" />
+            </button>
+          </div>
 
-            {/* Titre centré avec logo */}
-            <div className="flex-1 flex justify-center items-center space-x-3">
-              <InteliaLogo className="w-8 h-8" />
+          <div className="flex-1 flex justify-center items-center space-x-3">
+            <InteliaLogo className="w-8 h-8" />
+            <div className="text-center">
+              <h1 className="text-lg font-medium text-gray-900">Intelia | Expert</h1>
+              <SystemStatus isHealthy={systemHealthy} />
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <UserMenuButton />
+          </div>
+        </div>
+      </header>
+
+      {/* Zone de messages */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {messages.length > 0 && (
               <div className="text-center">
-                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                  {getCurrentDate()}
+                </span>
               </div>
-            </div>
-            
-            {/* Avatar utilisateur à droite */}
-            <div className="flex items-center">
-              <UserMenuButton />
-            </div>
-          </div>
-        </header>
+            )}
 
-        {/* Erreur système si présente */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <AlertTriangleIcon className="h-5 w-5 text-red-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  Problème de connexion détecté. {error}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Zone de messages */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Date */}
-              {messages.length > 0 && (
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                    {getCurrentDate()}
-                  </span>
-                </div>
-              )}
-
-              {messages.map((message, index) => (
-                <div key={message.id}>
-                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                    {!message.isUser && (
-                      <div className="relative">
-                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                      </div>
-                    )}
-                    
-                    <div className="max-w-xs lg:max-w-2xl">
-                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                          {message.content}
-                        </p>
-                      </div>
+            {messages.map((message, index) => (
+              <div key={message.id}>
+                <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                  {!message.isUser && (
+                    <div className="relative">
+                      <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                    </div>
+                  )}
+                  
+                  <div className="max-w-xs lg:max-w-2xl">
+                    <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                      <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                        {message.content}
+                      </p>
                       
-                      {/* Boutons de feedback */}
-                      {!message.isUser && index > 0 && (
-                        <div className="flex items-center space-x-2 mt-2 ml-2">
-                          <button
-                            onClick={() => handleFeedback(message.id, 'positive')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
-                            title="Réponse utile"
-                          >
-                            <ThumbUpIcon />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(message.id, 'negative')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
-                            title="Réponse non utile"
-                          >
-                            <ThumbDownIcon />
-                          </button>
+                      {!message.isUser && message.processing_time && (
+                        <div className="mt-2 text-xs text-gray-500 border-t pt-2">
+                          <span>⚡ {message.processing_time}s</span>
+                          {message.mode && (
+                            <span className="ml-2">🤖 {message.mode}</span>
+                          )}
                         </div>
                       )}
                     </div>
-
-                    {message.isUser && (
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                        <UserIcon className="w-5 h-5 text-white" />
+                    
+                    {!message.isUser && index > 0 && (
+                      <div className="flex items-center space-x-2 mt-2 ml-2">
+                        <button
+                          onClick={() => handleFeedback(message.id, 'positive')}
+                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                          title="Réponse utile"
+                        >
+                          <ThumbUpIcon />
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(message.id, 'negative')}
+                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                          title="Réponse non utile"
+                        >
+                          <ThumbDownIcon />
+                        </button>
+                        {message.fallback_used && (
+                          <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full" title="Système de secours utilisé">
+                            🔄 Fallback
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* Sujets suggérés après le message de bienvenue */}
-                  {!message.isUser && index === 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                      {suggestedTopics.map((topic, topicIndex) => (
-                        <button
-                          key={topicIndex}
-                          onClick={() => handleSendMessage(`Tell me about ${topic.label}`)}
-                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 ${topic.color}`}
-                        >
-                          {topic.label}
-                        </button>
-                      ))}
+                  {message.isUser && (
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <UserIcon className="w-5 h-5 text-white" />
                     </div>
                   )}
                 </div>
-              ))}
 
-              {/* Indicateur de frappe */}
-              {isLoading && (
-                <div className="flex items-start space-x-3">
-                  <div className="relative">
-                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                {!message.isUser && index === 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                    {suggestedTopics.map((topic, topicIndex) => (
+                      <button
+                        key={topicIndex}
+                        onClick={() => handleSendMessage(`Tell me about ${topic.label}`)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 ${topic.color}`}
+                      >
+                        {topic.label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Zone de saisie avec design du haut */}
-          <div className="px-4 py-4 bg-white border-t border-gray-100">
-            <div className="max-w-4xl mx-auto">
-              <form onSubmit={handleSubmit} className="flex items-center space-x-3">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder="Posez votre question..."
-                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                    disabled={isLoading}
-                    maxLength={1000}
-                  />
-                </div>
-                
-                <button
-                  type="submit"
-                  disabled={isLoading || !inputMessage.trim()}
-                  className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
-                >
-                  <PaperAirplaneIcon />
-                </button>
-              </form>
-              
-              {/* Footer avec statut système uniquement */}
-              <div className="mt-2 text-center">
-                <span className="text-xs text-gray-400">
-                  {systemHealthy ? '🟢' : '🔴'} Statut système
-                </span>
+                )}
               </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex items-start space-x-3">
+                <div className="relative">
+                  <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                </div>
+                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Zone de saisie */}
+        <div className="px-4 py-4 bg-white border-t border-gray-100">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Bientôt disponible"
+                disabled
+              >
+                <MicrophoneIcon />
+              </button>
+              
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                  placeholder="Posez votre question…"
+                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                  disabled={isLoading}
+                  maxLength={1000}
+                />
+              </div>
+              
+              <button
+                onClick={handleSendMessage}
+                disabled={isLoading || !inputMessage.trim()}
+                className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+              >
+                <PaperAirplaneIcon />
+              </button>
+            </div>
+            
+            <div className="mt-2 text-center">
+              <span className="text-xs text-gray-400">
+                🔍 Assistant IA spécialisé • API v2.1.0 • {systemHealthy ? '🟢' : '🔴'} Statut système
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
