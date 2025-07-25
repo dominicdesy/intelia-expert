@@ -40,7 +40,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    userType: 'producer' as 'producer' | 'professional' | 'admin'
+    userType: 'producer' as 'producer' | 'professional' // CORRIGÉ: Retiré 'admin' pour correspondre à l'interface User
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -144,7 +144,6 @@ export default function ProfilePage() {
 
   const getBadgeColor = (userType: string) => {
     switch (userType) {
-      case 'admin': return 'bg-red-100 text-red-800'
       case 'professional': return 'bg-blue-100 text-blue-800'
       case 'producer': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
@@ -153,7 +152,6 @@ export default function ProfilePage() {
 
   const getUserTypeLabel = (userType: string) => {
     switch (userType) {
-      case 'admin': return 'Administrateur'
       case 'professional': return 'Professionnel'
       case 'producer': return 'Producteur'
       default: return userType
@@ -293,7 +291,6 @@ export default function ProfilePage() {
                       >
                         <option value="producer">Producteur agricole</option>
                         <option value="professional">Professionnel santé animale</option>
-                        <option value="admin">Administrateur</option>
                       </select>
                     </div>
 
