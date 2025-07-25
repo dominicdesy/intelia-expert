@@ -107,7 +107,8 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
     }
   }
 
-  const getConversationPreview = (conversation: Conversation) => {
+  // FONCTION CORRIGÉE - Type spécifique pour les propriétés utilisées
+  const getConversationPreview = (conversation: Pick<Conversation, 'messages'>) => {
     if (conversation.messages.length === 0) {
       return "Nouvelle conversation"
     }
