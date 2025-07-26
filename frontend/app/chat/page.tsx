@@ -1373,5 +1373,924 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
               <input
                 type="url"
                 value={formData.companyWebsite}
+                onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+                placeholder="https://www.exemple.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-// End
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.companyLinkedin')}</label>
+              <input
+                type="url"
+                value={formData.linkedinCorporate}
+                onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
+                placeholder="https://linkedin.com/company/votre-entreprise"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={isLoading}
+            >
+              {t('modal.cancel')}
+            </button>
+            <button
+              onClick={handleProfileSave}
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? t('modal.loading') : t('modal.save')}
+            </button>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'password' && (
+        <>
+          <div className="pb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">{t('profile.password')}</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.currentPassword')}</label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.newPassword')}</label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <div className="mt-2 text-xs text-gray-600">
+                  <p>{t('profile.passwordRequirements')}</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>{t('form.passwordMinLength')}</li>
+                    <li>{t('form.passwordUppercase')}</li>
+                    <li>{t('form.passwordLowercase')}</li>
+                    <li>{t('form.passwordNumber')}</li>
+                    <li>{t('form.passwordSpecial')}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.confirmPassword')}</label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              {passwordErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="text-sm text-red-800">
+                    <p className="font-medium">{t('profile.passwordErrors')}</p>
+                    <ul className="list-disc list-inside mt-1">
+                      {passwordErrors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={isLoading}
+            >
+              {t('modal.back')}
+            </button>
+            <button
+              onClick={handlePasswordChange}
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? t('modal.updating') : t('profile.password')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
+  const { t } = useTranslation()
+  
+  // Simuler le forfait utilisateur (à remplacer par les vraies données)
+  const currentPlan = user?.plan || 'essential'
+  
+  const plans = {
+    essential: {
+      name: t('plan.essential'),
+      price: 'Gratuit',
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      features: [
+        '50 questions par mois',
+        'Accès aux documents publics',
+        'Support par email',
+        'Interface web'
+      ]
+    },
+    pro: {
+      name: t('plan.pro'),
+      price: '29$ / mois',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      features: [
+        'Questions illimitées',
+        'Accès documents confidentiels',
+        'Support prioritaire',
+        'Interface web + mobile',
+        'Analytics avancées'
+      ]
+    },
+    max: {
+      name: t('plan.max'),
+      price: 'Sur mesure',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      features: [
+        'Tout du forfait Pro',
+        'Documents privés personnalisés',
+        'Support téléphonique dédié',
+        'Intégrations API',
+        'Formation équipe',
+        'SLA garanti'
+      ]
+    }
+  }
+
+  const userPlan = plans[currentPlan as keyof typeof plans]
+
+  return (
+    <div className="space-y-6">
+      {/* Forfait actuel */}
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('subscription.currentPlan')}</h3>
+        <div className={`inline-flex items-center px-4 py-2 rounded-full ${userPlan.bgColor} ${userPlan.borderColor} border`}>
+          <span className={`font-medium ${userPlan.color}`}>{userPlan.name}</span>
+          <span className="mx-2 text-gray-400">•</span>
+          <span className={`font-bold ${userPlan.color}`}>{userPlan.price}</span>
+        </div>
+      </div>
+
+      {/* Fonctionnalités du forfait actuel */}
+      <div className={`p-4 rounded-lg ${userPlan.bgColor} ${userPlan.borderColor} border`}>
+        <h4 className="font-medium text-gray-900 mb-3">Fonctionnalités incluses :</h4>
+        <ul className="space-y-2">
+          {userPlan.features.map((feature, index) => (
+            <li key={index} className="flex items-center text-sm text-gray-700">
+              <span className="text-green-500 mr-2">✓</span>
+              {feature}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Options d'upgrade */}
+      {currentPlan !== 'max' && (
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-900">{t('subscription.modify')}</h4>
+          
+          {currentPlan === 'essential' && (
+            <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h5 className="font-medium text-blue-900">Forfait Pro</h5>
+                  <p className="text-sm text-blue-700">Questions illimitées + fonctionnalités avancées</p>
+                </div>
+                <button
+                  onClick={() => {
+                    console.log('Upgrade vers Pro demandé')
+                    // Logique d'upgrade à implémenter
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  {t('subscription.update')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 border border-purple-200 rounded-lg bg-purple-50">
+            <div className="flex justify-between items-center">
+              <div>
+                <h5 className="font-medium text-purple-900">Forfait Max</h5>
+                <p className="text-sm text-purple-700">Solution personnalisée pour votre organisation</p>
+              </div>
+              <button
+                onClick={() => {
+                  console.log('Contact commercial demandé')
+                  window.open('mailto:sales@intelia.com?subject=Demande forfait Max', '_blank')
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+              >
+                {t('nav.contact')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Utilisation du mois (simulation) */}
+      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <h4 className="font-medium text-gray-900 mb-2">Utilisation ce mois-ci</h4>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Questions posées :</span>
+          <span className="font-medium text-gray-900">
+            {currentPlan === 'essential' ? '23 / 50' : 'Illimité'}
+          </span>
+        </div>
+        {currentPlan === 'essential' && (
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '46%' }}></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          {t('modal.close')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const ContactModal = ({ onClose }: { onClose: () => void }) => {
+  const { t } = useTranslation()
+  
+  return (
+    <div className="space-y-4">
+      {/* Call Us */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">{t('contact.phone')}</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            {t('contact.phoneDescription')}
+          </p>
+          <a 
+            href="tel:+18666666221"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            +1 (866) 666 6221
+          </a>
+        </div>
+      </div>
+
+      {/* Email Us */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">{t('contact.email')}</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            {t('contact.emailDescription')}
+          </p>
+          <a 
+            href="mailto:support@intelia.com"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            support@intelia.com
+          </a>
+        </div>
+      </div>
+
+      {/* Visit our website */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">{t('contact.website')}</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            {t('contact.websiteDescription')}
+          </p>
+          <a 
+            href="https://www.intelia.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            www.intelia.com
+          </a>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-3">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          {t('modal.close')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ==================== MENU HISTORIQUE ====================
+const HistoryMenu = () => {
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+  const { conversations, deleteConversation, clearAllConversations } = useChatStore()
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        title={t('nav.history')}
+      >
+        <EllipsisVerticalIcon className="w-5 h-5" />
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          
+          <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
+                <button
+                  onClick={() => {
+                    clearAllConversations()
+                    setIsOpen(false)
+                  }}
+                  className="text-red-600 hover:text-red-700 text-sm"
+                >
+                  {t('nav.clearAll')}
+                </button>
+              </div>
+            </div>
+            
+            <div className="max-h-64 overflow-y-auto">
+              {conversations.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  {t('chat.noConversations')}
+                </div>
+              ) : (
+                conversations.map((conv) => (
+                  <div key={conv.id} className="p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                          {conv.title}
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(conv.updated_at).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteConversation(conv.id)}
+                        className="ml-2 p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Supprimer"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ==================== MENU UTILISATEUR ====================
+const UserMenuButton = () => {
+  const { user, logout } = useAuthStore()
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [showAccountModal, setShowAccountModal] = useState(false)
+
+  const userName = user?.name || user?.email || 'Utilisateur'
+  const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  
+  // Déterminer le forfait et ses couleurs
+  const currentPlan = user?.plan || 'essential'
+  const planConfig = {
+    essential: { name: t('plan.essential'), bgColor: 'bg-green-50', textColor: 'text-green-600', borderColor: 'border-green-200' },
+    pro: { name: t('plan.pro'), bgColor: 'bg-blue-50', textColor: 'text-blue-600', borderColor: 'border-blue-200' },
+    max: { name: t('plan.max'), bgColor: 'bg-purple-50', textColor: 'text-purple-600', borderColor: 'border-purple-200' }
+  }
+  const plan = planConfig[currentPlan as keyof typeof planConfig] || planConfig.essential
+
+  const handleContactClick = () => {
+    setIsOpen(false)
+    setShowContactModal(true)
+  }
+
+  const handleUserInfoClick = () => {
+    setIsOpen(false)
+    setShowUserInfoModal(true)
+  }
+
+  const handleAccountClick = () => {
+    setIsOpen(false)
+    setShowAccountModal(true)
+  }
+
+  return (
+    <>
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
+        >
+          <span className="text-white text-xs font-medium" data-user-initials>{userInitials}</span>
+        </button>
+
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setIsOpen(false)}
+            />
+            
+            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-900" data-user-name>{user?.name}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
+                <div className="mt-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.textColor} border ${plan.borderColor}`}>
+                    {plan.name}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleAccountClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
+                <span>{t('subscription.title')}</span>
+              </button>
+
+              <button
+                onClick={handleUserInfoClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                <span>{t('nav.profile')}</span>
+              </button>
+
+              <button
+                onClick={handleContactClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
+                <span>{t('nav.contact')}</span>
+              </button>
+
+              <button
+                onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
+                </svg>
+                <span>{t('nav.legal')}</span>
+              </button>
+              
+              <div className="border-t border-gray-100 mt-2 pt-2">
+                <button
+                  onClick={() => {
+                    logout()
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                  <span>{t('nav.logout')}</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        title={t('subscription.title')}
+      >
+        <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title={t('profile.title')}
+      >
+        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        title={t('contact.title')}
+      >
+        <ContactModal onClose={() => setShowContactModal(false)} />
+      </Modal>
+    </>
+  )
+}
+
+// ==================== COMPOSANT PRINCIPAL ====================
+export default function ChatInterface() {
+  const { user, isAuthenticated, isLoading } = useAuthStore()
+  const { t } = useTranslation()
+  
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputMessage, setInputMessage] = useState('')
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Scroll automatique
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // Message de bienvenue
+  useEffect(() => {
+    if (isAuthenticated && messages.length === 0) {
+      const welcomeMessage: Message = {
+        id: '1',
+        content: t('chat.welcome'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages([welcomeMessage])
+    }
+  }, [isAuthenticated, messages.length, t])
+
+  // Afficher un loader pendant le chargement
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">{t('chat.loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Rediriger si pas connecté
+  if (!isAuthenticated) {
+    window.location.href = '/'
+    return null
+  }
+
+  // Générer réponse RAG
+  const generateAIResponse = async (question: string): Promise<string> => {
+    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
+    
+    try {
+      console.log('🤖 Envoi question au RAG Intelia:', question)
+      console.log('📡 URL API:', apiUrl)
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          text: `${question.trim()}\n\nRépondez de manière concise et directe.`,
+          language: user?.language || 'fr',
+          speed_mode: 'balanced',
+          max_tokens: 150,
+          temperature: 0.7,
+          response_format: 'concise'
+        })
+      })
+
+      console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Erreur API détaillée:', errorText)
+        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log('✅ Réponse RAG reçue:', data)
+      
+      if (data.response || data.answer || data.message) {
+        return data.response || data.answer || data.message
+      } else {
+        console.warn('⚠️ Structure de réponse inattendue:', data)
+        return 'Le système RAG a répondu mais dans un format inattendu.'
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'appel au RAG:', error)
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return `Erreur de connexion au serveur RAG. 
+
+🔧 **Vérifications suggérées :**
+- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
+- Y a-t-il des problèmes de CORS ?
+- Le service est-il en cours d'exécution ?
+
+**Erreur technique :** ${error.message}`
+      }
+      
+      return `Erreur technique avec l'API : ${error.message}
+
+**URL testée :** ${apiUrl}
+**Type d'erreur :** ${error.name}
+
+Consultez la console développeur (F12) pour plus de détails.`
+    }
+  }
+
+  // Envoi message
+  const handleSendMessage = async (text: string = inputMessage) => {
+    if (!text.trim()) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: text.trim(),
+      isUser: true,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputMessage('')
+    setIsLoadingChat(true)
+
+    try {
+      const response = await generateAIResponse(text.trim())
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response,
+        isUser: false,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('❌ Error generating response:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: t('chat.errorMessage'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  // Gestion feedback
+  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId ? { ...msg, feedback } : msg
+    ))
+    console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
+  }
+
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: t('chat.welcome'),
+      isUser: false,
+      timestamp: new Date()
+    }])
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString(t('date.format'), { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
+  return (
+    <>
+      {/* Zoho SalesIQ Component */}
+      <ZohoSalesIQ user={user} />
+
+      <div className="h-screen bg-gray-50 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Boutons à gauche */}
+            <div className="flex items-center space-x-2">
+              <HistoryMenu />
+              <button
+                onClick={handleNewConversation}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.newConversation')}
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Titre centré avec logo */}
+            <div className="flex-1 flex justify-center items-center space-x-3">
+              <InteliaLogo className="w-8 h-8" />
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              </div>
+            </div>
+            
+            {/* Avatar utilisateur à droite */}
+            <div className="flex items-center">
+              <UserMenuButton />
+            </div>
+          </div>
+        </header>
+
+        {/* Zone de messages */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Date */}
+              {messages.length > 0 && (
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                    {getCurrentDate()}
+                  </span>
+                </div>
+              )}
+
+              {messages.map((message, index) => (
+                <div key={message.id}>
+                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
+                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                      </div>
+                    )}
+                    
+                    <div className="max-w-xs lg:max-w-2xl">
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {/* Boutons de feedback */}
+                      {!message.isUser && index > 0 && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                            title={t('chat.helpfulResponse')}
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                            title={t('chat.notHelpfulResponse')}
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                        <UserIcon className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Indicateur de frappe */}
+              {isLoadingChat && (
+                <div className="flex items-start space-x-3">
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Zone de saisie */}
+          <div className="px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  title={t('chat.voiceRecording')}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                  </svg>
+                </button>
+                
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder={t('chat.placeholder')}
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    disabled={isLoadingChat}
+                  />
+                </div>
+                
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoadingChat || !inputMessage.trim()}
+                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                >
+                  <PaperAirplaneIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
