@@ -18,9 +18,19 @@ declare global {
         ready: () => void
         chat?: {
           start: () => void
+          show?: () => void
+          open?: () => void
+        }
+        visitor?: {
+          info?: (data: { name: string; email: string }) => void
+        }
+        floatbutton?: {
+          visible?: (state: string) => void
+          show?: () => void
         }
       }
     }
+    siqReadyState?: boolean
   }
 }
 
@@ -1444,10 +1454,10 @@ Consultez la console développeur (F12) pour plus de détails.`
                   console.log('✅ Chat.start() appelé')
                 }
                 
-                if (window.$zoho.salesiq.visitor && window.$zoho.salesiq.visitor.info) {
+                if ((window.$zoho.salesiq as any).visitor && (window.$zoho.salesiq as any).visitor.info) {
                   const userName = "${user?.name || 'Utilisateur'}"
                   const userEmail = "${user?.email || ''}"
-                  window.$zoho.salesiq.visitor.info({
+                  ;(window.$zoho.salesiq as any).visitor.info({
                     name: userName,
                     email: userEmail
                   })
@@ -1497,10 +1507,10 @@ Consultez la console développeur (F12) pour plus de détails.`
                 }
                 
                 // Tenter d'autres méthodes d'activation
-                if (window.$zoho.salesiq.visitor) {
+                if ((window.$zoho.salesiq as any).visitor) {
                   const userName = '${user?.name || "Utilisateur"}'
                   const userEmail = '${user?.email || ""}'
-                  window.$zoho.salesiq.visitor.info({
+                  ;(window.$zoho.salesiq as any).visitor.info({
                     name: userName,
                     email: userEmail
                   })
@@ -1595,16 +1605,16 @@ Consultez la console développeur (F12) pour plus de détails.`
         try {
           console.log('🔧 Tentative de forçage d\'affichage...')
           
-          // Méthodes possibles
-          if (window.$zoho.salesiq.chat) {
-            if (window.$zoho.salesiq.chat.start) window.$zoho.salesiq.chat.start()
-            if (window.$zoho.salesiq.chat.show) window.$zoho.salesiq.chat.show()
-            if (window.$zoho.salesiq.chat.open) window.$zoho.salesiq.chat.open()
+          // Tenter d'autres méthodes d'activation
+          if ((window.$zoho.salesiq as any).chat) {
+            if ((window.$zoho.salesiq as any).chat.start) (window.$zoho.salesiq as any).chat.start()
+            if ((window.$zoho.salesiq as any).chat.show) (window.$zoho.salesiq as any).chat.show()
+            if ((window.$zoho.salesiq as any).chat.open) (window.$zoho.salesiq as any).chat.open()
           }
           
-          if (window.$zoho.salesiq.floatbutton) {
-            if (window.$zoho.salesiq.floatbutton.visible) window.$zoho.salesiq.floatbutton.visible('show')
-            if (window.$zoho.salesiq.floatbutton.show) window.$zoho.salesiq.floatbutton.show()
+          if ((window.$zoho.salesiq as any).floatbutton) {
+            if ((window.$zoho.salesiq as any).floatbutton.visible) (window.$zoho.salesiq as any).floatbutton.visible('show')
+            if ((window.$zoho.salesiq as any).floatbutton.show) (window.$zoho.salesiq as any).floatbutton.show()
           }
           
           console.log('✅ Tentatives de forçage terminées')
