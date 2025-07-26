@@ -5,7 +5,7 @@ const nextConfig = {
   // Configuration sécurité
   poweredByHeader: false,
   
-  // Headers de sécurité globaux + CSP CORRIGÉE pour Zoho SalesIQ
+  // ✅ HEADERS SIMPLIFIÉS - CSP maintenant gérée par middleware.ts
   async headers() {
     return [
       {
@@ -15,38 +15,8 @@ const nextConfig = {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
           },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          },
-          // ✅ CSP CORRIGÉE pour autoriser Zoho SalesIQ
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-              "style-src 'self' 'unsafe-inline' https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-              "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-              "connect-src 'self' https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com https://expert-app-cngws.ondigitalocean.app",
-              "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-              "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-              "worker-src 'self' blob:",
-              "font-src 'self' data: https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-              "media-src 'self' https://*.zoho.com"
-            ].join('; ')
-          }
+          // CSP supprimée - maintenant gérée par middleware.ts
+          // Autres headers de sécurité conservés mais optionnels (redondant avec middleware)
         ],
       },
     ]
