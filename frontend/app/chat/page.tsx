@@ -384,12 +384,161 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
   )
 }
 
-const ContactModal = ({ onClose }: { onClose: () => void }) => (
+const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
+  // Simuler le forfait utilisateur (à remplacer par les vraies données)
+  const currentPlan = user?.plan || 'essentiel'
+  
+  const plans = {
+    essentiel: {
+      name: 'Essentiel',
+      price: 'Gratuit',
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      features: [
+        '50 questions par mois',
+        'Accès aux documents publics',
+        'Support par email',
+        'Interface web'
+      ]
+    },
+    pro: {
+      name: 'Pro',
+      price: '29$ / mois',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      features: [
+        'Questions illimitées',
+        'Accès documents confidentiels',
+        'Support prioritaire',
+        'Interface web + mobile',
+        'Analytics avancées'
+      ]
+    },
+    entreprise: {
+      name: 'Entreprise',
+      price: 'Sur mesure',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      features: [
+        'Tout du forfait Pro',
+        'Documents privés personnalisés',
+        'Support téléphonique dédié',
+        'Intégrations API',
+        'Formation équipe',
+        'SLA garanti'
+      ]
+    }
+  }
+
+  const userPlan = plans[currentPlan as keyof typeof plans]
+
+  return (
+    <div className="space-y-6">
+      {/* Forfait actuel */}
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Mon forfait actuel</h3>
+        <div className={`inline-flex items-center px-4 py-2 rounded-full ${userPlan.bgColor} ${userPlan.borderColor} border`}>
+          <span className={`font-medium ${userPlan.color}`}>{userPlan.name}</span>
+          <span className="mx-2 text-gray-400">•</span>
+          <span className={`font-bold ${userPlan.color}`}>{userPlan.price}</span>
+        </div>
+      </div>
+
+      {/* Fonctionnalités du forfait actuel */}
+      <div className={`p-4 rounded-lg ${userPlan.bgColor} ${userPlan.borderColor} border`}>
+        <h4 className="font-medium text-gray-900 mb-3">Fonctionnalités incluses :</h4>
+        <ul className="space-y-2">
+          {userPlan.features.map((feature, index) => (
+            <li key={index} className="flex items-center text-sm text-gray-700">
+              <span className="text-green-500 mr-2">✓</span>
+              {feature}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Options d'upgrade */}
+      {currentPlan !== 'entreprise' && (
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-900">Mettre à niveau</h4>
+          
+          {currentPlan === 'essentiel' && (
+            <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h5 className="font-medium text-blue-900">Forfait Pro</h5>
+                  <p className="text-sm text-blue-700">Questions illimitées + fonctionnalités avancées</p>
+                </div>
+                <button
+                  onClick={() => {
+                    console.log('Upgrade vers Pro demandé')
+                    // Logique d'upgrade à implémenter
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Passer au Pro
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 border border-purple-200 rounded-lg bg-purple-50">
+            <div className="flex justify-between items-center">
+              <div>
+                <h5 className="font-medium text-purple-900">Forfait Entreprise</h5>
+                <p className="text-sm text-purple-700">Solution personnalisée pour votre organisation</p>
+              </div>
+              <button
+                onClick={() => {
+                  console.log('Contact commercial demandé')
+                  window.open('mailto:sales@intelia.com?subject=Demande forfait Entreprise', '_blank')
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+              >
+                Nous contacter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Utilisation du mois (simulation) */}
+      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <h4 className="font-medium text-gray-900 mb-2">Utilisation ce mois-ci</h4>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Questions posées :</span>
+          <span className="font-medium text-gray-900">
+            {currentPlan === 'essentiel' ? '23 / 50' : 'Illimité'}
+          </span>
+        </div>
+        {currentPlan === 'essentiel' && (
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '46%' }}></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+  )
+}
   <div className="space-y-4">
     {/* Chat with us */}
     <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl">💬</span>
+      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl text-white">💬</span>
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
@@ -410,8 +559,8 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
 
     {/* Call Us */}
     <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl">📞</span>
+      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl text-white">📞</span>
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
@@ -429,8 +578,8 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
 
     {/* Email Us */}
     <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl">📧</span>
+      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl text-white">📧</span>
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
@@ -448,8 +597,8 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
 
     {/* Visit our website */}
     <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl">🌐</span>
+      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl text-white">🌐</span>
       </div>
       <div className="flex-1">
         <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
@@ -558,6 +707,7 @@ const UserMenuButton = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
+  const [showAccountModal, setShowAccountModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -570,6 +720,11 @@ const UserMenuButton = () => {
   const handleUserInfoClick = () => {
     setIsOpen(false)
     setShowUserInfoModal(true)
+  }
+
+  const handleAccountClick = () => {
+    setIsOpen(false)
+    setShowAccountModal(true)
   }
 
   return (
@@ -599,10 +754,18 @@ const UserMenuButton = () => {
               </div>
 
               <button
+                onClick={handleAccountClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <span className="text-blue-600">💳</span>
+                <span>Mon compte</span>
+              </button>
+
+              <button
                 onClick={handleUserInfoClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span>👤</span>
+                <span className="text-blue-600">👤</span>
                 <span>Mes informations</span>
               </button>
 
@@ -610,7 +773,7 @@ const UserMenuButton = () => {
                 onClick={handleContactClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span>📞</span>
+                <span className="text-blue-600">📞</span>
                 <span>Nous joindre</span>
               </button>
 
@@ -618,7 +781,7 @@ const UserMenuButton = () => {
                 onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span>⚖️</span>
+                <span className="text-blue-600">⚖️</span>
                 <span>Mentions légales</span>
               </button>
               
@@ -630,7 +793,7 @@ const UserMenuButton = () => {
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <span>🚪</span>
+                  <span className="text-blue-600">🚪</span>
                   <span>Déconnexion</span>
                 </button>
               </div>
@@ -640,6 +803,14 @@ const UserMenuButton = () => {
       </div>
 
       {/* Modals */}
+      <Modal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        title="Mon compte"
+      >
+        <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+      </Modal>
+
       <Modal
         isOpen={showUserInfoModal}
         onClose={() => setShowUserInfoModal(false)}
@@ -675,28 +846,60 @@ export default function ChatInterface() {
   // Vérifier le statut des services
   const checkSystemStatus = async () => {
     try {
-      // Test API RAG
-      const ragResponse = await fetch('https://expert-app-cngws.ondigitalocean.app/api/health', {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      })
-      const ragStatus = ragResponse.ok
+      let ragStatus = false
+      let supabaseStatus = true // Simulé car on utilise des stores simulés
+      let networkStatus = true
 
-      // Test Supabase (simulation - ajustez selon votre config)
-      const supabaseStatus = true // Toujours true car on utilise des stores simulés
+      // Test 1: API RAG
+      try {
+        const ragResponse = await fetch('https://expert-app-cngws.ondigitalocean.app/api/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000)
+        })
+        ragStatus = ragResponse.ok
+      } catch (error) {
+        console.warn('⚠️ RAG API non accessible:', error)
+        ragStatus = false
+      }
 
-      const overall = ragStatus && supabaseStatus
+      // Test 2: Connectivité réseau générale
+      try {
+        await fetch('https://www.google.com/favicon.ico', {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(3000)
+        })
+        networkStatus = true
+      } catch (error) {
+        console.warn('⚠️ Problème de connectivité réseau:', error)
+        networkStatus = false
+      }
+
+      // Test 3: Supabase simulé (toujours true pour le moment)
+      // Dans un vrai projet, vous testeriez la connexion Supabase ici
+
+      // Statut global : tous les services doivent être opérationnels
+      const overall = ragStatus && supabaseStatus && networkStatus
 
       setSystemStatus({
         rag: ragStatus,
         supabase: supabaseStatus,
         overall
       })
+
+      // Log détaillé pour debug
+      console.log('🔍 Status check:', {
+        rag: ragStatus ? '✅' : '❌',
+        supabase: supabaseStatus ? '✅' : '❌',
+        network: networkStatus ? '✅' : '❌',
+        overall: overall ? '🟢 OK' : '🔴 PROBLÈME'
+      })
+
     } catch (error) {
       console.error('❌ Erreur vérification statut:', error)
       setSystemStatus({
         rag: false,
-        supabase: true, // Garde Supabase true car simulé
+        supabase: true,
         overall: false
       })
     }
@@ -1012,22 +1215,13 @@ Consultez la console développeur (F12) pour plus de détails.`
               </button>
             </div>
             
-            {/* Indicateur de statut système */}
+            {/* Indicateur de statut système simplifié */}
             <div className="mt-2 text-center">
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs bg-gray-100">
                 <div className="flex items-center space-x-1">
                   <div className={`w-2 h-2 rounded-full ${systemStatus.overall ? 'bg-green-500' : 'bg-red-500'}`}></div>
                   <span className={systemStatus.overall ? 'text-green-700' : 'text-red-700'}>
                     {systemStatus.overall ? 'Système opérationnel' : 'Problème détecté'}
-                  </span>
-                </div>
-                <div className="text-gray-400">•</div>
-                <div className="flex items-center space-x-2 text-gray-600">
-                  <span title={`RAG API: ${systemStatus.rag ? 'Connecté' : 'Déconnecté'}`}>
-                    🤖 {systemStatus.rag ? '✅' : '❌'}
-                  </span>
-                  <span title={`Supabase: ${systemStatus.supabase ? 'Connecté' : 'Déconnecté'}`}>
-                    🗄️ {systemStatus.supabase ? '✅' : '❌'}
                   </span>
                 </div>
               </div>
