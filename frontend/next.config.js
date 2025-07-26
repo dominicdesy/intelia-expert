@@ -5,7 +5,7 @@ const nextConfig = {
   // Configuration sécurité
   poweredByHeader: false,
   
-  // Headers de sécurité globaux + CSP pour Zoho SalesIQ
+  // Headers de sécurité globaux + CSP CORRIGÉE pour Zoho SalesIQ
   async headers() {
     return [
       {
@@ -31,19 +31,20 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
           },
-          // ✅ CSP pour autoriser Zoho SalesIQ
+          // ✅ CSP CORRIGÉE pour autoriser Zoho SalesIQ
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://salesiq.zohopublic.com https://salesiq.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-              "style-src 'self' 'unsafe-inline' https://salesiq.zohopublic.com https://*.zohostatic.com https://*.zohocdn.com",
-              "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zohostatic.com https://*.zohocdn.com",
-              "connect-src 'self' https://salesiq.zohopublic.com https://salesiq.zoho.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+              "style-src 'self' 'unsafe-inline' https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+              "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+              "connect-src 'self' https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com https://expert-app-cngws.ondigitalocean.app",
               "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
               "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
               "worker-src 'self' blob:",
-              "font-src 'self' data: https://*.zohostatic.com https://*.zohocdn.com"
+              "font-src 'self' data: https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+              "media-src 'self' https://*.zoho.com"
             ].join('; ')
           }
         ],
