@@ -117,7 +117,9 @@ const useAuthStore = () => {
     )
 
     return () => {
-      subscription.unsubscribe()
+      if (subscription && subscription.unsubscribe) {
+        subscription.unsubscribe()
+      }
     }
   }, [])
 
@@ -1568,7 +1570,9 @@ Consultez la console développeur (F12) pour plus de détails.`
     
     return () => {
       clearTimeout(timer)
-      clearInterval(diagnosticInterval)
+      if (diagnosticInterval) {
+        clearInterval(diagnosticInterval)
+      }
     }
   }, [user])
 
