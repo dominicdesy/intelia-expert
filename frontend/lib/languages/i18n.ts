@@ -1,5 +1,10 @@
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
 
+import { useState, useEffect } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+const supabase = createClientComponentClient()
+
 // Types pour le système de traduction
 interface TranslationKeys {
   // Navigation et Interface
