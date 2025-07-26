@@ -1222,6 +1222,46 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
           </svg>
         </div>
         <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
+          </p>
+          <a 
+            href="tel:+18666666221"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            +1 (866) 666 6221
+          </a>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Envoyez-nous un message détaillé et nous vous répondrons rapidement.
+          </p>
+          <a 
+            href="mailto:support@intelia.com"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            support@intelia.com
+          </a>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
+          </svg>
+        </div>
+        <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
           <p className="text-sm text-gray-600 mb-2">
             Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.
@@ -1824,43 +1864,4 @@ Consultez la console développeur (F12) pour plus de détails.`
       </div>
     </>
   )
-}<h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
-          </p>
-          <a 
-            href="tel:+18666666221"
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-          >
-            +1 (866) 666 6221
-          </a>
-        </div>
-      </div>
-
-      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Envoyez-nous un message détaillé et nous vous répondrons rapidement.
-          </p>
-          <a 
-            href="mailto:support@intelia.com"
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-          >
-            support@intelia.com
-          </a>
-        </div>
-      </div>
-
-      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
-          </svg>
-        </div>
-        <div className="flex-1">
+}
