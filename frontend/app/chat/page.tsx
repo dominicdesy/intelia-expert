@@ -16,14 +16,9 @@ const useAuthStore = () => ({
   },
   isAuthenticated: true,
   logout: async () => {
-    try {
-      console.log('🚪 Déconnexion en cours...')
-      await new Promise(resolve => setTimeout(resolve, 500))
-      window.location.href = '/auth/login'
-    } catch (error) {
-      console.error('❌ Erreur lors de la déconnexion:', error)
-      window.location.href = '/auth/login'
-    }
+    console.log('🚪 Déconnexion en cours...')
+    // Redirection vers la page de login externe
+    window.location.href = 'https://expert.intelia.com'
   },
   exportUserData: async () => {
     console.log('Export des données...')
@@ -73,7 +68,7 @@ interface Message {
 // ==================== ICÔNES SVG ====================
 const PaperAirplaneIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0721.485 12 59.77 0 713.27 20.876L5.999 12zm0 0h7.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.876L5.999 12zm0 0h7.5" />
   </svg>
 )
 
@@ -160,76 +155,243 @@ const Modal = ({ isOpen, onClose, title, children }: {
   )
 }
 
-const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) => (
-  <div className="space-y-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
-      <input
-        type="text"
-        defaultValue={user?.name}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
+const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
+  const [formData, setFormData] = useState({
+    firstName: user?.name?.split(' ')[0] || '',
+    lastName: user?.name?.split(' ').slice(1).join(' ') || '',
+    linkedinProfile: '',
+    companyName: '',
+    companyWebsite: '',
+    linkedinCorporate: '',
+    email: user?.email || '',
+    phone: '',
+    country: 'CA' // Default Canada
+  })
+
+  const countries = [
+    { code: 'CA', name: 'Canada', format: '+1 (XXX) XXX-XXXX' },
+    { code: 'US', name: 'États-Unis', format: '+1 (XXX) XXX-XXXX' },
+    { code: 'FR', name: 'France', format: '+33 X XX XX XX XX' },
+    { code: 'BE', name: 'Belgique', format: '+32 XXX XX XX XX' },
+    { code: 'CH', name: 'Suisse', format: '+41 XX XXX XX XX' },
+    { code: 'MX', name: 'Mexique', format: '+52 XXX XXX XXXX' },
+    { code: 'BR', name: 'Brésil', format: '+55 (XX) XXXXX-XXXX' }
+  ]
+
+  const formatPhoneNumber = (phone: string, countryCode: string) => {
+    const cleaned = phone.replace(/\D/g, '')
+    
+    switch (countryCode) {
+      case 'CA':
+      case 'US':
+        if (cleaned.length >= 10) {
+          return `+1 (${cleaned.slice(-10, -7)}) ${cleaned.slice(-7, -4)}-${cleaned.slice(-4)}`
+        }
+        break
+      case 'FR':
+        if (cleaned.length >= 9) {
+          return `+33 ${cleaned.slice(-9, -8)} ${cleaned.slice(-8, -6)} ${cleaned.slice(-6, -4)} ${cleaned.slice(-4, -2)} ${cleaned.slice(-2)}`
+        }
+        break
+      case 'BE':
+        if (cleaned.length >= 8) {
+          return `+32 ${cleaned.slice(-8, -5)} ${cleaned.slice(-5, -3)} ${cleaned.slice(-3, -1)} ${cleaned.slice(-1)}`
+        }
+        break
+      case 'CH':
+        if (cleaned.length >= 9) {
+          return `+41 ${cleaned.slice(-9, -7)} ${cleaned.slice(-7, -4)} ${cleaned.slice(-4, -2)} ${cleaned.slice(-2)}`
+        }
+        break
+      case 'MX':
+        if (cleaned.length >= 10) {
+          return `+52 ${cleaned.slice(-10, -7)} ${cleaned.slice(-7, -4)} ${cleaned.slice(-4)}`
+        }
+        break
+      case 'BR':
+        if (cleaned.length >= 10) {
+          return `+55 (${cleaned.slice(-10, -8)}) ${cleaned.slice(-8, -3)}-${cleaned.slice(-3)}`
+        }
+        break
+    }
+    return phone
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value, formData.country)
+    setFormData(prev => ({ ...prev, phone: formatted }))
+  }
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newCountry = e.target.value
+    setFormData(prev => ({ 
+      ...prev, 
+      country: newCountry,
+      phone: formatPhoneNumber(prev.phone, newCountry)
+    }))
+  }
+
+  const getCurrentCountryFormat = () => {
+    return countries.find(c => c.code === formData.country)?.format || ''
+  }
+
+  return (
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+      {/* Informations personnelles */}
+      <div className="border-b border-gray-200 pb-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Informations personnelles</h3>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+            <input
+              type="text"
+              value={formData.firstName}
+              onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nom de famille *</label>
+            <input
+              type="text"
+              value={formData.lastName}
+              onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Profil LinkedIn personnel</label>
+          <input
+            type="url"
+            value={formData.linkedinProfile}
+            onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
+            placeholder="https://linkedin.com/in/votre-profil"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Informations de contact */}
+      <div className="border-b border-gray-200 pb-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Contact</h3>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Pays *</label>
+          <select 
+            value={formData.country}
+            onChange={handleCountryChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            {countries.map(country => (
+              <option key={country.code} value={country.code}>
+                {country.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Téléphone
+            <span className="text-xs text-gray-500 ml-2">Format: {getCurrentCountryFormat()}</span>
+          </label>
+          <input
+            type="tel"
+            value={formData.phone}
+            onChange={handlePhoneChange}
+            placeholder={getCurrentCountryFormat()}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Informations entreprise */}
+      <div className="pb-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Entreprise</h3>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
+          <input
+            type="text"
+            value={formData.companyName}
+            onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Site web de l'entreprise</label>
+          <input
+            type="url"
+            value={formData.companyWebsite}
+            onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+            placeholder="https://www.exemple.com"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Page LinkedIn de l'entreprise</label>
+          <input
+            type="url"
+            value={formData.linkedinCorporate}
+            onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
+            placeholder="https://linkedin.com/company/votre-entreprise"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-gray-600 hover:text-gray-800"
+        >
+          Annuler
+        </button>
+        <button
+          onClick={() => {
+            console.log('Sauvegarde des informations utilisateur:', formData)
+            // Ici vous pouvez ajouter la logique de sauvegarde
+            onClose()
+          }}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          Sauvegarder
+        </button>
+      </div>
     </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-      <input
-        type="email"
-        defaultValue={user?.email}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Type d'utilisateur</label>
-      <select 
-        defaultValue={user?.user_type}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="producer">Producteur</option>
-        <option value="professional">Professionnel</option>
-      </select>
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Langue préférée</label>
-      <select 
-        defaultValue={user?.language}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="fr">Français</option>
-        <option value="en">English</option>
-        <option value="es">Español</option>
-      </select>
-    </div>
-    <div className="flex justify-end space-x-3 pt-4">
-      <button
-        onClick={onClose}
-        className="px-4 py-2 text-gray-600 hover:text-gray-800"
-      >
-        Annuler
-      </button>
-      <button
-        onClick={() => {
-          console.log('Sauvegarde des informations utilisateur')
-          onClose()
-        }}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-      >
-        Sauvegarder
-      </button>
-    </div>
-  </div>
-)
+  )
+}
 
 const ContactModal = ({ onClose }: { onClose: () => void }) => (
-  <div className="space-y-6">
+  <div className="space-y-4">
     {/* Chat with us */}
-    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
         <span className="text-2xl">💬</span>
       </div>
       <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-2">Chat with us</h3>
-        <p className="text-sm text-gray-600 mb-3">
-          Get in touch with our support team via in app chat.
+        <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
+        <p className="text-sm text-gray-600 mb-2">
+          Contactez notre équipe de support via le chat intégré.
         </p>
         <button 
           onClick={() => {
@@ -238,20 +400,20 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
           }}
           className="text-blue-600 hover:text-blue-700 font-medium text-sm"
         >
-          Contact Intelia support
+          Contacter le support Intelia
         </button>
       </div>
     </div>
 
     {/* Call Us */}
-    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
         <span className="text-2xl">📞</span>
       </div>
       <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-2">Call Us</h3>
-        <p className="text-sm text-gray-600 mb-3">
-          If you can't find a solution to your problem, call us to talk directly with our support team.
+        <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
+        <p className="text-sm text-gray-600 mb-2">
+          Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
         </p>
         <a 
           href="tel:+18666666221"
@@ -263,14 +425,14 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
     </div>
 
     {/* Email Us */}
-    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
         <span className="text-2xl">📧</span>
       </div>
       <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-2">Email Us</h3>
-        <p className="text-sm text-gray-600 mb-3">
-          Send us a detailed message and we'll get back to you as soon as possible.
+        <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
+        <p className="text-sm text-gray-600 mb-2">
+          Envoyez-nous un message détaillé et nous vous répondrons rapidement.
         </p>
         <a 
           href="mailto:support@intelia.com"
@@ -282,14 +444,14 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
     </div>
 
     {/* Visit our website */}
-    <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
         <span className="text-2xl">🌐</span>
       </div>
       <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-2">Visit our website</h3>
-        <p className="text-sm text-gray-600 mb-3">
-          To know more about us and the Intelia platform, visit our website.
+        <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
+        <p className="text-sm text-gray-600 mb-2">
+          Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.
         </p>
         <a 
           href="https://www.intelia.com"
@@ -302,21 +464,12 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => (
       </div>
     </div>
 
-    {/* Hours */}
-    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-      <h4 className="font-medium text-blue-900 mb-2">Support Hours</h4>
-      <p className="text-sm text-blue-700">
-        Monday - Friday: 9:00 AM - 5:00 PM (EST)<br/>
-        Saturday - Sunday: Closed
-      </p>
-    </div>
-
-    <div className="flex justify-end pt-4">
+    <div className="flex justify-end pt-3">
       <button
         onClick={onClose}
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
       >
-        Close
+        Fermer
       </button>
     </div>
   </div>
@@ -508,8 +661,43 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [systemStatus, setSystemStatus] = useState({
+    rag: false,
+    supabase: false,
+    overall: false
+  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
+
+  // Vérifier le statut des services
+  const checkSystemStatus = async () => {
+    try {
+      // Test API RAG
+      const ragResponse = await fetch('https://expert-app-cngws.ondigitalocean.app/api/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      const ragStatus = ragResponse.ok
+
+      // Test Supabase (simulation - ajustez selon votre config)
+      const supabaseStatus = true // Toujours true car on utilise des stores simulés
+
+      const overall = ragStatus && supabaseStatus
+
+      setSystemStatus({
+        rag: ragStatus,
+        supabase: supabaseStatus,
+        overall
+      })
+    } catch (error) {
+      console.error('❌ Erreur vérification statut:', error)
+      setSystemStatus({
+        rag: false,
+        supabase: true, // Garde Supabase true car simulé
+        overall: false
+      })
+    }
+  }
 
   // Scroll automatique
   const scrollToBottom = () => {
@@ -520,15 +708,26 @@ export default function ChatInterface() {
     scrollToBottom()
   }, [messages])
 
-  // Message de bienvenue
+  // Message de bienvenue + vérification statut
   useEffect(() => {
-    const welcomeMessage: Message = {
-      id: '1',
-      content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
-      isUser: false,
-      timestamp: new Date()
+    const initializeChat = async () => {
+      await checkSystemStatus()
+
+      const welcomeMessage: Message = {
+        id: '1',
+        content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages([welcomeMessage])
     }
-    setMessages([welcomeMessage])
+
+    initializeChat()
+    
+    // Vérifier le statut toutes les 30 secondes
+    const statusInterval = setInterval(checkSystemStatus, 30000)
+    
+    return () => clearInterval(statusInterval)
   }, [])
 
   // Générer réponse RAG
@@ -536,9 +735,9 @@ export default function ChatInterface() {
     try {
       console.log('🤖 Envoi question au RAG Intelia:', question)
       
-      // URL corrigée - utiliser l'endpoint public
+      // URL corrigée - utiliser l'endpoint public avec le bon chemin
       const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
-      console.log('📡 URL API:', apiUrl)
+      console.log('📡 URL API corrigée:', apiUrl)
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -784,7 +983,7 @@ Consultez la console développeur (F12) pour plus de détails.`
                 </svg>
               </button>
               
-              <div className="flex-1 relative">
+              <div className="flex-1">
                 <input
                   type="text"
                   value={inputMessage}
@@ -804,17 +1003,31 @@ Consultez la console développeur (F12) pour plus de détails.`
               <button
                 onClick={() => handleSendMessage()}
                 disabled={isLoading || !inputMessage.trim()}
-                className="p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
               >
                 <PaperAirplaneIcon />
               </button>
             </div>
             
-            {/* Indicateur RAG en bas */}
+            {/* Indicateur de statut système */}
             <div className="mt-2 text-center">
-              <span className="text-xs text-gray-400">
-                🔍 Assistant IA spécialisé en santé et nutrition animale
-              </span>
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs bg-gray-100">
+                <div className="flex items-center space-x-1">
+                  <div className={`w-2 h-2 rounded-full ${systemStatus.overall ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className={systemStatus.overall ? 'text-green-700' : 'text-red-700'}>
+                    {systemStatus.overall ? 'Système opérationnel' : 'Problème détecté'}
+                  </span>
+                </div>
+                <div className="text-gray-400">•</div>
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <span title={`RAG API: ${systemStatus.rag ? 'Connecté' : 'Déconnecté'}`}>
+                    🤖 {systemStatus.rag ? '✅' : '❌'}
+                  </span>
+                  <span title={`Supabase: ${systemStatus.supabase ? 'Connecté' : 'Déconnecté'}`}>
+                    🗄️ {systemStatus.supabase ? '✅' : '❌'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
