@@ -5,7 +5,7 @@ const nextConfig = {
   // Configuration sécurité
   poweredByHeader: false,
   
-  // Headers de sécurité globaux
+  // Headers de sécurité globaux + CSP pour Zoho SalesIQ
   async headers() {
     return [
       {
@@ -30,6 +30,21 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
+          },
+          // ✅ CSP pour autoriser Zoho SalesIQ
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://salesiq.zohopublic.com https://salesiq.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+              "style-src 'self' 'unsafe-inline' https://salesiq.zohopublic.com https://*.zohostatic.com https://*.zohocdn.com",
+              "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zohostatic.com https://*.zohocdn.com",
+              "connect-src 'self' https://salesiq.zohopublic.com https://salesiq.zoho.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com",
+              "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+              "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+              "worker-src 'self' blob:",
+              "font-src 'self' data: https://*.zohostatic.com https://*.zohocdn.com"
+            ].join('; ')
           }
         ],
       },
@@ -41,6 +56,10 @@ const nextConfig = {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com',
+      // Domaines Zoho pour les images
+      'salesiq.zohopublic.com',
+      'zohostatic.com',
+      'zohocdn.com'
     ],
     formats: ['image/webp', 'image/avif'],
   },
@@ -64,11 +83,10 @@ const nextConfig = {
   // Optimisation bundle + Configuration Supabase
   experimental: {
     optimizePackageImports: ['lucide-react', '@heroicons/react'],
-    // ✅ AJOUTÉ - Configuration pour éviter les warnings Supabase
     serverComponentsExternalPackages: ['@supabase/supabase-js']
   },
 
-  // ✅ AJOUTÉ - Configuration webpack pour Supabase
+  // Configuration webpack pour Supabase
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
