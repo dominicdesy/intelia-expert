@@ -5,6 +5,10 @@ export const runtime = 'nodejs'
 
 import React, { useState, useEffect, useRef } from 'react'
 import Script from 'next/script'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+// Instance Supabase
+const supabase = createClientComponentClient()
 
 // Déclaration TypeScript pour Zoho SalesIQ
 declare global {
@@ -20,41 +24,235 @@ declare global {
   }
 }
 
-// ==================== STORES SIMULÉS ====================
-const useAuthStore = () => ({
-  user: {
-    id: '1',
-    name: 'Jean Dupont', // Cette donnée sera remplacée par les vraies données utilisateur
-    email: 'jean.dupont@exemple.com', // Cette donnée sera remplacée par les vraies données utilisateur
-    user_type: 'producer',
-    language: 'fr',
-    created_at: '2024-01-15',
-    consentGiven: true,
-    consentDate: new Date('2024-01-15')
-  },
-  isAuthenticated: true,
-  logout: async () => {
-    console.log('🚪 Déconnexion en cours...')
-    // Redirection vers la page de login externe
-    window.location.href = 'https://expert.intelia.com'
-  },
-  exportUserData: async () => {
-    console.log('Export des données...')
-  },
-  deleteUserData: async () => {
-    console.log('Suppression des données...')
-  },
-  updateProfile: async (data: any) => {
-    console.log('Mise à jour profil:', data)
-    // Ici vous devriez faire l'appel API pour mettre à jour le profil
-    return { success: true }
-  },
-  changePassword: async (currentPassword: string, newPassword: string) => {
-    console.log('Changement de mot de passe demandé')
-    // Ici vous devriez faire l'appel API pour changer le mot de passe
-    return { success: true }
+// ==================== STORE D'AUTHENTIFICATION RÉEL ====================
+const useAuthStore = () => {
+  const [user, setUser] = useState<any>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Charger les données utilisateur au mount
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        // Récupérer la session active
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Erreur récupération session:', error)
+          setIsAuthenticated(false)
+          setIsLoading(false)
+          return
+        }
+
+        if (session?.user) {
+          console.log('✅ Utilisateur connecté:', session.user)
+          
+          // Structurer les données utilisateur
+          const userData = {
+            id: session.user.id,
+            email: session.user.email,
+            name: `${session.user.user_metadata?.first_name || ''} ${session.user.user_metadata?.last_name || ''}`.trim() || session.user.email?.split('@')[0],
+            
+            // Informations du profil
+            firstName: session.user.user_metadata?.first_name || '',
+            lastName: session.user.user_metadata?.last_name || '',
+            linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
+            
+            // Contact
+            country: session.user.user_metadata?.country || 'CA',
+            phone: session.user.user_metadata?.phone || '',
+            
+            // Entreprise
+            companyName: session.user.user_metadata?.company_name || '',
+            companyWebsite: session.user.user_metadata?.company_website || '',
+            linkedinCorporate: session.user.user_metadata?.company_linkedin || '',
+            
+            // Métadonnées
+            user_type: session.user.user_metadata?.role || 'producer',
+            language: 'fr', // Défaut français
+            created_at: session.user.created_at,
+            consentGiven: true,
+            consentDate: new Date(session.user.created_at)
+          }
+          
+          setUser(userData)
+          setIsAuthenticated(true)
+        } else {
+          console.log('ℹ️ Aucun utilisateur connecté')
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error('❌ Erreur chargement utilisateur:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadUser()
+
+    // Écouter les changements d'authentification
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔄 Changement auth:', event, session?.user?.email)
+        
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setIsAuthenticated(false)
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          // Recharger les données utilisateur
+          loadUser()
+        }
+      }
+    )
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // Fonction de déconnexion
+  const logout = async () => {
+    try {
+      console.log('🚪 Déconnexion en cours...')
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('❌ Erreur déconnexion:', error)
+        return
+      }
+      
+      setUser(null)
+      setIsAuthenticated(false)
+      
+      // Redirection vers la page de login
+      window.location.href = '/'
+    } catch (error) {
+      console.error('❌ Erreur critique déconnexion:', error)
+    }
   }
-})
+
+  // Fonction de mise à jour du profil
+  const updateProfile = async (data: any) => {
+    try {
+      console.log('📝 Mise à jour profil:', data)
+      
+      // Préparer les métadonnées utilisateur
+      const updates = {
+        data: {
+          first_name: data.firstName,
+          last_name: data.lastName,
+          linkedin_profile: data.linkedinProfile,
+          country: data.country,
+          phone: data.phone,
+          company_name: data.companyName,
+          company_website: data.companyWebsite,
+          company_linkedin: data.linkedinCorporate
+        }
+      }
+      
+      const { error } = await supabase.auth.updateUser(updates)
+      
+      if (error) {
+        console.error('❌ Erreur mise à jour profil:', error)
+        return { success: false, error: error.message }
+      }
+      
+      // Mettre à jour l'état local
+      setUser(prev => ({
+        ...prev,
+        ...data,
+        name: `${data.firstName} ${data.lastName}`.trim()
+      }))
+      
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Erreur critique mise à jour:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Fonction de changement de mot de passe
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      console.log('🔑 Changement mot de passe demandé')
+      
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+      
+      if (error) {
+        console.error('❌ Erreur changement mot de passe:', error)
+        return { success: false, error: error.message }
+      }
+      
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Erreur critique changement mot de passe:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // Fonctions RGPD
+  const exportUserData = async () => {
+    try {
+      console.log('📤 Export données utilisateur...')
+      
+      // Créer un export JSON des données
+      const exportData = {
+        user_info: user,
+        export_date: new Date().toISOString(),
+        export_type: 'user_data_export'
+      }
+      
+      // Télécharger le fichier
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json'
+      })
+      
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `intelia_export_${user.email}_${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      console.log('✅ Export réalisé avec succès')
+    } catch (error) {
+      console.error('❌ Erreur export données:', error)
+    }
+  }
+
+  const deleteUserData = async () => {
+    try {
+      console.log('🗑️ Suppression données utilisateur...')
+      
+      if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible.')) {
+        return
+      }
+      
+      // Note: La suppression complète nécessiterait un endpoint backend
+      // Pour l'instant, on fait juste la déconnexion
+      alert('Pour supprimer définitivement votre compte, veuillez contacter support@intelia.com')
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression données:', error)
+    }
+  }
+
+  return {
+    user,
+    isAuthenticated,
+    isLoading,
+    logout,
+    updateProfile,
+    changePassword,
+    exportUserData,
+    deleteUserData
+  }
+}
 
 const useChatStore = () => ({
   conversations: [
@@ -1033,7 +1231,25 @@ export default function ChatInterface() {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuthStore()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore()
+
+  // Afficher un loader pendant le chargement
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Rediriger si pas connecté
+  if (!isAuthenticated) {
+    window.location.href = '/'
+    return null
+  }
 
   // Scroll automatique
   const scrollToBottom = () => {
@@ -1187,68 +1403,244 @@ Consultez la console développeur (F12) pour plus de détails.`
     })
   }
 
-  // Configuration manuelle Zoho SalesIQ
+  // Configuration manuelle Zoho SalesIQ avec diagnostic avancé
   useEffect(() => {
+    let zohoInitialized = false
+    
     const initializeZohoSalesIQ = () => {
-      // Script d'initialisation
+      console.log('🚀 Initialisation Zoho SalesIQ...')
+      
+      // Nettoyer les scripts existants
+      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
+      existingScripts.forEach(script => script.remove())
+      
+      // Script d'initialisation global
       const initScript = document.createElement('script')
       initScript.innerHTML = `
+        console.log('📡 Initialisation globale Zoho...')
         window.$zoho = window.$zoho || {};
         window.$zoho.salesiq = window.$zoho.salesiq || {
           ready: function() {
-            console.log('🎯 Zoho SalesIQ initialisé manuellement')
-          }
+            console.log('✅ Zoho SalesIQ ready callback appelé')
+          },
+          widgetcode: 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+        };
+        
+        // Variables globales Zoho
+        window.siqReadyState = false;
+        window.$zoho.salesiq.ready = function() {
+          console.log('🎯 Zoho SalesIQ initialisé avec succès')
+          window.siqReadyState = true;
+          
+          // Forcer l'affichage du widget
+          setTimeout(() => {
+            try {
+              if (window.$zoho && window.$zoho.salesiq) {
+                console.log('🔧 Tentative d activation du widget...')
+                
+                // Méthodes possibles pour activer le widget
+                if (window.$zoho.salesiq.chat && window.$zoho.salesiq.chat.start) {
+                  window.$zoho.salesiq.chat.start()
+                  console.log('✅ Chat.start() appelé')
+                }
+                
+                if (window.$zoho.salesiq.visitor && window.$zoho.salesiq.visitor.info) {
+                  window.$zoho.salesiq.visitor.info({
+                    name: '${user?.name || 'Utilisateur'}',
+                    email: '${user?.email || ''}'
+                  })
+                  console.log('✅ Informations visiteur configurées')
+                }
+                
+                // Vérifier la présence du widget dans le DOM
+                setTimeout(() => {
+                  const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
+                  console.log('🔍 Éléments Zoho trouvés:', zohoElements)
+                  
+                  if (zohoElements.length === 0) {
+                    console.warn('⚠️ Aucun élément widget Zoho trouvé dans le DOM')
+                  }
+                }, 2000)
+              }
+            } catch (error) {
+              console.error('❌ Erreur activation widget:', error)
+            }
+          }, 1000)
         };
       `
       document.head.appendChild(initScript)
 
-      // Script principal Zoho
+      // Script principal Zoho avec gestion d'erreur avancée
       const zohoScript = document.createElement('script')
       zohoScript.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+      zohoScript.async = true
       zohoScript.defer = true
       
       zohoScript.onload = () => {
-        console.log('✅ Zoho SalesIQ chargé avec succès')
+        console.log('✅ Script Zoho SalesIQ chargé avec succès')
+        zohoInitialized = true
         
-        // Configuration additionnelle
-        setTimeout(() => {
-          if (window.$zoho && window.$zoho.salesiq) {
-            console.log('🔧 Configuration Zoho SalesIQ...')
+        // Multiples tentatives d'initialisation
+        const tryInitialize = (attempt = 1) => {
+          setTimeout(() => {
+            console.log(\`🔄 Tentative d'initialisation #\${attempt}\`)
             
-            // Tenter de rendre le widget visible
-            try {
-              if (window.$zoho.salesiq.chat) {
-                window.$zoho.salesiq.chat.start()
+            if (window.$zoho && window.$zoho.salesiq) {
+              console.log('✅ Objets Zoho détectés')
+              
+              try {
+                // Forcer le ready
+                if (typeof window.$zoho.salesiq.ready === 'function') {
+                  window.$zoho.salesiq.ready()
+                }
+                
+                // Tenter d'autres méthodes d'activation
+                if (window.$zoho.salesiq.visitor) {
+                  window.$zoho.salesiq.visitor.info({
+                    name: '${user?.name || 'Utilisateur'}',
+                    email: '${user?.email || ''}'
+                  })
+                }
+                
+              } catch (error) {
+                console.error(\`❌ Erreur tentative #\${attempt}:\`, error)
               }
-            } catch (error) {
-              console.log('ℹ️ Chat start non disponible:', error)
+            } else {
+              console.warn(\`⚠️ Objets Zoho non disponibles (tentative #\${attempt})\`)
             }
-          }
-        }, 3000)
+            
+            // Réessayer jusqu'à 5 fois
+            if (attempt < 5 && !window.siqReadyState) {
+              tryInitialize(attempt + 1)
+            }
+          }, attempt * 1500) // Délai progressif
+        }
+        
+        tryInitialize()
       }
       
       zohoScript.onerror = (error) => {
-        console.error('❌ Erreur chargement Zoho SalesIQ:', error)
+        console.error('❌ Erreur chargement script Zoho:', error)
+        
+        // Essayer de recharger le script une fois
+        if (!zohoInitialized) {
+          setTimeout(() => {
+            console.log('🔄 Nouvelle tentative de chargement Zoho...')
+            initializeZohoSalesIQ()
+          }, 5000)
+        }
       }
       
       document.head.appendChild(zohoScript)
     }
 
-    // Initialiser après le mount du composant
-    const timer = setTimeout(initializeZohoSalesIQ, 1000)
+    // Initialiser après un court délai
+    const timer = setTimeout(initializeZohoSalesIQ, 500)
+    
+    // Diagnostic périodique
+    const diagnosticInterval = setInterval(() => {
+      console.log('🔍 Diagnostic Zoho:')
+      console.log('- window.$zoho:', window.$zoho)
+      console.log('- siqReadyState:', window.siqReadyState)
+      
+      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
+      console.log('- Éléments DOM:', zohoElements.length)
+      
+      if (zohoElements.length > 0) {
+        console.log('✅ Widget Zoho détecté dans le DOM')
+        clearInterval(diagnosticInterval)
+      }
+    }, 10000) // Diagnostic toutes les 10 secondes
     
     return () => {
       clearTimeout(timer)
+      clearInterval(diagnosticInterval)
     }
-  }, [])
+  }, [user])
 
-  // Widget support simple comme fallback
+  // Widget support avec bouton debug Zoho
   const SimpleSupportWidget = () => {
     const [isOpen, setIsOpen] = useState(false)
+    const [showZohoDebug, setShowZohoDebug] = useState(false)
+
+    // Fonction de diagnostic Zoho
+    const checkZohoStatus = () => {
+      console.log('🔍 === DIAGNOSTIC ZOHO SALESIQ ===')
+      console.log('- window.$zoho:', window.$zoho)
+      console.log('- window.$zoho.salesiq:', window.$zoho?.salesiq)
+      console.log('- siqReadyState:', window.siqReadyState)
+      
+      // Chercher tous les éléments Zoho
+      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
+      console.log('- Éléments Zoho dans DOM:', zohoElements)
+      zohoElements.forEach((el, index) => {
+        console.log(`  ${index + 1}:`, el.tagName, el.id, el.className, el.style.display)
+      })
+      
+      // Vérifier les iframes
+      const iframes = document.querySelectorAll('iframe')
+      console.log('- Iframes présentes:', iframes.length)
+      iframes.forEach((iframe, index) => {
+        if (iframe.src.includes('zoho') || iframe.src.includes('salesiq')) {
+          console.log(`  Iframe Zoho ${index + 1}:`, iframe.src, iframe.style.display)
+        }
+      })
+      
+      // Tenter de forcer l'affichage
+      if (window.$zoho && window.$zoho.salesiq) {
+        try {
+          console.log('🔧 Tentative de forçage d\'affichage...')
+          
+          // Méthodes possibles
+          if (window.$zoho.salesiq.chat) {
+            if (window.$zoho.salesiq.chat.start) window.$zoho.salesiq.chat.start()
+            if (window.$zoho.salesiq.chat.show) window.$zoho.salesiq.chat.show()
+            if (window.$zoho.salesiq.chat.open) window.$zoho.salesiq.chat.open()
+          }
+          
+          if (window.$zoho.salesiq.floatbutton) {
+            if (window.$zoho.salesiq.floatbutton.visible) window.$zoho.salesiq.floatbutton.visible('show')
+            if (window.$zoho.salesiq.floatbutton.show) window.$zoho.salesiq.floatbutton.show()
+          }
+          
+          console.log('✅ Tentatives de forçage terminées')
+        } catch (error) {
+          console.error('❌ Erreur lors du forçage:', error)
+        }
+      }
+      
+      setShowZohoDebug(true)
+    }
+
+    // Fonction pour recharger Zoho
+    const reloadZoho = () => {
+      console.log('🔄 Rechargement forcé de Zoho SalesIQ...')
+      
+      // Supprimer tous les scripts Zoho existants
+      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
+      existingScripts.forEach(script => script.remove())
+      
+      // Supprimer les éléments Zoho existants
+      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"]')
+      zohoElements.forEach(el => el.remove())
+      
+      // Réinitialiser les variables
+      window.$zoho = undefined
+      window.siqReadyState = false
+      
+      // Recharger après un délai
+      setTimeout(() => {
+        const script = document.createElement('script')
+        script.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+        script.async = true
+        document.head.appendChild(script)
+        console.log('🚀 Script Zoho rechargé')
+      }, 1000)
+    }
 
     return (
       <>
-        {/* Bouton flottant */}
+        {/* Bouton flottant principal */}
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 z-50"
@@ -1258,6 +1650,77 @@ Consultez la console développeur (F12) pour plus de détails.`
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
           </svg>
         </button>
+
+        {/* Boutons de debug Zoho (en développement) */}
+        <div className="fixed bottom-6 left-6 space-y-2 z-50">
+          <button
+            onClick={checkZohoStatus}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs shadow-lg transition-colors"
+            title="Diagnostiquer Zoho SalesIQ"
+          >
+            🔍 Debug Zoho
+          </button>
+          <button
+            onClick={reloadZoho}
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs shadow-lg transition-colors"
+            title="Recharger Zoho SalesIQ"
+          >
+            🔄 Reload Zoho
+          </button>
+        </div>
+
+        {/* Modal de debug Zoho */}
+        {showZohoDebug && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+              onClick={() => setShowZohoDebug(false)}
+            />
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-white rounded-lg shadow-xl z-50 max-h-96 overflow-auto">
+              <div className="bg-orange-600 text-white p-4 flex items-center justify-between">
+                <h3 className="font-semibold">Debug Zoho SalesIQ</h3>
+                <button
+                  onClick={() => setShowZohoDebug(false)}
+                  className="text-white hover:text-gray-200"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-3 text-xs">
+                <div>
+                  <strong>Status:</strong> {window.$zoho ? '✅ Chargé' : '❌ Non chargé'}
+                </div>
+                <div>
+                  <strong>Ready State:</strong> {window.siqReadyState ? '✅ Prêt' : '❌ Non prêt'}
+                </div>
+                <div>
+                  <strong>Éléments DOM:</strong> {document.querySelectorAll('[id*="siq"], [class*="siq"]').length}
+                </div>
+                <div>
+                  <strong>Widget ID:</strong> siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09
+                </div>
+                
+                <div className="mt-4 space-y-2">
+                  <button
+                    onClick={reloadZoho}
+                    className="w-full bg-red-500 text-white px-3 py-2 rounded text-xs"
+                  >
+                    Recharger Zoho
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.open('https://salesiq.zoho.com/', '_blank')
+                    }}
+                    className="w-full bg-blue-500 text-white px-3 py-2 rounded text-xs"
+                  >
+                    Ouvrir Zoho Admin
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Modal support */}
         {isOpen && (
@@ -1541,6 +2004,9 @@ Consultez la console développeur (F12) pour plus de détails.`
           </div>
         </div>
       </div>
+      
+      {/* Widget support simple en attendant que Zoho fonctionne */}
+      <SimpleSupportWidget />
     </div>
     </>
   )
