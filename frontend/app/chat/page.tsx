@@ -541,7 +541,9 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
       {/* Chat with us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-2xl text-white">💬</span>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+          </svg>
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
@@ -563,7 +565,9 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
       {/* Call Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-2xl text-white">📞</span>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+          </svg>
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
@@ -582,7 +586,9 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
       {/* Email Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-2xl text-white">📧</span>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
@@ -601,7 +607,9 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
       {/* Visit our website */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-2xl text-white">🌐</span>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
+          </svg>
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
@@ -761,7 +769,9 @@ const UserMenuButton = () => {
                 onClick={handleAccountClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span className="text-blue-600">💳</span>
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
                 <span>Mon compte</span>
               </button>
 
@@ -769,7 +779,9 @@ const UserMenuButton = () => {
                 onClick={handleUserInfoClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span className="text-blue-600">👤</span>
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
                 <span>Mes informations</span>
               </button>
 
@@ -777,7 +789,9 @@ const UserMenuButton = () => {
                 onClick={handleContactClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span className="text-blue-600">📞</span>
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
                 <span>Nous joindre</span>
               </button>
 
@@ -785,7 +799,9 @@ const UserMenuButton = () => {
                 onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <span className="text-blue-600">⚖️</span>
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
+                </svg>
                 <span>Mentions légales</span>
               </button>
               
@@ -797,7 +813,9 @@ const UserMenuButton = () => {
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <span className="text-blue-600">🚪</span>
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
                   <span>Déconnexion</span>
                 </button>
               </div>
@@ -854,13 +872,32 @@ export default function ChatInterface() {
       let supabaseStatus = true // Simulé car on utilise des stores simulés
       let networkStatus = true
 
-      // Test 1: API RAG
+      // Test 1: API RAG - Test plus robuste
       try {
         const ragResponse = await fetch('https://expert-app-cngws.ondigitalocean.app/api/health', {
           method: 'GET',
           signal: AbortSignal.timeout(5000)
         })
-        ragStatus = ragResponse.ok
+        
+        if (ragResponse.ok) {
+          // Vérifier si la réponse contient des infos sur le fallback
+          try {
+            const healthData = await ragResponse.json()
+            console.log('🔍 Health check RAG:', healthData)
+            
+            // Vérifier s'il y a un indicateur de fallback dans la réponse
+            ragStatus = healthData.status === 'healthy' && !healthData.fallback_mode
+            
+            if (healthData.fallback_mode) {
+              console.warn('⚠️ RAG en mode fallback détecté')
+            }
+          } catch (jsonError) {
+            // Si pas de JSON, considérer comme OK si le status HTTP est 200
+            ragStatus = true
+          }
+        } else {
+          ragStatus = false
+        }
       } catch (error) {
         console.warn('⚠️ RAG API non accessible:', error)
         ragStatus = false
@@ -882,7 +919,7 @@ export default function ChatInterface() {
       // Test 3: Supabase simulé (toujours true pour le moment)
       // Dans un vrai projet, vous testeriez la connexion Supabase ici
 
-      // Statut global : tous les services doivent être opérationnels
+      // Statut global : tous les services doivent être opérationnels ET pas en fallback
       const overall = ragStatus && supabaseStatus && networkStatus
 
       setSystemStatus({
@@ -892,11 +929,11 @@ export default function ChatInterface() {
       })
 
       // Log détaillé pour debug
-      console.log('🔍 Status check:', {
-        rag: ragStatus ? '✅' : '❌',
+      console.log('🔍 Status check détaillé:', {
+        rag: ragStatus ? '✅ Opérationnel' : '❌ Problème/Fallback',
         supabase: supabaseStatus ? '✅' : '❌',
         network: networkStatus ? '✅' : '❌',
-        overall: overall ? '🟢 OK' : '🔴 PROBLÈME'
+        overall: overall ? '🟢 SYSTÈME OK' : '🔴 PROBLÈME DÉTECTÉ'
       })
 
     } catch (error) {
@@ -967,11 +1004,36 @@ export default function ChatInterface() {
       if (!response.ok) {
         const errorText = await response.text()
         console.error('❌ Erreur API détaillée:', errorText)
+        
+        // Mettre à jour le statut pour indiquer un problème RAG
+        setSystemStatus(prev => ({
+          ...prev,
+          rag: false,
+          overall: false
+        }))
+        
         throw new Error(`Erreur API: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
       console.log('✅ Réponse RAG reçue:', data)
+      
+      // Vérifier si la réponse indique un mode fallback
+      if (data.fallback_used || data.is_fallback || data.mode === 'fallback') {
+        console.warn('⚠️ Réponse générée en mode fallback')
+        setSystemStatus(prev => ({
+          ...prev,
+          rag: false, // Marquer comme problème si fallback utilisé
+          overall: false
+        }))
+      } else {
+        // Marquer comme OK si réponse normale
+        setSystemStatus(prev => ({
+          ...prev,
+          rag: true,
+          overall: true && prev.supabase // Garder l'état des autres services
+        }))
+      }
       
       if (data.response || data.answer || data.message) {
         return data.response || data.answer || data.message
@@ -982,6 +1044,13 @@ export default function ChatInterface() {
       
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'appel au RAG:', error)
+      
+      // Mettre à jour le statut pour indiquer un problème
+      setSystemStatus(prev => ({
+        ...prev,
+        rag: false,
+        overall: false
+      }))
       
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         return `Erreur de connexion au serveur RAG. 
@@ -1137,14 +1206,18 @@ Consultez la console développeur (F12) pour plus de détails.`
                           className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
                           title="Réponse utile"
                         >
-                          <ThumbUpIcon />
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 712.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.398.83 1.169 1.448 2.126 1.448h.386c.114 0 .228-.007.34-.02a4.877 4.877 0 004.2-3.204 4.877 4.877 0 00.258-1.826v-1.25a1.125 1.125 0 00-1.125-1.125H5.904z" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleFeedback(message.id, 'negative')}
                           className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
                           title="Réponse non utile"
                         >
-                          <ThumbDownIcon />
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 00.303-.54m.023-8.25H16.48a4.5 4.5 0 01-1.423-.23l-3.114-1.04a4.5 4.5 0 00-1.423-.23H6.504c-.618 0-1.217.247-1.605.729A11.95 11.95 0 002.25 12c0 .434.023.863.068 1.285C2.427 14.306 3.346 15 4.372 15h3.126c.618 0 .991.724.725 1.282A7.471 7.471 0 007.5 19.5a2.25 2.25 0 002.25 2.25.75.75 0 00.75-.75v-.633c0-.573.11-1.14.322-1.672.304-.76.93-1.33 1.653-1.715a9.04 9.04 0 002.86-2.4c.498-.634 1.226-1.08 2.032-1.08h.384z" />
+                          </svg>
                         </button>
                       </div>
                     )}
