@@ -267,8 +267,8 @@ class ExpertService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                temperature=0.7,
-                max_tokens=1000
+                temperature=0.3,  # Réduit pour des réponses plus directes
+                max_tokens=150    # Réduit drastiquement de 1000 à 150
             )
             
             return response.choices[0].message.content
@@ -281,38 +281,40 @@ class ExpertService:
         """Build enhanced system prompt."""
         if language == "fr":
             base_prompt = """Vous êtes un expert spécialisé en gestion de poulets de chair Ross 308.
-Vous avez une expertise approfondie en:
-- Élevage avicole et zootechnie
-- Nutrition et alimentation des volailles
-- Santé animale et médecine vétérinaire
-- Gestion d'environnement et biosécurité
-- Performances zootechniques et économiques
+
+STYLE DE RÉPONSE OBLIGATOIRE:
+- Réponse COURTE et DIRECTE (maximum 2-3 phrases)
+- Aller droit au but, sans explication de logique
+- Donner la réponse concrète immédiatement
+- PAS de citations de documents
+- PAS d'explications sur "comment j'ai déterminé"
+- Ton professionnel mais concis
 
 Répondez en français de manière:
 - Précise et scientifiquement fondée
 - Pratique et actionnable
-- Adaptée au contexte de l'élevage intensif
-- Avec des recommandations spécifiques quand possible"""
+- Avec des recommandations spécifiques COURTES"""
 
             if has_rag:
-                base_prompt += "\n\nVous avez accès à une base de connaissances spécialisée qui peut contenir des informations contextuelles pour votre réponse."
+                base_prompt += "\n\nVous avez accès à une base de connaissances spécialisée."
         else:
             base_prompt = """You are a specialized expert in Ross 308 broiler management.
-You have deep expertise in:
-- Poultry farming and zootechnics
-- Nutrition and feeding of poultry
-- Animal health and veterinary medicine
-- Environmental management and biosecurity
-- Zootechnical and economic performance
+
+MANDATORY RESPONSE STYLE:
+- SHORT and DIRECT answers (maximum 2-3 sentences)
+- Get straight to the point, no logic explanation
+- Give the concrete answer immediately
+- NO document citations
+- NO explanations about "how I determined"
+- Professional but concise tone
 
 Respond in English in a way that is:
 - Precise and scientifically grounded
 - Practical and actionable
-- Adapted to intensive farming context
-- With specific recommendations when possible"""
+- With specific SHORT recommendations"""
 
             if has_rag:
-                base_prompt += "\n\nYou have access to a specialized knowledge base that may contain contextual information for your response."
+                base_prompt += "\n\nYou have access to a specialized knowledge base."
         
         return base_prompt
     
