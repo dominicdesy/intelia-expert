@@ -1,5 +1,8 @@
 'use client'
 
+// Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
+export const runtime = 'nodejs'
+
 import React, { useState, useEffect, useRef } from 'react'
 
 // ==================== STORES SIMULÉS ====================
@@ -732,11 +735,11 @@ export default function ChatInterface() {
 
   // Générer réponse RAG
   const generateAIResponse = async (question: string): Promise<string> => {
+    // Définir l'URL en dehors du try/catch pour qu'elle soit accessible partout
+    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
+    
     try {
       console.log('🤖 Envoi question au RAG Intelia:', question)
-      
-      // URL corrigée - utiliser l'endpoint public avec le bon chemin
-      const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
       console.log('📡 URL API corrigée:', apiUrl)
       
       const response = await fetch(apiUrl, {
