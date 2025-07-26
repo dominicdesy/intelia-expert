@@ -524,9 +524,23 @@ const useAuthStore = () => {
   }
 }
 
+// ==================== TYPES POUR CONVERSATIONS ====================
+interface ConversationItem {
+  id: string
+  title: string
+  messages: Array<{
+    id: string
+    role: string
+    content: string
+  }>
+  updated_at: string
+  created_at: string
+  feedback?: number | null  // Ajout du type feedback
+}
+
 // ==================== HOOK CHAT AVEC LOGGING ====================
 const useChatStore = () => {
-  const [conversations, setConversations] = useState([
+  const [conversations, setConversations] = useState<ConversationItem[]>([
     {
       id: '1',
       title: 'Problème poulets Ross 308',
@@ -535,7 +549,8 @@ const useChatStore = () => {
         { id: '2', role: 'assistant', content: 'Selon notre base documentaire, pour les poulets Ross 308...' }
       ],
       updated_at: '2024-01-20',
-      created_at: '2024-01-20'
+      created_at: '2024-01-20',
+      feedback: null
     }
   ])
 
@@ -544,7 +559,7 @@ const useChatStore = () => {
       console.log('🔄 Chargement conversations depuis le logging...')
       const userConversations = await conversationService.getUserConversations(userId)
       
-      const formattedConversations = userConversations.map(conv => ({
+      const formattedConversations: ConversationItem[] = userConversations.map(conv => ({
         id: conv.conversation_id,
         title: conv.question.substring(0, 50) + '...',
         messages: [
@@ -553,7 +568,7 @@ const useChatStore = () => {
         ],
         updated_at: conv.updated_at,
         created_at: conv.timestamp,
-        feedback: conv.feedback
+        feedback: conv.feedback || null
       }))
       
       setConversations(formattedConversations)
@@ -586,7 +601,7 @@ const useChatStore = () => {
     loadConversations,
     deleteConversation,
     clearAllConversations,
-    currentConversation: null,
+    currentConversation: null as ConversationItem | null,
     loadConversation: async (id: string) => {},
     createConversation: () => {}
   }
