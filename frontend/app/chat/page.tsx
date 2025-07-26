@@ -272,7 +272,7 @@ export default function ChatInterface() {
 
   // ✅ FONCTION CORRIGÉE - API AUTHENTIFIÉE
   const generateAIResponse = async (question: string): Promise<string> => {
-    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+    const apiUrl = 'https://expert.intelia.com/api/v1/expert/ask'
     
     try {
       console.log('🤖 Envoi question au RAG Intelia (authentifié):', question)
@@ -352,7 +352,7 @@ Veuillez actualiser la page ou vous reconnecter.`
         return `Erreur de connexion au serveur RAG sécurisé.
 
 🔧 **Diagnostic suggéré :**
-1. Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
+1. Le serveur expert.intelia.com est-il accessible ?
 2. Votre session Supabase est-elle valide ?
 3. Y a-t-il des problèmes de CORS avec l'authentification ?
 
