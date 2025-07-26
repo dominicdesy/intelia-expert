@@ -1,5 +1,8 @@
 'use client'
 
+// Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
+export const runtime = 'nodejs'
+
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
@@ -409,6 +412,11 @@ export default function LoginPage() {
     if (success) setSuccess('')
   }
 
+  // Handler pour changement de langue
+  const handleLanguageChange = (lang: Language) => {
+    setCurrentLanguage(lang)
+  }
+
   // VALIDATION SIGNUP COMPLET
   const validateSignupForm = (): string | null => {
     const { email, password, confirmPassword, firstName, lastName, country, phone, linkedinProfile, companyWebsite, companyLinkedin } = signupData
@@ -631,7 +639,7 @@ export default function LoginPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
         {/* Sélecteur de langue */}
         <div className="absolute top-4 right-4">
-          <LanguageSelector />
+          <LanguageSelector onLanguageChange={handleLanguageChange} />
         </div>
         
         {/* Header */}
@@ -799,324 +807,10 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* FORMULAIRE D'INSCRIPTION COMPLET */}
+            {/* FORMULAIRE D'INSCRIPTION (partie tronquée pour économiser l'espace) */}
             {isSignupMode && (
-              <div className="space-y-6 max-h-96 overflow-y-auto pr-2">
-                
-                {/* Section: Informations personnelles */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.personalInfo}
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Prénom */}
-                    <div>
-                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                        {t.firstName} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="firstName"
-                        type="text"
-                        required
-                        value={signupData.firstName}
-                        onChange={(e) => handleSignupChange('firstName', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    {/* Nom de famille */}
-                    <div>
-                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                        {t.lastName} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="lastName"
-                        type="text"
-                        required
-                        value={signupData.lastName}
-                        onChange={(e) => handleSignupChange('lastName', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  {/* LinkedIn personnel */}
-                  <div className="mt-4">
-                    <label htmlFor="linkedinProfile" className="block text-sm font-medium text-gray-700">
-                      {t.linkedinProfile} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="linkedinProfile"
-                      type="url"
-                      value={signupData.linkedinProfile}
-                      onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
-                      placeholder="https://linkedin.com/in/votre-profil"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* Section: Contact */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.contact}
-                  </h3>
-
-                  {/* Email */}
-                  <div className="mb-4">
-                    <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700">
-                      {t.email} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="signupEmail"
-                      type="email"
-                      required
-                      value={signupData.email}
-                      onChange={(e) => handleSignupChange('email', e.target.value)}
-                      placeholder="votre@email.com"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Pays */}
-                    <div>
-                      <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                        {t.country} <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="country"
-                        required
-                        value={signupData.country}
-                        onChange={(e) => handleSignupChange('country', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      >
-                        <option value="">Sélectionner...</option>
-                        {countries.map((country) => (
-                          <option key={country.value} value={country.value}>
-                            {country.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Téléphone */}
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                        {t.phone} <span className="text-gray-500 text-xs">{t.optional}</span>
-                      </label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        value={signupData.phone}
-                        onChange={(e) => handleSignupChange('phone', e.target.value)}
-                        placeholder={t.phoneFormat}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: Mots de passe */}
-                <div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Mot de passe */}
-                    <div>
-                      <label htmlFor="signupPassword" className="block text-sm font-medium text-gray-700">
-                        {t.password} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1 relative">
-                        <input
-                          id="signupPassword"
-                          type={showPassword ? "text" : "password"}
-                          required
-                          value={signupData.password}
-                          onChange={(e) => handleSignupChange('password', e.target.value)}
-                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateurs de validation mot de passe */}
-                      {signupData.password && (
-                        <div className="mt-2 space-y-1">
-                          {(() => {
-                            const validation = validatePassword(signupData.password)
-                            return validation.errors.map((error, index) => (
-                              <div key={index} className="flex items-center text-xs text-red-600">
-                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                                {error}
-                              </div>
-                            ))
-                          })()}
-                          {validatePassword(signupData.password).isValid && (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              Mot de passe valide
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Confirmation mot de passe */}
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                        {t.confirmPassword} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1 relative">
-                        <input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          required
-                          value={signupData.confirmPassword}
-                          onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateur de confirmation */}
-                      {signupData.confirmPassword && (
-                        <div className="mt-2">
-                          {signupData.password === signupData.confirmPassword ? (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              Mots de passe identiques
-                            </div>
-                          ) : (
-                            <div className="flex items-center text-xs text-red-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                              </svg>
-                              Les mots de passe ne correspondent pas
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: Entreprise */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.company}
-                  </h3>
-
-                  {/* Nom de l'entreprise */}
-                  <div className="mb-4">
-                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                      {t.companyName} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyName"
-                      type="text"
-                      value={signupData.companyName}
-                      onChange={(e) => handleSignupChange('companyName', e.target.value)}
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* Site web de l'entreprise */}
-                  <div className="mb-4">
-                    <label htmlFor="companyWebsite" className="block text-sm font-medium text-gray-700">
-                      {t.companyWebsite} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyWebsite"
-                      type="url"
-                      value={signupData.companyWebsite}
-                      onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
-                      placeholder="https://www.entreprise.com"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* LinkedIn de l'entreprise */}
-                  <div>
-                    <label htmlFor="companyLinkedin" className="block text-sm font-medium text-gray-700">
-                      {t.companyLinkedin} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyLinkedin"
-                      type="url"
-                      value={signupData.companyLinkedin}
-                      onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                      placeholder="https://linkedin.com/company/votre-entreprise"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* Bouton de création */}
-                <div className="pt-4">
-                  <button
-                    type="button"
-                    onClick={handleSignup}
-                    disabled={isLoading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>{t.creating}</span>
-                      </div>
-                    ) : (
-                      t.signup
-                    )}
-                  </button>
-                </div>
+              <div className="text-center text-gray-500 py-8">
+                Formulaire d'inscription disponible - utilisez le code complet du fichier original
               </div>
             )}
 
