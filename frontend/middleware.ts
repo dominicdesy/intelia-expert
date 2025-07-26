@@ -1,4 +1,4 @@
-// middleware.ts - VERSION TEMPORAIRE POUR TESTS
+// middleware.ts - CORRIGÉ POUR ZOHO SALESIQ
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -33,17 +33,27 @@ export async function middleware(req: NextRequest) {
     }
     */
 
-    // Headers de sécurité
+    // Headers de sécurité CORRIGÉS pour Zoho SalesIQ
     const response = NextResponse.next()
     
     const cspHeader = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      `connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app`,
-      "media-src 'self'",
+      // ✅ SCRIPT-SRC CORRIGÉ pour autoriser Zoho SalesIQ
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+      // ✅ STYLE-SRC CORRIGÉ pour autoriser Zoho SalesIQ
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+      "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+      // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
+      "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+      // ✅ CONNECT-SRC CORRIGÉ pour autoriser Zoho SalesIQ + WebSockets
+      "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com",
+      // ✅ FRAME-SRC AJOUTÉ pour autoriser les iframes Zoho
+      "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+      // ✅ CHILD-SRC AJOUTÉ pour autoriser les pop-ups Zoho
+      "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+      // ✅ WORKER-SRC AJOUTÉ pour les service workers
+      "worker-src 'self' blob:",
+      "media-src 'self' https://*.zoho.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
