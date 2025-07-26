@@ -1,11 +1,4 @@
-  // Scroll automatique
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])'use client'
+'use client'
 
 // Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
 export const runtime = 'nodejs'
@@ -60,15 +53,6 @@ const useAuthStore = () => ({
     console.log('Changement de mot de passe demandé')
     // Ici vous devriez faire l'appel API pour changer le mot de passe
     return { success: true }
-  }
-}) async () => {
-    console.log('Export des données...')
-  },
-  deleteUserData: async () => {
-    console.log('Suppression des données...')
-  },
-  updateProfile: async (data: any) => {
-    console.log('Mise à jour profil:', data)
   }
 })
 
@@ -1050,6 +1034,15 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
+
+  // Scroll automatique
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   // Message de bienvenue
   useEffect(() => {
