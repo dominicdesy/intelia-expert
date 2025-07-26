@@ -11,6 +11,175 @@ import { useTranslation } from '../../lib/languages/i18n'
 // Instance Supabase
 const supabase = createClientComponentClient()
 
+// ==================== TYPES ÉTENDUS POUR LOGGING ====================
+interface Message {
+  id: string
+  content: string
+  isUser: boolean
+  timestamp: Date
+  feedback?: 'positive' | 'negative' | null
+  conversation_id?: string  // ID pour le tracking des conversations
+}
+
+interface ExpertApiResponse {
+  question: string
+  response: string
+  conversation_id: string
+  rag_used: boolean
+  timestamp: string
+  language: string
+  response_time_ms: number
+  confidence_score?: number
+}
+
+interface ConversationData {
+  user_id: string
+  question: string
+  response: string
+  conversation_id: string
+  confidence_score?: number
+  response_time_ms?: number
+  language?: string
+  rag_used?: boolean
+}
+
+// ==================== SERVICE DE LOGGING COMPLET ====================
+class ConversationService {
+  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/api/v1"
+
+  async saveConversation(data: ConversationData): Promise<void> {
+    try {
+      console.log('💾 Sauvegarde conversation:', data.conversation_id)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: data.user_id,
+          question: data.question,
+          response: data.response,
+          conversation_id: data.conversation_id,
+          confidence_score: data.confidence_score,
+          response_time_ms: data.response_time_ms,
+          language: data.language || 'fr',
+          rag_used: data.rag_used !== undefined ? data.rag_used : true
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation sauvegardée:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde conversation:', error)
+      // Ne pas bloquer l'UX si le logging échoue
+    }
+  }
+
+  async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
+    try {
+      console.log('📊 Envoi feedback:', conversationId, feedback)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ feedback })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Feedback enregistré:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi feedback:', error)
+      throw error  // Propager pour afficher erreur à l'utilisateur
+    }
+  }
+
+  async getUserConversations(userId: string, limit = 50): Promise<any[]> {
+    try {
+      console.log('🔍 Récupération conversations pour:', userId)
+      
+      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('✅ Conversations récupérées:', data.count)
+      return data.conversations || []
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération conversations:', error)
+      return []
+    }
+  }
+
+  async getAnalytics(days = 30): Promise<any> {
+    try {
+      console.log('📊 Récupération analytics:', days, 'jours')
+      
+      const response = await fetch(`${this.baseUrl}/logging/analytics?days=${days}`, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('✅ Analytics récupérées:', data)
+      return data
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération analytics:', error)
+      return null
+    }
+  }
+
+  async getDetailedStats(): Promise<any> {
+    try {
+      console.log('📈 Récupération stats détaillées')
+      
+      const response = await fetch(`${this.baseUrl}/logging/admin/stats`, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('✅ Stats détaillées récupérées:', data)
+      return data
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération stats:', error)
+      return null
+    }
+  }
+}
+
+// Instance globale du service
+const conversationService = new ConversationService()
+
 // ==================== COMPOSANT ZOHO SALESIQ SOLIDE ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   useEffect(() => {
@@ -155,58 +324,7 @@ const useAuthStore = () => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error('❌ Erreur récupération session:', error)
-          setIsAuthenticated(false)
-          setIsLoading(false)
-          return
-        }
-
-        if (session?.user) {
-          console.log('✅ Utilisateur connecté:', session.user)
-          
-          const userData = {
-            id: session.user.id,
-            email: session.user.email,
-            name: `${session.user.user_metadata?.first_name || ''} ${session.user.user_metadata?.last_name || ''}`.trim() || session.user.email?.split('@')[0],
-            
-            firstName: session.user.user_metadata?.first_name || '',
-            lastName: session.user.user_metadata?.last_name || '',
-            linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
-            
-            country: session.user.user_metadata?.country || 'CA',
-            phone: session.user.user_metadata?.phone || '',
-            
-            companyName: session.user.user_metadata?.company_name || '',
-            companyWebsite: session.user.user_metadata?.company_website || '',
-            linkedinCorporate: session.user.user_metadata?.company_linkedin || '',
-            
-            user_type: session.user.user_metadata?.role || 'producer',
-            language: session.user.user_metadata?.language || 'fr',
-            created_at: session.user.created_at,
-            consentGiven: true,
-            consentDate: new Date(session.user.created_at)
-          }
-          
-          setUser(userData)
-          setIsAuthenticated(true)
-        } else {
-          console.log('ℹ️ Aucun utilisateur connecté')
-          setIsAuthenticated(false)
-        }
-      } catch (error) {
-        console.error('❌ Erreur chargement utilisateur:', error)
-        setIsAuthenticated(false)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Changement auth:', event, session?.user?.email)
         
@@ -314,10 +432,16 @@ const useAuthStore = () => {
         return
       }
       
+      // Récupérer aussi les conversations via le service de logging
+      const conversations = await conversationService.getUserConversations(user.id)
+      const analytics = await conversationService.getAnalytics()
+      
       const exportData = {
         user_info: user,
+        conversations: conversations,
+        analytics: analytics,
         export_date: new Date().toISOString(),
-        export_type: 'user_data_export'
+        export_type: 'complete_user_data_export'
       }
       
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -333,7 +457,7 @@ const useAuthStore = () => {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      console.log('✅ Export réalisé avec succès')
+      console.log('✅ Export complet réalisé avec succès')
     } catch (error) {
       console.error('❌ Erreur export données:', error)
     }
@@ -366,9 +490,9 @@ const useAuthStore = () => {
   }
 }
 
-// ==================== HOOK CHAT ====================
-const useChatStore = () => ({
-  conversations: [
+// ==================== HOOK CHAT AVEC LOGGING ====================
+const useChatStore = () => {
+  const [conversations, setConversations] = useState([
     {
       id: '1',
       title: 'Problème poulets Ross 308',
@@ -379,26 +503,62 @@ const useChatStore = () => ({
       updated_at: '2024-01-20',
       created_at: '2024-01-20'
     }
-  ],
-  currentConversation: null,
-  loadConversations: () => {},
-  loadConversation: async (id: string) => {},
-  deleteConversation: async (id: string) => {
-    console.log('Suppression conversation:', id)
-  },
-  clearAllConversations: async () => {
-    console.log('Suppression toutes conversations')
-  },
-  createConversation: () => {}
-})
+  ])
 
-// ==================== TYPES ====================
-interface Message {
-  id: string
-  content: string
-  isUser: boolean
-  timestamp: Date
-  feedback?: 'positive' | 'negative' | null
+  const loadConversations = async (userId: string) => {
+    try {
+      console.log('🔄 Chargement conversations depuis le logging...')
+      const userConversations = await conversationService.getUserConversations(userId)
+      
+      // Conversion du format logging vers le format d'affichage
+      const formattedConversations = userConversations.map(conv => ({
+        id: conv.conversation_id,
+        title: conv.question.substring(0, 50) + '...',
+        messages: [
+          { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question },
+          { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response }
+        ],
+        updated_at: conv.updated_at,
+        created_at: conv.timestamp,
+        feedback: conv.feedback
+      }))
+      
+      setConversations(formattedConversations)
+      console.log('✅ Conversations chargées:', formattedConversations.length)
+    } catch (error) {
+      console.error('❌ Erreur chargement conversations:', error)
+    }
+  }
+
+  const deleteConversation = async (id: string) => {
+    try {
+      console.log('🗑️ Suppression conversation:', id)
+      // TODO: Implémenter endpoint de suppression dans le backend logging
+      setConversations(prev => prev.filter(conv => conv.id !== id))
+    } catch (error) {
+      console.error('❌ Erreur suppression conversation:', error)
+    }
+  }
+
+  const clearAllConversations = async () => {
+    try {
+      console.log('🗑️ Suppression toutes conversations')
+      // TODO: Implémenter endpoint de suppression massive
+      setConversations([])
+    } catch (error) {
+      console.error('❌ Erreur suppression conversations:', error)
+    }
+  }
+
+  return {
+    conversations,
+    loadConversations,
+    deleteConversation,
+    clearAllConversations,
+    currentConversation: null,
+    loadConversation: async (id: string) => {},
+    createConversation: () => {}
+  }
 }
 
 // ==================== ICÔNES SVG ====================
@@ -1149,7 +1309,483 @@ const LanguageModal = ({ onClose }: { onClose: () => void }) => {
                 {isUpdating ? (
                   <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
+                </svg>
+                <span>{t('nav.language')}</span>
+              </button>
+
+              <button
+                onClick={handleContactClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
+                <span>{t('nav.contact')}</span>
+              </button>
+
+              <button
+                onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
+                </svg>
+                <span>{t('nav.legal')}</span>
+              </button>
+              
+              <div className="border-t border-gray-100 mt-2 pt-2">
+                <button
+                  onClick={() => {
+                    logout()
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                  <span>{t('nav.logout')}</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        title={t('subscription.title')}
+      >
+        <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title={t('profile.title')}
+      >
+        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showLanguageModal}
+        onClose={() => setShowLanguageModal(false)}
+        title={t('language.title')}
+      >
+        <LanguageModal onClose={() => setShowLanguageModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        title={t('contact.title')}
+      >
+        <ContactModal onClose={() => setShowContactModal(false)} />
+      </Modal>
+    </>
+  )
+}
+
+// ==================== COMPOSANT PRINCIPAL AVEC LOGGING COMPLET ====================
+export default function ChatInterface() {
+  const { user, isAuthenticated, isLoading } = useAuthStore()
+  const { t, currentLanguage } = useTranslation()
+  
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputMessage, setInputMessage] = useState('')
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Scroll automatique
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // Message de bienvenue - se met à jour quand la langue change
+  useEffect(() => {
+    if (isAuthenticated) {
+      const welcomeMessage: Message = {
+        id: '1',
+        content: t('chat.welcome'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      
+      // Si c'est la première fois ou si la langue a changé, mettre à jour le message de bienvenue
+      if (messages.length === 0) {
+        setMessages([welcomeMessage])
+      } else if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
+        // Mettre à jour le premier message s'il s'agit du message de bienvenue
+        setMessages(prev => [welcomeMessage, ...prev.slice(1)])
+      }
+    }
+  }, [isAuthenticated, t, currentLanguage])
+
+  // Afficher un loader pendant le chargement
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">{t('chat.loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Rediriger si pas connecté
+  if (!isAuthenticated) {
+    window.location.href = '/'
+    return null
+  }
+
+  // Générer réponse RAG avec logging automatique
+  const generateAIResponse = async (question: string): Promise<ExpertApiResponse> => {
+    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask'
+    
+    try {
+      console.log('🤖 Envoi question au RAG Intelia:', question)
+      console.log('📡 URL API:', apiUrl)
+      console.log('👤 Utilisateur:', user?.id, user?.email)
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          question: question.trim(),
+          language: user?.language || 'fr',
+          user_id: user?.id || 'anonymous'
+        })
+      })
+
+      console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Erreur API détaillée:', errorText)
+        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+      }
+
+      const data: ExpertApiResponse = await response.json()
+      console.log('✅ Réponse RAG reçue:', data)
+      
+      // Sauvegarder automatiquement la conversation via le système de logging
+      if (user && data.conversation_id) {
+        console.log('💾 Déclenchement sauvegarde automatique...')
+        await conversationService.saveConversation({
+          user_id: user.id,
+          question: question,
+          response: data.response,
+          conversation_id: data.conversation_id,
+          confidence_score: data.confidence_score,
+          response_time_ms: data.response_time_ms,
+          language: data.language,
+          rag_used: data.rag_used
+        })
+      }
+      
+      return data
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'appel au RAG:', error)
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw new Error(`Erreur de connexion au serveur RAG. 
+
+🔧 **Vérifications suggérées :**
+- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
+- Y a-t-il des problèmes de CORS ?
+- Le service est-il en cours d'exécution ?
+
+**Erreur technique :** ${error.message}`)
+      }
+      
+      throw new Error(`Erreur technique avec l'API : ${error.message}
+
+**URL testée :** ${apiUrl}
+**Type d'erreur :** ${error.name}
+
+Consultez la console développeur (F12) pour plus de détails.`)
+    }
+  }
+
+  // Envoi message avec logging intégré
+  const handleSendMessage = async (text: string = inputMessage) => {
+    if (!text.trim()) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: text.trim(),
+      isUser: true,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputMessage('')
+    setIsLoadingChat(true)
+
+    try {
+      const response = await generateAIResponse(text.trim())
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response.response,
+        isUser: false,
+        timestamp: new Date(),
+        conversation_id: response.conversation_id  // Stocker l'ID pour le feedback
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+      console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
+      
+    } catch (error) {
+      console.error('❌ Error generating response:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: error instanceof Error ? error.message : t('chat.errorMessage'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  // Gestion feedback avec logging backend
+  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
+    // Trouver le message pour récupérer conversation_id
+    const message = messages.find(msg => msg.id === messageId)
+    
+    if (!message || !message.conversation_id) {
+      console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
+      alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
+      return
+    }
+
+    try {
+      console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
+      
+      // Mettre à jour l'UI immédiatement pour une bonne UX
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback } : msg
+      ))
+
+      // Envoyer au backend via le service de logging
+      const feedbackValue = feedback === 'positive' ? 1 : -1
+      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
+      
+      console.log(`✅ Feedback ${feedback} enregistré avec succès pour conversation ${message.conversation_id}`)
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi feedback:', error)
+      
+      // Annuler le changement UI en cas d'erreur
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback: null } : msg
+      ))
+      
+      alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
+    }
+  }
+
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: t('chat.welcome'),
+      isUser: false,
+      timestamp: new Date()
+    }])
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString(t('date.format'), { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
+  return (
+    <>
+      {/* Zoho SalesIQ Component */}
+      <ZohoSalesIQ user={user} />
+
+      <div className="h-screen bg-gray-50 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Boutons à gauche */}
+            <div className="flex items-center space-x-2">
+              <HistoryMenu />
+              <button
+                onClick={handleNewConversation}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.newConversation')}
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Titre centré avec logo */}
+            <div className="flex-1 flex justify-center items-center space-x-3">
+              <InteliaLogo className="w-8 h-8" />
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              </div>
+            </div>
+            
+            {/* Avatar utilisateur à droite */}
+            <div className="flex items-center">
+              <UserMenuButton />
+            </div>
+          </div>
+        </header>
+
+        {/* Zone de messages */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Date */}
+              {messages.length > 0 && (
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                    {getCurrentDate()}
+                  </span>
+                </div>
+              )}
+
+              {messages.map((message, index) => (
+                <div key={message.id}>
+                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
+                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                      </div>
+                    )}
+                    
+                    <div className="max-w-xs lg:max-w-2xl">
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {/* Boutons de feedback avec conversation_id */}
+                      {!message.isUser && index > 0 && message.conversation_id && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                            title={t('chat.helpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                            title={t('chat.notHelpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                          {message.feedback && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              Merci pour votre retour !
+                            </span>
+                          )}
+                          {message.conversation_id && (
+                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
+                              🔗
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                        <UserIcon className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Indicateur de frappe */}
+              {isLoadingChat && (
+                <div className="flex items-start space-x-3">
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Zone de saisie */}
+          <div className="px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  title={t('chat.voiceRecording')}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                  </svg>
+                </button>
+                
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder={t('chat.placeholder')}
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    disabled={isLoadingChat}
+                  />
+                </div>
+                
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoadingChat || !inputMessage.trim()}
+                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                >
+                  <PaperAirplaneIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+} h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -1229,7 +1865,7 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0 4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
           </svg>
         </div>
         <div className="flex-1">
@@ -1260,16 +1896,25 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
   )
 }
 
-// ==================== MENU HISTORIQUE ====================
+// ==================== MENU HISTORIQUE AVEC LOGGING ====================
 const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
-  const { conversations, deleteConversation, clearAllConversations } = useChatStore()
+  const { conversations, deleteConversation, clearAllConversations, loadConversations } = useChatStore()
+  const { user } = useAuthStore()
+
+  // Charger les conversations au premier clic
+  const handleToggle = () => {
+    if (!isOpen && user) {
+      loadConversations(user.id)
+    }
+    setIsOpen(!isOpen)
+  }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
         title={t('nav.history')}
       >
@@ -1315,6 +1960,11 @@ const HistoryMenu = () => {
                         <p className="text-xs text-gray-500 mt-1">
                           {new Date(conv.updated_at).toLocaleDateString('fr-FR')}
                         </p>
+                        {conv.feedback && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            {conv.feedback === 1 ? '👍 Apprécié' : '👎 Pas utile'}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => deleteConversation(conv.id)}
@@ -1429,428 +2079,55 @@ const UserMenuButton = () => {
                 onClick={handleLanguageClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
-                </svg>
-                <span>{t('nav.language')}</span>
-              </button>
+                <svg className="w-5 { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Erreur récupération session:', error)
+          setIsAuthenticated(false)
+          setIsLoading(false)
+          return
+        }
 
-              <button
-                onClick={handleContactClick}
-                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                </svg>
-                <span>{t('nav.contact')}</span>
-              </button>
-
-              <button
-                onClick={() => window.open('https://intelia.com/privacy-policy/', '_blank')}
-                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
-                </svg>
-                <span>{t('nav.legal')}</span>
-              </button>
-              
-              <div className="border-t border-gray-100 mt-2 pt-2">
-                <button
-                  onClick={() => {
-                    logout()
-                    setIsOpen(false)
-                  }}
-                  className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                  </svg>
-                  <span>{t('nav.logout')}</span>
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Modals */}
-      <Modal
-        isOpen={showAccountModal}
-        onClose={() => setShowAccountModal(false)}
-        title={t('subscription.title')}
-      >
-        <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
-      </Modal>
-
-      <Modal
-        isOpen={showUserInfoModal}
-        onClose={() => setShowUserInfoModal(false)}
-        title={t('profile.title')}
-      >
-        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
-      </Modal>
-
-      <Modal
-        isOpen={showLanguageModal}
-        onClose={() => setShowLanguageModal(false)}
-        title={t('language.title')}
-      >
-        <LanguageModal onClose={() => setShowLanguageModal(false)} />
-      </Modal>
-
-      <Modal
-        isOpen={showContactModal}
-        onClose={() => setShowContactModal(false)}
-        title={t('contact.title')}
-      >
-        <ContactModal onClose={() => setShowContactModal(false)} />
-      </Modal>
-    </>
-  )
-}
-
-// ==================== COMPOSANT PRINCIPAL ====================
-export default function ChatInterface() {
-  const { user, isAuthenticated, isLoading } = useAuthStore()
-  const { t, currentLanguage } = useTranslation()
-  
-  const [messages, setMessages] = useState<Message[]>([])
-  const [inputMessage, setInputMessage] = useState('')
-  const [isLoadingChat, setIsLoadingChat] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Scroll automatique
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
-  // Message de bienvenue - se met à jour quand la langue change
-  useEffect(() => {
-    if (isAuthenticated) {
-      const welcomeMessage: Message = {
-        id: '1',
-        content: t('chat.welcome'),
-        isUser: false,
-        timestamp: new Date()
-      }
-      
-      // Si c'est la première fois ou si la langue a changé, mettre à jour le message de bienvenue
-      if (messages.length === 0) {
-        setMessages([welcomeMessage])
-      } else if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
-        // Mettre à jour le premier message s'il s'agit du message de bienvenue
-        setMessages(prev => [welcomeMessage, ...prev.slice(1)])
-      }
-    }
-  }, [isAuthenticated, t, currentLanguage]) // Ajouter currentLanguage comme dépendance
-
-  // Afficher un loader pendant le chargement
-  if (isLoading) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">{t('chat.loading')}</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Rediriger si pas connecté
-  if (!isAuthenticated) {
-    window.location.href = '/'
-    return null
-  }
-
-  // Générer réponse RAG
-  const generateAIResponse = async (question: string): Promise<string> => {
-    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
-    
-    try {
-      console.log('🤖 Envoi question au RAG Intelia:', question)
-      console.log('📡 URL API:', apiUrl)
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          text: `${question.trim()}\n\nRépondez de manière concise et directe.`,
-          language: user?.language || 'fr',
-          speed_mode: 'balanced',
-          max_tokens: 150,
-          temperature: 0.7,
-          response_format: 'concise'
-        })
-      })
-
-      console.log('📊 Statut réponse API:', response.status, response.statusText)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Erreur API détaillée:', errorText)
-        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log('✅ Réponse RAG reçue:', data)
-      
-      if (data.response || data.answer || data.message) {
-        return data.response || data.answer || data.message
-      } else {
-        console.warn('⚠️ Structure de réponse inattendue:', data)
-        return 'Le système RAG a répondu mais dans un format inattendu.'
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erreur lors de l\'appel au RAG:', error)
-      
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        return `Erreur de connexion au serveur RAG. 
-
-🔧 **Vérifications suggérées :**
-- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
-- Y a-t-il des problèmes de CORS ?
-- Le service est-il en cours d'exécution ?
-
-**Erreur technique :** ${error.message}`
-      }
-      
-      return `Erreur technique avec l'API : ${error.message}
-
-**URL testée :** ${apiUrl}
-**Type d'erreur :** ${error.name}
-
-Consultez la console développeur (F12) pour plus de détails.`
-    }
-  }
-
-  // Envoi message
-  const handleSendMessage = async (text: string = inputMessage) => {
-    if (!text.trim()) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: text.trim(),
-      isUser: true,
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setIsLoadingChat(true)
-
-    try {
-      const response = await generateAIResponse(text.trim())
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        isUser: false,
-        timestamp: new Date()
-      }
-
-      setMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('❌ Error generating response:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: t('chat.errorMessage'),
-        isUser: false,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoadingChat(false)
-    }
-  }
-
-  // Gestion feedback
-  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, feedback } : msg
-    ))
-    console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
-  }
-
-  const handleNewConversation = () => {
-    setMessages([{
-      id: '1',
-      content: t('chat.welcome'),
-      isUser: false,
-      timestamp: new Date()
-    }])
-  }
-
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString(t('date.format'), { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    })
-  }
-
-  return (
-    <>
-      {/* Zoho SalesIQ Component */}
-      <ZohoSalesIQ user={user} />
-
-      <div className="h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-100 px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Boutons à gauche */}
-            <div className="flex items-center space-x-2">
-              <HistoryMenu />
-              <button
-                onClick={handleNewConversation}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title={t('nav.newConversation')}
-              >
-                <PlusIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Titre centré avec logo */}
-            <div className="flex-1 flex justify-center items-center space-x-3">
-              <InteliaLogo className="w-8 h-8" />
-              <div className="text-center">
-                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
-              </div>
-            </div>
+        if (session?.user) {
+          console.log('✅ Utilisateur connecté:', session.user)
+          
+          const userData = {
+            id: session.user.id,
+            email: session.user.email,
+            name: `${session.user.user_metadata?.first_name || ''} ${session.user.user_metadata?.last_name || ''}`.trim() || session.user.email?.split('@')[0],
             
-            {/* Avatar utilisateur à droite */}
-            <div className="flex items-center">
-              <UserMenuButton />
-            </div>
-          </div>
-        </header>
+            firstName: session.user.user_metadata?.first_name || '',
+            lastName: session.user.user_metadata?.last_name || '',
+            linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
+            
+            country: session.user.user_metadata?.country || 'CA',
+            phone: session.user.user_metadata?.phone || '',
+            
+            companyName: session.user.user_metadata?.company_name || '',
+            companyWebsite: session.user.user_metadata?.company_website || '',
+            linkedinCorporate: session.user.user_metadata?.company_linkedin || '',
+            
+            user_type: session.user.user_metadata?.role || 'producer',
+            language: session.user.user_metadata?.language || 'fr',
+            created_at: session.user.created_at,
+            consentGiven: true,
+            consentDate: new Date(session.user.created_at)
+          }
+          
+          setUser(userData)
+          setIsAuthenticated(true)
+        } else {
+          console.log('ℹ️ Aucun utilisateur connecté')
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error('❌ Erreur chargement utilisateur:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-        {/* Zone de messages */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Date */}
-              {messages.length > 0 && (
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                    {getCurrentDate()}
-                  </span>
-                </div>
-              )}
+    loadUser()
 
-              {messages.map((message, index) => (
-                <div key={message.id}>
-                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                    {!message.isUser && (
-                      <div className="relative">
-                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                      </div>
-                    )}
-                    
-                    <div className="max-w-xs lg:max-w-2xl">
-                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                          {message.content}
-                        </p>
-                      </div>
-                      
-                      {/* Boutons de feedback */}
-                      {!message.isUser && index > 0 && (
-                        <div className="flex items-center space-x-2 mt-2 ml-2">
-                          <button
-                            onClick={() => handleFeedback(message.id, 'positive')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
-                            title={t('chat.helpfulResponse')}
-                          >
-                            <ThumbUpIcon />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(message.id, 'negative')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
-                            title={t('chat.notHelpfulResponse')}
-                          >
-                            <ThumbDownIcon />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {message.isUser && (
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                        <UserIcon className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Indicateur de frappe */}
-              {isLoadingChat && (
-                <div className="flex items-start space-x-3">
-                  <div className="relative">
-                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Zone de saisie */}
-          <div className="px-4 py-4 bg-white border-t border-gray-100">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title={t('chat.voiceRecording')}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                  </svg>
-                </button>
-                
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    placeholder={t('chat.placeholder')}
-                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                    disabled={isLoadingChat}
-                  />
-                </div>
-                
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
-                >
-                  <PaperAirplaneIcon />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
+    const { data:
