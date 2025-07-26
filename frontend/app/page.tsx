@@ -255,7 +255,7 @@ const useLanguage = () => {
 }
 
 // ==================== SÉLECTEUR DE LANGUE ====================
-const LanguageSelector = () => {
+const LanguageSelector = ({ onLanguageChange }: { onLanguageChange: (lang: Language) => void }) => {
   const { language, changeLanguage } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
 
@@ -267,6 +267,12 @@ const LanguageSelector = () => {
   ]
 
   const currentLanguage = languages.find(lang => lang.code === language)
+
+  const handleLanguageChange = (newLanguage: Language) => {
+    changeLanguage(newLanguage)
+    onLanguageChange(newLanguage)
+    setIsOpen(false)
+  }
 
   return (
     <div className="relative">
@@ -293,10 +299,7 @@ const LanguageSelector = () => {
             {languages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => {
-                  changeLanguage(lang.code)
-                  setIsOpen(false)
-                }}
+                onClick={() => handleLanguageChange(lang.code)}
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
                   lang.code === language ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                 } first:rounded-t-lg last:rounded-b-lg transition-colors`}
@@ -354,7 +357,9 @@ const validateWebsite = (url: string): boolean => {
 
 // ==================== PAGE DE CONNEXION/INSCRIPTION ====================
 export default function LoginPage() {
-  const { t } = useLanguage()
+  const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
+  const t = translations[currentLanguage]
+  
   const [isSignupMode, setIsSignupMode] = useState(false)
   
   // Données de connexion
