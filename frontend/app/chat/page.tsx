@@ -34,13 +34,14 @@ declare global {
   }
 }
 
-// ==================== STORE D'AUTHENTIFICATION RÉEL ====================
+// ==================== STORE D'AUTHENTIFICATION CORRIGÉ ====================
 const useAuthStore = () => {
+  // ✅ CORRECTION : Tous les hooks DOIVENT être appelés à chaque rendu
   const [user, setUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Charger les données utilisateur au mount
+  // ✅ CORRECTION : useEffect principal avec cleanup approprié
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -116,12 +117,13 @@ const useAuthStore = () => {
       }
     )
 
+    // ✅ CORRECTION : Fonction de cleanup appropriée
     return () => {
-      if (subscription && subscription.unsubscribe) {
+      if (subscription?.unsubscribe) {
         subscription.unsubscribe()
       }
     }
-  }, [])
+  }, []) // ✅ Dependency array vide - ne s'exécute qu'au mount
 
   // Fonction de déconnexion
   const logout = async () => {
@@ -210,6 +212,12 @@ const useAuthStore = () => {
     try {
       console.log('📤 Export données utilisateur...')
       
+      // Guard clause appropriée
+      if (!user) {
+        console.warn('⚠️ Aucun utilisateur à exporter')
+        return
+      }
+      
       // Créer un export JSON des données
       const exportData = {
         user_info: user,
@@ -266,6 +274,7 @@ const useAuthStore = () => {
   }
 }
 
+// ==================== HOOK CHAT CORRIGÉ ====================
 const useChatStore = () => ({
   conversations: [
     {
@@ -1237,44 +1246,27 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL ====================
+// ==================== COMPOSANT PRINCIPAL CORRIGÉ ====================
 export default function ChatInterface() {
+  // ✅ CORRECTION : Appeler useAuthStore AVANT toute condition ou return
+  const { user, isAuthenticated, isLoading } = useAuthStore()
+  
+  // ✅ TOUS les autres hooks doivent être appelés APRÈS useAuthStore
+  // mais AVANT toute condition de return anticipé
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore()
 
-  // Afficher un loader pendant le chargement
-  if (authLoading) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Rediriger si pas connecté
-  if (!isAuthenticated) {
-    window.location.href = '/'
-    return null
-  }
-
-  // Scroll automatique
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
+  // ✅ CORRECTION : Scroll automatique en useEffect
   useEffect(() => {
-    scrollToBottom()
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Message de bienvenue
+  // ✅ CORRECTION : Message de bienvenue en useEffect
   useEffect(() => {
-    const initializeChat = async () => {
+    // Ne s'exécute que si l'utilisateur est authentifié
+    if (isAuthenticated && messages.length === 0) {
       const welcomeMessage: Message = {
         id: '1',
         content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
@@ -1283,140 +1275,13 @@ export default function ChatInterface() {
       }
       setMessages([welcomeMessage])
     }
+  }, [isAuthenticated, messages.length])
 
-    initializeChat()
-  }, [])
-
-  // Générer réponse RAG
-  const generateAIResponse = async (question: string): Promise<string> => {
-    // Définir l'URL en dehors du try/catch pour qu'elle soit accessible partout
-    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
-    
-    try {
-      console.log('🤖 Envoi question au RAG Intelia:', question)
-      console.log('📡 URL API corrigée:', apiUrl)
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          text: question.trim(),
-          language: user?.language || 'fr',
-          speed_mode: 'balanced'
-        })
-      })
-
-      console.log('📊 Statut réponse API:', response.status, response.statusText)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Erreur API détaillée:', errorText)
-        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log('✅ Réponse RAG reçue:', data)
-      
-      if (data.response || data.answer || data.message) {
-        return data.response || data.answer || data.message
-      } else {
-        console.warn('⚠️ Structure de réponse inattendue:', data)
-        return 'Le système RAG a répondu mais dans un format inattendu.'
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erreur lors de l\'appel au RAG:', error)
-      
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        return `Erreur de connexion au serveur RAG. 
-
-🔧 **Vérifications suggérées :**
-- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
-- Y a-t-il des problèmes de CORS ?
-- Le service est-il en cours d'exécution ?
-
-**Erreur technique :** ${error.message}`
-      }
-      
-      return `Erreur technique avec l'API : ${error.message}
-
-**URL testée :** ${apiUrl}
-**Type d'erreur :** ${error.name}
-
-Consultez la console développeur (F12) pour plus de détails.`
-    }
-  }
-
-  // Envoi message
-  const handleSendMessage = async (text: string = inputMessage) => {
-    if (!text.trim()) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: text.trim(),
-      isUser: true,
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setIsLoading(true)
-
-    try {
-      const response = await generateAIResponse(text.trim())
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        isUser: false,
-        timestamp: new Date()
-      }
-
-      setMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('❌ Error generating response:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
-        isUser: false,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Gestion feedback
-  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, feedback } : msg
-    ))
-    console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
-  }
-
-  const handleNewConversation = () => {
-    setMessages([{
-      id: '1',
-      content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
-      isUser: false,
-      timestamp: new Date()
-    }])
-  }
-
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('fr-FR', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    })
-  }
-
-  // Configuration manuelle Zoho SalesIQ avec diagnostic avancé
+  // ✅ CORRECTION : Configuration Zoho avec dépendance sur user
   useEffect(() => {
+    // Guard clause APRÈS la déclaration du useEffect
+    if (!user) return
+    
     let zohoInitialized = false
     
     const initializeZohoSalesIQ = () => {
@@ -1510,8 +1375,8 @@ Consultez la console développeur (F12) pour plus de détails.`
                 
                 // Tenter d'autres méthodes d'activation
                 if ((window.$zoho.salesiq as any).visitor) {
-                  const userName = '${user?.name || "Utilisateur"}'
-                  const userEmail = '${user?.email || ""}'
+                  const userName = user?.name || "Utilisateur"
+                  const userEmail = user?.email || ""
                   ;(window.$zoho.salesiq as any).visitor.info({
                     name: userName,
                     email: userEmail
@@ -1574,7 +1439,154 @@ Consultez la console développeur (F12) pour plus de détails.`
         clearInterval(diagnosticInterval)
       }
     }
-  }, [user])
+  }, [user]) // Dépendance sur user
+
+  // ✅ CORRECTION : Les conditions de return APRÈS tous les hooks
+  // Afficher un loader pendant le chargement
+  if (isLoading) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Rediriger si pas connecté
+  if (!isAuthenticated) {
+    window.location.href = '/'
+    return null
+  }
+
+  // Générer réponse RAG
+  const generateAIResponse = async (question: string): Promise<string> => {
+    // Définir l'URL en dehors du try/catch pour qu'elle soit accessible partout
+    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
+    
+    try {
+      console.log('🤖 Envoi question au RAG Intelia:', question)
+      console.log('📡 URL API corrigée:', apiUrl)
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          text: question.trim(),
+          language: user?.language || 'fr',
+          speed_mode: 'balanced'
+        })
+      })
+
+      console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Erreur API détaillée:', errorText)
+        throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log('✅ Réponse RAG reçue:', data)
+      
+      if (data.response || data.answer || data.message) {
+        return data.response || data.answer || data.message
+      } else {
+        console.warn('⚠️ Structure de réponse inattendue:', data)
+        return 'Le système RAG a répondu mais dans un format inattendu.'
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erreur lors de l\'appel au RAG:', error)
+      
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return `Erreur de connexion au serveur RAG. 
+
+🔧 **Vérifications suggérées :**
+- Le serveur expert-app-cngws.ondigitalocean.app est-il accessible ?
+- Y a-t-il des problèmes de CORS ?
+- Le service est-il en cours d'exécution ?
+
+**Erreur technique :** ${error.message}`
+      }
+      
+      return `Erreur technique avec l'API : ${error.message}
+
+**URL testée :** ${apiUrl}
+**Type d'erreur :** ${error.name}
+
+Consultez la console développeur (F12) pour plus de détails.`
+    }
+  }
+
+  // Envoi message
+  const handleSendMessage = async (text: string = inputMessage) => {
+    if (!text.trim()) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: text.trim(),
+      isUser: true,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputMessage('')
+    setIsLoadingChat(true)
+
+    try {
+      const response = await generateAIResponse(text.trim())
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response,
+        isUser: false,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('❌ Error generating response:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  // Gestion feedback
+  const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId ? { ...msg, feedback } : msg
+    ))
+    console.log(`📊 Feedback ${feedback} pour le message ${messageId}`)
+  }
+
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
+      isUser: false,
+      timestamp: new Date()
+    }])
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('fr-FR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
 
   // Widget support avec bouton debug Zoho
   const SimpleSupportWidget = () => {
@@ -1934,18 +1946,14 @@ Consultez la console développeur (F12) pour plus de détails.`
                           className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
                           title="Réponse utile"
                         >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                          </svg>
+                          <ThumbUpIcon />
                         </button>
                         <button
                           onClick={() => handleFeedback(message.id, 'negative')}
                           className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
                           title="Réponse non utile"
                         >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                          </svg>
+                          <ThumbDownIcon />
                         </button>
                       </div>
                     )}
@@ -1961,7 +1969,7 @@ Consultez la console développeur (F12) pour plus de détails.`
             ))}
 
             {/* Indicateur de frappe */}
-            {isLoading && (
+            {isLoadingChat && (
               <div className="flex items-start space-x-3">
                 <div className="relative">
                   <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
@@ -2007,13 +2015,13 @@ Consultez la console développeur (F12) pour plus de détails.`
                   }}
                   placeholder="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
                   className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                  disabled={isLoading}
+                  disabled={isLoadingChat}
                 />
               </div>
               
               <button
                 onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputMessage.trim()}
+                disabled={isLoadingChat || !inputMessage.trim()}
                 className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
               >
                 <PaperAirplaneIcon />
