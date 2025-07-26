@@ -10,28 +10,126 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 // Instance Supabase
 const supabase = createClientComponentClient()
 
-// Déclaration TypeScript pour Zoho SalesIQ
-declare global {
-  interface Window {
-    $zoho?: {
-      salesiq?: {
-        ready: () => void
-        chat?: {
-          start: () => void
-          show?: () => void
-          open?: () => void
-        }
-        visitor?: {
-          info?: (data: { name: string; email: string }) => void
-        }
-        floatbutton?: {
-          visible?: (state: string) => void
-          show?: () => void
+// ==================== COMPOSANT ZOHO SALESIQ SOLIDE ====================
+const ZohoSalesIQ = ({ user }: { user: any }) => {
+  useEffect(() => {
+    if (!user) return
+
+    console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email)
+    
+    // 1. Configuration globale AVANT le chargement du script
+    const initializeZohoConfig = () => {
+      console.log('🔧 Configuration initiale Zoho SalesIQ')
+      
+      // Configuration globale requise par Zoho
+      ;(window as any).$zoho = (window as any).$zoho || {}
+      ;(window as any).$zoho.salesiq = (window as any).$zoho.salesiq || {}
+      ;(window as any).$zoho.salesiq.widgetcode = 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+      
+      // Fonction ready qui sera appelée automatiquement par Zoho
+      ;(window as any).$zoho.salesiq.ready = function() {
+        console.log('✅ Zoho SalesIQ initialisé avec succès')
+        
+        try {
+          // Configuration utilisateur
+          if ((window as any).$zoho.salesiq.visitor) {
+            ;(window as any).$zoho.salesiq.visitor.info({
+              name: user.name || 'Utilisateur',
+              email: user.email || ''
+            })
+            console.log('👤 Informations utilisateur configurées:', { 
+              name: user.name || 'Utilisateur', 
+              email: user.email || '' 
+            })
+          }
+          
+          // Activation du chat
+          if ((window as any).$zoho.salesiq.chat) {
+            ;(window as any).$zoho.salesiq.chat.start()
+            console.log('💬 Chat démarré')
+          }
+          
+          // S'assurer que le widget est visible
+          if ((window as any).$zoho.salesiq.floatbutton) {
+            ;(window as any).$zoho.salesiq.floatbutton.visible('show')
+            console.log('👀 Widget rendu visible')
+          }
+          
+        } catch (error) {
+          console.error('❌ Erreur configuration Zoho:', error)
         }
       }
     }
-    siqReadyState?: boolean
-  }
+
+    // 2. Chargement du script de manière propre
+    const loadZohoScript = () => {
+      console.log('📡 Chargement script Zoho SalesIQ')
+      
+      // Supprimer les anciens scripts pour éviter les conflits
+      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
+      existingScripts.forEach(script => script.remove())
+      
+      // Créer et configurer le nouveau script
+      const script = document.createElement('script')
+      script.type = 'text/javascript'
+      script.async = true
+      script.defer = true
+      script.src = `https://salesiq.zohopublic.com/widget?wc=${(window as any).$zoho.salesiq.widgetcode}`
+      
+      // Gestion succès/erreur
+      script.onload = () => {
+        console.log('✅ Script Zoho SalesIQ chargé avec succès')
+        
+        // Vérification que tout fonctionne
+        setTimeout(() => {
+          const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"]')
+          console.log(`🔍 ${zohoElements.length} éléments Zoho détectés dans le DOM`)
+          
+          if (zohoElements.length === 0) {
+            console.warn('⚠️ Aucun élément widget visible, tentative de force')
+            if ((window as any).$zoho?.salesiq?.ready) {
+              ;(window as any).$zoho.salesiq.ready()
+            }
+          } else {
+            console.log('✅ Widget Zoho opérationnel!')
+          }
+        }, 2000)
+      }
+      
+      script.onerror = (error) => {
+        console.error('❌ Erreur chargement script Zoho:', error)
+        console.error('🔍 Vérifiez la CSP et la connectivité réseau')
+      }
+      
+      // Ajouter au DOM
+      document.head.appendChild(script)
+    }
+
+    // 3. Exécution séquentielle
+    initializeZohoConfig()
+    
+    // Délai pour s'assurer que la config est prête
+    setTimeout(() => {
+      loadZohoScript()
+    }, 100)
+
+    // 4. Diagnostic périodique pour le debug
+    const diagnosticInterval = setInterval(() => {
+      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"]')
+      
+      if (zohoElements.length > 0) {
+        console.log('✅ Widget Zoho actif et visible')
+        clearInterval(diagnosticInterval)
+      }
+    }, 5000)
+
+    // Nettoyage
+    return () => {
+      clearInterval(diagnosticInterval)
+    }
+  }, [user])
+
+  return null // Ce composant n'a pas de rendu visuel
 }
 
 // ==================== STORE D'AUTHENTIFICATION ====================
@@ -1124,46 +1222,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
-          </p>
-          <a 
-            href="tel:+18666666221"
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-          >
-            +1 (866) 666 6221
-          </a>
-        </div>
-      </div>
-
-      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Envoyez-nous un message détaillé et nous vous répondrons rapidement.
-          </p>
-          <a 
-            href="mailto:support@intelia.com"
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-          >
-            support@intelia.com
-          </a>
-        </div>
-      </div>
-
-      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
-          </svg>
-        </div>
-        <div className="flex-1">
           <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
           <p className="text-sm text-gray-600 mb-2">
             Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.
@@ -1463,212 +1521,6 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, messages.length])
 
-  useEffect(() => {
-    if (!user) return
-    
-    let zohoInitialized = false
-    
-    const initializeZohoSalesIQ = () => {
-      console.log('🚀 Initialisation Zoho SalesIQ...')
-      
-      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
-      existingScripts.forEach(script => script.remove())
-      
-      const initScript = document.createElement('script')
-      initScript.innerHTML = `
-        console.log('📡 Initialisation globale Zoho...')
-        window.$zoho = window.$zoho || {};
-        window.$zoho.salesiq = window.$zoho.salesiq || {
-          ready: function() {
-            console.log('✅ Zoho SalesIQ ready callback appelé')
-          },
-          widgetcode: 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
-        };
-        
-        window.siqReadyState = false;
-        window.$zoho.salesiq.ready = function() {
-          console.log('🎯 Zoho SalesIQ initialisé avec succès')
-          window.siqReadyState = true;
-          
-          setTimeout(function() {
-            try {
-              if (window.$zoho && window.$zoho.salesiq) {
-                console.log('🔧 Tentative d activation du widget...')
-                
-                if (window.$zoho.salesiq.chat && window.$zoho.salesiq.chat.start) {
-                  window.$zoho.salesiq.chat.start()
-                  console.log('✅ Chat.start() appelé')
-                }
-                
-                if (window.$zoho.salesiq.visitor && window.$zoho.salesiq.visitor.info) {
-                  var userName = "${user?.name || 'Utilisateur'}"
-                  var userEmail = "${user?.email || ''}"
-                  window.$zoho.salesiq.visitor.info({
-                    name: userName,
-                    email: userEmail
-                  })
-                  console.log('✅ Informations visiteur configurées')
-                }
-                
-                setTimeout(function() {
-                  var zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
-                  console.log('🔍 Éléments Zoho trouvés:', zohoElements)
-                  
-                  if (zohoElements.length === 0) {
-                    console.warn('⚠️ Aucun élément widget Zoho trouvé dans le DOM')
-                  }
-                }, 2000)
-              }
-            } catch (error) {
-              console.error('❌ Erreur activation widget:', error)
-            }
-          }, 1000)
-        };
-      `
-      document.head.appendChild(initScript)
-
-      const zohoScript = document.createElement('script')
-      zohoScript.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
-      zohoScript.async = true
-      zohoScript.defer = true
-      
-      zohoScript.onload = () => {
-        console.log('✅ Script Zoho SalesIQ chargé avec succès')
-        zohoInitialized = true
-        
-        setTimeout(() => {
-          console.log('🔄 Initialisation forcée Zoho après chargement')
-          
-          if (window.$zoho && window.$zoho.salesiq) {
-            console.log('✅ Objets Zoho détectés, initialisation...')
-            
-            try {
-              if (typeof window.$zoho.salesiq.ready === 'function') {
-                window.$zoho.salesiq.ready()
-                console.log('✅ Ready() appelé manuellement')
-              }
-              
-              setTimeout(() => {
-                if (window.$zoho && window.$zoho.salesiq) {
-                  if (window.$zoho.salesiq.visitor) {
-                    var userName = user?.name || "Utilisateur"
-                    var userEmail = user?.email || ""
-                    window.$zoho.salesiq.visitor.info({
-                      name: userName,
-                      email: userEmail
-                    })
-                    console.log('✅ Informations visiteur configurées')
-                  }
-                  
-                  if (window.$zoho.salesiq.chat) {
-                    if (window.$zoho.salesiq.chat.start) {
-                      window.$zoho.salesiq.chat.start()
-                      console.log('✅ Chat.start() appelé')
-                    }
-                  }
-                  
-                  setTimeout(() => {
-                    var zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
-                    console.log('🔍 Vérification éléments Zoho après init:', zohoElements.length)
-                    
-                    if (zohoElements.length > 0) {
-                      console.log('✅ Widget Zoho maintenant visible dans le DOM')
-                      window.siqReadyState = true
-                    } else {
-                      console.warn('⚠️ Widget toujours invisible, tentative alternative...')
-                      
-                      if (window.$zoho.salesiq.floatbutton && window.$zoho.salesiq.floatbutton.show) {
-                        window.$zoho.salesiq.floatbutton.show()
-                        console.log('🔧 Tentative alternative avec floatbutton.show()')
-                      }
-                    }
-                  }, 3000)
-                }
-              }, 1000)
-              
-            } catch (error) {
-              console.error('❌ Erreur lors de l\'initialisation forcée:', error)
-            }
-          } else {
-            console.warn('⚠️ Objets Zoho non disponibles après chargement')
-          }
-        }, 500)
-        
-        const tryInitialize = (attempt = 1) => {
-          setTimeout(() => {
-            console.log('🔄 Tentative d initialisation #' + attempt)
-            
-            if (window.$zoho && window.$zoho.salesiq) {
-              console.log('✅ Objets Zoho détectés')
-              
-              try {
-                if (typeof window.$zoho.salesiq.ready === 'function') {
-                  window.$zoho.salesiq.ready()
-                }
-                
-                if (window.$zoho.salesiq.visitor) {
-                  var userName = user?.name || "Utilisateur"
-                  var userEmail = user?.email || ""
-                  window.$zoho.salesiq.visitor.info({
-                    name: userName,
-                    email: userEmail
-                  })
-                }
-                
-              } catch (error) {
-                console.error('❌ Erreur tentative #' + attempt + ':', error)
-              }
-            } else {
-              console.warn('⚠️ Objets Zoho non disponibles (tentative #' + attempt + ')')
-            }
-            
-            if (attempt < 3 && !window.siqReadyState) {
-              tryInitialize(attempt + 1)
-            }
-          }, attempt * 2000)
-        }
-        
-        tryInitialize()
-      }
-      
-      zohoScript.onerror = (error) => {
-        console.error('❌ Erreur chargement script Zoho:', error)
-        
-        if (!zohoInitialized) {
-          setTimeout(() => {
-            console.log('🔄 Nouvelle tentative de chargement Zoho...')
-            initializeZohoSalesIQ()
-          }, 5000)
-        }
-      }
-      
-      document.head.appendChild(zohoScript)
-    }
-
-    const timer = setTimeout(initializeZohoSalesIQ, 500)
-    
-    const diagnosticInterval = setInterval(() => {
-      console.log('🔍 Diagnostic Zoho:')
-      console.log('- window.$zoho:', window.$zoho)
-      console.log('- siqReadyState:', window.siqReadyState)
-      
-      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
-      console.log('- Éléments DOM:', zohoElements.length)
-      
-      if (zohoElements.length > 0) {
-        console.log('✅ Widget Zoho détecté dans le DOM')
-        clearInterval(diagnosticInterval)
-      }
-    }, 10000)
-    
-    return () => {
-      clearTimeout(timer)
-      if (diagnosticInterval) {
-        clearInterval(diagnosticInterval)
-      }
-    }
-  }, [user])
-
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -1812,247 +1664,11 @@ Consultez la console développeur (F12) pour plus de détails.`
     })
   }
 
-  const SimpleSupportWidget = () => {
-    const [isOpen, setIsOpen] = useState(false)
-    const [showZohoDebug, setShowZohoDebug] = useState(false)
-
-    const checkZohoStatus = () => {
-      console.log('🔍 === DIAGNOSTIC ZOHO SALESIQ ===')
-      console.log('- window.$zoho:', window.$zoho)
-      console.log('- window.$zoho.salesiq:', window.$zoho?.salesiq)
-      console.log('- siqReadyState:', window.siqReadyState)
-      
-      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
-      console.log('- Éléments Zoho dans DOM:', zohoElements)
-      zohoElements.forEach((el, index) => {
-        console.log(`  ${index + 1}:`, el.tagName, el.id, el.className, (el as HTMLElement).style.display)
-      })
-      
-      const iframes = document.querySelectorAll('iframe')
-      console.log('- Iframes présentes:', iframes.length)
-      iframes.forEach((iframe, index) => {
-        if (iframe.src.includes('zoho') || iframe.src.includes('salesiq')) {
-          console.log(`  Iframe Zoho ${index + 1}:`, iframe.src, (iframe as HTMLElement).style.display)
-        }
-      })
-      
-      if (window.$zoho && window.$zoho.salesiq) {
-        try {
-          console.log('🔧 Tentative de forçage d\'affichage...')
-          
-          if (window.$zoho.salesiq.chat) {
-            if (window.$zoho.salesiq.chat.start) window.$zoho.salesiq.chat.start()
-            if (window.$zoho.salesiq.chat.show) window.$zoho.salesiq.chat.show()
-            if (window.$zoho.salesiq.chat.open) window.$zoho.salesiq.chat.open()
-          }
-          
-          if (window.$zoho.salesiq.floatbutton) {
-            if (window.$zoho.salesiq.floatbutton.visible) window.$zoho.salesiq.floatbutton.visible('show')
-            if (window.$zoho.salesiq.floatbutton.show) window.$zoho.salesiq.floatbutton.show()
-          }
-          
-          console.log('✅ Tentatives de forçage terminées')
-        } catch (error) {
-          console.error('❌ Erreur lors du forçage:', error)
-        }
-      }
-      
-      setShowZohoDebug(true)
-    }
-
-    const reloadZoho = () => {
-      console.log('🔄 Rechargement forcé de Zoho SalesIQ...')
-      
-      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
-      existingScripts.forEach(script => script.remove())
-      
-      const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"]')
-      zohoElements.forEach(el => el.remove())
-      
-      window.$zoho = undefined
-      window.siqReadyState = false
-      
-      setTimeout(() => {
-        const script = document.createElement('script')
-        script.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
-        script.async = true
-        document.head.appendChild(script)
-        console.log('🚀 Script Zoho rechargé')
-      }, 1000)
-    }
-
-    return (
-      <>
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 z-50"
-          title="Besoin d'aide ?"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-          </svg>
-        </button>
-
-        <div className="fixed bottom-6 left-6 space-y-2 z-50">
-          <button
-            onClick={checkZohoStatus}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs shadow-lg transition-colors"
-            title="Diagnostiquer Zoho SalesIQ"
-          >
-            🔍 Debug Zoho
-          </button>
-          <button
-            onClick={reloadZoho}
-            className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs shadow-lg transition-colors"
-            title="Recharger Zoho SalesIQ"
-          >
-            🔄 Reload Zoho
-          </button>
-        </div>
-
-        {showZohoDebug && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 z-50" 
-              onClick={() => setShowZohoDebug(false)}
-            />
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 bg-white rounded-lg shadow-xl z-50 max-h-96 overflow-auto">
-              <div className="bg-orange-600 text-white p-4 flex items-center justify-between">
-                <h3 className="font-semibold">Debug Zoho SalesIQ</h3>
-                <button
-                  onClick={() => setShowZohoDebug(false)}
-                  className="text-white hover:text-gray-200"
-                >
-                  ×
-                </button>
-              </div>
-              
-              <div className="p-4 space-y-3 text-xs">
-                <div>
-                  <strong>Status:</strong> {window.$zoho ? '✅ Chargé' : '❌ Non chargé'}
-                </div>
-                <div>
-                  <strong>Ready State:</strong> {window.siqReadyState ? '✅ Prêt' : '❌ Non prêt'}
-                </div>
-                <div>
-                  <strong>Éléments DOM:</strong> {document.querySelectorAll('[id*="siq"], [class*="siq"]').length}
-                </div>
-                <div>
-                  <strong>Widget ID:</strong> siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09
-                </div>
-                
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={reloadZoho}
-                    className="w-full bg-red-500 text-white px-3 py-2 rounded text-xs"
-                  >
-                    Recharger Zoho
-                  </button>
-                  <button
-                    onClick={() => {
-                      window.open('https://salesiq.zoho.com/', '_blank')
-                    }}
-                    className="w-full bg-blue-500 text-white px-3 py-2 rounded text-xs"
-                  >
-                    Ouvrir Zoho Admin
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {isOpen && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 z-50" 
-              onClick={() => setIsOpen(false)}
-            />
-            <div className="fixed bottom-6 right-6 w-80 bg-white rounded-lg shadow-xl z-50 max-h-96 overflow-hidden">
-              <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
-                <h3 className="font-semibold">Besoin d'aide ?</h3>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-white hover:text-gray-200"
-                >
-                  ×
-                </button>
-              </div>
-              
-              <div className="p-4 space-y-3">
-                <div className="text-sm text-gray-600 mb-4">
-                  Comment pouvons-nous vous aider aujourd'hui ?
-                </div>
-                
-                <button
-                  onClick={() => {
-                    window.open('mailto:support@intelia.com?subject=Question Intelia Expert', '_blank')
-                    setIsOpen(false)
-                  }}
-                  className="w-full text-left p-3 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm">Envoyer un email</div>
-                      <div className="text-xs text-gray-500">Réponse sous 24h</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    window.open('tel:+18666666221', '_self')
-                    setIsOpen(false)
-                  }}
-                  className="w-full text-left p-3 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm">Nous appeler</div>
-                      <div className="text-xs text-gray-500">+1 (866) 666 6221</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    window.open('https://intelia.com/faq', '_blank')
-                    setIsOpen(false)
-                  }}
-                  className="w-full text-left p-3 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-medium text-sm">Consulter la FAQ</div>
-                      <div className="text-xs text-gray-500">Réponses rapides</div>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </>
-    )
-  }
-
   return (
     <>
+      {/* Nouveau composant Zoho SalesIQ solide */}
+      {user && <ZohoSalesIQ user={user} />}
+      
       <Script id="zoho-salesiq-init" strategy="beforeInteractive">
         {`
           window.$zoho = window.$zoho || {};
@@ -2061,28 +1677,6 @@ Consultez la console développeur (F12) pour plus de détails.`
           };
         `}
       </Script>
-      
-      <Script 
-        id="zoho-salesiq-widget"
-        src="https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09" 
-        strategy="afterInteractive"
-        onLoad={() => {
-          console.log('✅ Zoho SalesIQ script chargé')
-          setTimeout(() => {
-            if (window.$zoho && window.$zoho.salesiq) {
-              console.log('🔄 Tentative d\'initialisation forcée Zoho SalesIQ')
-              try {
-                window.$zoho.salesiq.ready()
-              } catch (error) {
-                console.error('❌ Erreur initialisation Zoho:', error)
-              }
-            }
-          }, 2000)
-        }}
-        onError={(error) => {
-          console.error('❌ Erreur chargement Zoho SalesIQ:', error)
-        }}
-      />
 
       <div className="h-screen bg-gray-50 flex flex-col">
         <header className="bg-white border-b border-gray-100 px-4 py-3">
@@ -2227,9 +1821,46 @@ Consultez la console développeur (F12) pour plus de détails.`
             </div>
           </div>
         </div>
-        
-        <SimpleSupportWidget />
       </div>
     </>
   )
-}
+}<h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
+          </p>
+          <a 
+            href="tel:+18666666221"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            +1 (866) 666 6221
+          </a>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Envoyez-nous un message détaillé et nous vous répondrons rapidement.
+          </p>
+          <a 
+            href="mailto:support@intelia.com"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            support@intelia.com
+          </a>
+        </div>
+      </div>
+
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0 0c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3s4.5 4.03 4.5 9-2.015 9-4.5 9z" />
+          </svg>
+        </div>
+        <div className="flex-1">
