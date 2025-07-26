@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 import React, { useState, useEffect, useRef } from 'react'
 import Script from 'next/script'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useTranslation } from '../i18n'
+import { useTranslation } from '../../lib/languages/i18n'
 
 // Instance Supabase
 const supabase = createClientComponentClient()
