@@ -534,98 +534,102 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
     </div>
   )
 }
-  <div className="space-y-4">
-    {/* Chat with us */}
-    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl text-white">💬</span>
+
+const ContactModal = ({ onClose }: { onClose: () => void }) => {
+  return (
+    <div className="space-y-4">
+      {/* Chat with us */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-2xl text-white">💬</span>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Contactez notre équipe de support via le chat intégré.
+          </p>
+          <button 
+            onClick={() => {
+              console.log('Chat support ouvert')
+              onClose()
+            }}
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            Contacter le support Intelia
+          </button>
+        </div>
       </div>
-      <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
-        <p className="text-sm text-gray-600 mb-2">
-          Contactez notre équipe de support via le chat intégré.
-        </p>
-        <button 
-          onClick={() => {
-            console.log('Chat support ouvert')
-            onClose()
-          }}
-          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+
+      {/* Call Us */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-2xl text-white">📞</span>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
+          </p>
+          <a 
+            href="tel:+18666666221"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            +1 (866) 666 6221
+          </a>
+        </div>
+      </div>
+
+      {/* Email Us */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-2xl text-white">📧</span>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Envoyez-nous un message détaillé et nous vous répondrons rapidement.
+          </p>
+          <a 
+            href="mailto:support@intelia.com"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            support@intelia.com
+          </a>
+        </div>
+      </div>
+
+      {/* Visit our website */}
+      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-2xl text-white">🌐</span>
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.
+          </p>
+          <a 
+            href="https://www.intelia.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            www.intelia.com
+          </a>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-3">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
-          Contacter le support Intelia
+          Fermer
         </button>
       </div>
     </div>
-
-    {/* Call Us */}
-    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl text-white">📞</span>
-      </div>
-      <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-1">Nous appeler</h3>
-        <p className="text-sm text-gray-600 mb-2">
-          Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.
-        </p>
-        <a 
-          href="tel:+18666666221"
-          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-        >
-          +1 (866) 666 6221
-        </a>
-      </div>
-    </div>
-
-    {/* Email Us */}
-    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl text-white">📧</span>
-      </div>
-      <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-1">Nous écrire</h3>
-        <p className="text-sm text-gray-600 mb-2">
-          Envoyez-nous un message détaillé et nous vous répondrons rapidement.
-        </p>
-        <a 
-          href="mailto:support@intelia.com"
-          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-        >
-          support@intelia.com
-        </a>
-      </div>
-    </div>
-
-    {/* Visit our website */}
-    <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl text-white">🌐</span>
-      </div>
-      <div className="flex-1">
-        <h3 className="font-semibold text-gray-900 mb-1">Visiter notre site web</h3>
-        <p className="text-sm text-gray-600 mb-2">
-          Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.
-        </p>
-        <a 
-          href="https://www.intelia.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-        >
-          www.intelia.com
-        </a>
-      </div>
-    </div>
-
-    <div className="flex justify-end pt-3">
-      <button
-        onClick={onClose}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-      >
-        Fermer
-      </button>
-    </div>
-  </div>
-)
+  )
+}
 
 // ==================== MENU HISTORIQUE ====================
 const HistoryMenu = () => {
