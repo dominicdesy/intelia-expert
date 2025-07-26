@@ -41,6 +41,20 @@ const useAuthStore = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // ✅ CORRECTION : Écouter les mises à jour de profil
+  useEffect(() => {
+    const handleProfileUpdate = (event: CustomEvent) => {
+      console.log('🔄 Mise à jour profil reçue:', event.detail)
+      setUser(event.detail)
+    }
+
+    window.addEventListener('userProfileUpdated', handleProfileUpdate as EventListener)
+    
+    return () => {
+      window.removeEventListener('userProfileUpdated', handleProfileUpdate as EventListener)
+    }
+  }, [])
+
   // ✅ CORRECTION : useEffect principal avec cleanup approprié
   useEffect(() => {
     const loadUser = async () => {
@@ -172,12 +186,16 @@ const useAuthStore = () => {
         return { success: false, error: error.message }
       }
       
-      // Mettre à jour l'état local
-      setUser(prev => ({
-        ...prev,
+      // ✅ CORRECTION : Mise à jour immédiate de l'état local
+      const updatedUser = {
+        ...user,
         ...data,
         name: `${data.firstName} ${data.lastName}`.trim()
-      }))
+      }
+      
+      setUser(updatedUser)
+      
+      console.log('✅ Profil mis à jour localement:', updatedUser)
       
       return { success: true }
     } catch (error: any) {
@@ -335,14 +353,14 @@ const EllipsisVerticalIcon = ({ className = "w-6 h-6" }: { className?: string })
 )
 
 const ThumbUpIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 712.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.398.83 1.169 1.448 2.126 1.448h.386c.114 0 .228-.007.34-.02a4.877 4.877 0 004.2-3.204 4.877 4.877 0 00.258-1.826v-1.25a1.125 1.125 0 00-1.125-1.125H5.904z" />
+  <svg className={className} fill="currentColor" viewBox="0 0 20 20">
+    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
   </svg>
 )
 
 const ThumbDownIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15h2.25m8.024-9.75c.011.05.028.1.052.148.591 1.2.924 2.55.924 3.977a8.96 8.96 0 01-.999 4.125m.023-8.25c-.076-.365.183-.75.575-.75h.908c.889 0 1.713.518 1.972 1.368.339 1.11.521 2.287.521 3.507 0 1.553-.295 3.036-.831 4.398C20.613 14.547 19.833 15 19 15h-1.053c-.472 0-.745-.556-.5-.96a8.95 8.95 0 00.303-.54m.023-8.25H16.48a4.5 4.5 0 01-1.423-.23l-3.114-1.04a4.5 4.5 0 00-1.423-.23H6.504c-.618 0-1.217.247-1.605.729A11.95 11.95 0 002.25 12c0 .434.023.863.068 1.285C2.427 14.306 3.346 15 4.372 15h3.126c.618 0 .991.724.725 1.282A7.471 7.471 0 007.5 19.5a2.25 2.25 0 002.25 2.25.75.75 0 00.75-.75v-.633c0-.573.11-1.14.322-1.672.304-.76.93-1.33 1.653-1.715a9.04 9.04 0 002.86-2.4c.498-.634 1.226-1.08 2.032-1.08h.384z" />
+  <svg className={className} fill="currentColor" viewBox="0 0 20 20">
+    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
   </svg>
 )
 
@@ -547,9 +565,51 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
       const result = await updateProfile(formData)
       if (result.success) {
         alert('Profil mis à jour avec succès !')
+        
+        // ✅ CORRECTION : Mise à jour immédiate du nom affiché  
+        const updatedName = `${formData.firstName} ${formData.lastName}`.trim()
+        const updatedInitials = updatedName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        
+        // Mettre à jour l'affichage immédiatement
+        document.querySelectorAll('[data-user-name]').forEach(el => {
+          el.textContent = updatedName
+        })
+        document.querySelectorAll('[data-user-initials]').forEach(el => {
+          el.textContent = updatedInitials
+        })
+        // Récupérer la session mise à jour depuis Supabase
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (!error && session?.user) {
+          console.log('🔄 Rechargement données utilisateur après mise à jour')
+          
+          // Mettre à jour les données locales immédiatement
+          const updatedUserData = {
+            ...user,
+            name: `${formData.firstName} ${formData.lastName}`.trim(),
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            linkedinProfile: formData.linkedinProfile,
+            country: formData.country,
+            phone: formData.phone,
+            companyName: formData.companyName,
+            companyWebsite: formData.companyWebsite,
+            linkedinCorporate: formData.linkedinCorporate,
+            email: formData.email
+          }
+          
+          // Déclencher un événement personnalisé pour notifier useAuthStore
+          window.dispatchEvent(new CustomEvent('userProfileUpdated', { 
+            detail: updatedUserData 
+          }))
+        }
+        
         onClose()
+      } else {
+        alert('Erreur lors de la mise à jour du profil: ' + (result.error || 'Erreur inconnue'))
       }
     } catch (error) {
+      console.error('❌ Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour du profil')
     }
     setIsLoading(false)
@@ -1117,6 +1177,15 @@ const UserMenuButton = () => {
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  
+  // ✅ Déterminer le forfait et ses couleurs
+  const currentPlan = user?.plan || 'essentiel'
+  const planConfig = {
+    essentiel: { name: 'Essentiel', bgColor: 'bg-green-50', textColor: 'text-green-600', borderColor: 'border-green-200' },
+    pro: { name: 'Pro', bgColor: 'bg-blue-50', textColor: 'text-blue-600', borderColor: 'border-blue-200' },
+    entreprise: { name: 'Entreprise', bgColor: 'bg-purple-50', textColor: 'text-purple-600', borderColor: 'border-purple-200' }
+  }
+  const plan = planConfig[currentPlan as keyof typeof planConfig] || planConfig.essentiel
 
   const handleContactClick = () => {
     setIsOpen(false)
@@ -1140,7 +1209,7 @@ const UserMenuButton = () => {
           onClick={() => setIsOpen(!isOpen)}
           className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
         >
-          <span className="text-white text-xs font-medium">{userInitials}</span>
+          <span className="text-white text-xs font-medium" data-user-initials>{userInitials}</span>
         </button>
 
         {isOpen && (
@@ -1152,11 +1221,13 @@ const UserMenuButton = () => {
             
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                <p className="text-sm font-medium text-gray-900" data-user-name>{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Membre depuis {new Date(user?.created_at || '').toLocaleDateString('fr-FR')}
-                </p>
+                <div className="mt-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.textColor} border ${plan.borderColor}`}>
+                    {plan.name}
+                  </span>
+                </div>
               </div>
 
               <button
@@ -1359,7 +1430,72 @@ export default function ChatInterface() {
         console.log('✅ Script Zoho SalesIQ chargé avec succès')
         zohoInitialized = true
         
-        // Multiples tentatives d'initialisation
+        // ✅ CORRECTION : Forcer l'initialisation immédiatement après le chargement
+        setTimeout(() => {
+          console.log('🔄 Initialisation forcée Zoho après chargement')
+          
+          if (window.$zoho && window.$zoho.salesiq) {
+            console.log('✅ Objets Zoho détectés, initialisation...')
+            
+            try {
+              // Forcer le déclenchement du ready
+              if (typeof window.$zoho.salesiq.ready === 'function') {
+                window.$zoho.salesiq.ready()
+                console.log('✅ Ready() appelé manuellement')
+              }
+              
+              // Attendre un peu puis forcer l'affichage
+              setTimeout(() => {
+                if (window.$zoho && window.$zoho.salesiq) {
+                  // Tenter d'autres méthodes d'activation
+                  if (window.$zoho.salesiq.visitor) {
+                    var userName = user?.name || "Utilisateur"
+                    var userEmail = user?.email || ""
+                    window.$zoho.salesiq.visitor.info({
+                      name: userName,
+                      email: userEmail
+                    })
+                    console.log('✅ Informations visiteur configurées')
+                  }
+                  
+                  // Forcer l'affichage du widget
+                  if (window.$zoho.salesiq.chat) {
+                    if (window.$zoho.salesiq.chat.start) {
+                      window.$zoho.salesiq.chat.start()
+                      console.log('✅ Chat.start() appelé')
+                    }
+                  }
+                  
+                  // Vérifier les éléments DOM
+                  setTimeout(() => {
+                    var zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
+                    console.log('🔍 Vérification éléments Zoho après init:', zohoElements.length)
+                    
+                    if (zohoElements.length > 0) {
+                      console.log('✅ Widget Zoho maintenant visible dans le DOM')
+                      window.siqReadyState = true
+                    } else {
+                      console.warn('⚠️ Widget toujours invisible, tentative alternative...')
+                      
+                      // Dernière tentative avec l'API alternative
+                      if (window.$zoho.salesiq.floatbutton && window.$zoho.salesiq.floatbutton.show) {
+                        window.$zoho.salesiq.floatbutton.show()
+                        console.log('🔧 Tentative alternative avec floatbutton.show()')
+                      }
+                    }
+                  }, 3000)
+                }
+              }, 1000)
+              
+            } catch (error) {
+              console.error('❌ Erreur lors de l\'initialisation forcée:', error)
+            }
+          } else {
+            console.warn('⚠️ Objets Zoho non disponibles après chargement')
+          }
+        }, 500) // Délai court après le chargement
+        
+        // Multiples tentatives d'initialisation (code existant en backup)
         const tryInitialize = (attempt = 1) => {
           setTimeout(() => {
             console.log('🔄 Tentative d initialisation #' + attempt)
@@ -1390,13 +1526,14 @@ export default function ChatInterface() {
               console.warn('⚠️ Objets Zoho non disponibles (tentative #' + attempt + ')')
             }
             
-            // Réessayer jusqu'à 5 fois
-            if (attempt < 5 && !window.siqReadyState) {
+            // Réessayer jusqu'à 3 fois
+            if (attempt < 3 && !window.siqReadyState) {
               tryInitialize(attempt + 1)
             }
-          }, attempt * 1500) // Délai progressif
+          }, attempt * 2000) // Délai progressif
         }
         
+        // Démarrer les tentatives après un délai
         tryInitialize()
       }
       
@@ -1476,9 +1613,12 @@ export default function ChatInterface() {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          text: question.trim(),
+          text: `${question.trim()}\n\nRépondez de manière concise et directe.`,
           language: user?.language || 'fr',
-          speed_mode: 'balanced'
+          speed_mode: 'balanced',
+          max_tokens: 150, // ✅ Limitation forte pour réponses courtes
+          temperature: 0.7,
+          response_format: 'concise' // Format de réponse concis
         })
       })
 
