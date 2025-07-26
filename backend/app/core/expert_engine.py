@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import logging
 from pathlib import Path
 from typing import Dict, Optional
@@ -151,9 +151,20 @@ class InteliaExpertEngine:
             
             client = openai.OpenAI(api_key=openai_key)
             
-            system_prompt = "You are an expert in Ross 308 broiler management. Respond concisely and practically in French."
+            system_prompt = """Vous êtes un expert en gestion de poulets de chair Ross 308.
+
+STYLE DE RÉPONSE OBLIGATOIRE:
+- Réponse COURTE et DIRECTE (maximum 2-3 phrases)
+- Aller droit au but, sans explication
+- Donner la réponse concrète immédiatement
+- PAS de citations de documents
+- PAS d'explications sur "comment j'ai déterminé"
+- Ton professionnel mais concis
+
+Répondez de manière précise et actionnable."""
+            
             if self.rag_configured:
-                system_prompt += " You have access to a specialized knowledge base."
+                system_prompt += " Vous avez accès à une base de connaissances spécialisée."
             
             response = client.chat.completions.create(
                 model=model,
@@ -161,8 +172,8 @@ class InteliaExpertEngine:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
                 ],
-                temperature=0.7,
-                max_tokens=600
+                temperature=0.3,  # Réduit pour plus de directivité
+                max_tokens=150    # Réduit de 600 à 150
             )
             
             return response.choices[0].message.content
