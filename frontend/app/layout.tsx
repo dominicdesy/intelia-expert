@@ -9,8 +9,8 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Intelia Expert - Assistant IA Agriculture',
-  description: 'Assistant IA spécialisé en santé et nutrition animale pour les producteurs agricoles',
+  title: 'Intelia Expert - AI Advisor',
+  description: 'Assistant IA spécialisé pour les producteurs avicoles',
   keywords: 'agriculture, IA, santé animale, nutrition, élevage, expert',
   authors: [{ name: 'Intelia' }],
   creator: 'Intelia',
