@@ -37,7 +37,7 @@ const translations = {
     phoneInvalid: 'Format de téléphone invalide',
     terms: 'conditions d\'utilisation',
     privacy: 'politique de confidentialité',
-    gdprNotice: 'En vous connectant, vous acceptez nos'
+    gdprNotice: 'En vous connectant, vous acceptez nos',
     needHelp: 'Besoin d\'aide ?',
     contactSupport: 'Contactez le support',
     createAccount: 'Créer un compte',
@@ -85,7 +85,7 @@ const translations = {
     phoneInvalid: 'Invalid phone format',
     terms: 'terms of service',
     privacy: 'privacy policy',
-    gdprNotice: 'By signing in, you accept our'
+    gdprNotice: 'By signing in, you accept our',
     needHelp: 'Need help?',
     contactSupport: 'Contact support',
     createAccount: 'Create account',
@@ -133,7 +133,7 @@ const translations = {
     phoneInvalid: 'Formato de teléfono inválido',
     terms: 'términos de servicio',
     privacy: 'política de privacidad',
-    gdprNotice: 'Al iniciar sesión, aceptas nuestros'
+    gdprNotice: 'Al iniciar sesión, aceptas nuestros',
     needHelp: '¿Necesitas ayuda?',
     contactSupport: 'Contactar soporte',
     createAccount: 'Crear cuenta',
@@ -181,7 +181,7 @@ const translations = {
     phoneInvalid: 'Ungültiges Telefonformat',
     terms: 'Nutzungsbedingungen',
     privacy: 'Datenschutzrichtlinie',
-    gdprNotice: 'Durch die Anmeldung akzeptieren Sie unsere'
+    gdprNotice: 'Durch die Anmeldung akzeptieren Sie unsere',
     needHelp: 'Brauchen Sie Hilfe?',
     contactSupport: 'Support kontaktieren',
     createAccount: 'Konto erstellen',
