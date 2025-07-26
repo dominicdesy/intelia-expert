@@ -34,14 +34,12 @@ declare global {
   }
 }
 
-// ==================== STORE D'AUTHENTIFICATION CORRIGÉ ====================
+// ==================== STORE D'AUTHENTIFICATION ====================
 const useAuthStore = () => {
-  // ✅ CORRECTION : Tous les hooks DOIVENT être appelés à chaque rendu
   const [user, setUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // ✅ CORRECTION : Écouter les mises à jour de profil
   useEffect(() => {
     const handleProfileUpdate = (event: CustomEvent) => {
       console.log('🔄 Mise à jour profil reçue:', event.detail)
@@ -55,11 +53,9 @@ const useAuthStore = () => {
     }
   }, [])
 
-  // ✅ CORRECTION : useEffect principal avec cleanup approprié
   useEffect(() => {
     const loadUser = async () => {
       try {
-        // Récupérer la session active
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
@@ -72,29 +68,24 @@ const useAuthStore = () => {
         if (session?.user) {
           console.log('✅ Utilisateur connecté:', session.user)
           
-          // Structurer les données utilisateur
           const userData = {
             id: session.user.id,
             email: session.user.email,
             name: `${session.user.user_metadata?.first_name || ''} ${session.user.user_metadata?.last_name || ''}`.trim() || session.user.email?.split('@')[0],
             
-            // Informations du profil
             firstName: session.user.user_metadata?.first_name || '',
             lastName: session.user.user_metadata?.last_name || '',
             linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
             
-            // Contact
             country: session.user.user_metadata?.country || 'CA',
             phone: session.user.user_metadata?.phone || '',
             
-            // Entreprise
             companyName: session.user.user_metadata?.company_name || '',
             companyWebsite: session.user.user_metadata?.company_website || '',
             linkedinCorporate: session.user.user_metadata?.company_linkedin || '',
             
-            // Métadonnées
             user_type: session.user.user_metadata?.role || 'producer',
-            language: 'fr', // Défaut français
+            language: session.user.user_metadata?.language || 'fr',
             created_at: session.user.created_at,
             consentGiven: true,
             consentDate: new Date(session.user.created_at)
@@ -116,7 +107,6 @@ const useAuthStore = () => {
 
     loadUser()
 
-    // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Changement auth:', event, session?.user?.email)
@@ -125,21 +115,18 @@ const useAuthStore = () => {
           setUser(null)
           setIsAuthenticated(false)
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // Recharger les données utilisateur
           loadUser()
         }
       }
     )
 
-    // ✅ CORRECTION : Fonction de cleanup appropriée
     return () => {
       if (subscription?.unsubscribe) {
         subscription.unsubscribe()
       }
     }
-  }, []) // ✅ Dependency array vide - ne s'exécute qu'au mount
+  }, [])
 
-  // Fonction de déconnexion
   const logout = async () => {
     try {
       console.log('🚪 Déconnexion en cours...')
@@ -152,20 +139,16 @@ const useAuthStore = () => {
       
       setUser(null)
       setIsAuthenticated(false)
-      
-      // Redirection vers la page de login
       window.location.href = '/'
     } catch (error) {
       console.error('❌ Erreur critique déconnexion:', error)
     }
   }
 
-  // Fonction de mise à jour du profil
   const updateProfile = async (data: any) => {
     try {
       console.log('📝 Mise à jour profil:', data)
       
-      // Préparer les métadonnées utilisateur
       const updates = {
         data: {
           first_name: data.firstName,
@@ -175,7 +158,8 @@ const useAuthStore = () => {
           phone: data.phone,
           company_name: data.companyName,
           company_website: data.companyWebsite,
-          company_linkedin: data.linkedinCorporate
+          company_linkedin: data.linkedinCorporate,
+          language: data.language
         }
       }
       
@@ -186,7 +170,6 @@ const useAuthStore = () => {
         return { success: false, error: error.message }
       }
       
-      // ✅ CORRECTION : Mise à jour immédiate de l'état local
       const updatedUser = {
         ...user,
         ...data,
@@ -194,7 +177,6 @@ const useAuthStore = () => {
       }
       
       setUser(updatedUser)
-      
       console.log('✅ Profil mis à jour localement:', updatedUser)
       
       return { success: true }
@@ -204,7 +186,6 @@ const useAuthStore = () => {
     }
   }
 
-  // Fonction de changement de mot de passe
   const changePassword = async (currentPassword: string, newPassword: string) => {
     try {
       console.log('🔑 Changement mot de passe demandé')
@@ -225,25 +206,21 @@ const useAuthStore = () => {
     }
   }
 
-  // Fonctions RGPD
   const exportUserData = async () => {
     try {
       console.log('📤 Export données utilisateur...')
       
-      // Guard clause appropriée
       if (!user) {
         console.warn('⚠️ Aucun utilisateur à exporter')
         return
       }
       
-      // Créer un export JSON des données
       const exportData = {
         user_info: user,
         export_date: new Date().toISOString(),
         export_type: 'user_data_export'
       }
       
-      // Télécharger le fichier
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: 'application/json'
       })
@@ -271,8 +248,6 @@ const useAuthStore = () => {
         return
       }
       
-      // Note: La suppression complète nécessiterait un endpoint backend
-      // Pour l'instant, on fait juste la déconnexion
       alert('Pour supprimer définitivement votre compte, veuillez contacter support@intelia.com')
       
     } catch (error) {
@@ -292,7 +267,7 @@ const useAuthStore = () => {
   }
 }
 
-// ==================== HOOK CHAT CORRIGÉ ====================
+// ==================== HOOK CHAT ====================
 const useChatStore = () => ({
   conversations: [
     {
@@ -417,15 +392,15 @@ const Modal = ({ isOpen, onClose, title, children }: {
   )
 }
 
+// ==================== MODAL PROFIL ====================
 const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
   const { updateProfile, changePassword } = useAuthStore()
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
   const [isLoading, setIsLoading] = useState(false)
   
-  // Formulaire profil
   const [formData, setFormData] = useState({
-    firstName: user?.name?.split(' ')[0] || '',
-    lastName: user?.name?.split(' ').slice(1).join(' ') || '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
     linkedinProfile: user?.linkedinProfile || '',
     companyName: user?.companyName || '',
     companyWebsite: user?.companyWebsite || '',
@@ -435,7 +410,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
     country: user?.country || 'CA'
   })
 
-  // Formulaire mot de passe
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -566,24 +540,21 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
       if (result.success) {
         alert('Profil mis à jour avec succès !')
         
-        // ✅ CORRECTION : Mise à jour immédiate du nom affiché  
         const updatedName = `${formData.firstName} ${formData.lastName}`.trim()
         const updatedInitials = updatedName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
         
-        // Mettre à jour l'affichage immédiatement
         document.querySelectorAll('[data-user-name]').forEach(el => {
           el.textContent = updatedName
         })
         document.querySelectorAll('[data-user-initials]').forEach(el => {
           el.textContent = updatedInitials
         })
-        // Récupérer la session mise à jour depuis Supabase
+
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (!error && session?.user) {
           console.log('🔄 Rechargement données utilisateur après mise à jour')
           
-          // Mettre à jour les données locales immédiatement
           const updatedUserData = {
             ...user,
             name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -598,7 +569,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
             email: formData.email
           }
           
-          // Déclencher un événement personnalisé pour notifier useAuthStore
           window.dispatchEvent(new CustomEvent('userProfileUpdated', { 
             detail: updatedUserData 
           }))
@@ -617,7 +587,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-      {/* Onglets */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('profile')}
@@ -635,7 +604,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
 
       {activeTab === 'profile' && (
         <>
-          {/* Informations personnelles */}
           <div className="border-b border-gray-200 pb-4">
             <h3 className="text-lg font-medium text-gray-900 mb-3">Informations personnelles</h3>
             
@@ -674,7 +642,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
             </div>
           </div>
 
-          {/* Informations de contact */}
           <div className="border-b border-gray-200 pb-4">
             <h3 className="text-lg font-medium text-gray-900 mb-3">Contact</h3>
             
@@ -720,7 +687,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
             </div>
           </div>
 
-          {/* Informations entreprise */}
           <div className="pb-4">
             <h3 className="text-lg font-medium text-gray-900 mb-3">Entreprise</h3>
             
@@ -862,8 +828,113 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
   )
 }
 
-const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
-  // Simuler le forfait utilisateur (à remplacer par les vraies données)
+// ==================== MODAL LANGUE ====================
+const LanguageModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
+  const { updateProfile } = useAuthStore()
+  const [selectedLanguage, setSelectedLanguage] = useState(user?.language || 'fr')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const languages = [
+    { code: 'en', name: 'English', region: 'United States' },
+    { code: 'fr', name: 'Français', region: 'France' },
+    { code: 'es', name: 'Español', region: 'Latinoamérica' },
+    { code: 'de', name: 'Deutsch', region: 'Deutschland' },
+    { code: 'it', name: 'Italiano', region: 'Italia' },
+    { code: 'pt', name: 'Português', region: 'Brasil' },
+    { code: 'nl', name: 'Nederlands', region: 'Nederland' },
+    { code: 'ja', name: '日本語', region: '日本' },
+    { code: 'ko', name: '한국어', region: '대한민국' },
+    { code: 'zh', name: '中文', region: '中国' }
+  ]
+
+  const handleLanguageChange = async (languageCode: string) => {
+    setSelectedLanguage(languageCode)
+    setIsLoading(true)
+
+    try {
+      const result = await updateProfile({
+        ...user,
+        language: languageCode
+      })
+
+      if (result.success) {
+        console.log('✅ Langue mise à jour:', languageCode)
+        // Ici on pourrait ajouter la logique pour changer la langue de l'interface
+        setTimeout(() => {
+          onClose()
+        }, 500)
+      } else {
+        console.error('❌ Erreur mise à jour langue:', result.error)
+        setSelectedLanguage(user?.language || 'fr')
+      }
+    } catch (error) {
+      console.error('❌ Erreur critique mise à jour langue:', error)
+      setSelectedLanguage(user?.language || 'fr')
+    }
+
+    setIsLoading(false)
+  }
+
+  return (
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="text-sm text-gray-600 mb-4">
+        Sélectionnez votre langue préférée pour l'interface Intelia Expert
+      </div>
+
+      <div className="space-y-2">
+        {languages.map((language) => (
+          <button
+            key={language.code}
+            onClick={() => handleLanguageChange(language.code)}
+            disabled={isLoading}
+            className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+              selectedLanguage === language.code 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:bg-gray-50'
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="text-left">
+                <div className="font-medium text-gray-900">{language.name}</div>
+                <div className="text-sm text-gray-500">{language.region}</div>
+              </div>
+            </div>
+            
+            {selectedLanguage === language.code && (
+              <div className="text-blue-600">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="text-center py-4">
+          <div className="inline-flex items-center space-x-2 text-sm text-gray-600">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span>Mise à jour en cours...</span>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end pt-4 border-t border-gray-200">
+        <button
+          onClick={onClose}
+          disabled={isLoading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ==================== MODAL ABONNEMENT ====================
+const SubscriptionModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
   const currentPlan = user?.plan || 'essentiel'
   
   const plans = {
@@ -894,9 +965,9 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
         'Analytics avancées'
       ]
     },
-    entreprise: {
-      name: 'Entreprise',
-      price: 'Sur mesure',
+    max: {
+      name: 'Max',
+      price: '99$ / mois',
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200',
@@ -913,95 +984,124 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
 
   const userPlan = plans[currentPlan as keyof typeof plans]
 
+  // Simuler les données de facturation
+  const billingHistory = [
+    { date: '22 juil. 2025', amount: '160,97 $', status: 'Paid' },
+    { date: '22 juin 2025', amount: '120,78 $', status: 'Paid' },
+    { date: '19 juin 2025', amount: '29,40 $', status: 'Paid' },
+    { date: '19 mai 2025', amount: '29,40 $', status: 'Paid' },
+    { date: '19 avr. 2025', amount: '29,40 $', status: 'Paid' }
+  ]
+
   return (
-    <div className="space-y-6">
-      {/* Forfait actuel */}
-      <div className="text-center">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Mon forfait actuel</h3>
-        <div className={`inline-flex items-center px-4 py-2 rounded-full ${userPlan.bgColor} ${userPlan.borderColor} border`}>
-          <span className={`font-medium ${userPlan.color}`}>{userPlan.name}</span>
-          <span className="mx-2 text-gray-400">•</span>
-          <span className={`font-bold ${userPlan.color}`}>{userPlan.price}</span>
+    <div className="space-y-6 max-h-[80vh] overflow-y-auto">
+      {/* En-tête du forfait actuel */}
+      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Plan {userPlan.name}</h3>
+            <p className="text-sm text-gray-600">5 fois plus d'utilisation que Pro</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            console.log('Modifier abonnement demandé')
+          }}
+          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Modifier l'abonnement
+        </button>
+      </div>
+
+      <div className="text-sm text-gray-600">
+        Votre abonnement se renouvellera automatiquement le 22 août 2025.
+      </div>
+
+      {/* Section Paiement */}
+      <div className="space-y-4">
+        <h4 className="font-semibold text-gray-900">Paiement</h4>
+        
+        <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span className="text-sm text-gray-700">Link by Stripe</span>
+          </div>
+          <button
+            onClick={() => {
+              console.log('Mettre à jour paiement demandé')
+            }}
+            className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Mettre à jour
+          </button>
         </div>
       </div>
 
-      {/* Fonctionnalités du forfait actuel */}
-      <div className={`p-4 rounded-lg ${userPlan.bgColor} ${userPlan.borderColor} border`}>
-        <h4 className="font-medium text-gray-900 mb-3">Fonctionnalités incluses :</h4>
-        <ul className="space-y-2">
-          {userPlan.features.map((feature, index) => (
-            <li key={index} className="flex items-center text-sm text-gray-700">
-              <span className="text-green-500 mr-2">✓</span>
-              {feature}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Options d'upgrade */}
-      {currentPlan !== 'entreprise' && (
-        <div className="space-y-3">
-          <h4 className="font-medium text-gray-900">Mettre à niveau</h4>
+      {/* Section Factures */}
+      <div className="space-y-4">
+        <h4 className="font-semibold text-gray-900">Factures</h4>
+        
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <div className="flex justify-between text-sm font-medium text-gray-700">
+              <span>Date</span>
+              <span>Total</span>
+              <span>Statut</span>
+              <span>Actions</span>
+            </div>
+          </div>
           
-          {currentPlan === 'essentiel' && (
-            <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h5 className="font-medium text-blue-900">Forfait Pro</h5>
-                  <p className="text-sm text-blue-700">Questions illimitées + fonctionnalités avancées</p>
-                </div>
+          <div className="divide-y divide-gray-200">
+            {billingHistory.map((invoice, index) => (
+              <div key={index} className="px-4 py-3 flex justify-between items-center text-sm">
+                <span className="text-gray-900">{invoice.date}</span>
+                <span className="text-gray-900 font-medium">{invoice.amount}</span>
+                <span className="text-green-600 font-medium">{invoice.status}</span>
                 <button
                   onClick={() => {
-                    console.log('Upgrade vers Pro demandé')
-                    // Logique d'upgrade à implémenter
+                    console.log('Voir facture:', invoice.date)
                   }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  className="px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
                 >
-                  Passer au Pro
+                  Voir
                 </button>
               </div>
-            </div>
-          )}
-
-          <div className="p-4 border border-purple-200 rounded-lg bg-purple-50">
-            <div className="flex justify-between items-center">
-              <div>
-                <h5 className="font-medium text-purple-900">Forfait Entreprise</h5>
-                <p className="text-sm text-purple-700">Solution personnalisée pour votre organisation</p>
-              </div>
-              <button
-                onClick={() => {
-                  console.log('Contact commercial demandé')
-                  window.open('mailto:sales@intelia.com?subject=Demande forfait Entreprise', '_blank')
-                }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
-              >
-                Nous contacter
-              </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
-
-      {/* Utilisation du mois (simulation) */}
-      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <h4 className="font-medium text-gray-900 mb-2">Utilisation ce mois-ci</h4>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Questions posées :</span>
-          <span className="font-medium text-gray-900">
-            {currentPlan === 'essentiel' ? '23 / 50' : 'Illimité'}
-          </span>
-        </div>
-        {currentPlan === 'essentiel' && (
-          <div className="mt-2">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '46%' }}></div>
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="flex justify-end pt-4">
+      {/* Section Annulation */}
+      <div className="space-y-4">
+        <h4 className="font-semibold text-gray-900">Annulation</h4>
+        
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-700">Annuler l'abonnement</span>
+          <button
+            onClick={() => {
+              if (confirm('Êtes-vous sûr de vouloir annuler votre abonnement ? Vous perdrez l\'accès aux fonctionnalités premium.')) {
+                console.log('Annulation abonnement confirmée')
+                alert('Votre demande d\'annulation a été prise en compte. Vous recevrez un email de confirmation.')
+              }
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-4 border-t border-gray-200">
         <button
           onClick={onClose}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -1013,10 +1113,10 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
   )
 }
 
+// ==================== MODAL CONTACT ====================
 const ContactModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <div className="space-y-4">
-      {/* Call Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1037,7 +1137,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
 
-      {/* Email Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1058,7 +1157,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
 
-      {/* Visit our website */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1173,17 +1271,17 @@ const UserMenuButton = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [showLanguageModal, setShowLanguageModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   
-  // ✅ Déterminer le forfait et ses couleurs
   const currentPlan = user?.plan || 'essentiel'
   const planConfig = {
     essentiel: { name: 'Essentiel', bgColor: 'bg-green-50', textColor: 'text-green-600', borderColor: 'border-green-200' },
     pro: { name: 'Pro', bgColor: 'bg-blue-50', textColor: 'text-blue-600', borderColor: 'border-blue-200' },
-    entreprise: { name: 'Entreprise', bgColor: 'bg-purple-50', textColor: 'text-purple-600', borderColor: 'border-purple-200' }
+    max: { name: 'Max', bgColor: 'bg-purple-50', textColor: 'text-purple-600', borderColor: 'border-purple-200' }
   }
   const plan = planConfig[currentPlan as keyof typeof planConfig] || planConfig.essentiel
 
@@ -1197,9 +1295,14 @@ const UserMenuButton = () => {
     setShowUserInfoModal(true)
   }
 
-  const handleAccountClick = () => {
+  const handleSubscriptionClick = () => {
     setIsOpen(false)
-    setShowAccountModal(true)
+    setShowSubscriptionModal(true)
+  }
+
+  const handleLanguageClick = () => {
+    setIsOpen(false)
+    setShowLanguageModal(true)
   }
 
   return (
@@ -1231,23 +1334,33 @@ const UserMenuButton = () => {
               </div>
 
               <button
-                onClick={handleAccountClick}
-                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                </svg>
-                <span>Mon compte</span>
-              </button>
-
-              <button
                 onClick={handleUserInfoClick}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
-                <span>Mes informations</span>
+                <span>Profil</span>
+              </button>
+
+              <button
+                onClick={handleLanguageClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 6.824 9.659 6.824 9.659M9 12l3.75-3.75M9 12a4.5 4.5 0 0 0 9 0l-3.75-3.75" />
+                </svg>
+                <span>Langue</span>
+              </button>
+
+              <button
+                onClick={handleSubscriptionClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
+                <span>Abonnement</span>
               </button>
 
               <button
@@ -1291,19 +1404,27 @@ const UserMenuButton = () => {
 
       {/* Modals */}
       <Modal
-        isOpen={showAccountModal}
-        onClose={() => setShowAccountModal(false)}
-        title="Mon compte"
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title="Profil"
       >
-        <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
       </Modal>
 
       <Modal
-        isOpen={showUserInfoModal}
-        onClose={() => setShowUserInfoModal(false)}
-        title="Mes informations"
+        isOpen={showLanguageModal}
+        onClose={() => setShowLanguageModal(false)}
+        title="Langue"
       >
-        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+        <LanguageModal user={user} onClose={() => setShowLanguageModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        title="Abonnement"
+      >
+        <SubscriptionModal user={user} onClose={() => setShowSubscriptionModal(false)} />
       </Modal>
 
       <Modal
@@ -1317,26 +1438,20 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL CORRIGÉ ====================
+// ==================== COMPOSANT PRINCIPAL ====================
 export default function ChatInterface() {
-  // ✅ CORRECTION : Appeler useAuthStore AVANT toute condition ou return
   const { user, isAuthenticated, isLoading } = useAuthStore()
   
-  // ✅ TOUS les autres hooks doivent être appelés APRÈS useAuthStore
-  // mais AVANT toute condition de return anticipé
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // ✅ CORRECTION : Scroll automatique en useEffect
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // ✅ CORRECTION : Message de bienvenue en useEffect
   useEffect(() => {
-    // Ne s'exécute que si l'utilisateur est authentifié
     if (isAuthenticated && messages.length === 0) {
       const welcomeMessage: Message = {
         id: '1',
@@ -1348,9 +1463,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, messages.length])
 
-  // ✅ CORRECTION : Configuration Zoho avec dépendance sur user
   useEffect(() => {
-    // Guard clause APRÈS la déclaration du useEffect
     if (!user) return
     
     let zohoInitialized = false
@@ -1358,11 +1471,9 @@ export default function ChatInterface() {
     const initializeZohoSalesIQ = () => {
       console.log('🚀 Initialisation Zoho SalesIQ...')
       
-      // Nettoyer les scripts existants
       const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
       existingScripts.forEach(script => script.remove())
       
-      // Script d'initialisation global
       const initScript = document.createElement('script')
       initScript.innerHTML = `
         console.log('📡 Initialisation globale Zoho...')
@@ -1374,19 +1485,16 @@ export default function ChatInterface() {
           widgetcode: 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
         };
         
-        // Variables globales Zoho
         window.siqReadyState = false;
         window.$zoho.salesiq.ready = function() {
           console.log('🎯 Zoho SalesIQ initialisé avec succès')
           window.siqReadyState = true;
           
-          // Forcer l'affichage du widget
           setTimeout(function() {
             try {
               if (window.$zoho && window.$zoho.salesiq) {
                 console.log('🔧 Tentative d activation du widget...')
                 
-                // Méthodes possibles pour activer le widget
                 if (window.$zoho.salesiq.chat && window.$zoho.salesiq.chat.start) {
                   window.$zoho.salesiq.chat.start()
                   console.log('✅ Chat.start() appelé')
@@ -1402,7 +1510,6 @@ export default function ChatInterface() {
                   console.log('✅ Informations visiteur configurées')
                 }
                 
-                // Vérifier la présence du widget dans le DOM
                 setTimeout(function() {
                   var zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
                   console.log('🔍 Éléments Zoho trouvés:', zohoElements)
@@ -1420,7 +1527,6 @@ export default function ChatInterface() {
       `
       document.head.appendChild(initScript)
 
-      // Script principal Zoho avec gestion d'erreur avancée
       const zohoScript = document.createElement('script')
       zohoScript.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
       zohoScript.async = true
@@ -1430,7 +1536,6 @@ export default function ChatInterface() {
         console.log('✅ Script Zoho SalesIQ chargé avec succès')
         zohoInitialized = true
         
-        // ✅ CORRECTION : Forcer l'initialisation immédiatement après le chargement
         setTimeout(() => {
           console.log('🔄 Initialisation forcée Zoho après chargement')
           
@@ -1438,16 +1543,13 @@ export default function ChatInterface() {
             console.log('✅ Objets Zoho détectés, initialisation...')
             
             try {
-              // Forcer le déclenchement du ready
               if (typeof window.$zoho.salesiq.ready === 'function') {
                 window.$zoho.salesiq.ready()
                 console.log('✅ Ready() appelé manuellement')
               }
               
-              // Attendre un peu puis forcer l'affichage
               setTimeout(() => {
                 if (window.$zoho && window.$zoho.salesiq) {
-                  // Tenter d'autres méthodes d'activation
                   if (window.$zoho.salesiq.visitor) {
                     var userName = user?.name || "Utilisateur"
                     var userEmail = user?.email || ""
@@ -1458,7 +1560,6 @@ export default function ChatInterface() {
                     console.log('✅ Informations visiteur configurées')
                   }
                   
-                  // Forcer l'affichage du widget
                   if (window.$zoho.salesiq.chat) {
                     if (window.$zoho.salesiq.chat.start) {
                       window.$zoho.salesiq.chat.start()
@@ -1466,7 +1567,6 @@ export default function ChatInterface() {
                     }
                   }
                   
-                  // Vérifier les éléments DOM
                   setTimeout(() => {
                     var zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
                     console.log('🔍 Vérification éléments Zoho après init:', zohoElements.length)
@@ -1477,7 +1577,6 @@ export default function ChatInterface() {
                     } else {
                       console.warn('⚠️ Widget toujours invisible, tentative alternative...')
                       
-                      // Dernière tentative avec l'API alternative
                       if (window.$zoho.salesiq.floatbutton && window.$zoho.salesiq.floatbutton.show) {
                         window.$zoho.salesiq.floatbutton.show()
                         console.log('🔧 Tentative alternative avec floatbutton.show()')
@@ -1493,9 +1592,8 @@ export default function ChatInterface() {
           } else {
             console.warn('⚠️ Objets Zoho non disponibles après chargement')
           }
-        }, 500) // Délai court après le chargement
+        }, 500)
         
-        // Multiples tentatives d'initialisation (code existant en backup)
         const tryInitialize = (attempt = 1) => {
           setTimeout(() => {
             console.log('🔄 Tentative d initialisation #' + attempt)
@@ -1504,12 +1602,10 @@ export default function ChatInterface() {
               console.log('✅ Objets Zoho détectés')
               
               try {
-                // Forcer le ready
                 if (typeof window.$zoho.salesiq.ready === 'function') {
                   window.$zoho.salesiq.ready()
                 }
                 
-                // Tenter d'autres méthodes d'activation
                 if (window.$zoho.salesiq.visitor) {
                   var userName = user?.name || "Utilisateur"
                   var userEmail = user?.email || ""
@@ -1526,21 +1622,18 @@ export default function ChatInterface() {
               console.warn('⚠️ Objets Zoho non disponibles (tentative #' + attempt + ')')
             }
             
-            // Réessayer jusqu'à 3 fois
             if (attempt < 3 && !window.siqReadyState) {
               tryInitialize(attempt + 1)
             }
-          }, attempt * 2000) // Délai progressif
+          }, attempt * 2000)
         }
         
-        // Démarrer les tentatives après un délai
         tryInitialize()
       }
       
       zohoScript.onerror = (error) => {
         console.error('❌ Erreur chargement script Zoho:', error)
         
-        // Essayer de recharger le script une fois
         if (!zohoInitialized) {
           setTimeout(() => {
             console.log('🔄 Nouvelle tentative de chargement Zoho...')
@@ -1552,10 +1645,8 @@ export default function ChatInterface() {
       document.head.appendChild(zohoScript)
     }
 
-    // Initialiser après un court délai
     const timer = setTimeout(initializeZohoSalesIQ, 500)
     
-    // Diagnostic périodique
     const diagnosticInterval = setInterval(() => {
       console.log('🔍 Diagnostic Zoho:')
       console.log('- window.$zoho:', window.$zoho)
@@ -1568,7 +1659,7 @@ export default function ChatInterface() {
         console.log('✅ Widget Zoho détecté dans le DOM')
         clearInterval(diagnosticInterval)
       }
-    }, 10000) // Diagnostic toutes les 10 secondes
+    }, 10000)
     
     return () => {
       clearTimeout(timer)
@@ -1576,10 +1667,8 @@ export default function ChatInterface() {
         clearInterval(diagnosticInterval)
       }
     }
-  }, [user]) // Dépendance sur user
+  }, [user])
 
-  // ✅ CORRECTION : Les conditions de return APRÈS tous les hooks
-  // Afficher un loader pendant le chargement
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -1591,15 +1680,12 @@ export default function ChatInterface() {
     )
   }
 
-  // Rediriger si pas connecté
   if (!isAuthenticated) {
     window.location.href = '/'
     return null
   }
 
-  // Générer réponse RAG
   const generateAIResponse = async (question: string): Promise<string> => {
-    // Définir l'URL en dehors du try/catch pour qu'elle soit accessible partout
     const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask-public'
     
     try {
@@ -1616,9 +1702,9 @@ export default function ChatInterface() {
           text: `${question.trim()}\n\nRépondez de manière concise et directe.`,
           language: user?.language || 'fr',
           speed_mode: 'balanced',
-          max_tokens: 150, // ✅ Limitation forte pour réponses courtes
+          max_tokens: 150,
           temperature: 0.7,
-          response_format: 'concise' // Format de réponse concis
+          response_format: 'concise'
         })
       })
 
@@ -1663,7 +1749,6 @@ Consultez la console développeur (F12) pour plus de détails.`
     }
   }
 
-  // Envoi message
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -1703,7 +1788,6 @@ Consultez la console développeur (F12) pour plus de détails.`
     }
   }
 
-  // Gestion feedback
   const handleFeedback = (messageId: string, feedback: 'positive' | 'negative') => {
     setMessages(prev => prev.map(msg => 
       msg.id === messageId ? { ...msg, feedback } : msg
@@ -1728,26 +1812,22 @@ Consultez la console développeur (F12) pour plus de détails.`
     })
   }
 
-  // Widget support avec bouton debug Zoho
   const SimpleSupportWidget = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [showZohoDebug, setShowZohoDebug] = useState(false)
 
-    // Fonction de diagnostic Zoho
     const checkZohoStatus = () => {
       console.log('🔍 === DIAGNOSTIC ZOHO SALESIQ ===')
       console.log('- window.$zoho:', window.$zoho)
       console.log('- window.$zoho.salesiq:', window.$zoho?.salesiq)
       console.log('- siqReadyState:', window.siqReadyState)
       
-      // Chercher tous les éléments Zoho
       const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
       console.log('- Éléments Zoho dans DOM:', zohoElements)
       zohoElements.forEach((el, index) => {
         console.log(`  ${index + 1}:`, el.tagName, el.id, el.className, (el as HTMLElement).style.display)
       })
       
-      // Vérifier les iframes
       const iframes = document.querySelectorAll('iframe')
       console.log('- Iframes présentes:', iframes.length)
       iframes.forEach((iframe, index) => {
@@ -1756,12 +1836,10 @@ Consultez la console développeur (F12) pour plus de détails.`
         }
       })
       
-      // Tenter de forcer l'affichage
       if (window.$zoho && window.$zoho.salesiq) {
         try {
           console.log('🔧 Tentative de forçage d\'affichage...')
           
-          // Tenter d'autres méthodes d'activation
           if (window.$zoho.salesiq.chat) {
             if (window.$zoho.salesiq.chat.start) window.$zoho.salesiq.chat.start()
             if (window.$zoho.salesiq.chat.show) window.$zoho.salesiq.chat.show()
@@ -1782,23 +1860,18 @@ Consultez la console développeur (F12) pour plus de détails.`
       setShowZohoDebug(true)
     }
 
-    // Fonction pour recharger Zoho
     const reloadZoho = () => {
       console.log('🔄 Rechargement forcé de Zoho SalesIQ...')
       
-      // Supprimer tous les scripts Zoho existants
       const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
       existingScripts.forEach(script => script.remove())
       
-      // Supprimer les éléments Zoho existants
       const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"]')
       zohoElements.forEach(el => el.remove())
       
-      // Réinitialiser les variables
       window.$zoho = undefined
       window.siqReadyState = false
       
-      // Recharger après un délai
       setTimeout(() => {
         const script = document.createElement('script')
         script.src = 'https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
@@ -1810,7 +1883,6 @@ Consultez la console développeur (F12) pour plus de détails.`
 
     return (
       <>
-        {/* Bouton flottant principal */}
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 z-50"
@@ -1821,7 +1893,6 @@ Consultez la console développeur (F12) pour plus de détails.`
           </svg>
         </button>
 
-        {/* Boutons de debug Zoho (en développement) */}
         <div className="fixed bottom-6 left-6 space-y-2 z-50">
           <button
             onClick={checkZohoStatus}
@@ -1839,7 +1910,6 @@ Consultez la console développeur (F12) pour plus de détails.`
           </button>
         </div>
 
-        {/* Modal de debug Zoho */}
         {showZohoDebug && (
           <>
             <div 
@@ -1892,7 +1962,6 @@ Consultez la console développeur (F12) pour plus de détails.`
           </>
         )}
 
-        {/* Modal support */}
         {isOpen && (
           <>
             <div 
@@ -1915,7 +1984,6 @@ Consultez la console développeur (F12) pour plus de détails.`
                   Comment pouvons-nous vous aider aujourd'hui ?
                 </div>
                 
-                {/* Options rapides */}
                 <button
                   onClick={() => {
                     window.open('mailto:support@intelia.com?subject=Question Intelia Expert', '_blank')
@@ -1985,7 +2053,6 @@ Consultez la console développeur (F12) pour plus de détails.`
 
   return (
     <>
-      {/* Zoho SalesIQ Scripts - Version corrigée */}
       <Script id="zoho-salesiq-init" strategy="beforeInteractive">
         {`
           window.$zoho = window.$zoho || {};
@@ -2001,7 +2068,6 @@ Consultez la console développeur (F12) pour plus de détails.`
         strategy="afterInteractive"
         onLoad={() => {
           console.log('✅ Zoho SalesIQ script chargé')
-          // Forcer l'initialisation après 2 secondes
           setTimeout(() => {
             if (window.$zoho && window.$zoho.salesiq) {
               console.log('🔄 Tentative d\'initialisation forcée Zoho SalesIQ')
@@ -2019,161 +2085,151 @@ Consultez la console développeur (F12) pour plus de détails.`
       />
 
       <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Boutons à gauche */}
-          <div className="flex items-center space-x-2">
-            <HistoryMenu />
-            <button
-              onClick={handleNewConversation}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Nouvelle conversation"
-            >
-              <PlusIcon className="w-5 h-5" />
-            </button>
-          </div>
+        <header className="bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <HistoryMenu />
+              <button
+                onClick={handleNewConversation}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Nouvelle conversation"
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
 
-          {/* Titre centré avec logo */}
-          <div className="flex-1 flex justify-center items-center space-x-3">
-            <InteliaLogo className="w-8 h-8" />
-            <div className="text-center">
-              <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+            <div className="flex-1 flex justify-center items-center space-x-3">
+              <InteliaLogo className="w-8 h-8" />
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center">
+              <UserMenuButton />
             </div>
           </div>
-          
-          {/* Avatar utilisateur à droite */}
-          <div className="flex items-center">
-            <UserMenuButton />
-          </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Zone de messages */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Date */}
-            {messages.length > 0 && (
-              <div className="text-center">
-                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                  {getCurrentDate()}
-                </span>
-              </div>
-            )}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {messages.length > 0 && (
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                    {getCurrentDate()}
+                  </span>
+                </div>
+              )}
 
-            {messages.map((message, index) => (
-              <div key={message.id}>
-                <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                  {!message.isUser && (
-                    <div className="relative">
-                      <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                    </div>
-                  )}
-                  
-                  <div className="max-w-xs lg:max-w-2xl">
-                    <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                      <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                        {message.content}
-                      </p>
-                    </div>
+              {messages.map((message, index) => (
+                <div key={message.id}>
+                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
+                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                      </div>
+                    )}
                     
-                    {/* Boutons de feedback */}
-                    {!message.isUser && index > 0 && (
-                      <div className="flex items-center space-x-2 mt-2 ml-2">
-                        <button
-                          onClick={() => handleFeedback(message.id, 'positive')}
-                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
-                          title="Réponse utile"
-                        >
-                          <ThumbUpIcon />
-                        </button>
-                        <button
-                          onClick={() => handleFeedback(message.id, 'negative')}
-                          className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
-                          title="Réponse non utile"
-                        >
-                          <ThumbDownIcon />
-                        </button>
+                    <div className="max-w-xs lg:max-w-2xl">
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {!message.isUser && index > 0 && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                            title="Réponse utile"
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                            title="Réponse non utile"
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                        <UserIcon className="w-5 h-5 text-white" />
                       </div>
                     )}
                   </div>
+                </div>
+              ))}
 
-                  {message.isUser && (
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <UserIcon className="w-5 h-5 text-white" />
+              {isLoadingChat && (
+                <div className="flex items-start space-x-3">
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Indicateur de frappe */}
-            {isLoadingChat && (
-              <div className="flex items-start space-x-3">
-                <div className="relative">
-                  <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                </div>
-                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
+            </div>
           </div>
-        </div>
 
-        {/* Zone de saisie */}
-        <div className="px-4 py-4 bg-white border-t border-gray-100">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title="Enregistrement vocal"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                </svg>
-              </button>
-              
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                  placeholder="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
-                  className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                  disabled={isLoadingChat}
-                />
+          <div className="px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Enregistrement vocal"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                  </svg>
+                </button>
+                
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    disabled={isLoadingChat}
+                  />
+                </div>
+                
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoadingChat || !inputMessage.trim()}
+                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                >
+                  <PaperAirplaneIcon />
+                </button>
               </div>
-              
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={isLoadingChat || !inputMessage.trim()}
-                className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
-              >
-                <PaperAirplaneIcon />
-              </button>
             </div>
           </div>
         </div>
+        
+        <SimpleSupportWidget />
       </div>
-      
-      {/* Widget support simple en attendant que Zoho fonctionne */}
-      <SimpleSupportWidget />
-    </div>
     </>
   )
 }
