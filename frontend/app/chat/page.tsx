@@ -1588,7 +1588,7 @@ Consultez la console développeur (F12) pour plus de détails.`
       const zohoElements = document.querySelectorAll('[id*="siq"], [class*="siq"], [id*="zoho"], [class*="zoho"]')
       console.log('- Éléments Zoho dans DOM:', zohoElements)
       zohoElements.forEach((el, index) => {
-        console.log(`  ${index + 1}:`, el.tagName, el.id, el.className, el.style.display)
+        console.log(`  ${index + 1}:`, el.tagName, el.id, el.className, (el as HTMLElement).style.display)
       })
       
       // Vérifier les iframes
@@ -1596,7 +1596,7 @@ Consultez la console développeur (F12) pour plus de détails.`
       console.log('- Iframes présentes:', iframes.length)
       iframes.forEach((iframe, index) => {
         if (iframe.src.includes('zoho') || iframe.src.includes('salesiq')) {
-          console.log(`  Iframe Zoho ${index + 1}:`, iframe.src, iframe.style.display)
+          console.log(`  Iframe Zoho ${index + 1}:`, iframe.src, (iframe as HTMLElement).style.display)
         }
       })
       
