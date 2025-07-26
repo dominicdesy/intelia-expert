@@ -1,7 +1,7 @@
 """
 Intelia Expert - API Backend Complète
-Multi-langue + Performance + Sécurité + Tous Endpoints
-Version 2.1.0 - Complete
+Multi-langue + Performance + Sécurité + Logging System
+Version 2.1.0 - Complete avec Logging
 """
 
 import os
@@ -47,6 +47,26 @@ logger = logging.getLogger(__name__)
 rag_embedder: Optional[Any] = None
 supabase: Optional[Client] = None
 security = HTTPBearer()
+
+# =============================================================================
+# IMPORT DES MODULES API - AVEC LOGGING
+# =============================================================================
+
+# Import de tous les routers API existants
+try:
+    from app.api import auth, expert, admin, health, system
+    logger.info("✅ Routers API principaux importés avec succès")
+except ImportError as e:
+    logger.error(f"❌ Erreur import routers principaux: {e}")
+
+# Import du nouveau module logging
+try:
+    from app.api import logging as logging_router
+    logger.info("✅ Module logging importé avec succès")
+except ImportError as e:
+    logger.error(f"❌ Erreur import module logging: {e}")
+    logger.warning("⚠️ Le système fonctionnera sans logging persistant")
+    logging_router = None
 
 # =============================================================================
 # MULTI-LANGUAGE SUPPORT - 7 LANGUES
@@ -241,6 +261,7 @@ class HealthResponse(BaseModel):
     config: Dict[str, str]
     database_status: str
     rag_status: str
+    logging_status: str  # Nouveau champ pour le système de logging
 
 class FeedbackRequest(BaseModel):
     """Feedback request model"""
@@ -658,16 +679,28 @@ async def fallback_openai_response(question: str, user: Optional[UserProfile] = 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting Intelia Expert API...")
+    logger.info("🚀 Starting Intelia Expert API with Logging System...")
     
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
+    
+    # Test logging system
+    logging_available = logging_router is not None
+    if logging_available:
+        try:
+            # Test database initialization
+            from app.api.logging import logger_instance
+            logger.info("✅ Logging system initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Logging system error: {e}")
+            logging_available = False
     
     logger.info("✅ Application created successfully")
     logger.info("📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
     logger.info("⚡ Performance modes: fast, balanced, quality")
     logger.info(f"🗄️ Database: {'Available' if supabase_success else 'Not Available'}")
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
+    logger.info(f"📝 Logging system: {'Available' if logging_available else 'Not Available'}")
     
     if rag_embedder and rag_embedder.has_search_engine():
         logger.info("🔍 RAG system: Optimized (with document search)")
@@ -686,7 +719,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale - Multi-langue Optimisé",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Multi-langue Optimisé avec Logging",
     version="2.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -703,6 +736,24 @@ app.add_middleware(
 )
 
 # =============================================================================
+# INCLUDE ROUTERS - AVEC LOGGING
+# =============================================================================
+
+# Routers principaux
+app.include_router(expert.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1") 
+app.include_router(admin.router, prefix="/api/v1")
+app.include_router(health.router, prefix="/api/v1")
+app.include_router(system.router, prefix="/api/v1")
+
+# Nouveau router logging (si disponible)
+if logging_router:
+    app.include_router(logging_router.router, prefix="/api/v1")
+    logger.info("✅ Logging router registered at /api/v1/logging")
+else:
+    logger.warning("⚠️ Logging router not available - skipping registration")
+
+# =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
@@ -715,6 +766,17 @@ def get_rag_status() -> str:
     else:
         return "fallback"
 
+def get_logging_status() -> str:
+    """Get current logging system status"""
+    if logging_router is None:
+        return "not_available"
+    
+    try:
+        from app.api.logging import logger_instance
+        return "available"
+    except Exception:
+        return "error"
+
 # =============================================================================
 # API ENDPOINTS - ROOT & HEALTH
 # =============================================================================
@@ -723,13 +785,14 @@ def get_rag_status() -> str:
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API with Multi-Language RAG + Performance Optimized",
+        "message": "Intelia Expert API with Multi-Language RAG + Performance + Logging System",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
         "api_version": "2.1.0",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
+        "logging_system": get_logging_status(),
         "supported_languages": ["fr", "en", "es", "pt", "de", "nl", "pl"],
         "performance_modes": ["fast", "balanced", "quality"]
     }
@@ -746,14 +809,16 @@ async def health_check():
             "api": "running",
             "configuration": "loaded",
             "database": db_status,
-            "rag_system": get_rag_status()
+            "rag_system": get_rag_status(),
+            "logging_system": get_logging_status()
         },
         config={
             "source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
             "environment": os.getenv('ENV', 'production')
         },
         database_status=db_status,
-        rag_status=get_rag_status()
+        rag_status=get_rag_status(),
+        logging_status=get_logging_status()
     )
 
 # =============================================================================
@@ -1024,6 +1089,7 @@ async def get_admin_stats(user: UserProfile = Depends(require_user_type(["admin"
         return {
             "system_status": get_rag_status(),
             "database_status": "connected",
+            "logging_status": get_logging_status(),
             "users_count": users_count,
             "conversations_count": conversations_count,
             "feedback_count": feedback_count,
@@ -1075,7 +1141,7 @@ if __name__ == "__main__":
     port = int(os.getenv('PORT', 8080))
     host = os.getenv('HOST', '0.0.0.0')
     
-    logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
+    logger.info(f"🚀 Starting Intelia Expert API with Logging on {host}:{port}")
     
     uvicorn.run(
         app,
