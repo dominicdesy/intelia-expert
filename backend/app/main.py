@@ -1,7 +1,7 @@
 """
 Intelia Expert - API Backend Complète
 Multi-langue + Performance + Sécurité + Logging System
-Version 2.1.0 - Complete avec Logging
+Version 2.1.0 - Réécrite et corrigée
 """
 
 import os
@@ -23,18 +23,26 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 # Pydantic models
 from pydantic import BaseModel, Field
 
-# Supabase
-from supabase import create_client, Client
-import jwt
+# Supabase et JWT
+try:
+    from supabase import create_client, Client
+    import jwt
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    Client = None
 
 # Add backend to path
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Environment and logging
-from dotenv import load_dotenv
-load_dotenv()
+# Environment loading
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Configure logging
 logging.basicConfig(
@@ -49,24 +57,79 @@ supabase: Optional[Client] = None
 security = HTTPBearer()
 
 # =============================================================================
-# IMPORT DES MODULES API - AVEC LOGGING
+# IMPORT DES MODULES API - VERSION SÉCURISÉE
 # =============================================================================
 
-# Import de tous les routers API existants
-try:
-    from app.api import auth, expert, admin, health, system
-    logger.info("✅ Routers API principaux importés avec succès")
-except ImportError as e:
-    logger.error(f"❌ Erreur import routers principaux: {e}")
+# Variables globales pour stocker les modules
+expert = None
+auth = None
+admin = None
+health = None
+system = None
+logging_router = None
 
-# Import du nouveau module logging
+logger.info("🔄 Importation des modules API...")
+
+# Import sécurisé de chaque module
 try:
-    from app.api import logging as logging_router
+    from app.api import expert as expert_module
+    expert = expert_module
+    logger.info("✅ Module expert importé avec succès")
+except ImportError as e:
+    logger.error(f"❌ Erreur import expert: {e}")
+    expert = None
+
+try:
+    from app.api import auth as auth_module
+    auth = auth_module
+    logger.info("✅ Module auth importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ Module auth non trouvé: {e}")
+    auth = None
+
+try:
+    from app.api import admin as admin_module
+    admin = admin_module
+    logger.info("✅ Module admin importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ Module admin non trouvé: {e}")
+    admin = None
+
+try:
+    from app.api import health as health_module
+    health = health_module
+    logger.info("✅ Module health importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ Module health non trouvé: {e}")
+    health = None
+
+try:
+    from app.api import system as system_module
+    system = system_module
+    logger.info("✅ Module system importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ Module system non trouvé: {e}")
+    system = None
+
+# Import du module logging avec un nom différent pour éviter les conflits
+try:
+    from app.api import logging as logging_module
+    logging_router = logging_module
     logger.info("✅ Module logging importé avec succès")
 except ImportError as e:
-    logger.error(f"❌ Erreur import module logging: {e}")
-    logger.warning("⚠️ Le système fonctionnera sans logging persistant")
+    logger.warning(f"⚠️ Module logging non trouvé: {e}")
     logging_router = None
+
+# Résumé des imports
+available_modules = []
+if expert: available_modules.append("expert")
+if auth: available_modules.append("auth") 
+if admin: available_modules.append("admin")
+if health: available_modules.append("health")
+if system: available_modules.append("system")
+if logging_router: available_modules.append("logging")
+
+logger.info(f"📦 Modules disponibles: {', '.join(available_modules)}")
 
 # =============================================================================
 # MULTI-LANGUAGE SUPPORT - 7 LANGUES
@@ -90,30 +153,6 @@ LANGUAGE_PROMPTS = {
         "context_instruction": "Utiliza la siguiente información para responder a la pregunta:",
         "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados.",
         "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español. Usa tu conocimiento para dar consejos basados en las mejores prácticas del sector."
-    },
-    "pt": {
-        "system_base": """Você é um especialista veterinário em saúde e nutrição animal, particularmente para frangos de corte Ross 308.""",
-        "context_instruction": "Use as seguintes informações para responder à pergunta:",
-        "response_instruction": "Responda em português de forma precisa e prática, baseando-se nos documentos fornecidos.",
-        "fallback_instruction": "Responda às perguntas de forma precisa e prática em português. Use seu conhecimento para dar conselhos baseados nas melhores práticas do setor."
-    },
-    "de": {
-        "system_base": """Sie sind ein Veterinärexperte für Tiergesundheit und -ernährung, insbesondere für Ross 308 Masthähnchen.""",
-        "context_instruction": "Verwenden Sie die folgenden Informationen, um die Frage zu beantworten:",
-        "response_instruction": "Antworten Sie auf Deutsch präzise und praktisch, basierend auf den bereitgestellten Dokumenten.",
-        "fallback_instruction": "Beantworten Sie Fragen präzise und praktisch auf Deutsch. Nutzen Sie Ihr Wissen, um Ratschläge auf Basis der besten Branchenpraktiken zu geben."
-    },
-    "nl": {
-        "system_base": """U bent een veterinaire expert gespecialiseerd in diergezondheid en voeding, met name voor Ross 308 vleeskuikens.""",
-        "context_instruction": "Gebruik de volgende informatie om de vraag te beantwoorden:",
-        "response_instruction": "Antwoord in het Nederlands precies en praktisch, gebaseerd op de verstrekte documenten.",
-        "fallback_instruction": "Beantwoord vragen precies en praktisch in het Nederlands. Gebruik uw kennis om advies te geven gebaseerd op de beste praktijken in de sector."
-    },
-    "pl": {
-        "system_base": """Jesteś ekspertem weterynarii specjalizującym się w zdrowiu i żywieniu zwierząt, szczególnie w przypadku kurczaków brojlerów Ross 308.""",
-        "context_instruction": "Użyj następujących informacji, aby odpowiedzieć na pytanie:",
-        "response_instruction": "Odpowiedz po polsku precyzyjnie i praktycznie, opierając się na dostarczonych dokumentach.",
-        "fallback_instruction": "Odpowiadaj na pytania precyzyjnie i praktycznie po polsku. Wykorzystuj swoją wiedzę, aby udzielać porad opartych na najlepszych praktykach w branży."
     }
 }
 
@@ -141,22 +180,6 @@ def get_user_context_prompt(user_type: str, language: str) -> str:
         "es": {
             "professional": "Estás respondiendo a un profesional de la salud animal. Proporciona detalles técnicos profundos.",
             "producer": "Estás respondiendo a un productor agrícola. Enfócate en consejos prácticos y accesibles."
-        },
-        "pt": {
-            "professional": "Você está respondendo a um profissional de saúde animal. Forneça detalhes técnicos aprofundados.",
-            "producer": "Você está respondendo a um produtor agrícola. Foque em conselhos práticos e acessíveis."
-        },
-        "de": {
-            "professional": "Sie antworten einem Tiergesundheitsexperten. Geben Sie detaillierte technische Informationen.",
-            "producer": "Sie antworten einem landwirtschaftlichen Produzenten. Konzentrieren Sie sich auf praktische und zugängliche Ratschläge."
-        },
-        "nl": {
-            "professional": "U reageert op een diergezondheidsprofessional. Geef diepgaande technische details.",
-            "producer": "U reageert op een landbouwproducent. Focus op praktisch en toegankelijk advies."
-        },
-        "pl": {
-            "professional": "Odpowiadasz specjaliście ds. zdrowia zwierząt. Podaj szczegółowe informacje techniczne.",
-            "producer": "Odpowiadasz producentowi rolnemu. Skup się na praktycznych i dostępnych poradach."
         }
     }
     
@@ -174,17 +197,20 @@ def initialize_supabase():
     """Initialize Supabase client"""
     global supabase
     
+    if not SUPABASE_AVAILABLE:
+        logger.warning("⚠️ Supabase libraries not available")
+        return False
+    
     try:
         supabase_url = os.getenv('SUPABASE_URL')
         supabase_key = os.getenv('SUPABASE_ANON_KEY')
         
         if not supabase_url or not supabase_key:
-            logger.error("❌ Supabase credentials not found in environment")
+            logger.warning("⚠️ Supabase credentials not found in environment")
             return False
         
         logger.info(f"🔗 Connecting to Supabase: {supabase_url[:50]}...")
         
-        # Create client without any proxy parameter
         supabase = create_client(supabase_url, supabase_key)
         logger.info("✅ Supabase client created successfully")
         
@@ -218,7 +244,7 @@ class UserProfile(BaseModel):
 class QuestionRequest(BaseModel):
     """Request model for expert questions"""
     text: str = Field(..., description="Question text", min_length=1, max_length=2000)
-    language: Optional[str] = Field("fr", description="Response language (fr, en, es, pt, de, nl, pl)")
+    language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     context: Optional[str] = Field(None, description="Additional context")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
 
@@ -261,7 +287,7 @@ class HealthResponse(BaseModel):
     config: Dict[str, str]
     database_status: str
     rag_status: str
-    logging_status: str  # Nouveau champ pour le système de logging
+    logging_status: str
 
 class FeedbackRequest(BaseModel):
     """Feedback request model"""
@@ -359,14 +385,20 @@ async def initialize_rag_system():
     logger.info("🔧 Initializing RAG system...")
     
     try:
-        from rag.embedder import FastRAGEmbedder
-        logger.info("✅ RAG embedder imported successfully")
+        # Try to import RAG system
+        try:
+            from rag.embedder import FastRAGEmbedder
+            logger.info("✅ RAG embedder imported successfully")
+        except ImportError:
+            logger.warning("⚠️ RAG embedder not available - creating fallback")
+            rag_embedder = None
+            return False
         
-        # Create optimized embedder instance
+        # Create embedder instance
         embedder = FastRAGEmbedder(
             api_key=os.getenv('OPENAI_API_KEY'),
-            cache_embeddings=True,  # Enable caching
-            max_workers=2  # Limit concurrent processing
+            cache_embeddings=True,
+            max_workers=2
         )
         logger.info("✅ RAG embedder instance created")
         
@@ -406,13 +438,7 @@ async def initialize_rag_system():
             
     except Exception as e:
         logger.error(f"❌ Error initializing RAG system: {e}")
-        try:
-            from rag.embedder import FastRAGEmbedder
-            rag_embedder = FastRAGEmbedder(api_key=os.getenv('OPENAI_API_KEY'))
-            logger.info("✅ Fallback RAG embedder created successfully")
-        except Exception as fallback_error:
-            logger.error(f"❌ Even fallback embedder failed: {fallback_error}")
-            rag_embedder = None
+        rag_embedder = None
         return False
 
 # =============================================================================
@@ -497,97 +523,39 @@ async def process_question_with_rag(
     language: str = "fr",
     speed_mode: str = "balanced"
 ) -> Dict[str, Any]:
-    """Process question using RAG system - OPTIMIZED VERSION"""
+    """Process question using RAG system or fallback"""
     start_time = time.time()
     
     try:
         logger.info(f"🔍 Processing question: {question[:50]}... (User: {user.email if user else 'Anonymous'}, Lang: {language}, Mode: {speed_mode})")
         
-        if not rag_embedder:
-            raise Exception("RAG system not available")
-        
-        sources = []
-        
-        # Configure performance based on speed mode
-        performance_config = {
-            "fast": {"model": "gpt-3.5-turbo", "k": 2, "max_tokens": 300, "timeout": 8},
-            "balanced": {"model": "gpt-3.5-turbo", "k": 3, "max_tokens": 500, "timeout": 12},
-            "quality": {"model": "gpt-4o-mini", "k": 5, "max_tokens": 800, "timeout": 20}
-        }
-        
-        config = performance_config.get(speed_mode, performance_config["balanced"])
-        
-        # Determine processing mode based on user type and RAG availability
-        if rag_embedder.has_search_engine():
-            logger.info(f"🔄 Using optimized mode - RAG with document search (k={config['k']})")
-            
+        # Use expert service if available, otherwise fallback
+        if expert and hasattr(expert, 'router'):
             try:
-                # Search for relevant documents with optimized k
-                search_results = rag_embedder.search(question, k=config["k"])
-                logger.info(f"🔍 Search completed: {len(search_results)} results found")
+                # Try to use expert service
+                from app.services.expert_service import expert_service
+                result = await expert_service.ask_expert(question, language)
                 
-                if search_results:
-                    # Prepare context and sources - OPTIMIZED
-                    context_parts = []
-                    sources = []
-                    
-                    for i, result in enumerate(search_results[:config["k"]]):
-                        # Limit context size for speed
-                        context_chunk = result['text'][:400] + "..." if len(result['text']) > 400 else result['text']
-                        context_parts.append(f"Document {i+1}: {context_chunk}")
-                        sources.append({
-                            "index": result['index'],
-                            "score": result['score'],
-                            "preview": result['text'][:150] + "..."
-                        })
-                    
-                    context = "\n\n".join(context_parts)
-                    
-                    # Use OpenAI with RAG context - MULTI-LANGUAGE + OPTIMIZED
-                    import openai
-                    openai.api_key = os.getenv('OPENAI_API_KEY')
-                    
-                    # Get localized prompts
-                    system_base = get_language_prompt(language, "system_base")
-                    context_instruction = get_language_prompt(language, "context_instruction")
-                    response_instruction = get_language_prompt(language, "response_instruction")
-                    user_context = get_user_context_prompt(user.user_type if user else None, language)
-                    
-                    system_prompt = f"""{system_base}
-                    
-{user_context}
-
-{context_instruction}
-
-{context}
-
-{response_instruction}"""
-
-                    response = openai.chat.completions.create(
-                        model=config["model"],
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": question}
-                        ],
-                        temperature=0.7,
-                        max_tokens=config["max_tokens"],
-                        timeout=config["timeout"]
-                    )
-                    
-                    answer = response.choices[0].message.content
-                    mode = "rag_enhanced"
-                    note = f"Réponse basée sur la recherche documentaire ({len(search_results)} documents trouvés)"
-                    
-                else:
-                    logger.info("🔄 No relevant documents found - using fallback")
-                    answer, mode, note = await fallback_openai_response(question, user, language, config)
-                    
-            except Exception as search_error:
-                logger.error(f"❌ Search error: {search_error}")
-                answer, mode, note = await fallback_openai_response(question, user, language, config)
-        else:
-            logger.info("🔄 Using fallback mode - direct OpenAI")
-            answer, mode, note = await fallback_openai_response(question, user, language, config)
+                processing_time = time.time() - start_time
+                
+                return {
+                    "question": question,
+                    "response": result.get("response", "Service temporairement indisponible"),
+                    "mode": "expert_service",
+                    "note": "Réponse générée par le service expert",
+                    "sources": [],
+                    "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables'),
+                    "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                    "processing_time": round(processing_time, 2),
+                    "language": language
+                }
+                
+            except Exception as service_error:
+                logger.warning(f"⚠️ Expert service failed: {service_error}")
+                # Continue to fallback
+        
+        # Fallback response
+        answer, mode, note = await fallback_openai_response(question, user, language)
         
         processing_time = time.time() - start_time
         
@@ -596,8 +564,8 @@ async def process_question_with_rag(
             "response": answer,
             "mode": mode,
             "note": note,
-            "sources": sources,
-            "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
+            "sources": [],
+            "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables'),
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "processing_time": round(processing_time, 2),
             "language": language
@@ -605,7 +573,7 @@ async def process_question_with_rag(
         
         # Save conversation if user is authenticated
         if user:
-            await save_conversation(user.id, question, answer, mode, sources)
+            await save_conversation(user.id, question, answer, mode, [])
         
         return result
         
@@ -613,62 +581,66 @@ async def process_question_with_rag(
         logger.error(f"❌ Error processing question: {e}")
         processing_time = time.time() - start_time
         
-        # Emergency fallback
-        try:
-            config = {"model": "gpt-3.5-turbo", "max_tokens": 300, "timeout": 8}
-            answer, mode, note = await fallback_openai_response(question, user, language, config)
-            return {
-                "question": question,
-                "response": answer,
-                "mode": f"{mode}_emergency",
-                "note": f"Mode d'urgence activé: {str(e)}",
-                "sources": [],
-                "config_source": "Emergency Fallback",
-                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
-                "processing_time": round(processing_time, 2),
-                "language": language
-            }
-        except Exception as emergency_error:
-            logger.error(f"❌ Emergency fallback failed: {emergency_error}")
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Service temporairement indisponible: {str(e)}"
-            )
+        return {
+            "question": question,
+            "response": "Service temporairement indisponible. Veuillez réessayer plus tard.",
+            "mode": "emergency_fallback",
+            "note": f"Erreur: {str(e)}",
+            "sources": [],
+            "config_source": "Emergency Mode",
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "processing_time": round(processing_time, 2),
+            "language": language
+        }
 
-async def fallback_openai_response(question: str, user: Optional[UserProfile] = None, language: str = "fr", config: dict = None) -> tuple:
-    """Fallback response using OpenAI directly - MULTI-LANGUAGE + OPTIMIZED"""
-    import openai
-    
-    if config is None:
-        config = {"model": "gpt-3.5-turbo", "max_tokens": 500, "timeout": 12}
-    
-    openai.api_key = os.getenv('OPENAI_API_KEY')
-    
-    # Get localized prompts
-    system_base = get_language_prompt(language, "system_base")
-    fallback_instruction = get_language_prompt(language, "fallback_instruction")
-    user_context = get_user_context_prompt(user.user_type if user else None, language)
-    
-    system_prompt = f"""{system_base}
-
+async def fallback_openai_response(question: str, user: Optional[UserProfile] = None, language: str = "fr") -> tuple:
+    """Fallback response using basic logic"""
+    try:
+        # Try OpenAI if available
+        import openai
+        
+        api_key = os.getenv('OPENAI_API_KEY')
+        if api_key:
+            openai.api_key = api_key
+            
+            system_base = get_language_prompt(language, "system_base")
+            fallback_instruction = get_language_prompt(language, "fallback_instruction")
+            user_context = get_user_context_prompt(user.user_type if user else None, language)
+            
+            system_prompt = f"""{system_base}
 {user_context}
-
 {fallback_instruction}"""
 
-    response = openai.chat.completions.create(
-        model=config["model"],
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question}
-        ],
-        temperature=0.7,
-        max_tokens=config["max_tokens"],
-        timeout=config["timeout"]
-    )
+            response = openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": question}
+                ],
+                temperature=0.7,
+                max_tokens=500,
+                timeout=12
+            )
+            
+            answer = response.choices[0].message.content
+            mode = "openai_fallback"
+            note = "Réponse générée par OpenAI (mode de secours)"
+            
+            return answer, mode, note
     
-    answer = response.choices[0].message.content
-    mode = "fallback_openai"
-    note = "Réponse basée sur les connaissances générales (recherche documentaire non disponible)"
+    except Exception as e:
+        logger.warning(f"⚠️ OpenAI fallback failed: {e}")
+    
+    # Ultimate fallback
+    fallback_responses = {
+        "fr": "Je suis temporairement indisponible. Veuillez réessayer plus tard ou contactez le support technique.",
+        "en": "I am temporarily unavailable. Please try again later or contact technical support.",
+        "es": "Estoy temporalmente no disponible. Inténtelo de nuevo más tarde o póngase en contacto con el soporte técnico."
+    }
+    
+    answer = fallback_responses.get(language, fallback_responses["en"])
+    mode = "static_fallback"
+    note = "Mode de secours statique"
     
     return answer, mode, note
 
@@ -679,30 +651,22 @@ async def fallback_openai_response(question: str, user: Optional[UserProfile] = 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting Intelia Expert API with Logging System...")
+    logger.info("🚀 Starting Intelia Expert API...")
     
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
     
     # Test logging system
     logging_available = logging_router is not None
-    if logging_available:
-        try:
-            # Test database initialization
-            from app.api.logging import logger_instance
-            logger.info("✅ Logging system initialized successfully")
-        except Exception as e:
-            logger.error(f"❌ Logging system error: {e}")
-            logging_available = False
     
     logger.info("✅ Application created successfully")
-    logger.info("📊 Multi-language support: FR, EN, ES, PT, DE, NL, PL")
+    logger.info("📊 Multi-language support: FR, EN, ES")
     logger.info("⚡ Performance modes: fast, balanced, quality")
     logger.info(f"🗄️ Database: {'Available' if supabase_success else 'Not Available'}")
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
     logger.info(f"📝 Logging system: {'Available' if logging_available else 'Not Available'}")
     
-    if rag_embedder and rag_embedder.has_search_engine():
+    if rag_embedder and hasattr(rag_embedder, 'has_search_engine') and rag_embedder.has_search_engine():
         logger.info("🔍 RAG system: Optimized (with document search)")
     elif rag_embedder:
         logger.info("🔍 RAG system: Ready (fallback mode)")
@@ -719,7 +683,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale - Multi-langue Optimisé avec Logging",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Multi-langue Optimisé",
     version="2.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -736,22 +700,63 @@ app.add_middleware(
 )
 
 # =============================================================================
-# INCLUDE ROUTERS - AVEC LOGGING
+# INCLUDE ROUTERS - VERSION SÉCURISÉE
 # =============================================================================
 
-# Routers principaux
-app.include_router(expert.router, prefix="/api/v1")
-app.include_router(auth.router, prefix="/api/v1") 
-app.include_router(admin.router, prefix="/api/v1")
-app.include_router(health.router, prefix="/api/v1")
-app.include_router(system.router, prefix="/api/v1")
+logger.info("🔄 Enregistrement des routers...")
 
-# Nouveau router logging (si disponible)
-if logging_router:
-    app.include_router(logging_router.router, prefix="/api/v1")
-    logger.info("✅ Logging router registered at /api/v1/logging")
+# Router Expert (critique - doit exister)
+if expert and hasattr(expert, 'router'):
+    app.include_router(expert.router, prefix="/api/v1")
+    logger.info("✅ Expert router enregistré à /api/v1/expert")
 else:
-    logger.warning("⚠️ Logging router not available - skipping registration")
+    logger.error("❌ Expert router non disponible - service critique manquant")
+
+# Router Auth (optionnel)
+if auth and hasattr(auth, 'router'):
+    app.include_router(auth.router, prefix="/api/v1")
+    logger.info("✅ Auth router enregistré à /api/v1/auth")
+else:
+    logger.warning("⚠️ Auth router non disponible")
+
+# Router Admin (optionnel)
+if admin and hasattr(admin, 'router'):
+    app.include_router(admin.router, prefix="/api/v1")
+    logger.info("✅ Admin router enregistré à /api/v1/admin")
+else:
+    logger.warning("⚠️ Admin router non disponible")
+
+# Router Health (optionnel)
+if health and hasattr(health, 'router'):
+    app.include_router(health.router, prefix="/api/v1")
+    logger.info("✅ Health router enregistré à /api/v1/health")
+else:
+    logger.warning("⚠️ Health router non disponible")
+
+# Router System (optionnel)
+if system and hasattr(system, 'router'):
+    app.include_router(system.router, prefix="/api/v1")
+    logger.info("✅ System router enregistré à /api/v1/system")
+else:
+    logger.warning("⚠️ System router non disponible")
+
+# Router Logging (optionnel)
+if logging_router and hasattr(logging_router, 'router'):
+    app.include_router(logging_router.router, prefix="/api/v1")
+    logger.info("✅ Logging router enregistré à /api/v1/logging")
+else:
+    logger.warning("⚠️ Logging router non disponible")
+
+# Compteur des routers enregistrés
+registered_routers = 0
+if expert and hasattr(expert, 'router'): registered_routers += 1
+if auth and hasattr(auth, 'router'): registered_routers += 1
+if admin and hasattr(admin, 'router'): registered_routers += 1
+if health and hasattr(health, 'router'): registered_routers += 1
+if system and hasattr(system, 'router'): registered_routers += 1
+if logging_router and hasattr(logging_router, 'router'): registered_routers += 1
+
+logger.info(f"📊 Total routers enregistrés: {registered_routers}/6")
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -761,7 +766,7 @@ def get_rag_status() -> str:
     """Get current RAG system status"""
     if not rag_embedder:
         return "not_available"
-    elif rag_embedder.has_search_engine():
+    elif hasattr(rag_embedder, 'has_search_engine') and rag_embedder.has_search_engine():
         return "optimized"
     else:
         return "fallback"
@@ -793,8 +798,9 @@ async def root():
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "logging_system": get_logging_status(),
-        "supported_languages": ["fr", "en", "es", "pt", "de", "nl", "pl"],
-        "performance_modes": ["fast", "balanced", "quality"]
+        "supported_languages": ["fr", "en", "es"],
+        "performance_modes": ["fast", "balanced", "quality"],
+        "available_modules": available_modules
     }
 
 @app.get("/health", response_model=HealthResponse)
@@ -822,283 +828,101 @@ async def health_check():
     )
 
 # =============================================================================
-# AUTHENTICATION ENDPOINTS
+# AUTHENTICATION ENDPOINTS - FALLBACK SI AUTH MODULE MANQUANT
 # =============================================================================
 
-@app.post("/api/v1/auth/register")
-async def register(request: RegisterRequest):
-    """Register new user"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        # Register with Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            "email": request.email,
-            "password": request.password
-        })
-        
-        if auth_response.user:
-            # Create user profile
-            user_data = {
-                "email": request.email,
-                "user_type": request.user_type,
-                "full_name": request.full_name,
-                "auth_user_id": auth_response.user.id,
-                "created_at": datetime.utcnow().isoformat(),
-                "preferences": {}
-            }
-            
-            result = supabase.table('users').insert(user_data).execute()
-            
-            return {
-                "message": "User registered successfully",
-                "user_id": result.data[0]['id'],
-                "email": request.email,
-                "user_type": request.user_type
-            }
-        else:
-            raise HTTPException(status_code=400, detail="Registration failed")
-            
-    except Exception as e:
-        logger.error(f"❌ Registration error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+if not auth:
+    @app.post("/api/v1/auth/register")
+    async def register(request: RegisterRequest):
+        """Register new user - Fallback"""
+        return {"message": "Registration not available - auth module missing", "status": "not_implemented"}
 
-@app.post("/api/v1/auth/login")
-async def login(request: AuthRequest):
-    """User login"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        # Login with Supabase Auth
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
-        
-        if auth_response.user and auth_response.session:
-            # Get user profile
-            result = supabase.table('users').select('*').eq('id', auth_response.user.id).execute()
-            
-            if result.data:
-                user_data = result.data[0]
-                return {
-                    "access_token": auth_response.session.access_token,
-                    "token_type": "bearer",
-                    "user": user_data
-                }
-            else:
-                raise HTTPException(status_code=404, detail="User profile not found")
-        else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-            
-    except Exception as e:
-        logger.error(f"❌ Login error: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+    @app.post("/api/v1/auth/login")
+    async def login(request: AuthRequest):
+        """User login - Fallback"""
+        return {"message": "Login not available - auth module missing", "status": "not_implemented"}
 
-@app.post("/api/v1/auth/logout")
-async def logout(user: UserProfile = Depends(get_current_user)):
-    """User logout"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        supabase.auth.sign_out()
-        return {"message": "Logged out successfully"}
-    except Exception as e:
-        logger.error(f"❌ Logout error: {e}")
-        return {"message": "Logged out"}
+    @app.post("/api/v1/auth/logout")
+    async def logout():
+        """User logout - Fallback"""
+        return {"message": "Logout not available - auth module missing", "status": "not_implemented"}
 
-@app.get("/api/v1/auth/profile")
-async def get_profile(user: UserProfile = Depends(get_current_user)):
-    """Get user profile"""
-    return user
+    @app.get("/api/v1/auth/profile")
+    async def get_profile():
+        """Get user profile - Fallback"""
+        return {"message": "Profile not available - auth module missing", "status": "not_implemented"}
 
 # =============================================================================
-# EXPERT SYSTEM ENDPOINTS
+# EXPERT SYSTEM ENDPOINTS - FALLBACK SI EXPERT MODULE MANQUANT
 # =============================================================================
 
-@app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest):
-    """Ask a question without authentication - Multi-language + Performance modes"""
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Le texte de la question est requis")
-    
-    try:
-        result = await process_question_with_rag(
-            question=request.text,
-            user=None,
-            language=request.language or "fr",
-            speed_mode=request.speed_mode or "balanced"
-        )
-        
-        # Remove sources for public access
-        result["sources"] = []
-        result["note"] = result.get("note", "") + " (Accès public - fonctionnalités limitées)"
-        
-        return ExpertResponse(**result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert_public: {e}")
-        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+if not expert:
+    @app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
+    async def ask_expert_public(request: QuestionRequest):
+        """Ask a question without authentication - Fallback"""
+        try:
+            result = await process_question_with_rag(
+                question=request.text,
+                user=None,
+                language=request.language or "fr",
+                speed_mode=request.speed_mode or "balanced"
+            )
+            
+            # Remove sources for public access
+            result["sources"] = []
+            result["note"] = result.get("note", "") + " (Accès public - expert module indisponible)"
+            
+            return ExpertResponse(**result)
+            
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in ask_expert_public: {e}")
+            raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
-@app.post("/api/v1/expert/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
-    """Ask a question to the expert system - Full features"""
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Le texte de la question est requis")
-    
-    try:
-        result = await process_question_with_rag(
-            question=request.text,
-            user=user,
-            language=request.language or "fr",
-            speed_mode=request.speed_mode or "balanced"
-        )
-        
-        return ExpertResponse(**result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert: {e}")
-        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+    @app.post("/api/v1/expert/ask", response_model=ExpertResponse)
+    async def ask_expert(request: QuestionRequest):
+        """Ask a question to the expert system - Fallback without auth"""
+        try:
+            result = await process_question_with_rag(
+                question=request.text,
+                user=None,
+                language=request.language or "fr",
+                speed_mode=request.speed_mode or "balanced"
+            )
+            
+            return ExpertResponse(**result)
+            
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in ask_expert: {e}")
+            raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
-@app.get("/api/v1/expert/history", response_model=HistoryResponse)
-async def get_history(
-    page: int = 1, 
-    per_page: int = 20,
-    user: UserProfile = Depends(get_current_user)
-):
-    """Get conversation history"""
-    try:
-        history_data = await get_user_conversations(user.id, page, per_page)
-        return HistoryResponse(**history_data)
-    except Exception as e:
-        logger.error(f"❌ Error getting history: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la récupération de l'historique")
-
-@app.get("/api/v1/expert/topics", response_model=TopicsResponse)
-async def get_topics(user: UserProfile = Depends(get_current_user)):
-    """Get suggested topics"""
-    try:
-        # Topics based on user type
-        if user.user_type == "professional":
-            topics = [
-                {"title": "Protocoles de vaccination avancés", "category": "sante"},
-                {"title": "Diagnostic différentiel maladies", "category": "diagnostic"},
-                {"title": "Analyse performance comparative", "category": "performance"},
-                {"title": "Résistance aux antibiotiques", "category": "medicaments"},
-                {"title": "Nutrition de précision", "category": "nutrition"}
-            ]
-            keywords = ["diagnostic", "protocole", "analyse", "résistance", "précision"]
-        else:  # producer
-            topics = [
-                {"title": "Problèmes de croissance poulets", "category": "croissance"},
-                {"title": "Conditions environnementales optimales", "category": "environnement"}, 
-                {"title": "Mortalité élevée - causes", "category": "sante"},
-                {"title": "Nutrition et alimentation", "category": "nutrition"},
-                {"title": "Ventilation et température", "category": "environnement"}
-            ]
-            keywords = ["croissance", "température", "alimentation", "mortalité", "ventilation"]
+    @app.get("/api/v1/expert/topics", response_model=TopicsResponse)
+    async def get_topics():
+        """Get suggested topics - Fallback"""
+        topics = [
+            {"title": "Problèmes de croissance poulets", "category": "croissance"},
+            {"title": "Conditions environnementales optimales", "category": "environnement"}, 
+            {"title": "Mortalité élevée - causes", "category": "sante"},
+            {"title": "Nutrition et alimentation", "category": "nutrition"},
+            {"title": "Ventilation et température", "category": "environnement"}
+        ]
+        keywords = ["croissance", "température", "alimentation", "mortalité", "ventilation"]
         
         return TopicsResponse(
             topics=topics,
             popular_keywords=keywords,
-            user_type_specific=True
+            user_type_specific=False
         )
-    except Exception as e:
-        logger.error(f"❌ Error getting topics: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des sujets")
 
-@app.get("/api/v1/expert/suggestions", response_model=SuggestionsResponse)
-async def get_suggestions(
-    context: Optional[str] = None,
-    user: UserProfile = Depends(get_current_user)
-):
-    """Get question suggestions"""
-    try:
-        # Get recent conversations for context
-        recent_convs = await get_user_conversations(user.id, 1, 5)
-        has_history = len(recent_convs["conversations"]) > 0
-        
-        # Base suggestions by user type
-        if user.user_type == "professional":
-            suggestions = [
-                "Quel protocole de vaccination recommandez-vous pour les Ross 308?",
-                "Comment diagnostiquer une entérite nécrotique?",
-                "Quels sont les standards de performance à 35 jours?",
-                "Comment gérer la résistance aux coccidiostatiques?"
-            ]
-        else:  # producer
-            suggestions = [
-                "Quelle température maintenir au jour 14?",
-                "Comment améliorer l'indice de conversion?",
-                "Mes poulets mangent moins, que faire?",
-                "Comment détecter un problème sanitaire?"
-            ]
-        
-        return SuggestionsResponse(
-            suggestions=suggestions,
-            context_aware=context is not None,
-            based_on_history=has_history
-        )
-    except Exception as e:
-        logger.error(f"❌ Error getting suggestions: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des suggestions")
-
-@app.post("/api/v1/expert/feedback")
-async def submit_feedback(
-    feedback: FeedbackRequest,
-    user: UserProfile = Depends(get_current_user)
-):
-    """Submit feedback for a question/answer"""
-    try:
-        await save_feedback(user.id, feedback.question_id, feedback.rating, feedback.feedback)
-        
-        logger.info(f"📝 Feedback received from {user.email}: rating={feedback.rating}")
+    @app.post("/api/v1/expert/feedback")
+    async def submit_feedback(feedback: FeedbackRequest):
+        """Submit feedback for a question/answer - Fallback"""
+        logger.info(f"📝 Feedback received (fallback): rating={feedback.rating}")
         
         return {
             "status": "received",
-            "message": "Merci pour votre retour !",
+            "message": "Merci pour votre retour ! (mode dégradé)",
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
         }
-    except Exception as e:
-        logger.error(f"❌ Error saving feedback: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
-
-# =============================================================================
-# ADMIN ENDPOINTS
-# =============================================================================
-
-@app.get("/api/v1/admin/stats")
-async def get_admin_stats(user: UserProfile = Depends(require_user_type(["admin"]))):
-    """Get system statistics - Admin only"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        # Get basic stats
-        users_count = supabase.table('users').select('id', count='exact').execute().count or 0
-        conversations_count = supabase.table('conversations').select('id', count='exact').execute().count or 0
-        feedback_count = supabase.table('feedback').select('id', count='exact').execute().count or 0
-        
-        return {
-            "system_status": get_rag_status(),
-            "database_status": "connected",
-            "logging_status": get_logging_status(),
-            "users_count": users_count,
-            "conversations_count": conversations_count,
-            "feedback_count": feedback_count,
-            "rag_available": rag_embedder is not None,
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
-        }
-    except Exception as e:
-        logger.error(f"❌ Error getting admin stats: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des statistiques")
 
 # =============================================================================
 # ERROR HANDLERS
@@ -1141,7 +965,7 @@ if __name__ == "__main__":
     port = int(os.getenv('PORT', 8080))
     host = os.getenv('HOST', '0.0.0.0')
     
-    logger.info(f"🚀 Starting Intelia Expert API with Logging on {host}:{port}")
+    logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
     
     uvicorn.run(
         app,
