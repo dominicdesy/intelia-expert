@@ -1445,9 +1445,11 @@ Consultez la console développeur (F12) pour plus de détails.`
                 }
                 
                 if (window.$zoho.salesiq.visitor && window.$zoho.salesiq.visitor.info) {
+                  const userName = "${user?.name || 'Utilisateur'}"
+                  const userEmail = "${user?.email || ''}"
                   window.$zoho.salesiq.visitor.info({
-                    name: '${user?.name || 'Utilisateur'}',
-                    email: '${user?.email || ''}'
+                    name: userName,
+                    email: userEmail
                   })
                   console.log('✅ Informations visiteur configurées')
                 }
@@ -1483,7 +1485,7 @@ Consultez la console développeur (F12) pour plus de détails.`
         // Multiples tentatives d'initialisation
         const tryInitialize = (attempt = 1) => {
           setTimeout(() => {
-            console.log(\`🔄 Tentative d'initialisation #\${attempt}\`)
+            console.log('🔄 Tentative d initialisation #' + attempt)
             
             if (window.$zoho && window.$zoho.salesiq) {
               console.log('✅ Objets Zoho détectés')
@@ -1496,17 +1498,19 @@ Consultez la console développeur (F12) pour plus de détails.`
                 
                 // Tenter d'autres méthodes d'activation
                 if (window.$zoho.salesiq.visitor) {
+                  const userName = '${user?.name || "Utilisateur"}'
+                  const userEmail = '${user?.email || ""}'
                   window.$zoho.salesiq.visitor.info({
-                    name: '${user?.name || 'Utilisateur'}',
-                    email: '${user?.email || ''}'
+                    name: userName,
+                    email: userEmail
                   })
                 }
                 
               } catch (error) {
-                console.error(\`❌ Erreur tentative #\${attempt}:\`, error)
+                console.error('❌ Erreur tentative #' + attempt + ':', error)
               }
             } else {
-              console.warn(\`⚠️ Objets Zoho non disponibles (tentative #\${attempt})\`)
+              console.warn('⚠️ Objets Zoho non disponibles (tentative #' + attempt + ')')
             }
             
             // Réessayer jusqu'à 5 fois
