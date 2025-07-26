@@ -1081,6 +1081,103 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
   )
 }
 
+const LanguageModal = ({ onClose }: { onClose: () => void }) => {
+  const { t, changeLanguage, getCurrentLanguage } = useTranslation()
+  const { updateProfile } = useAuthStore()
+  const [isUpdating, setIsUpdating] = useState(false)
+  
+  const languages = [
+    { code: 'fr', name: 'Français', region: 'France', flag: '🇫🇷' },
+    { code: 'en', name: 'English', region: 'United States', flag: '🇺🇸' },
+    { code: 'es', name: 'Español', region: 'Latinoamérica', flag: '🇪🇸' }
+  ]
+
+  const currentLanguage = getCurrentLanguage()
+
+  const handleLanguageChange = async (languageCode: string) => {
+    if (languageCode === currentLanguage) return
+
+    setIsUpdating(true)
+    try {
+      // Changer la langue immédiatement
+      changeLanguage(languageCode)
+      
+      // Sauvegarder dans le profil utilisateur
+      await updateProfile({ language: languageCode })
+      
+      console.log('✅ Langue mise à jour:', languageCode)
+      
+      // Fermer la modal après un court délai
+      setTimeout(() => {
+        onClose()
+      }, 500)
+      
+    } catch (error) {
+      console.error('❌ Erreur changement langue:', error)
+    }
+    setIsUpdating(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600 mb-4">
+        {t('language.description')}
+      </p>
+      
+      <div className="space-y-2">
+        {languages.map((language) => (
+          <button
+            key={language.code}
+            onClick={() => handleLanguageChange(language.code)}
+            disabled={isUpdating}
+            className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+              currentLanguage === language.code
+                ? 'border-blue-500 bg-blue-50 text-blue-900'
+                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <span className="text-2xl">{language.flag}</span>
+              <div className="text-left">
+                <div className="font-medium text-sm">{language.name}</div>
+                <div className="text-xs text-gray-500">{language.region}</div>
+              </div>
+            </div>
+            
+            {currentLanguage === language.code && (
+              <div className="flex items-center space-x-2">
+                {isUpdating ? (
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {isUpdating && (
+        <div className="text-center text-sm text-gray-600 py-2">
+          {t('language.updating')}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-4 border-t border-gray-200">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          disabled={isUpdating}
+        >
+          {t('modal.close')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const ContactModal = ({ onClose }: { onClose: () => void }) => {
   const { t } = useTranslation()
   
@@ -1246,6 +1343,7 @@ const UserMenuButton = () => {
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
+  const [showLanguageModal, setShowLanguageModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -1272,6 +1370,11 @@ const UserMenuButton = () => {
   const handleAccountClick = () => {
     setIsOpen(false)
     setShowAccountModal(true)
+  }
+
+  const handleLanguageClick = () => {
+    setIsOpen(false)
+    setShowLanguageModal(true)
   }
 
   return (
@@ -1320,6 +1423,16 @@ const UserMenuButton = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
                 <span>{t('nav.profile')}</span>
+              </button>
+
+              <button
+                onClick={handleLanguageClick}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
+                </svg>
+                <span>{t('nav.language')}</span>
               </button>
 
               <button
@@ -1379,6 +1492,14 @@ const UserMenuButton = () => {
       </Modal>
 
       <Modal
+        isOpen={showLanguageModal}
+        onClose={() => setShowLanguageModal(false)}
+        title={t('language.title')}
+      >
+        <LanguageModal onClose={() => setShowLanguageModal(false)} />
+      </Modal>
+
+      <Modal
         isOpen={showContactModal}
         onClose={() => setShowContactModal(false)}
         title={t('contact.title')}
@@ -1392,7 +1513,7 @@ const UserMenuButton = () => {
 // ==================== COMPOSANT PRINCIPAL ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
-  const { t } = useTranslation()
+  const { t, currentLanguage } = useTranslation()
   
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -1404,18 +1525,25 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Message de bienvenue
+  // Message de bienvenue - se met à jour quand la langue change
   useEffect(() => {
-    if (isAuthenticated && messages.length === 0) {
+    if (isAuthenticated) {
       const welcomeMessage: Message = {
         id: '1',
         content: t('chat.welcome'),
         isUser: false,
         timestamp: new Date()
       }
-      setMessages([welcomeMessage])
+      
+      // Si c'est la première fois ou si la langue a changé, mettre à jour le message de bienvenue
+      if (messages.length === 0) {
+        setMessages([welcomeMessage])
+      } else if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
+        // Mettre à jour le premier message s'il s'agit du message de bienvenue
+        setMessages(prev => [welcomeMessage, ...prev.slice(1)])
+      }
     }
-  }, [isAuthenticated, messages.length, t])
+  }, [isAuthenticated, t, currentLanguage]) // Ajouter currentLanguage comme dépendance
 
   // Afficher un loader pendant le chargement
   if (isLoading) {
