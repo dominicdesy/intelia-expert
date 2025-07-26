@@ -1,16 +1,38 @@
-'use client'
+  // Scroll automatique
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])'use client'
 
 // Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
 export const runtime = 'nodejs'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Script from 'next/script'
+
+// Déclaration TypeScript pour Zoho SalesIQ
+declare global {
+  interface Window {
+    $zoho?: {
+      salesiq?: {
+        ready: () => void
+        chat?: {
+          start: () => void
+        }
+      }
+    }
+  }
+}
 
 // ==================== STORES SIMULÉS ====================
 const useAuthStore = () => ({
   user: {
     id: '1',
-    name: 'Jean Dupont',
-    email: 'jean.dupont@exemple.com',
+    name: 'Jean Dupont', // Cette donnée sera remplacée par les vraies données utilisateur
+    email: 'jean.dupont@exemple.com', // Cette donnée sera remplacée par les vraies données utilisateur
     user_type: 'producer',
     language: 'fr',
     created_at: '2024-01-15',
@@ -24,6 +46,22 @@ const useAuthStore = () => ({
     window.location.href = 'https://expert.intelia.com'
   },
   exportUserData: async () => {
+    console.log('Export des données...')
+  },
+  deleteUserData: async () => {
+    console.log('Suppression des données...')
+  },
+  updateProfile: async (data: any) => {
+    console.log('Mise à jour profil:', data)
+    // Ici vous devriez faire l'appel API pour mettre à jour le profil
+    return { success: true }
+  },
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    console.log('Changement de mot de passe demandé')
+    // Ici vous devriez faire l'appel API pour changer le mot de passe
+    return { success: true }
+  }
+}) async () => {
     console.log('Export des données...')
   },
   deleteUserData: async () => {
@@ -159,17 +197,31 @@ const Modal = ({ isOpen, onClose, title, children }: {
 }
 
 const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) => {
+  const { updateProfile, changePassword } = useAuthStore()
+  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Formulaire profil
   const [formData, setFormData] = useState({
     firstName: user?.name?.split(' ')[0] || '',
     lastName: user?.name?.split(' ').slice(1).join(' ') || '',
-    linkedinProfile: '',
-    companyName: '',
-    companyWebsite: '',
-    linkedinCorporate: '',
+    linkedinProfile: user?.linkedinProfile || '',
+    companyName: user?.companyName || '',
+    companyWebsite: user?.companyWebsite || '',
+    linkedinCorporate: user?.linkedinCorporate || '',
     email: user?.email || '',
-    phone: '',
-    country: 'CA' // Default Canada
+    phone: user?.phone || '',
+    country: user?.country || 'CA'
   })
+
+  // Formulaire mot de passe
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([])
 
   const countries = [
     { code: 'CA', name: 'Canada', format: '+1 (XXX) XXX-XXXX' },
@@ -238,148 +290,311 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
     return countries.find(c => c.code === formData.country)?.format || ''
   }
 
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = []
+    if (password.length < 8) errors.push('Au moins 8 caractères')
+    if (!/[A-Z]/.test(password)) errors.push('Au moins une majuscule')
+    if (!/[a-z]/.test(password)) errors.push('Au moins une minuscule')
+    if (!/[0-9]/.test(password)) errors.push('Au moins un chiffre')
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) errors.push('Au moins un caractère spécial')
+    return errors
+  }
+
+  const handlePasswordChange = async () => {
+    const errors: string[] = []
+    
+    if (!passwordData.currentPassword) {
+      errors.push('Mot de passe actuel requis')
+    }
+    
+    if (!passwordData.newPassword) {
+      errors.push('Nouveau mot de passe requis')
+    } else {
+      const passwordValidationErrors = validatePassword(passwordData.newPassword)
+      errors.push(...passwordValidationErrors)
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.push('Les mots de passe ne correspondent pas')
+    }
+
+    setPasswordErrors(errors)
+
+    if (errors.length === 0) {
+      setIsLoading(true)
+      try {
+        const result = await changePassword(passwordData.currentPassword, passwordData.newPassword)
+        if (result.success) {
+          alert('Mot de passe changé avec succès !')
+          setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+          setActiveTab('profile')
+        } else {
+          setPasswordErrors(['Erreur lors du changement de mot de passe'])
+        }
+      } catch (error) {
+        setPasswordErrors(['Erreur lors du changement de mot de passe'])
+      }
+      setIsLoading(false)
+    }
+  }
+
+  const handleProfileSave = async () => {
+    setIsLoading(true)
+    try {
+      const result = await updateProfile(formData)
+      if (result.success) {
+        alert('Profil mis à jour avec succès !')
+        onClose()
+      }
+    } catch (error) {
+      alert('Erreur lors de la mise à jour du profil')
+    }
+    setIsLoading(false)
+  }
+
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-      {/* Informations personnelles */}
-      <div className="border-b border-gray-200 pb-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Informations personnelles</h3>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-            <input
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Nom de famille *</label>
-            <input
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Profil LinkedIn personnel</label>
-          <input
-            type="url"
-            value={formData.linkedinProfile}
-            onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
-            placeholder="https://linkedin.com/in/votre-profil"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      {/* Informations de contact */}
-      <div className="border-b border-gray-200 pb-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Contact</h3>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Pays *</label>
-          <select 
-            value={formData.country}
-            onChange={handleCountryChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          >
-            {countries.map(country => (
-              <option key={country.code} value={country.code}>
-                {country.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Téléphone
-            <span className="text-xs text-gray-500 ml-2">Format: {getCurrentCountryFormat()}</span>
-          </label>
-          <input
-            type="tel"
-            value={formData.phone}
-            onChange={handlePhoneChange}
-            placeholder={getCurrentCountryFormat()}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      {/* Informations entreprise */}
-      <div className="pb-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Entreprise</h3>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
-          <input
-            type="text"
-            value={formData.companyName}
-            onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Site web de l'entreprise</label>
-          <input
-            type="url"
-            value={formData.companyWebsite}
-            onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
-            placeholder="https://www.exemple.com"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Page LinkedIn de l'entreprise</label>
-          <input
-            type="url"
-            value={formData.linkedinCorporate}
-            onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
-            placeholder="https://linkedin.com/company/votre-entreprise"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+      {/* Onglets */}
+      <div className="flex border-b border-gray-200">
         <button
-          onClick={onClose}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800"
+          onClick={() => setActiveTab('profile')}
+          className={`px-4 py-2 text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Annuler
+          Informations personnelles
         </button>
         <button
-          onClick={() => {
-            console.log('Sauvegarde des informations utilisateur:', formData)
-            // Ici vous pouvez ajouter la logique de sauvegarde
-            onClose()
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          onClick={() => setActiveTab('password')}
+          className={`px-4 py-2 text-sm font-medium ${activeTab === 'password' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Sauvegarder
+          Mot de passe
         </button>
       </div>
+
+      {activeTab === 'profile' && (
+        <>
+          {/* Informations personnelles */}
+          <div className="border-b border-gray-200 pb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Informations personnelles</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nom de famille *</label>
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Profil LinkedIn personnel</label>
+              <input
+                type="url"
+                value={formData.linkedinProfile}
+                onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
+                placeholder="https://linkedin.com/in/votre-profil"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Informations de contact */}
+          <div className="border-b border-gray-200 pb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Contact</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Pays *</label>
+              <select 
+                value={formData.country}
+                onChange={handleCountryChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                {countries.map(country => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Téléphone
+                <span className="text-xs text-gray-500 ml-2">Format: {getCurrentCountryFormat()}</span>
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={handlePhoneChange}
+                placeholder={getCurrentCountryFormat()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Informations entreprise */}
+          <div className="pb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Entreprise</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nom de l'entreprise</label>
+              <input
+                type="text"
+                value={formData.companyName}
+                onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Site web de l'entreprise</label>
+              <input
+                type="url"
+                value={formData.companyWebsite}
+                onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+                placeholder="https://www.exemple.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Page LinkedIn de l'entreprise</label>
+              <input
+                type="url"
+                value={formData.linkedinCorporate}
+                onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
+                placeholder="https://linkedin.com/company/votre-entreprise"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={isLoading}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleProfileSave}
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Sauvegarde...' : 'Sauvegarder'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'password' && (
+        <>
+          <div className="pb-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Changer le mot de passe</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe actuel *</label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe *</label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <div className="mt-2 text-xs text-gray-600">
+                  <p>Le mot de passe doit contenir :</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Au moins 8 caractères</li>
+                    <li>Au moins une majuscule</li>
+                    <li>Au moins une minuscule</li>
+                    <li>Au moins un chiffre</li>
+                    <li>Au moins un caractère spécial</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le nouveau mot de passe *</label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              {passwordErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="text-sm text-red-800">
+                    <p className="font-medium">Erreurs :</p>
+                    <ul className="list-disc list-inside mt-1">
+                      {passwordErrors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={isLoading}
+            >
+              Retour
+            </button>
+            <button
+              onClick={handlePasswordChange}
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Changement...' : 'Changer le mot de passe'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -538,30 +753,6 @@ const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => 
 const ContactModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <div className="space-y-4">
-      {/* Chat with us */}
-      <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Discuter avec nous</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Contactez notre équipe de support via le chat intégré.
-          </p>
-          <button 
-            onClick={() => {
-              console.log('Chat support ouvert')
-              onClose()
-            }}
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-          >
-            Contacter le support Intelia
-          </button>
-        </div>
-      </div>
-
       {/* Call Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -857,109 +1048,12 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [systemStatus, setSystemStatus] = useState({
-    rag: false,
-    supabase: false,
-    overall: false
-  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuthStore()
 
-  // Vérifier le statut des services
-  const checkSystemStatus = async () => {
-    try {
-      let ragStatus = false
-      let supabaseStatus = true // Simulé car on utilise des stores simulés
-      let networkStatus = true
-
-      // Test 1: API RAG - Test plus robuste
-      try {
-        const ragResponse = await fetch('https://expert-app-cngws.ondigitalocean.app/api/health', {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000)
-        })
-        
-        if (ragResponse.ok) {
-          // Vérifier si la réponse contient des infos sur le fallback
-          try {
-            const healthData = await ragResponse.json()
-            console.log('🔍 Health check RAG:', healthData)
-            
-            // Vérifier s'il y a un indicateur de fallback dans la réponse
-            ragStatus = healthData.status === 'healthy' && !healthData.fallback_mode
-            
-            if (healthData.fallback_mode) {
-              console.warn('⚠️ RAG en mode fallback détecté')
-            }
-          } catch (jsonError) {
-            // Si pas de JSON, considérer comme OK si le status HTTP est 200
-            ragStatus = true
-          }
-        } else {
-          ragStatus = false
-        }
-      } catch (error) {
-        console.warn('⚠️ RAG API non accessible:', error)
-        ragStatus = false
-      }
-
-      // Test 2: Connectivité réseau générale
-      try {
-        await fetch('https://www.google.com/favicon.ico', {
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(3000)
-        })
-        networkStatus = true
-      } catch (error) {
-        console.warn('⚠️ Problème de connectivité réseau:', error)
-        networkStatus = false
-      }
-
-      // Test 3: Supabase simulé (toujours true pour le moment)
-      // Dans un vrai projet, vous testeriez la connexion Supabase ici
-
-      // Statut global : tous les services doivent être opérationnels ET pas en fallback
-      const overall = ragStatus && supabaseStatus && networkStatus
-
-      setSystemStatus({
-        rag: ragStatus,
-        supabase: supabaseStatus,
-        overall
-      })
-
-      // Log détaillé pour debug
-      console.log('🔍 Status check détaillé:', {
-        rag: ragStatus ? '✅ Opérationnel' : '❌ Problème/Fallback',
-        supabase: supabaseStatus ? '✅' : '❌',
-        network: networkStatus ? '✅' : '❌',
-        overall: overall ? '🟢 SYSTÈME OK' : '🔴 PROBLÈME DÉTECTÉ'
-      })
-
-    } catch (error) {
-      console.error('❌ Erreur vérification statut:', error)
-      setSystemStatus({
-        rag: false,
-        supabase: true,
-        overall: false
-      })
-    }
-  }
-
-  // Scroll automatique
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  // Message de bienvenue + vérification statut
+  // Message de bienvenue
   useEffect(() => {
     const initializeChat = async () => {
-      await checkSystemStatus()
-
       const welcomeMessage: Message = {
         id: '1',
         content: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
@@ -970,11 +1064,6 @@ export default function ChatInterface() {
     }
 
     initializeChat()
-    
-    // Vérifier le statut toutes les 30 secondes
-    const statusInterval = setInterval(checkSystemStatus, 30000)
-    
-    return () => clearInterval(statusInterval)
   }, [])
 
   // Générer réponse RAG
@@ -1004,36 +1093,11 @@ export default function ChatInterface() {
       if (!response.ok) {
         const errorText = await response.text()
         console.error('❌ Erreur API détaillée:', errorText)
-        
-        // Mettre à jour le statut pour indiquer un problème RAG
-        setSystemStatus(prev => ({
-          ...prev,
-          rag: false,
-          overall: false
-        }))
-        
         throw new Error(`Erreur API: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
       console.log('✅ Réponse RAG reçue:', data)
-      
-      // Vérifier si la réponse indique un mode fallback
-      if (data.fallback_used || data.is_fallback || data.mode === 'fallback') {
-        console.warn('⚠️ Réponse générée en mode fallback')
-        setSystemStatus(prev => ({
-          ...prev,
-          rag: false, // Marquer comme problème si fallback utilisé
-          overall: false
-        }))
-      } else {
-        // Marquer comme OK si réponse normale
-        setSystemStatus(prev => ({
-          ...prev,
-          rag: true,
-          overall: true && prev.supabase // Garder l'état des autres services
-        }))
-      }
       
       if (data.response || data.answer || data.message) {
         return data.response || data.answer || data.message
@@ -1044,13 +1108,6 @@ export default function ChatInterface() {
       
     } catch (error: any) {
       console.error('❌ Erreur lors de l\'appel au RAG:', error)
-      
-      // Mettre à jour le statut pour indiquer un problème
-      setSystemStatus(prev => ({
-        ...prev,
-        rag: false,
-        overall: false
-      }))
       
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         return `Erreur de connexion au serveur RAG. 
@@ -1138,7 +1195,19 @@ Consultez la console développeur (F12) pour plus de détails.`
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
+    <>
+      {/* Zoho SalesIQ Scripts */}
+      <Script id="zoho-salesiq-init" strategy="beforeInteractive">
+        {`window.$zoho=window.$zoho || {};$zoho.salesiq=$zoho.salesiq||{ready:function(){}}`}
+      </Script>
+      <Script 
+        id="zoho-salesiq-widget"
+        src="https://salesiq.zohopublic.com/widget?wc=siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09" 
+        strategy="afterInteractive"
+        defer
+      />
+
+      <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-4 py-3">
         <div className="flex items-center justify-between">
@@ -1291,21 +1360,10 @@ Consultez la console développeur (F12) pour plus de détails.`
                 <PaperAirplaneIcon />
               </button>
             </div>
-            
-            {/* Indicateur de statut système simplifié */}
-            <div className="mt-2 text-center">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs bg-gray-100">
-                <div className="flex items-center space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${systemStatus.overall ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className={systemStatus.overall ? 'text-green-700' : 'text-red-700'}>
-                    {systemStatus.overall ? 'Système opérationnel' : 'Problème détecté'}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
     </div>
+    </>
   )
 }
