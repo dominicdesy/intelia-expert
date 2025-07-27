@@ -1,6 +1,6 @@
 """
-Intelia Expert - API Backend Corrigée
-Version 2.2.1 - FIXED: Routage URL corrigé
+Intelia Expert - API Backend avec Logging Intégré
+Version 2.3.0 - FIXED: Logging endpoints ajoutés
 """
 
 import os
@@ -54,6 +54,20 @@ logger = logging.getLogger(__name__)
 rag_embedder: Optional[Any] = None
 supabase: Optional[Client] = None
 security = HTTPBearer()
+
+# =============================================================================
+# IMPORT LOGGING SYSTEM
+# =============================================================================
+
+# Import du système de logging
+try:
+    from logging import router as logging_router
+    LOGGING_AVAILABLE = True
+    logger.info("✅ Système de logging importé avec succès")
+except ImportError as e:
+    LOGGING_AVAILABLE = False
+    logging_router = None
+    logger.error(f"❌ Erreur import logging: {e}")
 
 # =============================================================================
 # MULTI-LANGUAGE SUPPORT - 7 LANGUES
@@ -145,7 +159,7 @@ def initialize_supabase():
         return False
 
 # =============================================================================
-# PYDANTIC MODELS
+# PYDANTIC MODELS (ÉTENDUS POUR LOGGING)
 # =============================================================================
 
 class UserProfile(BaseModel):
@@ -304,7 +318,7 @@ async def initialize_rag_system():
         return False
 
 # =============================================================================
-# QUESTION PROCESSING
+# QUESTION PROCESSING AVEC LOGGING
 # =============================================================================
 
 async def process_question_with_rag(
@@ -313,7 +327,7 @@ async def process_question_with_rag(
     language: str = "fr",
     speed_mode: str = "balanced"
 ) -> Dict[str, Any]:
-    """Process question using RAG system"""
+    """Process question using RAG system with integrated logging"""
     start_time = time.time()
     
     try:
@@ -411,6 +425,28 @@ async def process_question_with_rag(
             "processing_time": round(processing_time, 2),
             "language": language
         }
+        
+        # ✅ NOUVEAU: LOG LA CONVERSATION SI LOGGING DISPONIBLE
+        if LOGGING_AVAILABLE and user:
+            try:
+                from logging import ConversationCreate, logger_instance
+                
+                conversation_data = ConversationCreate(
+                    user_id=user.id,
+                    question=question,
+                    response=answer,
+                    conversation_id=result["timestamp"],
+                    confidence_score=0.9 if mode == "rag_enhanced" else 0.7,
+                    response_time_ms=int(processing_time * 1000),
+                    language=language,
+                    rag_used=(mode == "rag_enhanced")
+                )
+                
+                logger_instance.save_conversation(conversation_data)
+                logger.info(f"✅ Conversation loggée: {result['timestamp']}")
+                
+            except Exception as log_error:
+                logger.warning(f"⚠️ Erreur logging conversation: {log_error}")
         
         return result
         
@@ -512,7 +548,7 @@ def get_rag_status() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting Intelia Expert API...")
+    logger.info("🚀 Starting Intelia Expert API with Logging...")
     
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
@@ -522,6 +558,7 @@ async def lifespan(app: FastAPI):
     logger.info("⚡ Performance modes: fast, balanced, quality")
     logger.info(f"🗄️ Database: {'Available' if supabase_success else 'Not Available'}")
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
+    logger.info(f"📝 Logging system: {'Available' if LOGGING_AVAILABLE else 'Not Available'}")
     
     if rag_embedder and rag_embedder.has_search_engine():
         logger.info("🔍 RAG system: Optimized (with document search)")
@@ -540,8 +577,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale",
-    version="2.2.1",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale avec Logging",
+    version="2.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -557,9 +594,19 @@ app.add_middleware(
         "http://localhost:8080"
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# INCLUSION DU ROUTER DE LOGGING
+# =============================================================================
+
+if LOGGING_AVAILABLE:
+    app.include_router(logging_router, prefix="/v1")
+    logger.info("✅ Logging router intégré avec succès")
+else:
+    logger.warning("⚠️ Logging router non disponible")
 
 # =============================================================================
 # API ENDPOINTS - ROUTAGE CORRIGÉ (/v1/ au lieu de /api/v1/)
@@ -569,21 +616,25 @@ app.add_middleware(
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API - Routage Corrigé v2.2.1",
+        "message": "Intelia Expert API - Logging Intégré v2.3.0",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
-        "api_version": "2.2.1",
+        "api_version": "2.3.0",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
+        "logging_system": LOGGING_AVAILABLE,
         "supported_languages": ["fr", "en", "es"],
         "performance_modes": ["fast", "balanced", "quality"],
         "cors_configured": True,
-        "routing_fixed": True,
         "available_endpoints": [
-            "/v1/expert/ask-public",  # ✅ CORRIGÉ: /v1/ au lieu de /api/v1/
+            "/v1/expert/ask-public",
             "/v1/expert/ask", 
             "/v1/expert/feedback",
+            "/v1/logging/conversation",
+            "/v1/logging/conversation/{id}/feedback",
+            "/v1/logging/user/{id}/conversations",
+            "/v1/logging/analytics",
             "/v1/auth/login",
             "/v1/auth/register",
             "/health",
@@ -603,7 +654,8 @@ async def health_check():
             "api": "running",
             "configuration": "loaded",
             "database": db_status,
-            "rag_system": get_rag_status()
+            "rag_system": get_rag_status(),
+            "logging_system": "available" if LOGGING_AVAILABLE else "unavailable"
         },
         config={
             "source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
@@ -787,7 +839,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "path": str(request.url.path),
-            "api_version": "2.2.1"
+            "api_version": "2.3.0"
         }
     )
 
@@ -817,7 +869,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
-    logger.info(f"📋 Version: 2.2.1 - Routing Fixed")
+    logger.info(f"📋 Version: 2.3.0 - Logging Integrated")
     
     uvicorn.run(
         app,
