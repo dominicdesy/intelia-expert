@@ -874,6 +874,7 @@ async def api_status():
         }
     }
 
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
     db_status = "connected" if supabase else "disconnected"
