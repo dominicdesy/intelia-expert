@@ -41,20 +41,13 @@ interface ConversationData {
   rag_used?: boolean
 }
 
-// ==================== SERVICE DE LOGGING AVEC URL CORRIGÉE ====================
+// ==================== SERVICE DE LOGGING COMPLET ====================
 class ConversationService {
-  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/v1"  // ✅ CORRIGÉ: /v1 au lieu de /api/v1
-  private loggingEnabled = true
+  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"
 
   async saveConversation(data: ConversationData): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('📝 Logging désactivé - conversation non sauvegardée:', data.conversation_id)
-      return
-    }
-
     try {
       console.log('💾 Sauvegarde conversation:', data.conversation_id)
-      console.log('📡 URL de sauvegarde:', `${this.baseUrl}/logging/conversation`)
       
       const response = await fetch(`${this.baseUrl}/logging/conversation`, {
         method: 'POST',
@@ -89,14 +82,8 @@ class ConversationService {
   }
 
   async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('📊 Logging désactivé - feedback non envoyé:', conversationId)
-      return
-    }
-
     try {
       console.log('📊 Envoi feedback:', conversationId, feedback)
-      console.log('📡 URL feedback:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback`)
       
       const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
         method: 'PATCH',
@@ -122,14 +109,8 @@ class ConversationService {
   }
 
   async getUserConversations(userId: string, limit = 50): Promise<any[]> {
-    if (!this.loggingEnabled) {
-      console.log('🔍 Logging désactivé - conversations non récupérées')
-      return []
-    }
-
     try {
       console.log('🔍 Récupération conversations pour:', userId)
-      console.log('📡 URL conversations:', `${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`)
       
       const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`, {
         headers: { 'Accept': 'application/json' }
@@ -156,7 +137,7 @@ const conversationService = new ConversationService()
 // ==================== FONCTION generateAIResponse CORRIGÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
   // ✅ URL correcte confirmée par test PowerShell
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/v1/expert/ask-public'
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
   
   try {
     console.log('🤖 Envoi question au RAG Intelia (endpoint public):', question)
@@ -167,7 +148,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'fast'  // ✅ CORRIGÉ: Mode rapide pour réponses concises
+      speed_mode: 'balanced'
     }
     
     console.log('📤 Corps de la requête:', requestBody)
@@ -250,7 +231,7 @@ Consultez la console développeur (F12) pour plus de détails.`)
   }
 }
 
-// ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
+// ==================== TRANSLATIONS INTÉGRÉES COMPLÈTES ====================
 const translations = {
   fr: {
     'chat.welcome': 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?',
@@ -512,7 +493,7 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
   return null
 }
 
-// ==================== STORE D'AUTHENTIFICATION ÉTENDU ====================
+// ==================== STORE D'AUTHENTIFICATION ====================
 const useAuthStore = () => {
   const [user, setUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -1722,7 +1703,7 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL AVEC TOUTES LES FONCTIONNALITÉS ====================
+// ==================== COMPOSANT PRINCIPAL AVEC LOGGING COMPLET ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
