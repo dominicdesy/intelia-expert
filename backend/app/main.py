@@ -1,7 +1,7 @@
 """
 Intelia Expert - API Backend Complète
 Multi-langue + Performance + Sécurité + Tous Endpoints
-Version 2.1.3 - HYBRID: Direct Endpoints + Router Fallback
+Version 2.1.4 - FIXED: Syntax Errors Resolved
 """
 
 import os
@@ -680,6 +680,19 @@ async def fallback_openai_response(question: str, user: Optional[UserProfile] = 
         return answer, mode, note
 
 # =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_rag_status() -> str:
+    """Get current RAG system status"""
+    if not rag_embedder:
+        return "not_available"
+    elif rag_embedder.has_search_engine():
+        return "optimized"
+    else:
+        return "fallback"
+
+# =============================================================================
 # LIFESPAN MANAGEMENT
 # =============================================================================
 
@@ -715,7 +728,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelia Expert API",
     description="Assistant IA Expert pour la Santé et Nutrition Animale - Multi-langue Optimisé",
-    version="2.1.3",
+    version="2.1.4",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -736,35 +749,13 @@ app.add_middleware(
 )
 
 # =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-def get_rag_status() -> str:
-    """Get current RAG system status"""
-    if not rag_embedder:
-        return "not_available"
-    elif rag_embedder.has_search_engine():
-        return "optimized"
-    else:
-        return "fallback"
-
-# =============================================================================
-# OPTIONAL ROUTER INCLUSION - NON-BLOCKING
+# ROUTER REGISTRATION
 # =============================================================================
 
 logger.info("🔄 Attempting to include external routers (optional)...")
 
 registered_routers = []
 
-# =============================================================================
-# INCLUDE ROUTERS - STRUCTURE V1 DIRECTE
-# =============================================================================
-
-logger.info("🔄 Enregistrement des routers v1...")
-
-registered_routers = []
-
-# Import et enregistrement des routers avec la structure v1 exacte
 def register_router_safe(module_name, router_name, prefix="/api/v1"):
     """Register router safely with error handling"""
     try:
@@ -802,11 +793,11 @@ logger.info(f"📊 External routers included: {', '.join(registered_routers) if 
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API - Direct DigitalOcean Access",
+        "message": "Intelia Expert API - Fixed Version 2.1.4",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
-        "api_version": "2.1.3",
+        "api_version": "2.1.4",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "supported_languages": ["fr", "en", "es", "pt", "de", "nl", "pl"],
@@ -816,6 +807,7 @@ async def root():
         "frontend_url": "https://expert.intelia.com",
         "api_url": "https://expert-app-cngws.ondigitalocean.app",
         "cors_configured": True,
+        "syntax_errors_fixed": True,
         "available_endpoints": [
             "/api/v1/expert/ask-public",
             "/api/v1/expert/ask", 
@@ -837,31 +829,7 @@ async def api_status():
         "endpoints_registered": len(registered_routers),
         "direct_access": True,
         "cors_enabled": True,
-        "recommended_frontend_config": {
-            "api_base_url": "https://expert-app-cngws.ondigitalocean.app",
-            "endpoints": {
-                "ask_public": "/api/v1/expert/ask-public",
-                "ask_authenticated": "/api/v1/expert/ask",
-                "topics": "/api/v1/expert/topics", 
-                "feedback": "/api/v1/expert/feedback",
-                "health": "/health"
-            }
-        }
-    }
-async def health_check():
-    """Health check endpoint"""
-    db_status = "connected" if supabase else "disconnected"
-    
-    @app.get("/api/status")
-async def api_status():
-    """API status endpoint optimized for frontend"""
-    return {
-        "api_healthy": True,
-        "database_connected": supabase is not None,
-        "rag_available": get_rag_status() == "optimized",
-        "endpoints_registered": len(registered_routers),
-        "direct_access": True,
-        "cors_enabled": True,
+        "syntax_fixed": True,
         "recommended_frontend_config": {
             "api_base_url": "https://expert-app-cngws.ondigitalocean.app",
             "endpoints": {
@@ -1147,7 +1115,7 @@ async def submit_feedback(
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
 
 # =============================================================================
-# ADMIN ENDPOINTS (DIRECT) - Only if admin router not available
+# ADMIN ENDPOINTS (DIRECT)
 # =============================================================================
 
 if "admin" not in registered_routers:
@@ -1190,7 +1158,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "path": str(request.url.path),
-            "api_version": "2.1.3"
+            "api_version": "2.1.4"
         }
     )
 
@@ -1220,7 +1188,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
-    logger.info(f"📋 Mode: Hybrid (Direct endpoints + Optional routers)")
+    logger.info(f"📋 Mode: Fixed Syntax Errors - Version 2.1.4")
     logger.info(f"📊 External routers: {', '.join(registered_routers) if registered_routers else 'None'}")
     
     uvicorn.run(
