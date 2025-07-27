@@ -17,7 +17,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-router = APIRouter(prefix="/expert", tags=["expert"])
+router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
