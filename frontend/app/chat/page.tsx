@@ -1,4 +1,163 @@
-'use client'
+// ==================== FONCTION generateAIResponse CORRIGÉE ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+      }
+    
+    const adaptedResponse: ExpertApiResponse = {
+      question: question,
+      response: data.response || data.answer || data.message || "Réponse reçue",
+      conversation_id: data.timestamp || Date.now().toString(),
+      rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced' || false,
+      timestamp: data.timestamp || new Date().toISOString(),
+      language: data.language || 'fr',
+      response_time_ms: (data.processing_time || 0) * 1000,
+      confidence_score: data.sources?.length > 0 ? 0.9 : 0.7
+    }
+    
+    // Sauvegarde optionnelle
+    if (user && adaptedResponse.conversation_id) {
+      try {
+        console.log('💾 Tentative sauvegarde conversation...')
+        await conversationService.saveConversation({
+          user_id: user.id,
+          question: question,
+          response: data.response || data.answer || data.message,
+          conversation_id: adaptedResponse.conversation_id,
+          confidence_score: adaptedResponse.confidence_score,
+          response_time_ms: adaptedResponse.response_time_ms,
+          language: adaptedResponse.language,
+          rag_used: adaptedResponse.rag_used
+        })
+      } catch (saveError) {
+        console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
+      }
+    }
+    
+    return adaptedResponse
+    
+  } catch (error: any) {
+    console.error('❌ Erreur lors de l\'appel au RAG:', error)
+    
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error(`Erreur de connexion au serveur.
+
+**URL testée:** ${apiUrl}
+**Erreur technique:** ${error.message}
+
+Vérifiez votre connexion internet et réessayez.`)
+    }
+    
+    throw new Error(`Erreur technique avec l'API : ${error.message}
+
+**URL testée:** ${apiUrl}
+**Type d'erreur:** ${error.name}
+
+Consultez la console développeur (F12) pour plus de détails.`)
+  }
+}// ==================== FONCTION generateAIResponse CORRIGÉE ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  // ✅ Utilisation de l'endpoint public en attendant la correction du JWT_SECRET backend
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
+  
+  try {
+    console.log('🤖 Envoi question au RAG Intelia (endpoint public temporaire):', question)
+    console.log('📡 URL API:', apiUrl)
+    console.log('👤 Utilisateur:', user?.id, user?.email)
+    console.log('⚠️ Note: Utilisation endpoint public car JWT_SECRET backend mal configuré')
+    
+    // ✅ Corps de la requête pour l'endpoint public
+    const requestBody = {
+      text: question.trim(),
+      language: user?.language || 'fr',
+      speed_mode: 'balanced'
+    }
+    
+    console.log('📤 Corps de la requête:', requestBody)
+    
+    // ✅ Headers sans authentification pour l'endpoint public
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+    
+    console.log('📤 Headers (endpoint public):', headers)
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(requestBody)
+    })
+
+    console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Erreur API détaillée:', errorText)
+      throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ Réponse RAG reçue:', data)
+    
+    const adaptedResponse: ExpertApiResponse = {
+      question: question,
+      response: data.response || data.answer || data.message || "Réponse reçue",
+      conversation_id: data.timestamp || Date.now().toString(),
+      rag_used: data.mode?.includes('rag') || data.mode === 'rag_// ==================== FONCTION generateAIResponse CORRIGÉE ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  // ✅ URL correcte de l'API
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+  
+  try {
+    console.log('🤖 Envoi question au RAG Intelia:', question)
+    console.log('📡 URL API:', apiUrl)
+    console.log('👤 Utilisateur:', user?.id, user?.email)
+    
+    // ✅ Corps de la requête avec authentification utilisateur intégrée
+    const requestBody = {
+      text: question.trim(),
+      language: user?.language || 'fr',
+      speed_mode: 'balanced',
+      user_id: user?.id,
+      user_email: user?.email
+    }
+    
+    console.log('📤 Corps de la requête:', requestBody)
+    
+    // ✅ Headers sans token Supabase (backend ne le reconnaît pas)
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-User-ID': user?.id || '',
+      'X-User-Email': user?.email || ''
+    }
+    
+    console.log('📤 Headers avec user info:', headers)
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(requestBody)
+    })
+
+    console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Erreur API détaillée:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Authentification requise - Votre backend ne reconnaît pas l\'utilisateur')
+      }
+      if (response.status === 403) {
+        throw new Error('Accès non autorisé - Permissions insuffisantes')
+      }
+      
+      throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ Réponse RAG reçue:', data)
+    'use client'
 
 // Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
 export const runtime = 'nodejs'
@@ -1182,29 +1341,15 @@ const UserMenuButton = () => {
 
 // ==================== FONCTION generateAIResponse CORRIGÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ URL correcte de l'API
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+  // ✅ URL correcte confirmée par test PowerShell
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
   
   try {
-    console.log('🤖 Envoi question au RAG Intelia:', question)
+    console.log('🤖 Envoi question au RAG Intelia (endpoint public):', question)
     console.log('📡 URL API:', apiUrl)
     console.log('👤 Utilisateur:', user?.id, user?.email)
     
-    // ✅ Récupération du token Supabase
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.error('❌ Erreur récupération session:', sessionError)
-      throw new Error('Erreur d\'authentification - session invalide')
-    }
-    
-    if (!session?.access_token) {
-      console.error('❌ Pas de token d\'accès disponible')
-      throw new Error('Authentification requise - veuillez vous reconnecter')
-    }
-    
-    console.log('✅ Token d\'authentification récupéré')
-    
+    // ✅ Corps de la requête pour l'endpoint public
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
@@ -1213,17 +1358,13 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     
     console.log('📤 Corps de la requête:', requestBody)
     
-    // Headers avec authentification Supabase
+    // ✅ Headers sans authentification pour l'endpoint public
     const headers = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
+      'Accept': 'application/json'
     }
     
-    console.log('📤 Headers avec auth:', { 
-      ...headers, 
-      Authorization: `Bearer ${session.access_token.substring(0, 20)}...` 
-    })
+    console.log('📤 Headers (endpoint public):', headers)
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -1236,20 +1377,64 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     if (!response.ok) {
       const errorText = await response.text()
       console.error('❌ Erreur API détaillée:', errorText)
-      
-      if (response.status === 401) {
-        throw new Error('Session expirée - veuillez vous reconnecter')
-      }
-      if (response.status === 403) {
-        throw new Error('Accès non autorisé - vérifiez vos permissions')
-      }
-      
       throw new Error(`Erreur API: ${response.status} - ${errorText}`)
     }
 
     const data = await response.json()
     console.log('✅ Réponse RAG reçue:', data)
     
+    const adaptedResponse: ExpertApiResponse = {
+      question: question,
+      response: data.response || data.answer || data.message || "Réponse reçue",
+      conversation_id: data.timestamp || Date.now().toString(),
+      rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced' || false,
+      timestamp: data.timestamp || new Date().toISOString(),
+      language: data.language || 'fr',
+      response_time_ms: (data.processing_time || 0) * 1000,
+      confidence_score: data.sources?.length > 0 ? 0.9 : 0.7
+    }
+    
+    // Sauvegarde optionnelle
+    if (user && adaptedResponse.conversation_id) {
+      try {
+        console.log('💾 Tentative sauvegarde conversation...')
+        await conversationService.saveConversation({
+          user_id: user.id,
+          question: question,
+          response: data.response || data.answer || data.message,
+          conversation_id: adaptedResponse.conversation_id,
+          confidence_score: adaptedResponse.confidence_score,
+          response_time_ms: adaptedResponse.response_time_ms,
+          language: adaptedResponse.language,
+          rag_used: adaptedResponse.rag_used
+        })
+      } catch (saveError) {
+        console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
+      }
+    }
+    
+    return adaptedResponse
+    
+  } catch (error: any) {
+    console.error('❌ Erreur lors de l\'appel au RAG:', error)
+    
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error(`Erreur de connexion au serveur.
+
+**URL testée:** ${apiUrl}
+**Erreur technique:** ${error.message}
+
+Vérifiez votre connexion internet et réessayez.`)
+    }
+    
+    throw new Error(`Erreur technique avec l'API : ${error.message}
+
+**URL testée:** ${apiUrl}
+**Type d'erreur:** ${error.name}
+
+Consultez la console développeur (F12) pour plus de détails.`)
+  }
+}
     const adaptedResponse: ExpertApiResponse = {
       question: question,
       response: data.response || data.answer || data.message || "Réponse reçue",
