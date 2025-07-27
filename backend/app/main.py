@@ -1,6 +1,6 @@
 """
-Intelia Expert - API Backend avec Logging Intégré
-Version 2.3.1 - FIXED: Import logging corrigé
+Intelia Expert - API Backend avec Imports Corrigés
+Version 2.4.0 - FIXED: Structure modulaire app/api/v1/
 """
 
 import os
@@ -56,36 +56,65 @@ supabase: Optional[Client] = None
 security = HTTPBearer()
 
 # =============================================================================
-# IMPORT LOGGING SYSTEM - CORRIGÉ
+# IMPORT ROUTERS - STRUCTURE CORRIGÉE app/api/v1/
 # =============================================================================
 
 # Import du système de logging personnalisé
 try:
-    # ✅ CORRIGÉ: Import explicite du fichier logging.py local
-    sys.path.insert(0, os.path.dirname(__file__))
-    import logging as logging_module  # Import du fichier logging.py local
-    from logging import router as logging_router
+    from app.api.v1.logging import router as logging_router
     LOGGING_AVAILABLE = True
     logger.info("✅ Système de logging personnalisé importé avec succès")
 except ImportError as e:
     LOGGING_AVAILABLE = False
     logging_router = None
-    logger.error(f"❌ Erreur import logging personnalisé: {e}")
-    logger.error("💡 Vérifiez que le fichier logging.py existe dans le même dossier")
-
-# =============================================================================
-# IMPORT EXPERT ROUTER - NOUVEAU
-# =============================================================================
+    logger.warning(f"⚠️ Erreur import logging router: {e}")
 
 # Import du router expert
 try:
-    from expert import router as expert_router
+    from app.api.v1.expert import router as expert_router
     EXPERT_ROUTER_AVAILABLE = True
     logger.info("✅ Expert router importé avec succès")
 except ImportError as e:
     EXPERT_ROUTER_AVAILABLE = False
     expert_router = None
-    logger.error(f"❌ Erreur import expert router: {e}")
+    logger.warning(f"⚠️ Erreur import expert router: {e}")
+
+# Import des autres routers disponibles
+try:
+    from app.api.v1.auth import router as auth_router
+    AUTH_ROUTER_AVAILABLE = True
+    logger.info("✅ Auth router importé avec succès")
+except ImportError as e:
+    AUTH_ROUTER_AVAILABLE = False
+    auth_router = None
+    logger.warning(f"⚠️ Auth router non disponible: {e}")
+
+try:
+    from app.api.v1.admin import router as admin_router
+    ADMIN_ROUTER_AVAILABLE = True
+    logger.info("✅ Admin router importé avec succès")
+except ImportError as e:
+    ADMIN_ROUTER_AVAILABLE = False
+    admin_router = None
+    logger.warning(f"⚠️ Admin router non disponible: {e}")
+
+try:
+    from app.api.v1.health import router as health_router
+    HEALTH_ROUTER_AVAILABLE = True
+    logger.info("✅ Health router importé avec succès")
+except ImportError as e:
+    HEALTH_ROUTER_AVAILABLE = False
+    health_router = None
+    logger.warning(f"⚠️ Health router non disponible: {e}")
+
+try:
+    from app.api.v1.system import router as system_router
+    SYSTEM_ROUTER_AVAILABLE = True
+    logger.info("✅ System router importé avec succès")
+except ImportError as e:
+    SYSTEM_ROUTER_AVAILABLE = False
+    system_router = None
+    logger.warning(f"⚠️ System router non disponible: {e}")
 
 # =============================================================================
 # MULTI-LANGUAGE SUPPORT - 7 LANGUES
@@ -444,10 +473,11 @@ async def process_question_with_rag(
             "language": language
         }
         
-        # ✅ NOUVEAU: LOG LA CONVERSATION SI LOGGING DISPONIBLE
+        # ✅ LOG LA CONVERSATION SI LOGGING DISPONIBLE
         if LOGGING_AVAILABLE and user:
             try:
-                from logging import ConversationCreate, logger_instance
+                # Import the models from the correct location
+                from app.api.v1.logging import ConversationCreate, logger_instance
                 
                 conversation_data = ConversationCreate(
                     user_id=user.id,
@@ -566,7 +596,7 @@ def get_rag_status() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting Intelia Expert API with Logging...")
+    logger.info("🚀 Starting Intelia Expert API v2.4.0...")
     
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
@@ -578,6 +608,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"🤖 RAG modules: {'Available' if rag_embedder else 'Not Available'}")
     logger.info(f"📝 Logging system: {'Available' if LOGGING_AVAILABLE else 'Not Available'}")
     logger.info(f"🔧 Expert router: {'Available' if EXPERT_ROUTER_AVAILABLE else 'Not Available'}")
+    logger.info(f"🔐 Auth router: {'Available' if AUTH_ROUTER_AVAILABLE else 'Not Available'}")
+    logger.info(f"⚕️ Health router: {'Available' if HEALTH_ROUTER_AVAILABLE else 'Not Available'}")
+    logger.info(f"🎛️ Admin router: {'Available' if ADMIN_ROUTER_AVAILABLE else 'Not Available'}")
+    logger.info(f"🖥️ System router: {'Available' if SYSTEM_ROUTER_AVAILABLE else 'Not Available'}")
     
     if rag_embedder and rag_embedder.has_search_engine():
         logger.info("🔍 RAG system: Optimized (with document search)")
@@ -596,8 +630,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale avec Logging",
-    version="2.3.1",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Structure Modulaire",
+    version="2.4.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -618,40 +652,86 @@ app.add_middleware(
 )
 
 # =============================================================================
-# INCLUSION DES ROUTERS - CORRIGÉ
+# INCLUSION DES ROUTERS - STRUCTURE MODULAIRE
 # =============================================================================
 
 # Router de logging personnalisé
-if LOGGING_AVAILABLE:
-    app.include_router(logging_router, prefix="/api/v1")
-    logger.info("✅ Logging router intégré avec succès sur /api/v1")
+if LOGGING_AVAILABLE and logging_router:
+    try:
+        app.include_router(logging_router, prefix="/api/v1")
+        logger.info("✅ Logging router intégré avec succès sur /api/v1")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration logging router: {e}")
+        LOGGING_AVAILABLE = False
 else:
     logger.warning("⚠️ Logging router non disponible")
 
 # Router expert (routes alternatives)
-if EXPERT_ROUTER_AVAILABLE:
-    app.include_router(expert_router, prefix="/api/v1/expert")
-    logger.info("✅ Expert router intégré avec succès sur /api/v1/expert")
+if EXPERT_ROUTER_AVAILABLE and expert_router:
+    try:
+        app.include_router(expert_router, prefix="/api/v1/expert")
+        logger.info("✅ Expert router intégré avec succès sur /api/v1/expert")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration expert router: {e}")
+        EXPERT_ROUTER_AVAILABLE = False
 else:
-    logger.warning("⚠️ Expert router non disponible")
+    logger.warning("⚠️ Expert router non disponible - utilisation endpoints intégrés")
+
+# Router auth
+if AUTH_ROUTER_AVAILABLE and auth_router:
+    try:
+        app.include_router(auth_router, prefix="/api/v1/auth")
+        logger.info("✅ Auth router intégré avec succès sur /api/v1/auth")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration auth router: {e}")
+
+# Router admin
+if ADMIN_ROUTER_AVAILABLE and admin_router:
+    try:
+        app.include_router(admin_router, prefix="/api/v1/admin")
+        logger.info("✅ Admin router intégré avec succès sur /api/v1/admin")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration admin router: {e}")
+
+# Router health
+if HEALTH_ROUTER_AVAILABLE and health_router:
+    try:
+        app.include_router(health_router, prefix="/api/v1")
+        logger.info("✅ Health router intégré avec succès sur /api/v1")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration health router: {e}")
+
+# Router system
+if SYSTEM_ROUTER_AVAILABLE and system_router:
+    try:
+        app.include_router(system_router, prefix="/api/v1/system")
+        logger.info("✅ System router intégré avec succès sur /api/v1/system")
+    except Exception as e:
+        logger.error(f"❌ Erreur intégration system router: {e}")
 
 # =============================================================================
-# API ENDPOINTS - ROUTAGE CORRIGÉ (/api/v1/ pour correspondre aux tests)
+# API ENDPOINTS - FALLBACK SI ROUTERS ÉCHOUENT
 # =============================================================================
 
 @app.get("/", response_class=JSONResponse)
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API - Logging Intégré v2.3.1",
+        "message": "Intelia Expert API - Structure Modulaire v2.4.0",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
-        "api_version": "2.3.1",
+        "api_version": "2.4.0",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
-        "logging_system": LOGGING_AVAILABLE,
-        "expert_router": EXPERT_ROUTER_AVAILABLE,
+        "routers_status": {
+            "logging": LOGGING_AVAILABLE,
+            "expert": EXPERT_ROUTER_AVAILABLE,
+            "auth": AUTH_ROUTER_AVAILABLE,
+            "admin": ADMIN_ROUTER_AVAILABLE,
+            "health": HEALTH_ROUTER_AVAILABLE,
+            "system": SYSTEM_ROUTER_AVAILABLE
+        },
         "supported_languages": ["fr", "en", "es"],
         "performance_modes": ["fast", "balanced", "quality"],
         "cors_configured": True,
@@ -659,22 +739,18 @@ async def root():
             "/api/v1/expert/ask-public",
             "/api/v1/expert/ask", 
             "/api/v1/expert/feedback",
-            "/api/v1/expert/ask-router",
-            "/api/v1/expert/ask-public-router",
             "/api/v1/logging/conversation",
-            "/api/v1/logging/conversation/{id}/feedback",
-            "/api/v1/logging/user/{id}/conversations",
-            "/api/v1/logging/analytics",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/health",
-            "/api/docs"
+            "/docs",
+            "/debug/routers"
         ]
     }
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - FALLBACK"""
     db_status = "connected" if supabase else "disconnected"
     
     return HealthResponse(
@@ -686,7 +762,11 @@ async def health_check():
             "database": db_status,
             "rag_system": get_rag_status(),
             "logging_system": "available" if LOGGING_AVAILABLE else "unavailable",
-            "expert_router": "available" if EXPERT_ROUTER_AVAILABLE else "unavailable"
+            "expert_router": "available" if EXPERT_ROUTER_AVAILABLE else "unavailable",
+            "auth_router": "available" if AUTH_ROUTER_AVAILABLE else "unavailable",
+            "admin_router": "available" if ADMIN_ROUTER_AVAILABLE else "unavailable",
+            "health_router": "available" if HEALTH_ROUTER_AVAILABLE else "unavailable",
+            "system_router": "available" if SYSTEM_ROUTER_AVAILABLE else "unavailable"
         },
         config={
             "source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
@@ -697,12 +777,12 @@ async def health_check():
     )
 
 # =============================================================================
-# EXPERT SYSTEM ENDPOINTS - ROUTAGE CORRIGÉ (/api/v1/ pour correspondre)
+# EXPERT SYSTEM ENDPOINTS - FALLBACK SI EXPERT ROUTER ÉCHOUE
 # =============================================================================
 
 @app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest):
-    """Ask a question without authentication"""
+async def ask_expert_public_fallback(request: QuestionRequest):
+    """Ask a question without authentication - FALLBACK ENDPOINT"""
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Le texte de la question est requis")
     
@@ -716,19 +796,19 @@ async def ask_expert_public(request: QuestionRequest):
         
         # Remove sources for public access
         result["sources"] = []
-        result["note"] = result.get("note", "") + " (Accès public - fonctionnalités limitées)"
+        result["note"] = result.get("note", "") + " (Accès public - endpoint fallback)"
         
         return ExpertResponse(**result)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert_public: {e}")
+        logger.error(f"❌ Unexpected error in ask_expert_public_fallback: {e}")
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
 @app.post("/api/v1/expert/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
-    """Ask a question to the expert system - Full features"""
+async def ask_expert_fallback(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
+    """Ask a question to the expert system - FALLBACK ENDPOINT"""
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Le texte de la question est requis")
     
@@ -740,122 +820,98 @@ async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_c
             speed_mode=request.speed_mode or "balanced"
         )
         
+        result["note"] = result.get("note", "") + " (Endpoint fallback intégré)"
+        
         return ExpertResponse(**result)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert: {e}")
+        logger.error(f"❌ Unexpected error in ask_expert_fallback: {e}")
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
 @app.post("/api/v1/expert/feedback")
-async def submit_feedback(feedback: FeedbackRequest):
-    """Submit feedback for a question/answer"""
+async def submit_feedback_fallback(feedback: FeedbackRequest):
+    """Submit feedback for a question/answer - FALLBACK ENDPOINT"""
     try:
-        logger.info(f"📝 Feedback received: rating={feedback.rating}")
+        logger.info(f"📝 Feedback received (fallback): rating={feedback.rating}")
         
         return {
             "status": "received",
-            "message": "Merci pour votre retour !",
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+            "message": "Merci pour votre retour ! (fallback endpoint)",
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "source": "fallback_endpoint"
         }
     except Exception as e:
-        logger.error(f"❌ Error saving feedback: {e}")
+        logger.error(f"❌ Error saving feedback (fallback): {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
 
 # =============================================================================
-# AUTHENTICATION ENDPOINTS - ROUTAGE CORRIGÉ (/api/v1/)
+# DEBUG & ADMIN ENDPOINTS
 # =============================================================================
 
-@app.post("/api/v1/auth/register")
-async def register(request: RegisterRequest):
-    """Register new user"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
+@app.get("/debug/routers")
+async def debug_routers():
+    """Debug endpoint pour voir quels routers sont chargés"""
+    return {
+        "routers_status": {
+            "logging": LOGGING_AVAILABLE,
+            "expert": EXPERT_ROUTER_AVAILABLE, 
+            "auth": AUTH_ROUTER_AVAILABLE,
+            "admin": ADMIN_ROUTER_AVAILABLE,
+            "health": HEALTH_ROUTER_AVAILABLE,
+            "system": SYSTEM_ROUTER_AVAILABLE
+        },
+        "available_routes": [
+            {
+                "path": route.path,
+                "methods": list(route.methods) if hasattr(route, 'methods') else ["GET"]
+            } for route in app.routes
+        ],
+        "modules_loaded": {
+            "supabase": SUPABASE_AVAILABLE,
+            "rag_embedder": rag_embedder is not None,
+            "rag_search_engine": rag_embedder.has_search_engine() if rag_embedder else False
+        },
+        "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+        "version": "2.4.0"
+    }
+
+@app.get("/debug/structure")
+async def debug_structure():
+    """Debug endpoint pour voir la structure du projet"""
     try:
-        # Register with Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            "email": request.email,
-            "password": request.password
-        })
+        structure = {}
         
-        if auth_response.user:
-            # Create user profile
-            user_data = {
-                "email": request.email,
-                "user_type": request.user_type,
-                "full_name": request.full_name,
-                "auth_user_id": auth_response.user.id,
-                "created_at": datetime.utcnow().isoformat(),
-                "preferences": {}
-            }
-            
-            result = supabase.table('users').insert(user_data).execute()
-            
-            return {
-                "message": "User registered successfully",
-                "user_id": result.data[0]['id'],
-                "email": request.email,
-                "user_type": request.user_type
-            }
-        else:
-            raise HTTPException(status_code=400, detail="Registration failed")
-            
-    except Exception as e:
-        logger.error(f"❌ Registration error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/v1/auth/login")
-async def login(request: AuthRequest):
-    """User login"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        # Login with Supabase Auth
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
+        # Lister les modules dans app/api/v1/
+        api_v1_path = os.path.join(backend_dir, "app", "api", "v1")
+        if os.path.exists(api_v1_path):
+            structure["api_v1_modules"] = [
+                f for f in os.listdir(api_v1_path) 
+                if f.endswith('.py') and not f.startswith('__')
+            ]
         
-        if auth_response.user and auth_response.session:
-            # Get user profile
-            result = supabase.table('users').select('*').eq('id', auth_response.user.id).execute()
-            
-            if result.data:
-                user_data = result.data[0]
-                return {
-                    "access_token": auth_response.session.access_token,
-                    "token_type": "bearer",
-                    "user": user_data
-                }
-            else:
-                raise HTTPException(status_code=404, detail="User profile not found")
-        else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-            
+        # Lister les modules RAG
+        rag_path = os.path.join(backend_dir, "rag")
+        if os.path.exists(rag_path):
+            structure["rag_modules"] = [
+                f for f in os.listdir(rag_path) 
+                if f.endswith('.py') and not f.startswith('__')
+            ]
+        
+        return {
+            "project_structure": structure,
+            "backend_dir": backend_dir,
+            "python_path": sys.path[:3],  # First 3 entries
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
     except Exception as e:
-        logger.error(f"❌ Login error: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
-
-@app.post("/api/v1/auth/logout")
-async def logout(user: UserProfile = Depends(get_current_user)):
-    """User logout"""
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Database not available")
-    
-    try:
-        supabase.auth.sign_out()
-        return {"message": "Logged out successfully"}
-    except Exception as e:
-        logger.error(f"❌ Logout error: {e}")
-        return {"message": "Logged out"}
-
-@app.get("/api/v1/auth/profile")
-async def get_profile(user: UserProfile = Depends(get_current_user)):
-    """Get user profile"""
-    return user
+        return {
+            "error": str(e),
+            "backend_dir": backend_dir,
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
 
 # =============================================================================
 # ERROR HANDLERS
@@ -870,7 +926,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "path": str(request.url.path),
-            "api_version": "2.3.1"
+            "api_version": "2.4.0"
         }
     )
 
@@ -900,7 +956,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
-    logger.info(f"📋 Version: 2.3.1 - Fixed Logging Import")
+    logger.info(f"📋 Version: 2.4.0 - Structure Modulaire Corrigée")
     
     uvicorn.run(
         app,
