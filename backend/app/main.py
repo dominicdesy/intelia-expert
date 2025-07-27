@@ -508,22 +508,28 @@ app.add_middleware(
 )
 
 # =============================================================================
-# MONTAGE DES ROUTERS
+# MONTAGE DES ROUTERS AVEC PRÉFIXES CORRECTS
 # =============================================================================
+
+# NOTE ARCHITECTURE:
+# - Les routers sont montés avec des préfixes complets incluant /api
+# - URLs finales: /api/v1/expert/ask-public, /api/v1/auth/login, etc.
+# - Pas besoin de reverse proxy pour ajouter /api (simplicité)
+# - URLs identiques en développement et production
 
 # Router logging
 if LOGGING_AVAILABLE and logging_router:
     try:
-        app.include_router(logging_router, prefix="/v1")
-        logger.info("✅ Router logging monté sur /v1")
+        app.include_router(logging_router, prefix="/api/v1")
+        logger.info("✅ Router logging monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router logging: {e}")
 
-# Router expert
+# Router expert - CORRECTION PRINCIPALE
 if EXPERT_ROUTER_AVAILABLE and expert_router:
     try:
-        app.include_router(expert_router, prefix="/v1/expert")
-        logger.info("✅ Router expert monté sur /v1/expert")
+        app.include_router(expert_router, prefix="/api/v1/expert")
+        logger.info("✅ Router expert monté sur /api/v1/expert")
         
         # Configurer les références RAG pour le router expert
         if hasattr(expert_router, 'setup_rag_references'):
@@ -535,32 +541,32 @@ if EXPERT_ROUTER_AVAILABLE and expert_router:
 # Router auth
 if AUTH_ROUTER_AVAILABLE and auth_router:
     try:
-        app.include_router(auth_router, prefix="/v1/auth")
-        logger.info("✅ Router auth monté sur /v1/auth")
+        app.include_router(auth_router, prefix="/api/v1/auth")
+        logger.info("✅ Router auth monté sur /api/v1/auth")
     except Exception as e:
         logger.error(f"❌ Erreur montage router auth: {e}")
 
 # Router admin
 if ADMIN_ROUTER_AVAILABLE and admin_router:
     try:
-        app.include_router(admin_router, prefix="/v1/admin")
-        logger.info("✅ Router admin monté sur /v1/admin")
+        app.include_router(admin_router, prefix="/api/v1/admin")
+        logger.info("✅ Router admin monté sur /api/v1/admin")
     except Exception as e:
         logger.error(f"❌ Erreur montage router admin: {e}")
 
-# Router health
+# Router health  
 if HEALTH_ROUTER_AVAILABLE and health_router:
     try:
-        app.include_router(health_router, prefix="/v1")
-        logger.info("✅ Router health monté sur /v1")
+        app.include_router(health_router, prefix="/api/v1")
+        logger.info("✅ Router health monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router health: {e}")
 
 # Router system
 if SYSTEM_ROUTER_AVAILABLE and system_router:
     try:
-        app.include_router(system_router, prefix="/v1/system")
-        logger.info("✅ Router system monté sur /v1/system")
+        app.include_router(system_router, prefix="/api/v1/system")
+        logger.info("✅ Router system monté sur /api/v1/system")
     except Exception as e:
         logger.error(f"❌ Erreur montage router system: {e}")
 
@@ -588,9 +594,9 @@ async def root():
         },
         "supported_languages": ["fr", "en", "es"],
         "available_endpoints": [
-            "/v1/expert/ask-public",
-            "/v1/expert/topics",
-            "/health",
+            "/api/v1/expert/ask-public",
+            "/api/v1/expert/topics",
+            "/api/v1/health",
             "/docs",
             "/debug/routers"
         ]
@@ -719,7 +725,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Démarrage de Intelia Expert API sur {host}:{port}")
-    logger.info(f"📋 Version: 3.0.0 - Architecture Propre")
+    logger.info(f"📋 Version: 3.0.0 - Architecture Propre + Préfixes Corrigés")
     
     uvicorn.run(
         app,
