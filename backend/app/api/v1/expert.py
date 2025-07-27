@@ -1,5 +1,5 @@
 """
-app/api/v1/expert.py - Version Propre avec Intégration RAG
+app/api/v1/expert.py - Version Corrigée avec Intégration RAG
 """
 import os
 import logging
@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field
 
 # OpenAI import sécurisé
@@ -21,11 +21,6 @@ except ImportError:
 
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
-
-# Variables globales pour stocker les références RAG
-_rag_embedder = None
-_process_question_with_rag = None
-_get_rag_status = None
 
 # =============================================================================
 # MODÈLES PYDANTIC
@@ -43,10 +38,12 @@ class ExpertResponse(BaseModel):
     response: str
     conversation_id: str
     rag_used: bool
+    rag_score: Optional[float] = None  # ✅ Score de confiance RAG
     timestamp: str
     language: str
     response_time_ms: int
     mode: str = "expert_router_v1"
+    user: Optional[str] = None  # ✅ Préparé pour authentification future
 
 class FeedbackRequest(BaseModel):
     """Feedback request model"""
@@ -58,35 +55,6 @@ class TopicsResponse(BaseModel):
     topics: List[str]
     language: str
     count: int
-
-# =============================================================================
-# FONCTION D'INITIALISATION RAG
-# =============================================================================
-
-def setup_rag_references(app):
-    """Configure les références RAG directement"""
-    global _rag_embedder, _process_question_with_rag, _get_rag_status
-    
-    try:
-        # Initialisation directe sans événement startup
-        if hasattr(app, 'state'):
-            _rag_embedder = getattr(app.state, 'rag_embedder', None)
-            _process_question_with_rag = getattr(app.state, 'process_question_with_rag', None)
-            _get_rag_status = getattr(app.state, 'get_rag_status', None)
-            
-            if _process_question_with_rag:
-                logger.info("✅ Système RAG connecté avec succès dans expert router")
-                return True
-            else:
-                logger.warning("⚠️ Fonction process_question_with_rag non disponible")
-                return False
-        else:
-            logger.error("❌ app.state non disponible")
-            return False
-            
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de l'initialisation RAG: {e}")
-        return False
 
 # =============================================================================
 # PROMPTS MULTI-LANGUES
@@ -102,6 +70,20 @@ Answer precisely and practically in English, providing advice based on industry 
     "es": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308.
 Responde de manera precisa y práctica en español, dando consejos basados en las mejores prácticas del sector."""
 }
+
+# =============================================================================
+# PROTECTION ENDPOINTS DEBUG
+# =============================================================================
+
+def admin_protection():
+    """Protection pour les endpoints debug en production"""
+    # Pour l'instant désactivé, mais préparé pour production
+    environment = os.getenv('ENVIRONMENT', 'development')
+    if environment == 'production':
+        # Décommenter pour activer en production :
+        # raise HTTPException(status_code=403, detail="Debug endpoints restricted in production")
+        pass
+    return True
 
 # =============================================================================
 # FONCTIONS HELPER
@@ -165,7 +147,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest):
+async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
     """Ask question sans authentification - AVEC RAG si disponible"""
     start_time = time.time()
     
@@ -177,26 +159,35 @@ async def ask_expert_public(request: QuestionRequest):
         conversation_id = str(uuid.uuid4())
         logger.info(f"🌐 Question publique - ID: {conversation_id[:8]}...")
         
-        # Essayer d'utiliser le RAG si disponible
+        # ✅ Préparé pour authentification future
+        user = getattr(fastapi_request.state, "user", None)
+        
+        # Accéder au RAG via app.state
         rag_used = False
+        rag_score = None  # ✅ Score de confiance
         answer = ""
         mode = "direct_openai"
         
-        if _process_question_with_rag:
+        # Obtenir process_question_with_rag depuis app.state
+        app = fastapi_request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if process_rag:
             try:
                 logger.info("🔍 Utilisation du système RAG...")
-                result = await _process_question_with_rag(
+                result = await process_rag(
                     question=question_text,
-                    user=None,
+                    user=user,  # ✅ Passé au RAG (None pour publique)
                     language=request.language or "fr",
                     speed_mode=request.speed_mode or "balanced"
                 )
                 
                 answer = result.get("response", "")
                 rag_used = result.get("mode", "").startswith("rag")
+                rag_score = result.get("score")  # ✅ Extraction score confiance
                 mode = result.get("mode", "rag_enhanced")
                 
-                logger.info(f"✅ RAG {'utilisé' if rag_used else 'consulté sans résultats'}")
+                logger.info(f"✅ RAG {'utilisé' if rag_used else 'consulté sans résultats'} - Score: {rag_score}")
                 
             except Exception as rag_error:
                 logger.error(f"❌ Erreur RAG, fallback OpenAI: {rag_error}")
@@ -221,10 +212,12 @@ async def ask_expert_public(request: QuestionRequest):
             response=answer,
             conversation_id=conversation_id,
             rag_used=rag_used,
+            rag_score=rag_score,  # ✅ Inclus score confiance
             timestamp=datetime.now().isoformat(),
             language=request.language or "fr",
             response_time_ms=response_time_ms,
-            mode=mode
+            mode=mode,
+            user=str(user) if user else None  # ✅ Inclus dans réponse
         )
     
     except HTTPException:
@@ -234,9 +227,9 @@ async def ask_expert_public(request: QuestionRequest):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest):
+async def ask_expert(request: QuestionRequest, fastapi_request: Request):
     """Ask question avec authentification - même logique pour l'instant"""
-    return await ask_expert_public(request)
+    return await ask_expert_public(request, fastapi_request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
@@ -313,13 +306,18 @@ async def get_conversation_history():
 # ENDPOINTS DE DEBUG
 # =============================================================================
 
-@router.get("/debug/status")
-async def debug_status():
+@router.get("/debug/status", dependencies=[Depends(admin_protection)])
+async def debug_status(request: Request):
     """Debug endpoint pour vérifier le statut du service"""
+    app = request.app
+    rag_embedder = getattr(app.state, 'rag_embedder', None)
+    get_rag_status = getattr(app.state, 'get_rag_status', None)
+    process_rag = getattr(app.state, 'process_question_with_rag', None)  # ✅ Corrigé
+    
     rag_status = "not_available"
-    if _get_rag_status:
+    if get_rag_status:
         try:
-            rag_status = _get_rag_status()
+            rag_status = get_rag_status()
         except:
             pass
     
@@ -329,41 +327,58 @@ async def debug_status():
             "openai_key_configured": bool(os.getenv('OPENAI_API_KEY'))
         },
         "rag_system": {
-            "embedder_connected": _rag_embedder is not None,
-            "function_connected": _process_question_with_rag is not None,
+            "embedder_connected": rag_embedder is not None,
+            "function_connected": process_rag is not None,  # ✅ Utilise la variable locale
             "status": rag_status
         },
         "timestamp": datetime.now().isoformat(),
         "version": "1.0.0"
     }
 
-@router.get("/debug/test-question")
-async def debug_test_question():
-    """Test endpoint avec question sur Compass"""
+@router.get("/debug/test-question", dependencies=[Depends(admin_protection)])
+async def debug_test_question(
+    request: Request, 
+    text: Optional[str] = Query(None, description="Custom question text")
+):  # ✅ Paramètre text personnalisable
+    """Test endpoint avec question sur Compass - question personnalisable"""
+    
+    # ✅ Question par défaut ou personnalisée
+    test_text = text or "What are the Compass Performance Analysis Protocol diagnostic patterns for Ross 308?"
+    
     test_request = QuestionRequest(
-        text="What are the Compass Performance Analysis Protocol diagnostic patterns for Ross 308?",
+        text=test_text,
         language="en",
         speed_mode="quality"
     )
     
     try:
-        response = await ask_expert_public(test_request)
+        # ✅ Passe maintenant request comme 2e argument
+        response = await ask_expert_public(test_request, request)
         return {
             "test_status": "success",
+            "question_tested": test_text,
             "rag_used": response.rag_used,
+            "rag_score": response.rag_score,  # ✅ Score inclus
             "response_preview": response.response[:200] + "..." if len(response.response) > 200 else response.response,
-            "response_time_ms": response.response_time_ms
+            "response_time_ms": response.response_time_ms,
+            "mode": response.mode
         }
     except Exception as e:
+        # ✅ Utilise la bonne variable locale
+        process_rag = getattr(request.app.state, 'process_question_with_rag', None)
         return {
             "test_status": "error",
+            "question_tested": test_text,
             "error": str(e),
-            "rag_available": _process_question_with_rag is not None
+            "rag_available": process_rag is not None
         }
 
-@router.get("/debug/routes")
-async def debug_routes():
+@router.get("/debug/routes", dependencies=[Depends(admin_protection)])
+async def debug_routes(request: Request):  # ✅ Ajouté Request parameter pour cohérence
     """Debug endpoint pour lister les routes disponibles"""
+    # ✅ Utilise la bonne variable locale
+    process_rag = getattr(request.app.state, 'process_question_with_rag', None)
+    
     return {
         "routes": [
             {"path": "/api/v1/expert/ask-public", "method": "POST", "description": "Question publique"},
@@ -371,11 +386,11 @@ async def debug_routes():
             {"path": "/api/v1/expert/feedback", "method": "POST", "description": "Soumettre feedback"},
             {"path": "/api/v1/expert/topics", "method": "GET", "description": "Sujets suggérés"},
             {"path": "/api/v1/expert/history", "method": "GET", "description": "Historique"},
-            {"path": "/api/v1/expert/debug/status", "method": "GET", "description": "Statut système"},
-            {"path": "/api/v1/expert/debug/test-question", "method": "GET", "description": "Test RAG"},
-            {"path": "/api/v1/expert/debug/routes", "method": "GET", "description": "Liste routes"}
+            {"path": "/api/v1/expert/debug/status", "method": "GET", "description": "Statut système (admin)"},
+            {"path": "/api/v1/expert/debug/test-question", "method": "GET", "description": "Test RAG (admin)", "params": "?text=custom_question"},
+            {"path": "/api/v1/expert/debug/routes", "method": "GET", "description": "Liste routes (admin)"}
         ],
-        "rag_connected": _process_question_with_rag is not None,
+        "rag_connected": process_rag is not None,  # ✅ Corrigé
         "timestamp": datetime.now().isoformat()
     }
 
