@@ -1,79 +1,4 @@
-// ==================== FONCTION generateAIResponse CORRIGÉE ====================
-const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ URL corrigée avec /api manquant
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'// ==================== FONCTION generateAIResponse AVEC URLs DE FALLBACK ====================
-const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ URLs possibles à tester (par ordre de priorité)
-  const possibleUrls = [
-    'https://expert-app-cngws.ondigitalocean.app/v1/expert/ask',
-    'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask',
-    'https://expert-app-cngws.ondigitalocean.app/expert/ask',
-    'https://expert-app-cngws.ondigitalocean.app/v1/expert/ask-public',
-    'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
-  ]
-  
-  let lastError: Error | null = null
-  
-  for (const apiUrl of possibleUrls) {
-    try {
-      console.log('🤖 Test URL API:', apiUrl)
-      console.log('📤 Question:', question)
-      console.log('👤 Utilisateur:', user?.id, user?.email)
-      
-      // ✅ Corps de la requête pour l'endpoint
-      const requestBody = {
-        text: question.trim(),
-        language: user?.language || 'fr',
-        speed_mode: 'fast'  // ✅ Mode rapide pour réponses concises
-      }
-      
-      console.log('📤 Corps de la requête:', requestBody)
-      
-      // ✅ Headers standards
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      console.log('📊 Statut réponse API:', response.status, response.statusText)
-
-      if (response.status === 404) {
-        console.log('❌ Endpoint non trouvé (404), tentative URL suivante...')
-        continue // Essayer l'URL suivante
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Erreur API détaillée:', errorText)
-        lastError = new Error(`Erreur API: ${response.status} - ${errorText}`)
-        continue
-      }
-
-      const data = await response.json()
-      console.log('✅ Réponse RAG reçue:', data)
-      console.log('✅ URL API fonctionnelle:', apiUrl)
-      
-      const adaptedResponse: ExpertApiResponse = {
-        question: question,
-        response: data.response || data.answer || data.message || "Réponse reçue",
-        conversation_id: data.timestamp || Date.now().toString(),
-        rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced' || false,
-        timestamp: data.timestamp || new Date().toISOString(),
-        language: data.language || 'fr',
-        response_time_ms: (data.processing_time || 0) * 1000,
-        confidence_score: data.sources?.length > 0 ? 0.9 : 0.7
-      }
-      
-      // Sauvegarde opt'use client'
-
-// Forcer l'utilisation du runtime Node.js au lieu d'Edge Runtime
-export const runtime = 'nodejs'
+'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -115,7 +40,7 @@ interface ConversationData {
 
 // ==================== SERVICE DE LOGGING AVEC URL CORRIGÉE ====================
 class ConversationService {
-  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"  // ✅ CORRIGÉ: /api/v1 au lieu de /v1
+  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"
   private loggingEnabled = true
 
   async saveConversation(data: ConversationData): Promise<void> {
@@ -239,7 +164,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'fast'  // ✅ CORRIGÉ: Mode rapide pour réponses concises
+      speed_mode: 'fast'  // ✅ Mode rapide pour réponses concises
     }
     
     console.log('📤 Corps de la requête:', requestBody)
