@@ -1,15 +1,15 @@
 """
-app/api/v1/expert.py - Version avec intégration RAG complète
+app/api/v1/expert.py - Version corrigée SANS import circulaire
+Utilise une approche différente pour accéder au RAG
 """
 import os
-import sys
 import logging
 import uuid
 import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 # OpenAI import sécurisé
@@ -19,27 +19,11 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-# Import du système RAG depuis main
-try:
-    # Remonter au répertoire backend pour importer depuis main
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    if backend_dir not in sys.path:
-        sys.path.insert(0, backend_dir)
-    
-    from main import process_question_with_rag, rag_embedder, get_rag_status
-    RAG_AVAILABLE = True
-except ImportError as e:
-    RAG_AVAILABLE = False
-    process_question_with_rag = None
-    rag_embedder = None
-    get_rag_status = lambda: "not_available"
-    logging.warning(f"⚠️ RAG system not available in expert router: {e}")
-
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# MODÈLES PYDANTIC
+# MODÈLES PYDANTIC SIMPLIFIÉS
 # =============================================================================
 
 class QuestionRequest(BaseModel):
@@ -47,10 +31,9 @@ class QuestionRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000, description="Question text")
     language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
-    context: Optional[str] = Field(None, description="Additional context")
 
 class ExpertResponse(BaseModel):
-    """Response model avec support RAG"""
+    """Response model simplifié"""
     question: str
     response: str
     conversation_id: str
@@ -58,14 +41,10 @@ class ExpertResponse(BaseModel):
     timestamp: str
     language: str
     response_time_ms: int
-    mode: str
-    sources: Optional[List[Dict[str, Any]]] = []
-    processing_time: Optional[float] = None
-    note: Optional[str] = None
+    mode: str = "expert_router_v1"
 
 class FeedbackRequest(BaseModel):
-    """Feedback request model"""
-    conversation_id: Optional[str] = None
+    """Feedback request model simplifié"""
     rating: str = Field(..., description="Rating: positive, negative, neutral")
     comment: Optional[str] = Field(None, max_length=500, description="Optional comment")
 
@@ -99,77 +78,82 @@ def get_expert_prompt(language: str) -> str:
     return EXPERT_PROMPTS.get(language, EXPERT_PROMPTS["fr"])
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback si ni RAG ni OpenAI disponibles"""
+    """Réponse de fallback si OpenAI n'est pas disponible"""
     fallback_responses = {
-        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{question[:50]}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène. Veuillez réessayer plus tard pour une réponse plus détaillée.",
-        "en": f"I am a veterinary expert. For your question about '{question[:50]}...', I recommend monitoring environmental parameters and maintaining good hygiene practices. Please try again later for a more detailed response.",
-        "es": f"Soy un experto veterinario. Para su pregunta sobre '{question[:50]}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene. Intente nuevamente más tarde para una respuesta más detallada."
+        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{question[:50]}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène.",
+        "en": f"I am a veterinary expert. For your question about '{question[:50]}...', I recommend monitoring environmental parameters and maintaining good hygiene practices.",
+        "es": f"Soy un experto veterinario. Para su pregunta sobre '{question[:50]}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene."
     }
     return fallback_responses.get(language, fallback_responses["fr"])
 
-async def process_question_direct_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> Dict[str, Any]:
-    """Fallback direct OpenAI sans RAG"""
+async def process_question_with_rag_if_available(request: Request, question: str, language: str = "fr", speed_mode: str = "balanced") -> Dict[str, Any]:
+    """Essaie d'utiliser le RAG si disponible dans l'app FastAPI"""
+    try:
+        # Accéder à l'app FastAPI depuis la request
+        app = request.app
+        
+        # Vérifier si le RAG est disponible dans l'état de l'app
+        if hasattr(app.state, 'rag_embedder') and app.state.rag_embedder:
+            logger.info("🔍 RAG embedder trouvé dans app.state")
+            
+            # Vérifier si la fonction process_question_with_rag existe
+            if hasattr(app.state, 'process_question_with_rag'):
+                logger.info("✅ Fonction RAG trouvée, utilisation...")
+                result = await app.state.process_question_with_rag(
+                    question=question,
+                    user=None,
+                    language=language,
+                    speed_mode=speed_mode
+                )
+                return result
+            else:
+                logger.warning("⚠️ Fonction process_question_with_rag non trouvée dans app.state")
+        else:
+            logger.warning("⚠️ RAG embedder non trouvé dans app.state")
+    except Exception as e:
+        logger.error(f"❌ Erreur accès RAG: {e}")
+    
+    # Fallback si RAG non disponible
+    return None
+
+async def process_question_openai(question: str, language: str = "fr") -> str:
+    """Process question using OpenAI directly"""
     if not OPENAI_AVAILABLE:
-        return {
-            "response": get_fallback_response(question, language),
-            "mode": "static_fallback",
-            "note": "Service temporairement indisponible"
-        }
+        return get_fallback_response(question, language)
     
     try:
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             logger.warning("OpenAI API key not found")
-            return {
-                "response": get_fallback_response(question, language),
-                "mode": "static_fallback",
-                "note": "Configuration manquante"
-            }
+            return get_fallback_response(question, language)
         
         openai.api_key = api_key
         system_prompt = get_expert_prompt(language)
         
-        # Configuration par mode
-        model_config = {
-            "fast": {"model": "gpt-3.5-turbo", "max_tokens": 300},
-            "balanced": {"model": "gpt-3.5-turbo", "max_tokens": 500},
-            "quality": {"model": "gpt-4o-mini", "max_tokens": 800}
-        }
-        
-        config = model_config.get(speed_mode, model_config["balanced"])
-        
         response = openai.chat.completions.create(
-            model=config["model"],
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": question}
             ],
             temperature=0.7,
-            max_tokens=config["max_tokens"],
+            max_tokens=500,
             timeout=15
         )
         
-        return {
-            "response": response.choices[0].message.content,
-            "mode": "direct_openai",
-            "note": "Réponse sans recherche documentaire (RAG non disponible)"
-        }
+        return response.choices[0].message.content
         
     except Exception as e:
         logger.error(f"OpenAI error: {e}")
-        return {
-            "response": get_fallback_response(question, language),
-            "mode": "error_fallback",
-            "note": f"Erreur technique: {str(e)}"
-        }
+        return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS AVEC INTÉGRATION RAG
+# ENDPOINTS
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest):
-    """Ask question sans authentification - AVEC RAG"""
+async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
+    """Ask question sans authentification - Essaie d'utiliser le RAG si disponible"""
     start_time = time.time()
     
     try:
@@ -181,51 +165,28 @@ async def ask_expert_public(request: QuestionRequest):
         conversation_id = str(uuid.uuid4())
         logger.info(f"🌐 Question publique - ID: {conversation_id}")
         
-        # Utiliser le système RAG si disponible
-        if RAG_AVAILABLE and process_question_with_rag:
-            try:
-                logger.info(f"🔍 Utilisation du système RAG pour la question: {question_text[:50]}...")
-                
-                # Appeler la fonction RAG depuis main.py
-                result = await process_question_with_rag(
-                    question=question_text,
-                    user=None,  # Pas d'utilisateur pour l'endpoint public
-                    language=request.language or "fr",
-                    speed_mode=request.speed_mode or "balanced"
-                )
-                
-                # Extraire les informations du résultat
-                answer = result.get("response", "")
-                rag_used = result.get("mode", "").startswith("rag")
-                sources = result.get("sources", [])
-                note = result.get("note", "")
-                
-                logger.info(f"✅ RAG utilisé: {rag_used}, Sources trouvées: {len(sources)}")
-                
-            except Exception as rag_error:
-                logger.error(f"❌ Erreur RAG, fallback OpenAI: {rag_error}")
-                # Fallback sur OpenAI direct
-                fallback_result = await process_question_direct_openai(
-                    question_text, 
-                    request.language or "fr",
-                    request.speed_mode or "balanced"
-                )
-                answer = fallback_result["response"]
-                rag_used = False
-                sources = []
-                note = fallback_result.get("note", "")
+        # Essayer d'utiliser le RAG si disponible
+        rag_result = await process_question_with_rag_if_available(
+            fastapi_request, 
+            question_text, 
+            request.language or "fr",
+            request.speed_mode or "balanced"
+        )
+        
+        if rag_result:
+            # RAG a fonctionné
+            logger.info("✅ Réponse via RAG")
+            answer = rag_result.get("response", "")
+            rag_used = True
+            mode = rag_result.get("mode", "rag_enhanced")
+            note = rag_result.get("note", "Réponse basée sur la recherche documentaire")
         else:
-            # RAG non disponible, utiliser OpenAI direct
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct")
-            fallback_result = await process_question_direct_openai(
-                question_text,
-                request.language or "fr", 
-                request.speed_mode or "balanced"
-            )
-            answer = fallback_result["response"]
+            # Fallback sur OpenAI
+            logger.info("🔄 Fallback sur OpenAI direct")
+            answer = await process_question_openai(question_text, request.language or "fr")
             rag_used = False
-            sources = []
-            note = fallback_result.get("note", "")
+            mode = "direct_openai"
+            note = "Réponse sans recherche documentaire"
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
@@ -237,10 +198,7 @@ async def ask_expert_public(request: QuestionRequest):
             timestamp=datetime.now().isoformat(),
             language=request.language or "fr",
             response_time_ms=response_time_ms,
-            mode="expert_router_v1_public",
-            sources=sources,
-            processing_time=round(time.time() - start_time, 2),
-            note=note
+            mode=mode
         )
         
         logger.info(f"✅ Réponse publique - ID: {conversation_id} - RAG: {rag_used}")
@@ -253,25 +211,21 @@ async def ask_expert_public(request: QuestionRequest):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest):
-    """Ask question avec authentification - AVEC RAG"""
-    # Même logique que ask_expert_public mais pourrait avoir des fonctionnalités supplémentaires
-    # Pour l'instant, on réutilise la même logique
-    return await ask_expert_public(request)
+async def ask_expert(request: QuestionRequest, fastapi_request: Request):
+    """Ask question avec authentification"""
+    # Pour l'instant, même logique que public
+    return await ask_expert_public(request, fastapi_request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
     """Submit feedback on response"""
     try:
-        logger.info(f"📊 Feedback reçu: {request.rating} pour conversation {request.conversation_id}")
-        
-        # Ici on pourrait sauvegarder le feedback en base de données
+        logger.info(f"📊 Feedback reçu: {request.rating}")
         
         return {
             "success": True,
             "message": "Feedback enregistré avec succès",
             "timestamp": datetime.now().isoformat(),
-            "conversation_id": request.conversation_id,
             "source": "expert_router_v1"
         }
     
@@ -281,7 +235,7 @@ async def submit_feedback(request: FeedbackRequest):
 
 @router.get("/topics", response_model=TopicsResponse)
 async def get_suggested_topics(language: str = "fr"):
-    """Get suggested topics - peut être enrichi avec les documents RAG"""
+    """Get suggested topics"""
     try:
         topics_by_language = {
             "fr": [
@@ -290,9 +244,7 @@ async def get_suggested_topics(language: str = "fr"):
                 "Température optimale pour élevage",
                 "Patterns de diagnostic du poids",
                 "Mortalité élevée - diagnostic",
-                "Ventilation et qualité d'air",
-                "Protocoles de vaccination",
-                "Indices de conversion alimentaire"
+                "Ventilation et qualité d'air"
             ],
             "en": [
                 "Compass Performance Analysis Protocol",
@@ -300,9 +252,7 @@ async def get_suggested_topics(language: str = "fr"):
                 "Weight Performance Diagnostic Patterns",
                 "Optimal temperature for farming",
                 "High mortality - diagnosis", 
-                "Ventilation and air quality",
-                "Vaccination protocols",
-                "Feed conversion ratios"
+                "Ventilation and air quality"
             ],
             "es": [
                 "Protocolos Compass análisis rendimiento",
@@ -310,9 +260,7 @@ async def get_suggested_topics(language: str = "fr"):
                 "Patrones diagnóstico peso",
                 "Temperatura óptima crianza",
                 "Mortalidad alta - diagnóstico",
-                "Ventilación y calidad aire",
-                "Protocolos vacunación",
-                "Índices conversión alimentaria"
+                "Ventilación y calidad aire"
             ]
         }
         
@@ -334,8 +282,7 @@ async def get_conversation_history():
     return {
         "status": "expert_router_v1",
         "message": "Historique conversations via router expert",
-        "note": "Version avec intégration RAG",
-        "rag_status": get_rag_status() if RAG_AVAILABLE else "not_available"
+        "note": "Version sans import circulaire"
     }
 
 # =============================================================================
@@ -343,52 +290,51 @@ async def get_conversation_history():
 # =============================================================================
 
 @router.get("/debug/status")
-async def debug_status():
+async def debug_status(request: Request):
     """Debug endpoint pour vérifier le statut du service"""
-    rag_status = "not_available"
-    rag_documents = 0
+    rag_available = False
+    rag_status = "not_checked"
     
-    if RAG_AVAILABLE:
-        rag_status = get_rag_status()
-        if rag_embedder and hasattr(rag_embedder, 'documents'):
-            rag_documents = len(rag_embedder.documents) if rag_embedder.documents else 0
+    try:
+        app = request.app
+        if hasattr(app.state, 'rag_embedder') and app.state.rag_embedder:
+            rag_available = True
+            if hasattr(app.state.rag_embedder, 'has_search_engine'):
+                rag_status = "optimized" if app.state.rag_embedder.has_search_engine() else "fallback"
+    except:
+        pass
     
     return {
         "expert_service_available": OPENAI_AVAILABLE,
-        "rag_available": RAG_AVAILABLE,
+        "rag_available": rag_available,
         "rag_status": rag_status,
-        "rag_documents": rag_documents,
         "module_path": __name__,
         "timestamp": datetime.now().isoformat(),
-        "version": "expert_router_v1_with_rag"
+        "version": "expert_router_v1_no_circular"
     }
 
 @router.get("/debug/test-question")
-async def debug_test_question():
-    """Test endpoint avec question qui devrait déclencher le RAG"""
+async def debug_test_question(request: Request):
+    """Test endpoint avec question simple"""
     test_request = QuestionRequest(
-        text="What are the Compass Performance Analysis Protocol diagnostic patterns for Ross 308?",
-        language="en",
-        speed_mode="quality"
+        text="Test de fonctionnement du système Ross 308",
+        language="fr"
     )
     
     try:
-        response = await ask_expert_public(test_request)
+        response = await ask_expert_public(test_request, request)
         return {
             "test_status": "success",
-            "response_preview": response.response[:200] + "...",
+            "response_preview": response.response[:100] + "...",
             "response_time_ms": response.response_time_ms,
             "mode": response.mode,
             "rag_used": response.rag_used,
-            "sources_count": len(response.sources) if response.sources else 0,
-            "rag_available": RAG_AVAILABLE,
-            "rag_status": get_rag_status() if RAG_AVAILABLE else "not_available"
+            "pydantic_fix": "working"
         }
     except Exception as e:
         return {
             "test_status": "error",
             "error": str(e),
-            "rag_available": RAG_AVAILABLE,
             "timestamp": datetime.now().isoformat()
         }
 
@@ -406,17 +352,12 @@ async def debug_routes():
             "/api/v1/expert/debug/test-question",
             "/api/v1/expert/debug/routes"
         ],
-        "features": {
-            "rag_integration": RAG_AVAILABLE,
-            "openai_fallback": OPENAI_AVAILABLE,
-            "multi_language": True,
-            "speed_modes": ["fast", "balanced", "quality"]
-        },
+        "note": "Routes expert v1 - Sans import circulaire",
         "timestamp": datetime.now().isoformat()
     }
 
 # =============================================================================
-# CONFIGURATION AU DÉMARRAGE
+# CONFIGURATION OPENAI
 # =============================================================================
 
 # Configuration OpenAI
@@ -426,9 +367,3 @@ if openai_api_key and OPENAI_AVAILABLE:
     logger.info("✅ OpenAI configuré avec succès dans expert router v1")
 else:
     logger.warning("⚠️ OpenAI API key manquante ou module indisponible dans expert router v1")
-
-# Log du statut RAG
-if RAG_AVAILABLE:
-    logger.info("✅ Système RAG disponible dans expert router")
-else:
-    logger.warning("⚠️ Système RAG non disponible dans expert router - fallback sur OpenAI direct")

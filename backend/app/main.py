@@ -634,6 +634,11 @@ async def lifespan(app: FastAPI):
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
     
+    # ✅ AJOUT: Exposer le RAG dans app.state pour les routers
+    app.state.rag_embedder = rag_embedder
+    app.state.process_question_with_rag = process_question_with_rag
+    app.state.get_rag_status = get_rag_status
+
     logger.info("✅ Application created successfully")
     logger.info("📊 Multi-language support: FR, EN, ES")
     logger.info("⚡ Performance modes: fast, balanced, quality")
