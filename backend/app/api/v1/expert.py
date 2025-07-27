@@ -1,6 +1,5 @@
 """
-app/api/v1/expert.py - Version corrigée SANS import circulaire
-Utilise une approche différente pour accéder au RAG
+app/api/v1/expert.py - Version avec RAG fonctionnel
 """
 import os
 import logging
@@ -9,7 +8,7 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 # OpenAI import sécurisé
@@ -22,8 +21,12 @@ except ImportError:
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
+# Variable globale pour stocker les références RAG
+_rag_system = None
+_process_question_func = None
+
 # =============================================================================
-# MODÈLES PYDANTIC SIMPLIFIÉS
+# MODÈLES PYDANTIC
 # =============================================================================
 
 class QuestionRequest(BaseModel):
@@ -33,7 +36,7 @@ class QuestionRequest(BaseModel):
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
 
 class ExpertResponse(BaseModel):
-    """Response model simplifié"""
+    """Response model avec support RAG"""
     question: str
     response: str
     conversation_id: str
@@ -44,7 +47,7 @@ class ExpertResponse(BaseModel):
     mode: str = "expert_router_v1"
 
 class FeedbackRequest(BaseModel):
-    """Feedback request model simplifié"""
+    """Feedback request model"""
     rating: str = Field(..., description="Rating: positive, negative, neutral")
     comment: Optional[str] = Field(None, max_length=500, description="Optional comment")
 
@@ -53,6 +56,28 @@ class TopicsResponse(BaseModel):
     topics: List[str]
     language: str
     count: int
+
+# =============================================================================
+# INITIALISATION DU SYSTÈME RAG
+# =============================================================================
+
+def initialize_rag_references(app):
+    """Initialise les références RAG depuis app.state"""
+    global _rag_system, _process_question_func
+    
+    try:
+        if hasattr(app.state, 'rag_embedder'):
+            _rag_system = app.state.rag_embedder
+            logger.info("✅ RAG embedder référencé depuis app.state")
+        
+        if hasattr(app.state, 'process_question_with_rag'):
+            _process_question_func = app.state.process_question_with_rag
+            logger.info("✅ Fonction process_question_with_rag référencée")
+            
+        return _rag_system is not None and _process_question_func is not None
+    except Exception as e:
+        logger.error(f"❌ Erreur initialisation RAG: {e}")
+        return False
 
 # =============================================================================
 # PROMPTS MULTI-LANGUES
@@ -78,43 +103,13 @@ def get_expert_prompt(language: str) -> str:
     return EXPERT_PROMPTS.get(language, EXPERT_PROMPTS["fr"])
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback si OpenAI n'est pas disponible"""
+    """Réponse de fallback si ni RAG ni OpenAI disponibles"""
     fallback_responses = {
         "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{question[:50]}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène.",
         "en": f"I am a veterinary expert. For your question about '{question[:50]}...', I recommend monitoring environmental parameters and maintaining good hygiene practices.",
         "es": f"Soy un experto veterinario. Para su pregunta sobre '{question[:50]}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene."
     }
     return fallback_responses.get(language, fallback_responses["fr"])
-
-async def process_question_with_rag_if_available(request: Request, question: str, language: str = "fr", speed_mode: str = "balanced") -> Dict[str, Any]:
-    """Essaie d'utiliser le RAG si disponible dans l'app FastAPI"""
-    try:
-        # Accéder à l'app FastAPI depuis la request
-        app = request.app
-        
-        # Vérifier si le RAG est disponible dans l'état de l'app
-        if hasattr(app.state, 'rag_embedder') and app.state.rag_embedder:
-            logger.info("🔍 RAG embedder trouvé dans app.state")
-            
-            # Vérifier si la fonction process_question_with_rag existe
-            if hasattr(app.state, 'process_question_with_rag'):
-                logger.info("✅ Fonction RAG trouvée, utilisation...")
-                result = await app.state.process_question_with_rag(
-                    question=question,
-                    user=None,
-                    language=language,
-                    speed_mode=speed_mode
-                )
-                return result
-            else:
-                logger.warning("⚠️ Fonction process_question_with_rag non trouvée dans app.state")
-        else:
-            logger.warning("⚠️ RAG embedder non trouvé dans app.state")
-    except Exception as e:
-        logger.error(f"❌ Erreur accès RAG: {e}")
-    
-    # Fallback si RAG non disponible
-    return None
 
 async def process_question_openai(question: str, language: str = "fr") -> str:
     """Process question using OpenAI directly"""
@@ -148,12 +143,18 @@ async def process_question_openai(question: str, language: str = "fr") -> str:
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS
+# ENDPOINTS AVEC RAG
 # =============================================================================
 
+@router.on_event("startup")
+async def startup_event():
+    """Initialise les références RAG au démarrage du router"""
+    # Cette fonction sera appelée après que l'app soit complètement initialisée
+    pass
+
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
-    """Ask question sans authentification - Essaie d'utiliser le RAG si disponible"""
+async def ask_expert_public(request: QuestionRequest):
+    """Ask question sans authentification - AVEC RAG"""
     start_time = time.time()
     
     try:
@@ -166,27 +167,31 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
         logger.info(f"🌐 Question publique - ID: {conversation_id}")
         
         # Essayer d'utiliser le RAG si disponible
-        rag_result = await process_question_with_rag_if_available(
-            fastapi_request, 
-            question_text, 
-            request.language or "fr",
-            request.speed_mode or "balanced"
-        )
+        rag_used = False
+        answer = ""
+        mode = "direct_openai"
         
-        if rag_result:
-            # RAG a fonctionné
-            logger.info("✅ Réponse via RAG")
-            answer = rag_result.get("response", "")
-            rag_used = True
-            mode = rag_result.get("mode", "rag_enhanced")
-            note = rag_result.get("note", "Réponse basée sur la recherche documentaire")
+        if _process_question_func:
+            try:
+                logger.info(f"🔍 Tentative d'utilisation du RAG...")
+                result = await _process_question_func(
+                    question=question_text,
+                    user=None,
+                    language=request.language or "fr",
+                    speed_mode=request.speed_mode or "balanced"
+                )
+                answer = result.get("response", "")
+                rag_used = result.get("mode", "").startswith("rag")
+                mode = result.get("mode", "rag_enhanced")
+                logger.info(f"✅ RAG utilisé avec succès: {rag_used}")
+            except Exception as rag_error:
+                logger.error(f"❌ Erreur RAG: {rag_error}")
+                # Fallback sur OpenAI
+                answer = await process_question_openai(question_text, request.language or "fr")
         else:
-            # Fallback sur OpenAI
-            logger.info("🔄 Fallback sur OpenAI direct")
+            # RAG non disponible, utiliser OpenAI direct
+            logger.info("⚠️ Fonction RAG non disponible, utilisation OpenAI direct")
             answer = await process_question_openai(question_text, request.language or "fr")
-            rag_used = False
-            mode = "direct_openai"
-            note = "Réponse sans recherche documentaire"
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
@@ -211,10 +216,10 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest, fastapi_request: Request):
+async def ask_expert(request: QuestionRequest):
     """Ask question avec authentification"""
     # Pour l'instant, même logique que public
-    return await ask_expert_public(request, fastapi_request)
+    return await ask_expert_public(request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
@@ -282,7 +287,7 @@ async def get_conversation_history():
     return {
         "status": "expert_router_v1",
         "message": "Historique conversations via router expert",
-        "note": "Version sans import circulaire"
+        "rag_available": _process_question_func is not None
     }
 
 # =============================================================================
@@ -290,46 +295,34 @@ async def get_conversation_history():
 # =============================================================================
 
 @router.get("/debug/status")
-async def debug_status(request: Request):
+async def debug_status():
     """Debug endpoint pour vérifier le statut du service"""
-    rag_available = False
-    rag_status = "not_checked"
-    
-    try:
-        app = request.app
-        if hasattr(app.state, 'rag_embedder') and app.state.rag_embedder:
-            rag_available = True
-            if hasattr(app.state.rag_embedder, 'has_search_engine'):
-                rag_status = "optimized" if app.state.rag_embedder.has_search_engine() else "fallback"
-    except:
-        pass
-    
     return {
         "expert_service_available": OPENAI_AVAILABLE,
-        "rag_available": rag_available,
-        "rag_status": rag_status,
+        "rag_available": _process_question_func is not None,
+        "rag_system_loaded": _rag_system is not None,
         "module_path": __name__,
         "timestamp": datetime.now().isoformat(),
-        "version": "expert_router_v1_no_circular"
+        "version": "expert_router_v1_rag"
     }
 
 @router.get("/debug/test-question")
-async def debug_test_question(request: Request):
+async def debug_test_question():
     """Test endpoint avec question simple"""
     test_request = QuestionRequest(
-        text="Test de fonctionnement du système Ross 308",
-        language="fr"
+        text="What are the Compass Performance Analysis Protocol patterns?",
+        language="en",
+        speed_mode="quality"
     )
     
     try:
-        response = await ask_expert_public(test_request, request)
+        response = await ask_expert_public(test_request)
         return {
             "test_status": "success",
-            "response_preview": response.response[:100] + "...",
+            "response_preview": response.response[:200] + "...",
             "response_time_ms": response.response_time_ms,
             "mode": response.mode,
-            "rag_used": response.rag_used,
-            "pydantic_fix": "working"
+            "rag_used": response.rag_used
         }
     except Exception as e:
         return {
@@ -352,9 +345,39 @@ async def debug_routes():
             "/api/v1/expert/debug/test-question",
             "/api/v1/expert/debug/routes"
         ],
-        "note": "Routes expert v1 - Sans import circulaire",
+        "rag_status": {
+            "function_available": _process_question_func is not None,
+            "system_available": _rag_system is not None
+        },
         "timestamp": datetime.now().isoformat()
     }
+
+# =============================================================================
+# HOOK POUR INITIALISER RAG APRÈS LE MONTAGE
+# =============================================================================
+
+@router.get("/init-rag")
+async def init_rag_endpoint():
+    """Endpoint pour forcer l'initialisation du RAG"""
+    from fastapi import Request
+    from starlette.applications import Starlette
+    
+    # Trouver l'app principale
+    app = None
+    for route in router.routes:
+        if hasattr(route, 'app'):
+            app = route.app
+            break
+    
+    if app:
+        success = initialize_rag_references(app)
+        return {
+            "initialized": success,
+            "rag_function": _process_question_func is not None,
+            "rag_system": _rag_system is not None
+        }
+    else:
+        return {"error": "App not found"}
 
 # =============================================================================
 # CONFIGURATION OPENAI
