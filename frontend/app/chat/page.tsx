@@ -1,6 +1,44 @@
 // ==================== FONCTION generateAIResponse CORRIGÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-      }
+  // ==================== FONCTION generateAIResponse CORRIGÉE ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  // ✅ URL confirmée qui fonctionne (endpoint public)
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
+  
+  try {
+    console.log('🤖 Envoi question au RAG Intelia:', question)
+    console.log('📡 URL API:', apiUrl)
+    console.log('👤 Utilisateur:', user?.id, user?.email)
+    
+    const requestBody = {
+      text: question.trim(),
+      language: user?.language || 'fr',
+      speed_mode: 'balanced'
+    }
+    
+    console.log('📤 Corps de la requête:', requestBody)
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(requestBody)
+    })
+
+    console.log('📊 Statut réponse API:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Erreur API détaillée:', errorText)
+      throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ Réponse RAG reçue:', data)
     
     const adaptedResponse: ExpertApiResponse = {
       question: question,
