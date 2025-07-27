@@ -1,6 +1,6 @@
 """
 Intelia Expert - API Backend avec Imports Corrigés
-Version 2.4.0 - FIXED: Structure modulaire app/api/v1/
+Version 2.4.1 - FIXED: Conflits de routes + Debug avancé
 """
 
 import os
@@ -56,7 +56,7 @@ supabase: Optional[Client] = None
 security = HTTPBearer()
 
 # =============================================================================
-# IMPORT ROUTERS - STRUCTURE CORRIGÉE app/api/v1/
+# IMPORT ROUTERS - STRUCTURE CORRIGÉE app/api/v1/ + DEBUG AVANCÉ
 # =============================================================================
 
 # Import du système de logging personnalisé
@@ -64,26 +64,56 @@ try:
     from app.api.v1.logging import router as logging_router
     LOGGING_AVAILABLE = True
     logger.info("✅ Système de logging personnalisé importé avec succès")
+    logger.info(f"🔍 DEBUG: logging_router = {logging_router}")
+    logger.info(f"🔍 DEBUG: logging_router type = {type(logging_router)}")
+    if hasattr(logging_router, 'routes'):
+        logger.info(f"🔍 DEBUG: logging_router routes count = {len(logging_router.routes)}")
 except ImportError as e:
     LOGGING_AVAILABLE = False
     logging_router = None
     logger.warning(f"⚠️ Erreur import logging router: {e}")
 
-# Import du router expert
+# Import du router expert AVEC DEBUG DÉTAILLÉ
 try:
     from app.api.v1.expert import router as expert_router
     EXPERT_ROUTER_AVAILABLE = True
     logger.info("✅ Expert router importé avec succès")
+    
+    # 🔍 DEBUG EXPERT ROUTER DÉTAILLÉ
+    logger.info(f"🔍 DEBUG: expert_router = {expert_router}")
+    logger.info(f"🔍 DEBUG: expert_router type = {type(expert_router)}")
+    
+    if expert_router:
+        if hasattr(expert_router, 'routes'):
+            logger.info(f"🔍 DEBUG: expert_router routes count = {len(expert_router.routes)}")
+            for i, route in enumerate(expert_router.routes):
+                route_info = {
+                    "path": getattr(route, 'path', 'NO_PATH'),
+                    "methods": list(getattr(route, 'methods', [])),
+                    "name": getattr(route, 'name', 'NO_NAME')
+                }
+                logger.info(f"🔍 DEBUG: expert route {i}: {route_info}")
+        else:
+            logger.warning("⚠️ DEBUG: expert_router has no 'routes' attribute")
+            
+        # Vérifier les attributs disponibles
+        attrs = [attr for attr in dir(expert_router) if not attr.startswith('_')]
+        logger.info(f"🔍 DEBUG: expert_router attributes = {attrs}")
+    else:
+        logger.error("❌ DEBUG: expert_router is None after import!")
+        
 except ImportError as e:
     EXPERT_ROUTER_AVAILABLE = False
     expert_router = None
-    logger.warning(f"⚠️ Erreur import expert router: {e}")
+    logger.error(f"❌ Erreur import expert router: {e}")
+    logger.error(f"❌ DEBUG: Import traceback: {traceback.format_exc()}")
 
 # Import des autres routers disponibles
 try:
     from app.api.v1.auth import router as auth_router
     AUTH_ROUTER_AVAILABLE = True
     logger.info("✅ Auth router importé avec succès")
+    logger.info(f"🔍 DEBUG: auth_router routes = {len(auth_router.routes) if hasattr(auth_router, 'routes') else 'NO_ROUTES'}")
 except ImportError as e:
     AUTH_ROUTER_AVAILABLE = False
     auth_router = None
@@ -93,6 +123,7 @@ try:
     from app.api.v1.admin import router as admin_router
     ADMIN_ROUTER_AVAILABLE = True
     logger.info("✅ Admin router importé avec succès")
+    logger.info(f"🔍 DEBUG: admin_router routes = {len(admin_router.routes) if hasattr(admin_router, 'routes') else 'NO_ROUTES'}")
 except ImportError as e:
     ADMIN_ROUTER_AVAILABLE = False
     admin_router = None
@@ -102,6 +133,7 @@ try:
     from app.api.v1.health import router as health_router
     HEALTH_ROUTER_AVAILABLE = True
     logger.info("✅ Health router importé avec succès")
+    logger.info(f"🔍 DEBUG: health_router routes = {len(health_router.routes) if hasattr(health_router, 'routes') else 'NO_ROUTES'}")
 except ImportError as e:
     HEALTH_ROUTER_AVAILABLE = False
     health_router = None
@@ -111,6 +143,7 @@ try:
     from app.api.v1.system import router as system_router
     SYSTEM_ROUTER_AVAILABLE = True
     logger.info("✅ System router importé avec succès")
+    logger.info(f"🔍 DEBUG: system_router routes = {len(system_router.routes) if hasattr(system_router, 'routes') else 'NO_ROUTES'}")
 except ImportError as e:
     SYSTEM_ROUTER_AVAILABLE = False
     system_router = None
@@ -596,7 +629,7 @@ def get_rag_status() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Starting Intelia Expert API v2.4.0...")
+    logger.info("🚀 Starting Intelia Expert API v2.4.1...")
     
     supabase_success = initialize_supabase()
     rag_success = await initialize_rag_system()
@@ -631,7 +664,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelia Expert API",
     description="Assistant IA Expert pour la Santé et Nutrition Animale - Structure Modulaire",
-    version="2.4.0",
+    version="2.4.1",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -652,27 +685,52 @@ app.add_middleware(
 )
 
 # =============================================================================
-# INCLUSION DES ROUTERS - STRUCTURE MODULAIRE
+# INCLUSION DES ROUTERS - STRUCTURE MODULAIRE + DEBUG DÉTAILLÉ
 # =============================================================================
 
 # Router de logging personnalisé
 if LOGGING_AVAILABLE and logging_router:
     try:
+        logger.info("🔍 DEBUG: Montage logging_router...")
         app.include_router(logging_router, prefix="/api/v1")
         logger.info("✅ Logging router intégré avec succès sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur intégration logging router: {e}")
+        logger.error(f"❌ DEBUG: Logging router traceback: {traceback.format_exc()}")
         LOGGING_AVAILABLE = False
 else:
     logger.warning("⚠️ Logging router non disponible")
 
-# Router expert (routes alternatives)
+# Router expert AVEC DEBUG AVANCÉ
 if EXPERT_ROUTER_AVAILABLE and expert_router:
     try:
+        logger.info("🔍 DEBUG: Montage expert_router...")
+        logger.info(f"🔍 DEBUG: expert_router avant montage = {expert_router}")
+        
+        # Vérifier que le router a des routes
+        if hasattr(expert_router, 'routes') and len(expert_router.routes) > 0:
+            logger.info(f"🔍 DEBUG: expert_router a {len(expert_router.routes)} routes à monter")
+            
+            # Lister les routes avant montage
+            for i, route in enumerate(expert_router.routes):
+                route_info = f"Route {i}: {getattr(route, 'path', 'NO_PATH')} {list(getattr(route, 'methods', []))}"
+                logger.info(f"🔍 DEBUG: {route_info}")
+        else:
+            logger.warning("⚠️ DEBUG: expert_router n'a PAS de routes à monter!")
+        
+        # Tenter le montage
         app.include_router(expert_router, prefix="/api/v1/expert")
         logger.info("✅ Expert router intégré avec succès sur /api/v1/expert")
+        
+        # Vérifier le montage en listant les routes de l'app
+        expert_routes_mounted = [route for route in app.routes if '/expert/' in str(getattr(route, 'path', ''))]
+        logger.info(f"🔍 DEBUG: Routes expert montées dans l'app: {len(expert_routes_mounted)}")
+        for route in expert_routes_mounted:
+            logger.info(f"🔍 DEBUG: Route montée: {getattr(route, 'path', 'NO_PATH')}")
+            
     except Exception as e:
         logger.error(f"❌ Erreur intégration expert router: {e}")
+        logger.error(f"❌ DEBUG: Expert router traceback: {traceback.format_exc()}")
         EXPERT_ROUTER_AVAILABLE = False
 else:
     logger.warning("⚠️ Expert router non disponible - utilisation endpoints intégrés")
@@ -680,48 +738,77 @@ else:
 # Router auth
 if AUTH_ROUTER_AVAILABLE and auth_router:
     try:
+        logger.info("🔍 DEBUG: Montage auth_router...")
         app.include_router(auth_router, prefix="/api/v1/auth")
         logger.info("✅ Auth router intégré avec succès sur /api/v1/auth")
     except Exception as e:
         logger.error(f"❌ Erreur intégration auth router: {e}")
+        logger.error(f"❌ DEBUG: Auth router traceback: {traceback.format_exc()}")
 
 # Router admin
 if ADMIN_ROUTER_AVAILABLE and admin_router:
     try:
+        logger.info("🔍 DEBUG: Montage admin_router...")
         app.include_router(admin_router, prefix="/api/v1/admin")
         logger.info("✅ Admin router intégré avec succès sur /api/v1/admin")
     except Exception as e:
         logger.error(f"❌ Erreur intégration admin router: {e}")
+        logger.error(f"❌ DEBUG: Admin router traceback: {traceback.format_exc()}")
 
 # Router health
 if HEALTH_ROUTER_AVAILABLE and health_router:
     try:
+        logger.info("🔍 DEBUG: Montage health_router...")
         app.include_router(health_router, prefix="/api/v1")
         logger.info("✅ Health router intégré avec succès sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur intégration health router: {e}")
+        logger.error(f"❌ DEBUG: Health router traceback: {traceback.format_exc()}")
 
 # Router system
 if SYSTEM_ROUTER_AVAILABLE and system_router:
     try:
+        logger.info("🔍 DEBUG: Montage system_router...")
         app.include_router(system_router, prefix="/api/v1/system")
         logger.info("✅ System router intégré avec succès sur /api/v1/system")
     except Exception as e:
         logger.error(f"❌ Erreur intégration system router: {e}")
+        logger.error(f"❌ DEBUG: System router traceback: {traceback.format_exc()}")
 
 # =============================================================================
-# API ENDPOINTS - FALLBACK SI ROUTERS ÉCHOUENT
+# DEBUG POST-MONTAGE - VÉRIFICATION COMPLÈTE
+# =============================================================================
+
+logger.info("🔍 DEBUG: === VÉRIFICATION POST-MONTAGE ===")
+logger.info(f"🔍 DEBUG: Total routes dans l'app: {len(app.routes)}")
+
+# Lister toutes les routes de l'app
+for i, route in enumerate(app.routes):
+    route_info = f"App Route {i}: {getattr(route, 'path', 'NO_PATH')} {list(getattr(route, 'methods', []))}"
+    logger.info(f"🔍 DEBUG: {route_info}")
+
+# Vérifier spécifiquement les routes expert
+expert_routes_final = [route for route in app.routes if '/expert/' in str(getattr(route, 'path', ''))]
+logger.info(f"🔍 DEBUG: Routes expert finales: {len(expert_routes_final)}")
+
+if len(expert_routes_final) == 0:
+    logger.error("❌ CRITIQUE: AUCUNE route expert montée dans l'app!")
+else:
+    logger.info("✅ Routes expert confirmées montées")
+
+# =============================================================================
+# API ENDPOINTS - ROOT & HEALTH
 # =============================================================================
 
 @app.get("/", response_class=JSONResponse)
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API - Structure Modulaire v2.4.0",
+        "message": "Intelia Expert API - Structure Modulaire v2.4.1",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
-        "api_version": "2.4.0",
+        "api_version": "2.4.1",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "routers_status": {
@@ -750,7 +837,7 @@ async def root():
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint - FALLBACK"""
+    """Health check endpoint"""
     db_status = "connected" if supabase else "disconnected"
     
     return HealthResponse(
@@ -777,77 +864,84 @@ async def health_check():
     )
 
 # =============================================================================
-# EXPERT SYSTEM ENDPOINTS - FALLBACK SI EXPERT ROUTER ÉCHOUE
+# EXPERT SYSTEM ENDPOINTS - FALLBACK CONDITIONNEL UNIQUEMENT
 # =============================================================================
 
-@app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
-async def ask_expert_public_fallback(request: QuestionRequest):
-    """Ask a question without authentication - FALLBACK ENDPOINT"""
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Le texte de la question est requis")
+# ✅ FALLBACK ENDPOINTS SEULEMENT SI EXPERT ROUTER ÉCHOUE
+if not EXPERT_ROUTER_AVAILABLE:
+    logger.warning("⚠️ Router expert non disponible - activation des endpoints fallback")
     
-    try:
-        result = await process_question_with_rag(
-            question=request.text,
-            user=None,
-            language=request.language or "fr",
-            speed_mode=request.speed_mode or "fast"
-        )
+    @app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
+    async def ask_expert_public_fallback(request: QuestionRequest):
+        """Ask a question without authentication - FALLBACK ENDPOINT"""
+        if not request.text.strip():
+            raise HTTPException(status_code=400, detail="Le texte de la question est requis")
         
-        # Remove sources for public access
-        result["sources"] = []
-        result["note"] = result.get("note", "") + " (Accès public - endpoint fallback)"
-        
-        return ExpertResponse(**result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert_public_fallback: {e}")
-        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
-
-@app.post("/api/v1/expert/ask", response_model=ExpertResponse)
-async def ask_expert_fallback(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
-    """Ask a question to the expert system - FALLBACK ENDPOINT"""
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Le texte de la question est requis")
+        try:
+            result = await process_question_with_rag(
+                question=request.text,
+                user=None,
+                language=request.language or "fr",
+                speed_mode=request.speed_mode or "fast"
+            )
+            
+            # Remove sources for public access
+            result["sources"] = []
+            result["note"] = result.get("note", "") + " (Accès public - endpoint fallback)"
+            
+            return ExpertResponse(**result)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in ask_expert_public_fallback: {e}")
+            raise HTTPException(status_code=500, detail="Erreur interne du serveur")
     
-    try:
-        result = await process_question_with_rag(
-            question=request.text,
-            user=user,
-            language=request.language or "fr",
-            speed_mode=request.speed_mode or "balanced"
-        )
+    @app.post("/api/v1/expert/ask", response_model=ExpertResponse)
+    async def ask_expert_fallback(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
+        """Ask a question to the expert system - FALLBACK ENDPOINT"""
+        if not request.text.strip():
+            raise HTTPException(status_code=400, detail="Le texte de la question est requis")
         
-        result["note"] = result.get("note", "") + " (Endpoint fallback intégré)"
-        
-        return ExpertResponse(**result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in ask_expert_fallback: {e}")
-        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+        try:
+            result = await process_question_with_rag(
+                question=request.text,
+                user=user,
+                language=request.language or "fr",
+                speed_mode=request.speed_mode or "balanced"
+            )
+            
+            result["note"] = result.get("note", "") + " (Endpoint fallback intégré)"
+            
+            return ExpertResponse(**result)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in ask_expert_fallback: {e}")
+            raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+    
+    @app.post("/api/v1/expert/feedback")
+    async def submit_feedback_fallback(feedback: FeedbackRequest):
+        """Submit feedback for a question/answer - FALLBACK ENDPOINT"""
+        try:
+            logger.info(f"📝 Feedback received (fallback): rating={feedback.rating}")
+            
+            return {
+                "status": "received",
+                "message": "Merci pour votre retour ! (fallback endpoint)",
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "source": "fallback_endpoint"
+            }
+        except Exception as e:
+            logger.error(f"❌ Error saving feedback (fallback): {e}")
+            raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
 
-@app.post("/api/v1/expert/feedback")
-async def submit_feedback_fallback(feedback: FeedbackRequest):
-    """Submit feedback for a question/answer - FALLBACK ENDPOINT"""
-    try:
-        logger.info(f"📝 Feedback received (fallback): rating={feedback.rating}")
-        
-        return {
-            "status": "received",
-            "message": "Merci pour votre retour ! (fallback endpoint)",
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
-            "source": "fallback_endpoint"
-        }
-    except Exception as e:
-        logger.error(f"❌ Error saving feedback (fallback): {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
+else:
+    logger.info("✅ Router expert disponible - endpoints fallback désactivés")
 
 # =============================================================================
-# DEBUG & ADMIN ENDPOINTS
+# DEBUG & ADMIN ENDPOINTS ENRICHIS
 # =============================================================================
 
 @app.get("/debug/routers")
@@ -865,8 +959,16 @@ async def debug_routers():
         "available_routes": [
             {
                 "path": route.path,
-                "methods": list(route.methods) if hasattr(route, 'methods') else ["GET"]
+                "methods": list(route.methods) if hasattr(route, 'methods') else ["GET"],
+                "name": getattr(route, 'name', 'NO_NAME')
             } for route in app.routes
+        ],
+        "expert_routes": [
+            {
+                "path": route.path,
+                "methods": list(route.methods) if hasattr(route, 'methods') else ["GET"],
+                "name": getattr(route, 'name', 'NO_NAME')
+            } for route in app.routes if '/expert/' in str(getattr(route, 'path', ''))
         ],
         "modules_loaded": {
             "supabase": SUPABASE_AVAILABLE,
@@ -874,7 +976,7 @@ async def debug_routers():
             "rag_search_engine": rag_embedder.has_search_engine() if rag_embedder else False
         },
         "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
-        "version": "2.4.0"
+        "version": "2.4.1"
     }
 
 @app.get("/debug/structure")
@@ -902,7 +1004,7 @@ async def debug_structure():
         return {
             "project_structure": structure,
             "backend_dir": backend_dir,
-            "python_path": sys.path[:3],  # First 3 entries
+            "python_path": sys.path[:3],
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
         }
         
@@ -926,7 +1028,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "path": str(request.url.path),
-            "api_version": "2.4.0"
+            "api_version": "2.4.1"
         }
     )
 
@@ -956,7 +1058,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
-    logger.info(f"📋 Version: 2.4.0 - Structure Modulaire Corrigée")
+    logger.info(f"📋 Version: 2.4.1 - Structure Modulaire + Debug + Fix Conflits")
     
     uvicorn.run(
         app,
