@@ -1,6 +1,6 @@
 """
 Intelia Expert - API Backend Corrigée
-Version 2.2.0 - STABLE: Tous problèmes de syntaxe résolus
+Version 2.2.1 - FIXED: Routage URL corrigé
 """
 
 import os
@@ -195,6 +195,13 @@ class AuthRequest(BaseModel):
     """Authentication request"""
     email: str = Field(..., description="User email")
     password: str = Field(..., description="User password")
+
+class RegisterRequest(BaseModel):
+    """Registration request"""
+    email: str = Field(..., description="User email")
+    password: str = Field(..., description="User password", min_length=8)
+    user_type: str = Field(..., description="'producer' or 'professional'")
+    full_name: Optional[str] = Field(None, description="User full name")
 
 # =============================================================================
 # AUTHENTICATION & AUTHORIZATION
@@ -534,7 +541,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelia Expert API",
     description="Assistant IA Expert pour la Santé et Nutrition Animale",
-    version="2.2.0",
+    version="2.2.1",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -555,28 +562,30 @@ app.add_middleware(
 )
 
 # =============================================================================
-# API ENDPOINTS
+# API ENDPOINTS - ROUTAGE CORRIGÉ (/v1/ au lieu de /api/v1/)
 # =============================================================================
 
 @app.get("/", response_class=JSONResponse)
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API - Version Corrigée 2.2.0",
+        "message": "Intelia Expert API - Routage Corrigé v2.2.1",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
-        "api_version": "2.2.0",
+        "api_version": "2.2.1",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "supported_languages": ["fr", "en", "es"],
         "performance_modes": ["fast", "balanced", "quality"],
         "cors_configured": True,
-        "syntax_errors_fixed": True,
+        "routing_fixed": True,
         "available_endpoints": [
-            "/api/v1/expert/ask-public",
-            "/api/v1/expert/ask", 
-            "/api/v1/expert/feedback",
+            "/v1/expert/ask-public",  # ✅ CORRIGÉ: /v1/ au lieu de /api/v1/
+            "/v1/expert/ask", 
+            "/v1/expert/feedback",
+            "/v1/auth/login",
+            "/v1/auth/register",
             "/health",
             "/docs"
         ]
@@ -604,7 +613,11 @@ async def health_check():
         rag_status=get_rag_status()
     )
 
-@app.post("/api/v1/expert/ask-public", response_model=ExpertResponse)
+# =============================================================================
+# EXPERT SYSTEM ENDPOINTS - ROUTAGE CORRIGÉ (/v1/ au lieu de /api/v1/)
+# =============================================================================
+
+@app.post("/v1/expert/ask-public", response_model=ExpertResponse)
 async def ask_expert_public(request: QuestionRequest):
     """Ask a question without authentication"""
     if not request.text.strip():
@@ -630,7 +643,7 @@ async def ask_expert_public(request: QuestionRequest):
         logger.error(f"❌ Unexpected error in ask_expert_public: {e}")
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
-@app.post("/api/v1/expert/ask", response_model=ExpertResponse)
+@app.post("/v1/expert/ask", response_model=ExpertResponse)
 async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_current_user)):
     """Ask a question to the expert system - Full features"""
     if not request.text.strip():
@@ -652,7 +665,7 @@ async def ask_expert(request: QuestionRequest, user: UserProfile = Depends(get_c
         logger.error(f"❌ Unexpected error in ask_expert: {e}")
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
-@app.post("/api/v1/expert/feedback")
+@app.post("/v1/expert/feedback")
 async def submit_feedback(feedback: FeedbackRequest):
     """Submit feedback for a question/answer"""
     try:
@@ -668,6 +681,100 @@ async def submit_feedback(feedback: FeedbackRequest):
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
 
 # =============================================================================
+# AUTHENTICATION ENDPOINTS - ROUTAGE CORRIGÉ (/v1/ au lieu de /api/v1/)
+# =============================================================================
+
+@app.post("/v1/auth/register")
+async def register(request: RegisterRequest):
+    """Register new user"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Register with Supabase Auth
+        auth_response = supabase.auth.sign_up({
+            "email": request.email,
+            "password": request.password
+        })
+        
+        if auth_response.user:
+            # Create user profile
+            user_data = {
+                "email": request.email,
+                "user_type": request.user_type,
+                "full_name": request.full_name,
+                "auth_user_id": auth_response.user.id,
+                "created_at": datetime.utcnow().isoformat(),
+                "preferences": {}
+            }
+            
+            result = supabase.table('users').insert(user_data).execute()
+            
+            return {
+                "message": "User registered successfully",
+                "user_id": result.data[0]['id'],
+                "email": request.email,
+                "user_type": request.user_type
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Registration failed")
+            
+    except Exception as e:
+        logger.error(f"❌ Registration error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/v1/auth/login")
+async def login(request: AuthRequest):
+    """User login"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Login with Supabase Auth
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": request.email,
+            "password": request.password
+        })
+        
+        if auth_response.user and auth_response.session:
+            # Get user profile
+            result = supabase.table('users').select('*').eq('id', auth_response.user.id).execute()
+            
+            if result.data:
+                user_data = result.data[0]
+                return {
+                    "access_token": auth_response.session.access_token,
+                    "token_type": "bearer",
+                    "user": user_data
+                }
+            else:
+                raise HTTPException(status_code=404, detail="User profile not found")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+    except Exception as e:
+        logger.error(f"❌ Login error: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+@app.post("/v1/auth/logout")
+async def logout(user: UserProfile = Depends(get_current_user)):
+    """User logout"""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        supabase.auth.sign_out()
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        logger.error(f"❌ Logout error: {e}")
+        return {"message": "Logged out"}
+
+@app.get("/v1/auth/profile")
+async def get_profile(user: UserProfile = Depends(get_current_user)):
+    """Get user profile"""
+    return user
+
+# =============================================================================
 # ERROR HANDLERS
 # =============================================================================
 
@@ -680,7 +787,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "path": str(request.url.path),
-            "api_version": "2.2.0"
+            "api_version": "2.2.1"
         }
     )
 
@@ -710,7 +817,7 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Starting Intelia Expert API on {host}:{port}")
-    logger.info(f"📋 Version: 2.2.0 - Syntax Errors Fixed")
+    logger.info(f"📋 Version: 2.2.1 - Routing Fixed")
     
     uvicorn.run(
         app,
