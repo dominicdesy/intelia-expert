@@ -64,27 +64,29 @@ class TopicsResponse(BaseModel):
 # =============================================================================
 
 def setup_rag_references(app):
-    """Configure les références RAG au démarrage de l'application"""
-    @app.on_event("startup")
-    async def initialize_rag_references():
-        global _rag_embedder, _process_question_with_rag, _get_rag_status
-        
-        try:
-            # Attendre que app.state soit disponible
-            if hasattr(app, 'state'):
-                _rag_embedder = getattr(app.state, 'rag_embedder', None)
-                _process_question_with_rag = getattr(app.state, 'process_question_with_rag', None)
-                _get_rag_status = getattr(app.state, 'get_rag_status', None)
-                
-                if _process_question_with_rag:
-                    logger.info("✅ Système RAG connecté avec succès dans expert router")
-                else:
-                    logger.warning("⚠️ Fonction process_question_with_rag non disponible")
+    """Configure les références RAG directement"""
+    global _rag_embedder, _process_question_with_rag, _get_rag_status
+    
+    try:
+        # Initialisation directe sans événement startup
+        if hasattr(app, 'state'):
+            _rag_embedder = getattr(app.state, 'rag_embedder', None)
+            _process_question_with_rag = getattr(app.state, 'process_question_with_rag', None)
+            _get_rag_status = getattr(app.state, 'get_rag_status', None)
+            
+            if _process_question_with_rag:
+                logger.info("✅ Système RAG connecté avec succès dans expert router")
+                return True
             else:
-                logger.error("❌ app.state non disponible lors de l'initialisation")
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur lors de l'initialisation RAG: {e}")
+                logger.warning("⚠️ Fonction process_question_with_rag non disponible")
+                return False
+        else:
+            logger.error("❌ app.state non disponible")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de l'initialisation RAG: {e}")
+        return False
 
 # =============================================================================
 # PROMPTS MULTI-LANGUES
