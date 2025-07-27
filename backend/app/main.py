@@ -668,8 +668,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan,
-    root_path="/api"
+    lifespan=lifespan
 )
 
 app.add_middleware(
