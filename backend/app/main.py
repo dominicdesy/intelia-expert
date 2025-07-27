@@ -751,27 +751,41 @@ logger.info("🔄 Attempting to include external routers (optional)...")
 
 registered_routers = []
 
-# Try to include admin router if available
-try:
-    from app.api.admin import router as admin_router
-    app.include_router(admin_router, prefix="/api/v1")
-    registered_routers.append("admin")
-    logger.info("✅ Admin router included successfully")
-except ImportError:
-    logger.info("⚠️ Admin router not available (using direct endpoints)")
-except Exception as e:
-    logger.warning(f"⚠️ Failed to include admin router: {e}")
+# =============================================================================
+# INCLUDE ROUTERS - STRUCTURE V1 DIRECTE
+# =============================================================================
 
-# Try to include auth router if available
-try:
-    from app.api.auth import router as auth_router
-    app.include_router(auth_router, prefix="/api/v1")
-    registered_routers.append("auth")
-    logger.info("✅ Auth router included successfully")
-except ImportError:
-    logger.info("⚠️ Auth router not available (using direct endpoints)")
-except Exception as e:
-    logger.warning(f"⚠️ Failed to include auth router: {e}")
+logger.info("🔄 Enregistrement des routers v1...")
+
+registered_routers = []
+
+# Import et enregistrement des routers avec la structure v1 exacte
+def register_router_safe(module_name, router_name, prefix="/api/v1"):
+    """Register router safely with error handling"""
+    try:
+        module = __import__(f'app.api.v1.{module_name}', fromlist=['router'])
+        router = getattr(module, 'router')
+        app.include_router(router, prefix=prefix)
+        registered_routers.append(router_name)
+        logger.info(f"✅ {router_name.capitalize()} router enregistré à {prefix}/{module_name}")
+        return True
+    except ImportError as e:
+        logger.warning(f"⚠️ {router_name.capitalize()} router import failed: {e}")
+        return False
+    except AttributeError as e:
+        logger.warning(f"⚠️ {router_name.capitalize()} router has no 'router' attribute: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ {router_name.capitalize()} router registration failed: {e}")
+        return False
+
+# Register each router
+register_router_safe('expert', 'expert')
+register_router_safe('admin', 'admin') 
+register_router_safe('auth', 'auth')
+register_router_safe('health', 'health')
+register_router_safe('logging', 'logging')
+register_router_safe('system', 'system')
 
 logger.info(f"📊 External routers included: {', '.join(registered_routers) if registered_routers else 'None'}")
 
