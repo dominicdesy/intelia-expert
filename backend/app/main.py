@@ -724,9 +724,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -797,7 +802,7 @@ logger.info(f"📊 External routers included: {', '.join(registered_routers) if 
 async def root():
     """Root endpoint"""
     return {
-        "message": "Intelia Expert API with Multi-Language RAG + Performance Optimized",
+        "message": "Intelia Expert API - Direct DigitalOcean Access",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables (PRODUCTION)'),
@@ -807,10 +812,68 @@ async def root():
         "supported_languages": ["fr", "en", "es", "pt", "de", "nl", "pl"],
         "performance_modes": ["fast", "balanced", "quality"],
         "external_routers": registered_routers,
-        "endpoint_mode": "hybrid_direct"
+        "endpoint_mode": "direct_digitalocean",
+        "frontend_url": "https://expert.intelia.com",
+        "api_url": "https://expert-app-cngws.ondigitalocean.app",
+        "cors_configured": True,
+        "available_endpoints": [
+            "/api/v1/expert/ask-public",
+            "/api/v1/expert/ask", 
+            "/api/v1/expert/topics",
+            "/api/v1/expert/feedback",
+            "/api/v1/expert/history",
+            "/health",
+            "/docs"
+        ]
     }
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/api/status")
+async def api_status():
+    """API status endpoint optimized for frontend"""
+    return {
+        "api_healthy": True,
+        "database_connected": supabase is not None,
+        "rag_available": get_rag_status() == "optimized",
+        "endpoints_registered": len(registered_routers),
+        "direct_access": True,
+        "cors_enabled": True,
+        "recommended_frontend_config": {
+            "api_base_url": "https://expert-app-cngws.ondigitalocean.app",
+            "endpoints": {
+                "ask_public": "/api/v1/expert/ask-public",
+                "ask_authenticated": "/api/v1/expert/ask",
+                "topics": "/api/v1/expert/topics", 
+                "feedback": "/api/v1/expert/feedback",
+                "health": "/health"
+            }
+        }
+    }
+async def health_check():
+    """Health check endpoint"""
+    db_status = "connected" if supabase else "disconnected"
+    
+    @app.get("/api/status")
+async def api_status():
+    """API status endpoint optimized for frontend"""
+    return {
+        "api_healthy": True,
+        "database_connected": supabase is not None,
+        "rag_available": get_rag_status() == "optimized",
+        "endpoints_registered": len(registered_routers),
+        "direct_access": True,
+        "cors_enabled": True,
+        "recommended_frontend_config": {
+            "api_base_url": "https://expert-app-cngws.ondigitalocean.app",
+            "endpoints": {
+                "ask_public": "/api/v1/expert/ask-public",
+                "ask_authenticated": "/api/v1/expert/ask",
+                "topics": "/api/v1/expert/topics", 
+                "feedback": "/api/v1/expert/feedback",
+                "health": "/health"
+            }
+        }
+    }
+
 async def health_check():
     """Health check endpoint"""
     db_status = "connected" if supabase else "disconnected"
