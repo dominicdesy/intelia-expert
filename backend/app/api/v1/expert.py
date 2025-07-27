@@ -1,14 +1,16 @@
 """
-app/api/expert.py - Version corrigée sans conflits
+app/api/v1/expert.py - Version corrigée sans conflits
+FIXED: Import os déplacé en haut
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+import os  # ✅ DÉPLACÉ EN HAUT
 import logging
 import uuid
 import time
-import openai
 from datetime import datetime
+from typing import Optional, List, Dict, Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 # Configuration OpenAI - direct import
 try:
@@ -107,7 +109,7 @@ def get_fallback_response(question: str, language: str = "fr") -> dict:
         specific_responses = {
             "fr": f"{fallback_base} Pour les Ross 308, maintenez 32-35°C la première semaine, puis réduisez progressivement de 2-3°C par semaine.",
             "en": f"{fallback_base} For Ross 308, maintain 32-35°C in the first week, then gradually reduce by 2-3°C per week.",
-            "es": f"{fallback_base} Para Ross 308, mantén 32-35°C la primera semana, luego reduce gradualmente 2-3°C por semana."
+            "es": f"{fallback_base} Para Ross 308, mantén 32-35°C la primera semaine, luego reduce gradualmente 2-3°C por semana."
         }
     elif any(word in question_lower for word in ["croissance", "growth", "crecimiento"]):
         specific_responses = {
@@ -144,7 +146,7 @@ async def process_question_openai(question: str, language: str = "fr") -> dict:
         return get_fallback_response(question, language)
     
     try:
-        api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.getenv('OPENAI_API_KEY')  # ✅ os maintenant importé
         if not api_key:
             logger.warning("OpenAI API key not found")
             return get_fallback_response(question, language)
@@ -181,9 +183,9 @@ async def process_question_openai(question: str, language: str = "fr") -> dict:
 # ENDPOINTS NON-CONFLICTUELS
 # =============================================================================
 
-@router.post("/ask-router", response_model=ExpertResponse)
-async def ask_expert_router(request: QuestionRequest):
-    """Ask question to AI expert - Router version (non-conflictuel)"""
+@router.post("/ask", response_model=ExpertResponse)
+async def ask_expert(request: QuestionRequest):
+    """Ask question to AI expert - ENDPOINT PRINCIPAL"""
     start_time = time.time()
     
     try:
@@ -193,7 +195,7 @@ async def ask_expert_router(request: QuestionRequest):
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        logger.info(f"🔍 Question router - ID: {conversation_id}")
+        logger.info(f"🔍 Question expert - ID: {conversation_id}")
         logger.info(f"📝 Question: {question_text[:100]}...")
         
         # Process avec OpenAI
@@ -211,23 +213,23 @@ async def ask_expert_router(request: QuestionRequest):
             "response_time_ms": response_time_ms,
             "confidence_score": result.get("confidence_score"),
             "mode": "expert_router",
-            "note": "Traité par le router expert",
+            "note": "Traité par le router expert v1",
             "sources": []
         }
         
-        logger.info(f"✅ Réponse router générée - ID: {conversation_id}, Temps: {response_time_ms}ms")
+        logger.info(f"✅ Réponse expert générée - ID: {conversation_id}, Temps: {response_time_ms}ms")
         
         return ExpertResponse(**response_data)
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur ask expert router: {e}")
+        logger.error(f"❌ Erreur ask expert: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
-@router.post("/ask-public-router", response_model=ExpertResponse)
-async def ask_expert_public_router(request: QuestionRequest):
-    """Ask question sans authentification - Router version (non-conflictuel)"""
+@router.post("/ask-public", response_model=ExpertResponse)
+async def ask_expert_public(request: QuestionRequest):
+    """Ask question sans authentification - ENDPOINT PUBLIC"""
     start_time = time.time()
     
     try:
@@ -237,7 +239,7 @@ async def ask_expert_public_router(request: QuestionRequest):
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        logger.info(f"🌐 Question publique router - ID: {conversation_id}")
+        logger.info(f"🌐 Question publique - ID: {conversation_id}")
         
         # Process avec OpenAI
         result = await process_question_openai(question_text, request.language or "fr")
@@ -254,40 +256,40 @@ async def ask_expert_public_router(request: QuestionRequest):
             "response_time_ms": response_time_ms,
             "confidence_score": result.get("confidence_score"),
             "mode": "public_router",
-            "note": "Accès public via router - fonctionnalités limitées",
+            "note": "Accès public via router expert v1",
             "sources": []
         }
         
-        logger.info(f"✅ Réponse publique router - ID: {conversation_id}")
+        logger.info(f"✅ Réponse publique - ID: {conversation_id}")
         
         return ExpertResponse(**response_data)
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur ask expert public router: {e}")
+        logger.error(f"❌ Erreur ask expert public: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
-@router.post("/feedback-router")
-async def submit_feedback_router(request: FeedbackRequest):
-    """Submit feedback on response - Router version"""
+@router.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Submit feedback on response"""
     try:
-        logger.info(f"📊 Feedback router reçu: {request.rating}")
+        logger.info(f"📊 Feedback reçu: {request.rating}")
         
         return {
             "success": True,
-            "message": "Feedback enregistré avec succès (router)",
+            "message": "Feedback enregistré avec succès",
             "timestamp": datetime.now().isoformat(),
-            "source": "expert_router"
+            "source": "expert_router_v1"
         }
     
     except Exception as e:
-        logger.error(f"❌ Erreur feedback router: {e}")
+        logger.error(f"❌ Erreur feedback: {e}")
         raise HTTPException(status_code=500, detail="Erreur enregistrement feedback")
 
-@router.get("/topics-router", response_model=TopicsResponse)
-async def get_suggested_topics_router(language: str = "fr"):
-    """Get suggested topics - Router version"""
+@router.get("/topics", response_model=TopicsResponse)
+async def get_suggested_topics(language: str = "fr"):
+    """Get suggested topics"""
     try:
         topics_by_language = {
             "fr": [
@@ -331,17 +333,16 @@ async def get_suggested_topics_router(language: str = "fr"):
         )
     
     except Exception as e:
-        logger.error(f"❌ Erreur topics router: {e}")
+        logger.error(f"❌ Erreur topics: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
-@router.get("/history-router")
-async def get_conversation_history_router():
-    """Get conversation history - Router version"""
+@router.get("/history")
+async def get_conversation_history():
+    """Get conversation history"""
     return {
-        "status": "router_version",
+        "status": "expert_router_v1",
         "message": "Historique conversations via router expert",
-        "redirect": "/api/v1/expert/history-router",
-        "note": "Version router - fonctionnalités limitées"
+        "note": "Version router expert v1"
     }
 
 # =============================================================================
@@ -367,7 +368,7 @@ async def debug_test_question():
     )
     
     try:
-        response = await ask_expert_public_router(test_request)
+        response = await ask_expert_public(test_request)
         return {
             "test_status": "success",
             "response_preview": response.response[:100] + "...",
@@ -386,28 +387,25 @@ async def debug_routes():
     """Debug endpoint pour lister les routes disponibles"""
     return {
         "available_routes": [
-            "/expert/ask-router",
-            "/expert/ask-public-router", 
-            "/expert/feedback-router",
-            "/expert/topics-router",
-            "/expert/history-router",
+            "/expert/ask",
+            "/expert/ask-public", 
+            "/expert/feedback",
+            "/expert/topics",
+            "/expert/history",
             "/expert/debug/status",
             "/expert/debug/test-question",
             "/expert/debug/routes"
         ],
-        "note": "Routes non-conflictuelles avec main.py",
+        "note": "Routes expert router v1 - Import os fixé",
         "timestamp": datetime.now().isoformat()
     }
 
 # =============================================================================
-# CONFIGURATION
+# CONFIGURATION OPENAI
 # =============================================================================
 
-# Import des variables d'environnement
-import os
-
 # Configuration OpenAI
-openai_api_key = os.getenv('OPENAI_API_KEY')
+openai_api_key = os.getenv('OPENAI_API_KEY')  # ✅ os maintenant importé
 if openai_api_key and OPENAI_AVAILABLE:
     openai.api_key = openai_api_key
     logger.info("✅ OpenAI configuré avec succès dans expert router")
