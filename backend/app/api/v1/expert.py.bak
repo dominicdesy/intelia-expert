@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 # OpenAI import sécurisé
@@ -21,11 +21,6 @@ except ImportError:
 
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
-
-# Variables globales pour stocker les références RAG
-_rag_embedder = None
-_process_question_with_rag = None
-_get_rag_status = None
 
 # =============================================================================
 # MODÈLES PYDANTIC
@@ -58,33 +53,6 @@ class TopicsResponse(BaseModel):
     topics: List[str]
     language: str
     count: int
-
-# =============================================================================
-# FONCTION D'INITIALISATION RAG
-# =============================================================================
-
-def setup_rag_references(app):
-    """Configure les références RAG au démarrage de l'application"""
-    @app.on_event("startup")
-    async def initialize_rag_references():
-        global _rag_embedder, _process_question_with_rag, _get_rag_status
-        
-        try:
-            # Attendre que app.state soit disponible
-            if hasattr(app, 'state'):
-                _rag_embedder = getattr(app.state, 'rag_embedder', None)
-                _process_question_with_rag = getattr(app.state, 'process_question_with_rag', None)
-                _get_rag_status = getattr(app.state, 'get_rag_status', None)
-                
-                if _process_question_with_rag:
-                    logger.info("✅ Système RAG connecté avec succès dans expert router")
-                else:
-                    logger.warning("⚠️ Fonction process_question_with_rag non disponible")
-            else:
-                logger.error("❌ app.state non disponible lors de l'initialisation")
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur lors de l'initialisation RAG: {e}")
 
 # =============================================================================
 # PROMPTS MULTI-LANGUES
@@ -163,7 +131,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest):
+async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
     """Ask question sans authentification - AVEC RAG si disponible"""
     start_time = time.time()
     
@@ -175,15 +143,19 @@ async def ask_expert_public(request: QuestionRequest):
         conversation_id = str(uuid.uuid4())
         logger.info(f"🌐 Question publique - ID: {conversation_id[:8]}...")
         
-        # Essayer d'utiliser le RAG si disponible
+        # Accéder au RAG via app.state
         rag_used = False
         answer = ""
         mode = "direct_openai"
         
-        if _process_question_with_rag:
+        # Obtenir process_question_with_rag depuis app.state
+        app = fastapi_request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if process_rag:
             try:
                 logger.info("🔍 Utilisation du système RAG...")
-                result = await _process_question_with_rag(
+                result = await process_rag(
                     question=question_text,
                     user=None,
                     language=request.language or "fr",
@@ -232,9 +204,9 @@ async def ask_expert_public(request: QuestionRequest):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask", response_model=ExpertResponse)
-async def ask_expert(request: QuestionRequest):
+async def ask_expert(request: QuestionRequest, fastapi_request: Request):
     """Ask question avec authentification - même logique pour l'instant"""
-    return await ask_expert_public(request)
+    return await ask_expert_public(request, fastapi_request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
@@ -312,12 +284,17 @@ async def get_conversation_history():
 # =============================================================================
 
 @router.get("/debug/status")
-async def debug_status():
+async def debug_status(request: Request):
     """Debug endpoint pour vérifier le statut du service"""
+    app = request.app
+    rag_embedder = getattr(app.state, 'rag_embedder', None)
+    get_rag_status = getattr(app.state, 'get_rag_status', None)
+    process_rag = getattr(app.state, 'process_question_with_rag', None)
+    
     rag_status = "not_available"
-    if _get_rag_status:
+    if get_rag_status:
         try:
-            rag_status = _get_rag_status()
+            rag_status = get_rag_status()
         except:
             pass
     
@@ -327,8 +304,8 @@ async def debug_status():
             "openai_key_configured": bool(os.getenv('OPENAI_API_KEY'))
         },
         "rag_system": {
-            "embedder_connected": _rag_embedder is not None,
-            "function_connected": _process_question_with_rag is not None,
+            "embedder_connected": rag_embedder is not None,
+            "function_connected": process_rag is not None,
             "status": rag_status
         },
         "timestamp": datetime.now().isoformat(),
