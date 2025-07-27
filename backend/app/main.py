@@ -727,6 +727,13 @@ if EXPERT_ROUTER_AVAILABLE and expert_router:
         app.include_router(expert_router, prefix="/api/v1/expert")
         logger.info("✅ Expert router intégré avec succès sur /api/v1/expert")
         
+        # ✅ AJOUT: Initialiser les références RAG dans le router expert
+        if hasattr(expert_router, 'initialize_rag_references'):
+            expert_router.initialize_rag_references(app)
+            logger.info("✅ Références RAG initialisées dans expert router")
+        else:
+            logger.warning("⚠️ Fonction initialize_rag_references non trouvée dans expert router")
+        
         # Vérifier le montage en listant les routes de l'app
         expert_routes_mounted = [route for route in app.routes if '/expert/' in str(getattr(route, 'path', ''))]
         logger.info(f"🔍 DEBUG: Routes expert montées dans l'app: {len(expert_routes_mounted)}")
@@ -739,6 +746,7 @@ if EXPERT_ROUTER_AVAILABLE and expert_router:
         EXPERT_ROUTER_AVAILABLE = False
 else:
     logger.warning("⚠️ Expert router non disponible - utilisation endpoints intégrés")
+
 
 # Router auth
 if AUTH_ROUTER_AVAILABLE and auth_router:
