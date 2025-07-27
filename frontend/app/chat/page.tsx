@@ -43,7 +43,7 @@ interface ConversationData {
 
 // ==================== SERVICE DE LOGGING COMPLET ====================
 class ConversationService {
-  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/api/v1"
+  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"
 
   async saveConversation(data: ConversationData): Promise<void> {
     try {
@@ -1228,7 +1228,7 @@ export default function ChatInterface() {
   }
 
   const generateAIResponse = async (question: string): Promise<ExpertApiResponse> => {
-    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/api/v1/expert/ask'
+    const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
     
     try {
       console.log('🤖 Envoi question au RAG Intelia:', question)
