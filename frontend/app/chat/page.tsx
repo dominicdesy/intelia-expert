@@ -1180,48 +1180,17 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== FONCTION HELPER POUR VÉRIFIER L'AUTH ====================
-const checkAuthenticationStatus = async (): Promise<boolean> => {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession()
-    
-    if (error) {
-      console.error('❌ Erreur vérification auth:', error)
-      return false
-    }
-    
-    if (!session?.access_token) {
-      console.warn('⚠️ Pas de session active')
-      return false
-    }
-    
-    // Vérifier si le token n'est pas expiré
-    const now = Math.floor(Date.now() / 1000)
-    if (session.expires_at && session.expires_at < now) {
-      console.warn('⚠️ Token expiré')
-      return false
-    }
-    
-    console.log('✅ Authentification valide')
-    return true
-    
-  } catch (error) {
-    console.error('❌ Erreur critique vérification auth:', error)
-    return false
-  }
-}
-
 // ==================== FONCTION generateAIResponse CORRIGÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ ENDPOINT SÉCURISÉ
-  const secureApiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+  // ✅ URL correcte de l'API
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
   
   try {
-    console.log('🤖 Envoi question au RAG Intelia (sécurisé):', question)
-    console.log('📡 URL API SÉCURISÉE:', secureApiUrl)
+    console.log('🤖 Envoi question au RAG Intelia:', question)
+    console.log('📡 URL API:', apiUrl)
     console.log('👤 Utilisateur:', user?.id, user?.email)
     
-    // ✅ RÉCUPÉRATION DU TOKEN SUPABASE
+    // ✅ Récupération du token Supabase
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
     if (sessionError) {
@@ -1236,21 +1205,19 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     
     console.log('✅ Token d\'authentification récupéré')
     
-    // ✅ FORMAT CORRECT SELON LE BACKEND
     const requestBody = {
-      text: question.trim(),           // ✅ "text" selon le modèle QuestionRequest
+      text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'balanced',          // ✅ Mode équilibré pour utilisateurs authentifiés
-      context: `User: ${user?.email}, Type: ${user?.user_type}` // Contexte utilisateur
+      speed_mode: 'balanced'
     }
     
     console.log('📤 Corps de la requête:', requestBody)
     
-    // ✅ HEADERS AVEC AUTHENTIFICATION
+    // Headers avec authentification Supabase
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Authorization': `Bearer ${session.access_token}` // ✅ TOKEN SUPABASE
+      'Authorization': `Bearer ${session.access_token}`
     }
     
     console.log('📤 Headers avec auth:', { 
@@ -1258,7 +1225,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       Authorization: `Bearer ${session.access_token.substring(0, 20)}...` 
     })
     
-    const response = await fetch(secureApiUrl, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(requestBody)
@@ -1270,7 +1237,6 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       const errorText = await response.text()
       console.error('❌ Erreur API détaillée:', errorText)
       
-      // ✅ GESTION SPÉCIFIQUE DES ERREURS D'AUTH
       if (response.status === 401) {
         throw new Error('Session expirée - veuillez vous reconnecter')
       }
@@ -1282,28 +1248,27 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     }
 
     const data = await response.json()
-    console.log('✅ Réponse RAG sécurisée reçue:', data)
+    console.log('✅ Réponse RAG reçue:', data)
     
-    // ✅ ADAPTER LA RÉPONSE AU FORMAT ATTENDU
     const adaptedResponse: ExpertApiResponse = {
       question: question,
-      response: data.response,
+      response: data.response || data.answer || data.message || "Réponse reçue",
       conversation_id: data.timestamp || Date.now().toString(),
-      rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced',
-      timestamp: data.timestamp,
+      rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced' || false,
+      timestamp: data.timestamp || new Date().toISOString(),
       language: data.language || 'fr',
       response_time_ms: (data.processing_time || 0) * 1000,
       confidence_score: data.sources?.length > 0 ? 0.9 : 0.7
     }
     
-    // ✅ SAUVEGARDE AUTOMATIQUE (OPTIONNELLE - PEUT ÊTRE DÉSACTIVÉE)
+    // Sauvegarde optionnelle
     if (user && adaptedResponse.conversation_id) {
       try {
         console.log('💾 Tentative sauvegarde conversation...')
         await conversationService.saveConversation({
           user_id: user.id,
           question: question,
-          response: data.response,
+          response: data.response || data.answer || data.message,
           conversation_id: adaptedResponse.conversation_id,
           confidence_score: adaptedResponse.confidence_score,
           response_time_ms: adaptedResponse.response_time_ms,
@@ -1312,39 +1277,43 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
         })
       } catch (saveError) {
         console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
-        // Ne pas faire échouer la réponse si la sauvegarde échoue
       }
     }
     
     return adaptedResponse
     
   } catch (error: any) {
-    console.error('❌ Erreur lors de l\'appel au RAG sécurisé:', error)
+    console.error('❌ Erreur lors de l\'appel au RAG:', error)
     
-    // ✅ GESTION D'ERREURS SPÉCIFIQUE
     if (error.message.includes('Failed to fetch')) {
       throw new Error(`Erreur de connexion au serveur.
 
-🔧 **Diagnostic :**
-- Vérifiez votre connexion internet
-- Le serveur API est-il accessible ?
-- Problème de CORS possible
+**URL testée:** ${apiUrl}
+**Erreur technique:** ${error.message}
 
-**URL testée :** ${secureApiUrl}
-**Erreur technique :** ${error.message}`)
+Vérifiez votre connexion internet et réessayez.`)
     }
     
     if (error.message.includes('Session expirée') || error.message.includes('Authentification requise')) {
-      // Rediriger vers la page de connexion
-      console.log('🔄 Redirection vers la page de connexion...')
-      window.location.href = '/'
-      return Promise.reject(error)
+      throw new Error(`🔐 **PROBLÈME D'AUTHENTIFICATION**
+
+Votre session semble avoir expiré ou l'API ne reconnaît pas votre authentification.
+
+**Solutions:**
+1. **Déconnectez-vous** et **reconnectez-vous**
+2. Videz le cache de votre navigateur (Ctrl+Shift+R)
+3. Vérifiez que l'API backend supporte l'authentification Supabase
+
+**Détails techniques:**
+- User ID: ${user?.id}
+- User Email: ${user?.email}
+- Erreur: ${error.message}`)
     }
     
-    throw new Error(`Erreur technique avec l'API sécurisée : ${error.message}
+    throw new Error(`Erreur technique avec l'API : ${error.message}
 
-**URL testée :** ${secureApiUrl}
-**Type d'erreur :** ${error.name}
+**URL testée:** ${apiUrl}
+**Type d'erreur:** ${error.name}
 
 Consultez la console développeur (F12) pour plus de détails.`)
   }
@@ -1397,18 +1366,8 @@ export default function ChatInterface() {
     return null
   }
 
-  // ==================== FONCTION handleSendMessage CORRIGÉE ====================
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
-
-    // ✅ VÉRIFIER L'AUTHENTIFICATION AVANT D'ENVOYER
-    const isAuthenticatedNow = await checkAuthenticationStatus()
-    if (!isAuthenticatedNow) {
-      console.error('❌ Utilisateur non authentifié')
-      alert('Votre session a expiré. Vous allez être redirigé vers la page de connexion.')
-      window.location.href = '/'
-      return
-    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
