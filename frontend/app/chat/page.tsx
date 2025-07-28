@@ -13,7 +13,7 @@ interface Message {
   isUser: boolean
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
-  conversation_id?: string  // ID pour le tracking des conversations
+  conversation_id?: string
 }
 
 interface ExpertApiResponse {
@@ -83,7 +83,6 @@ class ConversationService {
       
     } catch (error) {
       console.error('❌ Erreur sauvegarde conversation:', error)
-      // Ne pas bloquer l'UX si le logging échoue
     }
   }
 
@@ -116,7 +115,7 @@ class ConversationService {
       
     } catch (error) {
       console.error('❌ Erreur envoi feedback:', error)
-      throw error  // Propager pour afficher erreur à l'utilisateur
+      throw error
     }
   }
 
@@ -166,7 +165,6 @@ class ConversationService {
       })
       
       if (!response.ok) {
-        // Si l'endpoint n'existe pas (404), on continue sans erreur
         if (response.status === 404) {
           console.warn('⚠️ Endpoint de suppression non disponible sur le serveur')
           return
@@ -180,7 +178,7 @@ class ConversationService {
       
     } catch (error) {
       console.error('❌ Erreur suppression conversation serveur:', error)
-      throw error  // Propager pour que l'UI puisse gérer l'erreur
+      throw error
     }
   }
 
@@ -211,7 +209,7 @@ class ConversationService {
       
     } catch (error) {
       console.error('❌ Erreur suppression toutes conversations serveur:', error)
-      throw error  // Propager pour que l'UI puisse gérer l'erreur
+      throw error
     }
   }
 }
@@ -219,32 +217,101 @@ class ConversationService {
 // Instance globale du service
 const conversationService = new ConversationService()
 
-// ==================== FONCTION generateAIResponse CORRIGÉE ET SIMPLIFIÉE ====================
-const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ URL corrigée selon l'API backend validée
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
+// ==================== FONCTION generateAIResponse PLEINEMENT SÉCURISÉE ====================
+const generateAIResponseSecure = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  // 🔐 URL de l'API sécurisée UNIQUEMENT
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
   
   try {
-    console.log('🤖 Envoi question au RAG Intelia (endpoint public):', question)
-    console.log('📡 URL API:', apiUrl)
-    console.log('👤 Utilisateur:', user?.id, user?.email)
+    console.log('🔐 Envoi question au RAG Intelia (ENDPOINT SÉCURISÉ UNIQUEMENT):', question)
+    console.log('📡 URL API sécurisée:', apiUrl)
+    console.log('👤 Utilisateur authentifié:', user?.id, user?.email)
+    
+    // 🔑 ÉTAPE CRITIQUE: Récupérer le token JWT de la session Supabase
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('❌ Erreur récupération session:', sessionError)
+      throw new Error(`🔐 Erreur d'authentification
+
+Impossible de récupérer votre session utilisateur.
+
+**Erreur technique:** ${sessionError.message}
+
+**Action requise:** Veuillez vous reconnecter pour continuer.`)
+    }
+    
+    if (!session || !session.access_token) {
+      console.error('❌ Pas de session ou token manquant')
+      throw new Error(`🔐 Session expirée
+
+Votre session a expiré pour des raisons de sécurité.
+
+**Action requise:** 
+• Rafraîchir la page (F5) 
+• Vous reconnecter
+• Réessayer votre question
+
+Cette sécurité supplémentaire protège vos données.`)
+    }
+    
+    // Vérifier la validité du token
+    try {
+      const tokenPayload = JSON.parse(atob(session.access_token.split('.')[1]))
+      const expiryTime = tokenPayload.exp * 1000
+      const timeUntilExpiry = expiryTime - Date.now()
+      
+      if (timeUntilExpiry < 0) {
+        throw new Error('Token expiré')
+      }
+      
+      if (timeUntilExpiry < 5 * 60 * 1000) { // Moins de 5 minutes
+        console.warn('⚠️ Token expire bientôt, rafraîchissement automatique...')
+        
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+        
+        if (refreshError || !refreshData.session) {
+          throw new Error('Impossible de rafraîchir la session')
+        }
+        
+        console.log('✅ Session rafraîchie automatiquement')
+        // Utiliser le nouveau token
+        session.access_token = refreshData.session.access_token
+      }
+      
+    } catch (tokenError) {
+      console.error('❌ Token invalide:', tokenError)
+      throw new Error(`🔐 Token d'authentification invalide
+
+Votre token de sécurité n'est plus valide.
+
+**Action requise:** Reconnexion immédiate nécessaire.
+
+**Raison:** Protection contre l'utilisation de tokens compromis.`)
+    }
+    
+    console.log('🔑 Token JWT valide récupéré:', session.access_token.substring(0, 20) + '...')
     
     // ✅ Corps de la requête aligné avec QuestionRequest du backend
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'balanced'  // Mode par défaut selon l'API
+      speed_mode: 'balanced'
     }
     
-    console.log('📤 Corps de la requête:', requestBody)
+    console.log('📤 Corps de la requête sécurisée:', requestBody)
     
-    // ✅ Headers pour endpoint public (pas d'authentification)
+    // 🔐 Headers avec authentification Bearer JWT OBLIGATOIRE
     const headers = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${session.access_token}` // 🔑 SÉCURITÉ MAXIMALE
     }
     
-    console.log('📤 Headers (endpoint public):', headers)
+    console.log('📤 Headers sécurisés:', {
+      ...headers,
+      Authorization: 'Bearer ' + session.access_token.substring(0, 20) + '...'
+    })
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -252,16 +319,64 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📊 Statut réponse API:', response.status, response.statusText)
+    console.log('📊 Statut réponse API sécurisée:', response.status, response.statusText)
+
+    // Gestion STRICTE des erreurs d'authentification
+    if (response.status === 401) {
+      console.error('🔐 Erreur 401: Token invalide ou expiré')
+      throw new Error(`🔐 Authentification échouée (401)
+
+Votre token d'accès n'est plus valide ou a expiré.
+
+**Causes possibles:**
+• Session expirée naturellement
+• Token révoqué pour sécurité
+• Changement de mot de passe récent
+
+**Action requise:** Reconnexion immédiate nécessaire.`)
+    }
+    
+    if (response.status === 403) {
+      console.error('🔐 Erreur 403: Accès refusé')
+      throw new Error(`🔐 Accès refusé (403)
+
+Vous n'avez pas les permissions nécessaires pour cette action.
+
+**Causes possibles:**
+• Compte suspendu ou désactivé
+• Permissions insuffisantes
+• Limite d'utilisation atteinte
+
+**Action requise:** Contactez le support ou vérifiez votre abonnement.`)
+    }
+
+    if (response.status === 429) {
+      console.error('🔐 Erreur 429: Rate limiting dépassé')
+      throw new Error(`⏱️ Limite de requêtes dépassée (429)
+
+Vous avez envoyé trop de questions trop rapidement.
+
+**Action requise:** Attendez quelques minutes avant de réessayer.
+
+**Conseil:** Cette limite protège le service pour tous les utilisateurs.`)
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('❌ Erreur API détaillée:', errorText)
-      throw new Error(`Erreur API: ${response.status} - ${errorText}`)
+      throw new Error(`❌ Erreur du serveur sécurisé (${response.status})
+
+Le serveur a rencontré une erreur lors du traitement de votre requête authentifiée.
+
+**Détails techniques:** ${errorText}
+
+**Action suggérée:** 
+• Réessayer dans quelques instants
+• Contacter le support si le problème persiste`)
     }
 
     const data = await response.json()
-    console.log('✅ Réponse RAG reçue:', data)
+    console.log('✅ Réponse RAG sécurisée reçue:', data)
     
     // ✅ Adapter la réponse selon ExpertResponse du backend
     const adaptedResponse: ExpertApiResponse = {
@@ -273,14 +388,14 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       timestamp: data.timestamp || new Date().toISOString(),
       language: data.language || 'fr',
       response_time_ms: data.response_time_ms || 0,
-      mode: data.mode || 'unknown',
+      mode: data.mode || 'secure_mode',
       user: data.user
     }
     
-    // Sauvegarde optionnelle si logging disponible
+    // Sauvegarde sécurisée avec utilisateur authentifié
     if (user && adaptedResponse.conversation_id) {
       try {
-        console.log('💾 Tentative sauvegarde conversation...')
+        console.log('💾 Sauvegarde conversation utilisateur authentifié...')
         await conversationService.saveConversation({
           user_id: user.id,
           question: question,
@@ -299,23 +414,138 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     return adaptedResponse
     
   } catch (error: any) {
-    console.error('❌ Erreur lors de l\'appel au RAG:', error)
+    console.error('❌ Erreur lors de l\'appel au RAG sécurisé:', error)
     
+    // Gestion détaillée des erreurs de connectivité
     if (error.message.includes('Failed to fetch')) {
-      throw new Error(`Erreur de connexion au serveur.
+      throw new Error(`🌐 Erreur de connexion au serveur sécurisé
+
+Impossible de joindre le serveur d'authentification.
 
 **URL testée:** ${apiUrl}
-**Erreur technique:** ${error.message}
+**Erreur réseau:** ${error.message}
 
-Vérifiez votre connexion internet et réessayez.`)
+**Actions possibles:**
+• Vérifier votre connexion internet
+• Réessayer dans quelques instants
+• Contacter le support si le problème persiste
+
+**Note:** Seule l'API sécurisée est utilisée pour votre protection.`)
     }
     
-    throw new Error(`Erreur technique avec l'API : ${error.message}
+    // Propager l'erreur telle quelle si elle est déjà formatée
+    if (error.message.includes('🔐') || error.message.includes('❌') || error.message.includes('⏱️')) {
+      throw error
+    }
+    
+    // Erreur générique pour cas non gérés
+    throw new Error(`❌ Erreur technique avec l'API sécurisée
 
-**URL testée:** ${apiUrl}
-**Type d'erreur:** ${error.name}
+Une erreur inattendue s'est produite lors de l'authentification.
 
-Consultez la console développeur (F12) pour plus de détails.`)
+**Type d'erreur:** ${error.name || 'Inconnu'}
+**Message:** ${error.message}
+
+**Action suggérée:** 
+• Rafraîchir la page et vous reconnecter
+• Contacter le support avec ces détails
+
+**Note:** Votre sécurité est notre priorité - aucun fallback non sécurisé n'est utilisé.`)
+  }
+}
+
+// ==================== HOOK DE VÉRIFICATION DE SESSION RENFORCÉ ====================
+const useSecureSessionCheck = () => {
+  const [sessionValid, setSessionValid] = useState(true)
+  const [sessionExpiry, setSessionExpiry] = useState<number | null>(null)
+  const [lastCheck, setLastCheck] = useState(Date.now())
+  
+  const checkSession = async (): Promise<boolean> => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error || !session || !session.access_token) {
+        console.warn('⚠️ Session invalide détectée')
+        setSessionValid(false)
+        setSessionExpiry(null)
+        return false
+      }
+      
+      // Décoder et vérifier le token JWT
+      try {
+        const tokenPayload = JSON.parse(atob(session.access_token.split('.')[1]))
+        const expiryTime = tokenPayload.exp * 1000
+        const timeUntilExpiry = expiryTime - Date.now()
+        
+        setSessionExpiry(expiryTime)
+        
+        if (timeUntilExpiry < 0) {
+          console.warn('⚠️ Token expiré')
+          setSessionValid(false)
+          return false
+        }
+        
+        if (timeUntilExpiry < 5 * 60 * 1000) { // Moins de 5 minutes
+          console.warn('⚠️ Token expire bientôt, rafraîchissement automatique...')
+          
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+          
+          if (refreshError || !refreshData.session) {
+            console.error('❌ Impossible de rafraîchir la session')
+            setSessionValid(false)
+            return false
+          }
+          
+          console.log('✅ Session rafraîchie automatiquement')
+          
+          // Mettre à jour l'expiry avec le nouveau token
+          const newTokenPayload = JSON.parse(atob(refreshData.session.access_token.split('.')[1]))
+          setSessionExpiry(newTokenPayload.exp * 1000)
+        }
+        
+      } catch (tokenError) {
+        console.error('❌ Token JWT invalide:', tokenError)
+        setSessionValid(false)
+        setSessionExpiry(null)
+        return false
+      }
+      
+      setSessionValid(true)
+      setLastCheck(Date.now())
+      return true
+      
+    } catch (error) {
+      console.error('❌ Erreur vérification session:', error)
+      setSessionValid(false)
+      setSessionExpiry(null)
+      return false
+    }
+  }
+  
+  // Vérification automatique périodique
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Date.now() - lastCheck > 2 * 60 * 1000) { // Vérifier toutes les 2 minutes
+        checkSession()
+      }
+    }, 30 * 1000) // Vérifier toutes les 30 secondes
+    
+    return () => clearInterval(interval)
+  }, [lastCheck])
+  
+  // Calcul du temps restant avant expiration
+  const getTimeUntilExpiry = () => {
+    if (!sessionExpiry) return null
+    const timeLeft = sessionExpiry - Date.now()
+    return timeLeft > 0 ? timeLeft : 0
+  }
+  
+  return { 
+    sessionValid, 
+    sessionExpiry,
+    timeUntilExpiry: getTimeUntilExpiry(),
+    checkSession,
+    lastCheck: new Date(lastCheck)
   }
 }
 
@@ -330,6 +560,8 @@ const translations = {
     'chat.notHelpfulResponse': 'Réponse non utile',
     'chat.voiceRecording': 'Enregistrement vocal (bientôt disponible)',
     'chat.noConversations': 'Aucune conversation',
+    'chat.secureMode': 'Mode sécurisé actif',
+    'chat.sessionExpiry': 'Session expire dans',
     'nav.newConversation': 'Nouvelle conversation',
     'nav.history': 'Historique',
     'nav.clearAll': 'Tout effacer',
@@ -382,6 +614,8 @@ const translations = {
     'chat.notHelpfulResponse': 'Not helpful response',
     'chat.voiceRecording': 'Voice recording (coming soon)',
     'chat.noConversations': 'No conversations',
+    'chat.secureMode': 'Secure mode active',
+    'chat.sessionExpiry': 'Session expires in',
     'nav.newConversation': 'New conversation',
     'nav.history': 'History',
     'nav.clearAll': 'Clear all',
@@ -434,6 +668,8 @@ const translations = {
     'chat.notHelpfulResponse': 'Respuesta no útil',
     'chat.voiceRecording': 'Grabación de voz (próximamente)',
     'chat.noConversations': 'Sin conversaciones',
+    'chat.secureMode': 'Modo seguro activo',
+    'chat.sessionExpiry': 'La sesión expira en',
     'nav.newConversation': 'Nueva conversación',
     'nav.history': 'Historial',
     'nav.clearAll': 'Borrar todo',
@@ -493,7 +729,6 @@ const useTranslation = () => {
     localStorage.setItem('intelia_language', lang)
     console.log('✅ [useTranslation] État langue mis à jour:', lang)
     
-    // Force un re-render de tous les composants qui utilisent ce hook
     window.dispatchEvent(new Event('languageChanged'))
   }
   
@@ -505,7 +740,6 @@ const useTranslation = () => {
     }
   }, [])
 
-  // Écouter les changements de langue globaux
   useEffect(() => {
     const handleLanguageChange = () => {
       const savedLang = localStorage.getItem('intelia_language')
@@ -522,7 +756,7 @@ const useTranslation = () => {
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION FINALE OPTIMISÉE V5 ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION FINALE OPTIMISÉE ====================
 const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -532,33 +766,28 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
   const currentScriptRef = useRef<HTMLScriptElement | null>(null)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Fonction pour mapper les codes de langue vers les codes Zoho
   const getZohoLanguage = (lang: string): string => {
     const languageMap: Record<string, string> = {
-      'fr': 'fr',      // Français
-      'en': 'en',      // English  
-      'es': 'es'       // Español
+      'fr': 'fr',
+      'en': 'en',  
+      'es': 'es'
     }
     return languageMap[lang] || 'en'
   }
   
-  // Fonction pour nettoyer complètement Zoho
   const cleanupZoho = () => {
     console.log('🧹 [ZohoSalesIQ] DEBUT nettoyage complet de Zoho')
     
-    // Supprimer le script existant avec référence
     if (currentScriptRef.current) {
       currentScriptRef.current.remove()
       currentScriptRef.current = null
       console.log('🗑️ [ZohoSalesIQ] Script référencé supprimé')
     }
     
-    // Supprimer tous les scripts Zoho qui pourraient traîner
     document.querySelectorAll('script[src*="salesiq.zohopublic.com"]').forEach(script => {
       script.remove()
     })
     
-    // Supprimer tous les widgets Zoho (recherche plus extensive)
     const zohoSelectors = [
       '[id*="zsiq"]', '[class*="zsiq"]', '[id*="siq"]', '[class*="siq"]',
       '[id*="zoho"]', '[class*="zoho"]', '[data-widget*="zoho"]'
@@ -571,22 +800,19 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
     })
     console.log('🧹 [ZohoSalesIQ] Tous widgets Zoho supprimés')
     
-    // Nettoyer l'objet global complètement (avec protection supplémentaire)
     const globalWindow = window as any
     if (globalWindow.$zoho) {
       delete globalWindow.$zoho
-      globalWindow.$zoho = undefined  // Protection supplémentaire contre les fuites
+      globalWindow.$zoho = undefined
       console.log('🧹 [ZohoSalesIQ] Objet global $zoho supprimé et undefined')
     }
     
-    // Réinitialiser les états
     setIsZohoReady(false)
     setHasError(false)
     isReloadingRef.current = false
     console.log('🔄 [ZohoSalesIQ] États réinitialisés')
   }
   
-  // Fonction pour charger Zoho avec une langue spécifique
   const loadZohoWithLanguage = (targetLanguage: string) => {
     if (isReloadingRef.current) {
       console.log('🔄 [ZohoSalesIQ] Rechargement déjà en cours, ignoré')
@@ -600,15 +826,14 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
     const zohoLang = getZohoLanguage(targetLanguage)
     const globalWindow = window as any
     
-    // Configuration globale Zoho avec paramètres pour éviter l'ouverture automatique
     globalWindow.$zoho = {
       salesiq: {
         widgetcode: 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f',
         values: {
-          showLauncher: true,      // Affiche le bouton flottant
-          showChat: false,         // Empêche le chat de s'ouvrir automatiquement
-          autoOpen: false,         // Bloque toute ouverture automatique
-          floatbutton: 'show'      // Force l'affichage du bouton
+          showLauncher: true,
+          showChat: false,
+          autoOpen: false,
+          floatbutton: 'show'
         },
         ready: function() {
           console.log('✅ [ZohoSalesIQ] Callback ready déclenché avec langue:', zohoLang)
@@ -619,7 +844,6 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
               if (zoho) {
                 console.log('🔧 [ZohoSalesIQ] Configuration du widget...')
                 
-                // Configuration des informations utilisateur si disponible
                 if (user && zoho.visitor?.info) {
                   zoho.visitor.info({
                     name: user.name || 'Utilisateur Intelia',
@@ -628,13 +852,11 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
                   console.log('👤 [ZohoSalesIQ] Info utilisateur configurée pour:', user.email)
                 }
                 
-                // Afficher le widget (avec ou sans user)
                 if (zoho.floatbutton?.visible) {
                   zoho.floatbutton.visible('show')
                   console.log('👁️ [ZohoSalesIQ] Bouton flotant affiché')
                 }
                 
-                // Marquer comme prêt
                 setIsZohoReady(true)
                 setHasError(false)
                 console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
@@ -646,7 +868,6 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
               console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
               setHasError(true)
             } finally {
-              // TOUJOURS réinitialiser l'état de rechargement
               isReloadingRef.current = false
               console.log('🔄 [ZohoSalesIQ] isReloadingRef réinitialisé')
             }
@@ -655,7 +876,6 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
       }
     }
     
-    // Créer et charger le script Zoho avec un timestamp pour éviter le cache
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.async = true
@@ -674,46 +894,37 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
       isReloadingRef.current = false
     }
     
-    // Sauvegarder la référence et ajouter au DOM
     currentScriptRef.current = script
     document.head.appendChild(script)
     console.log('📝 [ZohoSalesIQ] Script ajouté au DOM avec référence')
   }
   
-  // Fonction pour recharger Zoho avec une nouvelle langue (avec debounce)
   const reloadZohoWithLanguage = (newLanguage: string) => {
     console.log('🔄 [ZohoSalesIQ] DEBUT reloadZohoWithLanguage avec langue:', newLanguage)
     console.log('👤 [ZohoSalesIQ] User disponible pour rechargement:', !!user, user?.email || 'N/A')
     
-    // 1. Nettoyer complètement
     cleanupZoho()
     
-    // 2. Attendre puis recharger
     setTimeout(() => {
       console.log('⏰ [ZohoSalesIQ] Démarrage rechargement après nettoyage')
       loadZohoWithLanguage(newLanguage)
     }, 500)
   }
   
-  // Fonction debounced pour éviter les changements rapides
   const debouncedLoadZoho = (targetLanguage: string) => {
-    // Annuler le timeout précédent s'il existe
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current)
       console.log('🚫 [ZohoSalesIQ] Changement de langue rapide détecté - debounce activé')
     }
     
-    // Programmer le nouveau chargement
     debounceTimeoutRef.current = setTimeout(() => {
       console.log('⏰ [ZohoSalesIQ] Debounce terminé - chargement de la langue:', targetLanguage)
       
       if (!initializationRef.current) {
-        // Première initialisation
         initializationRef.current = true
         lastLanguageRef.current = targetLanguage
         loadZohoWithLanguage(targetLanguage)
       } else {
-        // Changement de langue
         if (targetLanguage !== lastLanguageRef.current) {
           lastLanguageRef.current = targetLanguage
           reloadZohoWithLanguage(targetLanguage)
@@ -721,10 +932,9 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
       }
       
       debounceTimeoutRef.current = null
-    }, 300) // Debounce de 300ms pour éviter les changements rapides
+    }, 300)
   }
   
-  // ✅ UseEffect unifié pour la gestion de la langue (suppression du double appel)
   useEffect(() => {
     if (!language) {
       console.log('⏭️ [ZohoSalesIQ] Pas de langue fournie, initialisation reportée')
@@ -734,17 +944,14 @@ const ZohoSalesIQ = ({ user, language }: { user: any, language: string }) => {
     console.log('🌐 [ZohoSalesIQ] Langue reçue via props:', language)
     console.log('👤 [ZohoSalesIQ] User disponible:', !!user, user?.email || 'N/A')
     
-    // Utiliser la fonction debounced pour tous les changements
     debouncedLoadZoho(language)
     
-  }, [language]) // Réagit seulement aux changements de la prop language
+  }, [language])
 
-  // Cleanup à la destruction du composant
   useEffect(() => {
     return () => {
       console.log('🧹 [ZohoSalesIQ] Nettoyage à la destruction du composant')
       
-      // Annuler le debounce en cours
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current)
         debounceTimeoutRef.current = null
@@ -854,7 +1061,6 @@ const useAuthStore = () => {
     try {
       console.log('📝 Mise à jour profil:', data)
       
-      // Préparer les métadonnées utilisateur avec toutes les nouvelles données
       const updates = {
         data: {
           first_name: data.firstName,
@@ -876,7 +1082,6 @@ const useAuthStore = () => {
         return { success: false, error: error.message }
       }
       
-      // Mise à jour des données utilisateur locales avec toutes les nouvelles informations
       const updatedUser = {
         ...user,
         ...data,
@@ -935,7 +1140,7 @@ const useChatStore = () => {
     setIsLoading(true)
     try {
       console.log('🔄 [useChatStore] Chargement conversations pour userId:', userId)
-      const userConversations = await conversationService.getUserConversations(userId, 100) // Augmenter la limite
+      const userConversations = await conversationService.getUserConversations(userId, 100)
       
       console.log('📊 [useChatStore] Conversations brutes reçues:', userConversations.length, userConversations)
       
@@ -963,7 +1168,6 @@ const useChatStore = () => {
         }
       })
       
-      // Trier par date de mise à jour (plus récent en premier)
       const sortedConversations = formattedConversations.sort((a, b) => 
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
@@ -983,23 +1187,14 @@ const useChatStore = () => {
     try {
       console.log('🗑️ [useChatStore] Suppression conversation:', id)
       
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations(prev => prev.filter(conv => conv.id !== id))
       
-      // 2. Suppression côté serveur
       await conversationService.deleteConversation(id)
       
       console.log('✅ [useChatStore] Conversation supprimée du serveur:', id)
       
     } catch (error) {
       console.error('❌ [useChatStore] Erreur suppression conversation serveur:', error)
-      
-      // En cas d'erreur serveur, on pourrait remettre la conversation dans la liste
-      // mais pour l'instant on garde la suppression locale même si le serveur échoue
-      // pour éviter de confuser l'utilisateur
-      
-      // Optionnel: alerter l'utilisateur
-      // alert('Erreur lors de la suppression sur le serveur, mais conversation supprimée localement')
     }
   }
 
@@ -1007,10 +1202,8 @@ const useChatStore = () => {
     try {
       console.log('🗑️ [useChatStore] Suppression toutes conversations')
       
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations([])
       
-      // 2. Suppression côté serveur si userId disponible
       if (userId) {
         await conversationService.clearAllUserConversations(userId)
         console.log('✅ [useChatStore] Toutes conversations supprimées du serveur')
@@ -1020,17 +1213,14 @@ const useChatStore = () => {
       
     } catch (error) {
       console.error('❌ [useChatStore] Erreur suppression conversations serveur:', error)
-      // Même principe: on garde la suppression locale
     }
   }
 
-  // Fonction pour forcer le rechargement
   const refreshConversations = async (userId: string) => {
     console.log('🔄 [useChatStore] Rechargement forcé des conversations')
     await loadConversations(userId)
   }
 
-  // Fonction pour ajouter une nouvelle conversation à la liste locale
   const addConversation = (conversationId: string, question: string, response: string) => {
     const newConversation: ConversationItem = {
       id: conversationId,
@@ -1044,7 +1234,6 @@ const useChatStore = () => {
       feedback: null
     }
     
-    // Ajouter en première position (plus récent)
     setConversations(prev => [newConversation, ...prev])
     console.log('✅ [useChatStore] Nouvelle conversation ajoutée localement:', conversationId)
   }
@@ -1100,6 +1289,12 @@ const ThumbDownIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 const TrashIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+  </svg>
+)
+
+const ShieldCheckIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.623 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
   </svg>
 )
 
@@ -1220,7 +1415,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
   }
 
   const handlePasswordChange = async () => {
-    // Validation des mots de passe
     const errors: string[] = []
     
     if (!passwordData.currentPassword) {
@@ -1236,7 +1430,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
       errors.push('Les mots de passe ne correspondent pas')
     }
     
-    // Validation de la complexité du nouveau mot de passe
     const passwordValidationErrors = validatePassword(passwordData.newPassword)
     errors.push(...passwordValidationErrors)
     
@@ -1263,7 +1456,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
       console.log('✅ Mot de passe changé avec succès')
       alert('Mot de passe changé avec succès!')
       
-      // Réinitialiser le formulaire
       setPasswordData({
         currentPassword: '',
         newPassword: '',
@@ -1288,7 +1480,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
 
   return (
     <div className="space-y-4">
-      {/* Onglets */}
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
           {tabs.map((tab) => (
@@ -1308,11 +1499,9 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
         </nav>
       </div>
 
-      {/* Contenu des onglets */}
       <div className="space-y-6 max-h-[60vh] overflow-y-auto">
         {activeTab === 'profile' && (
           <>
-            {/* Section Informations Personnelles */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
                 {t('profile.personalInfo')}
@@ -1399,7 +1588,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
               </div>
             </div>
 
-            {/* Section Entreprise */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
                 {t('profile.company')}
@@ -1663,15 +1851,12 @@ const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
-      // 1. Changer la langue dans le hook (déclenche les re-renders)
       changeLanguage(languageCode)
       console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
       
-      // 2. Sauvegarder dans le profil utilisateur
       await updateProfile({ language: languageCode })
       console.log('✅ [LanguageModal] updateProfile() terminé')
       
-      // 3. Forcer la mise à jour globale
       setTimeout(() => {
         console.log('📊 [LanguageModal] Langue finale:', languageCode)
         onClose()
@@ -1748,7 +1933,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
   
   return (
     <div className="space-y-4">
-      {/* Call Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1769,7 +1953,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
 
-      {/* Email Us */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1790,7 +1973,6 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
         </div>
       </div>
 
-      {/* Visit our website */}
       <div className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1862,7 +2044,6 @@ const HistoryMenu = () => {
     try {
       console.log('🗑️ [HistoryMenu] Début suppression toutes conversations')
       
-      // Confirmation utilisateur
       const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer toutes les conversations ? Cette action est irréversible.')
       
       if (!confirmed) {
@@ -1870,11 +2051,9 @@ const HistoryMenu = () => {
         return
       }
       
-      // Appeler la fonction de suppression avec userId
       await clearAllConversations(user.id)
       console.log('✅ [HistoryMenu] Toutes conversations supprimées')
       
-      // Fermer le menu après suppression
       setIsOpen(false)
       
     } catch (error) {
@@ -2006,7 +2185,6 @@ const HistoryMenu = () => {
               )}
             </div>
 
-            {/* Footer avec statistiques */}
             {conversations.length > 0 && (
               <div className="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 text-center">
                 {conversations.length} conversation{conversations.length > 1 ? 's' : ''} • 
@@ -2194,11 +2372,80 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL AVEC TOUTES LES FONCTIONNALITÉS ====================
+// ==================== COMPOSANT INDICATEUR DE SÉCURITÉ ====================
+const SecurityIndicator = ({ sessionValid, timeUntilExpiry }: { 
+  sessionValid: boolean, 
+  timeUntilExpiry: number | null 
+}) => {
+  const { t } = useTranslation()
+  
+  const formatTimeLeft = (milliseconds: number) => {
+    const minutes = Math.floor(milliseconds / (1000 * 60))
+    const hours = Math.floor(minutes / 60)
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`
+    }
+    return `${minutes}m`
+  }
+
+  if (!sessionValid) {
+    return (
+      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4">
+        <div className="flex items-center">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+          </svg>
+          <div className="flex-1">
+            <span className="font-medium">🔐 Session expirée</span>
+            <p className="text-sm mt-1">
+              Votre session de sécurité a expiré. Veuillez vous reconnecter pour continuer à utiliser l'API sécurisée.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (timeUntilExpiry && timeUntilExpiry < 10 * 60 * 1000) { // Moins de 10 minutes
+    return (
+      <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-3 mb-4">
+        <div className="flex items-center">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+          </svg>
+          <div className="flex-1">
+            <span className="font-medium">⚠️ Session expire bientôt</span>
+            <p className="text-sm mt-1">
+              {t('chat.sessionExpiry')} {formatTimeLeft(timeUntilExpiry)}. La session sera rafraîchie automatiquement.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-2 mb-4">
+      <div className="flex items-center">
+        <ShieldCheckIcon className="w-4 h-4 mr-2" />
+        <span className="text-sm font-medium">{t('chat.secureMode')}</span>
+        {timeUntilExpiry && (
+          <span className="text-xs ml-2 opacity-75">
+            • Session valide {formatTimeLeft(timeUntilExpiry)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ==================== COMPOSANT PRINCIPAL AVEC API SÉCURISÉE ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   const { addConversation } = useChatStore()
+  const { sessionValid, timeUntilExpiry, checkSession } = useSecureSessionCheck()
   
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -2206,7 +2453,6 @@ export default function ChatInterface() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
   useEffect(() => {
     const detectMobileDevice = () => {
       const userAgent = navigator.userAgent.toLowerCase()
@@ -2254,7 +2500,6 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, t, currentLanguage])
 
-  // Loading state - toujours rendre quelque chose
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -2266,7 +2511,6 @@ export default function ChatInterface() {
     )
   }
 
-  // Not authenticated - toujours rendre quelque chose avant redirection
   if (!isAuthenticated) {
     useEffect(() => {
       window.location.href = '/'
@@ -2297,7 +2541,8 @@ export default function ChatInterface() {
     setIsLoadingChat(true)
 
     try {
-      const response = await generateAIResponse(text.trim(), user)
+      // 🔐 UTILISATION EXCLUSIVE DE L'API SÉCURISÉE
+      const response = await generateAIResponseSecure(text.trim(), user)
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -2308,17 +2553,25 @@ export default function ChatInterface() {
       }
 
       setMessages(prev => [...prev, aiMessage])
-      console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
+      console.log('✅ Message sécurisé ajouté avec conversation_id:', response.conversation_id)
       
       if (user && response.conversation_id) {
         addConversation(response.conversation_id, text.trim(), response.response)
       }
       
     } catch (error) {
-      console.error('❌ Error generating response:', error)
+      console.error('❌ Error generating secure response:', error)
+      
+      let errorContent = ''
+      if (error instanceof Error) {
+        errorContent = error.message
+      } else {
+        errorContent = t('chat.errorMessage')
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: error instanceof Error ? error.message : t('chat.errorMessage'),
+        content: errorContent,
         isUser: false,
         timestamp: new Date()
       }
@@ -2397,11 +2650,15 @@ export default function ChatInterface() {
               </button>
             </div>
 
-            {/* Titre centré avec logo */}
+            {/* Titre centré avec logo et indicateur sécurisé */}
             <div className="flex-1 flex justify-center items-center space-x-3">
               <InteliaLogo className="w-8 h-8" />
               <div className="text-center">
                 <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+                <div className="flex items-center justify-center space-x-1 mt-1">
+                  <ShieldCheckIcon className="w-3 h-3 text-green-600" />
+                  <span className="text-xs text-green-600 font-medium">Mode Sécurisé</span>
+                </div>
               </div>
             </div>
             
@@ -2416,11 +2673,18 @@ export default function ChatInterface() {
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto px-4 py-6">
             <div className="max-w-4xl mx-auto space-y-6">
+              {/* Indicateur de sécurité */}
+              <SecurityIndicator 
+                sessionValid={sessionValid} 
+                timeUntilExpiry={timeUntilExpiry} 
+              />
+              
               {/* Date */}
               {messages.length > 0 && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
                     {getCurrentDate()}
+                    <span className="ml-2 text-green-600">🔐 API Sécurisée</span>
                   </span>
                 </div>
               )}
@@ -2431,6 +2695,10 @@ export default function ChatInterface() {
                     {!message.isUser && (
                       <div className="relative">
                         <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                        {/* Badge sécurisé sur l'avatar */}
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-600 rounded-full flex items-center justify-center">
+                          <ShieldCheckIcon className="w-2.5 h-2.5 text-white" />
+                        </div>
                       </div>
                     )}
                     
@@ -2441,7 +2709,7 @@ export default function ChatInterface() {
                         </p>
                       </div>
                       
-                      {/* Boutons de feedback avec conversation_id */}
+                      {/* Boutons de feedback avec conversation_id et indicateur sécurisé */}
                       {!message.isUser && index > 0 && message.conversation_id && (
                         <div className="flex items-center space-x-2 mt-2 ml-2">
                           <button
@@ -2466,9 +2734,12 @@ export default function ChatInterface() {
                             </span>
                           )}
                           {message.conversation_id && (
-                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
-                              🔗
-                            </span>
+                            <div className="flex items-center space-x-1 ml-2">
+                              <ShieldCheckIcon className="w-3 h-3 text-green-600" />
+                              <span className="text-xs text-green-600" title={`Sécurisé - ID: ${message.conversation_id}`}>
+                                Authentifié
+                              </span>
+                            </div>
                           )}
                         </div>
                       )}
@@ -2483,17 +2754,23 @@ export default function ChatInterface() {
                 </div>
               ))}
 
-              {/* Indicateur de frappe */}
+              {/* Indicateur de frappe avec sécurité */}
               {isLoadingChat && (
                 <div className="flex items-start space-x-3">
                   <div className="relative">
                     <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-600 rounded-full flex items-center justify-center">
+                      <ShieldCheckIcon className="w-2.5 h-2.5 text-white" />
+                    </div>
                   </div>
                   <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-xs text-green-600 font-medium">API Sécurisée</span>
                     </div>
                   </div>
                 </div>
@@ -2503,9 +2780,18 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* Zone de saisie */}
+          {/* Zone de saisie avec indicateur de sécurité */}
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
+              {/* Indicateur de session dans la zone de saisie */}
+              {!sessionValid && (
+                <div className="mb-3 text-center">
+                  <span className="text-xs text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                    ⚠️ Session expirée - Reconnexion requise
+                  </span>
+                </div>
+              )}
+              
               <div className="flex items-center space-x-3">
                 {/* Afficher le micro seulement sur mobile/tablette */}
                 {isMobileDevice && (
@@ -2520,7 +2806,7 @@ export default function ChatInterface() {
                   </button>
                 )}
                 
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <input
                     type="text"
                     value={inputMessage}
@@ -2528,22 +2814,65 @@ export default function ChatInterface() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
-                        handleSendMessage()
+                        if (sessionValid) {
+                          handleSendMessage()
+                        } else {
+                          alert('Session expirée. Veuillez vous reconnecter.')
+                        }
                       }
                     }}
-                    placeholder={t('chat.placeholder')}
-                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                    disabled={isLoadingChat}
+                    placeholder={sessionValid ? t('chat.placeholder') : 'Session expirée - Reconnexion requise'}
+                    className={`w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:bg-white outline-none text-sm pr-12 ${
+                      sessionValid 
+                        ? 'focus:ring-blue-500' 
+                        : 'bg-red-50 text-red-500 placeholder-red-400 focus:ring-red-500'
+                    }`}
+                    disabled={isLoadingChat || !sessionValid}
                   />
+                  {/* Indicateur de sécurité dans le champ */}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {sessionValid ? (
+                      <ShieldCheckIcon className="w-4 h-4 text-green-600" title="API Sécurisée Active" />
+                    ) : (
+                      <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20" title="Session Expirée">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                  </div>
                 </div>
                 
                 <button
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                  onClick={() => sessionValid ? handleSendMessage() : checkSession()}
+                  disabled={isLoadingChat || (!sessionValid && inputMessage.trim())}
+                  className={`flex-shrink-0 p-2 transition-colors ${
+                    sessionValid 
+                      ? 'text-blue-600 hover:text-blue-700 disabled:text-gray-300'
+                      : 'text-red-600 hover:text-red-700'
+                  }`}
+                  title={sessionValid ? 'Envoyer' : 'Vérifier la session'}
                 >
-                  <PaperAirplaneIcon />
+                  {sessionValid ? (
+                    <PaperAirplaneIcon />
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l9.004-9.003m8.015 8.983a9.956 9.956 0 01-1.6 3.18c-.913 1.21-2.094 2.19-3.428 2.846a9.959 9.959 0 01-4.061.823c-2.649 0-5.106-.993-6.96-2.847m2.068-13.252a9.957 9.957 0 013.18-1.6 9.959 9.959 0 014.061-.823c2.649 0 5.106.993 6.96 2.847l1.6 1.6" />
+                    </svg>
+                  )}
                 </button>
+              </div>
+              
+              {/* Indicateur de statut en bas */}
+              <div className="mt-2 text-center">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  sessionValid 
+                    ? 'text-green-600 bg-green-50' 
+                    : 'text-red-600 bg-red-50'
+                }`}>
+                  {sessionValid 
+                    ? '🔐 Connexion sécurisée active' 
+                    : '⚠️ Session expirée - Reconnexion requise'
+                  }
+                </span>
               </div>
             </div>
           </div>
