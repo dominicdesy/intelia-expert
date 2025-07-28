@@ -487,10 +487,16 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
     const zohoLang = getZohoLanguage(language)
     const globalWindow = window as any
     
-    // Configuration globale Zoho
+    // Configuration globale Zoho avec paramètres pour éviter l'ouverture automatique
     globalWindow.$zoho = {
       salesiq: {
         widgetcode: 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f',
+        values: {
+          showLauncher: true,      // Affiche le bouton flottant
+          showChat: false,         // Empêche le chat de s'ouvrir automatiquement
+          autoOpen: false,         // Bloque toute ouverture automatique
+          floatbutton: 'show'      // Force l'affichage du bouton
+        },
         ready: function() {
           console.log('✅ [ZohoSalesIQ] Zoho ready callback avec langue:', zohoLang)
           
@@ -518,12 +524,13 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
                 // Marquer comme prêt
                 setIsZohoReady(true)
                 setHasError(false)
-                isReloadingRef.current = false
                 console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
               }
             } catch (error) {
               console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
               setHasError(true)
+            } finally {
+              // TOUJOURS réinitialiser l'état de rechargement
               isReloadingRef.current = false
             }
           }, 2000)
@@ -612,7 +619,8 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
   
   // Gestion du changement de langue
   useEffect(() => {
-    if (!currentLanguage || !user || !initializationRef.current) return
+    // Correction suggestion #1 : Supprimer la dépendance à user pour le changement de langue
+    if (!currentLanguage || !initializationRef.current) return
     
     // Si la langue a changé et qu'on avait déjà une langue
     if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
@@ -624,7 +632,7 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       console.log('🌐 [ZohoSalesIQ] Première définition langue:', currentLanguage)
       lastLanguageRef.current = currentLanguage
     }
-  }, [currentLanguage, user])
+  }, [currentLanguage]) // Suppression de la dépendance 'user'
 
   return null
 }
@@ -780,7 +788,7 @@ const useAuthStore = () => {
   }
 }
 
-// ==================== HOOK CHAT AVEC LOGGING ====================
+// ==================== HOOK CHAT AVEC LOGGING AMÉLIORÉ ====================
 interface ConversationItem {
   id: string
   title: string
@@ -796,54 +804,108 @@ interface ConversationItem {
 
 const useChatStore = () => {
   const [conversations, setConversations] = useState<ConversationItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   const loadConversations = async (userId: string) => {
+    if (!userId) {
+      console.warn('⚠️ [useChatStore] Pas d\'userId fourni pour charger les conversations')
+      return
+    }
+
+    setIsLoading(true)
     try {
-      console.log('🔄 Chargement conversations depuis le logging...')
-      const userConversations = await conversationService.getUserConversations(userId)
+      console.log('🔄 [useChatStore] Chargement conversations pour userId:', userId)
+      const userConversations = await conversationService.getUserConversations(userId, 100) // Augmenter la limite
       
-      const formattedConversations: ConversationItem[] = userConversations.map(conv => ({
-        id: conv.conversation_id,
-        title: conv.question.substring(0, 50) + '...',
-        messages: [
-          { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question },
-          { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response }
-        ],
-        updated_at: conv.updated_at,
-        created_at: conv.timestamp,
-        feedback: conv.feedback || null
-      }))
+      console.log('📊 [useChatStore] Conversations brutes reçues:', userConversations.length, userConversations)
       
-      setConversations(formattedConversations)
-      console.log('✅ Conversations chargées:', formattedConversations.length)
+      if (!userConversations || userConversations.length === 0) {
+        console.log('📭 [useChatStore] Aucune conversation trouvée')
+        setConversations([])
+        return
+      }
+      
+      const formattedConversations: ConversationItem[] = userConversations.map(conv => {
+        const title = conv.question && conv.question.length > 0 
+          ? (conv.question.length > 50 ? conv.question.substring(0, 50) + '...' : conv.question)
+          : 'Conversation sans titre'
+          
+        return {
+          id: conv.conversation_id || conv.id || Date.now().toString(),
+          title: title,
+          messages: [
+            { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question || 'Question non disponible' },
+            { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response || 'Réponse non disponible' }
+          ],
+          updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
+          created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
+          feedback: conv.feedback || null
+        }
+      })
+      
+      // Trier par date de mise à jour (plus récent en premier)
+      const sortedConversations = formattedConversations.sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )
+      
+      setConversations(sortedConversations)
+      console.log('✅ [useChatStore] Conversations formatées et triées:', sortedConversations.length)
+      
     } catch (error) {
-      console.error('❌ Erreur chargement conversations:', error)
+      console.error('❌ [useChatStore] Erreur chargement conversations:', error)
+      setConversations([])
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const deleteConversation = async (id: string) => {
     try {
-      console.log('🗑️ Suppression conversation:', id)
+      console.log('🗑️ [useChatStore] Suppression conversation:', id)
+      
+      // Mise à jour optimiste de l'UI
       setConversations(prev => prev.filter(conv => conv.id !== id))
+      
+      // TODO: Appeler l'API backend pour supprimer côté serveur
+      // await conversationService.deleteConversation(id)
+      
+      console.log('✅ [useChatStore] Conversation supprimée localement:', id)
     } catch (error) {
-      console.error('❌ Erreur suppression conversation:', error)
+      console.error('❌ [useChatStore] Erreur suppression conversation:', error)
+      // En cas d'erreur, recharger les conversations
+      // loadConversations(userId) // Nécessiterait de stocker userId
     }
   }
 
   const clearAllConversations = async () => {
     try {
-      console.log('🗑️ Suppression toutes conversations')
+      console.log('🗑️ [useChatStore] Suppression toutes conversations')
+      
+      // Mise à jour optimiste de l'UI
       setConversations([])
+      
+      // TODO: Appeler l'API backend pour supprimer côté serveur
+      // await conversationService.clearAllConversations(userId)
+      
+      console.log('✅ [useChatStore] Toutes conversations supprimées localement')
     } catch (error) {
-      console.error('❌ Erreur suppression conversations:', error)
+      console.error('❌ [useChatStore] Erreur suppression conversations:', error)
     }
+  }
+
+  // Fonction pour forcer le rechargement
+  const refreshConversations = async (userId: string) => {
+    console.log('🔄 [useChatStore] Rechargement forcé des conversations')
+    await loadConversations(userId)
   }
 
   return {
     conversations,
+    isLoading,
     loadConversations,
     deleteConversation,
-    clearAllConversations
+    clearAllConversations,
+    refreshConversations
   }
 }
 
@@ -1069,8 +1131,8 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
   }
 
   const tabs = [
-    { id: 'profile', label: 'Profil', icon: '👤' },
-    { id: 'password', label: 'Mot de passe', icon: '🔒' }
+    { id: 'profile', label: t('nav.profile'), icon: '👤' },
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ]
 
   return (
@@ -1616,14 +1678,25 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
 const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
-  const { conversations, deleteConversation, clearAllConversations, loadConversations } = useChatStore()
+  const { conversations, isLoading, deleteConversation, clearAllConversations, loadConversations, refreshConversations } = useChatStore()
   const { user } = useAuthStore()
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
     if (!isOpen && user) {
-      loadConversations(user.id)
+      console.log('📂 [HistoryMenu] Ouverture menu - chargement conversations pour:', user.id)
+      await loadConversations(user.id)
     }
     setIsOpen(!isOpen)
+  }
+
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) return
+    
+    console.log('🔄 [HistoryMenu] Rechargement manuel des conversations')
+    await refreshConversations(user.id)
   }
 
   const handleClearAll = async (e: React.MouseEvent) => {
@@ -1688,23 +1761,55 @@ const HistoryMenu = () => {
           <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
-                {conversations.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
+                  {isLoading && (
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={handleClearAll}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                    title="Supprimer toutes les conversations"
+                    onClick={handleRefresh}
+                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                    title="Actualiser"
                   >
-                    {t('nav.clearAll')}
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l9.004-9.003m8.015 8.983a9.956 9.956 0 01-1.6 3.18c-.913 1.21-2.094 2.19-3.428 2.846a9.959 9.959 0 01-4.061.823c-2.649 0-5.106-.993-6.96-2.847m2.068-13.252a9.957 9.957 0 013.18-1.6 9.959 9.959 0 014.061-.823c2.649 0 5.106.993 6.96 2.847l1.6 1.6" />
+                    </svg>
                   </button>
-                )}
+                  {conversations.length > 0 && (
+                    <button
+                      onClick={handleClearAll}
+                      className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                      title="Supprimer toutes les conversations"
+                    >
+                      {t('nav.clearAll')}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             
             <div className="max-h-64 overflow-y-auto">
-              {conversations.length === 0 ? (
+              {isLoading ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
-                  {t('chat.noConversations')}
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Chargement...</span>
+                  </div>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  <div className="mb-2">📭</div>
+                  <div>{t('chat.noConversations')}</div>
+                  {user && (
+                    <button
+                      onClick={handleRefresh}
+                      className="mt-2 text-blue-600 hover:text-blue-700 text-xs underline"
+                    >
+                      Actualiser
+                    </button>
+                  )}
                 </div>
               ) : (
                 conversations.map((conv) => (
@@ -1715,7 +1820,12 @@ const HistoryMenu = () => {
                           {conv.title}
                         </h4>
                         <p className="text-xs text-gray-500 mt-1">
-                          {new Date(conv.updated_at).toLocaleDateString('fr-FR')}
+                          {new Date(conv.updated_at).toLocaleDateString('fr-FR', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
                         </p>
                         {conv.feedback && (
                           <div className="text-xs text-gray-400 mt-1">
@@ -1741,7 +1851,7 @@ const HistoryMenu = () => {
               <div className="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 text-center">
                 {conversations.length} conversation{conversations.length > 1 ? 's' : ''} • 
                 <span className="ml-1">
-                  Dernière activité : {new Date(Math.max(...conversations.map(c => new Date(c.updated_at).getTime()))).toLocaleDateString('fr-FR')}
+                  Dernière : {new Date(Math.max(...conversations.map(c => new Date(c.updated_at).getTime()))).toLocaleDateString('fr-FR')}
                 </span>
               </div>
             )}
@@ -2069,11 +2179,43 @@ export default function ChatInterface() {
     })
   }
 
-  // Fonction pour détecter si on est sur mobile/tablette (désactivée temporairement)
+  // Fonction pour détecter si on est sur mobile/tablette (version restaurée et améliorée)
   const isMobileDevice = () => {
-    // Retourner false pour masquer le micro temporairement
-    // TODO: Implémenter la fonctionnalité vocale plus tard
-    return false
+    // Vérifier d'abord si on est dans un navigateur
+    if (typeof window === 'undefined') return false
+    
+    // Détection User Agent pour appareils mobiles/tablettes
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+    
+    // Vérifier la taille d'écran (tablettes généralement < 1024px)
+    const isTabletScreen = window.innerWidth <= 1024
+    
+    // Vérifier le support tactile
+    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    
+    // Détecter les iPads modernes qui se font passer pour des Macs
+    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+    
+    // Cas spéciaux : écrans tactiles de bureau (> 1200px avec beaucoup de points tactiles)
+    const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
+    
+    const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
+    
+    console.log('🔍 [Mobile Detection]', {
+      userAgent: navigator.userAgent,
+      isMobileUA,
+      isTabletScreen,
+      hasTouchScreen,
+      isIPadOS,
+      isDesktopTouchscreen,
+      screenWidth: window.innerWidth,
+      maxTouchPoints: navigator.maxTouchPoints,
+      platform: navigator.platform,
+      result
+    })
+    
+    return result
   }
 
   return (
