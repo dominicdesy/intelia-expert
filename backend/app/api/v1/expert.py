@@ -1,6 +1,6 @@
 """
-app/api/v1/expert.py - CORRECTION CRITIQUE UTF-8
-SOLUTION: Validation Pydantic complètement réécrite pour accepter tous caractères UTF-8
+app/api/v1/expert.py - CORRECTION FINALE UTF-8 ACCENTS FRANÇAIS
+SOLUTION RADICALE: Suppression complète de la validation Pydantic pour le champ text
 """
 import os
 import logging
@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 # OpenAI import sécurisé
 try:
@@ -24,80 +24,53 @@ router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# MODÈLES PYDANTIC AVEC VALIDATION UTF-8 RÉÉCRITE COMPLÈTEMENT
+# MODÈLES PYDANTIC AVEC VALIDATION COMPLÈTEMENT SUPPRIMÉE POUR TEXT
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model RÉÉCRIT pour accepter TOUS les caractères UTF-8"""
-    text: str = Field(..., description="Question text (accepts all UTF-8 characters)")
+    """Request model RADICAL: AUCUNE validation sur le champ text"""
+    text: str = Field(..., description="Question text (NO validation - accepts ALL)")
     language: Optional[str] = Field("fr", description="Response language")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode")
 
-    # Configuration permissive pour UTF-8
+    # Configuration ULTRA-PERMISSIVE
     model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="ignore",  # Ignore extra fields
-        # CRITIQUE: Configuration UTF-8 permissive
-        str_to_lower=False,
-        str_to_upper=False,
+        # CRITIQUE: Désactiver TOUTE validation
+        validate_assignment=False,
+        str_strip_whitespace=False,  # Ne pas toucher aux espaces
         validate_default=False,
-        # Force UTF-8 encoding
-        json_encoders={
-            str: lambda v: v if isinstance(v, str) else str(v)
-        }
+        extra="ignore",
+        # Pas d'encoders JSON pour éviter les transformations
+        arbitrary_types_allowed=True
     )
 
-    # SOLUTION RADICALE: Validation minimaliste pour éviter rejet UTF-8
-    @validator('text', pre=True, always=True)
-    def validate_text_permissive(cls, v):
-        """Validation ultra-permissive pour tous caractères UTF-8"""
-        if not v:
-            raise ValueError("Question text cannot be empty")
-        
-        # Accepter TOUS les types et les convertir en string
-        if isinstance(v, (str, int, float)):
-            text = str(v).strip()
+    # SOLUTION RADICALE: AUCUN VALIDATOR sur text
+    # Laisser Pydantic accepter text tel quel sans aucune transformation
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs):
+        """Override pour désactiver la validation sur text"""
+        super().__pydantic_init_subclass__(**kwargs)
+
+    def __init__(self, **data):
+        # BYPASS: Initialisation manuelle pour éviter la validation Pydantic
+        if 'text' in data:
+            # Accepter text directement sans validation
+            self.text = data['text'] if data['text'] else ""
         else:
-            text = str(v).strip()
-        
-        # Validation minimale
-        if not text:
-            raise ValueError("Question text cannot be empty after processing")
-        
-        # Limiter la longueur seulement
-        if len(text) > 2000:
-            text = text[:2000]
-        
-        # AUCUNE vérification d'encodage - accepter tel quel
-        return text
-
-    @validator('language', pre=True, always=True)
-    def validate_language_permissive(cls, v):
-        """Validation langue ultra-permissive"""
-        if not v:
-            return "fr"
-        
-        try:
-            lang = str(v).lower().strip()[:2]
-            return lang if lang in ["fr", "en", "es"] else "fr"
-        except:
-            return "fr"
-
-    @validator('speed_mode', pre=True, always=True)
-    def validate_speed_mode_permissive(cls, v):
-        """Validation mode ultra-permissive"""
-        if not v:
-            return "balanced"
-        
-        try:
-            mode = str(v).lower().strip()
-            return mode if mode in ["fast", "balanced", "quality"] else "balanced"
-        except:
-            return "balanced"
+            raise ValueError("text is required")
+            
+        # Valider les autres champs manuellement
+        self.language = data.get('language', 'fr')
+        if self.language not in ['fr', 'en', 'es']:
+            self.language = 'fr'
+            
+        self.speed_mode = data.get('speed_mode', 'balanced')
+        if self.speed_mode not in ['fast', 'balanced', 'quality']:
+            self.speed_mode = 'balanced'
 
 class ExpertResponse(BaseModel):
-    """Response model avec support UTF-8 complet"""
+    """Response model standard"""
     question: str
     response: str
     conversation_id: str
@@ -106,52 +79,18 @@ class ExpertResponse(BaseModel):
     timestamp: str
     language: str
     response_time_ms: int
-    mode: str = "expert_router_v2"
+    mode: str = "expert_router_v3"
     user: Optional[str] = None
     logged: bool = False
 
-    # Configuration UTF-8 forcée
-    model_config = ConfigDict(
-        validate_assignment=False,  # CRITIQUE: Pas de validation sur assignment
-        str_strip_whitespace=False,  # Garder tous les espaces
-        json_encoders={
-            str: lambda v: v if isinstance(v, str) else str(v)
-        }
-    )
-
 class FeedbackRequest(BaseModel):
-    """Feedback avec validation ultra-permissive"""
+    """Feedback model standard"""
     rating: str = Field(..., description="Rating: positive, negative, neutral")
     comment: Optional[str] = Field(None, description="Optional comment")
     conversation_id: Optional[str] = Field(None, description="Conversation ID")
 
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        extra="ignore"
-    )
-
-    @validator('rating', pre=True, always=True)
-    def validate_rating_permissive(cls, v):
-        """Validation rating ultra-permissive"""
-        if not v:
-            return "neutral"
-        rating = str(v).lower().strip()
-        return rating if rating in ["positive", "negative", "neutral"] else "neutral"
-
-    @validator('comment', pre=True, always=True)
-    def validate_comment_permissive(cls, v):
-        """Validation commentaire ultra-permissive"""
-        if not v:
-            return None
-        
-        try:
-            comment = str(v).strip()
-            return comment[:500] if len(comment) > 500 else comment
-        except:
-            return None
-
 # =============================================================================
-# IMPORT LOGGING AVEC GESTION D'ERREURS
+# IMPORT LOGGING
 # =============================================================================
 
 try:
@@ -174,21 +113,16 @@ async def save_conversation_auto(
     rag_score: float = None,
     response_time_ms: int = 0
 ) -> bool:
-    """Sauvegarde automatique avec gestion d'erreurs UTF-8"""
+    """Sauvegarde automatique"""
     
     if not LOGGING_AVAILABLE or not logger_instance:
         return False
     
     try:
-        # Assurer que tous les strings sont UTF-8 compatibles
-        safe_question = str(question) if question else ""
-        safe_response = str(response) if response else ""
-        safe_user_id = str(user_id) if user_id else "anonymous"
-        
         conversation = ConversationCreate(
-            user_id=safe_user_id,
-            question=safe_question,
-            response=safe_response,
+            user_id=str(user_id),
+            question=str(question),
+            response=str(response),
             conversation_id=conversation_id,
             confidence_score=rag_score,
             response_time_ms=response_time_ms,
@@ -205,13 +139,12 @@ async def save_conversation_auto(
         return False
 
 def get_user_id_from_request(request: Request) -> str:
-    """Extrait l'ID utilisateur avec gestion d'erreurs"""
+    """Extrait l'ID utilisateur"""
     try:
         user = getattr(request.state, "user", None)
         if user:
             return str(user.get("id", user.get("user_id", "authenticated_user")))
         
-        # ID anonyme basé sur IP
         client_ip = request.client.host if request.client else "unknown"
         user_agent = request.headers.get("user-agent", "unknown")
         
@@ -226,12 +159,12 @@ def get_user_id_from_request(request: Request) -> str:
         return f"anon_{uuid.uuid4().hex[:8]}"
 
 # =============================================================================
-# PROMPTS MULTI-LANGUES AVEC SUPPORT UTF-8 COMPLET
+# PROMPTS MULTI-LANGUES
 # =============================================================================
 
 EXPERT_PROMPTS = {
     "fr": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
-Réponds de manière précise et pratique en français. Tu peux utiliser tous les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, etc.) dans tes réponses.""",
+Réponds de manière précise et pratique en français. Tu peux utiliser tous les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, etc.) dans tes réponses sans restriction.""",
     
     "en": """You are a veterinary expert specialized in animal health and nutrition, particularly for Ross 308 broiler chickens.
 Answer precisely and practically in English, providing advice based on industry best practices.""",
@@ -245,11 +178,11 @@ def get_expert_prompt(language: str) -> str:
     return EXPERT_PROMPTS.get(language.lower(), EXPERT_PROMPTS["fr"])
 
 # =============================================================================
-# FONCTIONS HELPER AVEC SUPPORT UTF-8 COMPLET
+# FONCTIONS HELPER
 # =============================================================================
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback avec support UTF-8"""
+    """Réponse de fallback"""
     try:
         safe_question = str(question)[:50] if question else "votre question"
     except:
@@ -263,7 +196,7 @@ def get_fallback_response(question: str, language: str = "fr") -> str:
     return fallback_responses.get(language.lower(), fallback_responses["fr"])
 
 async def process_question_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> str:
-    """Process question using OpenAI avec support UTF-8 complet"""
+    """Process question using OpenAI"""
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
@@ -275,8 +208,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         openai.api_key = api_key
         system_prompt = get_expert_prompt(language)
         
-        # Assurer que la question est en string
-        safe_question = str(question) if question else ""
+        safe_question = str(question)
         
         model_config = {
             "fast": {"model": "gpt-3.5-turbo", "max_tokens": 300},
@@ -305,26 +237,28 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS AVEC VALIDATION UTF-8 COMPLÈTEMENT RÉÉCRITE
+# ENDPOINTS AVEC VALIDATION SUPPRIMÉE
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
 async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
-    """Question publique avec validation UTF-8 réécrite"""
+    """Question publique avec validation text SUPPRIMÉE"""
     start_time = time.time()
     
     try:
-        # Récupérer le texte - plus de validation stricte
+        # RÉCUPÉRATION DIRECTE sans validation
         question_text = request.text
         
+        # Vérification minimale seulement
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
         user_id = get_user_id_from_request(fastapi_request)
         
-        logger.info(f"🌐 Question UTF-8 reçue - ID: {conversation_id[:8]}...")
+        logger.info(f"🌐 Question SANS VALIDATION reçue - ID: {conversation_id[:8]}...")
         logger.info(f"📝 Question: {str(question_text)[:100]}...")
+        logger.info(f"🔤 Caractères détectés: {[c for c in question_text if ord(c) > 127]}")
         
         user = getattr(fastapi_request.state, "user", None)
         
@@ -407,18 +341,15 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert(request: QuestionRequest, fastapi_request: Request):
-    """Question avec authentification - même logique"""
+    """Question avec authentification"""
     return await ask_expert_public(request, fastapi_request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
-    """Submit feedback avec validation UTF-8 simplifiée"""
+    """Submit feedback"""
     try:
         logger.info(f"📊 Feedback reçu: {request.rating}")
-        if request.comment:
-            logger.info(f"💬 Commentaire: {str(request.comment)[:100]}...")
         
-        # Mise à jour du feedback en base
         feedback_updated = False
         if request.conversation_id and LOGGING_AVAILABLE and logger_instance:
             try:
@@ -451,7 +382,7 @@ async def submit_feedback(request: FeedbackRequest):
 
 @router.get("/topics")
 async def get_suggested_topics(language: str = "fr"):
-    """Get suggested topics avec support UTF-8"""
+    """Get suggested topics"""
     try:
         lang = language.lower() if language else "fr"
         if lang not in ["fr", "en", "es"]:
@@ -500,7 +431,7 @@ async def get_suggested_topics(language: str = "fr"):
 
 @router.get("/history")
 async def get_conversation_history(request: Request, limit: int = 10):
-    """Get conversation history avec intégration logging"""
+    """Get conversation history"""
     try:
         if LOGGING_AVAILABLE and logger_instance:
             user_id = get_user_id_from_request(request)
@@ -548,7 +479,52 @@ async def get_conversation_history(request: Request, limit: int = 10):
         }
 
 # =============================================================================
-# CONFIGURATION AU DÉMARRAGE
+# ENDPOINT DE TEST UTF-8 SPÉCIFIQUE
+# =============================================================================
+
+@router.post("/test-utf8")
+async def test_utf8_direct(fastapi_request: Request):
+    """Test endpoint pour UTF-8 direct sans validation Pydantic"""
+    try:
+        # Récupérer le body brut
+        body = await fastapi_request.body()
+        body_str = body.decode('utf-8')
+        
+        logger.info(f"📝 Body brut reçu: {body_str}")
+        logger.info(f"🔤 Longueur: {len(body_str)} caractères")
+        
+        # Parser JSON manuellement
+        import json
+        data = json.loads(body_str)
+        
+        question_text = data.get('text', '')
+        language = data.get('language', 'fr')
+        
+        logger.info(f"📝 Question extraite: {question_text}")
+        logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
+        
+        # Traitement direct
+        answer = await process_question_openai(question_text, language, "fast")
+        
+        return {
+            "success": True,
+            "question_received": question_text,
+            "special_chars_detected": [c for c in question_text if ord(c) > 127],
+            "response": answer,
+            "method": "direct_body_parsing",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur test UTF-8: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+# =============================================================================
+# CONFIGURATION
 # =============================================================================
 
 if OPENAI_AVAILABLE and openai:
@@ -561,5 +537,6 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("🔤 Support UTF-8 COMPLET activé - validation réécrite")
+logger.info("🔤 VALIDATION PYDANTIC SUPPRIMÉE pour champ text")
+logger.info("🔧 BYPASS complet de la validation UTF-8")
 logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
