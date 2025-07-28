@@ -5,7 +5,6 @@ CORRECTIONS:
 1. Validation UTF-8 complètement réécrite dans expert.py
 2. Router logging avec tous les endpoints manquants
 3. Exception handler amélioré pour UTF-8
-MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
 """
 
 import os
@@ -179,33 +178,27 @@ class HealthResponse(BaseModel):
     rag_status: str
 
 # =============================================================================
-# CONFIGURATION MULTI-LANGUES AVEC SUPPORT UTF-8 RENFORCÉ ET CONSIGNE LIGNÉE GÉNÉTIQUE
+# CONFIGURATION MULTI-LANGUES AVEC SUPPORT UTF-8 RENFORCÉ
 # =============================================================================
 
 LANGUAGE_PROMPTS = {
     "fr": {
-        "system_base": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair. Tu peux comprendre et répondre aux questions avec TOUS les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, €, etc.).
-
-IMPORTANT: Ne fais pas référence à une lignée génétique comme Ross ou Cobb, sauf si l'utilisateur la mentionne dans sa question. Donne une réponse générale qui s'applique à tous les poulets de chair.""",
+        "system_base": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. Tu peux comprendre et répondre aux questions avec TOUS les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, €, etc.).""",
         "context_instruction": "Utilise les informations suivantes pour répondre à la question:",
-        "response_instruction": "Réponds en français de manière précise et pratique, en te basant sur les documents fournis. Utilise librement tous les accents et caractères spéciaux français. Évite de mentionner des lignées génétiques spécifiques sauf si mentionnées par l'utilisateur.",
-        "fallback_instruction": "Réponds aux questions de manière précise et pratique en français avec tous les accents appropriés. Donne des conseils généraux applicables à tous les poulets de chair."
+        "response_instruction": "Réponds en français de manière précise et pratique, en te basant sur les documents fournis. Utilise librement tous les accents et caractères spéciaux français.",
+        "fallback_instruction": "Réponds aux questions de manière précise et pratique en français avec tous les accents appropriés."
     },
     "en": {
-        "system_base": """You are a veterinary expert specialized in animal health and nutrition, particularly for broiler chickens.
-
-IMPORTANT: Do not reference specific genetic lines like Ross or Cobb, unless the user mentions them in their question. Provide general answers that apply to all broiler chickens.""",
+        "system_base": """You are a veterinary expert specialized in animal health and nutrition, particularly for Ross 308 broiler chickens.""",
         "context_instruction": "Use the following information to answer the question:",
-        "response_instruction": "Respond in English precisely and practically, based on the provided documents. Avoid mentioning specific genetic lines unless mentioned by the user.",
-        "fallback_instruction": "Answer questions precisely and practically in English. Provide general advice applicable to all broiler chickens."
+        "response_instruction": "Respond in English precisely and practically, based on the provided documents.",
+        "fallback_instruction": "Answer questions precisely and practically in English."
     },
     "es": {
-        "system_base": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde. Puedes entender y responder preguntas con TODOS los caracteres especiales del español (ñ, ¿, ¡, acentos, ü, etc.).
-
-IMPORTANTE: No hagas referencia a líneas genéticas como Ross o Cobb, a menos que el usuario las mencione en su pregunta. Da respuestas generales que se apliquen a todos los pollos de engorde.""",
+        "system_base": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308. Puedes entender y responder preguntas con TODOS los caracteres especiales del español (ñ, ¿, ¡, acentos, ü, etc.).""",
         "context_instruction": "Utiliza la siguiente información para responder a la pregunta:",
-        "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados. Usa libremente todos los caracteres especiales del español. Evita mencionar líneas genéticas específicas a menos que las mencione el usuario.",
-        "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español con todos los caracteres especiales apropiados. Da consejos generales aplicables a todos los pollos de engorde."
+        "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados. Usa libremente todos los caracteres especiales del español.",
+        "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español con todos los caracteres especiales apropiados."
     }
 }
 
@@ -419,7 +412,7 @@ async def process_question_with_rag(
         raise HTTPException(status_code=500, detail=f"Erreur de traitement: {str(e)}")
 
 async def fallback_openai_response(question: str, language: str = "fr", config: dict = None) -> tuple:
-    """Fallback response using OpenAI directly avec support UTF-8 et consigne lignée génétique"""
+    """Fallback response using OpenAI directly avec support UTF-8"""
     try:
         import openai
         
@@ -433,7 +426,6 @@ async def fallback_openai_response(question: str, language: str = "fr", config: 
         system_base = get_language_prompt(language, "system_base")
         fallback_instruction = get_language_prompt(language, "fallback_instruction")
         
-        # Le prompt system_base contient maintenant la consigne lignée génétique
         system_prompt = f"{system_base}\n\n{fallback_instruction}"
 
         response = openai.chat.completions.create(
@@ -449,7 +441,7 @@ async def fallback_openai_response(question: str, language: str = "fr", config: 
         
         answer = str(response.choices[0].message.content)  # Conversion simple
         mode = "fallback_openai"
-        note = "Réponse sans recherche documentaire (lignée génétique neutre)"
+        note = "Réponse sans recherche documentaire"
         
         return answer, mode, note
     
@@ -504,7 +496,6 @@ async def lifespan(app: FastAPI):
     logger.info("🔤 Support UTF-8 COMPLET: Validation réécrite pour accepter tous caractères")
     logger.info("🔧 Router logging: Tous endpoints manquants ajoutés (404 corrigé)")
     logger.info("📊 Support multi-langues: FR, EN, ES avec caractères spéciaux")
-    logger.info("🧬 Consigne lignée génétique: Réponses générales sauf mention utilisateur")
     logger.info(f"🗄️ Base de données: {'Disponible' if supabase_success else 'Non disponible'}")
     logger.info(f"🤖 Modules RAG: {'Disponibles' if rag_embedder else 'Non disponibles'}")
     
@@ -529,7 +520,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale - Corrections Critiques v3.5 + Lignée Génétique",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Corrections Critiques v3.5",
     version="3.5.0",
     docs_url="/docs",
     redoc_url="/redoc", 
@@ -667,7 +658,7 @@ if SYSTEM_ROUTER_AVAILABLE and system_router:
 async def root():
     """Endpoint racine avec status des corrections appliquées"""
     return {
-        "message": "Intelia Expert API v3.5.0 - CORRECTIONS CRITIQUES + LIGNÉE GÉNÉTIQUE",
+        "message": "Intelia Expert API v3.5.0 - CORRECTIONS CRITIQUES APPLIQUÉES",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
         "api_version": "3.5.0",
@@ -678,8 +669,7 @@ async def root():
             "logging_404_fix": "Tous les endpoints manquants ajoutés dans logging.py",
             "exception_handler_fix": "Gestionnaire d'exceptions UTF-8 amélioré",
             "middleware_fix": "Middleware UTF-8 renforcé",
-            "genetic_line_fix": "Prompts adaptés pour éviter références spécifiques Ross/Cobb",
-            "expected_result": "Erreurs 400 UTF-8 et 404 logging corrigées + réponses générales"
+            "expected_result": "Erreurs 400 UTF-8 et 404 logging corrigées"
         },
         "routers_mounted": {
             "expert": EXPERT_ROUTER_AVAILABLE,
@@ -697,15 +687,9 @@ async def root():
             "symbols": "°C, %, €, £ - TOUS supportés",
             "encoding": "UTF-8 natif Python sans manipulation forcée"
         },
-        "genetic_line_policy": {
-            "strategy": "Générique sauf mention utilisateur",
-            "avoid_terms": ["Ross", "Cobb", "lignées spécifiques"],
-            "use_instead": "poulets de chair, broiler chickens, pollos de engorde",
-            "exception": "Mention spécifique si utilisateur évoque la lignée"
-        },
         "endpoints_fixed": [
             # Expert UTF-8 corrigé
-            "/api/v1/expert/ask-public - UTF-8 validation réécrite + lignée neutre",
+            "/api/v1/expert/ask-public - UTF-8 validation réécrite",
             "/api/v1/expert/topics - Caractères spéciaux supportés",
             # Logging 404 corrigé
             "/api/v1/logging/health - AJOUTÉ",
@@ -717,10 +701,9 @@ async def root():
         ],
         "deployment_notes": {
             "platform": "DigitalOcean App Platform",
-            "critical_fixes": "UTF-8 + Logging 404 + Lignée génétique résolus",
+            "critical_fixes": "UTF-8 + Logging 404 résolus",
             "validation_strategy": "Ultra-permissive pour UTF-8",
-            "prompt_strategy": "Générique sauf mention explicite utilisateur",
-            "expected_improvement": "Erreurs 400/404 éliminées + réponses inclusives"
+            "expected_improvement": "Erreurs 400/404 éliminées"
         }
     }
 
@@ -736,7 +719,6 @@ async def health_check():
             "rag_system": get_rag_status(),
             "utf8_support": "FIXED - validation rewritten",
             "logging_system": "FIXED - endpoints added",
-            "genetic_line_policy": "UPDATED - generic responses",
             "routers": "all_mounted_with_corrections"
         },
         config={
@@ -744,7 +726,7 @@ async def health_check():
             "deployment": "DigitalOcean App Platform",
             "encoding": "UTF-8 Native Python",
             "version": "3.5.0",
-            "corrections": "UTF-8 validation + Logging 404 + Genetic line policy fixed"
+            "corrections": "UTF-8 validation + Logging 404 fixed"
         },
         database_status="connected" if supabase else "disconnected",
         rag_status=get_rag_status()
@@ -785,18 +767,6 @@ async def debug_corrections():
                     "/logging/test-data"
                 ]
             },
-            "problem_3_genetic_lines": {
-                "issue": "Réponses mentionnaient toujours Ross 308",
-                "cause": "Prompts système référençaient lignée spécifique",
-                "solution": "Prompts modifiés pour réponses génériques",
-                "files_modified": ["main.py - LANGUAGE_PROMPTS", "expert.py - EXPERT_PROMPTS"],
-                "new_behavior": "Mention générique sauf si utilisateur spécifie lignée",
-                "examples": {
-                    "before": "Pour les poulets Ross 308, la température...",
-                    "after": "Pour les poulets de chair, la température...",
-                    "exception": "Si question contient 'Ross' → mention autorisée"
-                }
-            },
             "additional_fixes": {
                 "exception_handler": "Gestionnaire RequestValidationError UTF-8",
                 "middleware": "Middleware UTF-8 renforcé",
@@ -806,12 +776,11 @@ async def debug_corrections():
         },
         "expected_test_results": {
             "before_fixes": "21/31 tests (67.74% success)",
-            "after_fixes_expected": "28+/31 tests (90%+ success)",
+            "after_fixes_expected": "27+/31 tests (87%+ success)",
             "critical_fixes": [
                 "UTF-8 questions: 400 → 200",
                 "Logging endpoints: 404 → 200",
-                "Sauvegarde conversation: 404 → 200",
-                "Réponses génériques: Ross mentions → poulets de chair"
+                "Sauvegarde conversation: 404 → 200"
             ]
         },
         "validation_strategy": {
@@ -819,12 +788,6 @@ async def debug_corrections():
             "new_approach": "Ultra-permissive validation, native Python UTF-8",
             "philosophy": "Accept all input, let Python handle UTF-8 naturally",
             "config_changes": "validate_assignment=False, extra='ignore'"
-        },
-        "genetic_line_strategy": {
-            "old_approach": "Always mention Ross 308 in responses",
-            "new_approach": "Generic 'broiler chickens' unless user specifies",
-            "detection": "Check if user question contains 'Ross', 'Cobb', etc.",
-            "benefit": "More inclusive for all farmers regardless of breed"
         },
         "timestamp": datetime.now().isoformat(),
         "version": "3.5.0"
@@ -870,11 +833,6 @@ async def debug_utf8_test():
             "middleware": "UTF-8 headers enforced",
             "expected_result": "All UTF-8 characters accepted"
         },
-        "genetic_line_test": {
-            "generic_response": "Pour les poulets de chair, la température optimale...",
-            "specific_when_mentioned": "Pour vos Ross 308, la température optimale...",
-            "strategy": "Detect user mention before adding breed reference"
-        },
         "test_passed": all(result.get("success", False) for result in converted_results.values()),
         "timestamp": datetime.now().isoformat()
     }
@@ -894,7 +852,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "path": str(request.url.path),
             "version": "3.5.0",
             "encoding": "utf-8",
-            "corrections_note": "UTF-8 validation, logging endpoints and genetic line policy fixed"
+            "corrections_note": "UTF-8 validation and logging endpoints fixed"
         },
         headers={"content-type": "application/json; charset=utf-8"}
     )
@@ -913,7 +871,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             "path": str(request.url.path),
             "version": "3.5.0",
             "encoding": "utf-8",
-            "note": "Critical fixes applied for UTF-8, logging and genetic line neutrality"
+            "note": "Critical fixes applied for UTF-8 and logging"
         },
         headers={"content-type": "application/json; charset=utf-8"}
     )
@@ -934,9 +892,8 @@ if __name__ == "__main__":
     logger.info(f"   ✅ Logging 404: Tous endpoints manquants ajoutés")
     logger.info(f"   ✅ Exception Handler: RequestValidationError UTF-8 spécialisé")
     logger.info(f"   ✅ Middleware: UTF-8 renforcé sur toutes réponses")
-    logger.info(f"   ✅ Lignée Génétique: Prompts génériques sauf mention utilisateur")
-    logger.info(f"🎯 RÉSULTAT ATTENDU: Erreurs 400 UTF-8, 404 logging éliminées + réponses inclusives")
-    logger.info(f"📊 AMÉLIORATION ATTENDUE: 67% → 90%+ de tests réussis")
+    logger.info(f"🎯 RÉSULTAT ATTENDU: Erreurs 400 UTF-8 et 404 logging éliminées")
+    logger.info(f"📊 AMÉLIORATION ATTENDUE: 67% → 87%+ de tests réussis")
     
     uvicorn.run(
         app,
