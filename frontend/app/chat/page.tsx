@@ -219,143 +219,236 @@ class ConversationService {
 // Instance globale du service
 const conversationService = new ConversationService()
 
-// ==================== FONCTION generateAIResponse CORRIGÉE POUR UTILISER ENDPOINT SÉCURISÉ ====================
-const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // 🔒 UTILISATION ENDPOINT SÉCURISÉ OBLIGATOIRE avec authentification JWT
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+// ==================== CONFIGURATION API ====================
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+const API_TIMEOUT = 30000 // 30 secondes
+
+// ==================== CLASSES D'ERREUR PERSONNALISÉES ====================
+class AuthError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AuthError'
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TimeoutError'
+  }
+}
+
+class ApiError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+class RetryError extends Error {
+  public newToken: string
+  
+  constructor(message: string, newToken: string) {
+    super(message)
+    this.name = 'RetryError'
+    this.newToken = newToken
+  }
+}
+
+// ==================== FONCTIONS UTILITAIRES POUR L'API ====================
+
+// Récupération session avec gestion d'erreur propre
+async function getValidSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw error
+    return data.session
+  } catch (sessionError) {
+    console.error('❌ Erreur session:', sessionError)
+    throw new AuthError('Impossible de récupérer la session utilisateur')
+  }
+}
+
+// Fetch avec timeout
+async function fetchWithTimeout(url: string, options: RequestInit, timeout: number) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
   
   try {
-    console.log('🔒 Envoi question au RAG Intelia (endpoint sécurisé):', question)
-    console.log('📡 URL API:', apiUrl)
-    console.log('👤 Utilisateur:', user?.id, user?.email)
-    
-    // Récupération du token JWT depuis Supabase
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      throw new Error(`Erreur récupération session: ${sessionError.message}`)
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError('Timeout - le serveur met trop de temps à répondre')
     }
+    throw error
+  }
+}
+
+// Gestion des erreurs HTTP avec retry pour 401
+async function handleHttpErrors(response: Response) {
+  if (response.status === 401) {
+    console.error('❌ Erreur 401 - Token invalide, tentative de refresh...')
     
+    try {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError || !refreshData.session) {
+        throw new AuthError('Refresh token failed')
+      }
+      
+      console.log('✅ Token refreshed avec succès')
+      throw new RetryError('Token refreshed, retry needed', refreshData.session.access_token)
+      
+    } catch (refreshError) {
+      console.error('❌ Impossible de refresh le token:', refreshError)
+      await supabase.auth.signOut()
+      throw new AuthError('Session expirée - redirection vers connexion')
+    }
+  }
+  
+  if (response.status === 403) {
+    throw new AuthError('Accès refusé. Vérifiez vos permissions.')
+  }
+  
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Erreur inconnue')
+    throw new ApiError(`Erreur serveur (${response.status}): ${errorText}`)
+  }
+}
+
+// Parse JSON avec gestion d'erreur
+async function parseJsonResponse(response: Response) {
+  try {
+    return await response.json()
+  } catch (parseError) {
+    console.error('❌ Erreur parsing JSON:', parseError)
+    throw new ApiError('Réponse serveur invalide')
+  }
+}
+
+// Sauvegarde conversation sécurisée
+async function saveConversationSafely(user: any, question: string, response: ExpertApiResponse) {
+  if (!user?.id || !response.conversation_id) {
+    console.warn('⚠️ Pas de user.id ou conversation_id - historique non sauvegardé')
+    return
+  }
+  
+  try {
+    console.log('💾 Sauvegarde conversation pour historique...')
+    await conversationService.saveConversation({
+      user_id: user.id,
+      question: question,
+      response: response.response,
+      conversation_id: response.conversation_id,
+      confidence_score: response.rag_score,
+      response_time_ms: response.response_time_ms,
+      language: response.language,
+      rag_used: response.rag_used
+    })
+    console.log('✅ Conversation sauvegardée:', response.conversation_id)
+  } catch (saveError) {
+    console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
+    // Continue sans bloquer l'UX
+  }
+}
+
+// Gestion centralisée des erreurs
+function handleApiError(error: any): Error {
+  if (error instanceof AuthError) {
+    // Pour les erreurs d'auth, redirection différée pour éviter les crashs
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 1000)
+    return new Error('Session expirée - redirection vers connexion dans 1 seconde...')
+  }
+  
+  if (error instanceof TimeoutError) {
+    return new Error('Timeout - le serveur met trop de temps à répondre. Réessayez.')
+  }
+  
+  if (error instanceof RetryError) {
+    return new Error('Token refresh nécessaire - veuillez réessayer.')
+  }
+  
+  if (error.message?.includes('Failed to fetch')) {
+    return new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
+  }
+  
+  return new Error(`Erreur technique: ${error.message}`)
+}
+
+// ==================== FONCTION generateAIResponse CORRIGÉE ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
+  
+  console.log('🔒 Envoi question au RAG Intelia (endpoint sécurisé):', question.substring(0, 50) + '...')
+  
+  try {
+    // ===== 1. RÉCUPÉRATION SESSION SÉCURISÉE =====
+    const session = await getValidSession()
     if (!session?.access_token) {
-      throw new Error('Token d\'authentification manquant - veuillez vous reconnecter')
+      throw new AuthError('Session expirée - reconnexion nécessaire')
     }
     
-    console.log('🔑 Token JWT récupéré:', session.access_token.substring(0, 20) + '...')
+    console.log('✅ Token récupéré, longueur:', session.access_token.length)
     
-    // ✅ Corps de la requête aligné avec QuestionRequest du backend
+    // ===== 2. PRÉPARATION REQUÊTE =====
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'balanced'  // Mode par défaut selon l'API
+      speed_mode: 'balanced'
     }
     
-    console.log('📤 Corps de la requête:', requestBody)
-    
-    // ✅ Headers avec authentification JWT obligatoire
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'Authorization': `Bearer ${session.access_token}`
     }
     
-    console.log('📤 Headers (endpoint sécurisé avec JWT):', {
-      ...headers,
-      'Authorization': `Bearer ${session.access_token.substring(0, 20)}...`
-    })
+    console.log('📤 Envoi requête sécurisée...')
     
-    const response = await fetch(apiUrl, {
+    // ===== 3. REQUÊTE AVEC TIMEOUT =====
+    const response = await fetchWithTimeout(apiUrl, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(requestBody)
-    })
-
-    console.log('📊 Statut réponse API:', response.status, response.statusText)
-
-    // Gestion des erreurs d'authentification
-    if (response.status === 401) {
-      console.error('❌ Erreur authentification 401 - token expiré ou invalide')
-      throw new Error('Session expirée - veuillez vous reconnecter')
-    }
+    }, API_TIMEOUT)
     
-    if (response.status === 403) {
-      console.error('❌ Erreur autorisation 403 - accès refusé')
-      throw new Error('Accès refusé - vérifiez vos permissions')
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ Erreur API détaillée:', errorText)
-      throw new Error(`Erreur API: ${response.status} - ${errorText}`)
-    }
-
-    const data = await response.json()
-    console.log('✅ Réponse RAG reçue:', data)
-
-    // ✅ Adapter la réponse selon ExpertResponse du backend
+    console.log('📊 Réponse:', response.status, response.statusText)
+    
+    // ===== 4. GESTION ERREURS HTTP =====
+    await handleHttpErrors(response)
+    
+    // ===== 5. TRAITEMENT RÉPONSE =====
+    const data = await parseJsonResponse(response)
+    console.log('✅ Réponse RAG reçue avec succès')
+    
     const adaptedResponse: ExpertApiResponse = {
       question: data.question || question,
       response: data.response || "Réponse reçue mais vide",
-      conversation_id: data.conversation_id || Date.now().toString(),
+      conversation_id: data.conversation_id || `conv_${Date.now()}`,
       rag_used: data.rag_used || false,
       rag_score: data.rag_score,
       timestamp: data.timestamp || new Date().toISOString(),
       language: data.language || 'fr',
       response_time_ms: data.response_time_ms || 0,
-      mode: data.mode || 'unknown',
+      mode: data.mode || 'secured',
       user: data.user
     }
     
-    // 💾 SAUVEGARDE OBLIGATOIRE - C'est ici que l'historique doit être créé
-    if (user && adaptedResponse.conversation_id) {
-      try {
-        console.log('💾 ⚠️ IMPORTANT: Sauvegarde conversation pour historique...')
-        await conversationService.saveConversation({
-          user_id: user.id,
-          question: question,
-          response: adaptedResponse.response,
-          conversation_id: adaptedResponse.conversation_id,
-          confidence_score: adaptedResponse.rag_score,
-          response_time_ms: adaptedResponse.response_time_ms,
-          language: adaptedResponse.language,
-          rag_used: adaptedResponse.rag_used
-        })
-        console.log('✅ Conversation sauvegardée pour historique:', adaptedResponse.conversation_id)
-      } catch (saveError) {
-        console.error('❌ PROBLÈME: Erreur sauvegarde conversation (impact historique):', saveError)
-        // L'erreur de sauvegarde impacte l'historique mais ne bloque pas l'UX
-      }
-    } else {
-      console.warn('⚠️ PROBLÈME: Pas de user.id ou conversation_id - historique non sauvegardé')
-    }
+    // ===== 6. SAUVEGARDE CONVERSATION =====
+    await saveConversationSafely(user, question, adaptedResponse)
     
     return adaptedResponse
     
   } catch (error: any) {
-    console.error('❌ Erreur lors de l\'appel au RAG:', error)
-    
-    // Gestion spécifique des erreurs d'authentification
-    if (error.message.includes('Session expirée') || error.message.includes('Token d\'authentification manquant')) {
-      // Forcer la reconnexion
-      await supabase.auth.signOut()
-      window.location.href = '/'
-      throw new Error('Session expirée - redirection vers la connexion')
-    }
-    
-    if (error.message.includes('Failed to fetch')) {
-      throw new Error(`Erreur de connexion au serveur.
-
-**URL testée:** ${apiUrl}
-**Erreur technique:** ${error.message}
-
-Vérifiez votre connexion internet et réessayez.`)
-    }
-    
-    throw new Error(`Erreur technique avec l'API : ${error.message}
-
-**URL testée:** ${apiUrl}
-**Type d'erreur:** ${error.name}
-
-Consultez la console développeur (F12) pour plus de détails.`)
+    console.error('❌ Erreur dans generateAIResponse:', error.message)
+    throw handleApiError(error)
   }
 }
 
