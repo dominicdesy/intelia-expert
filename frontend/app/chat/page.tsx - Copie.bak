@@ -219,28 +219,15 @@ class ConversationService {
 // Instance globale du service
 const conversationService = new ConversationService()
 
-// ==================== FONCTION generateAIResponse CORRIGÉE POUR UTILISER ENDPOINT SÉCURISÉ ====================
+// ==================== FONCTION generateAIResponse CORRIGÉE ET SIMPLIFIÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // 🔒 UTILISATION ENDPOINT SÉCURISÉ OBLIGATOIRE avec authentification JWT
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask'
+  // ✅ URL corrigée selon l'API backend validée
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
   
   try {
-    console.log('🔒 Envoi question au RAG Intelia (endpoint sécurisé):', question)
+    console.log('🤖 Envoi question au RAG Intelia (endpoint public):', question)
     console.log('📡 URL API:', apiUrl)
     console.log('👤 Utilisateur:', user?.id, user?.email)
-    
-    // Récupération du token JWT depuis Supabase
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      throw new Error(`Erreur récupération session: ${sessionError.message}`)
-    }
-    
-    if (!session?.access_token) {
-      throw new Error('Token d\'authentification manquant - veuillez vous reconnecter')
-    }
-    
-    console.log('🔑 Token JWT récupéré:', session.access_token.substring(0, 20) + '...')
     
     // ✅ Corps de la requête aligné avec QuestionRequest du backend
     const requestBody = {
@@ -251,17 +238,13 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     
     console.log('📤 Corps de la requête:', requestBody)
     
-    // ✅ Headers avec authentification JWT obligatoire
+    // ✅ Headers pour endpoint public (pas d'authentification)
     const headers = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
+      'Accept': 'application/json'
     }
     
-    console.log('📤 Headers (endpoint sécurisé avec JWT):', {
-      ...headers,
-      'Authorization': `Bearer ${session.access_token.substring(0, 20)}...`
-    })
+    console.log('📤 Headers (endpoint public):', headers)
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -271,17 +254,6 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
 
     console.log('📊 Statut réponse API:', response.status, response.statusText)
 
-    // Gestion des erreurs d'authentification
-    if (response.status === 401) {
-      console.error('❌ Erreur authentification 401 - token expiré ou invalide')
-      throw new Error('Session expirée - veuillez vous reconnecter')
-    }
-    
-    if (response.status === 403) {
-      console.error('❌ Erreur autorisation 403 - accès refusé')
-      throw new Error('Accès refusé - vérifiez vos permissions')
-    }
-
     if (!response.ok) {
       const errorText = await response.text()
       console.error('❌ Erreur API détaillée:', errorText)
@@ -290,7 +262,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
 
     const data = await response.json()
     console.log('✅ Réponse RAG reçue:', data)
-
+    
     // ✅ Adapter la réponse selon ExpertResponse du backend
     const adaptedResponse: ExpertApiResponse = {
       question: data.question || question,
@@ -305,10 +277,10 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       user: data.user
     }
     
-    // 💾 SAUVEGARDE OBLIGATOIRE - C'est ici que l'historique doit être créé
+    // Sauvegarde optionnelle si logging disponible
     if (user && adaptedResponse.conversation_id) {
       try {
-        console.log('💾 ⚠️ IMPORTANT: Sauvegarde conversation pour historique...')
+        console.log('💾 Tentative sauvegarde conversation...')
         await conversationService.saveConversation({
           user_id: user.id,
           question: question,
@@ -319,27 +291,15 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
           language: adaptedResponse.language,
           rag_used: adaptedResponse.rag_used
         })
-        console.log('✅ Conversation sauvegardée pour historique:', adaptedResponse.conversation_id)
       } catch (saveError) {
-        console.error('❌ PROBLÈME: Erreur sauvegarde conversation (impact historique):', saveError)
-        // L'erreur de sauvegarde impacte l'historique mais ne bloque pas l'UX
+        console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
       }
-    } else {
-      console.warn('⚠️ PROBLÈME: Pas de user.id ou conversation_id - historique non sauvegardé')
     }
     
     return adaptedResponse
     
   } catch (error: any) {
     console.error('❌ Erreur lors de l\'appel au RAG:', error)
-    
-    // Gestion spécifique des erreurs d'authentification
-    if (error.message.includes('Session expirée') || error.message.includes('Token d\'authentification manquant')) {
-      // Forcer la reconnexion
-      await supabase.auth.signOut()
-      window.location.href = '/'
-      throw new Error('Session expirée - redirection vers la connexion')
-    }
     
     if (error.message.includes('Failed to fetch')) {
       throw new Error(`Erreur de connexion au serveur.
@@ -368,7 +328,7 @@ const translations = {
     'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
     'chat.helpfulResponse': 'Réponse utile',
     'chat.notHelpfulResponse': 'Réponse non utile',
-
+    'chat.voiceRecording': 'Enregistrement vocal (bientôt disponible)',
     'chat.noConversations': 'Aucune conversation',
     'nav.newConversation': 'Nouvelle conversation',
     'nav.history': 'Historique',
@@ -420,7 +380,7 @@ const translations = {
     'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
     'chat.helpfulResponse': 'Helpful response',
     'chat.notHelpfulResponse': 'Not helpful response',
-
+    'chat.voiceRecording': 'Voice recording (coming soon)',
     'chat.noConversations': 'No conversations',
     'nav.newConversation': 'New conversation',
     'nav.history': 'History',
@@ -472,7 +432,7 @@ const translations = {
     'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
     'chat.helpfulResponse': 'Respuesta útil',
     'chat.notHelpfulResponse': 'Respuesta no útil',
-
+    'chat.voiceRecording': 'Grabación de voz (próximamente)',
     'chat.noConversations': 'Sin conversaciones',
     'nav.newConversation': 'Nueva conversación',
     'nav.history': 'Historial',
@@ -1070,7 +1030,7 @@ const useChatStore = () => {
     await loadConversations(userId)
   }
 
-  // ✅ CORRECTION: Fonction pour ajouter une nouvelle conversation à la liste locale
+  // Fonction pour ajouter une nouvelle conversation à la liste locale
   const addConversation = (conversationId: string, question: string, response: string) => {
     const newConversation: ConversationItem = {
       id: conversationId,
@@ -2322,7 +2282,6 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ CORRECTION: handleSendMessage utilise TOUJOURS l'endpoint sécurisé avec JWT
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -2338,7 +2297,6 @@ export default function ChatInterface() {
     setIsLoadingChat(true)
 
     try {
-      console.log('🔒 [handleSendMessage] Envoi question via endpoint sécurisé avec JWT')
       const response = await generateAIResponse(text.trim(), user)
       
       const aiMessage: Message = {
@@ -2346,22 +2304,18 @@ export default function ChatInterface() {
         content: response.response,
         isUser: false,
         timestamp: new Date(),
-        conversation_id: response.conversation_id  // ✅ IMPORTANT: conversation_id propagé
+        conversation_id: response.conversation_id
       }
 
       setMessages(prev => [...prev, aiMessage])
-      console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
+      console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
       
-      // ✅ CORRECTION: Ajouter conversation à l'historique local aussi
       if (user && response.conversation_id) {
-        console.log('📂 [handleSendMessage] Ajout à l\'historique local:', response.conversation_id)
         addConversation(response.conversation_id, text.trim(), response.response)
-      } else {
-        console.warn('⚠️ [handleSendMessage] Pas de user.id ou conversation_id pour historique local')
       }
       
     } catch (error) {
-      console.error('❌ [handleSendMessage] Error generating response:', error)
+      console.error('❌ Error generating response:', error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: error instanceof Error ? error.message : t('chat.errorMessage'),
@@ -2487,8 +2441,8 @@ export default function ChatInterface() {
                         </p>
                       </div>
                       
-                      {/* ✅ CORRECTION: Boutons de feedback TOUJOURS affichés avec conversation_id */}
-                      {!message.isUser && index > 0 && (
+                      {/* Boutons de feedback avec conversation_id */}
+                      {!message.isUser && index > 0 && message.conversation_id && (
                         <div className="flex items-center space-x-2 mt-2 ml-2">
                           <button
                             onClick={() => handleFeedback(message.id, 'positive')}
@@ -2513,7 +2467,7 @@ export default function ChatInterface() {
                           )}
                           {message.conversation_id && (
                             <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
-                              🔗 {message.conversation_id.substring(0, 8)}...
+                              🔗
                             </span>
                           )}
                         </div>
@@ -2553,6 +2507,19 @@ export default function ChatInterface() {
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center space-x-3">
+                {/* Afficher le micro seulement sur mobile/tablette */}
+                {isMobileDevice && (
+                  <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={t('chat.voiceRecording')}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                  </button>
+                )}
+                
                 <div className="flex-1">
                   <input
                     type="text"
@@ -2569,7 +2536,7 @@ export default function ChatInterface() {
                     disabled={isLoadingChat}
                   />
                 </div>
-
+                
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={isLoadingChat || !inputMessage.trim()}
