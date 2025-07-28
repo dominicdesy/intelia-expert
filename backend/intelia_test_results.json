@@ -1,0 +1,628 @@
+﻿{
+    "CriticalFixes":  {
+                          "ExpectedImprovement":  "From 9/22 to 18+/22 success rate",
+                          "DoublePrefixFix":  "Applied",
+                          "AffectedEndpoints":  [
+                                                    "/v1/system/health",
+                                                    "/v1/system/metrics",
+                                                    "/v1/logging/analytics",
+                                                    "/v1/auth/login",
+                                                    "/v1/admin/dashboard"
+                                                ],
+                          "Version":  "3.4.0"
+                      },
+    "LoggingValidation":  {
+                              "Cleanup":  "Tested",
+                              "HealthCheck":  "Tested",
+                              "Analytics":  "Tested",
+                              "ConversationSaving":  "Tested",
+                              "FeedbackSystem":  "Tested"
+                          },
+    "DetailedResults":  [
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"message\":  \"Intelia Expert API v3.4.0 - Préfixes Doublés Corrigés\",\r\n    \"status\":  \"running\",\r\n    \"environment\":  \"production\",\r\n    \"api_version\":  \"3.4.0\",\r\n    \"database\":  true,\r\n    \"rag_system\":  \"optimized\",\r\n    \"routers_mounted\":  {\r\n                            \"expert\":  true,\r\n                            \"auth\":  true,\r\n                            \"admin\":  true,\r\n                            \"health\":  true,\r\n                            \"system\":  true,\r\n                            \"logging\":  true\r\n                        },\r\n    \"supported_languages\":  [\r\n                                \"fr\",\r\n                                \"en\",\r\n                                \"es\"\r\n                            ],\r\n    \"utf8_support\":  {\r\n                         \"enabled\":  true,\r\n                         \"french_accents\":  \"é, è, à, ç, ù, etc.\",\r\n                         \"spanish_special\":  \"ñ, ¿, ¡, acentos\",\r\n                         \"encoding\":  \"UTF-8 forcé sur toutes les requêtes/réponses\"\r\n                     },\r\n    \"available_endpoints\":  [\r\n                                \"/api/v1/expert/ask-public\",\r\n                                \"/api/v1/expert/topics\",\r\n                                \"/api/v1/auth/login\",\r\n                                \"/api/v1/auth/profile\",\r\n                                \"/api/v1/auth/logout\",\r\n                                \"/api/v1/admin/dashboard\",\r\n                                \"/api/v1/admin/users\",\r\n                                \"/api/v1/admin/analytics\",\r\n                                \"/api/v1/health/health\",\r\n                                \"/api/v1/health/detailed\",\r\n                                \"/api/v1/system/health\",\r\n                                \"/api/v1/system/metrics\",\r\n                                \"/api/v1/system/status\",\r\n                                \"/api/v1/logging/analytics\",\r\n                                \"/api/v1/logging/health\",\r\n                                \"/docs\",\r\n                                \"/debug/routers\"\r\n                            ],\r\n    \"fixes_applied_v3_4\":  {\r\n                               \"double_prefix_fix\":  \"Correction /v1/system/system → /v1/system\",\r\n                               \"router_mounting\":  \"Tous routers montés avec prefix=\\u0027/v1\\u0027 seulement\",\r\n                               \"expert_exception\":  \"Expert garde /v1/expert car pas de doublon interne\",\r\n                               \"endpoints_now_accessible\":  [\r\n                                                                \"/api/v1/system/health\",\r\n                                                                \"/api/v1/system/metrics\",\r\n                                                                \"/api/v1/logging/analytics\",\r\n                                                                \"/api/v1/auth/login\",\r\n                                                                \"/api/v1/admin/dashboard\"\r\n                                                            ]\r\n                           },\r\n    \"deployment_notes\":  {\r\n                             \"platform\":  \"DigitalOcean App Platform\",\r\n                             \"auto_prefix\":  \"/api ajouté automatiquement par DigitalOcean\",\r\n                             \"problem_solved\":  \"Préfixes doublés résolus pour tous routers\",\r\n                             \"utf8_support\":  \"Middleware UTF-8 actif pour caractères spéciaux\"\r\n                         }\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Endpoint Racine (/)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:09",
+                                "Error":  "",
+                                "Endpoint":  "/",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"healthy\",\r\n    \"timestamp\":  \"2025-07-28T18:53:09.464946Z\",\r\n    \"services\":  {\r\n                     \"api\":  \"running\",\r\n                     \"database\":  \"connected\",\r\n                     \"rag_system\":  \"optimized\",\r\n                     \"utf8_support\":  \"enabled\",\r\n                     \"routers\":  \"all_mounted_with_fixed_prefixes\"\r\n                 },\r\n    \"config\":  {\r\n                   \"environment\":  \"production\",\r\n                   \"deployment\":  \"DigitalOcean App Platform\",\r\n                   \"encoding\":  \"UTF-8\",\r\n                   \"version\":  \"3.4.0\",\r\n                   \"fix_applied\":  \"Double prefix correction\"\r\n               },\r\n    \"database_status\":  \"connected\",\r\n    \"rag_status\":  \"optimized\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Health Check Global",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:09",
+                                "Error":  "",
+                                "Endpoint":  "/health",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"routers_status\":  {\r\n                           \"expert\":  true,\r\n                           \"auth\":  true,\r\n                           \"admin\":  true,\r\n                           \"health\":  true,\r\n                           \"system\":  true,\r\n                           \"logging\":  true\r\n                       },\r\n    \"available_routes\":  [\r\n                             {\r\n                                 \"path\":  \"/openapi.json\",\r\n                                 \"methods\":  \"HEAD GET\",\r\n                                 \"name\":  \"openapi\",\r\n                                 \"tags\":  \"\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/docs\",\r\n                                 \"methods\":  \"HEAD GET\",\r\n                                 \"name\":  \"swagger_ui_html\",\r\n                                 \"tags\":  \"\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/docs/oauth2-redirect\",\r\n                                 \"methods\":  \"HEAD GET\",\r\n                                 \"name\":  \"swagger_ui_redirect\",\r\n                                 \"tags\":  \"\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/redoc\",\r\n                                 \"methods\":  \"HEAD GET\",\r\n                                 \"name\":  \"redoc_html\",\r\n                                 \"tags\":  \"\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/ask-public\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"ask_expert_public\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/ask\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"ask_expert\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/feedback\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"submit_feedback\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/topics\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_suggested_topics\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/history\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_conversation_history\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/debug/status\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_status\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/debug/test-question\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_test_question\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/debug/test-utf8\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_test_utf8\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/expert/debug/routes\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_routes\",\r\n                                 \"tags\":  \"Expert System expert\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/auth/login\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"login\",\r\n                                 \"tags\":  \"Authentication\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/auth/logout\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"logout\",\r\n                                 \"tags\":  \"Authentication\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/auth/profile\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_profile\",\r\n                                 \"tags\":  \"Authentication\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/auth/delete-data\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"delete_user_data\",\r\n                                 \"tags\":  \"Authentication\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/dashboard\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_dashboard\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/rag/diagnostics\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_rag_diagnostics\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/rag/force-configure\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"force_configure_rag\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/rag/test\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"test_rag_comprehensive\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/rag/status\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_rag_status\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/analytics\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_analytics\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/documents\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_documents_status\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/admin/documents/upload\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"upload_document\",\r\n                                 \"tags\":  \"Administration\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/health/\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"health_check\",\r\n                                 \"tags\":  \"Health Monitoring health\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/health/detailed\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"detailed_health\",\r\n                                 \"tags\":  \"Health Monitoring health\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/system/health\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"health_check\",\r\n                                 \"tags\":  \"System Monitoring\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/system/metrics\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_metrics\",\r\n                                 \"tags\":  \"System Monitoring\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/system/status\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_system_status\",\r\n                                 \"tags\":  \"System Monitoring\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/conversation\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"save_conversation\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/conversation/{conversation_id}/feedback\",\r\n                                 \"methods\":  \"PATCH\",\r\n                                 \"name\":  \"update_feedback\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/conversation/{conversation_id}\",\r\n                                 \"methods\":  \"DELETE\",\r\n                                 \"name\":  \"delete_conversation\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/conversation/{conversation_id}\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_conversation\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/user/{user_id}/conversations\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_user_conversations\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/user/{user_id}/conversations\",\r\n                                 \"methods\":  \"DELETE\",\r\n                                 \"name\":  \"delete_user_conversations\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/analytics\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_analytics\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/admin/stats\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_detailed_stats\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/admin/database-info\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"get_database_info\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/admin/cleanup\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"cleanup_old_data\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/admin/export-csv\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"export_conversations_csv\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/health\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"health_check\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/test/create-sample\",\r\n                                 \"methods\":  \"POST\",\r\n                                 \"name\":  \"create_sample_conversation\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/debug/all-conversations\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_get_all_conversations\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/v1/logging/debug/delete-test-data\",\r\n                                 \"methods\":  \"DELETE\",\r\n                                 \"name\":  \"debug_delete_test_data\",\r\n                                 \"tags\":  \"Logging logging\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"root\",\r\n                                 \"tags\":  \"Root\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/health\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"health_check\",\r\n                                 \"tags\":  \"Health\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/debug/routers\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_routers\",\r\n                                 \"tags\":  \"Debug\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/debug/utf8\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_utf8\",\r\n                                 \"tags\":  \"Debug\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/debug/structure\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_structure\",\r\n                                 \"tags\":  \"Debug\"\r\n                             },\r\n                             {\r\n                                 \"path\":  \"/debug/deployment\",\r\n                                 \"methods\":  \"GET\",\r\n                                 \"name\":  \"debug_deployment\",\r\n                                 \"tags\":  \"Debug\"\r\n                             }\r\n                         ],\r\n    \"prefix_corrections_v3_4\":  {\r\n                                    \"problem\":  \"Routers avaient des préfixes internes qui doublaient\",\r\n                                    \"example_before\":  \"/v1/system (mount) + /system (router) = /v1/system/system\",\r\n                                    \"example_after\":  \"/v1 (mount) + /system (router) = /v1/system\",\r\n                                    \"expert_exception\":  \"Expert garde /v1/expert car pas de préfixe interne /expert\"\r\n                                },\r\n    \"corrected_endpoints\":  {\r\n                                \"system\":  [\r\n                                               \"/api/v1/system/health\",\r\n                                               \"/api/v1/system/metrics\",\r\n                                               \"/api/v1/system/status\"\r\n                                           ],\r\n                                \"logging\":  [\r\n                                                \"/api/v1/logging/analytics\",\r\n                                                \"/api/v1/logging/health\"\r\n                                            ],\r\n                                \"auth\":  [\r\n                                             \"/api/v1/auth/login\",\r\n                                             \"/api/v1/auth/profile\",\r\n                                             \"/api/v1/auth/logout\"\r\n                                         ],\r\n                                \"admin\":  [\r\n                                              \"/api/v1/admin/dashboard\",\r\n                                              \"/api/v1/admin/users\",\r\n                                              \"/api/v1/admin/analytics\"\r\n                                          ],\r\n                                \"health\":  [\r\n                                               \"/api/v1/health/health\",\r\n                                               \"/api/v1/health/detailed\"\r\n                                           ],\r\n                                \"expert\":  [\r\n                                               \"/api/v1/expert/ask-public\",\r\n                                               \"/api/v1/expert/topics\"\r\n                                           ]\r\n                            },\r\n    \"digitalocean_mapping\":  {\r\n                                 \"fastapi_internal\":  \"/v1/system/health\",\r\n                                 \"digitalocean_external\":  \"/api/v1/system/health\",\r\n                                 \"note\":  \"DigitalOcean ajoute automatiquement /api\"\r\n                             },\r\n    \"utf8_status\":  {\r\n                        \"middleware_active\":  true,\r\n                        \"supported_chars\":  \"Tous caractères UTF-8 supportés\",\r\n                        \"test_chars\":  \"éèàçù, ñ¿¡, etc.\"\r\n                    },\r\n    \"timestamp\":  \"2025-07-28T18:53:09.581451\",\r\n    \"version\":  \"3.4.0\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Debug - ROUTERS",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:09",
+                                "Error":  "",
+                                "Endpoint":  "/debug/routers",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"utf8_test\":  {\r\n                      \"french\":  \"Température élevée à 32°C - problème détecté\",\r\n                      \"spanish\":  \"¿Cuál es la nutrición óptima para pollos?\",\r\n                      \"special_chars\":  \"àáâãäåæçèéêëìíîïñòóôõö\",\r\n                      \"symbols\":  \"°C, %, €, £, ¥\",\r\n                      \"encoding\":  \"UTF-8\"\r\n                  },\r\n    \"middleware_status\":  \"Actif - Force UTF-8 sur toutes les réponses\",\r\n    \"headers_forced\":  {\r\n                           \"content-type\":  \"application/json; charset=utf-8\",\r\n                           \"accept-charset\":  \"utf-8\"\r\n                       },\r\n    \"test_passed\":  true,\r\n    \"timestamp\":  \"2025-07-28T18:53:09.790374\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Debug - UTF8",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:09",
+                                "Error":  "",
+                                "Endpoint":  "/debug/utf8",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"project_structure\":  {\r\n\r\n                          },\r\n    \"backend_dir\":  \"/workspace/backend/app\",\r\n    \"deployment_environment\":  \"DigitalOcean\",\r\n    \"router_prefix_status\":  {\r\n                                 \"problem_identified\":  \"Double préfixes dans routers internes\",\r\n                                 \"correction_applied\":  \"Montage avec prefix=\\u0027/v1\\u0027 seulement\",\r\n                                 \"result\":  \"Endpoints maintenant accessibles aux bonnes URLs\"\r\n                             },\r\n    \"timestamp\":  \"2025-07-28T18:53:09.929919\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Debug - STRUCTURE",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:09",
+                                "Error":  "",
+                                "Endpoint":  "/debug/structure",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"platform\":  \"DigitalOcean App Platform\",\r\n    \"backend_dir\":  \"/workspace/backend/app\",\r\n    \"is_digitalocean\":  true,\r\n    \"environment_vars\":  {\r\n                             \"ENV\":  \"production\",\r\n                             \"PORT\":  \"8080\",\r\n                             \"HOST\":  \"not_set\",\r\n                             \"OPENAI_API_KEY\":  \"set\",\r\n                             \"SUPABASE_URL\":  \"set\"\r\n                         },\r\n    \"fixes_applied_v3_4\":  {\r\n                               \"critical_fix\":  \"Double préfixes routers corrigés\",\r\n                               \"routing_fix\":  \"Montage uniforme avec prefix=\\u0027/v1\\u0027\",\r\n                               \"utf8_fix\":  \"Middleware UTF-8 pour caractères spéciaux\",\r\n                               \"cors_fix\":  \"Headers UTF-8 ajoutés au CORS\",\r\n                               \"documentation_fix\":  \"Tags ajoutés pour organisation Swagger\"\r\n                           },\r\n    \"routing_explanation\":  {\r\n                                \"architecture_fixed\":  \"Préfixes doublés éliminés\",\r\n                                \"digitalocean_behavior\":  \"Ajoute automatiquement /api à toutes les routes\",\r\n                                \"final_result\":  \"FastAPI /v1/system + DO /api = /api/v1/system ✅\",\r\n                                \"utf8_result\":  \"Caractères spéciaux FR/ES supportés\",\r\n                                \"accessibility\":  \"Tous endpoints maintenant accessibles\"\r\n                            },\r\n    \"expected_improvements\":  {\r\n                                  \"system_endpoints\":  \"Maintenant accessibles\",\r\n                                  \"logging_endpoints\":  \"Maintenant accessibles\",\r\n                                  \"auth_endpoints\":  \"Maintenant accessibles\",\r\n                                  \"admin_endpoints\":  \"Maintenant accessibles\",\r\n                                  \"score_improvement\":  \"De 9/22 vers 18+/22 succès attendus\"\r\n                              },\r\n    \"timestamp\":  \"2025-07-28T18:53:10.043817\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Debug - DEPLOYMENT",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/debug/deployment",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Health Check Détaillé",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "Le serveur distant a retourné une erreur : (404) Introuvable.",
+                                "Endpoint":  "/v1/health/health",
+                                "StatusCode":  404
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"api_status\":  \"running\",\r\n    \"memory_usage\":  \"unknown\",\r\n    \"cpu_usage\":  \"unknown\",\r\n    \"disk_space\":  \"unknown\",\r\n    \"openai_configured\":  true,\r\n    \"timestamp\":  \"2025-07-28T18:53:10.314535\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Health Check Avancé",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/v1/health/detailed",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"healthy\",\r\n    \"timestamp\":  \"2025-07-28T18:53:10.485356\",\r\n    \"services\":  {\r\n                     \"api\":  \"running\",\r\n                     \"openai\":  \"configured\",\r\n                     \"rag\":  \"checking\"\r\n                 },\r\n    \"version\":  \"1.0.0\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "System Health (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/v1/system/health",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"active\",\r\n    \"metrics\":  {\r\n                    \"uptime\":  \"N/A\",\r\n                    \"memory_usage\":  \"N/A\",\r\n                    \"cpu_usage\":  \"N/A\",\r\n                    \"response_time_avg\":  \"N/A\"\r\n                }\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "System Metrics (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/v1/system/metrics",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"api_status\":  \"running\",\r\n    \"database_status\":  \"not_connected\",\r\n    \"rag_status\":  \"checking\",\r\n    \"ai_status\":  \"checking\",\r\n    \"timestamp\":  \"2025-07-28T18:53:10.712206\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "System Status (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/v1/system/status",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"topics\":  [\r\n                   \"Protocoles Compass pour l\\u0027analyse de performance\",\r\n                   \"Problèmes de croissance poulets Ross 308\",\r\n                   \"Température optimale pour élevage\",\r\n                   \"Patterns de diagnostic du poids\",\r\n                   \"Mortalité élevée - diagnostic\",\r\n                   \"Ventilation et qualité d\\u0027air\",\r\n                   \"Protocoles de vaccination\",\r\n                   \"Indices de conversion alimentaire\"\r\n               ],\r\n    \"language\":  \"fr\",\r\n    \"count\":  8\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Topics Suggérés",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:10",
+                                "Error":  "",
+                                "Endpoint":  "/v1/expert/topics",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "",
+                                "AdditionalData":  {
+                                                       "Question":  "Quelle est la température optimale pour les poulets Ross 308?",
+                                                       "Language":  "fr"
+                                                   },
+                                "TestName":  "Question Française Standard",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:11",
+                                "Error":  "Le serveur distant a retourné une erreur : (400) Demande incorrecte.",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  400
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"question\":  \"What is the optimal nutrition for broiler chickens?\",\r\n    \"response\":  \"Based on the provided documents, the optimal nutrition for broiler chickens involves providing a range of balanced diets that satisfy their nutrient needs at all stages of development and production. The diets should aim to optimize efficiency, profitability, bird welfare, and sustainability. For parent stock, the diets should also maximize welfare, reproductive potential, and chick quality. It is essential to maintain good uniformity and closely monitor body-weight targets. Therefore, to achieve optimal nutrition for broiler chickens, it is crucial to provide balanced diets tailored to their specific needs at each stage of development and production.\",\r\n    \"conversation_id\":  \"511a91dc-e472-4720-870c-81f047e83285\",\r\n    \"rag_used\":  true,\r\n    \"rag_score\":  null,\r\n    \"timestamp\":  \"2025-07-28T18:53:12.224146\",\r\n    \"language\":  \"en\",\r\n    \"response_time_ms\":  1094,\r\n    \"mode\":  \"rag_enhanced\",\r\n    \"user\":  null,\r\n    \"logged\":  true\r\n}",
+                                "AdditionalData":  {
+                                                       "Question":  "What is the optimal nutrition for broiler chickens?",
+                                                       "Language":  "en"
+                                                   },
+                                "TestName":  "Question Anglaise Standard",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:12",
+                                "Error":  "",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "",
+                                "AdditionalData":  {
+                                                       "Question":  "¿Cuál es la nutrición óptima para pollos de engorde?",
+                                                       "Language":  "es"
+                                                   },
+                                "TestName":  "Question Espagnole avec Caractères Spéciaux",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:12",
+                                "Error":  "Le serveur distant a retourné une erreur : (400) Demande incorrecte.",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  400
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "",
+                                "AdditionalData":  {
+                                                       "Question":  "Mes poulets ont une température corporelle élevée à 42°C, que faire?",
+                                                       "Language":  "fr"
+                                                   },
+                                "TestName":  "Question UTF-8 avec Accents et Symboles",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:12",
+                                "Error":  "Le serveur distant a retourné une erreur : (400) Demande incorrecte.",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  400
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n    \"response\":  \"Pour évaluer la performance en termes de vitesse de croissance des poulets de chair Ross 308, vous pouvez utiliser le Paramètre de l\\u0027Efficacité de Production (PEF) tel que décrit dans le Document 1.\\n\\nLe PEF se calcule en multipliant le pourcentage de survie (%), le poids vif (kg) et en le divisant par l\\u0027âge (jours) multiplié par l\\u0027Indice de Conversion Alimentaire (FCR). \\n\\nPar exemple, si vous avez des poulets de 35 jours, avec un poids vif de 2,296 kg, un pourcentage de survie de 97,20% et un FCR de 1,399, vous pouvez calculer le PEF comme suit :\\n\\nPEF = (97,20 x 2,296 x 100) / (35 x 1,399) = 456\\n\\nUn PEF plus élevé indique une meilleure performance en termes de vitesse de croissance. Vous pouvez utiliser cette formule pour évaluer et comparer la performance des poulets de chair Ross 308 en fonction de leur vitesse de croissance.\",\r\n    \"conversation_id\":  \"e2c40191-61bc-44e2-b255-c5652f754352\",\r\n    \"rag_used\":  true,\r\n    \"rag_score\":  null,\r\n    \"timestamp\":  \"2025-07-28T18:53:15.101120\",\r\n    \"language\":  \"fr\",\r\n    \"response_time_ms\":  2556,\r\n    \"mode\":  \"rag_enhanced\",\r\n    \"user\":  null,\r\n    \"logged\":  true\r\n}",
+                                "AdditionalData":  {
+                                                       "SpeedMode":  "fast"
+                                                   },
+                                "TestName":  "Mode Performance: fast",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:15",
+                                "Error":  "",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n    \"response\":  \"Pour évaluer la performance de croissance des poulets de chair Ross 308, vous pouvez utiliser le Facteur d\\u0027Efficacité de Production (PEF) tel que décrit dans le Document 1. Le PEF prend en compte des facteurs clés tels que la mortalité, le poids vif, l\\u0027âge et le FCR (indice de consommation de l\\u0027aliment).\\n\\nPour calculer le PEF, vous aurez besoin des valeurs suivantes:\\n- Pourcentage de livabilité\\n- Poids vif en kg\\n- Âge en jours\\n- FCR\\n\\nEn utilisant ces valeurs, vous pouvez calculer le PEF selon la formule donnée dans le Document 1. Un PEF plus élevé indique une meilleure performance de croissance des poulets.\\n\\nN\\u0027oubliez pas de surveiller également la qualité de l\\u0027eau, comme indiqué dans le Document 2, car une eau de mauvaise qualité peut affecter la santé et la croissance des poulets.\\n\\nEnfin, pour évaluer la distribution des poids des poulets, vous pouvez utiliser les exemples de grading donnés dans le Document 3, qui montrent comment classer les poulets en fonction de leur poids moyen et de leur coefficient de variation (%CV).\\n\\nEn résumé, pour un test de performance précis de la vitesse de croissance des poulets de chair Ross 308, utilisez le PEF, surveillez la qualité de l\\u0027eau et évaluez la distribution des poids des poulets.\",\r\n    \"conversation_id\":  \"d782482c-7391-4b2f-8d95-435a5ad226fd\",\r\n    \"rag_used\":  true,\r\n    \"rag_score\":  null,\r\n    \"timestamp\":  \"2025-07-28T18:53:17.809000\",\r\n    \"language\":  \"fr\",\r\n    \"response_time_ms\":  2618,\r\n    \"mode\":  \"rag_enhanced\",\r\n    \"user\":  null,\r\n    \"logged\":  true\r\n}",
+                                "AdditionalData":  {
+                                                       "SpeedMode":  "balanced"
+                                                   },
+                                "TestName":  "Mode Performance: balanced",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:17",
+                                "Error":  "",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n    \"response\":  \"Pour évaluer la performance en termes de vitesse de croissance des poulets de chair Ross 308, il est essentiel de prendre en compte plusieurs facteurs clés. Voici un aperçu basé sur les documents fournis :\\n\\n1. **Facteur d\\u0027Efficacité de Production (PEF)** : Le PEF est un indicateur important qui permet de mesurer la croissance des poulets. Il se calcule avec la formule suivante :\\n   \\\\[\\n   PEF = \\\\frac{\\\\text{Taux de survie (%) } \\\\times \\\\text{Poids vif (kg)} \\\\times 100}{\\\\text{Âge (jours) } \\\\times \\\\text{FCR}}\\n   \\\\]\\n   Par exemple, un poulet de 35 jours pesant 2.296 kg avec un taux de survie de 97.20 % et un FCR (coefficient de conversion alimentaire) de 1.399 donnerait un PEF de 456.\\n\\n2. **Poids vif** : Le poids des poulets à différents âges est un critère fondamental pour évaluer leur croissance. Par exemple, à 45 jours, un poids de 3.295 kg avec un taux de survie de 96.55 % et un FCR de 1.606 permettrait de calculer un PEF supplémentaire.\\n\\n3. **Qualité de l\\u0027eau** : La qualité de l\\u0027eau influençant la consommation et, par conséquent, la croissance, il est crucial de maintenir des critères de qualité. Une concentration de solides dissous totaux (TDS) inférieure à 1,000 ppm est considérée comme bonne, tandis qu\\u0027une concentration entre 1,000 et 3,000 ppm est satisfaisante mais peut entraîner des déjections humides.\\n\\n4. **Suivi des poids** : Il est également recommandé de suivre les poids des poulets à intervalles réguliers pour s\\u0027assurer qu\\u0027ils atteignent les standards de poids pour leur âge. Utiliser des méthodes comme le C.V. (coefficient de variation) permet d\\u0027évaluer la distribution des poids au sein du lot.\\n\\nEn résumé, pour un test de performance sur la vitesse de croissance des poulets de chair Ross 308, il est essentiel de mesurer le PEF, de surveiller le poids vif, d\\u0027assurer une bonne qualité de l\\u0027eau et de suivre régulièrement les poids pour garantir une croissance optimale.\",\r\n    \"conversation_id\":  \"77935220-2fe0-4a97-b43c-2ad3b5143d5a\",\r\n    \"rag_used\":  true,\r\n    \"rag_score\":  null,\r\n    \"timestamp\":  \"2025-07-28T18:53:28.127243\",\r\n    \"language\":  \"fr\",\r\n    \"response_time_ms\":  10243,\r\n    \"mode\":  \"rag_enhanced\",\r\n    \"user\":  null,\r\n    \"logged\":  true\r\n}",
+                                "AdditionalData":  {
+                                                       "SpeedMode":  "quality"
+                                                   },
+                                "TestName":  "Mode Performance: quality",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/expert/ask-public",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"healthy\",\r\n    \"database\":  \"connected\",\r\n    \"total_conversations\":  16,\r\n    \"timestamp\":  \"2025-07-28T18:53:28.231044\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Logging Health Check",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/health",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"message\":  \"Conversation de test créée\",\r\n    \"conversation_id\":  \"9fe80f72-1c68-4acc-acc6-39fa04e56b30\",\r\n    \"record_id\":  \"57356d99-688f-4d3d-b787-383b0a47fa57\",\r\n    \"timestamp\":  \"2025-07-28T18:53:28.347388\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Création Conversation Test",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/test/create-sample",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Sauvegarde Conversation Manuelle",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "Le serveur distant a retourné une erreur : (400) Demande incorrecte.",
+                                "Endpoint":  "/v1/logging/conversation",
+                                "StatusCode":  400
+                            },
+                            {
+                                "Method":  "PATCH",
+                                "Response":  "{\r\n    \"message\":  \"Feedback mis à jour avec succès\",\r\n    \"conversation_id\":  \"9fe80f72-1c68-4acc-acc6-39fa04e56b30\",\r\n    \"feedback\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:28.549525\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Mise à Jour Feedback (👍)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}/feedback",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"id\":  \"57356d99-688f-4d3d-b787-383b0a47fa57\",\r\n    \"conversation_id\":  \"9fe80f72-1c68-4acc-acc6-39fa04e56b30\",\r\n    \"user_id\":  \"test-user-123\",\r\n    \"question\":  \"Question de test du système de logging\",\r\n    \"response\":  \"Réponse de test générée automatiquement\",\r\n    \"feedback\":  1,\r\n    \"confidence_score\":  0.95,\r\n    \"response_time_ms\":  1500,\r\n    \"language\":  \"fr\",\r\n    \"rag_used\":  1,\r\n    \"timestamp\":  \"2025-07-28 18:53:28\",\r\n    \"updated_at\":  \"2025-07-28 18:53:28\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Récupération Conversation par ID",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"conversations\":  [\r\n\r\n                      ],\r\n    \"count\":  0,\r\n    \"user_id\":  \"test-user-powershell-1786182550\",\r\n    \"limit\":  10\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Conversations Utilisateur",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/user/{id}/conversations",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"total_conversations\":  17,\r\n    \"satisfaction_rate\":  100.0,\r\n    \"avg_response_time\":  3544.82,\r\n    \"feedback_distribution\":  {\r\n                                  \"positive\":  2,\r\n                                  \"negative\":  0,\r\n                                  \"no_feedback\":  15\r\n                              },\r\n    \"period_days\":  30\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Analytics Logging",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:28",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/analytics",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"frequent_patterns\":  [\r\n                              {\r\n                                  \"question_preview\":  \"Test de performance - vitesse de croissance poulet\",\r\n                                  \"frequency\":  3,\r\n                                  \"avg_satisfaction\":  null,\r\n                                  \"avg_response_time\":  5139.0\r\n                              }\r\n                          ],\r\n    \"language_distribution\":  [\r\n                                  {\r\n                                      \"language\":  \"fr\",\r\n                                      \"count\":  12,\r\n                                      \"satisfaction\":  1.0\r\n                                  },\r\n                                  {\r\n                                      \"language\":  \"en\",\r\n                                      \"count\":  3,\r\n                                      \"satisfaction\":  null\r\n                                  },\r\n                                  {\r\n                                      \"language\":  \"es\",\r\n                                      \"count\":  2,\r\n                                      \"satisfaction\":  null\r\n                                  }\r\n                              ],\r\n    \"daily_evolution\":  [\r\n                            {\r\n                                \"day\":  \"2025-07-28\",\r\n                                \"conversations\":  17,\r\n                                \"satisfaction\":  1.0,\r\n                                \"avg_response_time\":  3544.82\r\n                            }\r\n                        ]\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Stats Détaillées Admin",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/admin/stats",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"database_file\":  \"conversations.db\",\r\n    \"file_size_bytes\":  73728,\r\n    \"file_size_mb\":  0.07,\r\n    \"total_records\":  17,\r\n    \"first_conversation\":  \"2025-07-28 18:46:19\",\r\n    \"last_conversation\":  \"2025-07-28 18:53:28\",\r\n    \"indexes\":  [\r\n                    \"sqlite_autoindex_conversations_1\",\r\n                    \"sqlite_autoindex_conversations_2\",\r\n                    \"idx_conversation_id\",\r\n                    \"idx_user_id\",\r\n                    \"idx_timestamp\",\r\n                    \"idx_feedback\",\r\n                    \"idx_language\"\r\n                ],\r\n    \"status\":  \"healthy\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Infos Base de Données",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/admin/database-info",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"message\":  \"Debug: 5 conversations récupérées\",\r\n    \"conversations\":  [\r\n                          {\r\n                              \"conversation_id\":  \"9fe80f72-1c68-4acc-acc6-39fa04e56b30\",\r\n                              \"user_id\":  \"test-user-123\",\r\n                              \"question\":  \"Question de test du système de logging\",\r\n                              \"response\":  \"Réponse de test générée automatiquement\",\r\n                              \"feedback\":  1,\r\n                              \"timestamp\":  \"2025-07-28 18:53:28\",\r\n                              \"language\":  \"fr\",\r\n                              \"rag_used\":  1\r\n                          },\r\n                          {\r\n                              \"conversation_id\":  \"77935220-2fe0-4a97-b43c-2ad3b5143d5a\",\r\n                              \"user_id\":  \"anon_111e9aca\",\r\n                              \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n                              \"response\":  \"Pour évaluer la performance en termes de vitesse de croissance des poulets de chair Ross 308, il est essentiel de prendre en compte plusieurs facteurs clés. Voici un aperçu basé sur les documents fournis :\\n\\n1. **Facteur d\\u0027Efficacité de Production (PEF)** : Le PEF est un indicateur important qui permet de mesurer la croissance des poulets. Il se calcule avec la formule suivante :\\n   \\\\[\\n   PEF = \\\\frac{\\\\text{Taux de survie (%) } \\\\times \\\\text{Poids vif (kg)} \\\\times 100}{\\\\text{Âge (jours) } \\\\times \\\\text{FCR}}\\n   \\\\]\\n   Par exemple, un poulet de 35 jours pesant 2.296 kg avec un taux de survie de 97.20 % et un FCR (coefficient de conversion alimentaire) de 1.399 donnerait un PEF de 456.\\n\\n2. **Poids vif** : Le poids des poulets à différents âges est un critère fondamental pour évaluer leur croissance. Par exemple, à 45 jours, un poids de 3.295 kg avec un taux de survie de 96.55 % et un FCR de 1.606 permettrait de calculer un PEF supplémentaire.\\n\\n3. **Qualité de l\\u0027eau** : La qualité de l\\u0027eau influençant la consommation et, par conséquent, la croissance, il est crucial de maintenir des critères de qualité. Une concentration de solides dissous totaux (TDS) inférieure à 1,000 ppm est considérée comme bonne, tandis qu\\u0027une concentration entre 1,000 et 3,000 ppm est satisfaisante mais peut entraîner des déjections humides.\\n\\n4. **Suivi des poids** : Il est également recommandé de suivre les poids des poulets à intervalles réguliers pour s\\u0027assurer qu\\u0027ils atteignent les standards de poids pour leur âge. Utiliser des méthodes comme le C.V. (coefficient de variation) permet d\\u0027évaluer la distribution des poids au sein du lot.\\n\\nEn résumé, pour un test de performance sur la vitesse de croissance des poulets de chair Ross 308, il est essentiel de mesurer le PEF, de surveiller le poids vif, d\\u0027assurer une bonne qualité de l\\u0027eau et de suivre régulièrement les poids pour garantir une croissance optimale.\",\r\n                              \"feedback\":  null,\r\n                              \"timestamp\":  \"2025-07-28 18:53:28\",\r\n                              \"language\":  \"fr\",\r\n                              \"rag_used\":  1\r\n                          },\r\n                          {\r\n                              \"conversation_id\":  \"d782482c-7391-4b2f-8d95-435a5ad226fd\",\r\n                              \"user_id\":  \"anon_111e9aca\",\r\n                              \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n                              \"response\":  \"Pour évaluer la performance de croissance des poulets de chair Ross 308, vous pouvez utiliser le Facteur d\\u0027Efficacité de Production (PEF) tel que décrit dans le Document 1. Le PEF prend en compte des facteurs clés tels que la mortalité, le poids vif, l\\u0027âge et le FCR (indice de consommation de l\\u0027aliment).\\n\\nPour calculer le PEF, vous aurez besoin des valeurs suivantes:\\n- Pourcentage de livabilité\\n- Poids vif en kg\\n- Âge en jours\\n- FCR\\n\\nEn utilisant ces valeurs, vous pouvez calculer le PEF selon la formule donnée dans le Document 1. Un PEF plus élevé indique une meilleure performance de croissance des poulets.\\n\\nN\\u0027oubliez pas de surveiller également la qualité de l\\u0027eau, comme indiqué dans le Document 2, car une eau de mauvaise qualité peut affecter la santé et la croissance des poulets.\\n\\nEnfin, pour évaluer la distribution des poids des poulets, vous pouvez utiliser les exemples de grading donnés dans le Document 3, qui montrent comment classer les poulets en fonction de leur poids moyen et de leur coefficient de variation (%CV).\\n\\nEn résumé, pour un test de performance précis de la vitesse de croissance des poulets de chair Ross 308, utilisez le PEF, surveillez la qualité de l\\u0027eau et évaluez la distribution des poids des poulets.\",\r\n                              \"feedback\":  null,\r\n                              \"timestamp\":  \"2025-07-28 18:53:17\",\r\n                              \"language\":  \"fr\",\r\n                              \"rag_used\":  1\r\n                          },\r\n                          {\r\n                              \"conversation_id\":  \"e2c40191-61bc-44e2-b255-c5652f754352\",\r\n                              \"user_id\":  \"anon_111e9aca\",\r\n                              \"question\":  \"Test de performance - vitesse de croissance poulets\",\r\n                              \"response\":  \"Pour évaluer la performance en termes de vitesse de croissance des poulets de chair Ross 308, vous pouvez utiliser le Paramètre de l\\u0027Efficacité de Production (PEF) tel que décrit dans le Document 1.\\n\\nLe PEF se calcule en multipliant le pourcentage de survie (%), le poids vif (kg) et en le divisant par l\\u0027âge (jours) multiplié par l\\u0027Indice de Conversion Alimentaire (FCR). \\n\\nPar exemple, si vous avez des poulets de 35 jours, avec un poids vif de 2,296 kg, un pourcentage de survie de 97,20% et un FCR de 1,399, vous pouvez calculer le PEF comme suit :\\n\\nPEF = (97,20 x 2,296 x 100) / (35 x 1,399) = 456\\n\\nUn PEF plus élevé indique une meilleure performance en termes de vitesse de croissance. Vous pouvez utiliser cette formule pour évaluer et comparer la performance des poulets de chair Ross 308 en fonction de leur vitesse de croissance.\",\r\n                              \"feedback\":  null,\r\n                              \"timestamp\":  \"2025-07-28 18:53:15\",\r\n                              \"language\":  \"fr\",\r\n                              \"rag_used\":  1\r\n                          },\r\n                          {\r\n                              \"conversation_id\":  \"511a91dc-e472-4720-870c-81f047e83285\",\r\n                              \"user_id\":  \"anon_111e9aca\",\r\n                              \"question\":  \"What is the optimal nutrition for broiler chickens?\",\r\n                              \"response\":  \"Based on the provided documents, the optimal nutrition for broiler chickens involves providing a range of balanced diets that satisfy their nutrient needs at all stages of development and production. The diets should aim to optimize efficiency, profitability, bird welfare, and sustainability. For parent stock, the diets should also maximize welfare, reproductive potential, and chick quality. It is essential to maintain good uniformity and closely monitor body-weight targets. Therefore, to achieve optimal nutrition for broiler chickens, it is crucial to provide balanced diets tailored to their specific needs at each stage of development and production.\",\r\n                              \"feedback\":  null,\r\n                              \"timestamp\":  \"2025-07-28 18:53:12\",\r\n                              \"language\":  \"en\",\r\n                              \"rag_used\":  1\r\n                          }\r\n                      ],\r\n    \"total_shown\":  5,\r\n    \"limit\":  5\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Debug - Toutes Conversations",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/debug/all-conversations",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"status\":  \"not_implemented\",\r\n    \"message\":  \"Authentication coming soon\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Login (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/auth/login",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"not_implemented\",\r\n    \"message\":  \"User profile coming soon\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Profil Utilisateur (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/auth/profile",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "POST",
+                                "Response":  "{\r\n    \"status\":  \"logout_successful\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Logout (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/auth/logout",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"active\",\r\n    \"timestamp\":  \"2025-07-28T18:53:29.629237\",\r\n    \"services\":  {\r\n                     \"openai\":  \"✅ configured\",\r\n                     \"secrets\":  \"✅ loaded\",\r\n                     \"rag\":  \"✅ fully_configured\",\r\n                     \"expert_service\":  \"✅ operational\"\r\n                 },\r\n    \"rag_detailed_status\":  {\r\n                                \"rag_available\":  true,\r\n                                \"rag_configured\":  true,\r\n                                \"rag_method\":  \"FAISS_local\",\r\n                                \"diagnostics\":  {\r\n                                                    \"environment\":  \"digitalocean\",\r\n                                                    \"rag_index_path_exists\":  true,\r\n                                                    \"embedding_method\":  \"OpenAI\",\r\n                                                    \"openai_key_available\":  true,\r\n                                                    \"rag_directory_structure\":  \"embeddings.npy index.pkl enterprise_metadata.json index.faiss\",\r\n                                                    \"errors\":  \"\",\r\n                                                    \"rag_files_found\":  \"embeddings.npy index.pkl index.faiss\",\r\n                                                    \"expert_engine_available\":  true\r\n                                                },\r\n                                \"secrets_loaded\":  true,\r\n                                \"openai_key_available\":  true,\r\n                                \"expert_engine_available\":  true,\r\n                                \"expert_engine_status\":  {\r\n                                                             \"ai_analyzer_available\":  false,\r\n                                                             \"api_client_available\":  false,\r\n                                                             \"rag_configured\":  false,\r\n                                                             \"rag_status\":  \"unavailable\",\r\n                                                             \"services\":  \"@{ai_available=False; api_available=False; rag_config_available=False}\"\r\n                                                         }\r\n                            },\r\n    \"metrics\":  {\r\n                    \"total_questions\":  \"N/A\",\r\n                    \"satisfaction_rate\":  \"N/A\",\r\n                    \"average_response_time\":  \"N/A\",\r\n                    \"rag_usage_rate\":  \"N/A\"\r\n                },\r\n    \"preferred_method\":  \"digitalocean_optimized\",\r\n    \"recommendations\":  [\r\n\r\n                        ]\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Dashboard Admin (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/admin/dashboard",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Gestion Utilisateurs (Préfixe Corrigé)",
+                                "Success":  false,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "Le serveur distant a retourné une erreur : (404) Introuvable.",
+                                "Endpoint":  "/v1/admin/users",
+                                "StatusCode":  404
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "{\r\n    \"status\":  \"not_implemented\",\r\n    \"message\":  \"Detailed analytics coming soon\",\r\n    \"available_metrics\":  [\r\n                              \"question_volume_by_hour\",\r\n                              \"response_methods_distribution\",\r\n                              \"rag_usage_percentage\",\r\n                              \"satisfaction_scores_trend\",\r\n                              \"response_times_distribution\",\r\n                              \"language_preference_distribution\"\r\n                          ]\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Analytics Admin (Préfixe Corrigé)",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:29",
+                                "Error":  "",
+                                "Endpoint":  "/v1/admin/analytics",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "Interface accessible",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Interface Swagger UI",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/docs",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "Interface accessible",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Interface ReDoc",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/redoc",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "GET",
+                                "Response":  "Interface accessible",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Spécification OpenAPI JSON",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/openapi.json",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"Conversation supprimée avec succès\",\r\n    \"conversation_id\":  \"511a91dc-e472-4720-870c-81f047e83285\",\r\n    \"user_id\":  null,\r\n    \"deleted_count\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.600497\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Suppression Conversation 511a91dc-e472-4720-870c-81f047e83285",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"Conversation supprimée avec succès\",\r\n    \"conversation_id\":  \"e2c40191-61bc-44e2-b255-c5652f754352\",\r\n    \"user_id\":  null,\r\n    \"deleted_count\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.652659\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Suppression Conversation e2c40191-61bc-44e2-b255-c5652f754352",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"Conversation supprimée avec succès\",\r\n    \"conversation_id\":  \"d782482c-7391-4b2f-8d95-435a5ad226fd\",\r\n    \"user_id\":  null,\r\n    \"deleted_count\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.711966\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Suppression Conversation d782482c-7391-4b2f-8d95-435a5ad226fd",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"Conversation supprimée avec succès\",\r\n    \"conversation_id\":  \"77935220-2fe0-4a97-b43c-2ad3b5143d5a\",\r\n    \"user_id\":  null,\r\n    \"deleted_count\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.777627\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Suppression Conversation 77935220-2fe0-4a97-b43c-2ad3b5143d5a",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/conversation/{id}",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"0 conversations supprimées avec succès\",\r\n    \"conversation_id\":  null,\r\n    \"user_id\":  \"test-user-powershell-1786182550\",\r\n    \"deleted_count\":  0,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.835183\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Suppression Données Utilisateur Test",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/user/{id}/conversations",
+                                "StatusCode":  200
+                            },
+                            {
+                                "Method":  "DELETE",
+                                "Response":  "{\r\n    \"message\":  \"Debug: 1 conversations de test supprimées\",\r\n    \"deleted_count\":  1,\r\n    \"timestamp\":  \"2025-07-28T18:53:30.893120\"\r\n}",
+                                "AdditionalData":  {
+
+                                                   },
+                                "TestName":  "Nettoyage Global Données Test",
+                                "Success":  true,
+                                "Timestamp":  "2025-07-28 14:53:30",
+                                "Error":  "",
+                                "Endpoint":  "/v1/logging/debug/delete-test-data",
+                                "StatusCode":  200
+                            }
+                        ],
+    "UTF8TestResults":  {
+                            "Tested":  true,
+                            "Status":  "Supported",
+                            "CharactersDetected":  [
+                                                       "é",
+                                                       "è",
+                                                       "à",
+                                                       "ç",
+                                                       "ñ",
+                                                       "¿",
+                                                       "¡",
+                                                       "°"
+                                                   ]
+                        },
+    "TestSummary":  {
+                        "PassedTests":  38,
+                        "TestUserId":  "test-user-powershell-1786182550",
+                        "TotalTests":  44,
+                        "FailedTests":  6,
+                        "BaseUrl":  "https://expert-app-cngws.ondigitalocean.app/api",
+                        "TestDate":  "2025-07-28 14:53:30",
+                        "SuccessRate":  86.36
+                    },
+    "SwaggerStatus":  {
+                          "RedocAccessible":  true,
+                          "DocsAccessible":  true,
+                          "DocumentationUrl":  "https://expert-app-cngws.ondigitalocean.app/api/docs",
+                          "OpenApiJsonAccessible":  true
+                      }
+}

@@ -1,7 +1,6 @@
 """
 app/api/health.py
 Module de santé système - Version corrigée
-CORRECTION: Ajout de l'endpoint /health manquant pour résoudre l'erreur 404
 """
 
 from fastapi import APIRouter
@@ -45,39 +44,6 @@ async def health_check():
                 "openai": False
             }
         )
-
-# ============================================================================
-# CORRECTION: AJOUT DE L'ENDPOINT MANQUANT /health (résout erreur 404)
-# ============================================================================
-
-@router.get("/health")
-async def detailed_health_check():
-    """Health check détaillé - ENDPOINT MANQUANT AJOUTÉ pour corriger 404"""
-    try:
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "version": "3.4.0",
-            "services": {
-                "api": "running",
-                "rag": "checking",
-                "database": "checking",
-                "openai": "configured" if os.getenv("OPENAI_API_KEY") else "not_configured"
-            },
-            "system": {
-                "memory_usage": "N/A",
-                "cpu_usage": "N/A",
-                "disk_space": "N/A",
-                "uptime": "N/A"
-            },
-            "environment": os.getenv('ENV', 'production')
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
 
 @router.get("/detailed")
 async def detailed_health():
