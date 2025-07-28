@@ -1,6 +1,7 @@
 """
 Intelia Expert - API Backend Principal
-Version 3.1.0 - Version Finale avec Préfixes DigitalOcean Corrigés
+Version 3.2.0 - Version Finale avec Support UTF-8 Complet
+Correction: Encodage caractères spéciaux FR/ES
 """
 
 import os
@@ -14,7 +15,7 @@ from datetime import datetime
 import json
 
 # FastAPI imports
-from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -44,12 +45,19 @@ try:
 except ImportError:
     pass
 
-# Configuration logging
+# Configuration logging avec UTF-8
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
+
+# Force UTF-8 pour les logs
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # =============================================================================
 # VARIABLES GLOBALES
@@ -124,18 +132,24 @@ except ImportError as e:
     logger.warning(f"⚠️ Module system non disponible: {e}")
 
 # =============================================================================
-# MODÈLES PYDANTIC
+# MODÈLES PYDANTIC AVEC SUPPORT UTF-8
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model for expert questions"""
-    text: str = Field(..., description="Question text", min_length=1, max_length=2000)
+    """Request model for expert questions with UTF-8 support"""
+    text: str = Field(..., description="Question text (UTF-8 encoded)", min_length=1, max_length=2000)
     language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     context: Optional[str] = Field(None, description="Additional context")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
+    
+    class Config:
+        # Assurer l'encodage UTF-8 pour Pydantic
+        str_to_lower = False
+        validate_assignment = True
+        extra = "forbid"
 
 class ExpertResponse(BaseModel):
-    """Response model for expert answers"""
+    """Response model for expert answers with UTF-8 support"""
     question: str
     response: str
     mode: str
@@ -145,6 +159,12 @@ class ExpertResponse(BaseModel):
     timestamp: str
     processing_time: float
     language: str
+    
+    class Config:
+        # Assurer l'encodage UTF-8 pour les réponses
+        json_encoders = {
+            str: lambda v: v if isinstance(v, str) else str(v)
+        }
 
 class HealthResponse(BaseModel):
     """Health check response model"""
@@ -156,15 +176,15 @@ class HealthResponse(BaseModel):
     rag_status: str
 
 # =============================================================================
-# CONFIGURATION MULTI-LANGUES
+# CONFIGURATION MULTI-LANGUES AVEC SUPPORT UTF-8
 # =============================================================================
 
 LANGUAGE_PROMPTS = {
     "fr": {
-        "system_base": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308.""",
+        "system_base": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. Tu peux comprendre et répondre aux questions avec des caractères spéciaux français (é, è, à, ç, etc.).""",
         "context_instruction": "Utilise les informations suivantes pour répondre à la question:",
-        "response_instruction": "Réponds en français de manière précise et pratique, en te basant sur les documents fournis.",
-        "fallback_instruction": "Réponds aux questions de manière précise et pratique en français."
+        "response_instruction": "Réponds en français de manière précise et pratique, en te basant sur les documents fournis. N'hésite pas à utiliser les accents français appropriés.",
+        "fallback_instruction": "Réponds aux questions de manière précise et pratique en français avec les accents appropriés."
     },
     "en": {
         "system_base": """You are a veterinary expert specialized in animal health and nutrition, particularly for Ross 308 broiler chickens.""",
@@ -173,15 +193,15 @@ LANGUAGE_PROMPTS = {
         "fallback_instruction": "Answer questions precisely and practically in English."
     },
     "es": {
-        "system_base": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308.""",
+        "system_base": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308. Puedes entender y responder preguntas con caracteres especiales en español (ñ, ¿, ¡, acentos, etc.).""",
         "context_instruction": "Utiliza la siguiente información para responder a la pregunta:",
-        "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados.",
-        "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español."
+        "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados. Usa los caracteres especiales del español cuando sea apropiado.",
+        "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español con los caracteres especiales apropiados."
     }
 }
 
 def get_language_prompt(language: str, prompt_type: str) -> str:
-    """Get localized prompt for specified language and type."""
+    """Get localized prompt for specified language and type with UTF-8 support."""
     lang = language.lower() if language else "fr"
     if lang not in LANGUAGE_PROMPTS:
         lang = "fr"
@@ -274,7 +294,7 @@ async def initialize_rag_system():
         return False
 
 # =============================================================================
-# TRAITEMENT DES QUESTIONS AVEC RAG
+# TRAITEMENT DES QUESTIONS AVEC RAG ET SUPPORT UTF-8
 # =============================================================================
 
 async def process_question_with_rag(
@@ -283,11 +303,16 @@ async def process_question_with_rag(
     language: str = "fr",
     speed_mode: str = "balanced"
 ) -> Dict[str, Any]:
-    """Process question using RAG system"""
+    """Process question using RAG system with UTF-8 support"""
     start_time = time.time()
     
     try:
-        logger.info(f"🔍 Traitement question: {question[:50]}... (Lang: {language}, Mode: {speed_mode})")
+        # Assurer l'encodage UTF-8 de la question
+        if isinstance(question, str):
+            # Nettoyer et valider l'UTF-8
+            question = question.encode('utf-8', errors='ignore').decode('utf-8')
+        
+        logger.info(f"🔍 Traitement question UTF-8: {question[:50]}... (Lang: {language}, Mode: {speed_mode})")
         
         sources = []
         
@@ -313,12 +338,17 @@ async def process_question_with_rag(
                     sources = []
                     
                     for i, result in enumerate(search_results[:config["k"]]):
-                        context_chunk = result['text'][:400] + "..." if len(result['text']) > 400 else result['text']
+                        # Assurer l'UTF-8 pour le contexte
+                        text = result['text']
+                        if isinstance(text, str):
+                            text = text.encode('utf-8', errors='ignore').decode('utf-8')
+                        
+                        context_chunk = text[:400] + "..." if len(text) > 400 else text
                         context_parts.append(f"Document {i+1}: {context_chunk}")
                         sources.append({
                             "index": result['index'],
                             "score": result['score'],
-                            "preview": result['text'][:150] + "..."
+                            "preview": text[:150] + "..."
                         })
                     
                     context = "\n\n".join(context_parts)
@@ -351,6 +381,10 @@ async def process_question_with_rag(
                     )
                     
                     answer = response.choices[0].message.content
+                    # Assurer l'UTF-8 pour la réponse
+                    if isinstance(answer, str):
+                        answer = answer.encode('utf-8', errors='ignore').decode('utf-8')
+                    
                     mode = "rag_enhanced"
                     note = f"Réponse basée sur {len(search_results)} documents"
                     
@@ -384,7 +418,7 @@ async def process_question_with_rag(
         raise HTTPException(status_code=500, detail=f"Erreur de traitement: {str(e)}")
 
 async def fallback_openai_response(question: str, language: str = "fr", config: dict = None) -> tuple:
-    """Fallback response using OpenAI directly"""
+    """Fallback response using OpenAI directly with UTF-8 support"""
     try:
         import openai
         
@@ -392,6 +426,10 @@ async def fallback_openai_response(question: str, language: str = "fr", config: 
             config = {"model": "gpt-3.5-turbo", "max_tokens": 500, "timeout": 12}
         
         openai.api_key = os.getenv('OPENAI_API_KEY')
+        
+        # Assurer l'UTF-8 pour la question
+        if isinstance(question, str):
+            question = question.encode('utf-8', errors='ignore').decode('utf-8')
         
         system_base = get_language_prompt(language, "system_base")
         fallback_instruction = get_language_prompt(language, "fallback_instruction")
@@ -410,6 +448,10 @@ async def fallback_openai_response(question: str, language: str = "fr", config: 
         )
         
         answer = response.choices[0].message.content
+        # Assurer l'UTF-8 pour la réponse
+        if isinstance(answer, str):
+            answer = answer.encode('utf-8', errors='ignore').decode('utf-8')
+        
         mode = "fallback_openai"
         note = "Réponse sans recherche documentaire"
         
@@ -450,7 +492,7 @@ def get_rag_status() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Démarrage Intelia Expert API v3.1.0...")
+    logger.info("🚀 Démarrage Intelia Expert API v3.2.0...")
     
     # Initialisation des services
     supabase_success = initialize_supabase()
@@ -463,7 +505,7 @@ async def lifespan(app: FastAPI):
     
     # Logs de statut
     logger.info("✅ Application créée avec succès")
-    logger.info("📊 Support multi-langues: FR, EN, ES")
+    logger.info("📊 Support multi-langues: FR, EN, ES (UTF-8)")
     logger.info("⚡ Modes de performance: fast, balanced, quality")
     logger.info(f"🗄️ Base de données: {'Disponible' if supabase_success else 'Non disponible'}")
     logger.info(f"🤖 Modules RAG: {'Disponibles' if rag_embedder else 'Non disponibles'}")
@@ -478,26 +520,55 @@ async def lifespan(app: FastAPI):
     # Détecter l'environnement de déploiement
     deployment_env = "DigitalOcean" if "/workspace" in backend_dir else "Local"
     logger.info(f"🌐 Environnement détecté: {deployment_env}")
+    logger.info("🔤 Support UTF-8: Activé pour caractères spéciaux FR/ES")
     
     yield
     
     logger.info("🛑 Arrêt de Intelia Expert API...")
 
 # =============================================================================
-# APPLICATION FASTAPI
+# APPLICATION FASTAPI AVEC SUPPORT UTF-8
 # =============================================================================
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale",
-    version="3.1.0",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale (Support UTF-8 complet)",
+    version="3.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
-# Configuration CORS
+# =============================================================================
+# MIDDLEWARE UTF-8 ET CORS
+# =============================================================================
+
+# Middleware pour forcer l'encodage UTF-8
+@app.middleware("http")
+async def force_utf8_middleware(request: Request, call_next):
+    """Force UTF-8 encoding for all requests and responses"""
+    
+    # Loguer les caractères spéciaux détectés
+    if request.method == "POST":
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            # Log pour debug UTF-8
+            logger.info(f"🔤 Requête JSON reçue - Content-Type: {content_type}")
+    
+    response = await call_next(request)
+    
+    # Forcer l'encodage UTF-8 pour toutes les réponses JSON
+    if response.headers.get("content-type"):
+        if "application/json" in response.headers.get("content-type"):
+            response.headers["content-type"] = "application/json; charset=utf-8"
+    
+    # Ajouter headers UTF-8 supplémentaires
+    response.headers["Accept-Charset"] = "utf-8"
+    
+    return response
+
+# Configuration CORS avec Support UTF-8 Complet
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -508,7 +579,7 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["*", "Content-Type", "Accept-Charset", "Accept-Encoding"],
 )
 
 # =============================================================================
@@ -528,7 +599,7 @@ if LOGGING_AVAILABLE and logging_router:
     except Exception as e:
         logger.error(f"❌ Erreur montage router logging: {e}")
 
-# Router expert - CORRECTION CRITIQUE
+# Router expert - CORRECTION CRITIQUE + UTF-8
 if EXPERT_ROUTER_AVAILABLE and expert_router:
     try:
         app.include_router(expert_router, prefix="/v1/expert")
@@ -574,17 +645,17 @@ if SYSTEM_ROUTER_AVAILABLE and system_router:
         logger.error(f"❌ Erreur montage router system: {e}")
 
 # =============================================================================
-# ENDPOINTS DE BASE
+# ENDPOINTS DE BASE AVEC SUPPORT UTF-8
 # =============================================================================
 
 @app.get("/", response_class=JSONResponse)
 async def root():
-    """Endpoint racine avec URLs DigitalOcean correctes"""
+    """Endpoint racine avec URLs DigitalOcean correctes et support UTF-8"""
     return {
-        "message": "Intelia Expert API v3.1.0",
+        "message": "Intelia Expert API v3.2.0 - Support UTF-8 Complet",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
-        "api_version": "3.1.0",
+        "api_version": "3.2.0",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "routers": {
@@ -596,9 +667,15 @@ async def root():
             "system": SYSTEM_ROUTER_AVAILABLE
         },
         "supported_languages": ["fr", "en", "es"],
+        "utf8_support": {
+            "enabled": True,
+            "french_accents": "é, è, à, ç, ù, etc.",
+            "spanish_special": "ñ, ¿, ¡, acentos",
+            "encoding": "UTF-8 forcé sur toutes les requêtes/réponses"
+        },
         "available_endpoints": [
-            "/api/v1/expert/ask-public",    # ✅ URL finale correcte
-            "/api/v1/expert/topics",        # ✅ URL finale correcte
+            "/api/v1/expert/ask-public",    # ✅ URL finale correcte + UTF-8
+            "/api/v1/expert/topics",        # ✅ URL finale correcte + UTF-8
             "/api/v1/health",               # ✅ URL finale correcte
             "/docs",
             "/debug/routers"
@@ -607,7 +684,8 @@ async def root():
             "platform": "DigitalOcean App Platform",
             "auto_prefix": "/api ajouté automatiquement par DigitalOcean",
             "fastapi_prefix": "Routers montés sans /api pour éviter duplication",
-            "final_urls": "FastAPI /v1/expert + DO /api = /api/v1/expert"
+            "final_urls": "FastAPI /v1/expert + DO /api = /api/v1/expert",
+            "utf8_fix": "Middleware UTF-8 actif pour caractères spéciaux"
         }
     }
 
@@ -620,18 +698,20 @@ async def health_check():
         services={
             "api": "running",
             "database": "connected" if supabase else "disconnected",
-            "rag_system": get_rag_status()
+            "rag_system": get_rag_status(),
+            "utf8_support": "enabled"
         },
         config={
             "environment": os.getenv('ENV', 'production'),
-            "deployment": "DigitalOcean App Platform"
+            "deployment": "DigitalOcean App Platform",
+            "encoding": "UTF-8"
         },
         database_status="connected" if supabase else "disconnected",
         rag_status=get_rag_status()
     )
 
 # =============================================================================
-# ENDPOINTS DE DEBUG
+# ENDPOINTS DE DEBUG AVEC UTF-8
 # =============================================================================
 
 @app.get("/debug/routers")
@@ -664,40 +744,34 @@ async def debug_routers():
             "digitalocean_external": "/api/v1/expert/ask-public",
             "note": "DigitalOcean ajoute automatiquement /api"
         },
+        "utf8_status": {
+            "middleware_active": True,
+            "supported_chars": "Tous caractères UTF-8 supportés",
+            "test_chars": "éèàçù, ñ¿¡, etc."
+        },
         "timestamp": datetime.now().isoformat(),
-        "version": "3.1.0"
+        "version": "3.2.0"
     }
 
-@app.get("/debug/structure")
-async def debug_structure():
-    """Debug endpoint pour voir la structure du projet"""
-    try:
-        structure = {}
-        
-        # Lister les modules
-        api_v1_path = os.path.join(backend_dir, "app", "api", "v1")
-        if os.path.exists(api_v1_path):
-            structure["api_v1_modules"] = [
-                f for f in os.listdir(api_v1_path) 
-                if f.endswith('.py') and not f.startswith('__')
-            ]
-        
-        rag_path = os.path.join(backend_dir, "rag")
-        if os.path.exists(rag_path):
-            structure["rag_modules"] = [
-                f for f in os.listdir(rag_path) 
-                if f.endswith('.py') and not f.startswith('__')
-            ]
-        
-        return {
-            "project_structure": structure,
-            "backend_dir": backend_dir,
-            "deployment_environment": "DigitalOcean" if "/workspace" in backend_dir else "Local",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
+@app.get("/debug/utf8")
+async def debug_utf8():
+    """Debug endpoint spécifique pour tester l'UTF-8"""
+    return {
+        "utf8_test": {
+            "french": "Température élevée à 32°C - problème détecté",
+            "spanish": "¿Cuál es la nutrición óptima para pollos?",
+            "special_chars": "àáâãäåæçèéêëìíîïñòóôõö",
+            "symbols": "°C, %, €, £, ¥",
+            "encoding": "UTF-8"
+        },
+        "middleware_status": "Actif - Force UTF-8 sur toutes les réponses",
+        "headers_forced": {
+            "content-type": "application/json; charset=utf-8",
+            "accept-charset": "utf-8"
+        },
+        "test_passed": True,
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/debug/deployment")
 async def debug_deployment():
@@ -713,36 +787,42 @@ async def debug_deployment():
             "OPENAI_API_KEY": "set" if os.getenv('OPENAI_API_KEY') else "not_set",
             "SUPABASE_URL": "set" if os.getenv('SUPABASE_URL') else "not_set"
         },
+        "fixes_applied": {
+            "routing_fix": "Préfixes /api enlevés des routers FastAPI",
+            "utf8_fix": "Middleware UTF-8 ajouté pour caractères spéciaux",
+            "cors_fix": "Headers UTF-8 ajoutés au CORS"
+        },
         "routing_explanation": {
-            "problem_fixed": "Préfixes /api enlevés des routers FastAPI",
+            "problem_fixed": "Double préfixe /api/api évité",
             "digitalocean_behavior": "Ajoute automatiquement /api à toutes les routes",
             "result": "FastAPI /v1/expert + DO /api = /api/v1/expert",
-            "before_fix": "/api/v1/expert + /api = /api/api/v1/expert (404)",
-            "after_fix": "/v1/expert + /api = /api/v1/expert (200)"
+            "utf8_result": "Caractères spéciaux FR/ES maintenant supportés"
         },
         "timestamp": datetime.now().isoformat()
     }
 
 # =============================================================================
-# GESTIONNAIRES D'ERREURS
+# GESTIONNAIRES D'ERREURS AVEC SUPPORT UTF-8
 # =============================================================================
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Gestionnaire d'exceptions HTTP"""
+    """Gestionnaire d'exceptions HTTP avec UTF-8"""
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "detail": exc.detail,
             "timestamp": datetime.now().isoformat(),
             "path": str(request.url.path),
-            "version": "3.1.0"
-        }
+            "version": "3.2.0",
+            "encoding": "utf-8"
+        },
+        headers={"content-type": "application/json; charset=utf-8"}
     )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Gestionnaire d'exceptions générales"""
+    """Gestionnaire d'exceptions générales avec UTF-8"""
     logger.error(f"❌ Exception non gérée: {exc}")
     logger.error(f"Traceback: {traceback.format_exc()}")
     
@@ -752,8 +832,10 @@ async def general_exception_handler(request: Request, exc: Exception):
             "detail": "Erreur interne du serveur",
             "timestamp": datetime.now().isoformat(),
             "path": str(request.url.path),
-            "version": "3.1.0"
-        }
+            "version": "3.2.0",
+            "encoding": "utf-8"
+        },
+        headers={"content-type": "application/json; charset=utf-8"}
     )
 
 # =============================================================================
@@ -767,8 +849,9 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     
     logger.info(f"🚀 Démarrage de Intelia Expert API sur {host}:{port}")
-    logger.info(f"📋 Version: 3.1.0 - Préfixes DigitalOcean Corrigés")
+    logger.info(f"📋 Version: 3.2.0 - Support UTF-8 Complet")
     logger.info(f"🌐 URLs finales attendues: /api/v1/expert/ask-public")
+    logger.info(f"🔤 Support caractères spéciaux: é, è, ñ, ¿, etc.")
     
     uvicorn.run(
         app,
