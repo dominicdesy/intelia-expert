@@ -2315,6 +2315,102 @@ export default function ChatInterface() {
       year: 'numeric' 
     })
   }
+    if (!text.trim()) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: text.trim(),
+      isUser: true,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInputMessage('')
+    setIsLoadingChat(true)
+
+    try {
+      const response = await generateAIResponse(text.trim(), user)
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response.response,
+        isUser: false,
+        timestamp: new Date(),
+        conversation_id: response.conversation_id
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+      console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
+      
+      // Ajouter la conversation à l'historique local pour mise à jour immédiate
+      if (user && response.conversation_id) {
+        addConversation(response.conversation_id, text.trim(), response.response)
+      }
+      
+    } catch (error) {
+      console.error('❌ Error generating response:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: error instanceof Error ? error.message : t('chat.errorMessage'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
+    const message = messages.find(msg => msg.id === messageId)
+    
+    if (!message || !message.conversation_id) {
+      console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
+      alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
+      return
+    }
+
+    try {
+      console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
+      
+      // Mise à jour optimiste de l'UI
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback } : msg
+      ))
+
+      const feedbackValue = feedback === 'positive' ? 1 : -1
+      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
+      
+      console.log(`✅ Feedback ${feedback} enregistré avec succès pour conversation ${message.conversation_id}`)
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi feedback:', error)
+      
+      // Annulation en cas d'erreur
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback: null } : msg
+      ))
+      
+      alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
+    }
+  }
+
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: t('chat.welcome'),
+      isUser: false,
+      timestamp: new Date()
+    }])
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('fr-FR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
 
   // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
