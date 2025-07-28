@@ -1,5 +1,5 @@
 """
-app/api/v1/expert.py - Version Corrigée avec Intégration RAG
+app/api/v1/expert.py - Version Complète avec Logging Automatique Intégré
 """
 import os
 import logging
@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 # OpenAI import sécurisé
 try:
@@ -23,32 +23,208 @@ router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# MODÈLES PYDANTIC
+# INTEGRATION LOGGING AUTOMATIQUE
+# =============================================================================
+
+# Import du système de logging
+try:
+    from app.api.v1.logging import logger_instance, ConversationCreate
+    LOGGING_AVAILABLE = True
+    logger.info("✅ Système de logging intégré dans expert.py")
+except ImportError as e:
+    LOGGING_AVAILABLE = False
+    logger_instance = None
+    ConversationCreate = None
+    logger.warning(f"⚠️ Système de logging non disponible: {e}")
+
+async def save_conversation_auto(
+    conversation_id: str,
+    question: str, 
+    response: str,
+    user_id: str = "anonymous",
+    language: str = "fr",
+    rag_used: bool = False,
+    rag_score: float = None,
+    response_time_ms: int = 0
+) -> bool:
+    """Sauvegarde automatique de la conversation dans le système de logging"""
+    
+    if not LOGGING_AVAILABLE or not logger_instance:
+        logger.warning("⚠️ Logging non disponible - conversation non sauvegardée")
+        return False
+    
+    try:
+        # Créer l'objet conversation
+        conversation = ConversationCreate(
+            user_id=user_id,
+            question=question,
+            response=response,
+            conversation_id=conversation_id,
+            confidence_score=rag_score,
+            response_time_ms=response_time_ms,
+            language=language,
+            rag_used=rag_used
+        )
+        
+        # Sauvegarder dans la base de données
+        record_id = logger_instance.save_conversation(conversation)
+        
+        logger.info(f"💾 Conversation sauvegardée automatiquement: {conversation_id} -> {record_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur sauvegarde automatique conversation {conversation_id}: {e}")
+        return False
+
+def get_user_id_from_request(request: Request) -> str:
+    """Extrait l'ID utilisateur de la requête (ou génère un ID anonyme)"""
+    
+    # Vérifier si un utilisateur authentifié existe
+    user = getattr(request.state, "user", None)
+    if user:
+        return str(user.get("id", user.get("user_id", "authenticated_user")))
+    
+    # Générer un ID basé sur l'IP et le user-agent pour tracking anonyme
+    try:
+        client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+        
+        # Créer un ID anonyme consistant mais non-identifiable
+        import hashlib
+        anonymous_data = f"{client_ip}_{user_agent}_{datetime.now().strftime('%Y-%m-%d')}"
+        anonymous_id = f"anon_{hashlib.md5(anonymous_data.encode()).hexdigest()[:8]}"
+        
+        return anonymous_id
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur génération user_id anonyme: {e}")
+        return f"anon_{uuid.uuid4().hex[:8]}"
+
+# =============================================================================
+# FONCTIONS HELPER UTF-8 (gardées de la version précédente)
+# =============================================================================
+
+def ensure_utf8_string(text: str) -> str:
+    """Assure que le texte est correctement encodé en UTF-8"""
+    if not isinstance(text, str):
+        return str(text)
+    
+    try:
+        return text.encode('utf-8', errors='ignore').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return text.encode('ascii', errors='ignore').decode('ascii')
+
+def normalize_language_code(language: str) -> str:
+    """Normalise le code de langue"""
+    if not language:
+        return "fr"
+    return language.lower().strip()[:2]
+
+# =============================================================================
+# MODÈLES PYDANTIC AVEC SUPPORT UTF-8 (gardés de la version précédente)
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model pour questions expert"""
+    """Request model pour questions expert avec support UTF-8 complet"""
     text: str = Field(..., min_length=1, max_length=2000, description="Question text")
     language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
 
+    @validator('text', pre=True)
+    def validate_text_utf8(cls, v):
+        """Valide et corrige l'encodage UTF-8 du texte"""
+        if not v:
+            raise ValueError("Question text cannot be empty")
+        
+        cleaned_text = ensure_utf8_string(str(v).strip())
+        
+        if not cleaned_text:
+            raise ValueError("Question text cannot be empty after cleaning")
+        
+        if len(cleaned_text) > 2000:
+            raise ValueError("Question text too long (max 2000 characters)")
+        
+        return cleaned_text
+
+    @validator('language', pre=True)
+    def validate_language(cls, v):
+        """Valide le code de langue"""
+        normalized = normalize_language_code(v or "fr")
+        if normalized not in ["fr", "en", "es"]:
+            return "fr"
+        return normalized
+
+    @validator('speed_mode', pre=True)
+    def validate_speed_mode(cls, v):
+        """Valide le mode de vitesse"""
+        mode = str(v or "balanced").lower().strip()
+        if mode not in ["fast", "balanced", "quality"]:
+            return "balanced"
+        return mode
+
+    class Config:
+        str_strip_whitespace = True
+        validate_assignment = True
+        use_enum_values = True
+        json_encoders = {
+            str: lambda x: ensure_utf8_string(x) if isinstance(x, str) else str(x)
+        }
+
 class ExpertResponse(BaseModel):
-    """Response model avec support RAG"""
+    """Response model avec support RAG, UTF-8 et logging"""
     question: str
     response: str
     conversation_id: str
     rag_used: bool
-    rag_score: Optional[float] = None  # ✅ Score de confiance RAG
+    rag_score: Optional[float] = None
     timestamp: str
     language: str
     response_time_ms: int
     mode: str = "expert_router_v1"
-    user: Optional[str] = None  # ✅ Préparé pour authentification future
+    user: Optional[str] = None
+    logged: bool = False  # ✅ NOUVEAU: Indique si la conversation a été sauvegardée
+
+    @validator('question', 'response', pre=True)
+    def validate_text_fields(cls, v):
+        """Assure l'encodage UTF-8 des champs texte"""
+        return ensure_utf8_string(v) if v else ""
+
+    class Config:
+        json_encoders = {
+            str: lambda x: ensure_utf8_string(x) if isinstance(x, str) else str(x)
+        }
 
 class FeedbackRequest(BaseModel):
-    """Feedback request model"""
+    """Feedback request model avec validation UTF-8"""
     rating: str = Field(..., description="Rating: positive, negative, neutral")
     comment: Optional[str] = Field(None, max_length=500, description="Optional comment")
+    conversation_id: Optional[str] = Field(None, description="Conversation ID for feedback")  # ✅ NOUVEAU
+
+    @validator('rating', pre=True)
+    def validate_rating(cls, v):
+        """Valide le rating"""
+        rating = str(v or "").lower().strip()
+        if rating not in ["positive", "negative", "neutral"]:
+            raise ValueError("Rating must be: positive, negative, or neutral")
+        return rating
+
+    @validator('comment', pre=True)
+    def validate_comment_utf8(cls, v):
+        """Valide et corrige l'encodage UTF-8 du commentaire"""
+        if not v:
+            return None
+        
+        cleaned_comment = ensure_utf8_string(str(v).strip())
+        
+        if len(cleaned_comment) > 500:
+            raise ValueError("Comment too long (max 500 characters)")
+        
+        return cleaned_comment if cleaned_comment else None
+
+    class Config:
+        json_encoders = {
+            str: lambda x: ensure_utf8_string(x) if isinstance(x, str) else str(x)
+        }
 
 class TopicsResponse(BaseModel):
     """Topics response model"""
@@ -56,19 +232,26 @@ class TopicsResponse(BaseModel):
     language: str
     count: int
 
+    class Config:
+        json_encoders = {
+            str: lambda x: ensure_utf8_string(x) if isinstance(x, str) else str(x)
+        }
+
 # =============================================================================
-# PROMPTS MULTI-LANGUES
+# PROMPTS MULTI-LANGUES AVEC CARACTÈRES UTF-8
 # =============================================================================
 
 EXPERT_PROMPTS = {
     "fr": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
-Réponds de manière précise et pratique en français, en donnant des conseils basés sur les meilleures pratiques du secteur.""",
+Réponds de manière précise et pratique en français, en donnant des conseils basés sur les meilleures pratiques du secteur. 
+Tu peux utiliser tous les caractères français (é, è, à, ç, ù, etc.) dans tes réponses.""",
     
     "en": """You are a veterinary expert specialized in animal health and nutrition, particularly for Ross 308 broiler chickens.
 Answer precisely and practically in English, providing advice based on industry best practices.""",
     
     "es": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308.
-Responde de manera precisa y práctica en español, dando consejos basados en las mejores prácticas del sector."""
+Responde de manera precisa y práctica en español, dando consejos basados en las mejores prácticas del sector.
+Puedes usar todos los caracteres especiales del español (ñ, ¿, ¡, acentos, etc.) en tus respuestas."""
 }
 
 # =============================================================================
@@ -77,10 +260,8 @@ Responde de manera precisa y práctica en español, dando consejos basados en la
 
 def admin_protection():
     """Protection pour les endpoints debug en production"""
-    # Pour l'instant désactivé, mais préparé pour production
     environment = os.getenv('ENVIRONMENT', 'development')
     if environment == 'production':
-        # Décommenter pour activer en production :
         # raise HTTPException(status_code=403, detail="Debug endpoints restricted in production")
         pass
     return True
@@ -95,15 +276,17 @@ def get_expert_prompt(language: str) -> str:
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
     """Réponse de fallback si ni RAG ni OpenAI disponibles"""
+    safe_question = ensure_utf8_string(question)
+    
     fallback_responses = {
-        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{question[:50]}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène.",
-        "en": f"I am a veterinary expert. For your question about '{question[:50]}...', I recommend monitoring environmental parameters and maintaining good hygiene practices.",
-        "es": f"Soy un experto veterinario. Para su pregunta sobre '{question[:50]}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene."
+        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{safe_question[:50]}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène.",
+        "en": f"I am a veterinary expert. For your question about '{safe_question[:50]}...', I recommend monitoring environmental parameters and maintaining good hygiene practices.",
+        "es": f"Soy un experto veterinario. Para su pregunta sobre '{safe_question[:50]}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene."
     }
     return fallback_responses.get(language.lower(), fallback_responses["fr"])
 
 async def process_question_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> str:
-    """Process question using OpenAI directly"""
+    """Process question using OpenAI directly avec support UTF-8"""
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
@@ -116,7 +299,8 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         openai.api_key = api_key
         system_prompt = get_expert_prompt(language)
         
-        # Configuration selon le mode
+        safe_question = ensure_utf8_string(question)
+        
         model_config = {
             "fast": {"model": "gpt-3.5-turbo", "max_tokens": 300},
             "balanced": {"model": "gpt-3.5-turbo", "max_tokens": 500},
@@ -129,42 +313,46 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
             model=config["model"],
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question}
+                {"role": "user", "content": safe_question}
             ],
             temperature=0.7,
             max_tokens=config["max_tokens"],
             timeout=15
         )
         
-        return response.choices[0].message.content
+        answer = response.choices[0].message.content
+        return ensure_utf8_string(answer) if answer else get_fallback_response(question, language)
         
     except Exception as e:
         logger.error(f"OpenAI error: {e}")
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS
+# ENDPOINTS AVEC LOGGING AUTOMATIQUE
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
 async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
-    """Ask question sans authentification - AVEC RAG si disponible"""
+    """Ask question sans authentification - AVEC RAG + Logging automatique"""
     start_time = time.time()
     
     try:
-        question_text = request.text.strip()
+        question_text = request.text
+        
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        logger.info(f"🌐 Question publique - ID: {conversation_id[:8]}...")
+        user_id = get_user_id_from_request(fastapi_request)
         
-        # ✅ Préparé pour authentification future
+        logger.info(f"🌐 Question publique UTF-8 - ID: {conversation_id[:8]}... - User: {user_id[:10]}... - Langue: {request.language}")
+        logger.info(f"📝 Question reçue: {question_text[:100]}...")
+        
         user = getattr(fastapi_request.state, "user", None)
         
-        # Accéder au RAG via app.state
+        # Variables RAG
         rag_used = False
-        rag_score = None  # ✅ Score de confiance
+        rag_score = None
         answer = ""
         mode = "direct_openai"
         
@@ -174,17 +362,18 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
         
         if process_rag:
             try:
-                logger.info("🔍 Utilisation du système RAG...")
+                logger.info("🔍 Utilisation du système RAG avec support UTF-8...")
                 result = await process_rag(
                     question=question_text,
-                    user=user,  # ✅ Passé au RAG (None pour publique)
-                    language=request.language or "fr",
-                    speed_mode=request.speed_mode or "balanced"
+                    user=user,
+                    language=request.language,
+                    speed_mode=request.speed_mode
                 )
                 
-                answer = result.get("response", "")
+                raw_answer = result.get("response", "")
+                answer = ensure_utf8_string(raw_answer) if raw_answer else ""
                 rag_used = result.get("mode", "").startswith("rag")
-                rag_score = result.get("score")  # ✅ Extraction score confiance
+                rag_score = result.get("score")
                 mode = result.get("mode", "rag_enhanced")
                 
                 logger.info(f"✅ RAG {'utilisé' if rag_used else 'consulté sans résultats'} - Score: {rag_score}")
@@ -193,62 +382,108 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
                 logger.error(f"❌ Erreur RAG, fallback OpenAI: {rag_error}")
                 answer = await process_question_openai(
                     question_text, 
-                    request.language or "fr",
-                    request.speed_mode or "balanced"
+                    request.language,
+                    request.speed_mode
                 )
         else:
-            # RAG non disponible, utiliser OpenAI direct
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct")
+            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct avec UTF-8")
             answer = await process_question_openai(
                 question_text,
-                request.language or "fr",
-                request.speed_mode or "balanced"
+                request.language,
+                request.speed_mode
             )
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
-        return ExpertResponse(
+        # ✅ NOUVEAU: Sauvegarde automatique de la conversation
+        logged = await save_conversation_auto(
+            conversation_id=conversation_id,
             question=question_text,
             response=answer,
+            user_id=user_id,
+            language=request.language,
+            rag_used=rag_used,
+            rag_score=rag_score,
+            response_time_ms=response_time_ms
+        )
+        
+        # Retourner la réponse avec l'indicateur de logging
+        return ExpertResponse(
+            question=ensure_utf8_string(question_text),
+            response=ensure_utf8_string(answer),
             conversation_id=conversation_id,
             rag_used=rag_used,
-            rag_score=rag_score,  # ✅ Inclus score confiance
+            rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
-            language=request.language or "fr",
+            language=request.language,
             response_time_ms=response_time_ms,
             mode=mode,
-            user=str(user) if user else None  # ✅ Inclus dans réponse
+            user=str(user) if user else None,
+            logged=logged  # ✅ NOUVEAU: Indique si sauvegarde réussie
         )
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur ask expert public: {e}")
+        logger.error(f"❌ Erreur ask expert public UTF-8: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert(request: QuestionRequest, fastapi_request: Request):
-    """Ask question avec authentification - même logique pour l'instant"""
+    """Ask question avec authentification - même logique avec UTF-8 + Logging"""
     return await ask_expert_public(request, fastapi_request)
 
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest):
-    """Submit feedback on response"""
+    """Submit feedback on response avec support UTF-8 + Mise à jour logging"""
     try:
-        logger.info(f"📊 Feedback reçu: {request.rating}")
+        logger.info(f"📊 Feedback UTF-8 reçu: {request.rating}")
+        if request.comment:
+            logger.info(f"💬 Commentaire: {request.comment[:100]}...")
+        
+        # ✅ NOUVEAU: Mise à jour du feedback dans la base de données
+        feedback_updated = False
+        if request.conversation_id and LOGGING_AVAILABLE and logger_instance:
+            try:
+                # Convertir rating en numérique pour la base
+                rating_numeric = {
+                    "positive": 1,
+                    "negative": -1,
+                    "neutral": 0
+                }.get(request.rating, 0)
+                
+                feedback_updated = logger_instance.update_feedback(
+                    request.conversation_id, 
+                    rating_numeric
+                )
+                
+                if feedback_updated:
+                    logger.info(f"✅ Feedback mis à jour dans DB: {request.conversation_id}")
+                else:
+                    logger.warning(f"⚠️ Conversation non trouvée pour feedback: {request.conversation_id}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Erreur mise à jour feedback DB: {e}")
+        
         return {
             "success": True,
             "message": "Feedback enregistré avec succès",
+            "rating": request.rating,
+            "comment": request.comment,
+            "conversation_id": request.conversation_id,
+            "feedback_updated_in_db": feedback_updated,  # ✅ NOUVEAU
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"❌ Erreur feedback: {e}")
+        logger.error(f"❌ Erreur feedback UTF-8: {e}")
         raise HTTPException(status_code=500, detail="Erreur enregistrement feedback")
 
 @router.get("/topics", response_model=TopicsResponse)
 async def get_suggested_topics(language: str = "fr"):
-    """Get suggested topics"""
+    """Get suggested topics avec support UTF-8"""
     try:
+        lang = normalize_language_code(language)
+        
         topics_by_language = {
             "fr": [
                 "Protocoles Compass pour l'analyse de performance",
@@ -282,37 +517,82 @@ async def get_suggested_topics(language: str = "fr"):
             ]
         }
         
-        topics = topics_by_language.get(language.lower(), topics_by_language["fr"])
+        topics = topics_by_language.get(lang, topics_by_language["fr"])
+        safe_topics = [ensure_utf8_string(topic) for topic in topics]
         
         return TopicsResponse(
-            topics=topics,
-            language=language,
-            count=len(topics)
+            topics=safe_topics,
+            language=lang,
+            count=len(safe_topics)
         )
     except Exception as e:
-        logger.error(f"❌ Erreur topics: {e}")
+        logger.error(f"❌ Erreur topics UTF-8: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 @router.get("/history")
-async def get_conversation_history():
-    """Get conversation history - placeholder"""
-    return {
-        "conversations": [],
-        "message": "Historique des conversations (fonctionnalité à venir)",
-        "timestamp": datetime.now().isoformat()
-    }
+async def get_conversation_history(request: Request, limit: int = 10):
+    """Get conversation history avec intégration logging automatique"""
+    try:
+        # ✅ NOUVEAU: Récupération depuis la base de logging si disponible
+        if LOGGING_AVAILABLE and logger_instance:
+            user_id = get_user_id_from_request(request)
+            
+            try:
+                conversations = logger_instance.get_user_conversations(user_id, limit)
+                
+                # Formater les conversations pour l'API
+                formatted_conversations = []
+                for conv in conversations:
+                    formatted_conversations.append({
+                        "conversation_id": conv.get("conversation_id"),
+                        "question": conv.get("question", "")[:100] + "..." if len(conv.get("question", "")) > 100 else conv.get("question", ""),
+                        "timestamp": conv.get("timestamp"),
+                        "language": conv.get("language", "fr"),
+                        "rag_used": conv.get("rag_used", False),
+                        "feedback": conv.get("feedback")
+                    })
+                
+                return {
+                    "conversations": formatted_conversations,
+                    "count": len(formatted_conversations),
+                    "user_id": user_id[:8] + "...",  # Anonymisé partiellement
+                    "message": f"{len(formatted_conversations)} conversations récupérées",
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ Erreur récupération historique: {e}")
+                # Fallback vers réponse par défaut
+        
+        # Réponse par défaut si logging non disponible
+        return {
+            "conversations": [],
+            "count": 0,
+            "message": "Historique des conversations (système de logging en cours d'initialisation)",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur historique: {e}")
+        return {
+            "conversations": [],
+            "count": 0,
+            "message": "Erreur récupération historique",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 # =============================================================================
-# ENDPOINTS DE DEBUG
+# ENDPOINTS DE DEBUG AVEC LOGGING
 # =============================================================================
 
 @router.get("/debug/status", dependencies=[Depends(admin_protection)])
 async def debug_status(request: Request):
-    """Debug endpoint pour vérifier le statut du service"""
+    """Debug endpoint pour vérifier le statut du service + logging"""
     app = request.app
     rag_embedder = getattr(app.state, 'rag_embedder', None)
     get_rag_status = getattr(app.state, 'get_rag_status', None)
-    process_rag = getattr(app.state, 'process_question_with_rag', None)  # ✅ Corrigé
+    process_rag = getattr(app.state, 'process_question_with_rag', None)
     
     rag_status = "not_available"
     if get_rag_status:
@@ -321,90 +601,191 @@ async def debug_status(request: Request):
         except:
             pass
     
+    # ✅ NOUVEAU: Status du système de logging
+    logging_status = "not_available"
+    conversations_count = 0
+    if LOGGING_AVAILABLE and logger_instance:
+        try:
+            # Compter les conversations dans la base
+            import sqlite3
+            with sqlite3.connect(logger_instance.db_path) as conn:
+                conversations_count = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
+            logging_status = "available"
+        except Exception as e:
+            logging_status = f"error: {str(e)}"
+    
     return {
         "expert_service": {
             "openai_available": OPENAI_AVAILABLE,
-            "openai_key_configured": bool(os.getenv('OPENAI_API_KEY'))
+            "openai_key_configured": bool(os.getenv('OPENAI_API_KEY')),
+            "utf8_support": True,
+            "utf8_validation": "active"
         },
         "rag_system": {
             "embedder_connected": rag_embedder is not None,
-            "function_connected": process_rag is not None,  # ✅ Utilise la variable locale
+            "function_connected": process_rag is not None,
             "status": rag_status
         },
+        "logging_system": {  # ✅ NOUVEAU
+            "available": LOGGING_AVAILABLE,
+            "status": logging_status,
+            "conversations_count": conversations_count,
+            "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled"
+        },
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "1.2.0_with_integrated_logging"
     }
 
 @router.get("/debug/test-question", dependencies=[Depends(admin_protection)])
 async def debug_test_question(
     request: Request, 
     text: Optional[str] = Query(None, description="Custom question text")
-):  # ✅ Paramètre text personnalisable
-    """Test endpoint avec question sur Compass - question personnalisable"""
+):
+    """Test endpoint avec question sur Compass - question personnalisable avec UTF-8 + Logging"""
     
-    # ✅ Question par défaut ou personnalisée
     test_text = text or "What are the Compass Performance Analysis Protocol diagnostic patterns for Ross 308?"
+    safe_test_text = ensure_utf8_string(test_text)
     
     test_request = QuestionRequest(
-        text=test_text,
+        text=safe_test_text,
         language="en",
         speed_mode="quality"
     )
     
     try:
-        # ✅ Passe maintenant request comme 2e argument
         response = await ask_expert_public(test_request, request)
         return {
             "test_status": "success",
-            "question_tested": test_text,
+            "question_tested": safe_test_text,
             "rag_used": response.rag_used,
-            "rag_score": response.rag_score,  # ✅ Score inclus
+            "rag_score": response.rag_score,
             "response_preview": response.response[:200] + "..." if len(response.response) > 200 else response.response,
             "response_time_ms": response.response_time_ms,
-            "mode": response.mode
+            "mode": response.mode,
+            "utf8_processed": True,
+            "logged": response.logged,  # ✅ NOUVEAU
+            "conversation_id": response.conversation_id
         }
     except Exception as e:
-        # ✅ Utilise la bonne variable locale
         process_rag = getattr(request.app.state, 'process_question_with_rag', None)
         return {
             "test_status": "error",
-            "question_tested": test_text,
+            "question_tested": safe_test_text,
             "error": str(e),
-            "rag_available": process_rag is not None
+            "rag_available": process_rag is not None,
+            "utf8_processed": True,
+            "logged": False
         }
 
+@router.get("/debug/test-utf8", dependencies=[Depends(admin_protection)])
+async def debug_test_utf8(request: Request):
+    """Test endpoint spécifique pour validation UTF-8"""
+    
+    test_questions = [
+        {
+            "text": "Température optimale pour poulets Ross 308 ?",
+            "language": "fr",
+            "description": "Français avec accents"
+        },
+        {
+            "text": "¿Cuál es la nutrición óptima para pollos?",
+            "language": "es", 
+            "description": "Espagnol avec caractères spéciaux"
+        },
+        {
+            "text": "Contrôle qualité à 32°C avec humidité 65%",
+            "language": "fr",
+            "description": "Français avec symboles spéciaux"
+        }
+    ]
+    
+    results = []
+    
+    for test_q in test_questions:
+        try:
+            test_request = QuestionRequest(
+                text=test_q["text"],
+                language=test_q["language"],
+                speed_mode="fast"
+            )
+            
+            validation_result = {
+                "original": test_q["text"],
+                "processed": test_request.text,
+                "language": test_request.language,
+                "description": test_q["description"],
+                "validation_success": True,
+                "encoding_ok": test_request.text == ensure_utf8_string(test_q["text"])
+            }
+            
+        except Exception as e:
+            validation_result = {
+                "original": test_q["text"],
+                "processed": None,
+                "language": test_q["language"],
+                "description": test_q["description"],
+                "validation_success": False,
+                "error": str(e)
+            }
+        
+        results.append(validation_result)
+    
+    return {
+        "utf8_test_results": results,
+        "summary": {
+            "total_tests": len(results),
+            "successful": sum(1 for r in results if r.get("validation_success", False)),
+            "failed": sum(1 for r in results if not r.get("validation_success", False))
+        },
+        "logging_integration": {
+            "available": LOGGING_AVAILABLE,
+            "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled"
+        },
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.2.0_with_integrated_logging"
+    }
+
 @router.get("/debug/routes", dependencies=[Depends(admin_protection)])
-async def debug_routes(request: Request):  # ✅ Ajouté Request parameter pour cohérence
-    """Debug endpoint pour lister les routes disponibles"""
-    # ✅ Utilise la bonne variable locale
+async def debug_routes(request: Request):
+    """Debug endpoint pour lister les routes disponibles avec logging"""
     process_rag = getattr(request.app.state, 'process_question_with_rag', None)
     
     return {
         "routes": [
-            {"path": "/api/v1/expert/ask-public", "method": "POST", "description": "Question publique"},
-            {"path": "/api/v1/expert/ask", "method": "POST", "description": "Question authentifiée"},
-            {"path": "/api/v1/expert/feedback", "method": "POST", "description": "Soumettre feedback"},
-            {"path": "/api/v1/expert/topics", "method": "GET", "description": "Sujets suggérés"},
-            {"path": "/api/v1/expert/history", "method": "GET", "description": "Historique"},
-            {"path": "/api/v1/expert/debug/status", "method": "GET", "description": "Statut système (admin)"},
-            {"path": "/api/v1/expert/debug/test-question", "method": "GET", "description": "Test RAG (admin)", "params": "?text=custom_question"},
+            {"path": "/api/v1/expert/ask-public", "method": "POST", "description": "Question publique avec UTF-8 + Logging auto"},
+            {"path": "/api/v1/expert/ask", "method": "POST", "description": "Question authentifiée avec UTF-8 + Logging auto"},
+            {"path": "/api/v1/expert/feedback", "method": "POST", "description": "Soumettre feedback avec UTF-8 + DB update"},
+            {"path": "/api/v1/expert/topics", "method": "GET", "description": "Sujets suggérés avec UTF-8"},
+            {"path": "/api/v1/expert/history", "method": "GET", "description": "Historique avec intégration logging"},
+            {"path": "/api/v1/expert/debug/status", "method": "GET", "description": "Statut système + logging (admin)"},
+            {"path": "/api/v1/expert/debug/test-question", "method": "GET", "description": "Test RAG + logging (admin)", "params": "?text=custom_question"},
+            {"path": "/api/v1/expert/debug/test-utf8", "method": "GET", "description": "Test UTF-8 validation (admin)"},
             {"path": "/api/v1/expert/debug/routes", "method": "GET", "description": "Liste routes (admin)"}
         ],
-        "rag_connected": process_rag is not None,  # ✅ Corrigé
-        "timestamp": datetime.now().isoformat()
+        "rag_connected": process_rag is not None,
+        "utf8_support": "active",
+        "logging_integration": {
+            "available": LOGGING_AVAILABLE,
+            "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled",
+            "feedback_update": "enabled" if LOGGING_AVAILABLE else "disabled"
+        },
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.2.0_with_integrated_logging"
     }
 
 # =============================================================================
 # CONFIGURATION AU DÉMARRAGE
 # =============================================================================
 
-# Configuration OpenAI au chargement du module
 if OPENAI_AVAILABLE and openai:
     openai_api_key = os.getenv('OPENAI_API_KEY')
     if openai_api_key:
         openai.api_key = openai_api_key
-        logger.info("✅ OpenAI configuré avec succès dans expert router")
+        logger.info("✅ OpenAI configuré avec succès dans expert router UTF-8")
     else:
         logger.warning("⚠️ OpenAI API key non trouvée dans les variables d'environnement")
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
+
+logger.info("🔤 Support UTF-8 complet activé dans expert router")
+logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
