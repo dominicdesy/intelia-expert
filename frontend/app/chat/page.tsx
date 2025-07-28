@@ -445,16 +445,6 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
   const initializationRef = useRef(false)
   const lastLanguageRef = useRef<string>('')
   
-  // Fonction pour mapper les codes de langue vers les codes Zoho
-  const getZohoLanguage = (lang: string): string => {
-    const languageMap: Record<string, string> = {
-      'fr': 'fr',      // Français
-      'en': 'en',      // English  
-      'es': 'es'       // Español
-    }
-    return languageMap[lang] || 'en' // Défaut anglais si langue non supportée
-  }
-  
   // Fonction pour mapper les codes de langue vers les codes Zoho SalesIQ
   const getZohoLanguage = (lang: string): string => {
     const languageMap: Record<string, string> = {
