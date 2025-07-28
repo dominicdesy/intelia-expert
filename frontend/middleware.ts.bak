@@ -1,4 +1,4 @@
-// middleware.ts - CORRIGÉ POUR ZOHO SALESIQ + URL WEBSOCKET MANQUANTE
+// middleware.ts - CORRIGÉ POUR ZOHO SALESIQ
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -25,6 +25,14 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
+    // COMMENTÉ TEMPORAIREMENT - Pas de redirection auto vers chat
+    /*
+    if (req.nextUrl.pathname === '/' && session && !req.nextUrl.searchParams.has('redirect')) {
+      console.log('✅ Utilisateur connecté - Redirection vers chat')
+      return NextResponse.redirect(new URL('/chat', req.url))
+    }
+    */
+
     // Headers de sécurité CORRIGÉS pour Zoho SalesIQ
     const response = NextResponse.next()
     
@@ -37,8 +45,8 @@ export async function middleware(req: NextRequest) {
       "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
       // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
       "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-      // 🔥 CONNECT-SRC CORRIGÉ - URL WEBSOCKET MANQUANTE AJOUTÉE
-      "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com",
+      // ✅ CONNECT-SRC CORRIGÉ pour autoriser Zoho SalesIQ + WebSockets
+      "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com https://*.zohostatic.com",
       // ✅ FRAME-SRC AJOUTÉ pour autoriser les iframes Zoho
       "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
       // ✅ CHILD-SRC AJOUTÉ pour autoriser les pop-ups Zoho
