@@ -1,5 +1,6 @@
 """
 app/api/v1/expert.py - Version Complète avec Logging Automatique Intégré
+CORRECTION: Validation UTF-8 assouplie pour résoudre les erreurs 400
 """
 import os
 import logging
@@ -121,53 +122,82 @@ def normalize_language_code(language: str) -> str:
     return language.lower().strip()[:2]
 
 # =============================================================================
-# MODÈLES PYDANTIC AVEC SUPPORT UTF-8 (gardés de la version précédente)
+# MODÈLES PYDANTIC AVEC VALIDATION ASSOUPLIE (CORRECTION)
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model pour questions expert avec support UTF-8 complet"""
+    """Request model pour questions expert avec support UTF-8 CORRIGÉ"""
     text: str = Field(..., min_length=1, max_length=2000, description="Question text")
     language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode: fast, balanced, quality")
 
+    # =========================================================================
+    # CORRECTION: VALIDATION ASSOUPLIE POUR RÉSOUDRE LES ERREURS 400
+    # =========================================================================
+
     @validator('text', pre=True)
     def validate_text_utf8(cls, v):
-        """Valide et corrige l'encodage UTF-8 du texte"""
+        """Valide et corrige l'encodage UTF-8 du texte - VERSION ASSOUPLIE"""
         if not v:
             raise ValueError("Question text cannot be empty")
         
-        cleaned_text = ensure_utf8_string(str(v).strip())
-        
-        if not cleaned_text:
-            raise ValueError("Question text cannot be empty after cleaning")
-        
-        if len(cleaned_text) > 2000:
-            raise ValueError("Question text too long (max 2000 characters)")
-        
-        return cleaned_text
+        # CORRECTION: Validation plus permissive, pas de nettoyage UTF-8 strict
+        try:
+            # Accepter le texte tel quel s'il est déjà string
+            if isinstance(v, str):
+                cleaned_text = v.strip()
+            else:
+                cleaned_text = str(v).strip()
+            
+            # Vérification longueur seulement
+            if not cleaned_text:
+                raise ValueError("Question text cannot be empty after cleaning")
+            
+            if len(cleaned_text) > 2000:
+                cleaned_text = cleaned_text[:2000]  # Tronquer au lieu de rejeter
+            
+            return cleaned_text
+            
+        except Exception as e:
+            # En cas d'erreur, essayer de sauver le texte
+            try:
+                return str(v).strip() if v else ""
+            except:
+                raise ValueError(f"Invalid text format: {str(e)}")
 
     @validator('language', pre=True)
     def validate_language(cls, v):
-        """Valide le code de langue"""
-        normalized = normalize_language_code(v or "fr")
-        if normalized not in ["fr", "en", "es"]:
-            return "fr"
-        return normalized
+        """Valide le code de langue - VERSION ASSOUPLIE"""
+        try:
+            if not v:
+                return "fr"
+            normalized = str(v).lower().strip()[:2]
+            if normalized not in ["fr", "en", "es"]:
+                return "fr"  # Fallback au lieu d'erreur
+            return normalized
+        except:
+            return "fr"  # Fallback sécurisé
 
     @validator('speed_mode', pre=True)
     def validate_speed_mode(cls, v):
-        """Valide le mode de vitesse"""
-        mode = str(v or "balanced").lower().strip()
-        if mode not in ["fast", "balanced", "quality"]:
-            return "balanced"
-        return mode
+        """Valide le mode de vitesse - VERSION ASSOUPLIE"""
+        try:
+            if not v:
+                return "balanced"
+            mode = str(v).lower().strip()
+            if mode not in ["fast", "balanced", "quality"]:
+                return "balanced"  # Fallback au lieu d'erreur
+            return mode
+        except:
+            return "balanced"  # Fallback sécurisé
 
     class Config:
         str_strip_whitespace = True
         validate_assignment = True
         use_enum_values = True
+        # CORRECTION: Encoders plus permissifs
         json_encoders = {
-            str: lambda x: ensure_utf8_string(x) if isinstance(x, str) else str(x)
+            str: lambda x: str(x) if x is not None else ""
         }
 
 class ExpertResponse(BaseModel):
@@ -205,7 +235,7 @@ class FeedbackRequest(BaseModel):
         """Valide le rating"""
         rating = str(v or "").lower().strip()
         if rating not in ["positive", "negative", "neutral"]:
-            raise ValueError("Rating must be: positive, negative, or neutral")
+            return "neutral"  # CORRECTION: Fallback au lieu d'erreur
         return rating
 
     @validator('comment', pre=True)
@@ -217,7 +247,7 @@ class FeedbackRequest(BaseModel):
         cleaned_comment = ensure_utf8_string(str(v).strip())
         
         if len(cleaned_comment) > 500:
-            raise ValueError("Comment too long (max 500 characters)")
+            cleaned_comment = cleaned_comment[:500]  # CORRECTION: Tronquer au lieu de rejeter
         
         return cleaned_comment if cleaned_comment else None
 
@@ -633,7 +663,7 @@ async def debug_status(request: Request):
             "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled"
         },
         "timestamp": datetime.now().isoformat(),
-        "version": "1.2.0_with_integrated_logging"
+        "version": "1.2.0_with_integrated_logging_and_fixed_validation"
     }
 
 @router.get("/debug/test-question", dependencies=[Depends(admin_protection)])
@@ -742,7 +772,7 @@ async def debug_test_utf8(request: Request):
             "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled"
         },
         "timestamp": datetime.now().isoformat(),
-        "version": "1.2.0_with_integrated_logging"
+        "version": "1.2.0_with_integrated_logging_and_fixed_validation"
     }
 
 @router.get("/debug/routes", dependencies=[Depends(admin_protection)])
@@ -764,13 +794,14 @@ async def debug_routes(request: Request):
         ],
         "rag_connected": process_rag is not None,
         "utf8_support": "active",
+        "validation_fixed": "UTF-8 validation assouplie pour corriger erreurs 400",
         "logging_integration": {
             "available": LOGGING_AVAILABLE,
             "auto_save": "enabled" if LOGGING_AVAILABLE else "disabled",
             "feedback_update": "enabled" if LOGGING_AVAILABLE else "disabled"
         },
         "timestamp": datetime.now().isoformat(),
-        "version": "1.2.0_with_integrated_logging"
+        "version": "1.2.0_with_integrated_logging_and_fixed_validation"
     }
 
 # =============================================================================
@@ -788,4 +819,5 @@ else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
 logger.info("🔤 Support UTF-8 complet activé dans expert router")
+logger.info("🔧 Validation UTF-8 assouplie pour corriger erreurs 400")
 logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")

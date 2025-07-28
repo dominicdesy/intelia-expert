@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import logging
 from typing import Dict, Any
-from datetime import datetime
 
 router = APIRouter(prefix="/admin")
 logger = logging.getLogger(__name__)
@@ -62,71 +61,6 @@ async def get_dashboard():
             "status": "error",
             "error": str(e),
             "timestamp": expert_service._get_timestamp() if 'expert_service' in locals() else "unknown"
-        }
-
-# ============================================================================
-# CORRECTION: AJOUT DE L'ENDPOINT MANQUANT /users (résout erreur 404)
-# ============================================================================
-
-@router.get("/users")
-async def get_users():
-    """Gestion des utilisateurs - ENDPOINT MANQUANT AJOUTÉ pour corriger 404"""
-    try:
-        # Import du système de logging pour récupérer les utilisateurs
-        try:
-            from app.api.v1.logging import logger_instance
-            import sqlite3
-            
-            with sqlite3.connect(logger_instance.db_path) as conn:
-                # Statistiques utilisateurs
-                users_stats = conn.execute("""
-                    SELECT 
-                        user_id,
-                        COUNT(*) as question_count,
-                        MAX(timestamp) as last_activity,
-                        AVG(CASE WHEN feedback = 1 THEN 1.0 WHEN feedback = -1 THEN 0.0 END) as satisfaction
-                    FROM conversations
-                    GROUP BY user_id
-                    ORDER BY question_count DESC
-                    LIMIT 50
-                """).fetchall()
-                
-                users_list = []
-                for user_stat in users_stats:
-                    users_list.append({
-                        "user_id": user_stat[0][:10] + "..." if len(user_stat[0]) > 10 else user_stat[0],
-                        "question_count": user_stat[1],
-                        "last_activity": user_stat[2],
-                        "satisfaction": round(user_stat[3], 3) if user_stat[3] else None,
-                        "status": "active" if user_stat[1] > 5 else "low_activity"
-                    })
-                
-                return {
-                    "users": users_list,
-                    "total_users": len(users_list),
-                    "active_users": len([u for u in users_list if u["status"] == "active"]),
-                    "timestamp": datetime.now().isoformat(),
-                    "message": "Gestion utilisateurs basée sur les conversations"
-                }
-                
-        except Exception as db_error:
-            # Fallback si pas de base de données
-            return {
-                "users": [],
-                "total_users": 0,
-                "active_users": 0,
-                "message": "Système de gestion utilisateurs en cours d'initialisation",
-                "error": str(db_error),
-                "timestamp": datetime.now().isoformat()
-            }
-            
-    except Exception as e:
-        logger.error(f"Admin users error: {e}")
-        return {
-            "users": [],
-            "total_users": 0,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
         }
 
 @router.get("/rag/diagnostics")
