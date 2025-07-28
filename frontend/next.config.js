@@ -5,10 +5,6 @@ const nextConfig = {
   // Configuration sécurité
   poweredByHeader: false,
   
-  // ✅ Optimisations de build ajoutées
-  swcMinify: true,
-  compress: true,
-  
   // ✅ HEADERS SIMPLIFIÉS - CSP maintenant gérée par middleware.ts
   async headers() {
     return [
@@ -37,9 +33,6 @@ const nextConfig = {
       'zohocdn.com'
     ],
     formats: ['image/webp', 'image/avif'],
-    // Optimisations performance
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
 
   // Variables d'environnement exposées
@@ -61,18 +54,11 @@ const nextConfig = {
   // Optimisation bundle + Configuration Supabase
   experimental: {
     optimizePackageImports: ['lucide-react', '@heroicons/react'],
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-    // ✅ Nouvelles optimisations
-    swcTraceProfiling: true,
-    optimizeCss: true,
-    esmExternals: true,
-    // ❌ LIGNE PROBLÉMATIQUE SUPPRIMÉE
-    // incrementalCacheHandlerPath: require.resolve('./cache-handler.js'),
+    serverComponentsExternalPackages: ['@supabase/supabase-js']
   },
 
-  // Configuration webpack pour Supabase + optimisations
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Configuration Supabase existante
+  // Configuration webpack pour Supabase
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -82,58 +68,7 @@ const nextConfig = {
         crypto: false,
       }
     }
-
-    // ✅ Optimisations webpack ajoutées
-    if (!dev) {
-      // Cache webpack pour builds plus rapides
-      config.cache = {
-        type: 'filesystem',
-        buildDependencies: {
-          config: [__filename],
-        },
-      }
-
-      // Optimisation bundle splitting
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          minSize: 20000,
-          maxSize: 244000,
-          cacheGroups: {
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-            },
-            supabase: {
-              test: /[\\/]node_modules[\\/]@supabase[\\/]/,
-              name: 'supabase',
-              chunks: 'all',
-              priority: 20,
-            },
-          },
-        },
-      }
-
-      // Optimisation résolution
-      config.resolve.modules = ['node_modules']
-      config.resolve.symlinks = false
-    }
-
-    // Utiliser tous les CPU cores
-    config.parallelism = require('os').cpus().length
-
     return config
-  },
-
-  // ✅ Optimisation compilation
-  compiler: {
-    // Suppression console.log en production
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'],
-    } : false,
   },
 }
 
