@@ -425,25 +425,44 @@ const useTranslation = () => {
     setCurrentLanguage(lang)
     localStorage.setItem('intelia_language', lang)
     console.log('✅ [useTranslation] État langue mis à jour:', lang)
+    
+    // Force un re-render de tous les composants qui utilisent ce hook
+    window.dispatchEvent(new Event('languageChanged'))
   }
   
   useEffect(() => {
     const savedLang = localStorage.getItem('intelia_language')
     if (savedLang && translations[savedLang as keyof typeof translations]) {
+      console.log('🔄 [useTranslation] Chargement langue sauvegardée:', savedLang)
       setCurrentLanguage(savedLang)
     }
   }, [])
+
+  // Écouter les changements de langue globaux
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      const savedLang = localStorage.getItem('intelia_language')
+      if (savedLang && savedLang !== currentLanguage) {
+        console.log('🔄 [useTranslation] Mise à jour depuis événement global:', savedLang)
+        setCurrentLanguage(savedLang)
+      }
+    }
+
+    window.addEventListener('languageChanged', handleLanguageChange)
+    return () => window.removeEventListener('languageChanged', handleLanguageChange)
+  }, [currentLanguage])
   
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION MULTILINGUE ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE DÉFINITIVEMENT ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
   const { currentLanguage } = useTranslation()
   const initializationRef = useRef(false)
   const lastLanguageRef = useRef<string>('')
+  const isReloadingRef = useRef(false)
   
   // Fonction pour mapper les codes de langue vers les codes Zoho
   const getZohoLanguage = (lang: string): string => {
@@ -452,336 +471,168 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       'en': 'en',      // English  
       'es': 'es'       // Español
     }
-    return languageMap[lang] || 'en' // Défaut anglais si langue non supportée
+    return languageMap[lang] || 'en'
   }
   
-  // Fonction pour changer la langue de Zoho
-  const changeZohoLanguage = (language: string) => {
-    console.log('🌐 [ZohoSalesIQ] changeZohoLanguage appelée avec:', language)
-    try {
-      const globalWindow = window as any
-      const zoho = globalWindow.$zoho?.salesiq
-      
-      console.log('🔍 [ZohoSalesIQ] Objet Zoho disponible:', !!zoho)
-      console.log('🔍 [ZohoSalesIQ] Méthode zoho.set disponible:', !!(zoho && typeof zoho.set === 'function'))
-      
-      if (zoho && typeof zoho.set === 'function') {
-        const zohoLangCode = getZohoLanguage(language)
-        zoho.set('locale', zohoLangCode)
-        console.log(`✅ [ZohoSalesIQ] Langue Zoho changée vers: ${zohoLangCode}`)
-      } else if (zoho && typeof zoho.floatwindow === 'object' && zoho.floatwindow.language) {
-        // Alternative pour certaines versions
-        zoho.floatwindow.language(getZohoLanguage(language))
-        console.log(`✅ [ZohoSalesIQ] Langue Zoho changée (floatwindow): ${language}`)
-      } else {
-        console.warn('⚠️ [ZohoSalesIQ] API Zoho pour changement de langue non disponible')
-        // Forcer le rechargement du widget avec la nouvelle langue
-        const script = document.getElementById('zsiqscript')
-        if (script) {
-          console.log('🔄 [ZohoSalesIQ] Fallback - suppression script pour rechargement')
-          script.remove()
+  // Fonction pour charger Zoho avec une langue spécifique
+  const loadZohoWithLanguage = (language: string) => {
+    if (isReloadingRef.current) {
+      console.log('🔄 [ZohoSalesIQ] Rechargement déjà en cours, ignoré')
+      return
+    }
+    
+    isReloadingRef.current = true
+    console.log('🚀 [ZohoSalesIQ] Chargement Zoho avec langue:', language)
+    
+    const zohoLang = getZohoLanguage(language)
+    const globalWindow = window as any
+    
+    // Configuration globale Zoho avec paramètres pour éviter l'ouverture automatique
+    globalWindow.$zoho = {
+      salesiq: {
+        widgetcode: 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f',
+        values: {
+          showLauncher: true,      // Affiche le bouton flottant
+          showChat: false,         // Empêche le chat de s'ouvrir automatiquement
+          autoOpen: false,         // Bloque toute ouverture automatique
+          floatbutton: 'show'      // Force l'affichage du bouton
+        },
+        ready: function() {
+          console.log('✅ [ZohoSalesIQ] Zoho ready callback avec langue:', zohoLang)
+          
           setTimeout(() => {
-            loadZohoScriptWithLanguage(getZohoLanguage(language))
-          }, 1000)
+            try {
+              const zoho = globalWindow.$zoho?.salesiq
+              if (zoho && user) {
+                console.log('🔧 [ZohoSalesIQ] Configuration utilisateur...')
+                
+                // Configuration des informations utilisateur
+                if (zoho.visitor?.info) {
+                  zoho.visitor.info({
+                    name: user.name || 'Utilisateur Intelia',
+                    email: user.email || ''
+                  })
+                  console.log('👤 [ZohoSalesIQ] Info utilisateur configurée')
+                }
+                
+                // Afficher le widget
+                if (zoho.floatbutton?.visible) {
+                  zoho.floatbutton.visible('show')
+                  console.log('👁️ [ZohoSalesIQ] Bouton flotant affiché')
+                }
+                
+                // Marquer comme prêt
+                setIsZohoReady(true)
+                setHasError(false)
+                console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
+              }
+            } catch (error) {
+              console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
+              setHasError(true)
+            } finally {
+              // TOUJOURS réinitialiser l'état de rechargement
+              isReloadingRef.current = false
+            }
+          }, 2000)
         }
       }
-    } catch (error) {
-      console.warn('❌ [ZohoSalesIQ] Erreur changement langue Zoho:', error)
     }
-  }
-  
-  // Fonction pour charger le script Zoho avec une langue spécifique
-  const loadZohoScriptWithLanguage = (language: string) => {
-    console.log('📡 [ZohoSalesIQ] loadZohoScriptWithLanguage appelée avec:', language)
-    const globalWindow = window as any
+    
+    // Charger le script Zoho
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.async = true
     script.defer = true
     script.id = 'zsiqscript'
-    script.crossOrigin = 'anonymous'
-    script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${language}`
-    
-    console.log('📡 [ZohoSalesIQ] URL script:', script.src)
+    script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
     
     script.onload = () => {
-      console.log(`✅ [ZohoSalesIQ] Script Zoho rechargé avec langue: ${language}`)
-      setIsZohoReady(true)
+      console.log('✅ [ZohoSalesIQ] Script chargé avec locale:', zohoLang)
     }
     
-    script.onerror = (error) => {
-      console.error('❌ [ZohoSalesIQ] Erreur rechargement Zoho script:', error)
+    script.onerror = () => {
+      console.error('❌ [ZohoSalesIQ] Erreur chargement script')
       setHasError(true)
+      isReloadingRef.current = false
     }
     
     document.head.appendChild(script)
   }
   
-  // Effet pour gérer le changement de langue avec rechargement si nécessaire
-  useEffect(() => {
-    console.log('🎯 [ZohoSalesIQ] useEffect déclenché - currentLanguage:', currentLanguage, 'isZohoReady:', isZohoReady, 'lastLanguage:', lastLanguageRef.current)
+  // Fonction pour nettoyer complètement Zoho
+  const cleanupZoho = () => {
+    console.log('🧹 [ZohoSalesIQ] Nettoyage complet de Zoho')
     
-    if (isZohoReady && currentLanguage && currentLanguage !== lastLanguageRef.current) {
-      console.log(`🔄 [ZohoSalesIQ] Changement langue Zoho: ${lastLanguageRef.current} → ${currentLanguage}`)
-      
-      // Essayer d'abord le changement dynamique
-      changeZohoLanguage(currentLanguage)
-      
-      // Si pas de succès après 2 secondes, forcer le rechargement
-      setTimeout(() => {
-        const globalWindow = window as any
-        const zoho = globalWindow.$zoho?.salesiq
-        
-        // Vérifier si la langue a effectivement changé
-        if (zoho) {
-          console.log('🔄 [ZohoSalesIQ] Rechargement du widget Zoho pour changement de langue')
-          setIsZohoReady(false)
-          
-          // Supprimer l'ancien script
-          const oldScript = document.getElementById('zsiqscript')
-          if (oldScript) {
-            oldScript.remove()
-            console.log('🗑️ [ZohoSalesIQ] Ancien script supprimé')
-          }
-          
-          // Nettoyer l'ancien widget
-          const widgets = document.querySelectorAll('[id*="zsiq"], [class*="zsiq"]')
-          widgets.forEach(widget => widget.remove())
-          console.log('🧹 [ZohoSalesIQ] Widgets nettoyés:', widgets.length)
-          
-          // Recharger avec la nouvelle langue
-          setTimeout(() => {
-            console.log('🚀 [ZohoSalesIQ] Rechargement script avec langue:', currentLanguage)
-            loadZohoScriptWithLanguage(getZohoLanguage(currentLanguage))
-          }, 500)
-        }
-      }, 2000)
-      
-      lastLanguageRef.current = currentLanguage
-      console.log('✅ [ZohoSalesIQ] lastLanguageRef mis à jour:', currentLanguage)
-    } else {
-      console.log('⏸️ [ZohoSalesIQ] useEffect - conditions non remplies pour changement langue')
+    // Supprimer le script
+    const oldScript = document.getElementById('zsiqscript')
+    if (oldScript) {
+      oldScript.remove()
+      console.log('🗑️ [ZohoSalesIQ] Script supprimé')
     }
-  }, [currentLanguage, isZohoReady])
+    
+    // Supprimer tous les widgets Zoho
+    document.querySelectorAll('[id*="zsiq"], [class*="zsiq"], [id*="siq"]').forEach(el => {
+      el.remove()
+    })
+    console.log('🧹 [ZohoSalesIQ] Widgets supprimés')
+    
+    // Nettoyer l'objet global
+    const globalWindow = window as any
+    if (globalWindow.$zoho) {
+      delete globalWindow.$zoho
+      console.log('🧹 [ZohoSalesIQ] Objet global nettoyé')
+    }
+    
+    // Réinitialiser les états
+    setIsZohoReady(false)
+    setHasError(false)
+    isReloadingRef.current = false
+  }
   
+  // Fonction pour recharger Zoho avec une nouvelle langue
+  const reloadZohoWithLanguage = (newLanguage: string) => {
+    console.log('🔄 [ZohoSalesIQ] Demande rechargement avec langue:', newLanguage)
+    
+    // 1. Nettoyer complètement
+    cleanupZoho()
+    
+    // 2. Attendre puis recharger
+    setTimeout(() => {
+      loadZohoWithLanguage(newLanguage)
+    }, 1000)
+  }
+  
+  // Initialisation initiale
   useEffect(() => {
     if (!user || hasError || initializationRef.current) return
-
-    console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email, 'Langue:', currentLanguage)
+    
+    console.log('🚀 [ZohoSalesIQ] Initialisation initiale pour:', user.email, 'Langue:', currentLanguage)
     initializationRef.current = true
     lastLanguageRef.current = currentLanguage
     
-    const initializeZohoSafely = () => {
-      try {
-        // 1. Configuration globale sécurisée avec le bon widget code
-        const globalWindow = window as any
-        globalWindow.$zoho = globalWindow.$zoho || {}
-        globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
-        globalWindow.$zoho.salesiq.widgetcode = 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f'
-        
-        // 2. Override ready function avec gestion d'erreurs complète + langue
-        globalWindow.$zoho.salesiq.ready = function() {
-          console.log('🎯 Zoho ready callback - Initialisation sécurisée avec langue:', currentLanguage)
-          
-          // Attendre que le DOM et Zoho soient complètement chargés
-          setTimeout(() => {
-            try {
-              const zoho = globalWindow.$zoho?.salesiq
-              if (!zoho) {
-                throw new Error('Zoho SalesIQ object not available')
-              }
-              
-              // 3. Configuration visiteur avec vérifications strictes
-              if (zoho.visitor && typeof zoho.visitor.info === 'function') {
-                zoho.visitor.info({
-                  name: user.name || 'Utilisateur Intelia',
-                  email: user.email || ''
-                })
-                console.log('👤 Visiteur configuré:', user.name)
-              }
-              
-              // 4. Configuration langue dès l'initialisation
-              const initialLanguage = getZohoLanguage(currentLanguage)
-              if (zoho.set && typeof zoho.set === 'function') {
-                zoho.set('locale', initialLanguage)
-                console.log(`🌐 Langue Zoho initialisée: ${initialLanguage}`)
-              }
-              
-              // 5. Démarrage chat avec protection addClass
-              setTimeout(() => {
-                try {
-                  if (zoho.chat && typeof zoho.chat.start === 'function') {
-                    // Vérifier que les éléments DOM sont prêts
-                    const checkDOMReady = () => {
-                      const widget = document.querySelector('#zsiq_float') || 
-                                   document.querySelector('[id*="zsiq"]') ||
-                                   document.querySelector('.zsiq_float')
-                      
-                      if (widget || document.readyState === 'complete') {
-                        zoho.chat.start()
-                        console.log('💬 Chat Zoho démarré avec succès')
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!checkDOMReady()) {
-                      // Retry après chargement complet
-                      window.addEventListener('load', () => {
-                        setTimeout(() => {
-                          try {
-                            zoho.chat.start()
-                            console.log('💬 Chat Zoho démarré (après load)')
-                          } catch (e) {
-                            console.warn('⚠️ Chat start failed (non-critical)')
-                          }
-                        }, 1000)
-                      })
-                    }
-                  }
-                } catch (chatError) {
-                  console.warn('⚠️ Erreur chat start (non critique):', chatError.message)
-                }
-              }, 4000) // Délai augmenté pour stabilité
-              
-              // 6. Affichage widget avec protection addClass  
-              setTimeout(() => {
-                try {
-                  if (zoho.floatbutton && typeof zoho.floatbutton.visible === 'function') {
-                    // Double vérification DOM avant addClass
-                    const ensureWidgetReady = () => {
-                      const widgetElements = document.querySelectorAll('[class*="zsiq"], [id*="zsiq"]')
-                      if (widgetElements.length > 0) {
-                        zoho.floatbutton.visible('show')
-                        console.log('👀 Widget Zoho visible')
-                        setIsZohoReady(true)
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!ensureWidgetReady()) {
-                      // Observer pour détecter l'ajout des éléments Zoho
-                      const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                          if (mutation.addedNodes.length > 0) {
-                            const hasZohoNode = Array.from(mutation.addedNodes).some(node => 
-                              node.nodeType === 1 && 
-                              (node as Element).id?.includes('zsiq') ||
-                              (node as Element).className?.includes('zsiq')
-                            )
-                            if (hasZohoNode && ensureWidgetReady()) {
-                              observer.disconnect()
-                            }
-                          }
-                        })
-                      })
-                      
-                      observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                      })
-                      
-                      // Timeout safety
-                      setTimeout(() => {
-                        observer.disconnect()
-                        if (!isZohoReady) {
-                          console.log('⚠️ Timeout widget detection - fonctionnement silencieux')
-                        }
-                      }, 10000)
-                    }
-                  }
-                } catch (widgetError) {
-                  console.warn('⚠️ Erreur widget visibility (non critique):', widgetError.message)
-                }
-              }, 6000) // Délai augmenté pour stabilité
-              
-            } catch (error) {
-              console.warn('⚠️ Erreur configuration Zoho (non bloquante):', error.message)
-              setHasError(true)
-            }
-          }, 3000) // Délai initial augmenté
-        }
-        
-        // 3. Chargement script avec gestion d'erreurs robuste et langue initiale
-        const loadZohoScript = () => {
-          // Nettoyer anciens scripts
-          document.querySelectorAll('script[src*="salesiq.zohopublic.com"]').forEach(s => s.remove())
-          
-          const script = document.createElement('script')
-          script.type = 'text/javascript'
-          script.async = true
-          script.defer = true
-          script.id = 'zsiqscript'
-          script.crossOrigin = 'anonymous'
-          
-          // Inclure la langue dans l'URL du script
-          const initialLanguage = getZohoLanguage(currentLanguage)
-          script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${initialLanguage}`
-          
-          script.onload = () => {
-            console.log(`✅ Script Zoho chargé avec succès (langue: ${initialLanguage})`)
-          }
-          
-          script.onerror = (error) => {
-            console.error('❌ Erreur chargement Zoho script:', error)
-            setHasError(true)
-          }
-          
-          // Timeout de sécurité
-          setTimeout(() => {
-            if (!document.head.contains(script)) {
-              console.warn('⚠️ Timeout script Zoho')
-              setHasError(true)
-            }
-          }, 15000)
-          
-          document.head.appendChild(script)
-        }
-        
-        // 4. Démarrage avec délai de sécurité
-        setTimeout(loadZohoScript, 2000)
-        
-      } catch (error) {
-        console.error('❌ Erreur critique Zoho:', error)
-        setHasError(true)
-      }
-    }
+    // Délai initial puis chargement
+    setTimeout(() => {
+      loadZohoWithLanguage(currentLanguage)
+    }, 2000)
     
-    // Gestion des erreurs CSP
-    const handleSecurityError = (event: any) => {
-      if (event.sourceFile?.includes('zoho') || event.violatedDirective?.includes('connect-src')) {
-        console.warn('⚠️ Erreur sécurité Zoho détectée:', event.violatedDirective)
-        setHasError(true)
-      }
-    }
-    
-    window.addEventListener('securitypolicyviolation', handleSecurityError)
-    window.addEventListener('error', (event) => {
-      if (event.filename?.includes('zoho')) {
-        console.warn('⚠️ Erreur script Zoho détectée')
-        setHasError(true)
-      }
-    })
-    
-    // Initialisation
-    initializeZohoSafely()
-    
-    return () => {
-      window.removeEventListener('securitypolicyviolation', handleSecurityError)
-      initializationRef.current = false
-    }
-    
-  }, [user, hasError, currentLanguage]) // Ajout de currentLanguage dans les dépendances
+  }, [user, hasError])
   
-  // Feedback utilisateur
+  // Gestion du changement de langue
   useEffect(() => {
-    if (hasError) {
-      console.log('📞 Support Intelia: support@intelia.com | +1 (866) 666 6221')
-    } else if (isZohoReady) {
-      console.log('🎉 Zoho SalesIQ totalement opérationnel')
+    // Correction suggestion #1 : Supprimer la dépendance à user pour le changement de langue
+    if (!currentLanguage || !initializationRef.current) return
+    
+    // Si la langue a changé et qu'on avait déjà une langue
+    if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
+      console.log(`🌐 [ZohoSalesIQ] Changement langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
+      lastLanguageRef.current = currentLanguage
+      reloadZohoWithLanguage(currentLanguage)
+    } else if (lastLanguageRef.current === '') {
+      // Première fois qu'on définit la langue
+      console.log('🌐 [ZohoSalesIQ] Première définition langue:', currentLanguage)
+      lastLanguageRef.current = currentLanguage
     }
-  }, [hasError, isZohoReady])
+  }, [currentLanguage]) // Suppression de la dépendance 'user'
 
   return null
 }
@@ -937,7 +788,7 @@ const useAuthStore = () => {
   }
 }
 
-// ==================== HOOK CHAT AVEC LOGGING ====================
+// ==================== HOOK CHAT AVEC LOGGING AMÉLIORÉ ====================
 interface ConversationItem {
   id: string
   title: string
@@ -953,54 +804,108 @@ interface ConversationItem {
 
 const useChatStore = () => {
   const [conversations, setConversations] = useState<ConversationItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   const loadConversations = async (userId: string) => {
+    if (!userId) {
+      console.warn('⚠️ [useChatStore] Pas d\'userId fourni pour charger les conversations')
+      return
+    }
+
+    setIsLoading(true)
     try {
-      console.log('🔄 Chargement conversations depuis le logging...')
-      const userConversations = await conversationService.getUserConversations(userId)
+      console.log('🔄 [useChatStore] Chargement conversations pour userId:', userId)
+      const userConversations = await conversationService.getUserConversations(userId, 100) // Augmenter la limite
       
-      const formattedConversations: ConversationItem[] = userConversations.map(conv => ({
-        id: conv.conversation_id,
-        title: conv.question.substring(0, 50) + '...',
-        messages: [
-          { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question },
-          { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response }
-        ],
-        updated_at: conv.updated_at,
-        created_at: conv.timestamp,
-        feedback: conv.feedback || null
-      }))
+      console.log('📊 [useChatStore] Conversations brutes reçues:', userConversations.length, userConversations)
       
-      setConversations(formattedConversations)
-      console.log('✅ Conversations chargées:', formattedConversations.length)
+      if (!userConversations || userConversations.length === 0) {
+        console.log('📭 [useChatStore] Aucune conversation trouvée')
+        setConversations([])
+        return
+      }
+      
+      const formattedConversations: ConversationItem[] = userConversations.map(conv => {
+        const title = conv.question && conv.question.length > 0 
+          ? (conv.question.length > 50 ? conv.question.substring(0, 50) + '...' : conv.question)
+          : 'Conversation sans titre'
+          
+        return {
+          id: conv.conversation_id || conv.id || Date.now().toString(),
+          title: title,
+          messages: [
+            { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question || 'Question non disponible' },
+            { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response || 'Réponse non disponible' }
+          ],
+          updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
+          created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
+          feedback: conv.feedback || null
+        }
+      })
+      
+      // Trier par date de mise à jour (plus récent en premier)
+      const sortedConversations = formattedConversations.sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )
+      
+      setConversations(sortedConversations)
+      console.log('✅ [useChatStore] Conversations formatées et triées:', sortedConversations.length)
+      
     } catch (error) {
-      console.error('❌ Erreur chargement conversations:', error)
+      console.error('❌ [useChatStore] Erreur chargement conversations:', error)
+      setConversations([])
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const deleteConversation = async (id: string) => {
     try {
-      console.log('🗑️ Suppression conversation:', id)
+      console.log('🗑️ [useChatStore] Suppression conversation:', id)
+      
+      // Mise à jour optimiste de l'UI
       setConversations(prev => prev.filter(conv => conv.id !== id))
+      
+      // TODO: Appeler l'API backend pour supprimer côté serveur
+      // await conversationService.deleteConversation(id)
+      
+      console.log('✅ [useChatStore] Conversation supprimée localement:', id)
     } catch (error) {
-      console.error('❌ Erreur suppression conversation:', error)
+      console.error('❌ [useChatStore] Erreur suppression conversation:', error)
+      // En cas d'erreur, recharger les conversations
+      // loadConversations(userId) // Nécessiterait de stocker userId
     }
   }
 
   const clearAllConversations = async () => {
     try {
-      console.log('🗑️ Suppression toutes conversations')
+      console.log('🗑️ [useChatStore] Suppression toutes conversations')
+      
+      // Mise à jour optimiste de l'UI
       setConversations([])
+      
+      // TODO: Appeler l'API backend pour supprimer côté serveur
+      // await conversationService.clearAllConversations(userId)
+      
+      console.log('✅ [useChatStore] Toutes conversations supprimées localement')
     } catch (error) {
-      console.error('❌ Erreur suppression conversations:', error)
+      console.error('❌ [useChatStore] Erreur suppression conversations:', error)
     }
+  }
+
+  // Fonction pour forcer le rechargement
+  const refreshConversations = async (userId: string) => {
+    console.log('🔄 [useChatStore] Rechargement forcé des conversations')
+    await loadConversations(userId)
   }
 
   return {
     conversations,
+    isLoading,
     loadConversations,
     deleteConversation,
-    clearAllConversations
+    clearAllConversations,
+    refreshConversations
   }
 }
 
@@ -1226,8 +1131,8 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
   }
 
   const tabs = [
-    { id: 'profile', label: 'Profil', icon: '👤' },
-    { id: 'password', label: 'Mot de passe', icon: '🔒' }
+    { id: 'profile', label: t('nav.profile'), icon: '👤' },
+    { id: 'password', label: t('profile.password'), icon: '🔒' }
   ]
 
   return (
@@ -1415,13 +1320,38 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
                   required
                 />
                 <div className="mt-2 text-xs text-gray-600">
-                  <p>Le mot de passe doit contenir :</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Au moins 8 caractères</li>
-                    <li>Au moins une majuscule</li>
-                    <li>Au moins une minuscule</li>
-                    <li>Au moins un chiffre</li>
-                    <li>Au moins un caractère spécial</li>
+                  <p className="font-medium mb-2">Le mot de passe doit contenir :</p>
+                  <ul className="space-y-1">
+                    <li className={`flex items-center ${passwordData.newPassword.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {passwordData.newPassword.length >= 8 ? '✅' : '⭕'}
+                      </span>
+                      Au moins 8 caractères
+                    </li>
+                    <li className={`flex items-center ${/[A-Z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins une majuscule
+                    </li>
+                    <li className={`flex items-center ${/[a-z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins une minuscule
+                    </li>
+                    <li className={`flex items-center ${/\d/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins un chiffre
+                    </li>
+                    <li className={`flex items-center ${/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins un caractère spécial
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -1582,15 +1512,20 @@ const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
+      // 1. Changer la langue dans le hook (déclenche les re-renders)
       changeLanguage(languageCode)
       console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
       
+      // 2. Sauvegarder dans le profil utilisateur
       await updateProfile({ language: languageCode })
       console.log('✅ [LanguageModal] updateProfile() terminé')
-      console.log('📊 [LanguageModal] Langue mise à jour:', languageCode)
       
-      // Fermeture immédiate - le changement est maintenant dynamique
-      onClose()
+      // 3. Forcer la mise à jour globale
+      setTimeout(() => {
+        console.log('📊 [LanguageModal] Langue finale:', languageCode)
+        onClose()
+      }, 500)
+      
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
     }
@@ -1743,14 +1678,67 @@ const ContactModal = ({ onClose }: { onClose: () => void }) => {
 const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
-  const { conversations, deleteConversation, clearAllConversations, loadConversations } = useChatStore()
+  const { conversations, isLoading, deleteConversation, clearAllConversations, loadConversations, refreshConversations } = useChatStore()
   const { user } = useAuthStore()
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
     if (!isOpen && user) {
-      loadConversations(user.id)
+      console.log('📂 [HistoryMenu] Ouverture menu - chargement conversations pour:', user.id)
+      await loadConversations(user.id)
     }
     setIsOpen(!isOpen)
+  }
+
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) return
+    
+    console.log('🔄 [HistoryMenu] Rechargement manuel des conversations')
+    await refreshConversations(user.id)
+  }
+
+  const handleClearAll = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    try {
+      console.log('🗑️ [HistoryMenu] Début suppression toutes conversations')
+      
+      // Confirmation utilisateur
+      const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer toutes les conversations ? Cette action est irréversible.')
+      
+      if (!confirmed) {
+        console.log('❌ [HistoryMenu] Suppression annulée par utilisateur')
+        return
+      }
+      
+      // Appeler la fonction de suppression
+      await clearAllConversations()
+      console.log('✅ [HistoryMenu] Toutes conversations supprimées')
+      
+      // Fermer le menu après suppression
+      setIsOpen(false)
+      
+    } catch (error) {
+      console.error('❌ [HistoryMenu] Erreur suppression conversations:', error)
+      alert('Erreur lors de la suppression des conversations')
+    }
+  }
+
+  const handleDeleteSingle = async (conversationId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    try {
+      console.log('🗑️ [HistoryMenu] Suppression conversation:', conversationId)
+      await deleteConversation(conversationId)
+      console.log('✅ [HistoryMenu] Conversation supprimée:', conversationId)
+    } catch (error) {
+      console.error('❌ [HistoryMenu] Erreur suppression conversation:', error)
+      alert('Erreur lors de la suppression de la conversation')
+    }
   }
 
   return (
@@ -1773,23 +1761,55 @@ const HistoryMenu = () => {
           <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
-                <button
-                  onClick={() => {
-                    clearAllConversations()
-                    setIsOpen(false)
-                  }}
-                  className="text-red-600 hover:text-red-700 text-sm"
-                >
-                  {t('nav.clearAll')}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
+                  {isLoading && (
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleRefresh}
+                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                    title="Actualiser"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l9.004-9.003m8.015 8.983a9.956 9.956 0 01-1.6 3.18c-.913 1.21-2.094 2.19-3.428 2.846a9.959 9.959 0 01-4.061.823c-2.649 0-5.106-.993-6.96-2.847m2.068-13.252a9.957 9.957 0 013.18-1.6 9.959 9.959 0 014.061-.823c2.649 0 5.106.993 6.96 2.847l1.6 1.6" />
+                    </svg>
+                  </button>
+                  {conversations.length > 0 && (
+                    <button
+                      onClick={handleClearAll}
+                      className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                      title="Supprimer toutes les conversations"
+                    >
+                      {t('nav.clearAll')}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             
             <div className="max-h-64 overflow-y-auto">
-              {conversations.length === 0 ? (
+              {isLoading ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
-                  {t('chat.noConversations')}
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Chargement...</span>
+                  </div>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  <div className="mb-2">📭</div>
+                  <div>{t('chat.noConversations')}</div>
+                  {user && (
+                    <button
+                      onClick={handleRefresh}
+                      className="mt-2 text-blue-600 hover:text-blue-700 text-xs underline"
+                    >
+                      Actualiser
+                    </button>
+                  )}
                 </div>
               ) : (
                 conversations.map((conv) => (
@@ -1800,7 +1820,12 @@ const HistoryMenu = () => {
                           {conv.title}
                         </h4>
                         <p className="text-xs text-gray-500 mt-1">
-                          {new Date(conv.updated_at).toLocaleDateString('fr-FR')}
+                          {new Date(conv.updated_at).toLocaleDateString('fr-FR', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
                         </p>
                         {conv.feedback && (
                           <div className="text-xs text-gray-400 mt-1">
@@ -1809,9 +1834,9 @@ const HistoryMenu = () => {
                         )}
                       </div>
                       <button
-                        onClick={() => deleteConversation(conv.id)}
-                        className="ml-2 p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Supprimer"
+                        onClick={(e) => handleDeleteSingle(conv.id, e)}
+                        className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Supprimer cette conversation"
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -1820,6 +1845,16 @@ const HistoryMenu = () => {
                 ))
               )}
             </div>
+
+            {/* Footer avec statistiques */}
+            {conversations.length > 0 && (
+              <div className="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 text-center">
+                {conversations.length} conversation{conversations.length > 1 ? 's' : ''} • 
+                <span className="ml-1">
+                  Dernière : {new Date(Math.max(...conversations.map(c => new Date(c.updated_at).getTime()))).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -2144,6 +2179,45 @@ export default function ChatInterface() {
     })
   }
 
+  // Fonction pour détecter si on est sur mobile/tablette (version restaurée et améliorée)
+  const isMobileDevice = () => {
+    // Vérifier d'abord si on est dans un navigateur
+    if (typeof window === 'undefined') return false
+    
+    // Détection User Agent pour appareils mobiles/tablettes
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+    
+    // Vérifier la taille d'écran (tablettes généralement < 1024px)
+    const isTabletScreen = window.innerWidth <= 1024
+    
+    // Vérifier le support tactile
+    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    
+    // Détecter les iPads modernes qui se font passer pour des Macs
+    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+    
+    // Cas spéciaux : écrans tactiles de bureau (> 1200px avec beaucoup de points tactiles)
+    const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
+    
+    const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
+    
+    console.log('🔍 [Mobile Detection]', {
+      userAgent: navigator.userAgent,
+      isMobileUA,
+      isTabletScreen,
+      hasTouchScreen,
+      isIPadOS,
+      isDesktopTouchscreen,
+      screenWidth: window.innerWidth,
+      maxTouchPoints: navigator.maxTouchPoints,
+      platform: navigator.platform,
+      result
+    })
+    
+    return result
+  }
+
   return (
     <>
       <ZohoSalesIQ user={user} />
@@ -2274,15 +2348,18 @@ export default function ChatInterface() {
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title={t('chat.voiceRecording')}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                  </svg>
-                </button>
+                {/* Afficher le micro seulement sur mobile/tablette */}
+                {isMobileDevice() && (
+                  <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={t('chat.voiceRecording')}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                  </button>
+                )}
                 
                 <div className="flex-1">
                   <input

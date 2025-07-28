@@ -1,4 +1,32 @@
-'use client'
+async deleteConversation(conversationId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversation non supprimée:', conversationId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression conversation serveur:', conversationId)
+      console.log('📡 URL suppression:', `${this.baseUrl}/logging/conversation/${conversationId}`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        // Si l'endpoint n'existe pas (404), on continue sans erreur
+        if (response.status === 404) {
+          console.warn('⚠️ Endpoint de suppression non disponible sur le serveur')
+          return
+        }
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation supprimée du'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -145,6 +173,68 @@ class ConversationService {
     } catch (error) {
       console.error('❌ Erreur récupération conversations:', error)
       return []
+    }
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversation non supprimée:', conversationId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression conversation serveur:', conversationId)
+      console.log('📡 URL suppression:', `${this.baseUrl}/logging/conversation/${conversationId}`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation supprimée du serveur:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression conversation serveur:', error)
+      throw error  // Propager pour que l'UI puisse gérer l'erreur
+    }
+  }
+
+  async clearAllUserConversations(userId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversations non supprimées:', userId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression toutes conversations serveur pour:', userId)
+      console.log('📡 URL suppression globale:', `${this.baseUrl}/logging/user/${userId}/conversations`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Toutes conversations supprimées du serveur:', result.message, 'Count:', result.deleted_count)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression toutes conversations serveur:', error)
+      throw error  // Propager pour que l'UI puisse gérer l'erreur
     }
   }
 }
@@ -455,7 +545,7 @@ const useTranslation = () => {
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE DÉFINITIVEMENT ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE DÉFINITIVEMENT V2 ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -482,7 +572,8 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
     }
     
     isReloadingRef.current = true
-    console.log('🚀 [ZohoSalesIQ] Chargement Zoho avec langue:', language)
+    console.log('🚀 [ZohoSalesIQ] DEBUT loadZohoWithLanguage avec langue:', language)
+    console.log('👤 [ZohoSalesIQ] User présent:', !!user, user?.email)
     
     const zohoLang = getZohoLanguage(language)
     const globalWindow = window as any
@@ -498,24 +589,24 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
           floatbutton: 'show'      // Force l'affichage du bouton
         },
         ready: function() {
-          console.log('✅ [ZohoSalesIQ] Zoho ready callback avec langue:', zohoLang)
+          console.log('✅ [ZohoSalesIQ] Callback ready déclenché avec langue:', zohoLang)
           
           setTimeout(() => {
             try {
               const zoho = globalWindow.$zoho?.salesiq
-              if (zoho && user) {
-                console.log('🔧 [ZohoSalesIQ] Configuration utilisateur...')
+              if (zoho) {
+                console.log('🔧 [ZohoSalesIQ] Configuration du widget...')
                 
-                // Configuration des informations utilisateur
-                if (zoho.visitor?.info) {
+                // Configuration des informations utilisateur si disponible
+                if (user && zoho.visitor?.info) {
                   zoho.visitor.info({
                     name: user.name || 'Utilisateur Intelia',
                     email: user.email || ''
                   })
-                  console.log('👤 [ZohoSalesIQ] Info utilisateur configurée')
+                  console.log('👤 [ZohoSalesIQ] Info utilisateur configurée pour:', user.email)
                 }
                 
-                // Afficher le widget
+                // Afficher le widget (avec ou sans user)
                 if (zoho.floatbutton?.visible) {
                   zoho.floatbutton.visible('show')
                   console.log('👁️ [ZohoSalesIQ] Bouton flotant affiché')
@@ -525,6 +616,9 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
                 setIsZohoReady(true)
                 setHasError(false)
                 console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
+              } else {
+                console.error('❌ [ZohoSalesIQ] Objet Zoho non disponible')
+                setHasError(true)
               }
             } catch (error) {
               console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
@@ -532,81 +626,98 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
             } finally {
               // TOUJOURS réinitialiser l'état de rechargement
               isReloadingRef.current = false
+              console.log('🔄 [ZohoSalesIQ] isReloadingRef réinitialisé')
             }
           }, 2000)
         }
       }
     }
     
-    // Charger le script Zoho
+    // Charger le script Zoho avec un timestamp pour éviter le cache
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.async = true
     script.defer = true
     script.id = 'zsiqscript'
-    script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
+    script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}&t=${Date.now()}`
+    
+    console.log('📡 [ZohoSalesIQ] URL script avec locale:', script.src)
     
     script.onload = () => {
-      console.log('✅ [ZohoSalesIQ] Script chargé avec locale:', zohoLang)
+      console.log('✅ [ZohoSalesIQ] Script chargé avec succès pour locale:', zohoLang)
     }
     
     script.onerror = () => {
-      console.error('❌ [ZohoSalesIQ] Erreur chargement script')
+      console.error('❌ [ZohoSalesIQ] Erreur chargement script pour locale:', zohoLang)
       setHasError(true)
       isReloadingRef.current = false
     }
     
     document.head.appendChild(script)
+    console.log('📝 [ZohoSalesIQ] Script ajouté au DOM')
   }
   
   // Fonction pour nettoyer complètement Zoho
   const cleanupZoho = () => {
-    console.log('🧹 [ZohoSalesIQ] Nettoyage complet de Zoho')
+    console.log('🧹 [ZohoSalesIQ] DEBUT nettoyage complet de Zoho')
     
-    // Supprimer le script
+    // Supprimer le script existant
     const oldScript = document.getElementById('zsiqscript')
     if (oldScript) {
       oldScript.remove()
-      console.log('🗑️ [ZohoSalesIQ] Script supprimé')
+      console.log('🗑️ [ZohoSalesIQ] Script existant supprimé')
     }
     
-    // Supprimer tous les widgets Zoho
-    document.querySelectorAll('[id*="zsiq"], [class*="zsiq"], [id*="siq"]').forEach(el => {
-      el.remove()
-    })
-    console.log('🧹 [ZohoSalesIQ] Widgets supprimés')
+    // Supprimer tous les widgets Zoho (recherche plus extensive)
+    const zohoSelectors = [
+      '[id*="zsiq"]', '[class*="zsiq"]', '[id*="siq"]', '[class*="siq"]',
+      '[id*="zoho"]', '[class*="zoho"]', '[data-widget*="zoho"]'
+    ]
     
-    // Nettoyer l'objet global
+    zohoSelectors.forEach(selector => {
+      document.querySelectorAll(selector).forEach(el => {
+        el.remove()
+      })
+    })
+    console.log('🧹 [ZohoSalesIQ] Tous widgets Zoho supprimés')
+    
+    // Nettoyer l'objet global complètement
     const globalWindow = window as any
     if (globalWindow.$zoho) {
       delete globalWindow.$zoho
-      console.log('🧹 [ZohoSalesIQ] Objet global nettoyé')
+      console.log('🧹 [ZohoSalesIQ] Objet global $zoho supprimé')
     }
     
     // Réinitialiser les états
     setIsZohoReady(false)
     setHasError(false)
     isReloadingRef.current = false
+    console.log('🔄 [ZohoSalesIQ] États réinitialisés')
   }
   
   // Fonction pour recharger Zoho avec une nouvelle langue
   const reloadZohoWithLanguage = (newLanguage: string) => {
-    console.log('🔄 [ZohoSalesIQ] Demande rechargement avec langue:', newLanguage)
+    console.log('🔄 [ZohoSalesIQ] DEBUT reloadZohoWithLanguage avec langue:', newLanguage)
+    console.log('👤 [ZohoSalesIQ] User disponible pour rechargement:', !!user, user?.email || 'N/A')
     
     // 1. Nettoyer complètement
     cleanupZoho()
     
     // 2. Attendre puis recharger
     setTimeout(() => {
+      console.log('⏰ [ZohoSalesIQ] Démarrage rechargement après nettoyage')
       loadZohoWithLanguage(newLanguage)
     }, 1000)
   }
   
   // Initialisation initiale
   useEffect(() => {
-    if (!user || hasError || initializationRef.current) return
+    if (hasError || initializationRef.current) return
     
-    console.log('🚀 [ZohoSalesIQ] Initialisation initiale pour:', user.email, 'Langue:', currentLanguage)
+    console.log('🚀 [ZohoSalesIQ] Initialisation initiale')
+    console.log('👤 [ZohoSalesIQ] User à l\'init:', !!user, user?.email || 'N/A')
+    console.log('🌐 [ZohoSalesIQ] Langue à l\'init:', currentLanguage)
+    
     initializationRef.current = true
     lastLanguageRef.current = currentLanguage
     
@@ -615,16 +726,19 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       loadZohoWithLanguage(currentLanguage)
     }, 2000)
     
-  }, [user, hasError])
+  }, [hasError]) // Suppression de la dépendance user pour éviter les re-initialisations
   
   // Gestion du changement de langue
   useEffect(() => {
-    // Correction suggestion #1 : Supprimer la dépendance à user pour le changement de langue
-    if (!currentLanguage || !initializationRef.current) return
+    if (!currentLanguage || !initializationRef.current) {
+      console.log('⏭️ [ZohoSalesIQ] Changement langue ignoré - conditions non remplies')
+      return
+    }
     
     // Si la langue a changé et qu'on avait déjà une langue
     if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
-      console.log(`🌐 [ZohoSalesIQ] Changement langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
+      console.log(`🌐 [ZohoSalesIQ] CHANGEMENT DE LANGUE DÉTECTÉ: ${lastLanguageRef.current} → ${currentLanguage}`)
+      console.log('👤 [ZohoSalesIQ] User lors changement:', !!user, user?.email || 'N/A')
       lastLanguageRef.current = currentLanguage
       reloadZohoWithLanguage(currentLanguage)
     } else if (lastLanguageRef.current === '') {
@@ -632,7 +746,7 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       console.log('🌐 [ZohoSalesIQ] Première définition langue:', currentLanguage)
       lastLanguageRef.current = currentLanguage
     }
-  }, [currentLanguage]) // Suppression de la dépendance 'user'
+  }, [currentLanguage]) // Pas de dépendance user pour éviter les recharges intempestives
 
   return null
 }
@@ -863,33 +977,44 @@ const useChatStore = () => {
     try {
       console.log('🗑️ [useChatStore] Suppression conversation:', id)
       
-      // Mise à jour optimiste de l'UI
+      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations(prev => prev.filter(conv => conv.id !== id))
       
-      // TODO: Appeler l'API backend pour supprimer côté serveur
-      // await conversationService.deleteConversation(id)
+      // 2. Suppression côté serveur
+      await conversationService.deleteConversation(id)
       
-      console.log('✅ [useChatStore] Conversation supprimée localement:', id)
+      console.log('✅ [useChatStore] Conversation supprimée du serveur:', id)
+      
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversation:', error)
-      // En cas d'erreur, recharger les conversations
-      // loadConversations(userId) // Nécessiterait de stocker userId
+      console.error('❌ [useChatStore] Erreur suppression conversation serveur:', error)
+      
+      // En cas d'erreur serveur, on pourrait remettre la conversation dans la liste
+      // mais pour l'instant on garde la suppression locale même si le serveur échoue
+      // pour éviter de confuser l'utilisateur
+      
+      // Optionnel: alerter l'utilisateur
+      // alert('Erreur lors de la suppression sur le serveur, mais conversation supprimée localement')
     }
   }
 
-  const clearAllConversations = async () => {
+  const clearAllConversations = async (userId?: string) => {
     try {
       console.log('🗑️ [useChatStore] Suppression toutes conversations')
       
-      // Mise à jour optimiste de l'UI
+      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations([])
       
-      // TODO: Appeler l'API backend pour supprimer côté serveur
-      // await conversationService.clearAllConversations(userId)
+      // 2. Suppression côté serveur si userId disponible
+      if (userId) {
+        await conversationService.clearAllUserConversations(userId)
+        console.log('✅ [useChatStore] Toutes conversations supprimées du serveur')
+      } else {
+        console.warn('⚠️ [useChatStore] Pas d\'userId pour suppression serveur')
+      }
       
-      console.log('✅ [useChatStore] Toutes conversations supprimées localement')
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversations:', error)
+      console.error('❌ [useChatStore] Erreur suppression conversations serveur:', error)
+      // Même principe: on garde la suppression locale
     }
   }
 
@@ -899,13 +1024,33 @@ const useChatStore = () => {
     await loadConversations(userId)
   }
 
+  // Fonction pour ajouter une nouvelle conversation à la liste locale
+  const addConversation = (conversationId: string, question: string, response: string) => {
+    const newConversation: ConversationItem = {
+      id: conversationId,
+      title: question.length > 50 ? question.substring(0, 50) + '...' : question,
+      messages: [
+        { id: `${conversationId}-q`, role: 'user', content: question },
+        { id: `${conversationId}-a`, role: 'assistant', content: response }
+      ],
+      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      feedback: null
+    }
+    
+    // Ajouter en première position (plus récent)
+    setConversations(prev => [newConversation, ...prev])
+    console.log('✅ [useChatStore] Nouvelle conversation ajoutée localement:', conversationId)
+  }
+
   return {
     conversations,
     isLoading,
     loadConversations,
     deleteConversation,
     clearAllConversations,
-    refreshConversations
+    refreshConversations,
+    addConversation
   }
 }
 
@@ -1703,6 +1848,11 @@ const HistoryMenu = () => {
     e.preventDefault()
     e.stopPropagation()
     
+    if (!user) {
+      console.error('❌ [HistoryMenu] Pas d\'utilisateur pour la suppression')
+      return
+    }
+    
     try {
       console.log('🗑️ [HistoryMenu] Début suppression toutes conversations')
       
@@ -1714,8 +1864,8 @@ const HistoryMenu = () => {
         return
       }
       
-      // Appeler la fonction de suppression
-      await clearAllConversations()
+      // Appeler la fonction de suppression avec userId
+      await clearAllConversations(user.id)
       console.log('✅ [HistoryMenu] Toutes conversations supprimées')
       
       // Fermer le menu après suppression
@@ -1772,6 +1922,7 @@ const HistoryMenu = () => {
                     onClick={handleRefresh}
                     className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                     title="Actualiser"
+                    disabled={isLoading}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l9.004-9.003m8.015 8.983a9.956 9.956 0 01-1.6 3.18c-.913 1.21-2.094 2.19-3.428 2.846a9.959 9.959 0 01-4.061.823c-2.649 0-5.106-.993-6.96-2.847m2.068-13.252a9.957 9.957 0 013.18-1.6 9.959 9.959 0 014.061-.823c2.649 0 5.106.993 6.96 2.847l1.6 1.6" />
@@ -1782,6 +1933,7 @@ const HistoryMenu = () => {
                       onClick={handleClearAll}
                       className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
                       title="Supprimer toutes les conversations"
+                      disabled={isLoading}
                     >
                       {t('nav.clearAll')}
                     </button>
@@ -1806,6 +1958,7 @@ const HistoryMenu = () => {
                     <button
                       onClick={handleRefresh}
                       className="mt-2 text-blue-600 hover:text-blue-700 text-xs underline"
+                      disabled={isLoading}
                     >
                       Actualiser
                     </button>
@@ -1837,6 +1990,7 @@ const HistoryMenu = () => {
                         onClick={(e) => handleDeleteSingle(conv.id, e)}
                         className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Supprimer cette conversation"
+                        disabled={isLoading}
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -2038,6 +2192,7 @@ const UserMenuButton = () => {
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
+  const { addConversation } = useChatStore()
   
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -2114,6 +2269,11 @@ export default function ChatInterface() {
       setMessages(prev => [...prev, aiMessage])
       console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
       
+      // Ajouter la conversation à l'historique local pour mise à jour immédiate
+      if (user && response.conversation_id) {
+        addConversation(response.conversation_id, text.trim(), response.response)
+      }
+      
     } catch (error) {
       console.error('❌ Error generating response:', error)
       const errorMessage: Message = {
@@ -2179,8 +2339,8 @@ export default function ChatInterface() {
     })
   }
 
-  // Fonction pour détecter si on est sur mobile/tablette (version restaurée et améliorée)
-  const isMobileDevice = () => {
+  // Hook pour détecter si on est sur mobile/tablette (avec cache pour éviter les appels répétés)
+  const isMobileDevice = useMemo(() => {
     // Vérifier d'abord si on est dans un navigateur
     if (typeof window === 'undefined') return false
     
@@ -2202,7 +2362,8 @@ export default function ChatInterface() {
     
     const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
     
-    console.log('🔍 [Mobile Detection]', {
+    // Log seulement une fois au calcul initial
+    console.log('🔍 [Mobile Detection] - Calcul unique:', {
       userAgent: navigator.userAgent,
       isMobileUA,
       isTabletScreen,
@@ -2216,11 +2377,11 @@ export default function ChatInterface() {
     })
     
     return result
-  }
+  }, []) // Dépendances vides = calcul une seule fois
 
   return (
     <>
-      <ZohoSalesIQ user={user} />
+      <ZohoSalesIQ key={currentLanguage} user={user} />
 
       <div className="h-screen bg-gray-50 flex flex-col">
         {/* Header */}
@@ -2349,7 +2510,7 @@ export default function ChatInterface() {
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center space-x-3">
                 {/* Afficher le micro seulement sur mobile/tablette */}
-                {isMobileDevice() && (
+                {isMobileDevice && (
                   <button
                     type="button"
                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
