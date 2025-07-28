@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 // Instance Supabase
@@ -2316,45 +2316,61 @@ export default function ChatInterface() {
     })
   }
 
-  // Hook pour détecter si on est sur mobile/tablette (avec cache pour éviter les appels répétés)
-  const isMobileDevice = useMemo(() => {
-    // Vérifier d'abord si on est dans un navigateur
-    if (typeof window === 'undefined') return false
+  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
+  const [isMobileDevice, setIsMobileDevice] = useState(false)
+  
+  useEffect(() => {
+    // Cette fonction ne s'exécute que côté client
+    const detectMobileDevice = () => {
+      // Détection User Agent pour appareils mobiles/tablettes
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+      
+      // Vérifier la taille d'écran (tablettes généralement < 1024px)
+      const isTabletScreen = window.innerWidth <= 1024
+      
+      // Vérifier le support tactile
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      
+      // Détecter les iPads modernes qui se font passer pour des Macs
+      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+      
+      // Cas spéciaux : écrans tactiles de bureau (> 1200px avec beaucoup de points tactiles)
+      const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
+      
+      const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
+      
+      console.log('🔍 [Mobile Detection] - Détection côté client:', {
+        userAgent: navigator.userAgent,
+        isMobileUA,
+        isTabletScreen,
+        hasTouchScreen,
+        isIPadOS,
+        isDesktopTouchscreen,
+        screenWidth: window.innerWidth,
+        maxTouchPoints: navigator.maxTouchPoints,
+        platform: navigator.platform,
+        result
+      })
+      
+      return result
+    }
     
-    // Détection User Agent pour appareils mobiles/tablettes
-    const userAgent = navigator.userAgent.toLowerCase()
-    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+    // Détecter au montage du composant
+    setIsMobileDevice(detectMobileDevice())
     
-    // Vérifier la taille d'écran (tablettes généralement < 1024px)
-    const isTabletScreen = window.innerWidth <= 1024
+    // Optionnel: re-détecter au redimensionnement de la fenêtre
+    const handleResize = () => {
+      setIsMobileDevice(detectMobileDevice())
+    }
     
-    // Vérifier le support tactile
-    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    window.addEventListener('resize', handleResize)
     
-    // Détecter les iPads modernes qui se font passer pour des Macs
-    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-    
-    // Cas spéciaux : écrans tactiles de bureau (> 1200px avec beaucoup de points tactiles)
-    const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
-    
-    const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
-    
-    // Log seulement une fois au calcul initial
-    console.log('🔍 [Mobile Detection] - Calcul unique:', {
-      userAgent: navigator.userAgent,
-      isMobileUA,
-      isTabletScreen,
-      hasTouchScreen,
-      isIPadOS,
-      isDesktopTouchscreen,
-      screenWidth: window.innerWidth,
-      maxTouchPoints: navigator.maxTouchPoints,
-      platform: navigator.platform,
-      result
-    })
-    
-    return result
-  }, []) // Dépendances vides = calcul une seule fois
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, []) // S'exécute une seule fois au montage
 
   return (
     <>
