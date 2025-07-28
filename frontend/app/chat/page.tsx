@@ -21,10 +21,12 @@ interface ExpertApiResponse {
   response: string
   conversation_id: string
   rag_used: boolean
+  rag_score?: number
   timestamp: string
   language: string
   response_time_ms: number
-  confidence_score?: number
+  mode: string
+  user?: string
 }
 
 interface ConversationData {
@@ -150,26 +152,26 @@ class ConversationService {
 // Instance globale du service
 const conversationService = new ConversationService()
 
-// ==================== FONCTION generateAIResponse CORRIGÉE ====================
+// ==================== FONCTION generateAIResponse CORRIGÉE ET SIMPLIFIÉE ====================
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  // ✅ URL correcte confirmée par test PowerShell
-  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/v1/expert/ask-public'
+  // ✅ URL corrigée selon l'API backend validée
+  const apiUrl = 'https://expert-app-cngws.ondigitalocean.app/api/v1/expert/ask-public'
   
   try {
     console.log('🤖 Envoi question au RAG Intelia (endpoint public):', question)
     console.log('📡 URL API:', apiUrl)
     console.log('👤 Utilisateur:', user?.id, user?.email)
     
-    // ✅ Corps de la requête pour l'endpoint public
+    // ✅ Corps de la requête aligné avec QuestionRequest du backend
     const requestBody = {
       text: question.trim(),
       language: user?.language || 'fr',
-      speed_mode: 'fast'  // ✅ Mode rapide pour réponses concises
+      speed_mode: 'balanced'  // Mode par défaut selon l'API
     }
     
     console.log('📤 Corps de la requête:', requestBody)
     
-    // ✅ Headers sans authentification pour l'endpoint public
+    // ✅ Headers pour endpoint public (pas d'authentification)
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
@@ -194,27 +196,30 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     const data = await response.json()
     console.log('✅ Réponse RAG reçue:', data)
     
+    // ✅ Adapter la réponse selon ExpertResponse du backend
     const adaptedResponse: ExpertApiResponse = {
-      question: question,
-      response: data.response || data.answer || data.message || "Réponse reçue",
-      conversation_id: data.timestamp || Date.now().toString(),
-      rag_used: data.mode?.includes('rag') || data.mode === 'rag_enhanced' || false,
+      question: data.question || question,
+      response: data.response || "Réponse reçue mais vide",
+      conversation_id: data.conversation_id || Date.now().toString(),
+      rag_used: data.rag_used || false,
+      rag_score: data.rag_score,
       timestamp: data.timestamp || new Date().toISOString(),
       language: data.language || 'fr',
-      response_time_ms: (data.processing_time || 0) * 1000,
-      confidence_score: data.sources?.length > 0 ? 0.9 : 0.7
+      response_time_ms: data.response_time_ms || 0,
+      mode: data.mode || 'unknown',
+      user: data.user
     }
     
-    // Sauvegarde optionnelle
+    // Sauvegarde optionnelle si logging disponible
     if (user && adaptedResponse.conversation_id) {
       try {
         console.log('💾 Tentative sauvegarde conversation...')
         await conversationService.saveConversation({
           user_id: user.id,
           question: question,
-          response: data.response || data.answer || data.message,
+          response: adaptedResponse.response,
           conversation_id: adaptedResponse.conversation_id,
-          confidence_score: adaptedResponse.confidence_score,
+          confidence_score: adaptedResponse.rag_score,
           response_time_ms: adaptedResponse.response_time_ms,
           language: adaptedResponse.language,
           rag_used: adaptedResponse.rag_used
