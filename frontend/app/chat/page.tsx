@@ -425,19 +425,37 @@ const useTranslation = () => {
     setCurrentLanguage(lang)
     localStorage.setItem('intelia_language', lang)
     console.log('✅ [useTranslation] État langue mis à jour:', lang)
+    
+    // Force un re-render de tous les composants qui utilisent ce hook
+    window.dispatchEvent(new Event('languageChanged'))
   }
   
   useEffect(() => {
     const savedLang = localStorage.getItem('intelia_language')
     if (savedLang && translations[savedLang as keyof typeof translations]) {
+      console.log('🔄 [useTranslation] Chargement langue sauvegardée:', savedLang)
       setCurrentLanguage(savedLang)
     }
   }, [])
+
+  // Écouter les changements de langue globaux
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      const savedLang = localStorage.getItem('intelia_language')
+      if (savedLang && savedLang !== currentLanguage) {
+        console.log('🔄 [useTranslation] Mise à jour depuis événement global:', savedLang)
+        setCurrentLanguage(savedLang)
+      }
+    }
+
+    window.addEventListener('languageChanged', handleLanguageChange)
+    return () => window.removeEventListener('languageChanged', handleLanguageChange)
+  }, [currentLanguage])
   
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE AVEC NETTOYAGE COMPLET ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION SIMPLIFIÉE MAIS EFFICACE ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -452,330 +470,117 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       'en': 'en',      // English  
       'es': 'es'       // Español
     }
-    return languageMap[lang] || 'en' // Défaut anglais si langue non supportée
+    return languageMap[lang] || 'en'
   }
   
-  // Effet pour gérer le changement de langue avec rechargement complet
-  useEffect(() => {
-    if (!currentLanguage || currentLanguage === lastLanguageRef.current) {
-      console.log('⏸️ [ZohoSalesIQ] Pas de changement de langue nécessaire')
-      return
-    }
-
-    console.log(`🌐 [ZohoSalesIQ] Changement de langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
+  // Fonction pour recharger complètement Zoho avec une nouvelle langue
+  const reloadZohoWithLanguage = (newLanguage: string) => {
+    console.log('🔄 [ZohoSalesIQ] Rechargement complet Zoho avec langue:', newLanguage)
     
-    const zohoLang = getZohoLanguage(currentLanguage)
-    
-    // 1. Supprimer ancien script immédiatement
+    // 1. Nettoyer complètement l'ancien Zoho
     const oldScript = document.getElementById('zsiqscript')
     if (oldScript) {
       oldScript.remove()
-      console.log('🗑️ [ZohoSalesIQ] Script Zoho supprimé')
+      console.log('🗑️ [ZohoSalesIQ] Ancien script supprimé')
     }
     
-    // 2. Supprimer tous les éléments liés au widget
-    const widgets = document.querySelectorAll('[id*="zsiq"], [class*="zsiq"]')
-    widgets.forEach(el => el.remove())
-    console.log('🧹 [ZohoSalesIQ] Widgets Zoho nettoyés:', widgets.length)
+    // 2. Supprimer tous les widgets
+    document.querySelectorAll('[id*="zsiq"], [class*="zsiq"]').forEach(el => el.remove())
+    console.log('🧹 [ZohoSalesIQ] Widgets supprimés')
     
-    // 3. Nettoyer l'objet global Zoho
+    // 3. Nettoyer l'objet global
     const globalWindow = window as any
     if (globalWindow.$zoho?.salesiq) {
       delete globalWindow.$zoho.salesiq
-      console.log('🧹 [ZohoSalesIQ] Objet Zoho global nettoyé')
+      console.log('🧹 [ZohoSalesIQ] Objet global nettoyé')
     }
     
     // 4. Réinitialiser l'état
     setIsZohoReady(false)
     
-    // 5. Attendre un moment puis recharger avec la nouvelle langue
+    // 5. Attendre puis recharger
     setTimeout(() => {
-      console.log('🚀 [ZohoSalesIQ] Rechargement complet avec langue:', zohoLang)
+      const zohoLang = getZohoLanguage(newLanguage)
+      console.log('🚀 [ZohoSalesIQ] Rechargement avec locale:', zohoLang)
       
-      // Réinitialiser la configuration globale
+      // Configuration globale
       globalWindow.$zoho = globalWindow.$zoho || {}
       globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
       globalWindow.$zoho.salesiq.widgetcode = 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f'
       
-      // Nouvelle fonction ready
+      // Fonction ready simplifiée
       globalWindow.$zoho.salesiq.ready = function() {
-        console.log('✅ [ZohoSalesIQ] Zoho prêt avec langue:', zohoLang)
-        
+        console.log('✅ [ZohoSalesIQ] Zoho ready avec langue:', zohoLang)
         setTimeout(() => {
           try {
             const zoho = globalWindow.$zoho?.salesiq
             if (zoho) {
-              // Configuration visiteur
-              if (zoho.visitor && typeof zoho.visitor.info === 'function') {
+              if (zoho.visitor?.info) {
                 zoho.visitor.info({
-                  name: user.name || 'Utilisateur Intelia',
-                  email: user.email || ''
+                  name: user?.name || 'Utilisateur Intelia',
+                  email: user?.email || ''
                 })
               }
-              
-              // Démarrage chat
-              if (zoho.chat && typeof zoho.chat.start === 'function') {
-                zoho.chat.start()
-              }
-              
-              // Affichage widget
-              if (zoho.floatbutton && typeof zoho.floatbutton.visible === 'function') {
+              if (zoho.chat?.start) zoho.chat.start()
+              if (zoho.floatbutton?.visible) {
                 zoho.floatbutton.visible('show')
                 setIsZohoReady(true)
+                console.log('✅ [ZohoSalesIQ] Widget visible et prêt')
               }
             }
           } catch (error) {
-            console.warn('⚠️ [ZohoSalesIQ] Erreur configuration (non critique):', error)
+            console.warn('⚠️ [ZohoSalesIQ] Erreur configuration:', error)
           }
         }, 2000)
       }
       
-      // Injection du nouveau script avec la langue
-      const newScript = document.createElement('script')
-      newScript.type = 'text/javascript'
-      newScript.async = true
-      newScript.defer = true
-      newScript.id = 'zsiqscript'
-      newScript.crossOrigin = 'anonymous'
-      newScript.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
+      // Nouveau script avec la langue
+      const script = document.createElement('script')
+      script.type = 'text/javascript'
+      script.async = true
+      script.defer = true
+      script.id = 'zsiqscript'
+      script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
       
-      newScript.onload = () => {
-        console.log('✅ [ZohoSalesIQ] Script rechargé avec succès - locale:', zohoLang)
-      }
-      
-      newScript.onerror = () => {
-        console.error('❌ [ZohoSalesIQ] Erreur rechargement script')
+      script.onload = () => console.log('✅ [ZohoSalesIQ] Script chargé avec locale:', zohoLang)
+      script.onerror = () => {
+        console.error('❌ [ZohoSalesIQ] Erreur script')
         setHasError(true)
       }
       
-      document.head.appendChild(newScript)
-      console.log('🚀 [ZohoSalesIQ] Script Zoho injecté avec locale =', zohoLang)
-      
-    }, 1000) // Délai pour s'assurer que le nettoyage est complet
+      document.head.appendChild(script)
+    }, 1000)
+  }
+  
+  // Effet pour le changement de langue
+  useEffect(() => {
+    if (!currentLanguage || !isZohoReady) return
+    
+    if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
+      console.log(`🌐 [ZohoSalesIQ] Changement langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
+      reloadZohoWithLanguage(currentLanguage)
+    }
     
     lastLanguageRef.current = currentLanguage
-    console.log('✅ [ZohoSalesIQ] lastLanguageRef mis à jour:', currentLanguage)
-    
-  }, [currentLanguage, user])
+  }, [currentLanguage, isZohoReady])
   
+  // Initialisation initiale
   useEffect(() => {
     if (!user || hasError || initializationRef.current) return
-
-    console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email, 'Langue:', currentLanguage)
+    
+    console.log('🚀 [ZohoSalesIQ] Initialisation pour:', user.email, 'Langue:', currentLanguage)
     initializationRef.current = true
     lastLanguageRef.current = currentLanguage
     
-    const initializeZohoSafely = () => {
-      try {
-        // 1. Configuration globale sécurisée avec le bon widget code
-        const globalWindow = window as any
-        globalWindow.$zoho = globalWindow.$zoho || {}
-        globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
-        globalWindow.$zoho.salesiq.widgetcode = 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f'
-        
-        // 2. Override ready function avec gestion d'erreurs complète + langue
-        globalWindow.$zoho.salesiq.ready = function() {
-          console.log('🎯 Zoho ready callback - Initialisation sécurisée avec langue:', currentLanguage)
-          
-          // Attendre que le DOM et Zoho soient complètement chargés
-          setTimeout(() => {
-            try {
-              const zoho = globalWindow.$zoho?.salesiq
-              if (!zoho) {
-                throw new Error('Zoho SalesIQ object not available')
-              }
-              
-              // 3. Configuration visiteur avec vérifications strictes
-              if (zoho.visitor && typeof zoho.visitor.info === 'function') {
-                zoho.visitor.info({
-                  name: user.name || 'Utilisateur Intelia',
-                  email: user.email || ''
-                })
-                console.log('👤 Visiteur configuré:', user.name)
-              }
-              
-              // 4. Configuration langue dès l'initialisation
-              const initialLanguage = getZohoLanguage(currentLanguage)
-              if (zoho.set && typeof zoho.set === 'function') {
-                zoho.set('locale', initialLanguage)
-                console.log(`🌐 Langue Zoho initialisée: ${initialLanguage}`)
-              }
-              
-              // 5. Démarrage chat avec protection addClass
-              setTimeout(() => {
-                try {
-                  if (zoho.chat && typeof zoho.chat.start === 'function') {
-                    // Vérifier que les éléments DOM sont prêts
-                    const checkDOMReady = () => {
-                      const widget = document.querySelector('#zsiq_float') || 
-                                   document.querySelector('[id*="zsiq"]') ||
-                                   document.querySelector('.zsiq_float')
-                      
-                      if (widget || document.readyState === 'complete') {
-                        zoho.chat.start()
-                        console.log('💬 Chat Zoho démarré avec succès')
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!checkDOMReady()) {
-                      // Retry après chargement complet
-                      window.addEventListener('load', () => {
-                        setTimeout(() => {
-                          try {
-                            zoho.chat.start()
-                            console.log('💬 Chat Zoho démarré (après load)')
-                          } catch (e) {
-                            console.warn('⚠️ Chat start failed (non-critical)')
-                          }
-                        }, 1000)
-                      })
-                    }
-                  }
-                } catch (chatError) {
-                  console.warn('⚠️ Erreur chat start (non critique):', chatError.message)
-                }
-              }, 4000) // Délai augmenté pour stabilité
-              
-              // 6. Affichage widget avec protection addClass  
-              setTimeout(() => {
-                try {
-                  if (zoho.floatbutton && typeof zoho.floatbutton.visible === 'function') {
-                    // Double vérification DOM avant addClass
-                    const ensureWidgetReady = () => {
-                      const widgetElements = document.querySelectorAll('[class*="zsiq"], [id*="zsiq"]')
-                      if (widgetElements.length > 0) {
-                        zoho.floatbutton.visible('show')
-                        console.log('👀 Widget Zoho visible')
-                        setIsZohoReady(true)
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!ensureWidgetReady()) {
-                      // Observer pour détecter l'ajout des éléments Zoho
-                      const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                          if (mutation.addedNodes.length > 0) {
-                            const hasZohoNode = Array.from(mutation.addedNodes).some(node => 
-                              node.nodeType === 1 && 
-                              (node as Element).id?.includes('zsiq') ||
-                              (node as Element).className?.includes('zsiq')
-                            )
-                            if (hasZohoNode && ensureWidgetReady()) {
-                              observer.disconnect()
-                            }
-                          }
-                        })
-                      })
-                      
-                      observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                      })
-                      
-                      // Timeout safety
-                      setTimeout(() => {
-                        observer.disconnect()
-                        if (!isZohoReady) {
-                          console.log('⚠️ Timeout widget detection - fonctionnement silencieux')
-                        }
-                      }, 10000)
-                    }
-                  }
-                } catch (widgetError) {
-                  console.warn('⚠️ Erreur widget visibility (non critique):', widgetError.message)
-                }
-              }, 6000) // Délai augmenté pour stabilité
-              
-            } catch (error) {
-              console.warn('⚠️ Erreur configuration Zoho (non bloquante):', error.message)
-              setHasError(true)
-            }
-          }, 3000) // Délai initial augmenté
-        }
-        
-        // 3. Chargement script avec gestion d'erreurs robuste et langue initiale
-        const loadZohoScript = () => {
-          // Nettoyer anciens scripts
-          document.querySelectorAll('script[src*="salesiq.zohopublic.com"]').forEach(s => s.remove())
-          
-          const script = document.createElement('script')
-          script.type = 'text/javascript'
-          script.async = true
-          script.defer = true
-          script.id = 'zsiqscript'
-          script.crossOrigin = 'anonymous'
-          
-          // Inclure la langue dans l'URL du script
-          const initialLanguage = getZohoLanguage(currentLanguage)
-          script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${initialLanguage}`
-          
-          script.onload = () => {
-            console.log(`✅ Script Zoho chargé avec succès (langue: ${initialLanguage})`)
-          }
-          
-          script.onerror = (error) => {
-            console.error('❌ Erreur chargement Zoho script:', error)
-            setHasError(true)
-          }
-          
-          // Timeout de sécurité
-          setTimeout(() => {
-            if (!document.head.contains(script)) {
-              console.warn('⚠️ Timeout script Zoho')
-              setHasError(true)
-            }
-          }, 15000)
-          
-          document.head.appendChild(script)
-        }
-        
-        // 4. Démarrage avec délai de sécurité
-        setTimeout(loadZohoScript, 2000)
-        
-      } catch (error) {
-        console.error('❌ Erreur critique Zoho:', error)
-        setHasError(true)
-      }
-    }
-    
-    // Gestion des erreurs CSP
-    const handleSecurityError = (event: any) => {
-      if (event.sourceFile?.includes('zoho') || event.violatedDirective?.includes('connect-src')) {
-        console.warn('⚠️ Erreur sécurité Zoho détectée:', event.violatedDirective)
-        setHasError(true)
-      }
-    }
-    
-    window.addEventListener('securitypolicyviolation', handleSecurityError)
-    window.addEventListener('error', (event) => {
-      if (event.filename?.includes('zoho')) {
-        console.warn('⚠️ Erreur script Zoho détectée')
-        setHasError(true)
-      }
-    })
-    
-    // Initialisation
-    initializeZohoSafely()
+    // Délai initial puis premier chargement
+    setTimeout(() => {
+      reloadZohoWithLanguage(currentLanguage)
+    }, 2000)
     
     return () => {
-      window.removeEventListener('securitypolicyviolation', handleSecurityError)
       initializationRef.current = false
     }
-    
-  }, [user, hasError, currentLanguage]) // Ajout de currentLanguage dans les dépendances
-  
-  // Feedback utilisateur
-  useEffect(() => {
-    if (hasError) {
-      console.log('📞 Support Intelia: support@intelia.com | +1 (866) 666 6221')
-    } else if (isZohoReady) {
-      console.log('🎉 Zoho SalesIQ totalement opérationnel')
-    }
-  }, [hasError, isZohoReady])
+  }, [user, hasError])
 
   return null
 }
@@ -1576,15 +1381,20 @@ const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     try {
       console.log('🔄 [LanguageModal] Début changement langue:', currentLanguage, '→', languageCode)
       
+      // 1. Changer la langue dans le hook (déclenche les re-renders)
       changeLanguage(languageCode)
       console.log('✅ [LanguageModal] changeLanguage() appelée avec:', languageCode)
       
+      // 2. Sauvegarder dans le profil utilisateur
       await updateProfile({ language: languageCode })
       console.log('✅ [LanguageModal] updateProfile() terminé')
-      console.log('📊 [LanguageModal] Langue mise à jour:', languageCode)
       
-      // Fermeture immédiate - le changement est maintenant dynamique
-      onClose()
+      // 3. Forcer la mise à jour globale
+      setTimeout(() => {
+        console.log('📊 [LanguageModal] Langue finale:', languageCode)
+        onClose()
+      }, 500)
+      
     } catch (error) {
       console.error('❌ [LanguageModal] Erreur changement langue:', error)
     }
