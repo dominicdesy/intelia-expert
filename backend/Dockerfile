@@ -1,57 +1,62 @@
-# Multi-stage Docker build for Intelia Expert API
+# Multi-stage Docker build for Intelia Expert API - OPTIMISÉ
 FROM python:3.11-slim as builder
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install system dependencies (cached layer)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Create and set working directory
+# Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt .
+# Copy ONLY requirements first for maximum cache efficiency
+COPY backend/requirements.txt ./requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with optimized flags
+RUN pip install --no-cache-dir --upgrade pip==23.3.1 && \
+    pip install --no-cache-dir --compile -r requirements.txt
 
-# Production stage
+# Production stage - ultra minimal
 FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PORT=8000
+ENV PYTHONPATH=/app
+
+# Install ONLY runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 # Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder
+# Copy Python packages from builder (cached if requirements.txt unchanged)
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code INCLUDING RAG
+# Copy application code (this layer changes most frequently)
 COPY backend/ ./backend/
 COPY core/ ./core/
 COPY rag/ ./rag/
 COPY rag_index/ ./rag_index/
 COPY .streamlit/ ./.streamlit/
 
-# Create necessary directories and set permissions
+# Set ownership in one layer
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
@@ -60,9 +65,9 @@ USER appuser
 # Expose port
 EXPOSE $PORT
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Optimized health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:$PORT/health || exit 1
 
-# Start command
-CMD ["sh", "-c", "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
+# Optimized start command
+CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
