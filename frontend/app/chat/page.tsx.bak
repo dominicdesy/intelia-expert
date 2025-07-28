@@ -435,29 +435,73 @@ const useTranslation = () => {
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION 100% FONCTIONNELLE ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION MULTILINGUE ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const { currentLanguage } = useTranslation()
   const initializationRef = useRef(false)
+  const lastLanguageRef = useRef<string>('')
+  
+  // Fonction pour mapper les codes de langue vers les codes Zoho
+  const getZohoLanguage = (lang: string): string => {
+    const languageMap: Record<string, string> = {
+      'fr': 'fr',      // Français
+      'en': 'en',      // English  
+      'es': 'es'       // Español
+    }
+    return languageMap[lang] || 'en' // Défaut anglais si langue non supportée
+  }
+  
+  // Fonction pour changer la langue de Zoho
+  const changeZohoLanguage = (language: string) => {
+    try {
+      const globalWindow = window as any
+      const zoho = globalWindow.$zoho?.salesiq
+      
+      if (zoho && typeof zoho.language === 'function') {
+        const zohoLangCode = getZohoLanguage(language)
+        zoho.language(zohoLangCode)
+        console.log(`🌐 Langue Zoho changée vers: ${zohoLangCode}`)
+      } else if (zoho && zoho.set && typeof zoho.set === 'function') {
+        // Alternative API pour certaines versions
+        zoho.set('language', getZohoLanguage(language))
+        console.log(`🌐 Langue Zoho changée (set API): ${language}`)
+      } else {
+        console.warn('⚠️ API Zoho pour changement de langue non disponible')
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur changement langue Zoho:', error)
+    }
+  }
+  
+  // Effet pour gérer le changement de langue
+  useEffect(() => {
+    if (isZohoReady && currentLanguage && currentLanguage !== lastLanguageRef.current) {
+      console.log(`🔄 Changement langue Zoho: ${lastLanguageRef.current} → ${currentLanguage}`)
+      changeZohoLanguage(currentLanguage)
+      lastLanguageRef.current = currentLanguage
+    }
+  }, [currentLanguage, isZohoReady])
   
   useEffect(() => {
     if (!user || hasError || initializationRef.current) return
 
-    console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email)
+    console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email, 'Langue:', currentLanguage)
     initializationRef.current = true
+    lastLanguageRef.current = currentLanguage
     
     const initializeZohoSafely = () => {
       try {
-        // 1. Configuration globale sécurisée
+        // 1. Configuration globale sécurisée avec le bon widget code
         const globalWindow = window as any
         globalWindow.$zoho = globalWindow.$zoho || {}
         globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
-        globalWindow.$zoho.salesiq.widgetcode = 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+        globalWindow.$zoho.salesiq.widgetcode = 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f'
         
-        // 2. Override ready function avec gestion d'erreurs complète
+        // 2. Override ready function avec gestion d'erreurs complète + langue
         globalWindow.$zoho.salesiq.ready = function() {
-          console.log('🎯 Zoho ready callback - Initialisation sécurisée')
+          console.log('🎯 Zoho ready callback - Initialisation sécurisée avec langue:', currentLanguage)
           
           // Attendre que le DOM et Zoho soient complètement chargés
           setTimeout(() => {
@@ -476,7 +520,17 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
                 console.log('👤 Visiteur configuré:', user.name)
               }
               
-              // 4. Démarrage chat avec protection addClass
+              // 4. Configuration langue dès l'initialisation
+              const initialLanguage = getZohoLanguage(currentLanguage)
+              if (zoho.language && typeof zoho.language === 'function') {
+                zoho.language(initialLanguage)
+                console.log(`🌐 Langue Zoho initialisée: ${initialLanguage}`)
+              } else if (zoho.set && typeof zoho.set === 'function') {
+                zoho.set('language', initialLanguage)
+                console.log(`🌐 Langue Zoho initialisée (set): ${initialLanguage}`)
+              }
+              
+              // 5. Démarrage chat avec protection addClass
               setTimeout(() => {
                 try {
                   if (zoho.chat && typeof zoho.chat.start === 'function') {
@@ -513,7 +567,7 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
                 }
               }, 4000) // Délai augmenté pour stabilité
               
-              // 5. Affichage widget avec protection addClass  
+              // 6. Affichage widget avec protection addClass  
               setTimeout(() => {
                 try {
                   if (zoho.floatbutton && typeof zoho.floatbutton.visible === 'function') {
@@ -637,7 +691,7 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
       initializationRef.current = false
     }
     
-  }, [user, hasError])
+  }, [user, hasError, currentLanguage]) // Ajout de currentLanguage dans les dépendances
   
   // Feedback utilisateur
   useEffect(() => {
@@ -1449,10 +1503,8 @@ const LanguageModal = ({ onClose }: { onClose: () => void }) => {
       await updateProfile({ language: languageCode })
       console.log('✅ Langue mise à jour:', languageCode)
       
-      // Petit délai pour que l'utilisateur voie le changement
-      setTimeout(() => {
-        onClose()
-      }, 800)
+      // Fermeture immédiate - le changement est maintenant dynamique
+      onClose()
     } catch (error) {
       console.error('❌ Erreur changement langue:', error)
     }
@@ -1886,8 +1938,13 @@ export default function ChatInterface() {
       
       if (messages.length === 0) {
         setMessages([welcomeMessage])
-      } else if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
-        setMessages(prev => [welcomeMessage, ...prev.slice(1)])
+      } else {
+        // Mise à jour dynamique du message de bienvenue lors du changement de langue
+        setMessages(prev => prev.map((msg, index) => 
+          index === 0 && !msg.isUser && msg.id === '1' 
+            ? { ...msg, content: t('chat.welcome') }
+            : msg
+        ))
       }
     }
   }, [isAuthenticated, t, currentLanguage])
