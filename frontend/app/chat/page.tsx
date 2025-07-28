@@ -2174,7 +2174,31 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const [isMobileDevice, setIsMobileDevice] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
+  useEffect(() => {
+    const detectMobileDevice = () => {
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+      const isTabletScreen = window.innerWidth <= 1024
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+      const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
+      
+      return (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
+    }
+    
+    setIsMobileDevice(detectMobileDevice())
+    
+    const handleResize = () => {
+      setIsMobileDevice(detectMobileDevice())
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -2192,7 +2216,6 @@ export default function ChatInterface() {
       if (messages.length === 0) {
         setMessages([welcomeMessage])
       } else {
-        // Mise à jour dynamique du message de bienvenue lors du changement de langue
         setMessages(prev => prev.map((msg, index) => 
           index === 0 && !msg.isUser && msg.id === '1' 
             ? { ...msg, content: t('chat.welcome') }
@@ -2202,6 +2225,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, t, currentLanguage])
 
+  // Loading state - toujours rendre quelque chose
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -2213,9 +2237,20 @@ export default function ChatInterface() {
     )
   }
 
+  // Not authenticated - toujours rendre quelque chose avant redirection
   if (!isAuthenticated) {
-    window.location.href = '/'
-    return null
+    useEffect(() => {
+      window.location.href = '/'
+    }, [])
+    
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">Redirection...</p>
+        </div>
+      </div>
+    )
   }
 
   const handleSendMessage = async (text: string = inputMessage) => {
@@ -2246,7 +2281,6 @@ export default function ChatInterface() {
       setMessages(prev => [...prev, aiMessage])
       console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
       
-      // Ajouter la conversation à l'historique local pour mise à jour immédiate
       if (user && response.conversation_id) {
         addConversation(response.conversation_id, text.trim(), response.response)
       }
@@ -2277,7 +2311,6 @@ export default function ChatInterface() {
     try {
       console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
       
-      // Mise à jour optimiste de l'UI
       setMessages(prev => prev.map(msg => 
         msg.id === messageId ? { ...msg, feedback } : msg
       ))
@@ -2290,7 +2323,6 @@ export default function ChatInterface() {
     } catch (error) {
       console.error('❌ Erreur envoi feedback:', error)
       
-      // Annulation en cas d'erreur
       setMessages(prev => prev.map(msg => 
         msg.id === messageId ? { ...msg, feedback: null } : msg
       ))
@@ -2315,334 +2347,6 @@ export default function ChatInterface() {
       year: 'numeric' 
     })
   }
-
-  return (
-    <>
-      <ZohoSalesIQ key={currentLanguage} user={user} />
-
-      <div className="h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-100 px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Boutons gauche */}
-            <div className="flex items-center space-x-2">
-              <HistoryMenu />
-              <button
-                onClick={handleNewConversation}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title={t('nav.newConversation')}
-              >
-                <PlusIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Titre centré avec logo */}
-            <div className="flex-1 flex justify-center items-center space-x-3">
-              <InteliaLogo className="w-8 h-8" />
-              <div className="text-center">
-                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
-              </div>
-            </div>
-            
-            {/* Avatar utilisateur à droite */}
-            <div className="flex items-center">
-              <UserMenuButton />
-            </div>
-          </div>
-        </header>
-
-        {/* Zone de messages */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Date */}
-              {messages.length > 0 && (
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                    {getCurrentDate()}
-                  </span>
-                </div>
-              )}
-
-              {messages.map((message, index) => (
-                <div key={message.id}>
-                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                    {!message.isUser && (
-                      <div className="relative">
-                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                      </div>
-                    )}
-                    
-                    <div className="max-w-xs lg:max-w-2xl">
-                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                          {message.content}
-                        </p>
-                      </div>
-                      
-                      {/* Boutons de feedback avec conversation_id */}
-                      {!message.isUser && index > 0 && message.conversation_id && (
-                        <div className="flex items-center space-x-2 mt-2 ml-2">
-                          <button
-                            onClick={() => handleFeedback(message.id, 'positive')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
-                            title={t('chat.helpfulResponse')}
-                            disabled={message.feedback !== null}
-                          >
-                            <ThumbUpIcon />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(message.id, 'negative')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
-                            title={t('chat.notHelpfulResponse')}
-                            disabled={message.feedback !== null}
-                          >
-                            <ThumbDownIcon />
-                          </button>
-                          {message.feedback && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              Merci pour votre retour !
-                            </span>
-                          )}
-                          {message.conversation_id && (
-                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
-                              🔗
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {message.isUser && (
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                        <UserIcon className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Indicateur de frappe */}
-              {isLoadingChat && (
-                <div className="flex items-start space-x-3">
-                  <div className="relative">
-                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Zone de saisie */}
-          <div className="px-4 py-4 bg-white border-t border-gray-100">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center space-x-3">
-                {/* Afficher le micro seulement sur mobile/tablette */}
-                {isMobileDevice && (
-                  <button
-                    type="button"
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    title={t('chat.voiceRecording')}
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                    </svg>
-                  </button>
-                )}
-                
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    placeholder={t('chat.placeholder')}
-                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
-                    disabled={isLoadingChat}
-                  />
-                </div>
-                
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
-                >
-                  <PaperAirplaneIcon />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
-    if (!text.trim()) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: text.trim(),
-      isUser: true,
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setIsLoadingChat(true)
-
-    try {
-      const response = await generateAIResponse(text.trim(), user)
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response.response,
-        isUser: false,
-        timestamp: new Date(),
-        conversation_id: response.conversation_id
-      }
-
-      setMessages(prev => [...prev, aiMessage])
-      console.log('✅ Message ajouté avec conversation_id:', response.conversation_id)
-      
-      // Ajouter la conversation à l'historique local pour mise à jour immédiate
-      if (user && response.conversation_id) {
-        addConversation(response.conversation_id, text.trim(), response.response)
-      }
-      
-    } catch (error) {
-      console.error('❌ Error generating response:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: error instanceof Error ? error.message : t('chat.errorMessage'),
-        isUser: false,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoadingChat(false)
-    }
-  }
-
-  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
-    const message = messages.find(msg => msg.id === messageId)
-    
-    if (!message || !message.conversation_id) {
-      console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
-      alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
-      return
-    }
-
-    try {
-      console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
-      
-      // Mise à jour optimiste de l'UI
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, feedback } : msg
-      ))
-
-      const feedbackValue = feedback === 'positive' ? 1 : -1
-      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
-      
-      console.log(`✅ Feedback ${feedback} enregistré avec succès pour conversation ${message.conversation_id}`)
-      
-    } catch (error) {
-      console.error('❌ Erreur envoi feedback:', error)
-      
-      // Annulation en cas d'erreur
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, feedback: null } : msg
-      ))
-      
-      alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
-    }
-  }
-
-  const handleNewConversation = () => {
-    setMessages([{
-      id: '1',
-      content: t('chat.welcome'),
-      isUser: false,
-      timestamp: new Date()
-    }])
-  }
-
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('fr-FR', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    })
-  }
-
-  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
-  const [isMobileDevice, setIsMobileDevice] = useState(false)
-  
-  useEffect(() => {
-    // Cette fonction ne s'exécute que côté client
-    const detectMobileDevice = () => {
-      // Détection User Agent pour appareils mobiles/tablettes
-      const userAgent = navigator.userAgent.toLowerCase()
-      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
-      
-      // Vérifier la taille d'écran (tablettes généralement < 1024px)
-      const isTabletScreen = window.innerWidth <= 1024
-      
-      // Vérifier le support tactile
-      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-      
-      // Détecter les iPads modernes qui se font passer pour des Macs
-      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-      
-      // Cas spéciaux : écrans tactiles de bureau (> 1200px avec beaucoup de points tactiles)
-      const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
-      
-      const result = (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
-      
-      console.log('🔍 [Mobile Detection] - Détection côté client:', {
-        userAgent: navigator.userAgent,
-        isMobileUA,
-        isTabletScreen,
-        hasTouchScreen,
-        isIPadOS,
-        isDesktopTouchscreen,
-        screenWidth: window.innerWidth,
-        maxTouchPoints: navigator.maxTouchPoints,
-        platform: navigator.platform,
-        result
-      })
-      
-      return result
-    }
-    
-    // Détecter au montage du composant
-    setIsMobileDevice(detectMobileDevice())
-    
-    // Optionnel: re-détecter au redimensionnement de la fenêtre
-    const handleResize = () => {
-      setIsMobileDevice(detectMobileDevice())
-    }
-    
-    window.addEventListener('resize', handleResize)
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize)
-    }
-  }, []) // S'exécute une seule fois au montage
 
   return (
     <>
