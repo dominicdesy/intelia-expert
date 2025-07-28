@@ -1006,7 +1006,7 @@ export default function ChatInterface() {
               
               <button
                 onClick={() => sessionValid ? handleSendMessage() : checkSession()}
-                disabled={isLoadingChat || (!sessionValid && inputMessage.trim())}
+                disabled={isLoadingChat || (!sessionValid && Boolean(inputMessage.trim()))}
                 className={`flex-shrink-0 p-2 transition-colors ${
                   sessionValid 
                     ? 'text-blue-600 hover:text-blue-700 disabled:text-gray-300'
