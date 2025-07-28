@@ -435,218 +435,81 @@ const useTranslation = () => {
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION 100% FONCTIONNELLE ====================
+// ==================== COMPOSANT ZOHO SALESIQ ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
-  const [isZohoReady, setIsZohoReady] = useState(false)
-  const [hasError, setHasError] = useState(false)
-  const initializationRef = useRef(false)
-  
   useEffect(() => {
-    if (!user || hasError || initializationRef.current) return
+    if (!user) return
 
     console.log('🚀 Initialisation Zoho SalesIQ pour:', user.email)
-    initializationRef.current = true
     
-    const initializeZohoSafely = () => {
-      try {
-        // 1. Configuration globale sécurisée
-        const globalWindow = window as any
-        globalWindow.$zoho = globalWindow.$zoho || {}
-        globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
-        globalWindow.$zoho.salesiq.widgetcode = 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+    const initializeZohoConfig = () => {
+      console.log('🔧 Configuration initiale Zoho SalesIQ')
+      
+      ;(window as any).$zoho = (window as any).$zoho || {}
+      ;(window as any).$zoho.salesiq = (window as any).$zoho.salesiq || {}
+      ;(window as any).$zoho.salesiq.widgetcode = 'siq657f7803e2e48661958a7ad1d48f293e50d5ba705ca11222b8cc9df0c8d01f09'
+      
+      ;(window as any).$zoho.salesiq.ready = function() {
+        console.log('✅ Zoho SalesIQ initialisé avec succès')
         
-        // 2. Override ready function avec gestion d'erreurs complète
-        globalWindow.$zoho.salesiq.ready = function() {
-          console.log('🎯 Zoho ready callback - Initialisation sécurisée')
-          
-          // Attendre que le DOM et Zoho soient complètement chargés
-          setTimeout(() => {
-            try {
-              const zoho = globalWindow.$zoho?.salesiq
-              if (!zoho) {
-                throw new Error('Zoho SalesIQ object not available')
-              }
-              
-              // 3. Configuration visiteur avec vérifications strictes
-              if (zoho.visitor && typeof zoho.visitor.info === 'function') {
-                zoho.visitor.info({
-                  name: user.name || 'Utilisateur Intelia',
-                  email: user.email || ''
-                })
-                console.log('👤 Visiteur configuré:', user.name)
-              }
-              
-              // 4. Démarrage chat avec protection addClass
-              setTimeout(() => {
-                try {
-                  if (zoho.chat && typeof zoho.chat.start === 'function') {
-                    // Vérifier que les éléments DOM sont prêts
-                    const checkDOMReady = () => {
-                      const widget = document.querySelector('#zsiq_float') || 
-                                   document.querySelector('[id*="zsiq"]') ||
-                                   document.querySelector('.zsiq_float')
-                      
-                      if (widget || document.readyState === 'complete') {
-                        zoho.chat.start()
-                        console.log('💬 Chat Zoho démarré avec succès')
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!checkDOMReady()) {
-                      // Retry après chargement complet
-                      window.addEventListener('load', () => {
-                        setTimeout(() => {
-                          try {
-                            zoho.chat.start()
-                            console.log('💬 Chat Zoho démarré (après load)')
-                          } catch (e) {
-                            console.warn('⚠️ Chat start failed (non-critical)')
-                          }
-                        }, 1000)
-                      })
-                    }
-                  }
-                } catch (chatError) {
-                  console.warn('⚠️ Erreur chat start (non critique):', chatError.message)
-                }
-              }, 4000) // Délai augmenté pour stabilité
-              
-              // 5. Affichage widget avec protection addClass  
-              setTimeout(() => {
-                try {
-                  if (zoho.floatbutton && typeof zoho.floatbutton.visible === 'function') {
-                    // Double vérification DOM avant addClass
-                    const ensureWidgetReady = () => {
-                      const widgetElements = document.querySelectorAll('[class*="zsiq"], [id*="zsiq"]')
-                      if (widgetElements.length > 0) {
-                        zoho.floatbutton.visible('show')
-                        console.log('👀 Widget Zoho visible')
-                        setIsZohoReady(true)
-                        return true
-                      }
-                      return false
-                    }
-                    
-                    if (!ensureWidgetReady()) {
-                      // Observer pour détecter l'ajout des éléments Zoho
-                      const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                          if (mutation.addedNodes.length > 0) {
-                            const hasZohoNode = Array.from(mutation.addedNodes).some(node => 
-                              node.nodeType === 1 && 
-                              (node as Element).id?.includes('zsiq') ||
-                              (node as Element).className?.includes('zsiq')
-                            )
-                            if (hasZohoNode && ensureWidgetReady()) {
-                              observer.disconnect()
-                            }
-                          }
-                        })
-                      })
-                      
-                      observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                      })
-                      
-                      // Timeout safety
-                      setTimeout(() => {
-                        observer.disconnect()
-                        if (!isZohoReady) {
-                          console.log('⚠️ Timeout widget detection - fonctionnement silencieux')
-                        }
-                      }, 10000)
-                    }
-                  }
-                } catch (widgetError) {
-                  console.warn('⚠️ Erreur widget visibility (non critique):', widgetError.message)
-                }
-              }, 6000) // Délai augmenté pour stabilité
-              
-            } catch (error) {
-              console.warn('⚠️ Erreur configuration Zoho (non bloquante):', error.message)
-              setHasError(true)
-            }
-          }, 3000) // Délai initial augmenté
-        }
-        
-        // 3. Chargement script avec gestion d'erreurs robuste
-        const loadZohoScript = () => {
-          // Nettoyer anciens scripts
-          document.querySelectorAll('script[src*="salesiq.zohopublic.com"]').forEach(s => s.remove())
-          
-          const script = document.createElement('script')
-          script.type = 'text/javascript'
-          script.async = true
-          script.defer = true
-          script.crossOrigin = 'anonymous'
-          script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}`
-          
-          script.onload = () => {
-            console.log('✅ Script Zoho chargé avec succès')
+        try {
+          if ((window as any).$zoho.salesiq.visitor) {
+            ;(window as any).$zoho.salesiq.visitor.info({
+              name: user.name || 'Utilisateur',
+              email: user.email || ''
+            })
+            console.log('👤 Informations utilisateur configurées:', { 
+              name: user.name || 'Utilisateur', 
+              email: user.email || '' 
+            })
           }
           
-          script.onerror = (error) => {
-            console.error('❌ Erreur chargement Zoho script:', error)
-            setHasError(true)
+          if ((window as any).$zoho.salesiq.chat) {
+            ;(window as any).$zoho.salesiq.chat.start()
+            console.log('💬 Chat démarré')
           }
           
-          // Timeout de sécurité
-          setTimeout(() => {
-            if (!document.head.contains(script)) {
-              console.warn('⚠️ Timeout script Zoho')
-              setHasError(true)
-            }
-          }, 15000)
+          if ((window as any).$zoho.salesiq.floatbutton) {
+            ;(window as any).$zoho.salesiq.floatbutton.visible('show')
+            console.log('👀 Widget rendu visible')
+          }
           
-          document.head.appendChild(script)
+        } catch (error) {
+          console.error('❌ Erreur configuration Zoho:', error)
         }
-        
-        // 4. Démarrage avec délai de sécurité
-        setTimeout(loadZohoScript, 2000)
-        
-      } catch (error) {
-        console.error('❌ Erreur critique Zoho:', error)
-        setHasError(true)
       }
     }
-    
-    // Gestion des erreurs CSP
-    const handleSecurityError = (event: any) => {
-      if (event.sourceFile?.includes('zoho') || event.violatedDirective?.includes('connect-src')) {
-        console.warn('⚠️ Erreur sécurité Zoho détectée:', event.violatedDirective)
-        setHasError(true)
+
+    const loadZohoScript = () => {
+      console.log('📡 Chargement script Zoho SalesIQ')
+      
+      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"]')
+      existingScripts.forEach(script => script.remove())
+      
+      const script = document.createElement('script')
+      script.type = 'text/javascript'
+      script.async = true
+      script.defer = true
+      script.src = `https://salesiq.zohopublic.com/widget?wc=${(window as any).$zoho.salesiq.widgetcode}`
+      
+      script.onload = () => {
+        console.log('✅ Script Zoho SalesIQ chargé avec succès')
       }
-    }
-    
-    window.addEventListener('securitypolicyviolation', handleSecurityError)
-    window.addEventListener('error', (event) => {
-      if (event.filename?.includes('zoho')) {
-        console.warn('⚠️ Erreur script Zoho détectée')
-        setHasError(true)
+      
+      script.onerror = (error) => {
+        console.error('❌ Erreur chargement script Zoho:', error)
       }
-    })
-    
-    // Initialisation
-    initializeZohoSafely()
-    
-    return () => {
-      window.removeEventListener('securitypolicyviolation', handleSecurityError)
-      initializationRef.current = false
+      
+      document.head.appendChild(script)
     }
+
+    initializeZohoConfig()
     
-  }, [user, hasError])
-  
-  // Feedback utilisateur
-  useEffect(() => {
-    if (hasError) {
-      console.log('📞 Support Intelia: support@intelia.com | +1 (866) 666 6221')
-    } else if (isZohoReady) {
-      console.log('🎉 Zoho SalesIQ totalement opérationnel')
-    }
-  }, [hasError, isZohoReady])
+    setTimeout(() => {
+      loadZohoScript()
+    }, 100)
+
+  }, [user])
 
   return null
 }
