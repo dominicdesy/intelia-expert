@@ -1,7 +1,7 @@
 """
 Module de logging pour Intelia Expert
 Gestion des conversations et feedback utilisateurs
-Version complète avec analytics, administration et suppression
+Version complète avec analytics et administration
 """
 import sqlite3
 import uuid
@@ -34,13 +34,6 @@ class ConversationResponse(BaseModel):
     conversation_id: str
     timestamp: datetime
     message: str
-
-class DeleteResponse(BaseModel):
-    message: str
-    conversation_id: Optional[str] = None
-    user_id: Optional[str] = None
-    deleted_count: int
-    timestamp: datetime
 
 class AnalyticsResponse(BaseModel):
     total_conversations: int
@@ -162,41 +155,6 @@ class ConversationLogger:
                     
         except Exception as e:
             print(f"❌ Erreur mise à jour feedback: {e}")
-            raise e
-    
-    def delete_conversation(self, conversation_id: str) -> bool:
-        """Supprime une conversation spécifique"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
-                    DELETE FROM conversations WHERE conversation_id = ?
-                """, (conversation_id,))
-                
-                if cursor.rowcount > 0:
-                    print(f"✅ Conversation supprimée: {conversation_id}")
-                    return True
-                else:
-                    print(f"⚠️ Conversation non trouvée pour suppression: {conversation_id}")
-                    return False
-                    
-        except Exception as e:
-            print(f"❌ Erreur suppression conversation: {e}")
-            raise e
-    
-    def delete_user_conversations(self, user_id: str) -> int:
-        """Supprime toutes les conversations d'un utilisateur"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
-                    DELETE FROM conversations WHERE user_id = ?
-                """, (user_id,))
-                
-                deleted_count = cursor.rowcount
-                print(f"✅ {deleted_count} conversations supprimées pour l'utilisateur: {user_id}")
-                return deleted_count
-                
-        except Exception as e:
-            print(f"❌ Erreur suppression conversations utilisateur: {e}")
             raise e
     
     def get_conversation(self, conversation_id: str) -> Optional[Dict]:
@@ -489,25 +447,6 @@ async def update_feedback(conversation_id: str, feedback: FeedbackUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la mise à jour: {str(e)}")
 
-@router.delete("/conversation/{conversation_id}", response_model=DeleteResponse)
-async def delete_conversation(conversation_id: str):
-    """Supprime une conversation spécifique"""
-    try:
-        success = logger_instance.delete_conversation(conversation_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Conversation non trouvée")
-        
-        return DeleteResponse(
-            message="Conversation supprimée avec succès",
-            conversation_id=conversation_id,
-            deleted_count=1,
-            timestamp=datetime.now()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
-
 @router.get("/conversation/{conversation_id}")
 async def get_conversation(conversation_id: str):
     """Récupère une conversation par ID"""
@@ -529,21 +468,6 @@ async def get_user_conversations(user_id: str, limit: int = 50):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération: {str(e)}")
-
-@router.delete("/user/{user_id}/conversations", response_model=DeleteResponse)
-async def delete_user_conversations(user_id: str):
-    """Supprime toutes les conversations d'un utilisateur"""
-    try:
-        deleted_count = logger_instance.delete_user_conversations(user_id)
-        
-        return DeleteResponse(
-            message=f"{deleted_count} conversations supprimées avec succès",
-            user_id=user_id,
-            deleted_count=deleted_count,
-            timestamp=datetime.now()
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
 
 @router.get("/analytics", response_model=AnalyticsResponse)
 async def get_analytics(days: int = 30):
@@ -676,49 +600,3 @@ async def create_sample_conversation():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur création test: {str(e)}")
-
-# ==================== ENDPOINTS DE DÉVELOPPEMENT/DEBUG ====================
-
-@router.get("/debug/all-conversations")
-async def debug_get_all_conversations(limit: int = 10):
-    """Récupère toutes les conversations pour debug (dev seulement)"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
-                SELECT conversation_id, user_id, question, response, feedback, 
-                       timestamp, language, rag_used
-                FROM conversations 
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,))
-            
-            conversations = [dict(row) for row in cursor.fetchall()]
-            
-        return {
-            "message": f"Debug: {len(conversations)} conversations récupérées",
-            "conversations": conversations,
-            "total_shown": len(conversations),
-            "limit": limit
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur debug: {str(e)}")
-
-@router.delete("/debug/delete-test-data")
-async def debug_delete_test_data():
-    """Supprime toutes les conversations de test (dev seulement)"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            cursor = conn.execute("""
-                DELETE FROM conversations WHERE user_id LIKE 'test-%'
-            """)
-            
-            deleted_count = cursor.rowcount
-            
-        return {
-            "message": f"Debug: {deleted_count} conversations de test supprimées",
-            "deleted_count": deleted_count,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur suppression test data: {str(e)}")
