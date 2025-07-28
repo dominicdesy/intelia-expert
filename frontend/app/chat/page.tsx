@@ -455,13 +455,14 @@ const useTranslation = () => {
   return { t, changeLanguage, currentLanguage }
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION SIMPLIFIÉE MAIS EFFICACE ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE DÉFINITIVEMENT ====================
 const ZohoSalesIQ = ({ user }: { user: any }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
   const { currentLanguage } = useTranslation()
   const initializationRef = useRef(false)
   const lastLanguageRef = useRef<string>('')
+  const isReloadingRef = useRef(false)
   
   // Fonction pour mapper les codes de langue vers les codes Zoho
   const getZohoLanguage = (lang: string): string => {
@@ -473,114 +474,157 @@ const ZohoSalesIQ = ({ user }: { user: any }) => {
     return languageMap[lang] || 'en'
   }
   
-  // Fonction pour recharger complètement Zoho avec une nouvelle langue
-  const reloadZohoWithLanguage = (newLanguage: string) => {
-    console.log('🔄 [ZohoSalesIQ] Rechargement complet Zoho avec langue:', newLanguage)
+  // Fonction pour charger Zoho avec une langue spécifique
+  const loadZohoWithLanguage = (language: string) => {
+    if (isReloadingRef.current) {
+      console.log('🔄 [ZohoSalesIQ] Rechargement déjà en cours, ignoré')
+      return
+    }
     
-    // 1. Nettoyer complètement l'ancien Zoho
+    isReloadingRef.current = true
+    console.log('🚀 [ZohoSalesIQ] Chargement Zoho avec langue:', language)
+    
+    const zohoLang = getZohoLanguage(language)
+    const globalWindow = window as any
+    
+    // Configuration globale Zoho
+    globalWindow.$zoho = {
+      salesiq: {
+        widgetcode: 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f',
+        ready: function() {
+          console.log('✅ [ZohoSalesIQ] Zoho ready callback avec langue:', zohoLang)
+          
+          setTimeout(() => {
+            try {
+              const zoho = globalWindow.$zoho?.salesiq
+              if (zoho && user) {
+                console.log('🔧 [ZohoSalesIQ] Configuration utilisateur...')
+                
+                // Configuration des informations utilisateur
+                if (zoho.visitor?.info) {
+                  zoho.visitor.info({
+                    name: user.name || 'Utilisateur Intelia',
+                    email: user.email || ''
+                  })
+                  console.log('👤 [ZohoSalesIQ] Info utilisateur configurée')
+                }
+                
+                // Afficher le widget
+                if (zoho.floatbutton?.visible) {
+                  zoho.floatbutton.visible('show')
+                  console.log('👁️ [ZohoSalesIQ] Bouton flotant affiché')
+                }
+                
+                // Marquer comme prêt
+                setIsZohoReady(true)
+                setHasError(false)
+                isReloadingRef.current = false
+                console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
+              }
+            } catch (error) {
+              console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
+              setHasError(true)
+              isReloadingRef.current = false
+            }
+          }, 2000)
+        }
+      }
+    }
+    
+    // Charger le script Zoho
+    const script = document.createElement('script')
+    script.type = 'text/javascript'
+    script.async = true
+    script.defer = true
+    script.id = 'zsiqscript'
+    script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
+    
+    script.onload = () => {
+      console.log('✅ [ZohoSalesIQ] Script chargé avec locale:', zohoLang)
+    }
+    
+    script.onerror = () => {
+      console.error('❌ [ZohoSalesIQ] Erreur chargement script')
+      setHasError(true)
+      isReloadingRef.current = false
+    }
+    
+    document.head.appendChild(script)
+  }
+  
+  // Fonction pour nettoyer complètement Zoho
+  const cleanupZoho = () => {
+    console.log('🧹 [ZohoSalesIQ] Nettoyage complet de Zoho')
+    
+    // Supprimer le script
     const oldScript = document.getElementById('zsiqscript')
     if (oldScript) {
       oldScript.remove()
-      console.log('🗑️ [ZohoSalesIQ] Ancien script supprimé')
+      console.log('🗑️ [ZohoSalesIQ] Script supprimé')
     }
     
-    // 2. Supprimer tous les widgets
-    document.querySelectorAll('[id*="zsiq"], [class*="zsiq"]').forEach(el => el.remove())
+    // Supprimer tous les widgets Zoho
+    document.querySelectorAll('[id*="zsiq"], [class*="zsiq"], [id*="siq"]').forEach(el => {
+      el.remove()
+    })
     console.log('🧹 [ZohoSalesIQ] Widgets supprimés')
     
-    // 3. Nettoyer l'objet global
+    // Nettoyer l'objet global
     const globalWindow = window as any
-    if (globalWindow.$zoho?.salesiq) {
-      delete globalWindow.$zoho.salesiq
+    if (globalWindow.$zoho) {
+      delete globalWindow.$zoho
       console.log('🧹 [ZohoSalesIQ] Objet global nettoyé')
     }
     
-    // 4. Réinitialiser l'état
+    // Réinitialiser les états
     setIsZohoReady(false)
-    
-    // 5. Attendre puis recharger
-    setTimeout(() => {
-      const zohoLang = getZohoLanguage(newLanguage)
-      console.log('🚀 [ZohoSalesIQ] Rechargement avec locale:', zohoLang)
-      
-      // Configuration globale
-      globalWindow.$zoho = globalWindow.$zoho || {}
-      globalWindow.$zoho.salesiq = globalWindow.$zoho.salesiq || {}
-      globalWindow.$zoho.salesiq.widgetcode = 'siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f'
-      
-      // Fonction ready simplifiée
-      globalWindow.$zoho.salesiq.ready = function() {
-        console.log('✅ [ZohoSalesIQ] Zoho ready avec langue:', zohoLang)
-        setTimeout(() => {
-          try {
-            const zoho = globalWindow.$zoho?.salesiq
-            if (zoho) {
-              if (zoho.visitor?.info) {
-                zoho.visitor.info({
-                  name: user?.name || 'Utilisateur Intelia',
-                  email: user?.email || ''
-                })
-              }
-              if (zoho.chat?.start) zoho.chat.start()
-              if (zoho.floatbutton?.visible) {
-                zoho.floatbutton.visible('show')
-                setIsZohoReady(true)
-                console.log('✅ [ZohoSalesIQ] Widget visible et prêt')
-              }
-            }
-          } catch (error) {
-            console.warn('⚠️ [ZohoSalesIQ] Erreur configuration:', error)
-          }
-        }, 2000)
-      }
-      
-      // Nouveau script avec la langue
-      const script = document.createElement('script')
-      script.type = 'text/javascript'
-      script.async = true
-      script.defer = true
-      script.id = 'zsiqscript'
-      script.src = `https://salesiq.zohopublic.com/widget?wc=${globalWindow.$zoho.salesiq.widgetcode}&locale=${zohoLang}`
-      
-      script.onload = () => console.log('✅ [ZohoSalesIQ] Script chargé avec locale:', zohoLang)
-      script.onerror = () => {
-        console.error('❌ [ZohoSalesIQ] Erreur script')
-        setHasError(true)
-      }
-      
-      document.head.appendChild(script)
-    }, 1000)
+    setHasError(false)
+    isReloadingRef.current = false
   }
   
-  // Effet pour le changement de langue
-  useEffect(() => {
-    if (!currentLanguage || !isZohoReady) return
+  // Fonction pour recharger Zoho avec une nouvelle langue
+  const reloadZohoWithLanguage = (newLanguage: string) => {
+    console.log('🔄 [ZohoSalesIQ] Demande rechargement avec langue:', newLanguage)
     
-    if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
-      console.log(`🌐 [ZohoSalesIQ] Changement langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
-      reloadZohoWithLanguage(currentLanguage)
-    }
+    // 1. Nettoyer complètement
+    cleanupZoho()
     
-    lastLanguageRef.current = currentLanguage
-  }, [currentLanguage, isZohoReady])
+    // 2. Attendre puis recharger
+    setTimeout(() => {
+      loadZohoWithLanguage(newLanguage)
+    }, 1000)
+  }
   
   // Initialisation initiale
   useEffect(() => {
     if (!user || hasError || initializationRef.current) return
     
-    console.log('🚀 [ZohoSalesIQ] Initialisation pour:', user.email, 'Langue:', currentLanguage)
+    console.log('🚀 [ZohoSalesIQ] Initialisation initiale pour:', user.email, 'Langue:', currentLanguage)
     initializationRef.current = true
     lastLanguageRef.current = currentLanguage
     
-    // Délai initial puis premier chargement
+    // Délai initial puis chargement
     setTimeout(() => {
-      reloadZohoWithLanguage(currentLanguage)
+      loadZohoWithLanguage(currentLanguage)
     }, 2000)
     
-    return () => {
-      initializationRef.current = false
-    }
   }, [user, hasError])
+  
+  // Gestion du changement de langue
+  useEffect(() => {
+    if (!currentLanguage || !user || !initializationRef.current) return
+    
+    // Si la langue a changé et qu'on avait déjà une langue
+    if (currentLanguage !== lastLanguageRef.current && lastLanguageRef.current !== '') {
+      console.log(`🌐 [ZohoSalesIQ] Changement langue détecté: ${lastLanguageRef.current} → ${currentLanguage}`)
+      lastLanguageRef.current = currentLanguage
+      reloadZohoWithLanguage(currentLanguage)
+    } else if (lastLanguageRef.current === '') {
+      // Première fois qu'on définit la langue
+      console.log('🌐 [ZohoSalesIQ] Première définition langue:', currentLanguage)
+      lastLanguageRef.current = currentLanguage
+    }
+  }, [currentLanguage, user])
 
   return null
 }
@@ -1214,13 +1258,38 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
                   required
                 />
                 <div className="mt-2 text-xs text-gray-600">
-                  <p>Le mot de passe doit contenir :</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Au moins 8 caractères</li>
-                    <li>Au moins une majuscule</li>
-                    <li>Au moins une minuscule</li>
-                    <li>Au moins un chiffre</li>
-                    <li>Au moins un caractère spécial</li>
+                  <p className="font-medium mb-2">Le mot de passe doit contenir :</p>
+                  <ul className="space-y-1">
+                    <li className={`flex items-center ${passwordData.newPassword.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {passwordData.newPassword.length >= 8 ? '✅' : '⭕'}
+                      </span>
+                      Au moins 8 caractères
+                    </li>
+                    <li className={`flex items-center ${/[A-Z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins une majuscule
+                    </li>
+                    <li className={`flex items-center ${/[a-z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins une minuscule
+                    </li>
+                    <li className={`flex items-center ${/\d/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins un chiffre
+                    </li>
+                    <li className={`flex items-center ${/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                      <span className="mr-2 text-sm">
+                        {/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}
+                      </span>
+                      Au moins un caractère spécial
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -1557,6 +1626,48 @@ const HistoryMenu = () => {
     setIsOpen(!isOpen)
   }
 
+  const handleClearAll = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    try {
+      console.log('🗑️ [HistoryMenu] Début suppression toutes conversations')
+      
+      // Confirmation utilisateur
+      const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer toutes les conversations ? Cette action est irréversible.')
+      
+      if (!confirmed) {
+        console.log('❌ [HistoryMenu] Suppression annulée par utilisateur')
+        return
+      }
+      
+      // Appeler la fonction de suppression
+      await clearAllConversations()
+      console.log('✅ [HistoryMenu] Toutes conversations supprimées')
+      
+      // Fermer le menu après suppression
+      setIsOpen(false)
+      
+    } catch (error) {
+      console.error('❌ [HistoryMenu] Erreur suppression conversations:', error)
+      alert('Erreur lors de la suppression des conversations')
+    }
+  }
+
+  const handleDeleteSingle = async (conversationId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    try {
+      console.log('🗑️ [HistoryMenu] Suppression conversation:', conversationId)
+      await deleteConversation(conversationId)
+      console.log('✅ [HistoryMenu] Conversation supprimée:', conversationId)
+    } catch (error) {
+      console.error('❌ [HistoryMenu] Erreur suppression conversation:', error)
+      alert('Erreur lors de la suppression de la conversation')
+    }
+  }
+
   return (
     <div className="relative">
       <button
@@ -1578,15 +1689,15 @@ const HistoryMenu = () => {
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-gray-900">{t('nav.history')}</h3>
-                <button
-                  onClick={() => {
-                    clearAllConversations()
-                    setIsOpen(false)
-                  }}
-                  className="text-red-600 hover:text-red-700 text-sm"
-                >
-                  {t('nav.clearAll')}
-                </button>
+                {conversations.length > 0 && (
+                  <button
+                    onClick={handleClearAll}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                    title="Supprimer toutes les conversations"
+                  >
+                    {t('nav.clearAll')}
+                  </button>
+                )}
               </div>
             </div>
             
@@ -1613,9 +1724,9 @@ const HistoryMenu = () => {
                         )}
                       </div>
                       <button
-                        onClick={() => deleteConversation(conv.id)}
-                        className="ml-2 p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Supprimer"
+                        onClick={(e) => handleDeleteSingle(conv.id, e)}
+                        className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Supprimer cette conversation"
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -1624,6 +1735,16 @@ const HistoryMenu = () => {
                 ))
               )}
             </div>
+
+            {/* Footer avec statistiques */}
+            {conversations.length > 0 && (
+              <div className="p-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 text-center">
+                {conversations.length} conversation{conversations.length > 1 ? 's' : ''} • 
+                <span className="ml-1">
+                  Dernière activité : {new Date(Math.max(...conversations.map(c => new Date(c.updated_at).getTime()))).toLocaleDateString('fr-FR')}
+                </span>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1948,6 +2069,13 @@ export default function ChatInterface() {
     })
   }
 
+  // Fonction pour détecter si on est sur mobile/tablette (désactivée temporairement)
+  const isMobileDevice = () => {
+    // Retourner false pour masquer le micro temporairement
+    // TODO: Implémenter la fonctionnalité vocale plus tard
+    return false
+  }
+
   return (
     <>
       <ZohoSalesIQ user={user} />
@@ -2078,15 +2206,18 @@ export default function ChatInterface() {
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title={t('chat.voiceRecording')}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                  </svg>
-                </button>
+                {/* Afficher le micro seulement sur mobile/tablette */}
+                {isMobileDevice() && (
+                  <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={t('chat.voiceRecording')}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                  </button>
+                )}
                 
                 <div className="flex-1">
                   <input
