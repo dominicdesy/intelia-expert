@@ -6,7 +6,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 // Instance Supabase
 const supabase = createClientComponentClient()
 
-// ==================== TYPES ÉTENDUS POUR LOGGING ====================
+// ===================== TYPES ÉTENDUS POUR LOGGING =====================
 interface Message {
   id: string
   content: string
