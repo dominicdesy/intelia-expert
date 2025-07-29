@@ -290,6 +290,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                   areaCode={formData.area_code}
                   phoneNumber={formData.phone_number}
                   onChange={handlePhoneChange}
+                  className="bg-gray-50 p-3 rounded-lg"
                 />
               </div>
 

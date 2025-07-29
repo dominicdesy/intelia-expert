@@ -19,11 +19,12 @@ import {
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
+import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ==================== COMPOSANT PRINCIPAL AVEC TRANSMISSION LANGUE CORRIGÉE ====================
+// ==================== COMPOSANT PRINCIPAL AVEC MODAL FEEDBACK ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
-  const { t, currentLanguage } = useTranslation() // ✅ RÉCUPÉRATION currentLanguage
+  const { t, currentLanguage } = useTranslation()
   const { addConversation } = useChatStore()
   
   const [messages, setMessages] = useState<Message[]>([])
@@ -35,6 +36,18 @@ export default function ChatInterface() {
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [isUserScrolling, setIsUserScrolling] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  
+  // ✅ NOUVEAUX ÉTATS POUR LA MODAL FEEDBACK
+  const [feedbackModal, setFeedbackModal] = useState<{
+    isOpen: boolean
+    messageId: string | null
+    feedbackType: 'positive' | 'negative' | null
+  }>({
+    isOpen: false,
+    messageId: null,
+    feedbackType: null
+  })
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -160,7 +173,7 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ FONCTION ENVOI DE MESSAGE AVEC TRANSMISSION DE LA LANGUE
+  // FONCTION ENVOI DE MESSAGE (RESTE IDENTIQUE)
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -181,7 +194,6 @@ export default function ChatInterface() {
     try {
       console.log('🔒 [handleSendMessage] Envoi question avec langue:', currentLanguage)
       
-      // ✅ CORRECTION PRINCIPALE: Passer currentLanguage à l'API
       const response = await generateAIResponse(text.trim(), user, currentLanguage)
       
       const aiMessage: Message = {
@@ -194,10 +206,8 @@ export default function ChatInterface() {
 
       setMessages(prev => [...prev, aiMessage])
       console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
-      console.log('🌐 [handleSendMessage] Langue utilisée:', currentLanguage)
       
       if (user && response.conversation_id) {
-        console.log('📂 [handleSendMessage] Ajout à l\'historique local:', response.conversation_id)
         addConversation(response.conversation_id, text.trim(), response.response)
       }
       
@@ -215,39 +225,95 @@ export default function ChatInterface() {
     }
   }
 
-  // [TOUTES LES AUTRES FONCTIONS RESTENT IDENTIQUES]
-  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
-    const message = messages.find(msg => msg.id === messageId)
+  // ✅ NOUVELLE FONCTION GESTION FEEDBACK AVEC MODAL
+  const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
+    console.log('👆 [handleFeedbackClick] Ouverture modal feedback:', messageId, feedback)
     
+    setFeedbackModal({
+      isOpen: true,
+      messageId,
+      feedbackType: feedback
+    })
+  }
+
+  // ✅ FONCTION SOUMISSION FEEDBACK AVEC COMMENTAIRE
+  const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
+    const { messageId } = feedbackModal
+    if (!messageId) return
+
+    const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
       console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
       alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
       return
     }
 
+    setIsSubmittingFeedback(true)
     try {
-      console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
+      console.log('📊 [handleFeedbackSubmit] Envoi feedback avec commentaire:', {
+        conversation_id: message.conversation_id,
+        feedback,
+        comment: comment || 'Aucun commentaire'
+      })
       
+      // ✅ MISE À JOUR IMMÉDIATE DE L'UI
       setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, feedback } : msg
+        msg.id === messageId ? { 
+          ...msg, 
+          feedback,
+          feedbackComment: comment 
+        } : msg
       ))
 
+      // ✅ ENVOIS SÉPARÉS : FEEDBACK + COMMENTAIRE (SI FOURNI)
       const feedbackValue = feedback === 'positive' ? 1 : -1
-      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
       
-      console.log(`✅ Feedback ${feedback} enregistré avec succès pour conversation ${message.conversation_id}`)
+      // 1. Envoyer le feedback principal
+      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
+      console.log('✅ Feedback principal enregistré')
+
+      // 2. Envoyer le commentaire si fourni (extension future du service)
+      if (comment && comment.trim()) {
+        try {
+          // Essayer d'envoyer le commentaire (méthode à développer côté serveur)
+          await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
+          console.log('✅ Commentaire feedback enregistré')
+        } catch (commentError) {
+          console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
+          // Le feedback principal est déjà enregistré, continuer
+        }
+      }
+      
+      console.log(`✅ Feedback ${feedback} avec commentaire enregistré pour conversation ${message.conversation_id}`)
       
     } catch (error) {
       console.error('❌ Erreur envoi feedback:', error)
       
+      // ✅ ROLLBACK EN CAS D'ERREUR
       setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, feedback: null } : msg
+        msg.id === messageId ? { 
+          ...msg, 
+          feedback: null,
+          feedbackComment: undefined 
+        } : msg
       ))
       
       alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
+    } finally {
+      setIsSubmittingFeedback(false)
     }
   }
 
+  // ✅ FERMETURE MODAL FEEDBACK
+  const handleFeedbackModalClose = () => {
+    setFeedbackModal({
+      isOpen: false,
+      messageId: null,
+      feedbackType: null
+    })
+  }
+
+  // [AUTRES FONCTIONS RESTENT IDENTIQUES]
   const handleNewConversation = () => {
     const welcomeMessage = {
       id: '1',
@@ -279,7 +345,7 @@ export default function ChatInterface() {
     })
   }
 
-  // [LE RESTE DU COMPOSANT RESTE IDENTIQUE]
+  // [LE RESTE DU COMPOSANT AVEC MODAL AJOUTÉE]
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
@@ -344,11 +410,11 @@ export default function ChatInterface() {
                         </p>
                       </div>
                       
-                      {/* Boutons de feedback */}
+                      {/* ✅ BOUTONS DE FEEDBACK AVEC MODAL */}
                       {!message.isUser && index > 0 && message.conversation_id && (
                         <div className="flex items-center space-x-2 mt-2 ml-2">
                           <button
-                            onClick={() => handleFeedback(message.id, 'positive')}
+                            onClick={() => handleFeedbackClick(message.id, 'positive')}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
                             title={t('chat.helpfulResponse')}
                             disabled={message.feedback !== null}
@@ -356,18 +422,28 @@ export default function ChatInterface() {
                             <ThumbUpIcon />
                           </button>
                           <button
-                            onClick={() => handleFeedback(message.id, 'negative')}
+                            onClick={() => handleFeedbackClick(message.id, 'negative')}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
                             title={t('chat.notHelpfulResponse')}
                             disabled={message.feedback !== null}
                           >
                             <ThumbDownIcon />
                           </button>
+                          
+                          {/* ✅ AFFICHAGE STATUS FEEDBACK */}
                           {message.feedback && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              Merci pour votre retour !
-                            </span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-gray-500">
+                                Merci pour votre retour !
+                              </span>
+                              {message.feedbackComment && (
+                                <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                                  💬
+                                </span>
+                              )}
+                            </div>
                           )}
+                          
                           {message.conversation_id && (
                             <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
                               🔗
@@ -452,6 +528,15 @@ export default function ChatInterface() {
           </div>
         </div>
       </div>
+
+      {/* ✅ MODAL FEEDBACK */}
+      <FeedbackModal
+        isOpen={feedbackModal.isOpen}
+        onClose={handleFeedbackModalClose}
+        onSubmit={handleFeedbackSubmit}
+        feedbackType={feedbackModal.feedbackType!}
+        isSubmitting={isSubmittingFeedback}
+      />
     </>
   )
 }
