@@ -6,10 +6,9 @@ import { UserInfoModal } from './modals/UserInfoModal'
 import { AccountModal } from './modals/AccountModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
-import { InviteFriendModal } from './modals/InviteFriendModal'
 import { PLAN_CONFIGS } from '../types'
 
-// ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
+// ==================== MENU UTILISATEUR ====================
 export const UserMenuButton = () => {
   const { user, logout } = useAuthStore()
   const { t } = useTranslation()
@@ -18,7 +17,6 @@ export const UserMenuButton = () => {
   const [showContactModal, setShowContactModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [showLanguageModal, setShowLanguageModal] = useState(false)
-  const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
   const userName = user?.name || user?.email || 'Utilisateur'
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -44,11 +42,6 @@ export const UserMenuButton = () => {
   const handleLanguageClick = () => {
     setIsOpen(false)
     setShowLanguageModal(true)
-  }
-
-  const handleInviteFriendClick = () => {
-    setIsOpen(false)
-    setShowInviteFriendModal(true)
   }
 
   return (
@@ -107,17 +100,6 @@ export const UserMenuButton = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
                 </svg>
                 <span>{t('nav.language')}</span>
-              </button>
-
-              {/* ✅ NOUVEAU BOUTON INVITER UN AMI */}
-              <button
-                onClick={handleInviteFriendClick}
-                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
-                </svg>
-                <span>Inviter un ami</span>
               </button>
 
               <button
@@ -189,15 +171,6 @@ export const UserMenuButton = () => {
         title={t('contact.title')}
       >
         <ContactModal onClose={() => setShowContactModal(false)} />
-      </Modal>
-
-      {/* ✅ NOUVELLE MODAL INVITER UN AMI */}
-      <Modal
-        isOpen={showInviteFriendModal}
-        onClose={() => setShowInviteFriendModal(false)}
-        title="Inviter des amis"
-      >
-        <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />
       </Modal>
     </>
   )
