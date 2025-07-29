@@ -448,16 +448,16 @@ class AgriculturalDomainValidator:
         """Retourne le message de rejet approprié selon la langue et la raison"""
         messages = {
             "fr": {
-                "non_agricultural": "Je suis un expert dans le domaine avicole, donc je ne suis pas spécialisé dans la cryptomonnaie. Si vous avez des questions sur le domaine avicole, je serais ravi de vous aider.",
-                "too_general": "Cette question semble trop générale ou ne contient pas assez d'éléments spécifiques au domaine avicole. Pouvez-vous la reformuler en précisant l'aspect d'élevage, de santé animale ou de nutrition qui vous intéresse ?"
+                "non_agricultural": "Cette question semble concerner un domaine différent de l'agriculture et de l'élevage. Notre assistant IA Intelia Expert est spécialisé en santé et nutrition animale et ne peut pas traiter ce type de demande.",
+                "too_general": "Cette question semble trop générale ou ne contient pas assez d'éléments spécifiques au domaine agricole. Pouvez-vous la reformuler en précisant l'aspect d'élevage, de santé animale ou de nutrition qui vous intéresse ?"
             },
             "en": {
-                "non_agricultural": "I am an expert in the poultry field, so I am not specialized in cryptocurrency. If you have questions about the poultry field, I would be happy to help you.",
-                "too_general": "This question seems too general or doesn't contain enough elements specific to the poultry domain. Could you rephrase it by specifying the livestock, animal health, or nutrition aspect you're interested in?"
+                "non_agricultural": "This question appears to concern a domain different from agriculture and livestock. Our Intelia Expert AI assistant specializes in animal health and nutrition and cannot handle this type of request.",
+                "too_general": "This question seems too general or doesn't contain enough elements specific to the agricultural domain. Could you rephrase it by specifying the livestock, animal health, or nutrition aspect you're interested in?"
             },
             "es": {
-                "non_agricultural": "Soy un experto en el campo avícola, por lo que no me especializo en criptomonedas. Si tienes preguntas sobre el campo avícola, estaría encantado de ayudarte.",
-                "too_general": "Esta pregunta parece demasiado general o no contiene suficientes elementos específicos del dominio avícola. ¿Podría reformularla especificando el aspecto ganadero, de salud animal o nutrición que le interesa?"
+                "non_agricultural": "Esta pregunta parece concernir un dominio diferente de la agricultura y ganadería. Nuestro asistente IA Intelia Expert se especializa en salud y nutrición animal y no puede tratar este tipo de consulta.",
+                "too_general": "Esta pregunta parece demasiado general o no contiene suficientes elementos específicos del dominio agrícola. ¿Podría reformularla especificando el aspecto ganadero, de salud animal o nutrición que le interesa?"
             }
         }
         
