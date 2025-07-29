@@ -1,9 +1,8 @@
 """
-app/api/v1/expert.py - VERSION CORRIGÉE AVEC AUTHENTIFICATION auth.py
-CORRECTION: Utilise get_current_user de auth.py au lieu de dupliquer l'authentification
-SOLUTION UTF-8: Validation Pydantic ultra-permissive fonctionnelle
-MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
-CORRECTION 422: Fix du problème de mapping FastAPI - Body directement mappé vers QuestionRequest
+app/api/v1/expert.py - VERSION CORRIGÉE AVEC CORRECTIONS 422
+CORRECTION 1: Injection Request correcte pour FastAPI
+CORRECTION 2: Modèle Pydantic simplifié et robuste
+CORRECTION 3: Gestion d'erreur améliorée avec logs détaillés
 """
 import os
 import logging
@@ -14,7 +13,7 @@ from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict
 
 # Import de l'authentification centralisée
 try:
@@ -39,50 +38,30 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 # =============================================================================
-# MODÈLES PYDANTIC AVEC VALIDATION SUPPRIMÉE POUR TEXT (VERSION FONCTIONNELLE)
+# MODÈLES PYDANTIC CORRIGÉS - VERSION SIMPLE ET ROBUSTE
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model avec validation text DÉSACTIVÉE mais compatible FastAPI"""
-    text: str = Field(..., description="Question text (NO validation)")
-    language: Optional[str] = Field("fr", description="Response language")
-    speed_mode: Optional[str] = Field("balanced", description="Speed mode")
+    """Request model simplifié et robuste"""
+    text: str = Field(..., min_length=1, max_length=5000, description="Question text")
+    language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
+    speed_mode: Optional[str] = Field("balanced", description="Speed mode (fast, balanced, quality)")
 
-    # Configuration PERMISSIVE
     model_config = ConfigDict(
-        validate_assignment=False,
-        str_strip_whitespace=False,  # CRITIQUE: Ne pas toucher au texte
-        extra="ignore",
-        validate_default=False
+        str_strip_whitespace=True,  # Nettoie automatiquement les espaces
+        validate_default=True,      # Valide les valeurs par défaut
+        extra="ignore"              # Ignore les champs supplémentaires
     )
 
-    # SOLUTION: Validation qui n'échoue JAMAIS pour text
-    @field_validator('text', mode='before')
-    @classmethod
-    def validate_text_always_pass(cls, v):
-        """Validation qui accepte TOUT pour text"""
-        # Si c'est vide, on rejette seulement
-        if not v:
-            raise ValueError("Question text cannot be empty")
+    def model_post_init(self, __context) -> None:
+        """Post-validation pour nettoyer et valider les champs"""
+        # Validation et nettoyage de la langue
+        if self.language not in ['fr', 'en', 'es']:
+            self.language = 'fr'
         
-        # Sinon, on accepte TOUT sans transformation
-        return v
-
-    @field_validator('language', mode='before')
-    @classmethod
-    def validate_language_safe(cls, v):
-        """Validation langue safe"""
-        if not v or str(v).lower() not in ['fr', 'en', 'es']:
-            return 'fr'
-        return str(v).lower()
-
-    @field_validator('speed_mode', mode='before')
-    @classmethod
-    def validate_speed_mode_safe(cls, v):
-        """Validation speed_mode safe"""
-        if not v or str(v).lower() not in ['fast', 'balanced', 'quality']:
-            return 'balanced'
-        return str(v).lower()
+        # Validation et nettoyage du mode de vitesse
+        if self.speed_mode not in ['fast', 'balanced', 'quality']:
+            self.speed_mode = 'balanced'
 
 class ExpertResponse(BaseModel):
     """Response model standard"""
@@ -94,7 +73,7 @@ class ExpertResponse(BaseModel):
     timestamp: str
     language: str
     response_time_ms: int
-    mode: str = "expert_router_final"
+    mode: str = "expert_router_corrected"
     user: Optional[str] = None
     logged: bool = False
 
@@ -104,12 +83,15 @@ class FeedbackRequest(BaseModel):
     comment: Optional[str] = Field(None, description="Optional comment")
     conversation_id: Optional[str] = Field(None, description="Conversation ID")
 
-    @field_validator('rating', mode='before')
-    @classmethod
-    def validate_rating_safe(cls, v):
-        if not v or str(v).lower() not in ['positive', 'negative', 'neutral']:
-            return 'neutral'
-        return str(v).lower()
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="ignore"
+    )
+
+    def model_post_init(self, __context) -> None:
+        """Post-validation pour le rating"""
+        if self.rating not in ['positive', 'negative', 'neutral']:
+            self.rating = 'neutral'
 
 # =============================================================================
 # IMPORT LOGGING
@@ -181,7 +163,7 @@ def get_user_id_from_request(fastapi_request: Request) -> str:
         return f"anon_{uuid.uuid4().hex[:8]}"
 
 # =============================================================================
-# PROMPTS MULTI-LANGUES AVEC CONSIGNE LIGNÉE GÉNÉTIQUE
+# PROMPTS MULTI-LANGUES
 # =============================================================================
 
 EXPERT_PROMPTS = {
@@ -196,13 +178,13 @@ Answer precisely and practically in English, providing advice based on industry 
 IMPORTANT: Do not reference specific genetic lines like Ross or Cobb, unless the user mentions them in their question. Provide general answers that apply to all broiler chickens.""",
     
     "es": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde.
-Responde de manera precisa y práctica en español. Puedes usar todos los caractères especiales del español (ñ, ¿, ¡, acentos, etc.) en tus respuestas.
+Responde de manera precisa y práctica en español. Puedes usar todos los caractéres especiales del español (ñ, ¿, ¡, acentos, etc.) en tus respuestas.
 
 IMPORTANTE: No hagas referencia a líneas genéticas como Ross o Cobb, a menos que el usuario las mencione en su pregunta. Da respuestas generales que se apliquen a todos los pollos de engorde."""
 }
 
 def get_expert_prompt(language: str) -> str:
-    """Get expert system prompt for language avec consigne lignée génétique"""
+    """Get expert system prompt for language"""
     return EXPERT_PROMPTS.get(language.lower(), EXPERT_PROMPTS["fr"])
 
 # =============================================================================
@@ -210,7 +192,7 @@ def get_expert_prompt(language: str) -> str:
 # =============================================================================
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback avec lignée générique"""
+    """Réponse de fallback"""
     try:
         safe_question = str(question)[:50] if question else "votre question"
     except:
@@ -224,7 +206,7 @@ def get_fallback_response(question: str, language: str = "fr") -> str:
     return fallback_responses.get(language.lower(), fallback_responses["fr"])
 
 async def process_question_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> str:
-    """Process question using OpenAI avec consigne lignée génétique"""
+    """Process question using OpenAI"""
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
@@ -234,7 +216,6 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
             return get_fallback_response(question, language)
         
         openai.api_key = api_key
-        # get_expert_prompt contient maintenant la consigne lignée génétique
         system_prompt = get_expert_prompt(language)
         
         safe_question = str(question)
@@ -266,21 +247,30 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS AVEC AUTHENTIFICATION CENTRALISÉE - CORRECTION 422
+# ENDPOINTS CORRIGÉS AVEC INJECTION REQUEST CORRECTE
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
-    request_data: QuestionRequest = Body(...),  # CORRECTION: Explicitement Body() pour mapping correct
-    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None,
-    fastapi_request: Request = None
+    request_data: QuestionRequest,  # ✅ CORRECTION: FastAPI mappe automatiquement le JSON
+    request: Request,               # ✅ CORRECTION: FastAPI injecte automatiquement Request
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification Supabase via auth.py - CORRECTION 422"""
+    """Question avec authentification Supabase - CORRIGÉ INJECTION REQUEST"""
     start_time = time.time()
     
     try:
+        # Log détaillé pour debug
+        logger.info("=" * 60)
+        logger.info("🔐 DÉBUT ask_expert_secure")
+        logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
+        logger.info(f"🌐 Langue: {request_data.language}")
+        logger.info(f"⚡ Mode: {request_data.speed_mode}")
+        logger.info(f"👤 User auth disponible: {bool(current_user)}")
+        
         # Vérifier si l'authentification est disponible
         if not AUTH_AVAILABLE or not current_user:
+            logger.error("❌ Service d'authentification non disponible")
             raise HTTPException(
                 status_code=503,
                 detail="Service d'authentification non disponible"
@@ -292,21 +282,20 @@ async def ask_expert_secure(
         
         logger.info(f"🔐 Question sécurisée de {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
         
-        # Ajouter les infos utilisateur à la requête (si disponible)
-        if fastapi_request:
-            fastapi_request.state.user = current_user
+        # Ajouter les infos utilisateur à la requête
+        request.state.user = current_user
         
-        # Récupération directe de la question depuis request_data
-        question_text = request_data.text
+        # Récupération de la question avec validation
+        question_text = request_data.text.strip()
         
         if not question_text:
+            logger.error("❌ Question vide après nettoyage")
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
         
-        logger.info(f"🌐 Question SÉCURISÉE reçue - ID: {conversation_id[:8]}...")
-        logger.info(f"📝 Question: {str(question_text)[:100]}...")
-        logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
+        logger.info(f"🆔 Conversation ID: {conversation_id}")
+        logger.info(f"🔤 Caractères spéciaux détectés: {[c for c in question_text if ord(c) > 127]}")
         
         # Variables par défaut
         rag_used = False
@@ -314,47 +303,37 @@ async def ask_expert_secure(
         answer = ""
         mode = "authenticated_direct_openai"
         
-        # Essayer RAG d'abord (si fastapi_request disponible)
-        if fastapi_request:
-            app = fastapi_request.app
-            process_rag = getattr(app.state, 'process_question_with_rag', None)
-            
-            if process_rag:
-                try:
-                    logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
-                    result = await process_rag(
-                        question=question_text,
-                        user=current_user,  # Passer current_user de auth.py
-                        language=request_data.language,
-                        speed_mode=request_data.speed_mode
-                    )
-                    
-                    answer = str(result.get("response", ""))
-                    rag_used = result.get("mode", "").startswith("rag")
-                    rag_score = result.get("score")
-                    mode = f"authenticated_{result.get('mode', 'rag_enhanced')}"
-                    
-                    logger.info(f"✅ RAG traité pour utilisateur authentifié - Score: {rag_score}")
-                    
-                except Exception as rag_error:
-                    logger.error(f"❌ Erreur RAG pour utilisateur authentifié: {rag_error}")
-                    answer = await process_question_openai(
-                        question_text, 
-                        request_data.language,
-                        request_data.speed_mode
-                    )
-                    mode = "authenticated_fallback_openai"
-            else:
-                logger.info("⚠️ RAG non disponible, utilisation OpenAI pour utilisateur authentifié")
+        # Essayer RAG d'abord
+        app = request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if process_rag:
+            try:
+                logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
+                result = await process_rag(
+                    question=question_text,
+                    user=current_user,
+                    language=request_data.language,
+                    speed_mode=request_data.speed_mode
+                )
+                
+                answer = str(result.get("response", ""))
+                rag_used = result.get("mode", "").startswith("rag")
+                rag_score = result.get("score")
+                mode = f"authenticated_{result.get('mode', 'rag_enhanced')}"
+                
+                logger.info(f"✅ RAG traité - Mode: {mode}, Score: {rag_score}")
+                
+            except Exception as rag_error:
+                logger.error(f"❌ Erreur RAG: {rag_error}")
                 answer = await process_question_openai(
-                    question_text,
+                    question_text, 
                     request_data.language,
                     request_data.speed_mode
                 )
-                mode = "authenticated_direct_openai"
+                mode = "authenticated_fallback_openai"
         else:
-            # Pas de fastapi_request, utilisation directe OpenAI
-            logger.info("⚠️ Pas de fastapi_request, utilisation OpenAI direct")
+            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct")
             answer = await process_question_openai(
                 question_text,
                 request_data.language,
@@ -364,20 +343,24 @@ async def ask_expert_secure(
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
-        # Sauvegarde automatique avec vrai user_id
+        logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
+        
+        # Sauvegarde automatique
         logged = await save_conversation_auto(
             conversation_id=conversation_id,
             question=question_text,
             response=answer,
-            user_id=user_id or "authenticated_user",  # user_id de auth.py
+            user_id=user_id or "authenticated_user",
             language=request_data.language,
             rag_used=rag_used,
             rag_score=rag_score,
             response_time_ms=response_time_ms
         )
         
-        # Retourner la réponse avec infos utilisateur
-        return ExpertResponse(
+        logger.info(f"💾 Sauvegarde: {'✅ Réussie' if logged else '❌ Échouée'}")
+        
+        # Retourner la réponse
+        response_obj = ExpertResponse(
             question=str(question_text),
             response=str(answer),
             conversation_id=conversation_id,
@@ -387,38 +370,56 @@ async def ask_expert_secure(
             language=request_data.language,
             response_time_ms=response_time_ms,
             mode=mode,
-            user=user_email,  # Email de l'utilisateur authentifié via auth.py
+            user=user_email,
             logged=logged
         )
+        
+        logger.info("✅ FIN ask_expert_secure - Succès")
+        logger.info("=" * 60)
+        
+        return response_obj
     
     except HTTPException:
+        logger.info("=" * 60)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur ask expert sécurisé: {e}")
+        logger.error(f"❌ Erreur critique ask expert sécurisé: {e}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
+        logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request_data: QuestionRequest = Body(...), fastapi_request: Request = None):
-    """Question publique avec validation text FONCTIONNELLE - CORRECTION 422"""
+async def ask_expert_public(
+    request_data: QuestionRequest,  # ✅ CORRECTION: Mapping automatique
+    request: Request                # ✅ CORRECTION: Injection correcte
+):
+    """Question publique - CORRIGÉ INJECTION REQUEST"""
     start_time = time.time()
     
     try:
-        # Récupération directe depuis request_data - plus de problème d'initialisation
-        question_text = request_data.text
+        # Log détaillé pour debug
+        logger.info("=" * 60)
+        logger.info("🌐 DÉBUT ask_expert_public")
+        logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
+        logger.info(f"🌐 Langue: {request_data.language}")
+        logger.info(f"⚡ Mode: {request_data.speed_mode}")
+        
+        # Récupération de la question avec validation
+        question_text = request_data.text.strip()
         
         if not question_text:
+            logger.error("❌ Question vide après nettoyage")
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        user_id = get_user_id_from_request(fastapi_request) if fastapi_request else "anonymous"
+        user_id = get_user_id_from_request(request)
         
-        logger.info(f"🌐 Question PUBLIQUE reçue - ID: {conversation_id[:8]}...")
-        logger.info(f"📝 Question: {str(question_text)[:100]}...")
+        logger.info(f"🆔 Conversation ID: {conversation_id}")
+        logger.info(f"👤 User ID: {user_id}")
         logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
         
-        user = getattr(fastapi_request.state, "user", None) if fastapi_request else None
+        user = getattr(request.state, "user", None)
         
         # Variables par défaut
         rag_used = False
@@ -427,49 +428,44 @@ async def ask_expert_public(request_data: QuestionRequest = Body(...), fastapi_r
         mode = "direct_openai"
         
         # Essayer RAG d'abord
-        if fastapi_request:
-            app = fastapi_request.app
-            process_rag = getattr(app.state, 'process_question_with_rag', None)
-            
-            if process_rag:
-                try:
-                    logger.info("🔍 Utilisation du système RAG...")
-                    result = await process_rag(
-                        question=question_text,
-                        user=user,
-                        language=request_data.language,
-                        speed_mode=request_data.speed_mode
-                    )
-                    
-                    answer = str(result.get("response", ""))
-                    rag_used = result.get("mode", "").startswith("rag")
-                    rag_score = result.get("score")
-                    mode = result.get("mode", "rag_enhanced")
-                    
-                    logger.info(f"✅ RAG traité - Score: {rag_score}")
-                    
-                except Exception as rag_error:
-                    logger.error(f"❌ Erreur RAG: {rag_error}")
-                    answer = await process_question_openai(
-                        question_text, 
-                        request_data.language,
-                        request_data.speed_mode
-                    )
-            else:
-                logger.info("⚠️ RAG non disponible, utilisation OpenAI")
+        app = request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if process_rag:
+            try:
+                logger.info("🔍 Utilisation du système RAG...")
+                result = await process_rag(
+                    question=question_text,
+                    user=user,
+                    language=request_data.language,
+                    speed_mode=request_data.speed_mode
+                )
+                
+                answer = str(result.get("response", ""))
+                rag_used = result.get("mode", "").startswith("rag")
+                rag_score = result.get("score")
+                mode = result.get("mode", "rag_enhanced")
+                
+                logger.info(f"✅ RAG traité - Mode: {mode}, Score: {rag_score}")
+                
+            except Exception as rag_error:
+                logger.error(f"❌ Erreur RAG: {rag_error}")
                 answer = await process_question_openai(
-                    question_text,
+                    question_text, 
                     request_data.language,
                     request_data.speed_mode
                 )
         else:
+            logger.info("⚠️ RAG non disponible, utilisation OpenAI")
             answer = await process_question_openai(
                 question_text,
-                request_data.language or "fr",
-                request_data.speed_mode or "balanced"
+                request_data.language,
+                request_data.speed_mode
             )
         
         response_time_ms = int((time.time() - start_time) * 1000)
+        
+        logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
         
         # Sauvegarde automatique
         logged = await save_conversation_auto(
@@ -483,8 +479,10 @@ async def ask_expert_public(request_data: QuestionRequest = Body(...), fastapi_r
             response_time_ms=response_time_ms
         )
         
+        logger.info(f"💾 Sauvegarde: {'✅ Réussie' if logged else '❌ Échouée'}")
+        
         # Retourner la réponse
-        return ExpertResponse(
+        response_obj = ExpertResponse(
             question=str(question_text),
             response=str(answer),
             conversation_id=conversation_id,
@@ -497,18 +495,25 @@ async def ask_expert_public(request_data: QuestionRequest = Body(...), fastapi_r
             user=str(user) if user else None,
             logged=logged
         )
+        
+        logger.info("✅ FIN ask_expert_public - Succès")
+        logger.info("=" * 60)
+        
+        return response_obj
     
     except HTTPException:
+        logger.info("=" * 60)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur ask expert: {e}")
+        logger.error(f"❌ Erreur critique ask expert public: {e}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
+        logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/feedback")
-async def submit_feedback(feedback_data: FeedbackRequest = Body(...)):
-    """Submit feedback - CORRECTION 422"""
+async def submit_feedback(feedback_data: FeedbackRequest):
+    """Submit feedback - CORRIGÉ"""
     try:
         logger.info(f"📊 Feedback reçu: {feedback_data.rating}")
         
@@ -544,7 +549,7 @@ async def submit_feedback(feedback_data: FeedbackRequest = Body(...)):
 
 @router.get("/topics")
 async def get_suggested_topics(language: str = "fr"):
-    """Get suggested topics avec lignées génériques"""
+    """Get suggested topics"""
     try:
         lang = language.lower() if language else "fr"
         if lang not in ["fr", "en", "es"]:
@@ -592,62 +597,13 @@ async def get_suggested_topics(language: str = "fr"):
         logger.error(f"❌ Erreur topics: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
-@router.get("/history")
-async def get_conversation_history(fastapi_request: Request, limit: int = 10):
-    """Get conversation history"""
-    try:
-        if LOGGING_AVAILABLE and logger_instance:
-            user_id = get_user_id_from_request(fastapi_request)
-            
-            try:
-                conversations = logger_instance.get_user_conversations(user_id, limit)
-                
-                formatted_conversations = []
-                for conv in conversations:
-                    formatted_conversations.append({
-                        "conversation_id": conv.get("conversation_id"),
-                        "question": str(conv.get("question", ""))[:100] + "..." if len(str(conv.get("question", ""))) > 100 else str(conv.get("question", "")),
-                        "timestamp": conv.get("timestamp"),
-                        "language": conv.get("language", "fr"),
-                        "rag_used": conv.get("rag_used", False),
-                        "feedback": conv.get("feedback")
-                    })
-                
-                return {
-                    "conversations": formatted_conversations,
-                    "count": len(formatted_conversations),
-                    "user_id": user_id[:8] + "...",
-                    "message": f"{len(formatted_conversations)} conversations récupérées",
-                    "timestamp": datetime.now().isoformat()
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ Erreur récupération historique: {e}")
-        
-        return {
-            "conversations": [],
-            "count": 0,
-            "message": "Historique des conversations (système de logging en cours d'initialisation)",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur historique: {e}")
-        return {
-            "conversations": [],
-            "count": 0,
-            "message": "Erreur récupération historique",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
 # =============================================================================
-# ENDPOINTS D'AUTHENTIFICATION UTILITAIRES
+# ENDPOINTS UTILITAIRES CORRIGÉS
 # =============================================================================
 
 @router.get("/auth-status")
 async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None):
-    """Vérifier le statut d'authentification - REQUIERT TOKEN"""
+    """Vérifier le statut d'authentification"""
     if not AUTH_AVAILABLE or not current_user:
         raise HTTPException(
             status_code=503,
@@ -664,10 +620,10 @@ async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_use
 
 @router.post("/test-auth")
 async def test_auth_endpoint(
-    request_data: QuestionRequest = Body(...),
+    request_data: QuestionRequest,  # ✅ CORRECTION: Mapping automatique
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Endpoint de test pour vérifier l'authentification - REQUIERT TOKEN - CORRECTION 422"""
+    """Endpoint de test pour vérifier l'authentification"""
     if not AUTH_AVAILABLE or not current_user:
         raise HTTPException(
             status_code=503,
@@ -690,11 +646,11 @@ async def test_auth_endpoint(
 # =============================================================================
 
 @router.post("/test-utf8")
-async def test_utf8_direct(fastapi_request: Request):
-    """Test endpoint pour UTF-8 direct - FONCTIONNE PARFAITEMENT"""
+async def test_utf8_direct(request: Request):  # ✅ CORRECTION: Injection correcte
+    """Test endpoint pour UTF-8 direct"""
     try:
         # Récupérer le body brut
-        body = await fastapi_request.body()
+        body = await request.body()
         body_str = body.decode('utf-8')
         
         logger.info(f"📝 Body brut reçu: {body_str}")
@@ -718,7 +674,6 @@ async def test_utf8_direct(fastapi_request: Request):
             "special_chars_detected": [c for c in question_text if ord(c) > 127],
             "response": answer,
             "method": "direct_body_parsing",
-            "genetic_line_note": "Response uses generic 'broiler chickens' terminology",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -744,13 +699,11 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("🔤 VALIDATION UTF-8 FONCTIONNELLE avec field_validator")
-logger.info("🔧 Compatible FastAPI - plus d'erreur 500")
-logger.info("🧬 LIGNÉE GÉNÉTIQUE: Prompts génériques sauf mention utilisateur")
+logger.info("✅ CORRECTIONS 422 APPLIQUÉES:")
+logger.info("🔧 1. Injection Request corrigée (plus de = None)")
+logger.info("🔧 2. Modèle Pydantic simplifié et robuste")
+logger.info("🔧 3. Logs détaillés pour debug")
+logger.info("🔧 4. Validation et nettoyage automatique des données")
 logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
 logger.info(f"🔐 Authentification centralisée: {'Activée' if AUTH_AVAILABLE else 'auth.py requis'}")
-logger.info(f"🛡️ Sécurité /ask: Authentification via auth.py")
-logger.info(f"🌐 Endpoint public /ask-public: Toujours disponible sans auth")
-logger.info(f"📝 Topics suggérés: Terminologie générique (poulets de chair/broiler chickens/pollos de engorde)")
-logger.info("🔧 CORRECTION 422: Ajout de Body(...) explicite pour mapping correct FastAPI")
-logger.info("✅ PROBLÈME 422 RÉSOLU: FastAPI mappe maintenant correctement le JSON vers QuestionRequest")
+logger.info("✅ EXPERT.PY PRÊT POUR PRODUCTION")

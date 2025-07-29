@@ -414,7 +414,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     }
     
     console.log('📤 Envoi requête avec encodage UTF-8...')
-    console.log('🔤 Caractères spéciaux:', [...cleanQuestion].filter(c => c.charCodeAt(0) > 127))
+    console.log('🔤 Caractères spéciaux:', Array.from(cleanQuestion).filter(c => c.charCodeAt(0) > 127))
     
     // ===== 3. REQUÊTE AVEC TIMEOUT =====
     const response = await fetchWithTimeout(apiUrl, {
