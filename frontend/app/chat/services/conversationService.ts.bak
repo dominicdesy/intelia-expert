@@ -1,6 +1,6 @@
 import { ConversationData, API_CONFIG } from '../types'
 
-// ==================== SERVICE DE LOGGING AVEC COMMENTAIRES FEEDBACK ====================
+// ==================== SERVICE DE LOGGING AVEC URL CORRIGÉE ====================
 export class ConversationService {
   private baseUrl = API_CONFIG.LOGGING_BASE_URL
   private loggingEnabled = true
@@ -77,100 +77,6 @@ export class ConversationService {
     } catch (error) {
       console.error('❌ Erreur envoi feedback:', error)
       throw error  // Propager pour afficher erreur à l'utilisateur
-    }
-  }
-
-  // ✅ NOUVELLE MÉTHODE POUR ENVOYER COMMENTAIRE FEEDBACK
-  async sendFeedbackComment(conversationId: string, comment: string): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('💬 Logging désactivé - commentaire non envoyé:', conversationId)
-      return
-    }
-
-    try {
-      console.log('💬 Envoi commentaire feedback:', conversationId, comment.substring(0, 50) + '...')
-      console.log('📡 URL commentaire:', `${this.baseUrl}/logging/conversation/${conversationId}/comment`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/comment`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ 
-          comment: comment,
-          timestamp: new Date().toISOString()
-        })
-      })
-      
-      if (!response.ok) {
-        // Si l'endpoint n'existe pas encore, ne pas faire échouer
-        if (response.status === 404) {
-          console.warn('⚠️ Endpoint commentaire feedback pas encore implémenté sur le serveur')
-          return
-        }
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Commentaire feedback enregistré:', result.message)
-      
-    } catch (error) {
-      console.error('❌ Erreur envoi commentaire feedback:', error)
-      // Ne pas faire échouer si le commentaire ne peut pas être envoyé
-      // Le feedback principal est plus important
-    }
-  }
-
-  // ✅ MÉTHODE COMBINÉE POUR FEEDBACK + COMMENTAIRE
-  async sendFeedbackWithComment(
-    conversationId: string, 
-    feedback: 1 | -1, 
-    comment?: string
-  ): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('📊💬 Logging désactivé - feedback avec commentaire non envoyé:', conversationId)
-      return
-    }
-
-    try {
-      console.log('📊💬 Envoi feedback avec commentaire:', conversationId, feedback, comment ? 'avec commentaire' : 'sans commentaire')
-      console.log('📡 URL feedback combiné:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback-with-comment`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback-with-comment`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ 
-          feedback,
-          comment: comment || null,
-          timestamp: new Date().toISOString()
-        })
-      })
-      
-      if (!response.ok) {
-        // Fallback vers les méthodes séparées si l'endpoint combiné n'existe pas
-        if (response.status === 404) {
-          console.warn('⚠️ Endpoint combiné non disponible, utilisation méthodes séparées')
-          await this.sendFeedback(conversationId, feedback)
-          if (comment) {
-            await this.sendFeedbackComment(conversationId, comment)
-          }
-          return
-        }
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Feedback avec commentaire enregistré:', result.message)
-      
-    } catch (error) {
-      console.error('❌ Erreur envoi feedback avec commentaire:', error)
-      throw error
     }
   }
 
@@ -266,67 +172,6 @@ export class ConversationService {
     } catch (error) {
       console.error('❌ Erreur suppression toutes conversations serveur:', error)
       throw error  // Propager pour que l'UI puisse gérer l'erreur
-    }
-  }
-
-  // ✅ MÉTHODE POUR RÉCUPÉRER STATISTIQUES FEEDBACK
-  async getFeedbackStats(userId?: string, days: number = 7): Promise<any> {
-    if (!this.loggingEnabled) {
-      console.log('📊 Logging désactivé - stats feedback non récupérées')
-      return null
-    }
-
-    try {
-      const params = new URLSearchParams()
-      if (userId) params.append('user_id', userId)
-      params.append('days', days.toString())
-      
-      const url = `${this.baseUrl}/logging/analytics/feedback?${params.toString()}`
-      console.log('📊 Récupération stats feedback:', url)
-      
-      const response = await fetch(url, {
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.warn('⚠️ Endpoint stats feedback pas encore implémenté')
-          return null
-        }
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('✅ Stats feedback récupérées:', data)
-      return data
-      
-    } catch (error) {
-      console.error('❌ Erreur récupération stats feedback:', error)
-      return null
-    }
-  }
-
-  // ✅ MÉTHODE POUR TESTER LA CONNECTIVITÉ DU SERVICE
-  async testConnection(): Promise<boolean> {
-    try {
-      console.log('🔍 Test connectivité service logging...')
-      
-      const response = await fetch(`${this.baseUrl}/logging/test`, {
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log('✅ Service logging opérationnel:', data.message)
-        return true
-      } else {
-        console.warn('⚠️ Service logging indisponible:', response.status)
-        return false
-      }
-      
-    } catch (error) {
-      console.error('❌ Erreur test connectivité:', error)
-      return false
     }
   }
 }
