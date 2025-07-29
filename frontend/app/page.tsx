@@ -500,10 +500,11 @@ export default function LoginPage() {
 
     setIsLoading(true)
 
-    // Simulation d'appel API
+    // Simulation d'appel API avec session factice
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
       
+      // Stocker les préférences
       if (loginData.rememberMe) {
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', loginData.email.trim())
@@ -511,6 +512,24 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-remember-me')
         localStorage.removeItem('intelia-last-email')
       }
+      
+      // Créer une session factice pour le développement
+      const mockSession = {
+        access_token: 'mock-jwt-token-for-development',
+        refresh_token: 'mock-refresh-token',
+        user: {
+          id: 'mock-user-id',
+          email: loginData.email.trim(),
+          user_metadata: {
+            first_name: 'Utilisateur',
+            last_name: 'Test'
+          }
+        },
+        expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 heures
+      }
+      
+      // Stocker la session factice
+      localStorage.setItem('supabase.auth.token', JSON.stringify(mockSession))
       
       // Redirection vers le chat
       window.location.href = '/chat'
