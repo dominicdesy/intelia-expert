@@ -2589,3 +2589,174 @@ export default function ChatInterface() {
       timestamp: new Date()
     }])
   }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('fr-FR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
+  return (
+    <>
+      <ZohoSalesIQ user={user} language={currentLanguage} />
+
+      <div className="h-screen bg-gray-50 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Boutons gauche */}
+            <div className="flex items-center space-x-2">
+              <HistoryMenu />
+              <button
+                onClick={handleNewConversation}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.newConversation')}
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Titre centré avec logo */}
+            <div className="flex-1 flex justify-center items-center space-x-3">
+              <InteliaLogo className="w-8 h-8" />
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              </div>
+            </div>
+            
+            {/* Avatar utilisateur à droite */}
+            <div className="flex items-center">
+              <UserMenuButton />
+            </div>
+          </div>
+        </header>
+
+        {/* Zone de messages */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Date */}
+              {messages.length > 0 && (
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                    {getCurrentDate()}
+                  </span>
+                </div>
+              )}
+
+              {messages.map((message, index) => (
+                <div key={message.id}>
+                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
+                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                      </div>
+                    )}
+                    
+                    <div className="max-w-xs lg:max-w-2xl">
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {/* Boutons de feedback avec conversation_id */}
+                      {!message.isUser && index > 0 && message.conversation_id && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                            title={t('chat.helpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                            title={t('chat.notHelpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                          {message.feedback && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              Merci pour votre retour !
+                            </span>
+                          )}
+                          {message.conversation_id && (
+                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
+                              🔗
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                        <UserIcon className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Indicateur de frappe */}
+              {isLoadingChat && (
+                <div className="flex items-start space-x-3">
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Zone de saisie */}
+          <div className="px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder={t('chat.placeholder')}
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    disabled={isLoadingChat}
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoadingChat || !inputMessage.trim()}
+                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                >
+                  <PaperAirplaneIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
