@@ -558,7 +558,7 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ MODIFICATION: Fonction de connexion avec "Se souvenir de moi"
+  // ✅ FONCTION DE CONNEXION avec "Se souvenir de moi"
   const handleLogin = async () => {
     setError('')
     setSuccess('')
@@ -588,14 +588,10 @@ export default function LoginPage() {
     try {
       console.log('🔐 Tentative de connexion:', loginData.email, 'Remember me:', loginData.rememberMe)
       
-      // ✅ CORRECTION: Implémentation du "Se souvenir de moi"
+      // ✅ CORRECTION: Connexion simple sans options de persistance
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
-        password: loginData.password,
-        options: {
-          // Configuration de la persistance de session selon le choix utilisateur
-          persistSession: loginData.rememberMe
-        }
+        password: loginData.password
       })
       
       if (error) {
@@ -622,16 +618,15 @@ export default function LoginPage() {
 
       console.log('✅ Connexion réussie:', data.user.email)
       
-      // ✅ CORRECTION: Sauvegarder les préférences utilisateur
+      // ✅ FONCTIONNALITÉ: Gestion "Se souvenir de moi"
       if (loginData.rememberMe) {
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', loginData.email.trim())
-        console.log('💾 Préférences "Se souvenir de moi" sauvegardées')
+        console.log('💾 Email sauvegardé pour prochaine connexion')
       } else {
-        // Si l'utilisateur décoche, on supprime les données sauvegardées
         localStorage.removeItem('intelia-remember-me')
         localStorage.removeItem('intelia-last-email')
-        console.log('🗑️ Préférences "Se souvenir de moi" supprimées')
+        console.log('🗑️ Préférences supprimées')
       }
       
       window.location.href = '/chat'
