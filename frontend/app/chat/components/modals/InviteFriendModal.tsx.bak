@@ -436,5 +436,3 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     </div>
   )
 }
-
-// new
