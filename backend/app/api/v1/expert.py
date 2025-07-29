@@ -1,6 +1,6 @@
 """
-app/api/v1/expert.py - VERSION COMPLÈTE AVEC AUTHENTIFICATION SUPABASE SÉCURISÉE
-OPTION A: Authentification OBLIGATOIRE sur /ask
+app/api/v1/expert.py - VERSION CORRIGÉE AVEC AUTHENTIFICATION auth.py
+CORRECTION: Utilise get_current_user de auth.py au lieu de dupliquer l'authentification
 SOLUTION UTF-8: Validation Pydantic ultra-permissive fonctionnelle
 MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
 """
@@ -15,13 +15,13 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-# JWT import pour authentification Supabase
+# Import de l'authentification centralisée
 try:
-    import jwt
-    JWT_AVAILABLE = True
+    from app.api.v1.auth import get_current_user
+    AUTH_AVAILABLE = True
 except ImportError:
-    JWT_AVAILABLE = False
-    jwt = None
+    AUTH_AVAILABLE = False
+    get_current_user = None
 
 # OpenAI import sécurisé
 try:
@@ -36,79 +36,6 @@ logger = logging.getLogger(__name__)
 
 # Configuration sécurité pour authentification
 security = HTTPBearer()
-
-# =============================================================================
-# FONCTIONS D'AUTHENTIFICATION SUPABASE
-# =============================================================================
-
-def get_supabase_config():
-    """Récupère la configuration Supabase"""
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_jwt_secret = os.getenv('SUPABASE_JWT_SECRET')
-    supabase_anon_key = os.getenv('SUPABASE_ANON_KEY')
-    
-    if not supabase_url or not supabase_jwt_secret:
-        logger.warning("⚠️ Configuration Supabase incomplète")
-        return None, None, None
-    
-    return supabase_url, supabase_jwt_secret, supabase_anon_key
-
-async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Vérifie le token JWT Supabase - AUTHENTIFICATION OBLIGATOIRE
-    """
-    if not JWT_AVAILABLE:
-        raise HTTPException(
-            status_code=503, 
-            detail="Service d'authentification non disponible (PyJWT requis)"
-        )
-    
-    try:
-        token = credentials.credentials
-        supabase_url, jwt_secret, anon_key = get_supabase_config()
-        
-        if not jwt_secret:
-            raise HTTPException(
-                status_code=503, 
-                detail="Service d'authentification non configuré (SUPABASE_JWT_SECRET manquant)"
-            )
-        
-        # Vérification du JWT Supabase
-        try:
-            payload = jwt.decode(
-                token, 
-                jwt_secret, 
-                algorithms=["HS256"],
-                options={"verify_aud": False}  # Supabase n'utilise pas toujours aud
-            )
-            
-            user_id = payload.get('sub')
-            email = payload.get('email')
-            
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Token invalide: pas d'utilisateur")
-            
-            logger.info(f"🔐 Utilisateur authentifié: {email} ({user_id[:8]}...)")
-            
-            # Retourner les infos utilisateur
-            return {
-                "user_id": user_id,
-                "email": email,
-                "raw_token": token,
-                "payload": payload,
-                "authenticated": True
-            }
-            
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expiré")
-        except jwt.InvalidTokenError as e:
-            raise HTTPException(status_code=401, detail=f"Token invalide: {str(e)}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Erreur vérification token: {e}")
-        raise HTTPException(status_code=401, detail="Erreur d'authentification")
 
 # =============================================================================
 # MODÈLES PYDANTIC AVEC VALIDATION SUPPRIMÉE POUR TEXT (VERSION FONCTIONNELLE)
@@ -338,26 +265,36 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS AVEC AUTHENTIFICATION SÉCURISÉE
+# ENDPOINTS AVEC AUTHENTIFICATION CENTRALISÉE
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
     request: QuestionRequest, 
     fastapi_request: Request,
-    user_auth = Depends(verify_supabase_token)  # AUTHENTIFICATION OBLIGATOIRE
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification Supabase OBLIGATOIRE - SÉCURISÉ"""
+    """Question avec authentification Supabase via auth.py"""
     start_time = time.time()
     
     try:
-        # L'utilisateur est authentifié, on a ses infos dans user_auth
-        logger.info(f"🔐 Question sécurisée de {user_auth['email']} ({user_auth['user_id'][:8]}...)")
+        # Vérifier si l'authentification est disponible
+        if not AUTH_AVAILABLE or not current_user:
+            raise HTTPException(
+                status_code=503,
+                detail="Service d'authentification non disponible"
+            )
+        
+        # L'utilisateur est authentifié via auth.py
+        user_id = current_user.get("user_id")
+        user_email = current_user.get("email")
+        
+        logger.info(f"🔐 Question sécurisée de {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
         
         # Ajouter les infos utilisateur à la requête
-        fastapi_request.state.user = user_auth
+        fastapi_request.state.user = current_user
         
-        # Récupération directe - plus de problème d'initialisation
+        # Récupération directe de la question
         question_text = request.text
         
         if not question_text:
@@ -384,7 +321,7 @@ async def ask_expert_secure(
                 logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
                 result = await process_rag(
                     question=question_text,
-                    user=user_auth,  # Passer les infos utilisateur authentifié au RAG
+                    user=current_user,  # Passer current_user de auth.py
                     language=request.language,
                     speed_mode=request.speed_mode
                 )
@@ -420,7 +357,7 @@ async def ask_expert_secure(
             conversation_id=conversation_id,
             question=question_text,
             response=answer,
-            user_id=user_auth['user_id'],  # Vrai user_id authentifié Supabase
+            user_id=user_id or "authenticated_user",  # user_id de auth.py
             language=request.language,
             rag_used=rag_used,
             rag_score=rag_score,
@@ -438,7 +375,7 @@ async def ask_expert_secure(
             language=request.language,
             response_time_ms=response_time_ms,
             mode=mode,
-            user=user_auth['email'],  # Email de l'utilisateur authentifié
+            user=user_email,  # Email de l'utilisateur authentifié via auth.py
             logged=logged
         )
     
@@ -446,7 +383,6 @@ async def ask_expert_secure(
         raise
     except Exception as e:
         logger.error(f"❌ Erreur ask expert sécurisé: {e}")
-        # Log détaillé pour debug
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
@@ -547,7 +483,6 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
         raise
     except Exception as e:
         logger.error(f"❌ Erreur ask expert: {e}")
-        # Log détaillé pour debug
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
@@ -692,27 +627,39 @@ async def get_conversation_history(request: Request, limit: int = 10):
 # =============================================================================
 
 @router.get("/auth-status")
-async def get_auth_status(user_auth = Depends(verify_supabase_token)):
+async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None):
     """Vérifier le statut d'authentification - REQUIERT TOKEN"""
+    if not AUTH_AVAILABLE or not current_user:
+        raise HTTPException(
+            status_code=503,
+            detail="Service d'authentification non disponible"
+        )
+    
     return {
         "authenticated": True,
-        "user_id": user_auth['user_id'],
-        "email": user_auth['email'],
-        "message": "Utilisateur authentifié avec succès",
+        "user_id": current_user.get('user_id'),
+        "email": current_user.get('email'),
+        "message": "Utilisateur authentifié avec succès via auth.py",
         "timestamp": datetime.now().isoformat()
     }
 
 @router.post("/test-auth")
 async def test_auth_endpoint(
     request: QuestionRequest,
-    user_auth = Depends(verify_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
     """Endpoint de test pour vérifier l'authentification - REQUIERT TOKEN"""
+    if not AUTH_AVAILABLE or not current_user:
+        raise HTTPException(
+            status_code=503,
+            detail="Service d'authentification non disponible"
+        )
+    
     return {
         "success": True,
-        "message": "🔐 Authentification fonctionnelle !",
-        "user_email": user_auth['email'],
-        "user_id": user_auth['user_id'][:8] + "...",
+        "message": "🔐 Authentification fonctionnelle via auth.py !",
+        "user_email": current_user.get('email'),
+        "user_id": str(current_user.get('user_id', ''))[:8] + "...",
         "question_received": request.text,
         "question_length": len(request.text),
         "special_chars": [c for c in request.text if ord(c) > 127],
@@ -782,7 +729,7 @@ logger.info("🔤 VALIDATION UTF-8 FONCTIONNELLE avec field_validator")
 logger.info("🔧 Compatible FastAPI - plus d'erreur 500")
 logger.info("🧬 LIGNÉE GÉNÉTIQUE: Prompts génériques sauf mention utilisateur")
 logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
-logger.info(f"🔐 Authentification JWT: {'Activée' if JWT_AVAILABLE else 'PyJWT requis'}")
-logger.info(f"🛡️ Sécurité /ask: Authentification Supabase OBLIGATOIRE")
+logger.info(f"🔐 Authentification centralisée: {'Activée' if AUTH_AVAILABLE else 'auth.py requis'}")
+logger.info(f"🛡️ Sécurité /ask: Authentification via auth.py")
 logger.info(f"🌐 Endpoint public /ask-public: Toujours disponible sans auth")
 logger.info(f"📝 Topics suggérés: Terminologie générique (poulets de chair/broiler chickens/pollos de engorde)")

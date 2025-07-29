@@ -2,6 +2,7 @@
 app/api/v1/expert.py - VERSION COMPLÈTE AVEC AUTHENTIFICATION SUPABASE SÉCURISÉE
 OPTION A: Authentification OBLIGATOIRE sur /ask
 SOLUTION UTF-8: Validation Pydantic ultra-permissive fonctionnelle
+MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
 """
 import os
 import logging
@@ -252,22 +253,28 @@ def get_user_id_from_request(request: Request) -> str:
         return f"anon_{uuid.uuid4().hex[:8]}"
 
 # =============================================================================
-# PROMPTS MULTI-LANGUES
+# PROMPTS MULTI-LANGUES AVEC CONSIGNE LIGNÉE GÉNÉTIQUE
 # =============================================================================
 
 EXPERT_PROMPTS = {
-    "fr": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair Ross 308. 
-Réponds de manière précise et pratique en français. Tu peux utiliser tons les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, etc.) dans tes réponses.""",
+    "fr": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair. 
+Réponds de manière précise et pratique en français. Tu peux utiliser tous les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, etc.) dans tes réponses.
+
+IMPORTANT: Ne fais pas référence à une lignée génétique comme Ross ou Cobb, sauf si l'utilisateur la mentionne dans sa question. Donne une réponse générale qui s'applique à tous les poulets de chair.""",
     
-    "en": """You are a veterinary expert specialized in animal health and nutrition, particularly for Ross 308 broiler chickens.
-Answer precisely and practically in English, providing advice based on industry best practices.""",
+    "en": """You are a veterinary expert specialized in animal health and nutrition, particularly for broiler chickens.
+Answer precisely and practically in English, providing advice based on industry best practices.
+
+IMPORTANT: Do not reference specific genetic lines like Ross or Cobb, unless the user mentions them in their question. Provide general answers that apply to all broiler chickens.""",
     
-    "es": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde Ross 308.
-Responde de manera precisa y práctica en español. Puedes usar todos los caractères especiales del español (ñ, ¿, ¡, acentos, etc.) en tus respuestas."""
+    "es": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde.
+Responde de manera precisa y práctica en español. Puedes usar todos los caractères especiales del español (ñ, ¿, ¡, acentos, etc.) en tus respuestas.
+
+IMPORTANTE: No hagas referencia a líneas genéticas como Ross o Cobb, a menos que el usuario las mencione en su pregunta. Da respuestas generales que se apliquen a todos los pollos de engorde."""
 }
 
 def get_expert_prompt(language: str) -> str:
-    """Get expert system prompt for language"""
+    """Get expert system prompt for language avec consigne lignée génétique"""
     return EXPERT_PROMPTS.get(language.lower(), EXPERT_PROMPTS["fr"])
 
 # =============================================================================
@@ -275,21 +282,21 @@ def get_expert_prompt(language: str) -> str:
 # =============================================================================
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback"""
+    """Réponse de fallback avec lignée générique"""
     try:
         safe_question = str(question)[:50] if question else "votre question"
     except:
         safe_question = "votre question"
     
     fallback_responses = {
-        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{safe_question}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène.",
-        "en": f"I am a veterinary expert. For your question about '{safe_question}...', I recommend monitoring environmental parameters and maintaining good hygiene practices.",
-        "es": f"Soy un experto veterinario. Para su pregunta sobre '{safe_question}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene."
+        "fr": f"Je suis un expert vétérinaire. Pour votre question sur '{safe_question}...', je recommande de surveiller les paramètres environnementaux et de maintenir de bonnes pratiques d'hygiène pour vos poulets de chair.",
+        "en": f"I am a veterinary expert. For your question about '{safe_question}...', I recommend monitoring environmental parameters and maintaining good hygiene practices for your broiler chickens.",
+        "es": f"Soy un experto veterinario. Para su pregunta sobre '{safe_question}...', recomiendo monitorear los parámetros ambientales y mantener buenas prácticas de higiene para sus pollos de engorde."
     }
     return fallback_responses.get(language.lower(), fallback_responses["fr"])
 
 async def process_question_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> str:
-    """Process question using OpenAI"""
+    """Process question using OpenAI avec consigne lignée génétique"""
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
@@ -299,6 +306,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
             return get_fallback_response(question, language)
         
         openai.api_key = api_key
+        # get_expert_prompt contient maintenant la consigne lignée génétique
         system_prompt = get_expert_prompt(language)
         
         safe_question = str(question)
@@ -582,7 +590,7 @@ async def submit_feedback(request: FeedbackRequest):
 
 @router.get("/topics")
 async def get_suggested_topics(language: str = "fr"):
-    """Get suggested topics"""
+    """Get suggested topics avec lignées génériques"""
     try:
         lang = language.lower() if language else "fr"
         if lang not in ["fr", "en", "es"]:
@@ -591,7 +599,7 @@ async def get_suggested_topics(language: str = "fr"):
         topics_by_language = {
             "fr": [
                 "Protocoles Compass pour l'analyse de performance",
-                "Problèmes de croissance poulets Ross 308",
+                "Problèmes de croissance poulets de chair",
                 "Température optimale pour élevage (32°C)",
                 "Mortalité élevée - diagnostic",
                 "Ventilation et qualité d'air",
@@ -600,7 +608,7 @@ async def get_suggested_topics(language: str = "fr"):
             ],
             "en": [
                 "Compass Performance Analysis Protocol",
-                "Ross 308 growth problems",
+                "Broiler chicken growth problems",
                 "Optimal temperature for farming (32°C)",
                 "High mortality - diagnosis", 
                 "Ventilation and air quality",
@@ -609,7 +617,7 @@ async def get_suggested_topics(language: str = "fr"):
             ],
             "es": [
                 "Protocolos Compass análisis rendimiento",
-                "Problemas crecimiento pollos Ross 308",
+                "Problemas crecimiento pollos de engorde",
                 "Temperatura óptima crianza (32°C)",
                 "Mortalidad alta - diagnóstico",
                 "Ventilación y calidad aire",
@@ -623,7 +631,8 @@ async def get_suggested_topics(language: str = "fr"):
         return {
             "topics": topics,
             "language": lang,
-            "count": len(topics)
+            "count": len(topics),
+            "note": "Topics génériques pour tous poulets de chair"
         }
     except Exception as e:
         logger.error(f"❌ Erreur topics: {e}")
@@ -743,6 +752,7 @@ async def test_utf8_direct(fastapi_request: Request):
             "special_chars_detected": [c for c in question_text if ord(c) > 127],
             "response": answer,
             "method": "direct_body_parsing",
+            "genetic_line_note": "Response uses generic 'broiler chickens' terminology",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -770,7 +780,9 @@ else:
 
 logger.info("🔤 VALIDATION UTF-8 FONCTIONNELLE avec field_validator")
 logger.info("🔧 Compatible FastAPI - plus d'erreur 500")
+logger.info("🧬 LIGNÉE GÉNÉTIQUE: Prompts génériques sauf mention utilisateur")
 logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
 logger.info(f"🔐 Authentification JWT: {'Activée' if JWT_AVAILABLE else 'PyJWT requis'}")
 logger.info(f"🛡️ Sécurité /ask: Authentification Supabase OBLIGATOIRE")
 logger.info(f"🌐 Endpoint public /ask-public: Toujours disponible sans auth")
+logger.info(f"📝 Topics suggérés: Terminologie générique (poulets de chair/broiler chickens/pollos de engorde)")
