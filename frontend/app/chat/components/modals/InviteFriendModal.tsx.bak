@@ -89,12 +89,14 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [errors, setErrors] = useState<string[]>([])
   const [successMessage, setSuccessMessage] = useState('')
 
-  // CORRECTION 3: Vérification que l'utilisateur est connecté
+  // CORRECTION 3: Vérification que l'utilisateur est connecté avec fallback
   React.useEffect(() => {
-    if (!user?.email) {
+    if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
+    } else {
+      setErrors([]) // Clear errors si utilisateur trouvé
     }
-  }, [user])
+  }, [currentUser])
 
   // Validation des emails
   const validateEmails = (emailString: string): { valid: string[], invalid: string[] } => {
@@ -122,8 +124,8 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     setErrors([])
     setSuccessMessage('')
     
-    // CORRECTION 4: Validation utilisateur connecté
-    if (!user?.email) {
+    // CORRECTION 4: Validation utilisateur connecté avec fallback
+    if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
       return
     }
@@ -158,18 +160,18 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     try {
       console.log('🚀 [InviteFriendModal] Début envoi invitations:', {
         emails: valid,
-        userEmail: user.email,
-        userName: user.name
+        userEmail: currentUser.email,
+        userName: currentUser.name
       })
       
-      // CORRECTION 5: Utiliser les vraies données utilisateur
+      // CORRECTION 5: Utiliser les vraies données utilisateur avec fallback
       const result = await invitationService.sendInvitation(
         valid, 
         personalMessage.trim(), 
         {
-          name: user.name || user.email?.split('@')[0] || 'Utilisateur Intelia',
-          email: user.email, // CRITIQUE: Email exact de l'utilisateur connecté
-          language: user.language || 'fr'
+          name: currentUser.name || currentUser.email?.split('@')[0] || 'Utilisateur Intelia',
+          email: currentUser.email, // CRITIQUE: Email exact de l'utilisateur connecté
+          language: currentUser.language || 'fr'
         }
       )
       
@@ -230,8 +232,37 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return valid.length
   }
 
-  // CORRECTION 6: Affichage désactivé si pas d'utilisateur
-  if (!user?.email) {
+  // CORRECTION: Récupération flexible des données utilisateur
+  const getCurrentUser = () => {
+    // Essayer plusieurs sources pour les données utilisateur
+    if (user?.email) {
+      return user
+    }
+    
+    // Fallback: essayer de récupérer depuis localStorage/sessionStorage
+    try {
+      const supabaseAuth = localStorage.getItem('supabase.auth.token') || sessionStorage.getItem('supabase.auth.token')
+      if (supabaseAuth) {
+        const authData = JSON.parse(supabaseAuth)
+        if (authData.user?.email) {
+          return {
+            email: authData.user.email,
+            name: authData.user.user_metadata?.name || authData.user.name || authData.user.email.split('@')[0],
+            id: authData.user.id
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Erreur récupération auth depuis storage:', e)
+    }
+    
+    return null
+  }
+
+  const currentUser = getCurrentUser()
+
+  // CORRECTION 6: Affichage désactivé si vraiment pas d'utilisateur
+  if (!currentUser?.email) {
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -243,9 +274,13 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Connexion requise
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mb-4">
             Vous devez être connecté pour envoyer des invitations
           </p>
+          <div className="text-xs text-gray-500">
+            Debug: user={JSON.stringify(user)}<br/>
+            localStorage auth: {localStorage.getItem('supabase.auth.token') ? 'présent' : 'absent'}
+          </div>
         </div>
         
         <div className="flex justify-center">
@@ -273,7 +308,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           Invitez vos collègues à découvrir Intelia Expert
         </h2>
         <p className="text-sm text-gray-600">
-          Invitations envoyées par <strong>{user.name || user.email}</strong>
+          Invitations envoyées par <strong>{currentUser.name || currentUser.email}</strong>
         </p>
       </div>
 
@@ -401,3 +436,5 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     </div>
   )
 }
+
+// new
