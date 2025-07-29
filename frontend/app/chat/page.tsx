@@ -7,7 +7,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 const supabase = createClientComponentClient()
 
 // ==================== TYPES ÉTENDUS POUR LOGGING ====================
-// ==================== TYPES ÉTENDUS POUR LOGGING ====================
 interface Message {
   id: string
   content: string
@@ -88,14 +87,14 @@ class ConversationService {
     }
   }
 
-  async sendFeedback(conversationId: string, feedback: 1 | -1, comment?: string): Promise<void> {
+  async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('📊 Logging désactivé - feedback non envoyé:', conversationId)
       return
     }
 
     try {
-      console.log('📊 Envoi feedback:', conversationId, feedback, comment ? 'avec commentaire' : 'sans commentaire')
+      console.log('📊 Envoi feedback:', conversationId, feedback)
       console.log('📡 URL feedback:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback`)
       
       const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
@@ -104,10 +103,7 @@ class ConversationService {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ 
-          feedback,
-          comment: comment || null
-        })
+        body: JSON.stringify({ feedback })
       })
       
       if (!response.ok) {
@@ -403,8 +399,6 @@ function adaptResponse(data: any, originalQuestion: string): ExpertApiResponse {
 }
 
 // ==================== FONCTION generateAIResponse ====================
-// ==================== CORRECTION generateAIResponse - ÉLIMINER request_data ====================
-
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
   const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
   
@@ -494,7 +488,6 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
   }
 }
 
-
 // ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
 const translations = {
   fr: {
@@ -504,7 +497,6 @@ const translations = {
     'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
     'chat.helpfulResponse': 'Réponse utile',
     'chat.notHelpfulResponse': 'Réponse non utile',
-
     'chat.noConversations': 'Aucune conversation',
     'nav.newConversation': 'Nouvelle conversation',
     'nav.history': 'Historique',
@@ -556,7 +548,6 @@ const translations = {
     'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
     'chat.helpfulResponse': 'Helpful response',
     'chat.notHelpfulResponse': 'Not helpful response',
-
     'chat.noConversations': 'No conversations',
     'nav.newConversation': 'New conversation',
     'nav.history': 'History',
@@ -608,7 +599,6 @@ const translations = {
     'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
     'chat.helpfulResponse': 'Respuesta útil',
     'chat.notHelpfulResponse': 'Respuesta no útil',
-
     'chat.noConversations': 'Sin conversaciones',
     'nav.newConversation': 'Nueva conversación',
     'nav.history': 'Historial',
@@ -961,9 +951,6 @@ const useAuthStore = () => {
             firstName: session.user.user_metadata?.first_name || '',
             lastName: session.user.user_metadata?.last_name || '',
             phone: session.user.user_metadata?.phone || '',
-            countryCode: session.user.user_metadata?.country_code || '',
-            areaCode: session.user.user_metadata?.area_code || '',
-            phoneNumber: session.user.user_metadata?.phone_number || '',
             country: session.user.user_metadata?.country || '',
             linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
             companyName: session.user.user_metadata?.company_name || '',
@@ -1039,9 +1026,6 @@ const useAuthStore = () => {
           first_name: data.firstName,
           last_name: data.lastName,
           phone: data.phone,
-          country_code: data.countryCode,
-          area_code: data.areaCode,
-          phone_number: data.phoneNumber,
           country: data.country,
           linkedin_profile: data.linkedinProfile,
           company_name: data.companyName,
@@ -1064,9 +1048,6 @@ const useAuthStore = () => {
         ...data,
         name: `${data.firstName} ${data.lastName}`.trim(),
         phone: data.phone,
-        countryCode: data.countryCode,
-        areaCode: data.areaCode,
-        phoneNumber: data.phoneNumber,
         country: data.country,
         linkedinProfile: data.linkedinProfile,
         companyName: data.companyName,
@@ -1297,107 +1278,6 @@ const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   />
 )
 
-// ==================== MODAL FEEDBACK ====================
-const FeedbackModal = ({ isOpen, onClose, feedbackType, onSubmit }: {
-  isOpen: boolean
-  onClose: () => void
-  feedbackType: 'positive' | 'negative'
-  onSubmit: (comment: string) => void
-}) => {
-  const [comment, setComment] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true)
-    try {
-      await onSubmit(comment)
-      setComment('')
-      onClose()
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi du feedback:', error)
-    }
-    setIsSubmitting(false)
-  }
-
-  const handleClose = () => {
-    setComment('')
-    onClose()
-  }
-
-  if (!isOpen) return null
-
-  const isPositive = feedbackType === 'positive'
-  
-  return (
-    <>
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
-        onClick={handleClose}
-      />
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-      >
-        <div 
-          className="bg-white rounded-lg shadow-xl max-w-md w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              {isPositive ? 'Commentaire positif' : 'Commentaire négatif'}
-            </h2>
-            
-            <p className="text-sm text-gray-600 mb-4">
-              Veuillez fournir des détails : (facultatif)
-            </p>
-            
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={isPositive ? 
-                "Dans quelle mesure cette réponse était-elle satisfaisante ?" : 
-                "Dans quelle mesure cette réponse n'était-elle pas satisfaisante ?"
-              }
-              className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={4}
-              maxLength={500}
-            />
-            
-            <p className="text-xs text-gray-500 mt-2 mb-4">
-              En soumettant ce rapport, vous envoyez l'intégralité de la conversation actuelle à Anthropic pour nous aider à améliorer nos modèles. <span className="text-blue-600 cursor-pointer">En savoir plus</span>
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={handleClose}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
-                disabled={isSubmitting}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 font-medium"
-              >
-                {isSubmitting ? 'Envoi...' : 'Envoyer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal de feedback */}
-      <FeedbackModal
-        isOpen={feedbackModal.isOpen}
-        onClose={() => setFeedbackModal(prev => ({ ...prev, isOpen: false }))}
-        feedbackType={feedbackModal.type}
-        onSubmit={handleFeedbackSubmit}
-      />
-    </>
-  )
-}
-
 // ==================== COMPOSANTS MODAL ====================
 const Modal = ({ isOpen, onClose, title, children }: {
   isOpen: boolean
@@ -1451,9 +1331,6 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
     lastName: user?.lastName || '',
     email: user?.email || '',
     phone: user?.phone || '',
-    countryCode: user?.countryCode || '',
-    areaCode: user?.areaCode || '',
-    phoneNumber: user?.phoneNumber || '',
     country: user?.country || '',
     linkedinProfile: user?.linkedinProfile || '',
     companyName: user?.companyName || '',
@@ -1642,74 +1519,35 @@ const UserInfoModal = ({ user, onClose }: { user: any, onClose: () => void }) =>
                 />
               </div>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.country')}</label>
-                <select
-                  value={formData.country}
-                  onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Sélectionner un pays</option>
-                  <option value="CA">🇨🇦 Canada</option>
-                  <option value="US">🇺🇸 États-Unis</option>
-                  <option value="FR">🇫🇷 France</option>
-                  <option value="BE">🇧🇪 Belgique</option>
-                  <option value="CH">🇨🇭 Suisse</option>
-                  <option value="MX">🇲🇽 Mexique</option>
-                  <option value="BR">🇧🇷 Brésil</option>
-                  <option value="other">🌍 Autre</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Country Code</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.phone')}</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.country')}</label>
                   <select
-                    value={formData.countryCode || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, countryCode: e.target.value }))}
+                    value={formData.country}
+                    onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">+</option>
-                    <option value="+1">+1</option>
-                    <option value="+33">+33</option>
-                    <option value="+32">+32</option>
-                    <option value="+41">+41</option>
-                    <option value="+52">+52</option>
-                    <option value="+55">+55</option>
-                    <option value="+44">+44</option>
-                    <option value="+49">+49</option>
-                    <option value="+39">+39</option>
-                    <option value="+34">+34</option>
+                    <option value="">Sélectionner un pays</option>
+                    <option value="CA">🇨🇦 Canada</option>
+                    <option value="US">🇺🇸 États-Unis</option>
+                    <option value="FR">🇫🇷 France</option>
+                    <option value="BE">🇧🇪 Belgique</option>
+                    <option value="CH">🇨🇭 Suisse</option>
+                    <option value="MX">🇲🇽 Mexique</option>
+                    <option value="BR">🇧🇷 Brésil</option>
+                    <option value="other">🌍 Autre</option>
                   </select>
-                  <p className="text-red-500 text-xs mt-1">Required!</p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Area Code</label>
-                  <input
-                    type="tel"
-                    value={formData.areaCode || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, areaCode: e.target.value }))}
-                    placeholder="555"
-                    maxLength={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-red-500 text-xs mt-1">Required!</p>
-                  <p className="text-gray-400 text-xs">0/3</p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={formData.phoneNumber || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                    placeholder="1234567"
-                    maxLength={7}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-red-500 text-xs mt-1">Required!</p>
-                  <p className="text-gray-400 text-xs">0/7</p>
                 </div>
               </div>
 
@@ -2532,17 +2370,6 @@ export default function ChatInterface() {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
-  const [feedbackModal, setFeedbackModal] = useState<{
-    isOpen: boolean
-    messageId: string
-    conversationId: string
-    type: 'positive' | 'negative'
-  }>({
-    isOpen: false,
-    messageId: '',
-    conversationId: '',
-    type: 'positive'
-  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
@@ -2621,111 +2448,9 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ FONCTION handleSendMessage AVEC COMMANDE /invite INTÉGRÉE
+  // ✅ CORRECTION: handleSendMessage utilise TOUJOURS l'endpoint sécurisé avec JWT
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
-
-    // ✅ DÉTECTION COMMANDE INVITE
-    if (text.trim().toLowerCase().startsWith('/invite')) {
-      const emailPart = text.replace(/^\/invite\s*/i, '').trim()
-      
-      if (!emailPart) {
-        // Afficher une aide si pas d'email fourni
-        const helpMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: `Pour inviter un ami, utilisez la commande :\n\n**/invite email@exemple.com**\n\nOu pour plusieurs personnes :\n**/invite email1@exemple.com, email2@exemple.com**\n\nVous pouvez aussi ajouter un message :\n**/invite email@exemple.com "Découvre cette super app !"**`,
-          isUser: false,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          content: text.trim(),
-          isUser: true,
-          timestamp: new Date()
-        }, helpMessage])
-        setInputMessage('')
-        return
-      }
-
-      // Traiter la commande d'invitation
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        content: text.trim(),
-        isUser: true,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, userMessage])
-      setInputMessage('')
-      setIsLoadingChat(true)
-
-      try {
-        // Extraire emails et message personnel
-        let emails = emailPart
-        let personalMessage = ''
-        
-        // Détecter si il y a un message entre guillemets
-        const messageMatch = emailPart.match(/(.+?)\s+"(.+)"$/)
-        if (messageMatch) {
-          emails = messageMatch[1]
-          personalMessage = messageMatch[2]
-        }
-
-        // Nettoyer les emails
-        const emailList = emails.split(',').map(email => email.trim()).filter(email => email)
-        
-        if (emailList.length === 0) {
-          throw new Error('Aucune adresse email valide trouvée')
-        }
-
-        console.log('📧 Envoi invitations pour:', emailList)
-
-        const session = await getValidSession()
-        if (!session?.access_token) {
-          throw new Error('Session expirée')
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/v1/invitations/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            emails: emailList,
-            personal_message: personalMessage,
-            sender_name: user?.name || user?.email || 'Utilisateur Intelia',
-            sender_email: user?.email || ''
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Erreur lors de l\'envoi des invitations')
-        }
-
-        const result = await response.json()
-        
-        const successMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: `✅ **Invitations envoyées avec succès !**\n\n📧 **${result.sent_count || emailList.length} personne(s) invitée(s) :**\n${emailList.map(email => `• ${email}`).join('\n')}\n\n${personalMessage ? `💬 **Message personnel :** "${personalMessage}"\n\n` : ''}🎉 Vos amis recevront un email d'invitation personnalisé avec votre nom comme référent !`,
-          isUser: false,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, successMessage])
-
-      } catch (error) {
-        console.error('❌ Erreur invitation:', error)
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: `❌ **Erreur lors de l'envoi des invitations**\n\n${error instanceof Error ? error.message : 'Erreur technique'}\n\nVeuillez vérifier les adresses email et réessayer.`,
-          isUser: false,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, errorMessage])
-      } finally {
-        setIsLoadingChat(false)
-      }
-      return
-    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -2758,3 +2483,231 @@ export default function ChatInterface() {
         console.log('📂 [handleSendMessage] Ajout à l\'historique local:', response.conversation_id)
         addConversation(response.conversation_id, text.trim(), response.response)
       } else {
+        console.warn('⚠️ [handleSendMessage] Pas de user.id ou conversation_id pour historique local')
+      }
+      
+    } catch (error) {
+      console.error('❌ [handleSendMessage] Error generating response:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: error instanceof Error ? error.message : t('chat.errorMessage'),
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoadingChat(false)
+    }
+  }
+
+  const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
+    const message = messages.find(msg => msg.id === messageId)
+    
+    if (!message || !message.conversation_id) {
+      console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
+      alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
+      return
+    }
+
+    try {
+      console.log('📊 Envoi feedback pour conversation:', message.conversation_id, feedback)
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback } : msg
+      ))
+
+      const feedbackValue = feedback === 'positive' ? 1 : -1
+      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
+      
+      console.log(`✅ Feedback ${feedback} enregistré avec succès pour conversation ${message.conversation_id}`)
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi feedback:', error)
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback: null } : msg
+      ))
+      
+      alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
+    }
+  }
+
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: t('chat.welcome'),
+      isUser: false,
+      timestamp: new Date()
+    }])
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('fr-FR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
+  return (
+    <>
+      <ZohoSalesIQ user={user} language={currentLanguage} />
+
+      <div className="h-screen bg-gray-50 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Boutons gauche */}
+            <div className="flex items-center space-x-2">
+              <HistoryMenu />
+              <button
+                onClick={handleNewConversation}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title={t('nav.newConversation')}
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Titre centré avec logo */}
+            <div className="flex-1 flex justify-center items-center space-x-3">
+              <InteliaLogo className="w-8 h-8" />
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+              </div>
+            </div>
+            
+            {/* Avatar utilisateur à droite */}
+            <div className="flex items-center">
+              <UserMenuButton />
+            </div>
+          </div>
+        </header>
+
+        {/* Zone de messages */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Date */}
+              {messages.length > 0 && (
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                    {getCurrentDate()}
+                  </span>
+                </div>
+              )}
+
+              {messages.map((message, index) => (
+                <div key={message.id}>
+                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
+                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                      </div>
+                    )}
+                    
+                    <div className="max-w-xs lg:max-w-2xl">
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {/* Boutons de feedback avec conversation_id */}
+                      {!message.isUser && index > 0 && message.conversation_id && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+                            title={t('chat.helpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'}`}
+                            title={t('chat.notHelpfulResponse')}
+                            disabled={message.feedback !== null}
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                          {message.feedback && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              Merci pour votre retour !
+                            </span>
+                          )}
+                          {message.conversation_id && (
+                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
+                              🔗
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                        <UserIcon className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Indicateur de frappe */}
+              {isLoadingChat && (
+                <div className="flex items-start space-x-3">
+                  <div className="relative">
+                    <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Zone de saisie */}
+          <div className="px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendMessage()
+                      }
+                    }}
+                    placeholder={t('chat.placeholder')}
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    disabled={isLoadingChat}
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoadingChat || !inputMessage.trim()}
+                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                >
+                  <PaperAirplaneIcon />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
