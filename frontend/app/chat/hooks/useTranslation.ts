@@ -1,0 +1,46 @@
+import { useState, useEffect } from 'react'
+import { translations } from '../utils/translations'
+import { Translation } from '../types'
+
+// Hook de traduction simple
+export const useTranslation = (): Translation => {
+  const [currentLanguage, setCurrentLanguage] = useState('fr')
+  
+  const t = (key: string): string => {
+    return translations[currentLanguage as keyof typeof translations]?.[key as keyof typeof translations['fr']] || key
+  }
+  
+  const changeLanguage = (lang: string) => {
+    console.log('🌐 [useTranslation] changeLanguage appelée:', currentLanguage, '→', lang)
+    setCurrentLanguage(lang)
+    localStorage.setItem('intelia_language', lang)
+    console.log('✅ [useTranslation] État langue mis à jour:', lang)
+    
+    // Force un re-render de tous les composants qui utilisent ce hook
+    window.dispatchEvent(new Event('languageChanged'))
+  }
+  
+  useEffect(() => {
+    const savedLang = localStorage.getItem('intelia_language')
+    if (savedLang && translations[savedLang as keyof typeof translations]) {
+      console.log('🔄 [useTranslation] Chargement langue sauvegardée:', savedLang)
+      setCurrentLanguage(savedLang)
+    }
+  }, [])
+
+  // Écouter les changements de langue globaux
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      const savedLang = localStorage.getItem('intelia_language')
+      if (savedLang && savedLang !== currentLanguage) {
+        console.log('🔄 [useTranslation] Mise à jour depuis événement global:', savedLang)
+        setCurrentLanguage(savedLang)
+      }
+    }
+
+    window.addEventListener('languageChanged', handleLanguageChange)
+    return () => window.removeEventListener('languageChanged', handleLanguageChange)
+  }, [currentLanguage])
+  
+  return { t, changeLanguage, currentLanguage }
+}
