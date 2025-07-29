@@ -1,7 +1,7 @@
 """
-app/api/v1/expert.py - VERSION NETTOYÉE
-SUPPRESSION: Endpoints non-utilisés qui échouent dans les tests
-CONSERVATION: Tous les endpoints fonctionnels et diagnostic auth (car il fonctionne)
+app/api/v1/expert.py - VERSION COMPLÈTE AVEC DIAGNOSTICS
+CONSERVATION: Tous les endpoints et fonctionnalités de l'original
+AJOUT: Diagnostics ciblés pour résoudre le problème d'authentification
 """
 import os
 import logging
@@ -477,7 +477,7 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# TOUS LES AUTRES ENDPOINTS FONCTIONNELS (CONSERVÉS INTÉGRALEMENT)
+# TOUS LES AUTRES ENDPOINTS DE L'ORIGINAL (CONSERVÉS INTÉGRALEMENT)
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
@@ -689,9 +689,50 @@ async def get_suggested_topics(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 # =============================================================================
-# ENDPOINTS DEBUG UTILES (CONSERVÉS CAR FONCTIONNELS)
+# ENDPOINTS UTILITAIRES CORRIGÉS
 # =============================================================================
 
+@router.get("/auth-status")
+async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None):
+    """Vérifier le statut d'authentification"""
+    if not AUTH_AVAILABLE or not current_user:
+        raise HTTPException(
+            status_code=503,
+            detail="Service d'authentification non disponible"
+        )
+    
+    return {
+        "authenticated": True,
+        "user_id": current_user.get('user_id'),
+        "email": current_user.get('email'),
+        "message": "Utilisateur authentifié avec succès via auth.py",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@router.post("/test-auth")
+async def test_auth_endpoint(
+    request_data: QuestionRequest,  # ✅ CORRECTION: Mapping automatique
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
+):
+    """Endpoint de test pour vérifier l'authentification"""
+    if not AUTH_AVAILABLE or not current_user:
+        raise HTTPException(
+            status_code=503,
+            detail="Service d'authentification non disponible"
+        )
+    
+    return {
+        "success": True,
+        "message": "🔐 Authentification fonctionnelle via auth.py !",
+        "user_email": current_user.get('email'),
+        "user_id": str(current_user.get('user_id', ''))[:8] + "...",
+        "question_received": request_data.text,
+        "question_length": len(request_data.text),
+        "special_chars": [c for c in request_data.text if ord(c) > 127],
+        "timestamp": datetime.now().isoformat()
+    }
+
+# ✅ AJOUT: Endpoint de diagnostic complet
 @router.get("/debug-system")
 async def debug_system_info():
     """Endpoint de diagnostic système complet"""
@@ -866,8 +907,8 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ EXPERT.PY NETTOYÉ - ENDPOINTS INUTILES SUPPRIMÉS")
+logger.info("✅ EXPERT.PY COMPLET AVEC DIAGNOSTICS CIBLÉS")
 logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
 logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
 logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
-logger.info("✅ ENDPOINTS SUPPRIMÉS: /auth-status, /test-auth (retournaient 401/503)")
+logger.info("✅ PRÊT POUR DIAGNOSTIC AUTHENTIFICATION")
