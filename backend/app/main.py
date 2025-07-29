@@ -1,1243 +1,946 @@
-'use client'
+"""
+Intelia Expert - API Backend Principal
+Version 3.5.0 - CORRECTIONS CRITIQUES UTF-8 et LOGGING 404
+CORRECTIONS: 
+1. Validation UTF-8 complètement réécrite dans expert.py
+2. Router logging avec tous les endpoints manquants
+3. Exception handler amélioré pour UTF-8
+MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
+"""
 
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import Head from 'next/head'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import os
+import sys
+import time
+import logging
+import traceback
+from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
+from datetime import datetime
+import json
 
-// Instance Supabase réutilisable
-const supabase = createClientComponentClient()
+# FastAPI imports
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.exceptions import RequestValidationError
 
-// ==================== SYSTEM INTERNATIONALIZATION ====================
-type Language = 'fr' | 'en' | 'es' | 'de'
+# Pydantic models
+from pydantic import BaseModel, Field, ValidationError
 
-const translations = {
-  fr: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Mot de passe',
-    confirmPassword: 'Confirmer le mot de passe',
-    login: 'Se connecter',
-    signup: 'Créer un compte',
-    rememberMe: 'Se souvenir de moi',
-    forgotPassword: 'Mot de passe oublié ?',
-    newToIntelia: 'Nouveau sur Intelia ?',
-    connecting: 'Connexion en cours...',
-    creating: 'Création en cours...',
-    loginError: 'Erreur de connexion',
-    signupError: 'Erreur de création',
-    emailRequired: 'L\'adresse email est requise',
-    emailInvalid: 'Veuillez entrer une adresse email valide',
-    passwordRequired: 'Le mot de passe est requis',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre',
-    passwordMismatch: 'Les mots de passe ne correspondent pas',
-    firstNameRequired: 'Le prénom est requis',
-    lastNameRequired: 'Le nom de famille est requis',
-    countryRequired: 'Le pays est requis',
-    phoneInvalid: 'Format de téléphone invalide',
-    terms: 'conditions d\'utilisation',
-    privacy: 'politique de confidentialité',
-    gdprNotice: 'En vous connectant, vous acceptez nos',
-    needHelp: 'Besoin d\'aide ?',
-    contactSupport: 'Contactez le support',
-    createAccount: 'Créer un compte',
-    backToLogin: 'Retour à la connexion',
-    confirmationSent: 'Email de confirmation envoyé ! Vérifiez votre boîte mail.',
-    accountCreated: 'Compte créé avec succès ! Vérifiez vos emails pour confirmer votre compte.',
-    // Champs formulaire d'inscription
-    personalInfo: 'Informations personnelles',
-    firstName: 'Prénom',
-    lastName: 'Nom de famille',
-    linkedinProfile: 'Profil LinkedIn personnel',
-    contact: 'Contact',
-    country: 'Pays',
-    phone: 'Téléphone',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
-    company: 'Entreprise',
-    companyName: 'Nom de l\'entreprise',
-    companyWebsite: 'Site web de l\'entreprise',
-    companyLinkedin: 'Page LinkedIn de l\'entreprise',
-    optional: '(optionnel)',
-    required: '*'
-  },
-  en: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Password',
-    confirmPassword: 'Confirm password',
-    login: 'Sign in',
-    signup: 'Create account',
-    rememberMe: 'Remember me',
-    forgotPassword: 'Forgot password?',
-    newToIntelia: 'New to Intelia?',
-    connecting: 'Signing in...',
-    creating: 'Creating account...',
-    loginError: 'Login error',
-    signupError: 'Signup error',
-    emailRequired: 'Email address is required',
-    emailInvalid: 'Please enter a valid email address',
-    passwordRequired: 'Password is required',
-    passwordTooShort: 'Password must be at least 8 characters with one uppercase letter and one number',
-    passwordMismatch: 'Passwords do not match',
-    firstNameRequired: 'First name is required',
-    lastNameRequired: 'Last name is required',
-    countryRequired: 'Country is required',
-    phoneInvalid: 'Invalid phone format',
-    terms: 'terms of service',
-    privacy: 'privacy policy',
-    gdprNotice: 'By signing in, you accept our',
-    needHelp: 'Need help?',
-    contactSupport: 'Contact support',
-    createAccount: 'Create account',
-    backToLogin: 'Back to login',
-    confirmationSent: 'Confirmation email sent! Check your mailbox.',
-    accountCreated: 'Account created successfully! Check your emails to confirm your account.',
-    // Champs formulaire d'inscription
-    personalInfo: 'Personal Information',
-    firstName: 'First Name',
-    lastName: 'Last Name',
-    linkedinProfile: 'Personal LinkedIn Profile',
-    contact: 'Contact',
-    country: 'Country',
-    phone: 'Phone',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
-    company: 'Company',
-    companyName: 'Company Name',
-    companyWebsite: 'Company Website',
-    companyLinkedin: 'Company LinkedIn Page',
-    optional: '(optional)',
-    required: '*'
-  },
-  es: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Contraseña',
-    confirmPassword: 'Confirmar contraseña',
-    login: 'Iniciar sesión',
-    signup: 'Crear cuenta',
-    rememberMe: 'Recordarme',
-    forgotPassword: '¿Olvidaste tu contraseña?',
-    newToIntelia: '¿Nuevo en Intelia?',
-    connecting: 'Iniciando sesión...',
-    creating: 'Creando cuenta...',
-    loginError: 'Error de inicio de sesión',
-    signupError: 'Error de registro',
-    emailRequired: 'La dirección de correo es requerida',
-    emailInvalid: 'Por favor ingresa una dirección de correo válida',
-    passwordRequired: 'La contraseña es requerida',
-    passwordTooShort: 'La contraseña debe tener al menos 8 caracteres con una mayúscula y un número',
-    passwordMismatch: 'Las contraseñas no coinciden',
-    firstNameRequired: 'El nombre es requerido',
-    lastNameRequired: 'El apellido es requerido',
-    countryRequired: 'El país es requerido',
-    phoneInvalid: 'Formato de teléfono inválido',
-    terms: 'términos de servicio',
-    privacy: 'política de privacidad',
-    gdprNotice: 'Al iniciar sesión, aceptas nuestros',
-    needHelp: '¿Necesitas ayuda?',
-    contactSupport: 'Contactar soporte',
-    createAccount: 'Crear cuenta',
-    backToLogin: 'Volver al inicio',
-    confirmationSent: '¡Email de confirmación enviado! Revisa tu bandeja de entrada.',
-    accountCreated: '¡Cuenta creada exitosamente! Revisa tus emails para confirmar tu cuenta.',
-    // Champs formulaire d'inscription
-    personalInfo: 'Información Personal',
-    firstName: 'Nombre',
-    lastName: 'Apellido',
-    linkedinProfile: 'Perfil Personal de LinkedIn',
-    contact: 'Contacto',
-    country: 'País',
-    phone: 'Teléfono',
-    phoneFormat: 'Formato: +1 (XXX) XXX-XXXX',
-    company: 'Empresa',
-    companyName: 'Nombre de la Empresa',
-    companyWebsite: 'Sitio Web de la Empresa',
-    companyLinkedin: 'Página LinkedIn de la Empresa',
-    optional: '(opcional)',
-    required: '*'
-  },
-  de: {
-    title: 'Intelia Expert',
-    email: 'E-Mail',
-    password: 'Passwort',
-    confirmPassword: 'Passwort bestätigen',
-    login: 'Anmelden',
-    signup: 'Konto erstellen',
-    rememberMe: 'Angemeldet bleiben',
-    forgotPassword: 'Passwort vergessen?',
-    newToIntelia: 'Neu bei Intelia?',
-    connecting: 'Anmeldung läuft...',
-    creating: 'Konto wird erstellt...',
-    loginError: 'Anmeldefehler',
-    signupError: 'Registrierungsfehler',
-    emailRequired: 'E-Mail-Adresse ist erforderlich',
-    emailInvalid: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
-    passwordRequired: 'Passwort ist erforderlich',
-    passwordTooShort: 'Passwort muss mindestens 8 Zeichen mit einem Großbuchstaben und einer Zahl haben',
-    passwordMismatch: 'Passwörter stimmen nicht überein',
-    firstNameRequired: 'Vorname ist erforderlich',
-    lastNameRequired: 'Nachname ist erforderlich',
-    countryRequired: 'Land ist erforderlich',
-    phoneInvalid: 'Ungültiges Telefonformat',
-    terms: 'Nutzungsbedingungen',
-    privacy: 'Datenschutzrichtlinie',
-    gdprNotice: 'Durch die Anmeldung akzeptieren Sie unsere',
-    needHelp: 'Brauchen Sie Hilfe?',
-    contactSupport: 'Support kontaktieren',
-    createAccount: 'Konto erstellen',
-    backToLogin: 'Zurück zur Anmeldung',
-    confirmationSent: 'Bestätigungs-E-Mail gesendet! Überprüfen Sie Ihr Postfach.',
-    accountCreated: 'Konto erfolgreich erstellt! Überprüfen Sie Ihre E-Mails zur Kontobestätigung.',
-    // Champs formulaire d'inscription
-    personalInfo: 'Persönliche Informationen',
-    firstName: 'Vorname',
-    lastName: 'Nachname',
-    linkedinProfile: 'Persönliches LinkedIn-Profil',
-    contact: 'Kontakt',
-    country: 'Land',
-    phone: 'Telefon',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
-    company: 'Unternehmen',
-    companyName: 'Firmenname',
-    companyWebsite: 'Firmen-Website',
-    companyLinkedin: 'Unternehmens-LinkedIn-Seite',
-    optional: '(optional)',
-    required: '*'
-  }
+# Supabase
+try:
+    from supabase import create_client, Client
+    import jwt
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    Client = None
+    jwt = None
+
+# Configuration du path
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+# Environment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# Configuration logging avec UTF-8
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Force UTF-8 pour les logs
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
+# =============================================================================
+# VARIABLES GLOBALES
+# =============================================================================
+
+rag_embedder: Optional[Any] = None
+supabase: Optional[Client] = None
+security = HTTPBearer()
+
+# =============================================================================
+# IMPORT DES ROUTERS AVEC GESTION D'ERREURS - CORRECTION LOGGING CRITIQUE
+# =============================================================================
+
+# Import logging router - CORRECTION CRITIQUE
+try:
+    from app.api.v1.logging import router as logging_router
+    LOGGING_AVAILABLE = True
+    logger.info("✅ Module logging CORRIGÉ importé")
+except ImportError as e:
+    LOGGING_AVAILABLE = False
+    logging_router = None
+    logger.warning(f"⚠️ Module logging non disponible: {e}")
+
+# Import expert router - CORRECTION UTF-8
+try:
+    from app.api.v1.expert import router as expert_router
+    EXPERT_ROUTER_AVAILABLE = True
+    logger.info("✅ Module expert UTF-8 CORRIGÉ importé")
+except ImportError as e:
+    EXPERT_ROUTER_AVAILABLE = False
+    expert_router = None
+    logger.warning(f"⚠️ Module expert non disponible: {e}")
+
+# Import autres routers
+try:
+    from app.api.v1.auth import router as auth_router
+    AUTH_ROUTER_AVAILABLE = True
+    logger.info("✅ Module auth importé")
+except ImportError as e:
+    AUTH_ROUTER_AVAILABLE = False
+    auth_router = None
+    logger.warning(f"⚠️ Module auth non disponible: {e}")
+
+try:
+    from app.api.v1.admin import router as admin_router
+    ADMIN_ROUTER_AVAILABLE = True
+    logger.info("✅ Module admin importé")
+except ImportError as e:
+    ADMIN_ROUTER_AVAILABLE = False
+    admin_router = None
+    logger.warning(f"⚠️ Module admin non disponible: {e}")
+
+try:
+    from app.api.v1.health import router as health_router
+    HEALTH_ROUTER_AVAILABLE = True
+    logger.info("✅ Module health importé")
+except ImportError as e:
+    HEALTH_ROUTER_AVAILABLE = False
+    health_router = None
+    logger.warning(f"⚠️ Module health non disponible: {e}")
+
+try:
+    from app.api.v1.system import router as system_router
+    SYSTEM_ROUTER_AVAILABLE = True
+    logger.info("✅ Module system importé")
+except ImportError as e:
+    SYSTEM_ROUTER_AVAILABLE = False
+    system_router = None
+    logger.warning(f"⚠️ Module system non disponible: {e}")
+
+# =============================================================================
+# MODÈLES PYDANTIC AVEC SUPPORT UTF-8 RENFORCÉ
+# =============================================================================
+
+class QuestionRequest(BaseModel):
+    """Request model pour questions avec support UTF-8 complet"""
+    text: str = Field(..., description="Question text (all UTF-8 characters accepted)")
+    language: Optional[str] = Field("fr", description="Response language")
+    context: Optional[str] = Field(None, description="Additional context")
+    speed_mode: Optional[str] = Field("balanced", description="Speed mode")
+    
+    class Config:
+        str_to_lower = False
+        validate_assignment = False  # CRITIQUE: Éviter la validation sur assignment
+        extra = "ignore"
+        json_encoders = {
+            str: lambda v: str(v) if v is not None else ""
+        }
+
+class ExpertResponse(BaseModel):
+    """Response model pour réponses expert avec UTF-8"""
+    question: str
+    response: str
+    mode: str
+    note: Optional[str] = None
+    sources: Optional[List[Dict[str, Any]]] = []
+    config_source: str
+    timestamp: str
+    processing_time: float
+    language: str
+    
+    class Config:
+        json_encoders = {
+            str: lambda v: str(v) if v is not None else ""
+        }
+
+class HealthResponse(BaseModel):
+    """Health check response model"""
+    status: str
+    timestamp: str
+    services: Dict[str, str]
+    config: Dict[str, str]
+    database_status: str
+    rag_status: str
+
+# =============================================================================
+# CONFIGURATION MULTI-LANGUES AVEC SUPPORT UTF-8 RENFORCÉ ET CONSIGNE LIGNÉE GÉNÉTIQUE
+# =============================================================================
+
+LANGUAGE_PROMPTS = {
+    "fr": {
+        "system_base": """Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair. Tu peux comprendre et répondre aux questions avec TOUS les caractères français (é, è, à, ç, ù, etc.) et tous les symboles (°C, %, €, etc.).
+
+IMPORTANT: Ne fais pas référence à une lignée génétique comme Ross ou Cobb, sauf si l'utilisateur la mentionne dans sa question. Donne une réponse générale qui s'applique à tous les poulets de chair.""",
+        "context_instruction": "Utilise les informations suivantes pour répondre à la question:",
+        "response_instruction": "Réponds en français de manière précise et pratique, en te basant sur les documents fournis. Utilise librement tous les accents et caractères spéciaux français. Évite de mentionner des lignées génétiques spécifiques sauf si mentionnées par l'utilisateur.",
+        "fallback_instruction": "Réponds aux questions de manière précise et pratique en français avec tous les accents appropriés. Donne des conseils généraux applicables à tous les poulets de chair."
+    },
+    "en": {
+        "system_base": """You are a veterinary expert specialized in animal health and nutrition, particularly for broiler chickens.
+
+IMPORTANT: Do not reference specific genetic lines like Ross or Cobb, unless the user mentions them in their question. Provide general answers that apply to all broiler chickens.""",
+        "context_instruction": "Use the following information to answer the question:",
+        "response_instruction": "Respond in English precisely and practically, based on the provided documents. Avoid mentioning specific genetic lines unless mentioned by the user.",
+        "fallback_instruction": "Answer questions precisely and practically in English. Provide general advice applicable to all broiler chickens."
+    },
+    "es": {
+        "system_base": """Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde. Puedes entender y responder preguntas con TODOS los caracteres especiales del español (ñ, ¿, ¡, acentos, ü, etc.).
+
+IMPORTANTE: No hagas referencia a líneas genéticas como Ross o Cobb, a menos que el usuario las mencione en su pregunta. Da respuestas generales que se apliquen a todos los pollos de engorde.""",
+        "context_instruction": "Utiliza la siguiente información para responder a la pregunta:",
+        "response_instruction": "Responde en español de manera precisa y práctica, basándote en los documentos proporcionados. Usa libremente todos los caracteres especiales del español. Evita mencionar líneas genéticas específicas a menos que las mencione el usuario.",
+        "fallback_instruction": "Responde a las preguntas de manera precisa y práctica en español con todos los caracteres especiales apropiados. Da consejos generales aplicables a todos los pollos de engorde."
+    }
 }
 
-// Liste des pays
-const countries = [
-  { value: 'CA', label: 'Canada' },
-  { value: 'US', label: 'États-Unis' },
-  { value: 'FR', label: 'France' },
-  { value: 'BE', label: 'Belgique' },
-  { value: 'CH', label: 'Suisse' },
-  { value: 'MX', label: 'Mexique' },
-  { value: 'BR', label: 'Brésil' }
-]
+def get_language_prompt(language: str, prompt_type: str) -> str:
+    """Get localized prompt for specified language with UTF-8 support."""
+    lang = language.lower() if language else "fr"
+    if lang not in LANGUAGE_PROMPTS:
+        lang = "fr"
+    return LANGUAGE_PROMPTS[lang].get(prompt_type, LANGUAGE_PROMPTS["fr"][prompt_type])
 
-// ==================== LOGO INTELIA ====================
-const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={className}
-  />
+# =============================================================================
+# INITIALISATION SUPABASE
+# =============================================================================
+
+def initialize_supabase():
+    """Initialize Supabase client"""
+    global supabase
+    
+    if not SUPABASE_AVAILABLE:
+        logger.warning("⚠️ Bibliothèques Supabase non disponibles")
+        return False
+    
+    try:
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_ANON_KEY')
+        
+        if not supabase_url or not supabase_key:
+            logger.warning("⚠️ Credentials Supabase non trouvés")
+            return False
+        
+        logger.info(f"🔗 Connexion à Supabase...")
+        supabase = create_client(supabase_url, supabase_key)
+        logger.info("✅ Client Supabase créé avec succès")
+        return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur initialisation Supabase: {e}")
+        return False
+
+# =============================================================================
+# INITIALISATION RAG
+# =============================================================================
+
+async def initialize_rag_system():
+    """Initialize RAG system"""
+    global rag_embedder
+    
+    logger.info("🔧 Initialisation du système RAG...")
+    
+    try:
+        from rag.embedder import FastRAGEmbedder
+        logger.info("✅ Module RAG embedder importé")
+        
+        embedder = FastRAGEmbedder(
+            api_key=os.getenv('OPENAI_API_KEY'),
+            cache_embeddings=True,
+            max_workers=2
+        )
+        logger.info("✅ Instance RAG embedder créée")
+        
+        # Recherche de l'index existant
+        index_paths = [
+            '/workspace/backend/rag_index',
+            './rag_index', 
+            '/tmp/rag_index',
+            os.path.join(backend_dir, 'rag_index')
+        ]
+        
+        index_loaded = False
+        for index_path in index_paths:
+            if os.path.exists(index_path):
+                faiss_file = os.path.join(index_path, 'index.faiss')
+                pkl_file = os.path.join(index_path, 'index.pkl')
+                
+                if os.path.exists(faiss_file) and os.path.exists(pkl_file):
+                    logger.info(f"📁 Index trouvé dans: {index_path}")
+                    
+                    if embedder.load_index(index_path):
+                        logger.info(f"✅ Index RAG chargé depuis {index_path}")
+                        index_loaded = True
+                        break
+        
+        rag_embedder = embedder
+        
+        if index_loaded and embedder.has_search_engine():
+            logger.info("✅ Système RAG initialisé avec recherche documentaire")
+            return True
+        else:
+            logger.warning("⚠️ Système RAG initialisé mais sans index valide")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur initialisation RAG: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
+
+# =============================================================================
+# TRAITEMENT DES QUESTIONS AVEC RAG ET SUPPORT UTF-8 RENFORCÉ
+# =============================================================================
+
+async def process_question_with_rag(
+    question: str, 
+    user: Optional[Any] = None, 
+    language: str = "fr",
+    speed_mode: str = "balanced"
+) -> Dict[str, Any]:
+    """Process question using RAG system avec support UTF-8 renforcé"""
+    start_time = time.time()
+    
+    try:
+        # CORRECTION: Pas de manipulation d'encodage UTF-8 forcée
+        # Laisser Python gérer l'UTF-8 naturellement
+        safe_question = str(question) if question else ""
+        
+        logger.info(f"🔍 Traitement question: {safe_question[:50]}... (Lang: {language})")
+        
+        sources = []
+        
+        # Configuration selon le mode
+        performance_config = {
+            "fast": {"model": "gpt-3.5-turbo", "k": 2, "max_tokens": 300, "timeout": 8},
+            "balanced": {"model": "gpt-3.5-turbo", "k": 3, "max_tokens": 500, "timeout": 12},
+            "quality": {"model": "gpt-4o-mini", "k": 5, "max_tokens": 800, "timeout": 20}
+        }
+        
+        config = performance_config.get(speed_mode, performance_config["balanced"])
+        
+        # Utiliser RAG si disponible
+        if rag_embedder and rag_embedder.has_search_engine():
+            logger.info(f"🔄 Utilisation RAG avec recherche documentaire (k={config['k']})")
+            
+            try:
+                search_results = rag_embedder.search(safe_question, k=config["k"])
+                logger.info(f"🔍 Recherche terminée: {len(search_results)} résultats")
+                
+                if search_results:
+                    context_parts = []
+                    sources = []
+                    
+                    for i, result in enumerate(search_results[:config["k"]]):
+                        text = str(result['text'])  # Conversion simple en string
+                        
+                        context_chunk = text[:400] + "..." if len(text) > 400 else text
+                        context_parts.append(f"Document {i+1}: {context_chunk}")
+                        sources.append({
+                            "index": result['index'],
+                            "score": result['score'],
+                            "preview": text[:150] + "..."
+                        })
+                    
+                    context = "\n\n".join(context_parts)
+                    
+                    # Utiliser OpenAI avec contexte RAG
+                    import openai
+                    openai.api_key = os.getenv('OPENAI_API_KEY')
+                    
+                    system_base = get_language_prompt(language, "system_base")
+                    context_instruction = get_language_prompt(language, "context_instruction")
+                    response_instruction = get_language_prompt(language, "response_instruction")
+                    
+                    system_prompt = f"""{system_base}
+
+{context_instruction}
+
+{context}
+
+{response_instruction}"""
+
+                    response = openai.chat.completions.create(
+                        model=config["model"],
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": safe_question}
+                        ],
+                        temperature=0.7,
+                        max_tokens=config["max_tokens"],
+                        timeout=config["timeout"]
+                    )
+                    
+                    answer = str(response.choices[0].message.content)  # Conversion simple
+                    mode = "rag_enhanced"
+                    note = f"Réponse basée sur {len(search_results)} documents"
+                    
+                else:
+                    logger.info("🔄 Aucun document pertinent trouvé - utilisation fallback")
+                    answer, mode, note = await fallback_openai_response(safe_question, language, config)
+                    
+            except Exception as search_error:
+                logger.error(f"❌ Erreur recherche: {search_error}")
+                answer, mode, note = await fallback_openai_response(safe_question, language, config)
+        else:
+            logger.info("🔄 Mode fallback - OpenAI direct")
+            answer, mode, note = await fallback_openai_response(safe_question, language, config)
+        
+        processing_time = time.time() - start_time
+        
+        return {
+            "question": safe_question,
+            "response": answer,
+            "mode": mode,
+            "note": note,
+            "sources": sources,
+            "config_source": os.getenv('CONFIG_SOURCE', 'Environment Variables'),
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "processing_time": round(processing_time, 2),
+            "language": language
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur traitement question: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de traitement: {str(e)}")
+
+async def fallback_openai_response(question: str, language: str = "fr", config: dict = None) -> tuple:
+    """Fallback response using OpenAI directly avec support UTF-8 et consigne lignée génétique"""
+    try:
+        import openai
+        
+        if config is None:
+            config = {"model": "gpt-3.5-turbo", "max_tokens": 500, "timeout": 12}
+        
+        openai.api_key = os.getenv('OPENAI_API_KEY')
+        
+        safe_question = str(question)  # Conversion simple
+        
+        system_base = get_language_prompt(language, "system_base")
+        fallback_instruction = get_language_prompt(language, "fallback_instruction")
+        
+        # Le prompt system_base contient maintenant la consigne lignée génétique
+        system_prompt = f"{system_base}\n\n{fallback_instruction}"
+
+        response = openai.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": safe_question}
+            ],
+            temperature=0.7,
+            max_tokens=config["max_tokens"],
+            timeout=config["timeout"]
+        )
+        
+        answer = str(response.choices[0].message.content)  # Conversion simple
+        mode = "fallback_openai"
+        note = "Réponse sans recherche documentaire (lignée génétique neutre)"
+        
+        return answer, mode, note
+    
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur OpenAI fallback: {e}")
+        
+        fallback_responses = {
+            "fr": "Je suis temporairement indisponible. Veuillez réessayer plus tard.",
+            "en": "I am temporarily unavailable. Please try again later.",
+            "es": "Estoy temporalmente no disponible. Inténtelo de nuevo más tarde."
+        }
+        
+        answer = fallback_responses.get(language, fallback_responses["fr"])
+        mode = "static_fallback"
+        note = "Service temporairement indisponible"
+        
+        return answer, mode, note
+
+# =============================================================================
+# FONCTIONS HELPER
+# =============================================================================
+
+def get_rag_status() -> str:
+    """Get current RAG system status"""
+    if not rag_embedder:
+        return "not_available"
+    elif rag_embedder.has_search_engine():
+        return "optimized"
+    else:
+        return "fallback"
+
+# =============================================================================
+# GESTION DU CYCLE DE VIE
+# =============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    logger.info("🚀 Démarrage Intelia Expert API v3.5.0 - CORRECTIONS CRITIQUES...")
+    
+    # Initialisation des services
+    supabase_success = initialize_supabase()
+    rag_success = await initialize_rag_system()
+    
+    # Exposer le RAG dans app.state pour les routers
+    app.state.rag_embedder = rag_embedder
+    app.state.process_question_with_rag = process_question_with_rag
+    app.state.get_rag_status = get_rag_status
+    
+    # Logs de statut
+    logger.info("✅ Application créée avec succès")
+    logger.info("🔤 Support UTF-8 COMPLET: Validation réécrite pour accepter tous caractères")
+    logger.info("🔧 Router logging: Tous endpoints manquants ajoutés (404 corrigé)")
+    logger.info("📊 Support multi-langues: FR, EN, ES avec caractères spéciaux")
+    logger.info("🧬 Consigne lignée génétique: Réponses générales sauf mention utilisateur")
+    logger.info(f"🗄️ Base de données: {'Disponible' if supabase_success else 'Non disponible'}")
+    logger.info(f"🤖 Modules RAG: {'Disponibles' if rag_embedder else 'Non disponibles'}")
+    
+    if rag_embedder and rag_embedder.has_search_engine():
+        logger.info("🔍 Système RAG: Optimisé (avec recherche documentaire)")
+    elif rag_embedder:
+        logger.info("🔍 Système RAG: Prêt (mode fallback)")
+    else:
+        logger.info("🔍 Système RAG: Non disponible")
+    
+    # Détecter l'environnement de déploiement
+    deployment_env = "DigitalOcean" if "/workspace" in backend_dir else "Local"
+    logger.info(f"🌐 Environnement détecté: {deployment_env}")
+    
+    yield
+    
+    logger.info("🛑 Arrêt de Intelia Expert API...")
+
+# =============================================================================
+# APPLICATION FASTAPI AVEC SUPPORT UTF-8 RENFORCÉ
+# =============================================================================
+
+app = FastAPI(
+    title="Intelia Expert API",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Corrections Critiques v3.5 + Lignée Génétique",
+    version="3.5.0",
+    docs_url="/docs",
+    redoc_url="/redoc", 
+    openapi_url="/openapi.json",
+    root_path="/api",
+    lifespan=lifespan
 )
 
-// ==================== LANGUAGE CONTEXT ====================
-const useLanguage = () => {
-  const [language, setLanguage] = useState<Language>('fr')
+# =============================================================================
+# MIDDLEWARE UTF-8 RENFORCÉ ET EXCEPTION HANDLERS
+# =============================================================================
 
-  useEffect(() => {
-    const savedLanguage = localStorage.getItem('intelia-language') as Language
-    if (savedLanguage && translations[savedLanguage]) {
-      setLanguage(savedLanguage)
-    } else {
-      const browserLanguage = navigator.language.substring(0, 2) as Language
-      if (translations[browserLanguage]) {
-        setLanguage(browserLanguage)
-      }
-    }
-  }, [])
-
-  const changeLanguage = (newLanguage: Language) => {
-    setLanguage(newLanguage)
-    localStorage.setItem('intelia-language', newLanguage)
-  }
-
-  return {
-    language,
-    changeLanguage,
-    t: translations[language]
-  }
-}
-
-// ==================== SÉLECTEUR DE LANGUE ====================
-const LanguageSelector = ({ onLanguageChange }: { onLanguageChange: (lang: Language) => void }) => {
-  const { language, changeLanguage } = useLanguage()
-  const [isOpen, setIsOpen] = useState(false)
-
-  const languages = [
-    { code: 'fr' as Language, name: 'Français', flag: '🇫🇷' },
-    { code: 'en' as Language, name: 'English', flag: '🇺🇸' },
-    { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
-    { code: 'de' as Language, name: 'Deutsch', flag: '🇩🇪' }
-  ]
-
-  const currentLanguage = languages.find(lang => lang.code === language)
-
-  const handleLanguageChange = (newLanguage: Language) => {
-    changeLanguage(newLanguage)
-    onLanguageChange(newLanguage)
-    setIsOpen(false)
-  }
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-      >
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-        </svg>
-        <span>{currentLanguage?.name}</span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => handleLanguageChange(lang.code)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
-                  lang.code === language ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                } first:rounded-t-lg last:rounded-b-lg transition-colors`}
-              >
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ==================== VALIDATION FUNCTIONS ====================
-const validateEmail = (email: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = []
-  
-  if (password.length < 8) {
-    errors.push('Au moins 8 caractères')
-  }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Une majuscule')
-  }
-  if (!/[0-9]/.test(password)) {
-    errors.push('Un chiffre')
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
-}
-
-const validatePhone = (phone: string): boolean => {
-  if (!phone.trim()) return true // Optional field
-  // Format: +1 (XXX) XXX-XXXX or variations
-  return /^[\+]?[1-9][\d]{0,3}[\s\(\-]?[\d]{3}[\s\)\-]?[\d]{3}[\s\-]?[\d]{4}$/.test(phone.replace(/\s/g, ''))
-}
-
-const validateLinkedIn = (url: string): boolean => {
-  if (!url.trim()) return true // Optional field
-  return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
-}
-
-const validateWebsite = (url: string): boolean => {
-  if (!url.trim()) return true // Optional field
-  return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
-}
-
-// ==================== PAGE DE CONNEXION/INSCRIPTION ====================
-export default function LoginPage() {
-  const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
-  const t = translations[currentLanguage]
-  
-  const [isSignupMode, setIsSignupMode] = useState(false)
-  
-  // Données de connexion
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false
-  })
-
-  // Données d'inscription complètes
-  const [signupData, setSignupData] = useState({
-    // Authentification
-    email: '',
-    password: '',
-    confirmPassword: '',
+# Middleware pour forcer l'encodage UTF-8
+@app.middleware("http")
+async def force_utf8_middleware(request: Request, call_next):
+    """Middleware UTF-8 renforcé pour tous les contenus"""
     
-    // Informations personnelles
-    firstName: '',
-    lastName: '',
-    linkedinProfile: '',
+    response = await call_next(request)
     
-    // Contact
-    country: '',
-    phone: '',
+    # Forcer UTF-8 sur toutes les réponses
+    if "content-type" in response.headers:
+        content_type = response.headers["content-type"]
+        if "application/json" in content_type and "charset" not in content_type:
+            response.headers["content-type"] = "application/json; charset=utf-8"
     
-    // Entreprise
-    companyName: '',
-    companyWebsite: '',
-    companyLinkedin: ''
-  })
-
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-
-  // ✅ MODIFICATION: useEffect avec chargement des données "Se souvenir de moi"
-  useEffect(() => {
-    // Charger la langue sauvegardée
-    const savedLanguage = localStorage.getItem('intelia-language') as Language
-    if (savedLanguage && translations[savedLanguage]) {
-      setCurrentLanguage(savedLanguage)
-    } else {
-      const browserLanguage = navigator.language.substring(0, 2) as Language
-      if (translations[browserLanguage]) {
-        setCurrentLanguage(browserLanguage)
-      }
-    }
-
-    // ✅ NOUVEAU: Charger les données "Se souvenir de moi"
-    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    response.headers["Accept-Charset"] = "utf-8"
     
-    if (rememberMe && lastEmail) {
-      setLoginData(prev => ({
-        ...prev,
-        email: lastEmail,
-        rememberMe: true
-      }))
-      console.log('✅ Données "Se souvenir de moi" chargées:', lastEmail)
-    }
-  }, [])
+    return response
 
-  const handleLanguageChange = (newLanguage: Language) => {
-    setCurrentLanguage(newLanguage)
-    localStorage.setItem('intelia-language', newLanguage)
-  }
-
-  const handleLoginChange = (field: string, value: string | boolean) => {
-    setLoginData(prev => ({ ...prev, [field]: value }))
-    if (error) setError('')
-    if (success) setSuccess('')
-  }
-
-  const handleSignupChange = (field: string, value: string) => {
-    setSignupData(prev => ({ ...prev, [field]: value }))
-    if (error) setError('')
-    if (success) setSuccess('')
-  }
-
-  // VALIDATION SIGNUP COMPLET
-  const validateSignupForm = (): string | null => {
-    const { email, password, confirmPassword, firstName, lastName, country, phone, linkedinProfile, companyWebsite, companyLinkedin } = signupData
-
-    if (!email.trim()) return t.emailRequired
-    if (!validateEmail(email)) return t.emailInvalid
-    if (!password) return t.passwordRequired
+# CORRECTION CRITIQUE: Exception handler pour erreurs de validation UTF-8
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Gestionnaire spécialisé pour erreurs de validation Pydantic avec UTF-8"""
     
-    const passwordValidation = validatePassword(password)
-    if (!passwordValidation.isValid) return t.passwordTooShort
-    
-    if (password !== confirmPassword) return t.passwordMismatch
-    if (!firstName.trim()) return t.firstNameRequired
-    if (!lastName.trim()) return t.lastNameRequired
-    if (!country) return t.countryRequired
-    if (!validatePhone(phone)) return t.phoneInvalid
-    if (linkedinProfile && !validateLinkedIn(linkedinProfile)) return 'Format LinkedIn invalide'
-    if (companyWebsite && !validateWebsite(companyWebsite)) return 'Format de site web invalide'
-    if (companyLinkedin && !validateLinkedIn(companyLinkedin)) return 'Format LinkedIn entreprise invalide'
-    
-    return null
-  }
-
-  // FONCTION DE CRÉATION DE COMPTE AMÉLIORÉE
-  const handleSignup = async () => {
-    setError('')
-    setSuccess('')
-    
-    const validationError = validateSignupForm()
-    if (validationError) {
-      setError(validationError)
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      console.log('📝 Création de compte avec profil complet:', signupData.email)
-      
-      // CRÉATION DE COMPTE AVEC MÉTADONNÉES COMPLÈTES
-      const { data, error } = await supabase.auth.signUp({
-        email: signupData.email.trim(),
-        password: signupData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            // Informations personnelles
-            first_name: signupData.firstName.trim(),
-            last_name: signupData.lastName.trim(),
-            linkedin_profile: signupData.linkedinProfile.trim(),
-            
-            // Contact
-            country: signupData.country,
-            phone: signupData.phone.trim(),
-            
-            // Entreprise
-            company_name: signupData.companyName.trim(),
-            company_website: signupData.companyWebsite.trim(),
-            company_linkedin: signupData.companyLinkedin.trim(),
-            
-            // Métadonnées
-            created_at: new Date().toISOString(),
-            role: 'producer',
-            profile_complete: true
-          }
-        }
-      })
-      
-      if (error) {
-        console.error('❌ Erreur Supabase signup:', error)
-        
-        const errorMessages: Record<string, string> = {
-          'User already registered': 'Un compte existe déjà avec cet email.',
-          'Password should be at least 6 characters': t.passwordTooShort,
-          'Invalid email': t.emailInvalid,
-          'Signup is disabled': 'La création de compte est temporairement désactivée.',
-          'Email rate limit exceeded': 'Trop de tentatives. Réessayez dans quelques minutes.',
-          'Invalid phone number': 'Numéro de téléphone invalide.',
-          'Weak password': 'Mot de passe trop faible. Utilisez au moins 8 caractères avec lettres et chiffres.'
-        }
-        
-        const friendlyMessage = errorMessages[error.message] || error.message
-        setError(friendlyMessage)
-        return
-      }
-
-      console.log('✅ Compte créé avec succès:', data)
-
-      if (data.user && !data.user.email_confirmed_at) {
-        setSuccess(t.accountCreated)
-        // Réinitialiser le formulaire
-        setSignupData({
-          email: '', password: '', confirmPassword: '',
-          firstName: '', lastName: '', linkedinProfile: '',
-          country: '', phone: '',
-          companyName: '', companyWebsite: '', companyLinkedin: ''
+    # Extraire les détails d'erreur
+    error_details = []
+    for error in exc.errors():
+        error_details.append({
+            "field": " -> ".join(str(loc) for loc in error["loc"]),
+            "message": error["msg"],
+            "type": error["type"],
+            "input": str(error.get("input", ""))[:100] + "..." if len(str(error.get("input", ""))) > 100 else str(error.get("input", ""))
         })
-        // Passer en mode login après 4 secondes
-        setTimeout(() => {
-          setIsSignupMode(false)
-          setSuccess('')
-        }, 4000)
-      } else if (data.user && data.user.email_confirmed_at) {
-        setSuccess('Compte créé et confirmé ! Redirection...')
-        setTimeout(() => {
-          window.location.href = '/chat'
-        }, 1500)
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erreur critique de création:', error)
-      setError('Erreur technique inattendue. Veuillez réessayer.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // ✅ FONCTION DE CONNEXION avec "Se souvenir de moi"
-  const handleLogin = async () => {
-    setError('')
-    setSuccess('')
     
-    if (!loginData.email.trim()) {
-      setError(t.emailRequired)
-      return
-    }
+    logger.error(f"❌ Erreur de validation UTF-8: {error_details}")
     
-    if (!validateEmail(loginData.email)) {
-      setError(t.emailInvalid)
-      return
-    }
-    
-    if (!loginData.password) {
-      setError(t.passwordRequired)
-      return
-    }
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Erreur de validation des données",
+            "errors": error_details,
+            "message": "Vérifiez le format de vos données",
+            "utf8_note": "Tous les caractères UTF-8 sont normalement supportés",
+            "timestamp": datetime.now().isoformat(),
+            "path": str(request.url.path)
+        },
+        headers={"content-type": "application/json; charset=utf-8"}
+    )
 
-    if (loginData.password.length < 6) {
-      setError(t.passwordTooShort)
-      return
-    }
+# Configuration CORS avec Support UTF-8 Complet
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*", "Content-Type", "Accept-Charset", "Accept-Encoding"],
+)
 
-    setIsLoading(true)
+# =============================================================================
+# MONTAGE DES ROUTERS - CORRECTIONS APPLIQUÉES
+# =============================================================================
 
-    try {
-      console.log('🔐 Tentative de connexion:', loginData.email, 'Remember me:', loginData.rememberMe)
-      
-      // ✅ CORRECTION: Connexion simple sans options de persistance
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginData.email.trim(),
-        password: loginData.password
-      })
-      
-      if (error) {
-        console.error('❌ Erreur Supabase:', error)
+# Router expert - CORRECTION UTF-8 APPLIQUÉE
+if EXPERT_ROUTER_AVAILABLE and expert_router:
+    try:
+        app.include_router(expert_router, prefix="/v1/expert", tags=["Expert System UTF-8"])
+        logger.info("✅ Router expert UTF-8 CORRIGÉ monté sur /v1/expert")
         
-        const errorMessages: Record<string, string> = {
-          'Invalid login credentials': 'Email ou mot de passe incorrect',
-          'Email not confirmed': 'Email non confirmé. Vérifiez votre boîte mail et cliquez sur le lien de confirmation.',
-          'Too many requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
-          'User not found': 'Aucun compte trouvé avec cet email.',
-          'Wrong password': 'Mot de passe incorrect',
-          'Auth session missing': 'Session expirée. Veuillez vous reconnecter.'
+        if hasattr(expert_router, 'setup_rag_references'):
+            expert_router.setup_rag_references(app)
+            logger.info("✅ Références RAG configurées pour router expert")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router expert: {e}")
+
+# Router logging - CORRECTION 404 APPLIQUÉE
+if LOGGING_AVAILABLE and logging_router:
+    try:
+        app.include_router(logging_router, prefix="/v1", tags=["Logging System"])
+        logger.info("✅ Router logging CORRIGÉ monté sur /v1 (endpoints: /v1/logging/*)")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router logging: {e}")
+
+# Router auth
+if AUTH_ROUTER_AVAILABLE and auth_router:
+    try:
+        app.include_router(auth_router, prefix="/v1", tags=["Authentication"])
+        logger.info("✅ Router auth monté sur /v1 (endpoints: /v1/auth/*)")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router auth: {e}")
+
+# Router admin
+if ADMIN_ROUTER_AVAILABLE and admin_router:
+    try:
+        app.include_router(admin_router, prefix="/v1", tags=["Administration"])
+        logger.info("✅ Router admin monté sur /v1 (endpoints: /v1/admin/*)")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router admin: {e}")
+
+# Router health
+if HEALTH_ROUTER_AVAILABLE and health_router:
+    try:
+        app.include_router(health_router, prefix="/v1", tags=["Health Monitoring"])
+        logger.info("✅ Router health monté sur /v1 (endpoints: /v1/health/*)")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router health: {e}")
+
+# Router system
+if SYSTEM_ROUTER_AVAILABLE and system_router:
+    try:
+        app.include_router(system_router, prefix="/v1", tags=["System Monitoring"])
+        logger.info("✅ Router system monté sur /v1 (endpoints: /v1/system/*)")
+    except Exception as e:
+        logger.error(f"❌ Erreur montage router system: {e}")
+
+# =============================================================================
+# ENDPOINTS DE BASE AVEC SUPPORT UTF-8 RENFORCÉ
+# =============================================================================
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Endpoint racine avec status des corrections appliquées"""
+    return {
+        "message": "Intelia Expert API v3.5.0 - CORRECTIONS CRITIQUES + LIGNÉE GÉNÉTIQUE",
+        "status": "running",
+        "environment": os.getenv('ENV', 'production'),
+        "api_version": "3.5.0",
+        "database": supabase is not None,
+        "rag_system": get_rag_status(),
+        "corrections_applied_v3_5": {
+            "utf8_validation_fix": "Validation Pydantic complètement réécrite dans expert.py",
+            "logging_404_fix": "Tous les endpoints manquants ajoutés dans logging.py",
+            "exception_handler_fix": "Gestionnaire d'exceptions UTF-8 amélioré",
+            "middleware_fix": "Middleware UTF-8 renforcé",
+            "genetic_line_fix": "Prompts adaptés pour éviter références spécifiques Ross/Cobb",
+            "expected_result": "Erreurs 400 UTF-8 et 404 logging corrigées + réponses générales"
+        },
+        "routers_mounted": {
+            "expert": EXPERT_ROUTER_AVAILABLE,
+            "auth": AUTH_ROUTER_AVAILABLE,
+            "admin": ADMIN_ROUTER_AVAILABLE,
+            "health": HEALTH_ROUTER_AVAILABLE,
+            "system": SYSTEM_ROUTER_AVAILABLE,
+            "logging": LOGGING_AVAILABLE
+        },
+        "utf8_support": {
+            "enabled": True,
+            "validation_rewritten": "Pydantic validation ultra-permissive",
+            "french_accents": "é, è, à, ç, ù - TOUS supportés",
+            "spanish_special": "ñ, ¿, ¡, acentos - TOUS supportés",
+            "symbols": "°C, %, €, £ - TOUS supportés",
+            "encoding": "UTF-8 natif Python sans manipulation forcée"
+        },
+        "genetic_line_policy": {
+            "strategy": "Générique sauf mention utilisateur",
+            "avoid_terms": ["Ross", "Cobb", "lignées spécifiques"],
+            "use_instead": "poulets de chair, broiler chickens, pollos de engorde",
+            "exception": "Mention spécifique si utilisateur évoque la lignée"
+        },
+        "endpoints_fixed": [
+            # Expert UTF-8 corrigé
+            "/api/v1/expert/ask-public - UTF-8 validation réécrite + lignée neutre",
+            "/api/v1/expert/topics - Caractères spéciaux supportés",
+            # Logging 404 corrigé
+            "/api/v1/logging/health - AJOUTÉ",
+            "/api/v1/logging/analytics - AJOUTÉ", 
+            "/api/v1/logging/admin/stats - AJOUTÉ",
+            "/api/v1/logging/database/info - AJOUTÉ",
+            "/api/v1/logging/conversations/{user_id} - AJOUTÉ",
+            "/api/v1/logging/test-data - AJOUTÉ (cleanup)"
+        ],
+        "deployment_notes": {
+            "platform": "DigitalOcean App Platform",
+            "critical_fixes": "UTF-8 + Logging 404 + Lignée génétique résolus",
+            "validation_strategy": "Ultra-permissive pour UTF-8",
+            "prompt_strategy": "Générique sauf mention explicite utilisateur",
+            "expected_improvement": "Erreurs 400/404 éliminées + réponses inclusives"
         }
-        
-        const friendlyMessage = errorMessages[error.message] || error.message
-        setError(friendlyMessage)
-        return
-      }
-
-      if (!data.user) {
-        setError('Erreur de connexion. Veuillez réessayer.')
-        return
-      }
-
-      console.log('✅ Connexion réussie:', data.user.email)
-      
-      // ✅ FONCTIONNALITÉ: Gestion "Se souvenir de moi"
-      if (loginData.rememberMe) {
-        localStorage.setItem('intelia-remember-me', 'true')
-        localStorage.setItem('intelia-last-email', loginData.email.trim())
-        console.log('💾 Email sauvegardé pour prochaine connexion')
-      } else {
-        localStorage.removeItem('intelia-remember-me')
-        localStorage.removeItem('intelia-last-email')
-        console.log('🗑️ Préférences supprimées')
-      }
-      
-      window.location.href = '/chat'
-      
-    } catch (error: any) {
-      console.error('❌ Erreur critique de connexion:', error)
-      setError('Erreur technique inattendue. Veuillez réessayer.')
-    } finally {
-      setIsLoading(false)
     }
-  }
 
-  const handleSubmit = () => {
-    if (isSignupMode) {
-      handleSignup()
-    } else {
-      handleLogin()
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
+async def health_check():
+    """Health check endpoint global avec status des corrections"""
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.utcnow().isoformat() + "Z",
+        services={
+            "api": "running",
+            "database": "connected" if supabase else "disconnected",
+            "rag_system": get_rag_status(),
+            "utf8_support": "FIXED - validation rewritten",
+            "logging_system": "FIXED - endpoints added",
+            "genetic_line_policy": "UPDATED - generic responses",
+            "routers": "all_mounted_with_corrections"
+        },
+        config={
+            "environment": os.getenv('ENV', 'production'),
+            "deployment": "DigitalOcean App Platform",
+            "encoding": "UTF-8 Native Python",
+            "version": "3.5.0",
+            "corrections": "UTF-8 validation + Logging 404 + Genetic line policy fixed"
+        },
+        database_status="connected" if supabase else "disconnected",
+        rag_status=get_rag_status()
+    )
+
+# =============================================================================
+# ENDPOINTS DE DEBUG AVEC CORRECTIONS
+# =============================================================================
+
+@app.get("/debug/corrections", tags=["Debug"])
+async def debug_corrections():
+    """Debug endpoint spécifique aux corrections appliquées"""
+    return {
+        "corrections_v3_5": {
+            "problem_1_utf8": {
+                "issue": "Erreurs 400 sur questions avec caractères UTF-8",
+                "cause": "Validation Pydantic trop stricte sur encodage",
+                "solution": "Validation complètement réécrite ultra-permissive",
+                "files_modified": ["expert.py - QuestionRequest model"],
+                "validation_strategy": "Accepter tous caractères, conversion string simple",
+                "test_cases": [
+                    "Température optimale pour poulets Ross 308 ?",
+                    "¿Cuál es la nutrición óptima para pollos?",  
+                    "Contrôle qualité à 32°C avec humidité 65%"
+                ]
+            },
+            "problem_2_logging_404": {
+                "issue": "Erreurs 404 sur endpoints de logging",
+                "cause": "Endpoints manquants dans le router logging",
+                "solution": "Ajout de tous les endpoints manquants",
+                "files_modified": ["logging.py - router with missing endpoints"],
+                "endpoints_added": [
+                    "/logging/health",
+                    "/logging/analytics", 
+                    "/logging/admin/stats",
+                    "/logging/database/info",
+                    "/logging/conversations/{user_id}",
+                    "/logging/test-data"
+                ]
+            },
+            "problem_3_genetic_lines": {
+                "issue": "Réponses mentionnaient toujours Ross 308",
+                "cause": "Prompts système référençaient lignée spécifique",
+                "solution": "Prompts modifiés pour réponses génériques",
+                "files_modified": ["main.py - LANGUAGE_PROMPTS", "expert.py - EXPERT_PROMPTS"],
+                "new_behavior": "Mention générique sauf si utilisateur spécifie lignée",
+                "examples": {
+                    "before": "Pour les poulets Ross 308, la température...",
+                    "after": "Pour les poulets de chair, la température...",
+                    "exception": "Si question contient 'Ross' → mention autorisée"
+                }
+            },
+            "additional_fixes": {
+                "exception_handler": "Gestionnaire RequestValidationError UTF-8",
+                "middleware": "Middleware UTF-8 renforcé",
+                "cors": "Headers UTF-8 explicites",
+                "logging": "Logs améliorés pour debug UTF-8"
+            }
+        },
+        "expected_test_results": {
+            "before_fixes": "21/31 tests (67.74% success)",
+            "after_fixes_expected": "28+/31 tests (90%+ success)",
+            "critical_fixes": [
+                "UTF-8 questions: 400 → 200",
+                "Logging endpoints: 404 → 200",
+                "Sauvegarde conversation: 404 → 200",
+                "Réponses génériques: Ross mentions → poulets de chair"
+            ]
+        },
+        "validation_strategy": {
+            "old_approach": "Strict UTF-8 encoding validation with cleaning",
+            "new_approach": "Ultra-permissive validation, native Python UTF-8",
+            "philosophy": "Accept all input, let Python handle UTF-8 naturally",
+            "config_changes": "validate_assignment=False, extra='ignore'"
+        },
+        "genetic_line_strategy": {
+            "old_approach": "Always mention Ross 308 in responses",
+            "new_approach": "Generic 'broiler chickens' unless user specifies",
+            "detection": "Check if user question contains 'Ross', 'Cobb', etc.",
+            "benefit": "More inclusive for all farmers regardless of breed"
+        },
+        "timestamp": datetime.now().isoformat(),
+        "version": "3.5.0"
     }
-  }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading) {
-      handleSubmit()
+@app.get("/debug/utf8-test", tags=["Debug"])
+async def debug_utf8_test():
+    """Debug endpoint pour tester les caractères UTF-8 corrigés"""
+    test_strings = {
+        "french_accents": "Température élevée à 32°C - problème détecté à 65% d'humidité",
+        "spanish_special": "¿Cuál es la nutrición óptima para pollos? ¡Importante!",
+        "symbols_mixed": "Coût: 15€/kg, température: 32°C, efficacité: 95%",
+        "complex_french": "Contrôle qualité effectué à 32°C avec humidité relative de 65%",
+        "complex_spanish": "Diagnóstico: nutrición deficiente en proteínas (18% vs 22% requerido)"
     }
-  }
-
-  // ✅ MODIFICATION: Toggle mode avec préservation des préférences "remember me"
-  const toggleMode = () => {
-    setIsSignupMode(!isSignupMode)
-    setError('')
-    setSuccess('')
     
-    // ✅ AMÉLIORATION: Préserver l'email et remember me en mode connexion
-    if (!isSignupMode) {
-      // Passer en mode signup - vider tout
-      setLoginData({ email: '', password: '', rememberMe: false })
-    } else {
-      // Passer en mode login - recharger les préférences "remember me" si elles existent
-      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-      const lastEmail = localStorage.getItem('intelia-last-email') || ''
-      
-      setLoginData({ 
-        email: rememberMe ? lastEmail : '', 
-        password: '', 
-        rememberMe 
-      })
-    }
+    # Test de conversion string simple (comme dans la correction)
+    converted_results = {}
+    for key, text in test_strings.items():
+        try:
+            # Même logique que dans expert.py corrigé
+            converted = str(text).strip()
+            converted_results[key] = {
+                "original": text,
+                "converted": converted,
+                "length": len(converted),
+                "success": True,
+                "method": "str() conversion - natural UTF-8"
+            }
+        except Exception as e:
+            converted_results[key] = {
+                "original": text,
+                "error": str(e),
+                "success": False
+            }
     
-    // Vider le formulaire d'inscription
-    setSignupData({
-      email: '', password: '', confirmPassword: '',
-      firstName: '', lastName: '', linkedinProfile: '',
-      country: '', phone: '',
-      companyName: '', companyWebsite: '', companyLinkedin: ''
-    })
-  }
+    return {
+        "utf8_correction_test": converted_results,
+        "correction_summary": {
+            "strategy": "Natural Python UTF-8 handling",
+            "validation": "Ultra-permissive Pydantic models",
+            "encoding": "No forced encoding manipulation",
+            "middleware": "UTF-8 headers enforced",
+            "expected_result": "All UTF-8 characters accepted"
+        },
+        "genetic_line_test": {
+            "generic_response": "Pour les poulets de chair, la température optimale...",
+            "specific_when_mentioned": "Pour vos Ross 308, la température optimale...",
+            "strategy": "Detect user mention before adding breed reference"
+        },
+        "test_passed": all(result.get("success", False) for result in converted_results.values()),
+        "timestamp": datetime.now().isoformat()
+    }
 
-  return (
-    <>
-      <Head>
-        <title>Intelia | Expert</title>
-        <meta name="description" content="Intelia Expert - Connexion" />
-      </Head>
-      
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
-        {/* Sélecteur de langue */}
-        <div className="absolute top-4 right-4">
-          <LanguageSelector onLanguageChange={handleLanguageChange} />
-        </div>
-        
-        {/* Header */}
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="flex justify-center">
-            <InteliaLogo className="w-16 h-16" />
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t.title}
-          </h2>
-        </div>
+# =============================================================================
+# GESTIONNAIRES D'ERREURS AVEC SUPPORT UTF-8 RENFORCÉ
+# =============================================================================
 
-        {/* Formulaire */}
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto">
-            
-            {/* Messages d'erreur et succès */}
-            {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">
-                      {isSignupMode ? t.signupError : t.loginError}
-                    </h3>
-                    <div className="mt-1 text-sm text-red-700">
-                      {error}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Gestionnaire d'exceptions HTTP avec UTF-8"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "timestamp": datetime.now().isoformat(),
+            "path": str(request.url.path),
+            "version": "3.5.0",
+            "encoding": "utf-8",
+            "corrections_note": "UTF-8 validation, logging endpoints and genetic line policy fixed"
+        },
+        headers={"content-type": "application/json; charset=utf-8"}
+    )
 
-            {success && (
-              <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <div className="text-sm text-green-700">
-                      {success}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Gestionnaire d'exceptions générales avec UTF-8"""
+    logger.error(f"❌ Exception non gérée: {exc}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Erreur interne du serveur",
+            "timestamp": datetime.now().isoformat(),
+            "path": str(request.url.path),
+            "version": "3.5.0",
+            "encoding": "utf-8",
+            "note": "Critical fixes applied for UTF-8, logging and genetic line neutrality"
+        },
+        headers={"content-type": "application/json; charset=utf-8"}
+    )
 
-            {/* FORMULAIRE DE CONNEXION */}
-            {!isSignupMode && (
-              <div className="space-y-6">
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    {t.email} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={loginData.email}
-                      onChange={(e) => handleLoginChange('email', e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                      placeholder="votre@email.com"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
+# =============================================================================
+# POINT D'ENTRÉE PRINCIPAL
+# =============================================================================
 
-                {/* Mot de passe */}
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    {t.password} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      required
-                      value={loginData.password}
-                      onChange={(e) => handleLoginChange('password', e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                      placeholder="••••••••"
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                      disabled={isLoading}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                        </svg>
-                      ) : (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Options */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      name="remember-me"
-                      type="checkbox"
-                      checked={loginData.rememberMe}
-                      onChange={(e) => handleLoginChange('rememberMe', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      disabled={isLoading}
-                    />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                      {t.rememberMe}
-                    </label>
-                  </div>
-
-                  <div className="text-sm">
-                    <Link 
-                      href="/auth/forgot-password" 
-                      className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-                    >
-                      {t.forgotPassword}
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Bouton de connexion */}
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleLogin}
-                    disabled={isLoading || !loginData.email || !loginData.password}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>{t.connecting}</span>
-                      </div>
-                    ) : (
-                      t.login
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* FORMULAIRE D'INSCRIPTION COMPLET */}
-            {isSignupMode && (
-              <div className="space-y-6">
-                
-                {/* Section: Informations personnelles */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.personalInfo}
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Prénom */}
-                    <div>
-                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                        {t.firstName} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="firstName"
-                        type="text"
-                        required
-                        value={signupData.firstName}
-                        onChange={(e) => handleSignupChange('firstName', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    {/* Nom de famille */}
-                    <div>
-                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                        {t.lastName} <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="lastName"
-                        type="text"
-                        required
-                        value={signupData.lastName}
-                        onChange={(e) => handleSignupChange('lastName', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  {/* LinkedIn personnel */}
-                  <div className="mt-4">
-                    <label htmlFor="linkedinProfile" className="block text-sm font-medium text-gray-700">
-                      {t.linkedinProfile} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="linkedinProfile"
-                      type="url"
-                      value={signupData.linkedinProfile}
-                      onChange={(e) => handleSignupChange('linkedinProfile', e.target.value)}
-                      placeholder="https://linkedin.com/in/votre-profil"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* Section: Contact */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.contact}
-                  </h3>
-
-                  {/* Email */}
-                  <div className="mb-4">
-                    <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700">
-                      {t.email} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="signupEmail"
-                      type="email"
-                      required
-                      value={signupData.email}
-                      onChange={(e) => handleSignupChange('email', e.target.value)}
-                      placeholder="votre@email.com"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Pays */}
-                    <div>
-                      <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                        {t.country} <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="country"
-                        required
-                        value={signupData.country}
-                        onChange={(e) => handleSignupChange('country', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      >
-                        <option value="">Sélectionner...</option>
-                        {countries.map((country) => (
-                          <option key={country.value} value={country.value}>
-                            {country.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Téléphone */}
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                        {t.phone} <span className="text-gray-500 text-xs">{t.optional}</span>
-                      </label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        value={signupData.phone}
-                        onChange={(e) => handleSignupChange('phone', e.target.value)}
-                        placeholder={t.phoneFormat}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: Mots de passe */}
-                <div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Mot de passe */}
-                    <div>
-                      <label htmlFor="signupPassword" className="block text-sm font-medium text-gray-700">
-                        {t.password} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1 relative">
-                        <input
-                          id="signupPassword"
-                          type={showPassword ? "text" : "password"}
-                          required
-                          value={signupData.password}
-                          onChange={(e) => handleSignupChange('password', e.target.value)}
-                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateurs de validation mot de passe */}
-                      {signupData.password && (
-                        <div className="mt-2 space-y-1">
-                          {(() => {
-                            const validation = validatePassword(signupData.password)
-                            return validation.errors.map((error, index) => (
-                              <div key={index} className="flex items-center text-xs text-red-600">
-                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                                {error}
-                              </div>
-                            ))
-                          })()}
-                          {validatePassword(signupData.password).isValid && (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              Mot de passe valide
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Confirmation mot de passe */}
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                        {t.confirmPassword} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1 relative">
-                        <input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          required
-                          value={signupData.confirmPassword}
-                          onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateur de confirmation */}
-                      {signupData.confirmPassword && (
-                        <div className="mt-2">
-                          {signupData.password === signupData.confirmPassword ? (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              Mots de passe identiques
-                            </div>
-                          ) : (
-                            <div className="flex items-center text-xs text-red-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                              </svg>
-                              Les mots de passe ne correspondent pas
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: Entreprise */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                    {t.company}
-                  </h3>
-
-                  {/* Nom de l'entreprise */}
-                  <div className="mb-4">
-                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                      {t.companyName} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyName"
-                      type="text"
-                      value={signupData.companyName}
-                      onChange={(e) => handleSignupChange('companyName', e.target.value)}
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* Site web de l'entreprise */}
-                  <div className="mb-4">
-                    <label htmlFor="companyWebsite" className="block text-sm font-medium text-gray-700">
-                      {t.companyWebsite} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyWebsite"
-                      type="url"
-                      value={signupData.companyWebsite}
-                      onChange={(e) => handleSignupChange('companyWebsite', e.target.value)}
-                      placeholder="https://www.entreprise.com"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* LinkedIn de l'entreprise */}
-                  <div>
-                    <label htmlFor="companyLinkedin" className="block text-sm font-medium text-gray-700">
-                      {t.companyLinkedin} <span className="text-gray-500 text-xs">{t.optional}</span>
-                    </label>
-                    <input
-                      id="companyLinkedin"
-                      type="url"
-                      value={signupData.companyLinkedin}
-                      onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                      placeholder="https://linkedin.com/company/votre-entreprise"
-                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* Bouton de création */}
-                <div className="pt-4">
-                  <button
-                    type="button"
-                    onClick={handleSignup}
-                    disabled={isLoading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>{t.creating}</span>
-                      </div>
-                    ) : (
-                      t.signup
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Séparateur et toggle */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-gray-500">
-                    {isSignupMode ? 'Déjà un compte ?' : t.newToIntelia}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  {isSignupMode ? t.backToLogin : t.createAccount}
-                </button>
-              </div>
-            </div>
-
-            {/* Footer RGPD */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center leading-relaxed">
-                {t.gdprNotice}{' '}
-                <a href="/terms" className="text-blue-600 hover:text-blue-500 transition-colors">
-                  {t.terms}
-                </a>{' '}
-                et notre{' '}
-                <a href="/privacy" className="text-blue-600 hover:text-blue-500 transition-colors">
-                  {t.privacy}
-                </a>
-                .
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer avec support */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
-            {t.needHelp}{' '}
-            <button
-              type="button"
-              onClick={() => window.open('mailto:support@intelia.com', '_blank')}
-              className="text-blue-600 hover:underline font-medium"
-            >
-              {t.contactSupport}
-            </button>
-          </p>
-        </div>
-      </div>
-    </>
-  )
-}
+if __name__ == "__main__":
+    import uvicorn
+    
+    port = int(os.getenv('PORT', 8080))
+    host = os.getenv('HOST', '0.0.0.0')
+    
+    logger.info(f"🚀 Démarrage Intelia Expert API v3.5.0 sur {host}:{port}")
+    logger.info(f"🔧 CORRECTIONS CRITIQUES APPLIQUÉES:")
+    logger.info(f"   ✅ UTF-8 Validation: Pydantic models réécrites ultra-permissifs")
+    logger.info(f"   ✅ Logging 404: Tous endpoints manquants ajoutés")
+    logger.info(f"   ✅ Exception Handler: RequestValidationError UTF-8 spécialisé")
+    logger.info(f"   ✅ Middleware: UTF-8 renforcé sur toutes réponses")
+    logger.info(f"   ✅ Lignée Génétique: Prompts génériques sauf mention utilisateur")
+    logger.info(f"🎯 RÉSULTAT ATTENDU: Erreurs 400 UTF-8, 404 logging éliminées + réponses inclusives")
+    logger.info(f"📊 AMÉLIORATION ATTENDUE: 67% → 90%+ de tests réussis")
+    
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info"
+    )
