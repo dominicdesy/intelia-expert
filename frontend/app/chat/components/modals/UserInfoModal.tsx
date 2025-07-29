@@ -7,7 +7,7 @@ import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 
 const supabase = createClientComponentClient()
 
-// ==================== MODAL PROFIL AVEC PHONE INPUT INTÉGRÉ ====================
+// ==================== MODAL PROFIL REDESIGNÉ COMPLÈTEMENT ====================
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
@@ -19,7 +19,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    // ✅ CHAMPS TÉLÉPHONE SÉPARÉS MAINTENANT TYPÉS CORRECTEMENT
     country_code: user?.country_code || '',
     area_code: user?.area_code || '',
     phone_number: user?.phone_number || '',
@@ -61,9 +60,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     return errors
   }
 
-  // ✅ GESTIONNAIRE CHANGEMENT TÉLÉPHONE
   const handlePhoneChange = (phoneData: { country_code: string; area_code: string; phone_number: string }) => {
-    console.log('📞 [UserInfoModal] Changement téléphone:', phoneData)
     setFormData(prev => ({
       ...prev,
       country_code: phoneData.country_code,
@@ -77,7 +74,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     setFormErrors([])
     
     try {
-      // ✅ VALIDATION CHAMPS OBLIGATOIRES
       const errors: string[] = []
       
       if (!formData.firstName.trim()) {
@@ -90,7 +86,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         errors.push('L\'email est requis')
       }
       
-      // ✅ VALIDATION TÉLÉPHONE OPTIONNELLE MAIS COHÉRENTE
       const phoneValidation = validatePhoneFields(
         formData.country_code, 
         formData.area_code, 
@@ -105,12 +100,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         setFormErrors(errors)
         return
       }
-
-      console.log('💾 [UserInfoModal] Sauvegarde profil avec téléphone:', {
-        country_code: formData.country_code,
-        area_code: formData.area_code, 
-        phone_number: formData.phone_number
-      })
 
       const result = await updateProfile(formData)
       if (result.success) {
@@ -127,7 +116,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   }
 
   const handlePasswordChange = async () => {
-    // Validation des mots de passe
     const errors: string[] = []
     
     if (!passwordData.currentPassword) {
@@ -143,7 +131,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       errors.push('Les mots de passe ne correspondent pas')
     }
     
-    // Validation de la complexité du nouveau mot de passe
     const passwordValidationErrors = validatePassword(passwordData.newPassword)
     errors.push(...passwordValidationErrors)
     
@@ -155,33 +142,25 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
     setIsLoading(true)
     try {
-      console.log('🔒 Changement de mot de passe en cours...')
-      
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       })
       
       if (error) {
-        console.error('❌ Erreur changement mot de passe:', error)
         setPasswordErrors([error.message || 'Erreur lors du changement de mot de passe'])
         return
       }
       
-      console.log('✅ Mot de passe changé avec succès')
       alert('Mot de passe changé avec succès!')
-      
-      // Réinitialiser le formulaire
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       })
       setPasswordErrors([])
-      
       onClose()
       
     } catch (error: any) {
-      console.error('❌ Erreur critique changement mot de passe:', error)
       setPasswordErrors([error.message || 'Erreur technique lors du changement de mot de passe'])
     } finally {
       setIsLoading(false)
@@ -194,292 +173,332 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   ]
 
   return (
-    <div className="space-y-4">
-      {/* Onglets */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {tabs.map((tab) => (
+    <>
+      {/* Overlay */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+        onClick={onClose}
+      />
+      
+      {/* Modal Container - Taille fixe optimisée */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header Fixe */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {t('profile.title')}
+            </h2>
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
             >
-              <span className="mr-2">{tab.icon}</span>
-              {tab.label}
+              ×
             </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Erreurs de validation globales */}
-      {formErrors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3">
-          <div className="text-sm text-red-800">
-            <p className="font-medium mb-1">Erreurs de validation :</p>
-            <ul className="list-disc list-inside space-y-0.5">
-              {formErrors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
           </div>
-        </div>
-      )}
 
-      {/* Contenu des onglets */}
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-        {activeTab === 'profile' && (
-          <>
-            {/* Section Informations Personnelles */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                {t('profile.personalInfo')} <span className="text-red-500">*</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('profile.firstName')} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('profile.lastName')} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.email')} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              {/* ✅ NOUVEAU COMPOSANT TÉLÉPHONE INTÉGRÉ */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.phone')} <span className="text-gray-500 text-xs">(optionnel)</span>
-                </label>
-                <PhoneInput
-                  countryCode={formData.country_code}
-                  areaCode={formData.area_code}
-                  phoneNumber={formData.phone_number}
-                  onChange={handlePhoneChange}
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.country')} <span className="text-gray-500 text-xs">(optionnel)</span>
-                </label>
-                <select
-                  value={formData.country}
-                  onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {/* Onglets Fixes */}
+          <div className="border-b border-gray-200 flex-shrink-0">
+            <nav className="flex px-6">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
                 >
-                  <option value="">Sélectionner un pays</option>
-                  <option value="CA">🇨🇦 Canada</option>
-                  <option value="US">🇺🇸 États-Unis</option>
-                  <option value="FR">🇫🇷 France</option>
-                  <option value="BE">🇧🇪 Belgique</option>
-                  <option value="CH">🇨🇭 Suisse</option>
-                  <option value="MX">🇲🇽 Mexique</option>
-                  <option value="BR">🇧🇷 Brésil</option>
-                  <option value="other">🌍 Autre</option>
-                </select>
-              </div>
+                  <span className="mr-2">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Profil LinkedIn Personnel <span className="text-gray-500 text-xs">(optionnel)</span>
-                </label>
-                <input
-                  type="url"
-                  value={formData.linkedinProfile}
-                  onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
-                  placeholder="https://linkedin.com/in/votre-profil"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Section Entreprise */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                {t('profile.company')} <span className="text-gray-500 text-xs">(optionnel)</span>
-              </h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.companyName')}</label>
-                <input
-                  type="text"
-                  value={formData.companyName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                  placeholder="Nom de votre entreprise ou exploitation"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.companyWebsite')}</label>
-                <input
-                  type="url"
-                  value={formData.companyWebsite}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
-                  placeholder="https://www.votre-entreprise.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Page LinkedIn Entreprise
-                </label>
-                <input
-                  type="url"
-                  value={formData.linkedinCorporate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
-                  placeholder="https://linkedin.com/company/votre-entreprise"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'password' && (
-          <div className="pb-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-              {t('profile.password')}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.currentPassword')} *</label>
-                <input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.newPassword')} *</label>
-                <input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <div className="mt-2 text-xs text-gray-600">
-                  <p className="font-medium mb-2">Le mot de passe doit contenir :</p>
-                  <ul className="space-y-1">
-                    <li className={`flex items-center ${passwordData.newPassword.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-2 text-sm">
-                        {passwordData.newPassword.length >= 8 ? '✅' : '⭕'}
-                      </span>
-                      Au moins 8 caractères
-                    </li>
-                    <li className={`flex items-center ${/[A-Z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-2 text-sm">
-                        {/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                      </span>
-                      Au moins une majuscule
-                    </li>
-                    <li className={`flex items-center ${/[a-z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-2 text-sm">
-                        {/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                      </span>
-                      Au moins une minuscule
-                    </li>
-                    <li className={`flex items-center ${/\d/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-2 text-sm">
-                        {/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                      </span>
-                      Au moins un chiffre
-                    </li>
-                    <li className={`flex items-center ${/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
-                      <span className="mr-2 text-sm">
-                        {/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}
-                      </span>
-                      Au moins un caractère spécial
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.confirmPassword')} *</label>
-                <input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              
-              {passwordErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+          {/* Contenu Scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
+              {/* Erreurs globales */}
+              {formErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="text-sm text-red-800">
-                    <p className="font-medium">Erreurs :</p>
-                    <ul className="list-disc list-inside mt-1">
-                      {passwordErrors.map((error, index) => (
+                    <p className="font-medium mb-2">Erreurs de validation :</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {formErrors.map((error, index) => (
                         <li key={index}>{error}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
               )}
+
+              {activeTab === 'profile' && (
+                <div className="space-y-6">
+                  {/* Informations Personnelles */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                      {t('profile.personalInfo')}
+                      <span className="text-red-500 ml-1">*</span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.firstName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.firstName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.lastName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.lastName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.email')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    {/* Téléphone - Composant simplifié intégré */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        {t('profile.phone')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <PhoneInput
+                        countryCode={formData.country_code}
+                        areaCode={formData.area_code}
+                        phoneNumber={formData.phone_number}
+                        onChange={handlePhoneChange}
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.country')} <span className="text-gray-500 text-sm">(optionnel)</span>
+                      </label>
+                      <select
+                        value={formData.country}
+                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      >
+                        <option value="">Sélectionner un pays</option>
+                        <option value="CA">🇨🇦 Canada</option>
+                        <option value="US">🇺🇸 États-Unis</option>
+                        <option value="FR">🇫🇷 France</option>
+                        <option value="BE">🇧🇪 Belgique</option>
+                        <option value="CH">🇨🇭 Suisse</option>
+                        <option value="MX">🇲🇽 Mexique</option>
+                        <option value="BR">🇧🇷 Brésil</option>
+                        <option value="other">🌍 Autre</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Informations Professionnelles */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                      Informations Professionnelles
+                      <span className="text-gray-500 text-sm ml-2">(optionnel)</span>
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Profil LinkedIn Personnel
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinProfile}
+                          onChange={(e) => setFormData(prev => ({ ...prev, linkedinProfile: e.target.value }))}
+                          placeholder="https://linkedin.com/in/votre-profil"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyName')}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.companyName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                          placeholder="Nom de votre entreprise ou exploitation"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('profile.companyWebsite')}
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.companyWebsite}
+                          onChange={(e) => setFormData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+                          placeholder="https://www.votre-entreprise.com"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Page LinkedIn Entreprise
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.linkedinCorporate}
+                          onChange={(e) => setFormData(prev => ({ ...prev, linkedinCorporate: e.target.value }))}
+                          placeholder="https://linkedin.com/company/votre-entreprise"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'password' && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                    {t('profile.password')}
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.currentPassword')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.newPassword')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Le mot de passe doit contenir :</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                          <div className={`flex items-center ${passwordData.newPassword.length >= 8 ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{passwordData.newPassword.length >= 8 ? '✅' : '⭕'}</span>
+                            8+ caractères
+                          </div>
+                          <div className={`flex items-center ${/[A-Z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/[A-Z]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Une majuscule
+                          </div>
+                          <div className={`flex items-center ${/[a-z]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/[a-z]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Une minuscule
+                          </div>
+                          <div className={`flex items-center ${/\d/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className="mr-1">{/\d/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Un chiffre
+                          </div>
+                          <div className={`flex items-center ${/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? 'text-green-600' : 'text-gray-400'} sm:col-span-2`}>
+                            <span className="mr-1">{/[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword) ? '✅' : '⭕'}</span>
+                            Un caractère spécial (!@#$%^&*...)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('profile.confirmPassword')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    
+                    {passwordErrors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="text-sm text-red-800">
+                          <p className="font-medium mb-2">Erreurs :</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {passwordErrors.map((error, index) => (
+                              <li key={index}>{error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
 
-      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800"
-          disabled={isLoading}
-        >
-          {t('modal.cancel')}
-        </button>
-        <button
-          onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isLoading ? t('modal.loading') : t('modal.save')}
-        </button>
+          {/* Footer Fixe */}
+          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              disabled={isLoading}
+            >
+              {t('modal.cancel')}
+            </button>
+            <button
+              onClick={activeTab === 'profile' ? handleProfileSave : handlePasswordChange}
+              disabled={isLoading}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center"
+            >
+              {isLoading && (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              )}
+              {isLoading ? t('modal.loading') : t('modal.save')}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

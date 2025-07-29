@@ -416,29 +416,38 @@ export default function ChatInterface() {
                           <button
                             onClick={() => {
                               console.log('👍 Clic bouton positif pour message:', message.id)
+                              console.log('👍 Message feedback actuel:', message.feedback)
+                              console.log('👍 Message conversation_id:', message.conversation_id)
                               handleFeedbackClick(message.id, 'positive')
                             }}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
                               message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
                             }`}
                             title={t('chat.helpfulResponse')}
-                            disabled={message.feedback !== null}
+                            disabled={false}
                           >
                             <ThumbUpIcon />
                           </button>
                           <button
                             onClick={() => {
                               console.log('👎 Clic bouton négatif pour message:', message.id)
+                              console.log('👎 Message feedback actuel:', message.feedback)
+                              console.log('👎 Message conversation_id:', message.conversation_id)
                               handleFeedbackClick(message.id, 'negative')
                             }}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
                               message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
                             }`}
                             title={t('chat.notHelpfulResponse')}
-                            disabled={message.feedback !== null}
+                            disabled={false}
                           >
                             <ThumbDownIcon />
                           </button>
+                          
+                          {/* DEBUG TEMPORAIRE */}
+                          <span className="text-xs text-red-600">
+                            DEBUG: feedback={message.feedback || 'null'}, id={message.conversation_id ? 'OK' : 'MISSING'}
+                          </span>
                           
                           {/* ✅ AFFICHAGE STATUS FEEDBACK */}
                           {message.feedback && (
