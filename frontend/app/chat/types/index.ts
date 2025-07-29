@@ -75,7 +75,7 @@ export interface ProfileUpdateData {
   firstName: string
   lastName: string
   email: string
-  phone: string  // ⚠️ Champ existant - gardé pour compatibilité
+  phone?: string  // ✅ CORRIGÉ : Maintenant optionnel pour éviter les conflits
   country: string
   linkedinProfile: string
   companyName: string

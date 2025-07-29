@@ -46,7 +46,7 @@ export interface ConversationItem {
   feedback?: number | null
 }
 
-// ==================== TYPES UTILISATEUR ====================
+// ==================== TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
 
 export interface User {
   id: string
@@ -54,7 +54,7 @@ export interface User {
   name: string
   firstName: string
   lastName: string
-  phone: string
+  phone: string  // ⚠️ Champ existant - gardé pour compatibilité
   country: string
   linkedinProfile: string
   companyName: string
@@ -64,19 +64,45 @@ export interface User {
   language: string
   created_at: string
   plan: string
+  
+  // ✅ NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
+  country_code?: string    // Code pays (ex: +1, +33, +32)
+  area_code?: string       // Code régional (ex: 514, 04, 2)
+  phone_number?: string    // Numéro principal (ex: 1234567, 12345678)
 }
 
 export interface ProfileUpdateData {
   firstName: string
   lastName: string
   email: string
-  phone: string
+  phone: string  // ⚠️ Champ existant - gardé pour compatibilité
   country: string
   linkedinProfile: string
   companyName: string
   companyWebsite: string
   linkedinCorporate: string
   language?: string
+  
+  // ✅ NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
+  country_code?: string
+  area_code?: string
+  phone_number?: string
+}
+
+// ==================== TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
+
+export interface PhoneData {
+  country_code: string
+  area_code: string
+  phone_number: string
+}
+
+export interface PhoneValidationResult {
+  isValid: boolean
+  errors: string[]
+  isValidCountry: boolean
+  isValidArea: boolean
+  isValidNumber: boolean
 }
 
 // ==================== TYPES HOOKS ====================
