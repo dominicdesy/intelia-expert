@@ -5,10 +5,8 @@ import Link from 'next/link'
 import Head from 'next/head'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// Instance Supabase réutilisable
 const supabase = createClientComponentClient()
 
-// ==================== SYSTEM INTERNATIONALIZATION ====================
 type Language = 'fr' | 'en' | 'es' | 'de'
 
 const translations = {
@@ -206,7 +204,6 @@ const translations = {
   }
 }
 
-// Liste des pays
 const countries = [
   { value: 'CA', label: 'Canada' },
   { value: 'US', label: 'États-Unis' },
@@ -217,7 +214,6 @@ const countries = [
   { value: 'BR', label: 'Brésil' }
 ]
 
-// ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   <img 
     src="/images/favicon.png" 
@@ -226,7 +222,6 @@ const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   />
 )
 
-// ==================== SÉLECTEUR DE LANGUE ====================
 const LanguageSelector = ({ onLanguageChange, currentLanguage }: { 
   onLanguageChange: (lang: Language) => void
   currentLanguage: Language 
@@ -241,11 +236,6 @@ const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
   ]
 
   const currentLang = languages.find(lang => lang.code === currentLanguage)
-
-  const handleLanguageChange = (newLanguage: Language) => {
-    onLanguageChange(newLanguage)
-    setIsOpen(false)
-  }
 
   return (
     <div className="relative">
@@ -272,7 +262,10 @@ const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
             {languages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => handleLanguageChange(lang.code)}
+                onClick={() => {
+                  onLanguageChange(lang.code)
+                  setIsOpen(false)
+                }}
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
                   lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                 } first:rounded-t-lg last:rounded-b-lg transition-colors`}
@@ -288,7 +281,6 @@ const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
   )
 }
 
-// ==================== VALIDATION FUNCTIONS ====================
 const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -313,24 +305,19 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
 }
 
 const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
-  // Si tous les champs sont vides, c'est valide (optionnel)
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
     return true
   }
   
-  // Si un des champs est rempli, tous doivent être valides
   if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
-    // Country code: doit commencer par + et avoir 1-4 chiffres
     if (!countryCode.trim() || !/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
       return false
     }
     
-    // Area code: doit avoir exactement 3 chiffres
     if (!areaCode.trim() || !/^\d{3}$/.test(areaCode.trim())) {
       return false
     }
     
-    // Phone number: doit avoir exactement 7 chiffres
     if (!phoneNumber.trim() || !/^\d{7}$/.test(phoneNumber.trim())) {
       return false
     }
@@ -340,30 +327,27 @@ const validatePhone = (countryCode: string, areaCode: string, phoneNumber: strin
 }
 
 const validateLinkedIn = (url: string): boolean => {
-  if (!url.trim()) return true // Optional field
+  if (!url.trim()) return true
   return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
 }
 
 const validateWebsite = (url: string): boolean => {
-  if (!url.trim()) return true // Optional field
+  if (!url.trim()) return true
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// ==================== PAGE DE CONNEXION/INSCRIPTION ====================
 export default function LoginPage() {
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const t = translations[currentLanguage]
   
   const [isSignupMode, setIsSignupMode] = useState(false)
   
-  // Données de connexion
   const [loginData, setLoginData] = useState({
     email: '',
     password: '',
     rememberMe: false
   })
 
-  // Données d'inscription avec 3 champs téléphone séparés
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
@@ -387,7 +371,6 @@ export default function LoginPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
-    // Charger la langue sauvegardée
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -398,7 +381,6 @@ export default function LoginPage() {
       }
     }
 
-    // Charger les données "Se souvenir de moi"
     const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
     const lastEmail = localStorage.getItem('intelia-last-email') || ''
     
@@ -591,7 +573,6 @@ export default function LoginPage() {
         return
       }
       
-      // Gestion "Se souvenir de moi"
       if (loginData.rememberMe) {
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', loginData.email.trim())
@@ -653,12 +634,10 @@ export default function LoginPage() {
       </Head>
       
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
-        {/* Sélecteur de langue */}
         <div className="absolute top-4 right-4">
           <LanguageSelector onLanguageChange={handleLanguageChange} currentLanguage={currentLanguage} />
         </div>
         
-        {/* Header */}
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
             <InteliaLogo className="w-16 h-16" />
@@ -668,11 +647,9 @@ export default function LoginPage() {
           </h2>
         </div>
 
-        {/* Formulaire */}
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
           <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto">
             
-            {/* Messages d'erreur et succès */}
             {error && (
               <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex">
@@ -710,10 +687,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* FORMULAIRE DE CONNEXION */}
             {!isSignupMode && (
               <div className="space-y-6">
-                {/* Email */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                     {t.email} <span className="text-red-500">*</span>
@@ -735,7 +710,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Mot de passe */}
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                     {t.password} <span className="text-red-500">*</span>
@@ -775,7 +749,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Options */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <input
@@ -802,85 +775,12 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Bouton de connexion */}
                 <div>
                   <button
                     type="button"
                     onClick={handleLogin}
                     disabled={isLoading || !loginData.email || !loginData.password}
                     className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>{t.creating}</span>
-                      </div>
-                    ) : (
-                      t.signup
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Séparateur et toggle */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-gray-500">
-                    {isSignupMode ? 'Déjà un compte ?' : t.newToIntelia}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  {isSignupMode ? t.backToLogin : t.createAccount}
-                </button>
-              </div>
-            </div>
-
-            {/* Footer RGPD */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center leading-relaxed">
-                {t.gdprNotice}{' '}
-                <a href="/terms" className="text-blue-600 hover:text-blue-500 transition-colors">
-                  {t.terms}
-                </a>{' '}
-                et notre{' '}
-                <a href="/privacy" className="text-blue-600 hover:text-blue-500 transition-colors">
-                  {t.privacy}
-                </a>
-                .
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer avec support */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
-            {t.needHelp}{' '}
-            <button
-              type="button"
-              onClick={() => window.open('mailto:support@intelia.com', '_blank')}
-              className="text-blue-600 hover:underline font-medium"
-            >
-              {t.contactSupport}
-            </button>
-          </p>
-        </div>
-      </div>
-    </>
-  )
-}2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isLoading ? (
                       <div className="flex items-center space-x-2">
@@ -895,18 +795,14 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* FORMULAIRE D'INSCRIPTION */}
             {isSignupMode && (
               <div className="space-y-6">
-                
-                {/* Section: Informations personnelles */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                     {t.personalInfo}
                   </h3>
                   
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Prénom */}
                     <div>
                       <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                         {t.firstName} <span className="text-red-500">*</span>
@@ -922,7 +818,6 @@ export default function LoginPage() {
                       />
                     </div>
 
-                    {/* Nom de famille */}
                     <div>
                       <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
                         {t.lastName} <span className="text-red-500">*</span>
@@ -939,7 +834,6 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {/* LinkedIn personnel */}
                   <div className="mt-4">
                     <label htmlFor="linkedinProfile" className="block text-sm font-medium text-gray-700">
                       {t.linkedinProfile} <span className="text-gray-500 text-xs">{t.optional}</span>
@@ -956,13 +850,11 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Section: Contact */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                     {t.contact}
                   </h3>
 
-                  {/* Email */}
                   <div className="mb-4">
                     <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700">
                       {t.email} <span className="text-red-500">*</span>
@@ -979,7 +871,6 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  {/* Pays */}
                   <div className="mb-4">
                     <label htmlFor="country" className="block text-sm font-medium text-gray-700">
                       {t.country} <span className="text-red-500">*</span>
@@ -1001,13 +892,11 @@ export default function LoginPage() {
                     </select>
                   </div>
 
-                  {/* Champs téléphone */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Téléphone <span className="text-gray-500 text-xs">{t.optional}</span>
                     </label>
                     <div className="grid grid-cols-3 gap-3">
-                      {/* Country Code */}
                       <div>
                         <label htmlFor="countryCode" className="block text-xs font-medium text-gray-600 mb-1">
                           {t.countryCode}
@@ -1029,7 +918,6 @@ export default function LoginPage() {
                         </select>
                       </div>
                       
-                      {/* Area Code */}
                       <div>
                         <label htmlFor="areaCode" className="block text-xs font-medium text-gray-600 mb-1">
                           {t.areaCode}
@@ -1046,7 +934,6 @@ export default function LoginPage() {
                         />
                       </div>
                       
-                      {/* Phone Number */}
                       <div>
                         <label htmlFor="phoneNumber" className="block text-xs font-medium text-gray-600 mb-1">
                           {t.phoneNumber}
@@ -1064,7 +951,6 @@ export default function LoginPage() {
                       </div>
                     </div>
                     
-                    {/* Validation téléphone en temps réel */}
                     {(signupData.countryCode || signupData.areaCode || signupData.phoneNumber) && (
                       <div className="mt-2">
                         {validatePhone(signupData.countryCode, signupData.areaCode, signupData.phoneNumber) ? (
@@ -1087,10 +973,8 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Section: Mots de passe */}
                 <div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Mot de passe */}
                     <div>
                       <label htmlFor="signupPassword" className="block text-sm font-medium text-gray-700">
                         {t.password} <span className="text-red-500">*</span>
@@ -1118,7 +1002,6 @@ export default function LoginPage() {
                           </svg>
                         </button>
                       </div>
-                      {/* Indicateurs de validation mot de passe */}
                       {signupData.password && (
                         <div className="mt-2 space-y-1">
                           {(() => {
@@ -1144,7 +1027,6 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    {/* Confirmation mot de passe */}
                     <div>
                       <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                         {t.confirmPassword} <span className="text-red-500">*</span>
@@ -1172,7 +1054,6 @@ export default function LoginPage() {
                           </svg>
                         </button>
                       </div>
-                      {/* Indicateur de confirmation */}
                       {signupData.confirmPassword && (
                         <div className="mt-2">
                           {signupData.password === signupData.confirmPassword ? (
@@ -1196,13 +1077,11 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Section: Entreprise */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                     {t.company}
                   </h3>
 
-                  {/* Nom de l'entreprise */}
                   <div className="mb-4">
                     <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
                       {t.companyName} <span className="text-gray-500 text-xs">{t.optional}</span>
@@ -1217,7 +1096,6 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  {/* Site web de l'entreprise */}
                   <div className="mb-4">
                     <label htmlFor="companyWebsite" className="block text-sm font-medium text-gray-700">
                       {t.companyWebsite} <span className="text-gray-500 text-xs">{t.optional}</span>
@@ -1233,7 +1111,6 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  {/* LinkedIn de l'entreprise */}
                   <div>
                     <label htmlFor="companyLinkedin" className="block text-sm font-medium text-gray-700">
                       {t.companyLinkedin} <span className="text-gray-500 text-xs">{t.optional}</span>
@@ -1250,10 +1127,78 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Bouton de création */}
                 <div className="pt-4">
                   <button
                     type="button"
                     onClick={handleSignup}
                     disabled={isLoading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-
+                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>{t.creating}</span>
+                      </div>
+                    ) : (
+                      t.signup
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-2 text-gray-500">
+                    {isSignupMode ? 'Déjà un compte ?' : t.newToIntelia}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  {isSignupMode ? t.backToLogin : t.createAccount}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center leading-relaxed">
+                {t.gdprNotice}{' '}
+                <a href="/terms" className="text-blue-600 hover:text-blue-500 transition-colors">
+                  {t.terms}
+                </a>{' '}
+                et notre{' '}
+                <a href="/privacy" className="text-blue-600 hover:text-blue-500 transition-colors">
+                  {t.privacy}
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500">
+            {t.needHelp}{' '}
+            <button
+              type="button"
+              onClick={() => window.open('mailto:support@intelia.com', '_blank')}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              {t.contactSupport}
+            </button>
+          </p>
+        </div>
+      </div>
+    </>
+  )
+}
