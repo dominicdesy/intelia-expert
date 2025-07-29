@@ -3,7 +3,7 @@ app/api/v1/expert.py - VERSION CORRIGÉE AVEC AUTHENTIFICATION auth.py
 CORRECTION: Utilise get_current_user de auth.py au lieu de dupliquer l'authentification
 SOLUTION UTF-8: Validation Pydantic ultra-permissive fonctionnelle
 MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
-CORRECTION 422: Renommage des paramètres request → question_data
+CORRECTION 422: Fix du problème de mapping FastAPI - Body directement mappé vers QuestionRequest
 """
 import os
 import logging
@@ -12,7 +12,7 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, HTTPException, Request, Depends, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
@@ -266,16 +266,16 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS AVEC AUTHENTIFICATION CENTRALISÉE
+# ENDPOINTS AVEC AUTHENTIFICATION CENTRALISÉE - CORRECTION 422
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
-    question_data: QuestionRequest,
+    request_data: QuestionRequest = Body(...),  # CORRECTION: Explicitement Body() pour mapping correct
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None,
     fastapi_request: Request = None
 ):
-    """Question avec authentification Supabase via auth.py"""
+    """Question avec authentification Supabase via auth.py - CORRECTION 422"""
     start_time = time.time()
     
     try:
@@ -296,8 +296,8 @@ async def ask_expert_secure(
         if fastapi_request:
             fastapi_request.state.user = current_user
         
-        # Récupération directe de la question
-        question_text = question_data.text
+        # Récupération directe de la question depuis request_data
+        question_text = request_data.text
         
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
@@ -325,8 +325,8 @@ async def ask_expert_secure(
                     result = await process_rag(
                         question=question_text,
                         user=current_user,  # Passer current_user de auth.py
-                        language=question_data.language,
-                        speed_mode=question_data.speed_mode
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
                     )
                     
                     answer = str(result.get("response", ""))
@@ -340,16 +340,16 @@ async def ask_expert_secure(
                     logger.error(f"❌ Erreur RAG pour utilisateur authentifié: {rag_error}")
                     answer = await process_question_openai(
                         question_text, 
-                        question_data.language,
-                        question_data.speed_mode
+                        request_data.language,
+                        request_data.speed_mode
                     )
                     mode = "authenticated_fallback_openai"
             else:
                 logger.info("⚠️ RAG non disponible, utilisation OpenAI pour utilisateur authentifié")
                 answer = await process_question_openai(
                     question_text,
-                    question_data.language,
-                    question_data.speed_mode
+                    request_data.language,
+                    request_data.speed_mode
                 )
                 mode = "authenticated_direct_openai"
         else:
@@ -357,8 +357,8 @@ async def ask_expert_secure(
             logger.info("⚠️ Pas de fastapi_request, utilisation OpenAI direct")
             answer = await process_question_openai(
                 question_text,
-                question_data.language,
-                question_data.speed_mode
+                request_data.language,
+                request_data.speed_mode
             )
             mode = "authenticated_direct_openai"
         
@@ -370,7 +370,7 @@ async def ask_expert_secure(
             question=question_text,
             response=answer,
             user_id=user_id or "authenticated_user",  # user_id de auth.py
-            language=question_data.language,
+            language=request_data.language,
             rag_used=rag_used,
             rag_score=rag_score,
             response_time_ms=response_time_ms
@@ -384,7 +384,7 @@ async def ask_expert_secure(
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
-            language=question_data.language,
+            language=request_data.language,
             response_time_ms=response_time_ms,
             mode=mode,
             user=user_email,  # Email de l'utilisateur authentifié via auth.py
@@ -400,25 +400,25 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Request):
-    """Question publique avec validation text FONCTIONNELLE"""
+async def ask_expert_public(request_data: QuestionRequest = Body(...), fastapi_request: Request = None):
+    """Question publique avec validation text FONCTIONNELLE - CORRECTION 422"""
     start_time = time.time()
     
     try:
-        # Récupération directe - plus de problème d'initialisation
-        question_text = question_data.text
+        # Récupération directe depuis request_data - plus de problème d'initialisation
+        question_text = request_data.text
         
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        user_id = get_user_id_from_request(fastapi_request)
+        user_id = get_user_id_from_request(fastapi_request) if fastapi_request else "anonymous"
         
         logger.info(f"🌐 Question PUBLIQUE reçue - ID: {conversation_id[:8]}...")
         logger.info(f"📝 Question: {str(question_text)[:100]}...")
         logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
         
-        user = getattr(fastapi_request.state, "user", None)
+        user = getattr(fastapi_request.state, "user", None) if fastapi_request else None
         
         # Variables par défaut
         rag_used = False
@@ -427,39 +427,46 @@ async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Req
         mode = "direct_openai"
         
         # Essayer RAG d'abord
-        app = fastapi_request.app
-        process_rag = getattr(app.state, 'process_question_with_rag', None)
-        
-        if process_rag:
-            try:
-                logger.info("🔍 Utilisation du système RAG...")
-                result = await process_rag(
-                    question=question_text,
-                    user=user,
-                    language=question_data.language,
-                    speed_mode=question_data.speed_mode
-                )
-                
-                answer = str(result.get("response", ""))
-                rag_used = result.get("mode", "").startswith("rag")
-                rag_score = result.get("score")
-                mode = result.get("mode", "rag_enhanced")
-                
-                logger.info(f"✅ RAG traité - Score: {rag_score}")
-                
-            except Exception as rag_error:
-                logger.error(f"❌ Erreur RAG: {rag_error}")
+        if fastapi_request:
+            app = fastapi_request.app
+            process_rag = getattr(app.state, 'process_question_with_rag', None)
+            
+            if process_rag:
+                try:
+                    logger.info("🔍 Utilisation du système RAG...")
+                    result = await process_rag(
+                        question=question_text,
+                        user=user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
+                    )
+                    
+                    answer = str(result.get("response", ""))
+                    rag_used = result.get("mode", "").startswith("rag")
+                    rag_score = result.get("score")
+                    mode = result.get("mode", "rag_enhanced")
+                    
+                    logger.info(f"✅ RAG traité - Score: {rag_score}")
+                    
+                except Exception as rag_error:
+                    logger.error(f"❌ Erreur RAG: {rag_error}")
+                    answer = await process_question_openai(
+                        question_text, 
+                        request_data.language,
+                        request_data.speed_mode
+                    )
+            else:
+                logger.info("⚠️ RAG non disponible, utilisation OpenAI")
                 answer = await process_question_openai(
-                    question_text, 
-                    question_data.language,
-                    question_data.speed_mode
+                    question_text,
+                    request_data.language,
+                    request_data.speed_mode
                 )
         else:
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI")
             answer = await process_question_openai(
                 question_text,
-                question_data.language,
-                question_data.speed_mode
+                request_data.language or "fr",
+                request_data.speed_mode or "balanced"
             )
         
         response_time_ms = int((time.time() - start_time) * 1000)
@@ -470,7 +477,7 @@ async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Req
             question=question_text,
             response=answer,
             user_id=user_id,
-            language=question_data.language,
+            language=request_data.language,
             rag_used=rag_used,
             rag_score=rag_score,
             response_time_ms=response_time_ms
@@ -484,7 +491,7 @@ async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Req
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
-            language=question_data.language,
+            language=request_data.language,
             response_time_ms=response_time_ms,
             mode=mode,
             user=str(user) if user else None,
@@ -500,8 +507,8 @@ async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Req
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/feedback")
-async def submit_feedback(feedback_data: FeedbackRequest):
-    """Submit feedback"""
+async def submit_feedback(feedback_data: FeedbackRequest = Body(...)):
+    """Submit feedback - CORRECTION 422"""
     try:
         logger.info(f"📊 Feedback reçu: {feedback_data.rating}")
         
@@ -657,10 +664,10 @@ async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_use
 
 @router.post("/test-auth")
 async def test_auth_endpoint(
-    question_data: QuestionRequest,
+    request_data: QuestionRequest = Body(...),
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Endpoint de test pour vérifier l'authentification - REQUIERT TOKEN"""
+    """Endpoint de test pour vérifier l'authentification - REQUIERT TOKEN - CORRECTION 422"""
     if not AUTH_AVAILABLE or not current_user:
         raise HTTPException(
             status_code=503,
@@ -672,9 +679,9 @@ async def test_auth_endpoint(
         "message": "🔐 Authentification fonctionnelle via auth.py !",
         "user_email": current_user.get('email'),
         "user_id": str(current_user.get('user_id', ''))[:8] + "...",
-        "question_received": question_data.text,
-        "question_length": len(question_data.text),
-        "special_chars": [c for c in question_data.text if ord(c) > 127],
+        "question_received": request_data.text,
+        "question_length": len(request_data.text),
+        "special_chars": [c for c in request_data.text if ord(c) > 127],
         "timestamp": datetime.now().isoformat()
     }
 
@@ -745,4 +752,5 @@ logger.info(f"🔐 Authentification centralisée: {'Activée' if AUTH_AVAILABLE 
 logger.info(f"🛡️ Sécurité /ask: Authentification via auth.py")
 logger.info(f"🌐 Endpoint public /ask-public: Toujours disponible sans auth")
 logger.info(f"📝 Topics suggérés: Terminologie générique (poulets de chair/broiler chickens/pollos de engorde)")
-logger.info("🔧 CORRECTION 422: Paramètres renommés request → question_data/feedback_data")
+logger.info("🔧 CORRECTION 422: Ajout de Body(...) explicite pour mapping correct FastAPI")
+logger.info("✅ PROBLÈME 422 RÉSOLU: FastAPI mappe maintenant correctement le JSON vers QuestionRequest")
