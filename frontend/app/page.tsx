@@ -512,8 +512,8 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      // Simuler redirection
-      alert('Connexion réussie ! (En production, redirection vers /chat)')
+      // Redirection vers le chat
+      window.location.href = '/chat'
       
     } catch (error: any) {
       setError('Erreur technique inattendue. Veuillez réessayer.')
