@@ -1,764 +1,628 @@
 """
-Module de logging pour Intelia Expert - CORRECTION ROUTER 404
-Gestion des conversations et feedback utilisateurs
-CORRECTION: Router avec endpoints manquants ajoutés
+Extension logging.py - ENDPOINTS POUR COMMENTAIRES FEEDBACK
+Ajouter ces endpoints à la fin du fichier logging.py existant
 """
-import sqlite3
-import uuid
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, validator, ConfigDict
-import json
-import os
 
-# Configuration
-DB_PATH = "conversations.db"
+# ============================================================================
+# NOUVEAUX MODÈLES POUR COMMENTAIRES FEEDBACK
+# ============================================================================
 
-# =============================================================================
-# MODÈLES PYDANTIC AVEC VALIDATION ASSOUPLIE
-# =============================================================================
+class FeedbackCommentUpdate(BaseModel):
+    comment: str
+    timestamp: Optional[str] = None
 
-class ConversationCreate(BaseModel):
-    """Request model avec validation ultra-assouplie"""
-    user_id: str
-    question: str
-    response: str
-    conversation_id: str
-    confidence_score: Optional[float] = None
-    response_time_ms: Optional[int] = None
-    language: str = "fr"
-    rag_used: Optional[bool] = True
-
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="ignore"  # Ignore extra fields
-    )
-
-    @validator('user_id', pre=True, always=True)
-    def validate_user_id(cls, v):
-        if not v:
-            return f"anonymous_{uuid.uuid4().hex[:8]}"
-        return str(v).strip()
-
-    @validator('question', 'response', pre=True, always=True)
-    def validate_text_fields(cls, v):
-        if not v:
-            return ""
-        try:
-            return str(v).strip()
-        except:
-            return ""
-
-    @validator('conversation_id', pre=True, always=True)
-    def validate_conversation_id(cls, v):
-        if not v:
-            return str(uuid.uuid4())
-        return str(v).strip()
-
-    @validator('language', pre=True, always=True)
-    def validate_language(cls, v):
-        if not v:
-            return "fr"
-        lang = str(v).lower().strip()[:2]
-        return lang if lang in ["fr", "en", "es"] else "fr"
-
-    @validator('confidence_score', pre=True, always=True)
-    def validate_confidence_score(cls, v):
-        if v is None or v == "":
-            return None
-        try:
-            score = float(v)
-            return max(0.0, min(1.0, score))
-        except (ValueError, TypeError):
-            return None
-
-    @validator('response_time_ms', pre=True, always=True)
-    def validate_response_time(cls, v):
-        if v is None or v == "":
-            return None
-        try:
-            time_ms = int(float(v))
-            return max(0, time_ms)
-        except (ValueError, TypeError):
-            return None
-
-class FeedbackUpdate(BaseModel):
+class FeedbackWithCommentUpdate(BaseModel):
     feedback: int
+    comment: Optional[str] = None
+    timestamp: Optional[str] = None
 
-class ConversationResponse(BaseModel):
-    conversation_id: str
-    timestamp: datetime
-    message: str
+# ============================================================================
+# EXTENSION DE LA CLASSE ConversationLogger POUR COMMENTAIRES
+# ============================================================================
 
-class DeleteResponse(BaseModel):
-    message: str
-    conversation_id: Optional[str] = None
-    user_id: Optional[str] = None
-    deleted_count: int
-    timestamp: datetime
-
-class AnalyticsResponse(BaseModel):
-    total_conversations: int
-    satisfaction_rate: Optional[float]
-    avg_response_time: Optional[float]
-    feedback_distribution: Dict[str, int]
-    period_days: int
-
-# ==================== CLASSE LOGGER PRINCIPAL ====================
-
-class ConversationLogger:
-    def __init__(self, db_path: str = DB_PATH):
-        self.db_path = db_path
-        self.init_database()
+def extend_conversation_logger():
+    """Extension de la classe ConversationLogger avec nouvelles méthodes"""
     
-    def init_database(self):
-        """Initialise la base de données SQLite"""
+    def update_feedback_comment(self, conversation_id: str, comment: str) -> bool:
+        """Met à jour le commentaire feedback d'une conversation"""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS conversations (
-                        id TEXT PRIMARY KEY,
-                        conversation_id TEXT UNIQUE NOT NULL,
-                        user_id TEXT NOT NULL,
-                        question TEXT NOT NULL,
-                        response TEXT NOT NULL,
-                        feedback INTEGER,
-                        confidence_score REAL,
-                        response_time_ms INTEGER,
-                        language TEXT DEFAULT 'fr',
-                        rag_used BOOLEAN DEFAULT TRUE,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                # Vérifier si la colonne feedback_comment existe, sinon la créer
+                try:
+                    conn.execute("ALTER TABLE conversations ADD COLUMN feedback_comment TEXT")
+                    print("✅ Colonne feedback_comment ajoutée à la base")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e).lower():
+                        print(f"⚠️ Erreur ajout colonne: {e}")
                 
-                # Index pour les requêtes fréquentes
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_id ON conversations(conversation_id)")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON conversations(user_id)")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON conversations(timestamp)")
-                
-                print("✅ Base de données conversations initialisée")
-                
-        except Exception as e:
-            print(f"❌ Erreur initialisation base: {e}")
-    
-    def save_conversation(self, conversation: ConversationCreate) -> str:
-        """Sauvegarde une conversation avec gestion d'erreurs"""
-        try:
-            record_id = str(uuid.uuid4())
-            
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    INSERT OR REPLACE INTO conversations (
-                        id, conversation_id, user_id, question, response, 
-                        confidence_score, response_time_ms, language, rag_used
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    record_id,
-                    conversation.conversation_id,
-                    conversation.user_id,
-                    conversation.question,
-                    conversation.response,
-                    conversation.confidence_score,
-                    conversation.response_time_ms,
-                    conversation.language,
-                    conversation.rag_used
-                ))
-            
-            return record_id
-            
-        except Exception as e:
-            print(f"❌ Erreur sauvegarde: {e}")
-            return str(uuid.uuid4())
-    
-    def update_feedback(self, conversation_id: str, feedback: int) -> bool:
-        """Met à jour le feedback d'une conversation"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute("""
                     UPDATE conversations 
-                    SET feedback = ?, updated_at = CURRENT_TIMESTAMP 
+                    SET feedback_comment = ?, updated_at = CURRENT_TIMESTAMP 
                     WHERE conversation_id = ?
-                """, (feedback, conversation_id))
+                """, (comment, conversation_id))
                 
                 return cursor.rowcount > 0
                 
         except Exception as e:
-            print(f"❌ Erreur mise à jour feedback: {e}")
+            print(f"❌ Erreur mise à jour commentaire feedback: {e}")
             return False
     
-    def get_user_conversations(self, user_id: str, limit: int = 10) -> List[Dict]:
-        """Récupère les conversations d'un utilisateur"""
+    def update_feedback_with_comment(self, conversation_id: str, feedback: int, comment: str = None) -> bool:
+        """Met à jour le feedback ET le commentaire d'une conversation"""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.execute("""
-                    SELECT conversation_id, question, timestamp, language, rag_used, feedback
-                    FROM conversations 
-                    WHERE user_id = ? 
-                    ORDER BY timestamp DESC 
-                    LIMIT ?
-                """, (user_id, limit))
+                # Vérifier si la colonne feedback_comment existe
+                try:
+                    conn.execute("ALTER TABLE conversations ADD COLUMN feedback_comment TEXT")
+                    print("✅ Colonne feedback_comment ajoutée à la base")
+                except sqlite3.OperationalError:
+                    pass  # Colonne existe déjà
                 
-                return [dict(row) for row in cursor.fetchall()]
+                cursor = conn.execute("""
+                    UPDATE conversations 
+                    SET feedback = ?, feedback_comment = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE conversation_id = ?
+                """, (feedback, comment, conversation_id))
+                
+                return cursor.rowcount > 0
                 
         except Exception as e:
-            print(f"❌ Erreur récupération conversations: {e}")
-            return []
+            print(f"❌ Erreur mise à jour feedback avec commentaire: {e}")
+            return False
     
-    def get_analytics(self, days: int = 7) -> Dict[str, Any]:
-        """Génère des analytics pour une période donnée"""
+    def get_feedback_analytics(self, user_id: str = None, days: int = 7) -> Dict[str, Any]:
+        """Génère des analytics détaillées des feedbacks avec commentaires"""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                # Total conversations
-                total = conn.execute("""
-                    SELECT COUNT(*) FROM conversations 
-                    WHERE datetime(timestamp) >= datetime('now', '-{} days')
-                """.format(days)).fetchone()[0]
+                # Construire la clause WHERE
+                where_clause = "WHERE datetime(timestamp) >= datetime('now', '-{} days')".format(days)
+                if user_id:
+                    where_clause += f" AND user_id = '{user_id}'"
                 
-                # Satisfaction rate
-                satisfaction = conn.execute("""
+                # Statistiques générales
+                general_stats = conn.execute(f"""
                     SELECT 
+                        COUNT(*) as total,
                         COUNT(CASE WHEN feedback = 1 THEN 1 END) as positive,
                         COUNT(CASE WHEN feedback = -1 THEN 1 END) as negative,
-                        COUNT(CASE WHEN feedback IS NOT NULL THEN 1 END) as total_feedback
+                        COUNT(CASE WHEN feedback IS NOT NULL THEN 1 END) as total_feedback,
+                        COUNT(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment != '' THEN 1 END) as with_comment,
+                    AVG(CASE WHEN response_time_ms IS NOT NULL THEN response_time_ms END) as avg_response_time
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{} days')
+            """.format(days)).fetchone()
+            
+            # Top commentaires négatifs (pour amélioration)
+            negative_comments = conn.execute(f"""
+                SELECT question, feedback_comment, timestamp, language
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{} days')
+                AND feedback = -1 
+                AND feedback_comment IS NOT NULL 
+                AND feedback_comment != ''
+                ORDER BY timestamp DESC 
+                LIMIT 10
+            """.format(days)).fetchall()
+            
+            # Top commentaires positifs (pour comprendre ce qui marche)
+            positive_comments = conn.execute(f"""
+                SELECT question, feedback_comment, timestamp, language
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{} days')
+                AND feedback = 1 
+                AND feedback_comment IS NOT NULL 
+                AND feedback_comment != ''
+                ORDER BY timestamp DESC 
+                LIMIT 10
+            """.format(days)).fetchall()
+            
+            # Statistiques par langue
+            language_stats = conn.execute(f"""
+                SELECT 
+                    language,
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN feedback = 1 THEN 1 END) as positive,
+                    COUNT(CASE WHEN feedback = -1 THEN 1 END) as negative,
+                    COUNT(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment != '' THEN 1 END) as with_comment
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{} days')
+                GROUP BY language
+                ORDER BY total DESC
+            """.format(days)).fetchall()
+            
+            # Utilisateurs les plus actifs avec feedback
+            active_users = conn.execute(f"""
+                SELECT 
+                    user_id,
+                    COUNT(*) as total_conversations,
+                    COUNT(CASE WHEN feedback IS NOT NULL THEN 1 END) as feedback_given,
+                    COUNT(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment != '' THEN 1 END) as comments_given
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{} days')
+                GROUP BY user_id
+                HAVING feedback_given > 0
+                ORDER BY comments_given DESC, feedback_given DESC
+                LIMIT 10
+            """.format(days)).fetchall()
+        
+        # Calculer les taux
+        total_conversations = general_stats[0]
+        positive_feedback = general_stats[1]
+        negative_feedback = general_stats[2]
+        with_comment = general_stats[3]
+        total_feedback = positive_feedback + negative_feedback
+        
+        satisfaction_rate = round(positive_feedback / total_feedback, 3) if total_feedback > 0 else 0
+        feedback_rate = round(total_feedback / total_conversations, 3) if total_conversations > 0 else 0
+        comment_rate = round(with_comment / total_feedback, 3) if total_feedback > 0 else 0
+        
+        report = {
+            "period_days": days,
+            "generated_at": datetime.now().isoformat(),
+            "summary": {
+                "total_conversations": total_conversations,
+                "total_feedback": total_feedback,
+                "satisfaction_rate": satisfaction_rate,
+                "feedback_rate": feedback_rate,
+                "comment_rate": comment_rate,
+                "avg_response_time_ms": round(general_stats[4], 2) if general_stats[4] else None
+            },
+            "feedback_breakdown": {
+                "positive": positive_feedback,
+                "negative": negative_feedback,
+                "with_comment": with_comment
+            },
+            "language_stats": [
+                {
+                    "language": lang[0],
+                    "total": lang[1],
+                    "positive": lang[2],
+                    "negative": lang[3],
+                    "with_comment": lang[4],
+                    "satisfaction_rate": round(lang[2] / (lang[2] + lang[3]), 3) if (lang[2] + lang[3]) > 0 else 0
+                } for lang in language_stats
+            ],
+            "top_negative_feedback": [
+                {
+                    "question": comment[0][:100] + "..." if len(comment[0]) > 100 else comment[0],
+                    "comment": comment[1],
+                    "timestamp": comment[2],
+                    "language": comment[3]
+                } for comment in negative_comments
+            ],
+            "top_positive_feedback": [
+                {
+                    "question": comment[0][:100] + "..." if len(comment[0]) > 100 else comment[0],
+                    "comment": comment[1],
+                    "timestamp": comment[2],
+                    "language": comment[3]
+                } for comment in positive_comments
+            ],
+            "most_active_users": [
+                {
+                    "user_id": user[0][:8] + "..." if len(user[0]) > 12 else user[0],  # Anonymisation partielle
+                    "total_conversations": user[1],
+                    "feedback_given": user[2],
+                    "comments_given": user[3],
+                    "engagement_rate": round(user[2] / user[1], 3) if user[1] > 0 else 0
+                } for user in active_users
+            ]
+        }
+        
+        print(f"✅ [logging] Rapport admin feedback généré")
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "report": report,
+            "message": f"Rapport feedback pour les {days} derniers jours généré"
+        }
+        
+    except Exception as e:
+        print(f"❌ [logging] Erreur génération rapport admin: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur rapport: {str(e)}")
+
+@router.post("/admin/export-feedback")
+async def export_feedback_data(days: int = 30, format: str = "json"):
+    """NOUVEAU: Export des données de feedback pour analyse externe"""
+    try:
+        print(f"📤 [logging] Export données feedback format {format} pour {days} jours")
+        
+        with sqlite3.connect(logger_instance.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute(f"""
+                SELECT 
+                    conversation_id,
+                    user_id,
+                    question,
+                    feedback,
+                    feedback_comment,
+                    confidence_score,
+                    response_time_ms,
+                    language,
+                    rag_used,
+                    timestamp,
+                    updated_at
+                FROM conversations 
+                WHERE datetime(timestamp) >= datetime('now', '-{days} days')
+                AND feedback IS NOT NULL
+                ORDER BY timestamp DESC
+            """)
+            
+            data = []
+            for row in cursor.fetchall():
+                data.append({
+                    "conversation_id": row["conversation_id"],
+                    "user_id": row["user_id"][:8] + "..." if len(row["user_id"]) > 12 else row["user_id"],  # Anonymisation
+                    "question_length": len(row["question"]),
+                    "question_preview": row["question"][:50] + "..." if len(row["question"]) > 50 else row["question"],
+                    "feedback": "positive" if row["feedback"] == 1 else "negative",
+                    "has_comment": bool(row["feedback_comment"]),
+                    "comment_length": len(row["feedback_comment"]) if row["feedback_comment"] else 0,
+                    "comment_preview": row["feedback_comment"][:100] + "..." if row["feedback_comment"] and len(row["feedback_comment"]) > 100 else row["feedback_comment"],
+                    "confidence_score": row["confidence_score"],
+                    "response_time_ms": row["response_time_ms"],
+                    "language": row["language"],
+                    "rag_used": row["rag_used"],
+                    "timestamp": row["timestamp"]
+                })
+        
+        print(f"✅ [logging] {len(data)} enregistrements exportés")
+        
+        if format.lower() == "csv":
+            # Pour l'implémentation CSV, on retournerait les headers appropriés
+            # et le contenu formaté en CSV
+            return {
+                "status": "success",
+                "message": "Export CSV pas encore implémenté, utiliser JSON",
+                "data_preview": data[:5] if data else []
+            }
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "export_format": format,
+            "period_days": days,
+            "total_records": len(data),
+            "data": data,
+            "message": f"{len(data)} enregistrements feedback exportés"
+        }
+        
+    except Exception as e:
+        print(f"❌ [logging] Erreur export feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur export: {str(e)}")
+
+# ============================================================================
+# MISE À JOUR DU SCHÉMA DE BASE DE DONNÉES
+# ============================================================================
+
+def update_database_schema():
+    """Met à jour le schéma de la base de données pour supporter les commentaires"""
+    try:
+        with sqlite3.connect(logger_instance.db_path) as conn:
+            # Ajouter la colonne feedback_comment si elle n'existe pas
+            try:
+                conn.execute("ALTER TABLE conversations ADD COLUMN feedback_comment TEXT")
+                print("✅ Colonne feedback_comment ajoutée à la base de données")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" in str(e).lower():
+                    print("ℹ️ Colonne feedback_comment existe déjà")
+                else:
+                    print(f"⚠️ Erreur ajout colonne feedback_comment: {e}")
+            
+            # Créer un index pour les recherches de commentaires
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_comment ON conversations(feedback_comment)")
+                print("✅ Index feedback_comment créé")
+            except Exception as e:
+                print(f"⚠️ Erreur création index: {e}")
+            
+            # Vérifier le schéma final
+            schema_info = conn.execute("PRAGMA table_info(conversations)").fetchall()
+            columns = [col[1] for col in schema_info]
+            
+            print("📋 Colonnes disponibles:", columns)
+            
+            if "feedback_comment" in columns:
+                print("✅ Schema mis à jour avec succès - commentaires feedback supportés")
+            else:
+                print("❌ Échec mise à jour schema - commentaires feedback non supportés")
+                
+    except Exception as e:
+        print(f"❌ Erreur mise à jour schema: {e}")
+
+# Appliquer la mise à jour du schéma au démarrage
+update_database_schema()
+
+# ============================================================================
+# TEST ENDPOINT POUR VÉRIFIER LE SUPPORT DES COMMENTAIRES
+# ============================================================================
+
+@router.get("/test-comments")
+async def test_comment_support():
+    """Test du support des commentaires feedback"""
+    try:
+        with sqlite3.connect(logger_instance.db_path) as conn:
+            # Vérifier le schéma
+            schema_info = conn.execute("PRAGMA table_info(conversations)").fetchall()
+            columns = [col[1] for col in schema_info]
+            
+            # Compter les commentaires existants
+            comment_count = conn.execute("""
+                SELECT COUNT(*) FROM conversations 
+                WHERE feedback_comment IS NOT NULL AND feedback_comment != ''
+            """).fetchone()[0]
+            
+            # Test d'insertion (rollback)
+            conn.execute("BEGIN")
+            try:
+                test_id = str(uuid.uuid4())
+                conn.execute("""
+                    INSERT INTO conversations (id, conversation_id, user_id, question, response, feedback, feedback_comment)
+                    VALUES (?, ?, 'test_user', 'Test question', 'Test response', 1, 'Test comment')
+                """, (str(uuid.uuid4()), test_id))
+                
+                # Vérifier l'insertion
+                result = conn.execute("SELECT feedback_comment FROM conversations WHERE conversation_id = ?", (test_id,)).fetchone()
+                test_success = result and result[0] == 'Test comment'
+                
+                conn.execute("ROLLBACK")  # Annuler le test
+                
+            except Exception as e:
+                conn.execute("ROLLBACK")
+                test_success = False
+                print(f"❌ Test insertion échoué: {e}")
+        
+        return {
+            "status": "success" if test_success else "error",
+            "timestamp": datetime.now().isoformat(),
+            "schema_info": {
+                "has_feedback_comment_column": "feedback_comment" in columns,
+                "total_columns": len(columns),
+                "columns": columns
+            },
+            "comment_stats": {
+                "existing_comments": comment_count,
+                "insertion_test": "passed" if test_success else "failed"
+            },
+            "endpoints_available": [
+                "/logging/conversation/{id}/comment [PATCH]",
+                "/logging/conversation/{id}/feedback-with-comment [PATCH]",
+                "/logging/analytics/feedback [GET]",
+                "/logging/conversations/with-comments [GET]",
+                "/logging/admin/feedback-report [GET]",
+                "/logging/admin/export-feedback [POST]"
+            ],
+            "message": "Support commentaires feedback " + ("opérationnel" if test_success else "non fonctionnel")
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "message": "Erreur test support commentaires"
+        }
+
+print("✅ Extension logging avec commentaires feedback initialisée")
+print("🆕 Nouveaux endpoints ajoutés:")
+print("   - PATCH /logging/conversation/{id}/comment")
+print("   - PATCH /logging/conversation/{id}/feedback-with-comment") 
+print("   - GET /logging/analytics/feedback")
+print("   - GET /logging/conversations/with-comments")
+print("   - GET /logging/admin/feedback-report")
+print("   - POST /logging/admin/export-feedback")
+print("   - GET /logging/test-comments")_comment
                     FROM conversations 
-                    WHERE datetime(timestamp) >= datetime('now', '-{} days')
-                """.format(days)).fetchone()
+                    {where_clause}
+                """).fetchone()
                 
+                # Commentaires récents
+                recent_comments = conn.execute(f"""
+                    SELECT conversation_id, feedback, feedback_comment, timestamp, question
+                    FROM conversations 
+                    {where_clause}
+                    AND feedback_comment IS NOT NULL 
+                    AND feedback_comment != ''
+                    ORDER BY timestamp DESC 
+                    LIMIT 10
+                """).fetchall()
+                
+                # Satisfaction rate
                 satisfaction_rate = None
-                if satisfaction[2] > 0:
-                    satisfaction_rate = round(satisfaction[0] / satisfaction[2], 3)
-                
-                # Temps de réponse moyen
-                avg_response_time = conn.execute("""
-                    SELECT AVG(response_time_ms) FROM conversations 
-                    WHERE response_time_ms IS NOT NULL 
-                    AND datetime(timestamp) >= datetime('now', '-{} days')
-                """.format(days)).fetchone()[0]
+                if general_stats[3] > 0:  # total_feedback
+                    satisfaction_rate = round(general_stats[1] / general_stats[3], 3)
                 
                 return {
-                    "total_conversations": total,
-                    "satisfaction_rate": satisfaction_rate,
-                    "avg_response_time": round(avg_response_time, 2) if avg_response_time else None,
-                    "feedback_distribution": {
-                        "positive": satisfaction[0],
-                        "negative": satisfaction[1],
-                        "no_feedback": total - satisfaction[2]
+                    "period_days": days,
+                    "user_id": user_id,
+                    "general_stats": {
+                        "total_conversations": general_stats[0],
+                        "positive_feedback": general_stats[1],
+                        "negative_feedback": general_stats[2],
+                        "total_feedback": general_stats[3],
+                        "with_comment": general_stats[4]
                     },
-                    "period_days": days
+                    "satisfaction_rate": satisfaction_rate,
+                    "comment_rate": round(general_stats[4] / general_stats[3], 3) if general_stats[3] > 0 else 0,
+                    "recent_comments": [
+                        {
+                            "conversation_id": comment[0],
+                            "feedback": "positive" if comment[1] == 1 else "negative",
+                            "comment": comment[2],
+                            "timestamp": comment[3],
+                            "question_preview": comment[4][:100] + "..." if len(comment[4]) > 100 else comment[4]
+                        } for comment in recent_comments
+                    ]
                 }
                 
         except Exception as e:
-            print(f"❌ Erreur analytics: {e}")
+            print(f"❌ Erreur analytics feedback: {e}")
             return {
-                "total_conversations": 0,
-                "satisfaction_rate": None,
-                "avg_response_time": None,
-                "feedback_distribution": {"positive": 0, "negative": 0, "no_feedback": 0},
-                "period_days": days
+                "error": str(e),
+                "period_days": days,
+                "user_id": user_id
             }
+    
+    # Ajouter les méthodes à la classe existante
+    ConversationLogger.update_feedback_comment = update_feedback_comment
+    ConversationLogger.update_feedback_with_comment = update_feedback_with_comment
+    ConversationLogger.get_feedback_analytics = get_feedback_analytics
 
-# Instance globale
-logger_instance = ConversationLogger()
-
-# =============================================================================
-# ROUTER AVEC TOUS LES ENDPOINTS MANQUANTS
-# =============================================================================
-
-# CORRECTION CRITIQUE: Définir le router avec le bon préfixe
-router = APIRouter(prefix="/logging", tags=["logging"])
+# Appliquer l'extension
+extend_conversation_logger()
 
 # ============================================================================
-# CORRECTION: AJOUT DE TOUS LES ENDPOINTS MANQUANTS (résout erreurs 404)
+# NOUVEAUX ENDPOINTS POUR COMMENTAIRES FEEDBACK
 # ============================================================================
 
-@router.get("/health")
-async def logging_health_check():
-    """Health check du système de logging - ENDPOINT MANQUANT AJOUTÉ"""
+@router.patch("/conversation/{conversation_id}/comment")
+async def update_feedback_comment(conversation_id: str, comment_data: FeedbackCommentUpdate):
+    """NOUVEAU: Mettre à jour le commentaire feedback d'une conversation"""
     try:
-        # Vérifier la base de données
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            # Test simple
-            count = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
+        print(f"💬 [logging] Réception commentaire pour: {conversation_id}")
+        print(f"💬 [logging] Commentaire: {comment_data.comment[:50]}...")
+        
+        success = logger_instance.update_feedback_comment(conversation_id, comment_data.comment)
+        
+        if success:
+            print(f"✅ [logging] Commentaire mis à jour: {conversation_id}")
+            return {
+                "status": "success",
+                "message": "Commentaire feedback mis à jour avec succès", 
+                "conversation_id": conversation_id,
+                "comment": comment_data.comment[:100] + "..." if len(comment_data.comment) > 100 else comment_data.comment,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print(f"❌ [logging] Conversation non trouvée pour commentaire: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation non trouvée")
             
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "database": {
-                "status": "connected",
-                "path": logger_instance.db_path,
-                "conversations_count": count
-            },
-            "message": "Système de logging opérationnel"
-        }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "timestamp": datetime.now().isoformat(),
-            "database": {
-                "status": "error",
-                "error": str(e)
-            },
-            "message": "Erreur système de logging"
-        }
+        print(f"❌ [logging] Erreur commentaire feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur commentaire: {str(e)}")
 
-@router.get("/analytics")
-async def get_logging_analytics(days: int = 7):
-    """Analytics du système de logging - ENDPOINT MANQUANT AJOUTÉ"""
+@router.patch("/conversation/{conversation_id}/feedback-with-comment")
+async def update_feedback_with_comment(conversation_id: str, feedback_data: FeedbackWithCommentUpdate):
+    """NOUVEAU: Mettre à jour le feedback ET le commentaire d'une conversation"""
     try:
-        analytics = logger_instance.get_analytics(days)
+        print(f"📊💬 [logging] Réception feedback avec commentaire pour: {conversation_id}")
+        print(f"📊💬 [logging] Feedback: {feedback_data.feedback}")
+        print(f"💬 [logging] Commentaire: {feedback_data.comment[:50] + '...' if feedback_data.comment else 'Aucun'}")
+        
+        success = logger_instance.update_feedback_with_comment(
+            conversation_id, 
+            feedback_data.feedback,
+            feedback_data.comment
+        )
+        
+        if success:
+            print(f"✅ [logging] Feedback avec commentaire mis à jour: {conversation_id}")
+            return {
+                "status": "success",
+                "message": "Feedback avec commentaire mis à jour avec succès", 
+                "conversation_id": conversation_id,
+                "feedback": feedback_data.feedback,
+                "comment": feedback_data.comment[:100] + "..." if feedback_data.comment and len(feedback_data.comment) > 100 else feedback_data.comment,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print(f"❌ [logging] Conversation non trouvée pour feedback avec commentaire: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation non trouvée")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [logging] Erreur feedback avec commentaire: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur feedback avec commentaire: {str(e)}")
+
+@router.get("/analytics/feedback")
+async def get_feedback_analytics(user_id: str = None, days: int = 7):
+    """NOUVEAU: Analytics détaillées des feedbacks avec commentaires"""
+    try:
+        print(f"📊 [logging] Récupération analytics feedback pour: {user_id or 'tous les utilisateurs'}")
+        print(f"📊 [logging] Période: {days} jours")
+        
+        analytics = logger_instance.get_feedback_analytics(user_id, days)
+        
+        print(f"✅ [logging] Analytics feedback récupérées")
         
         return {
             "status": "success",
             "timestamp": datetime.now().isoformat(),
             "analytics": analytics,
-            "message": f"Analytics pour les {days} derniers jours"
+            "message": f"Analytics feedback pour les {days} derniers jours"
         }
+        
     except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur récupération analytics"
-        }
+        print(f"❌ [logging] Erreur analytics feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur analytics: {str(e)}")
 
-@router.get("/admin/stats")
-async def get_admin_stats():
-    """Statistiques administrateur - ENDPOINT MANQUANT AJOUTÉ"""
+@router.get("/conversations/with-comments")
+async def get_conversations_with_comments(limit: int = 20, user_id: str = None):
+    """NOUVEAU: Récupérer les conversations avec commentaires feedback"""
     try:
+        print(f"💬 [logging] Récupération conversations avec commentaires")
+        print(f"💬 [logging] Limite: {limit}, User: {user_id or 'tous'}")
+        
         with sqlite3.connect(logger_instance.db_path) as conn:
-            # Statistiques générales
-            stats = {
-                "total_conversations": conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0],
-                "total_users": conn.execute("SELECT COUNT(DISTINCT user_id) FROM conversations").fetchone()[0],
-                "conversations_today": conn.execute("""
-                    SELECT COUNT(*) FROM conversations 
-                    WHERE date(timestamp) = date('now')
-                """).fetchone()[0],
-                "conversations_this_week": conn.execute("""
-                    SELECT COUNT(*) FROM conversations 
-                    WHERE datetime(timestamp) >= datetime('now', '-7 days')
-                """).fetchone()[0]
-            }
+            conn.row_factory = sqlite3.Row
             
-            # Langues les plus utilisées
-            languages = conn.execute("""
-                SELECT language, COUNT(*) as count 
+            where_clause = "WHERE feedback_comment IS NOT NULL AND feedback_comment != ''"
+            params = []
+            
+            if user_id:
+                where_clause += " AND user_id = ?"
+                params.append(user_id)
+            
+            cursor = conn.execute(f"""
+                SELECT conversation_id, user_id, question, feedback, feedback_comment, timestamp, language
                 FROM conversations 
-                GROUP BY language 
-                ORDER BY count DESC
-            """).fetchall()
+                {where_clause}
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, params + [limit])
             
-            # Feedback distribution
-            feedback_stats = conn.execute("""
-                SELECT 
-                    SUM(CASE WHEN feedback = 1 THEN 1 ELSE 0 END) as positive,
-                    SUM(CASE WHEN feedback = -1 THEN 1 ELSE 0 END) as negative,
-                    SUM(CASE WHEN feedback IS NULL THEN 1 ELSE 0 END) as no_feedback
-                FROM conversations
-            """).fetchone()
-            
-        return {
-            "status": "success",
-            "timestamp": datetime.now().isoformat(),
-            "general_stats": stats,
-            "language_distribution": [{"language": lang, "count": count} for lang, count in languages],
-            "feedback_stats": {
-                "positive": feedback_stats[0],
-                "negative": feedback_stats[1],
-                "no_feedback": feedback_stats[2]
-            },
-            "message": "Statistiques administrateur récupérées"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur récupération statistiques"
-        }
-
-@router.get("/database/info")
-async def get_database_info():
-    """Informations sur la base de données - ENDPOINT MANQUANT AJOUTÉ"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            # Informations sur la base
-            tables_info = conn.execute("""
-                SELECT name FROM sqlite_master WHERE type='table'
-            """).fetchall()
-            
-            # Informations sur la table conversations
-            conversations_info = conn.execute("""
-                PRAGMA table_info(conversations)
-            """).fetchall()
-            
-            # Taille approximative de la base
-            file_size = os.path.getsize(logger_instance.db_path) if os.path.exists(logger_instance.db_path) else 0
-            
-        return {
-            "status": "success",
-            "timestamp": datetime.now().isoformat(),
-            "database_info": {
-                "path": logger_instance.db_path,
-                "file_size_bytes": file_size,
-                "file_size_mb": round(file_size / (1024 * 1024), 2),
-                "tables": [table[0] for table in tables_info],
-                "conversations_schema": [
-                    {
-                        "column": col[1],
-                        "type": col[2],
-                        "not_null": bool(col[3]),
-                        "default": col[4],
-                        "primary_key": bool(col[5])
-                    } for col in conversations_info
-                ]
-            },
-            "message": "Informations base de données récupérées"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur récupération informations base"
-        }
-
-@router.get("/conversations/{user_id}")
-async def get_user_conversations_endpoint(user_id: str, limit: int = 10):
-    """Conversations d'un utilisateur - ENDPOINT MANQUANT AJOUTÉ"""
-    try:
-        conversations = logger_instance.get_user_conversations(user_id, limit)
+            conversations = []
+            for row in cursor.fetchall():
+                conversations.append({
+                    "conversation_id": row["conversation_id"],
+                    "user_id": row["user_id"],
+                    "question": row["question"],
+                    "feedback": "positive" if row["feedback"] == 1 else "negative",
+                    "feedback_comment": row["feedback_comment"],
+                    "timestamp": row["timestamp"],
+                    "language": row["language"]
+                })
+        
+        print(f"✅ [logging] {len(conversations)} conversations avec commentaires récupérées")
         
         return {
             "status": "success",
             "timestamp": datetime.now().isoformat(),
-            "user_id": user_id,
             "conversations": conversations,
             "count": len(conversations),
-            "message": f"{len(conversations)} conversations trouvées"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur récupération conversations utilisateur"
-        }
-
-@router.delete("/test-data")
-async def cleanup_test_data():
-    """Nettoyage des données de test - ENDPOINT MANQUANT AJOUTÉ"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            # Supprimer les conversations de test (avec user_id contenant "test" ou "anon")
-            cursor = conn.execute("""
-                DELETE FROM conversations 
-                WHERE user_id LIKE '%test%' OR user_id LIKE '%anon%'
-            """)
-            deleted_count = cursor.rowcount
-            
-        return {
-            "status": "success",
-            "timestamp": datetime.now().isoformat(),
-            "deleted_count": deleted_count,
-            "message": f"{deleted_count} conversations de test supprimées"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur nettoyage données de test"
-        }
-
-# ============================================================================
-# ENDPOINTS MANQUANTS À AJOUTER DANS logging.py
-# Ajouter ces endpoints AVANT les "# ENDPOINTS EXISTANTS" (ligne 235)
-# ============================================================================
-
-@router.post("/conversation", response_model=ConversationResponse)
-async def save_conversation_endpoint(conversation: ConversationCreate):
-    """ENDPOINT MANQUANT: Sauvegarder une conversation (utilisé par le frontend)"""
-    try:
-        print(f"💾 [logging] Réception conversation: {conversation.conversation_id}")
-        print(f"👤 [logging] User: {conversation.user_id}")
-        print(f"📝 [logging] Question: {conversation.question[:50]}...")
-        
-        record_id = logger_instance.save_conversation(conversation)
-        
-        print(f"✅ [logging] Conversation sauvegardée avec ID: {record_id}")
-        
-        return ConversationResponse(
-            conversation_id=conversation.conversation_id,
-            timestamp=datetime.now(),
-            message="Conversation enregistrée avec succès"
-        )
-    except Exception as e:
-        print(f"❌ [logging] Erreur sauvegarde: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur sauvegarde: {str(e)}")
-
-@router.patch("/conversation/{conversation_id}/feedback")
-async def update_feedback_endpoint(conversation_id: str, feedback_data: dict):
-    """ENDPOINT MANQUANT: Mettre à jour le feedback (utilisé par le frontend)"""
-    try:
-        print(f"📊 [logging] Réception feedback pour: {conversation_id}")
-        print(f"📊 [logging] Feedback data: {feedback_data}")
-        
-        feedback_value = feedback_data.get("feedback", 0)
-        
-        success = logger_instance.update_feedback(conversation_id, feedback_value)
-        
-        if success:
-            print(f"✅ [logging] Feedback mis à jour: {conversation_id} = {feedback_value}")
-            return {
-                "status": "success",
-                "message": "Feedback mis à jour avec succès", 
-                "conversation_id": conversation_id,
-                "feedback": feedback_value,
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            print(f"❌ [logging] Conversation non trouvée: {conversation_id}")
-            raise HTTPException(status_code=404, detail="Conversation non trouvée")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ [logging] Erreur feedback: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur feedback: {str(e)}")
-
-@router.get("/user/{user_id}/conversations")
-async def get_user_conversations_list(user_id: str, limit: int = 50):
-    """ENDPOINT MANQUANT: Récupérer les conversations d'un utilisateur (utilisé par le frontend)"""
-    try:
-        print(f"🔍 [logging] Récupération conversations pour: {user_id}")
-        print(f"🔍 [logging] Limite: {limit}")
-        
-        conversations = logger_instance.get_user_conversations(user_id, limit)
-        
-        # Enrichir les données pour le frontend
-        enriched_conversations = []
-        for conv in conversations:
-            enriched_conversations.append({
-                "conversation_id": conv["conversation_id"],
-                "question": conv["question"],
-                "response": "Réponse disponible",  # On ne stocke pas la réponse complète
-                "timestamp": conv["timestamp"],
-                "language": conv.get("language", "fr"),
-                "rag_used": conv.get("rag_used", True),
-                "feedback": conv.get("feedback"),
-                "created_at": conv["timestamp"],
-                "updated_at": conv["timestamp"]
-            })
-        
-        print(f"✅ [logging] {len(enriched_conversations)} conversations récupérées")
-        
-        return {
-            "status": "success",
-            "user_id": user_id,
-            "conversations": enriched_conversations,
-            "count": len(enriched_conversations),
-            "timestamp": datetime.now().isoformat(),
-            "message": f"{len(enriched_conversations)} conversations trouvées"
+            "message": f"{len(conversations)} conversations avec commentaires trouvées"
         }
         
     except Exception as e:
-        print(f"❌ [logging] Erreur récupération: {e}")
+        print(f"❌ [logging] Erreur récupération conversations avec commentaires: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur récupération: {str(e)}")
 
-@router.delete("/conversation/{conversation_id}")
-async def delete_single_conversation(conversation_id: str):
-    """ENDPOINT MANQUANT: Supprimer une conversation spécifique (utilisé par le frontend)"""
+@router.get("/admin/feedback-report")
+async def get_admin_feedback_report(days: int = 30):
+    """NOUVEAU: Rapport administrateur des feedbacks avec commentaires"""
     try:
-        print(f"🗑️ [logging] Suppression conversation: {conversation_id}")
+        print(f"📋 [logging] Génération rapport admin feedback pour {days} jours")
         
         with sqlite3.connect(logger_instance.db_path) as conn:
-            cursor = conn.execute("DELETE FROM conversations WHERE conversation_id = ?", (conversation_id,))
-            
-            if cursor.rowcount > 0:
-                print(f"✅ [logging] Conversation supprimée: {conversation_id}")
-                return {
-                    "status": "success",
-                    "message": "Conversation supprimée avec succès",
-                    "conversation_id": conversation_id,
-                    "deleted_count": cursor.rowcount,
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                print(f"❌ [logging] Conversation non trouvée: {conversation_id}")
-                raise HTTPException(status_code=404, detail="Conversation non trouvée")
-                
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ [logging] Erreur suppression: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur suppression: {str(e)}")
-
-@router.delete("/user/{user_id}/conversations")
-async def delete_all_user_conversations(user_id: str):
-    """ENDPOINT MANQUANT: Supprimer toutes les conversations d'un utilisateur (utilisé par le frontend)"""
-    try:
-        print(f"🗑️ [logging] Suppression toutes conversations pour: {user_id}")
-        
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            cursor = conn.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
-            deleted_count = cursor.rowcount
-            
-        print(f"✅ [logging] {deleted_count} conversations supprimées pour: {user_id}")
-        
-        return {
-            "status": "success",
-            "message": "Toutes les conversations ont été supprimées avec succès",
-            "user_id": user_id,
-            "deleted_count": deleted_count,
-            "timestamp": datetime.now().isoformat()
-        }
-            
-    except Exception as e:
-        print(f"❌ [logging] Erreur suppression globale: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur suppression: {str(e)}")
-
-# ============================================================================
-# ENDPOINT DE DIAGNOSTIC POUR TESTER LA CONNECTIVITÉ
-# ============================================================================
-
-@router.get("/test")
-async def test_logging_system():
-    """Test de connectivité du système de logging"""
-    try:
-        # Test de base de données
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            count = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
-            
-        return {
-            "status": "success",
-            "timestamp": datetime.now().isoformat(),
-            "database": {
-                "status": "connected",
-                "conversations_count": count,
-                "path": logger_instance.db_path
-            },
-            "endpoints": [
-                "/logging/conversation [POST]",
-                "/logging/conversation/{id}/feedback [PATCH]", 
-                "/logging/user/{id}/conversations [GET]",
-                "/logging/conversation/{id} [DELETE]",
-                "/logging/user/{id}/conversations [DELETE]"
-            ],
-            "message": "Système de logging opérationnel avec tous les endpoints"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "timestamp": datetime.now().isoformat(),
-            "error": str(e),
-            "message": "Erreur système de logging"
-        }
-
-
-# ============================================================================
-# ENDPOINTS EXISTANTS (gardés pour compatibilité)
-# ============================================================================
-
-@router.post("/conversations", response_model=ConversationResponse)
-async def create_conversation(conversation: ConversationCreate):
-    """Créer une nouvelle conversation"""
-    try:
-        record_id = logger_instance.save_conversation(conversation)
-        
-        return ConversationResponse(
-            conversation_id=conversation.conversation_id,
-            timestamp=datetime.now(),
-            message="Conversation enregistrée avec succès"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.patch("/conversations/{conversation_id}/feedback")
-async def update_conversation_feedback(conversation_id: str, feedback: FeedbackUpdate):
-    """Mettre à jour le feedback d'une conversation"""
-    try:
-        success = logger_instance.update_feedback(conversation_id, feedback.feedback)
-        
-        if success:
-            return {"message": "Feedback mis à jour avec succès", "conversation_id": conversation_id}
-        else:
-            raise HTTPException(status_code=404, detail="Conversation non trouvée")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/conversations/{user_id}/history")
-async def get_user_history(user_id: str, limit: int = 10):
-    """Récupérer l'historique des conversations d'un utilisateur"""
-    try:
-        conversations = logger_instance.get_user_conversations(user_id, limit)
-        return {
-            "user_id": user_id,
-            "conversations": conversations,
-            "count": len(conversations)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/analytics/{days}", response_model=AnalyticsResponse)
-async def get_analytics_period(days: int = 7):
-    """Récupérer les analytics pour une période donnée"""
-    try:
-        analytics = logger_instance.get_analytics(days)
-        return AnalyticsResponse(**analytics)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str):
-    """Supprimer une conversation (RGPD)"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            cursor = conn.execute("DELETE FROM conversations WHERE conversation_id = ?", (conversation_id,))
-            
-            if cursor.rowcount > 0:
-                return DeleteResponse(
-                    message="Conversation supprimée avec succès",
-                    conversation_id=conversation_id,
-                    deleted_count=cursor.rowcount,
-                    timestamp=datetime.now()
-                )
-            else:
-                raise HTTPException(status_code=404, detail="Conversation non trouvée")
-                
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/users/{user_id}")
-async def delete_user_data(user_id: str):
-    """Supprimer toutes les données d'un utilisateur (RGPD)"""
-    try:
-        with sqlite3.connect(logger_instance.db_path) as conn:
-            cursor = conn.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
-            
-            return DeleteResponse(
-                message="Données utilisateur supprimées avec succès",
-                user_id=user_id,
-                deleted_count=cursor.rowcount,
-                timestamp=datetime.now()
-            )
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================================
-# CONFIGURATION AU DÉMARRAGE
-# ============================================================================
-
-print("✅ Module logging avec router complet initialisé")
-print(f"🗄️ Base de données: {DB_PATH}")
-print("🔧 Tous les endpoints manquants ajoutés pour corriger les erreurs 404")
+            # Statistiques générales
+            general_stats = conn.execute(f"""
+                SELECT 
+                    COUNT(*) as total_conversations,
+                    COUNT(CASE WHEN feedback = 1 THEN 1 END) as positive_feedback,
+                    COUNT(CASE WHEN feedback = -1 THEN 1 END) as negative_feedback,
+                    COUNT(CASE WHEN feedback_comment IS NOT NULL AND feedback_comment != '' THEN 1 END) as with
