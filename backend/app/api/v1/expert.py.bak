@@ -328,10 +328,42 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
-    # Reste du code OpenAI inchangé...
-
-
-
+    # Code OpenAI complet
+    try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return get_fallback_response(question, language)
+        
+        openai.api_key = api_key
+        system_prompt = get_expert_prompt(language)
+        
+        safe_question = str(question)
+        
+        model_config = {
+            "fast": {"model": "gpt-3.5-turbo", "max_tokens": 300},
+            "balanced": {"model": "gpt-3.5-turbo", "max_tokens": 500},
+            "quality": {"model": "gpt-4o-mini", "max_tokens": 800}
+        }
+        
+        config = model_config.get(speed_mode, model_config["balanced"])
+        
+        response = openai.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": safe_question}
+            ],
+            temperature=0.7,
+            max_tokens=config["max_tokens"],
+            timeout=15
+        )
+        
+        answer = response.choices[0].message.content
+        return str(answer) if answer else get_fallback_response(question, language)
+        
+    except Exception as e:
+        logger.error(f"❌ OpenAI error: {e}")
+        return get_fallback_response(question, language)
 
 # =============================================================================
 # ENDPOINT PRINCIPAL AVEC DIAGNOSTIC CIBLÉ
