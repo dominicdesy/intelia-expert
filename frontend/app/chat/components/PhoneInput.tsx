@@ -130,12 +130,12 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Layout responsive corrigé */}
-      <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-3">
-        {/* Code pays - Meilleur affichage */}
-        <div className="sm:col-span-5">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+    <div className="space-y-4">
+      {/* Layout responsive avec espacement amélioré */}
+      <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-12 md:gap-4">
+        {/* Code pays - Proportions équilibrées */}
+        <div className="md:col-span-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Code pays
           </label>
           <select
@@ -154,12 +154,14 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           </select>
         </div>
 
-        {/* Code régional - Largeur fixe */}
-        <div className="sm:col-span-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Code régional - Largeur optimisée */}
+        <div className="md:col-span-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Code régional
-            {countryCode === '+1' && <span className="text-xs text-gray-500 block">(3 chiffres)</span>}
-            {countryCode === '+33' && <span className="text-xs text-gray-500 block">(1-2 chiffres)</span>}
+            <span className="text-xs text-gray-500 ml-1">
+              {countryCode === '+1' && '(3 chiffres)'}
+              {countryCode === '+33' && '(1-2 chiffres)'}
+            </span>
           </label>
           <input
             type="text"
@@ -178,12 +180,14 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           />
         </div>
 
-        {/* Numéro principal - Ajusté */}
-        <div className="sm:col-span-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Numéro principal - Plus d'espace */}
+        <div className="md:col-span-5">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Numéro de téléphone
-            {countryCode === '+1' && <span className="text-xs text-gray-500 block">(7 chiffres)</span>}
-            {countryCode === '+33' && <span className="text-xs text-gray-500 block">(8 chiffres)</span>}
+            <span className="text-xs text-gray-500 ml-1">
+              {countryCode === '+1' && '(7 chiffres)'}
+              {countryCode === '+33' && '(8 chiffres)'}
+            </span>
           </label>
           <input
             type="tel"
