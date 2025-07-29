@@ -399,6 +399,9 @@ function adaptResponse(data: any, originalQuestion: string): ExpertApiResponse {
 }
 
 // ==================== FONCTION generateAIResponse CORRIGÉE AVEC DEBUG 422 ====================
+// ==================== CORRECTION ERREUR 422 ====================
+// Remplacer la fonction generateAIResponse dans votre fichier page.tsx
+
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
   const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
   
@@ -413,26 +416,27 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     
     console.log('✅ Token récupéré, longueur:', session.access_token.length)
     
-    // ===== 2. PRÉPARATION REQUÊTE AVEC NETTOYAGE UTF-8 =====
+    // ===== 2. PRÉPARATION REQUÊTE AVEC FORMAT CORRECT =====
     const cleanQuestion = question.trim().normalize('NFC')
     
-    // ✅ CORRECTION: Format standard selon backend expert.py
+    // ✅ CORRECTION: Format exact attendu par le backend
     const requestBody = {
-      text: cleanQuestion,
-      language: user?.language || 'fr',
-      speed_mode: 'balanced'
+      request_data: {
+        text: cleanQuestion,
+        language: user?.language || 'fr',
+        speed_mode: 'balanced'
+      }
     }
     
-    // ✅ CORRECTION: Headers avec charset UTF-8 explicite
+    // ✅ Headers avec charset UTF-8 explicite
     const headers = {
       'Content-Type': 'application/json; charset=utf-8',
       'Accept': 'application/json',
       'Authorization': `Bearer ${session.access_token}`
     }
     
-    console.log('📤 Données envoyées:', JSON.stringify(requestBody, null, 2))
+    console.log('📤 Données envoyées (format corrigé):', JSON.stringify(requestBody, null, 2))
     console.log('📡 URL complète:', apiUrl)
-    console.log('🔤 Caractères spéciaux:', Array.from(cleanQuestion).filter(c => c.charCodeAt(0) > 127))
     
     // ===== 3. REQUÊTE AVEC TIMEOUT =====
     const response = await fetchWithTimeout(apiUrl, {
@@ -442,95 +446,51 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     }, API_TIMEOUT)
     
     console.log('📊 Réponse:', response.status, response.statusText)
-    console.log('📋 Headers réponse:', Object.fromEntries(response.headers.entries()))
     
-    // ===== 4. GESTION ERREURS HTTP AVEC DEBUG =====
+    // ===== 4. GESTION ERREURS HTTP =====
     if (!response.ok) {
       const errorText = await response.text()
       console.error('❌ Erreur HTTP détaillée:', {
         status: response.status,
         statusText: response.statusText,
         body: errorText,
-        headers: Object.fromEntries(response.headers.entries()),
         requestSent: requestBody
       })
       
-      // Si 422, essayer le format alternatif avec request_data
-      if (response.status === 422 && errorText.includes('request_data')) {
-        console.log('🔄 Erreur 422 détectée, tentative avec format request_data...')
-        
-        const alternativeBody = {
-          request_data: {
-            text: cleanQuestion,
-            language: user?.language || 'fr',
-            speed_mode: 'balanced'
-          }
-        }
-        
-        console.log('📤 Tentative avec format alternatif:', JSON.stringify(alternativeBody, null, 2))
-        
-        const retryResponse = await fetchWithTimeout(apiUrl, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(alternativeBody)
-        }, API_TIMEOUT)
-        
-        console.log('📊 Réponse retry:', retryResponse.status, retryResponse.statusText)
-        
-        if (retryResponse.ok) {
-          const data = await parseJsonResponse(retryResponse)
-          console.log('✅ Succès avec format request_data')
-          const adaptedResponse = adaptResponse(data, cleanQuestion)
-          await saveConversationSafely(user, cleanQuestion, adaptedResponse)
-          return adaptedResponse
-        } else {
-          const retryErrorText = await retryResponse.text()
-          console.error('❌ Erreur même avec format alternatif:', retryErrorText)
-        }
-      }
-      
-      // Si 422, essayer aussi un format direct sans wrapper
-      if (response.status === 422) {
-        console.log('🔄 Tentative avec mapping direct...')
-        
-        const directBody = cleanQuestion // String direct
-        
-        const directResponse = await fetchWithTimeout(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: directBody
-        }, API_TIMEOUT)
-        
-        if (directResponse.ok) {
-          const data = await parseJsonResponse(directResponse)
-          console.log('✅ Succès avec format direct')
-          const adaptedResponse = adaptResponse(data, cleanQuestion)
-          await saveConversationSafely(user, cleanQuestion, adaptedResponse)
-          return adaptedResponse
-        }
-      }
-      
-      throw new ApiError(`Erreur serveur (${response.status}): ${errorText}`)
+      throw new Error(`Erreur serveur (${response.status}): ${errorText}`)
     }
     
     // ===== 5. TRAITEMENT RÉPONSE =====
-    const data = await parseJsonResponse(response)
+    const data = await response.json()
     console.log('✅ Réponse RAG reçue avec succès:', data)
     
-    const adaptedResponse = adaptResponse(data, cleanQuestion)
-    
+    const adaptedResponse = {
+      question: data.question || cleanQuestion,
+      response: data.response || "Réponse reçue mais vide",
+      conversation_id: data.conversation_id || `conv_${Date.now()}`,
+      rag_used: data.rag_used || false,
+      rag_score: data.rag_score,
+      timestamp: data.timestamp || new Date().toISOString(),
+      language: data.language || 'fr',
+      response_time_ms: data.response_time_ms || 0,
+      mode: data.mode || 'secured',
+      user: data.user
+    }
+
     // ===== 6. SAUVEGARDE CONVERSATION =====
     await saveConversationSafely(user, cleanQuestion, adaptedResponse)
     
+   
     return adaptedResponse
     
   } catch (error: any) {
     console.error('❌ Erreur dans generateAIResponse:', error.message)
-    throw handleApiError(error)
+    
+    if (error.message?.includes('Failed to fetch')) {
+      throw new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
+    }
+    
+    throw new Error(`Erreur technique: ${error.message}`)
   }
 }
 
