@@ -6,32 +6,66 @@ interface InviteFriendModalProps {
   onClose: () => void
 }
 
-// ==================== SERVICE D'INVITATION ====================
+// ==================== SERVICE D'INVITATION CORRIGÉ ====================
 const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     
     try {
-      console.log('📧 [InvitationService] Envoi invitation:', { emails, hasMessage: !!personalMessage })
+      console.log('📧 [InvitationService] Envoi invitation:', { 
+        emails, 
+        hasMessage: !!personalMessage,
+        inviterEmail: inviterInfo.email 
+      })
+      
+      // CORRECTION 1: Récupérer le token d'auth Supabase
+      const token = localStorage.getItem('supabase.auth.token') || 
+                   localStorage.getItem('supabase_token') ||
+                   sessionStorage.getItem('supabase.auth.token')
+      
+      if (!token) {
+        throw new Error('Vous devez être connecté pour envoyer des invitations')
+      }
+
+      // CORRECTION 2: Headers d'authentification appropriés
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
+        'Accept-Charset': 'utf-8'
+      }
+
+      // Ajouter l'authorization header selon le format Supabase
+      if (token.startsWith('Bearer ')) {
+        headers['Authorization'] = token
+      } else {
+        headers['Authorization'] = `Bearer ${token}`
+      }
       
       const response = await fetch(`${API_BASE_URL}/api/v1/invitations/send`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase_token')}`
-        },
+        headers,
         body: JSON.stringify({
           emails,
           personal_message: personalMessage,
           inviter_name: inviterInfo.name,
-          inviter_email: inviterInfo.email,
+          inviter_email: inviterInfo.email, // CRITIQUE: Doit correspondre à l'user connecté
           language: inviterInfo.language || 'fr'
         })
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Erreur lors de l\'envoi des invitations')
+        const errorText = await response.text()
+        let errorMessage = 'Erreur lors de l\'envoi des invitations'
+        
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.detail || errorJson.message || errorMessage
+        } catch {
+          // Si ce n'est pas du JSON, garder le message par défaut
+        }
+        
+        console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorMessage)
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
@@ -45,7 +79,7 @@ const invitationService = {
   }
 }
 
-// ==================== MODAL INVITATION AMI ====================
+// ==================== MODAL INVITATION AMI CORRIGÉE ====================
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { user } = useAuthStore()
@@ -54,6 +88,13 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [successMessage, setSuccessMessage] = useState('')
+
+  // CORRECTION 3: Vérification que l'utilisateur est connecté
+  React.useEffect(() => {
+    if (!user?.email) {
+      setErrors(['Vous devez être connecté pour envoyer des invitations'])
+    }
+  }, [user])
 
   // Validation des emails
   const validateEmails = (emailString: string): { valid: string[], invalid: string[] } => {
@@ -81,6 +122,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     setErrors([])
     setSuccessMessage('')
     
+    // CORRECTION 4: Validation utilisateur connecté
+    if (!user?.email) {
+      setErrors(['Vous devez être connecté pour envoyer des invitations'])
+      return
+    }
+
     if (!emails.trim()) {
       setErrors(['Veuillez saisir au moins une adresse email'])
       return
@@ -109,15 +156,20 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     setIsLoading(true)
     
     try {
-      console.log('🚀 [InviteFriendModal] Début envoi invitations:', valid)
+      console.log('🚀 [InviteFriendModal] Début envoi invitations:', {
+        emails: valid,
+        userEmail: user.email,
+        userName: user.name
+      })
       
+      // CORRECTION 5: Utiliser les vraies données utilisateur
       const result = await invitationService.sendInvitation(
         valid, 
         personalMessage.trim(), 
         {
-          name: user?.name || 'Utilisateur Intelia',
-          email: user?.email || '',
-          language: user?.language || 'fr'
+          name: user.name || user.email?.split('@')[0] || 'Utilisateur Intelia',
+          email: user.email, // CRITIQUE: Email exact de l'utilisateur connecté
+          language: user.language || 'fr'
         }
       )
       
@@ -125,20 +177,49 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         `✅ ${result.sent_count} invitation${result.sent_count > 1 ? 's' : ''} envoyée${result.sent_count > 1 ? 's' : ''} avec succès !`
       )
       
-      // Réinitialiser le formulaire après 2 secondes
-      setTimeout(() => {
-        setEmails('')
-        setPersonalMessage('')
-        setSuccessMessage('')
-        onClose()
-      }, 2000)
+      // Afficher les échecs s'il y en a
+      if (result.failed_emails && result.failed_emails.length > 0) {
+        setErrors([
+          `Certaines invitations ont échoué : ${result.failed_emails.join(', ')}`
+        ])
+      }
+      
+      // Réinitialiser le formulaire après 3 secondes si tout est OK
+      if (result.failed_emails.length === 0) {
+        setTimeout(() => {
+          setEmails('')
+          setPersonalMessage('')
+          setSuccessMessage('')
+          onClose()
+        }, 3000)
+      }
       
     } catch (error) {
       console.error('❌ [InviteFriendModal] Erreur envoi:', error)
-      setErrors([
-        error instanceof Error ? error.message : 'Erreur lors de l\'envoi des invitations',
-        'Veuillez réessayer ou contacter le support si le problème persiste.'
-      ])
+      
+      let errorMessage = 'Erreur lors de l\'envoi des invitations'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      // Messages d'erreur spécifiques pour débug
+      if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        setErrors([
+          'Erreur d\'autorisation - Vérifiez que vous êtes bien connecté',
+          'Si le problème persiste, déconnectez-vous et reconnectez-vous'
+        ])
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        setErrors([
+          'Session expirée - Veuillez vous reconnecter',
+          'Votre session a expiré, reconnectez-vous pour continuer'
+        ])
+      } else {
+        setErrors([
+          errorMessage,
+          'Veuillez réessayer ou contacter le support si le problème persiste.'
+        ])
+      }
     } finally {
       setIsLoading(false)
     }
@@ -147,6 +228,36 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const getEmailCount = () => {
     const { valid } = validateEmails(emails)
     return valid.length
+  }
+
+  // CORRECTION 6: Affichage désactivé si pas d'utilisateur
+  if (!user?.email) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Connexion requise
+          </h2>
+          <p className="text-sm text-gray-600">
+            Vous devez être connecté pour envoyer des invitations
+          </p>
+        </div>
+        
+        <div className="flex justify-center">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -162,7 +273,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           Invitez vos collègues à découvrir Intelia Expert
         </h2>
         <p className="text-sm text-gray-600">
-          Partagez l'intelligence artificielle spécialisée en santé animale avec votre équipe
+          Invitations envoyées par <strong>{user.name || user.email}</strong>
         </p>
       </div>
 
@@ -246,20 +357,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           </div>
         </div>
 
-        {/* Aperçu de l'invitation */}
-        {getEmailCount() > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">📧 Aperçu de l'invitation :</h4>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p><strong>De :</strong> {user?.name || 'Vous'} via support@intelia.com</p>
-              <p><strong>À :</strong> {getEmailCount()} destinataire{getEmailCount() > 1 ? 's' : ''}</p>
-              <p><strong>Sujet :</strong> {user?.name || 'Votre collègue'} vous invite à découvrir Intelia Expert</p>
-              {personalMessage.trim() && (
-                <p><strong>Message personnel :</strong> Inclus ✓</p>
-              )}
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Boutons d'action */}
