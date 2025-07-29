@@ -4,6 +4,8 @@ app/api/v1/agricultural_domain_validator.py
 Module spécialisé pour la validation des questions dans le domaine agricole.
 Garantit que les questions sont liées à l'élevage, la santé animale et la nutrition.
 Intégré avec le système de configuration Intelia.
+
+
 """
 
 import re

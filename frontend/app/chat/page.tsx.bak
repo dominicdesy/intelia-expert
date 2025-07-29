@@ -399,8 +399,6 @@ function adaptResponse(data: any, originalQuestion: string): ExpertApiResponse {
 }
 
 // ==================== FONCTION generateAIResponse ====================
-// ==================== CORRECTION generateAIResponse - ÉLIMINER request_data ====================
-
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
   const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
   
@@ -490,7 +488,6 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
   }
 }
 
-
 // ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
 const translations = {
   fr: {
@@ -500,7 +497,6 @@ const translations = {
     'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
     'chat.helpfulResponse': 'Réponse utile',
     'chat.notHelpfulResponse': 'Réponse non utile',
-
     'chat.noConversations': 'Aucune conversation',
     'nav.newConversation': 'Nouvelle conversation',
     'nav.history': 'Historique',
@@ -552,7 +548,6 @@ const translations = {
     'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
     'chat.helpfulResponse': 'Helpful response',
     'chat.notHelpfulResponse': 'Not helpful response',
-
     'chat.noConversations': 'No conversations',
     'nav.newConversation': 'New conversation',
     'nav.history': 'History',
@@ -604,7 +599,6 @@ const translations = {
     'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
     'chat.helpfulResponse': 'Respuesta útil',
     'chat.notHelpfulResponse': 'Respuesta no útil',
-
     'chat.noConversations': 'Sin conversaciones',
     'nav.newConversation': 'Nueva conversación',
     'nav.history': 'Historial',
