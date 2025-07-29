@@ -319,7 +319,7 @@ const LanguageSelector = ({ onLanguageChange }: { onLanguageChange: (lang: Langu
   )
 }
 
-// ==================== VALIDATION FUNCTIONS MODIFIÉES ====================
+// ==================== VALIDATION FUNCTIONS ====================
 const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -343,7 +343,6 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
   }
 }
 
-// ✅ FONCTION validatePhone ADAPTÉE pour les 3 champs séparés
 const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
   // Si tous les champs sont vides, c'est valide (optionnel)
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
@@ -395,7 +394,7 @@ export default function LoginPage() {
     rememberMe: false
   })
 
-  // ✅ DONNÉES D'INSCRIPTION MODIFIÉES avec 3 champs téléphone séparés
+  // Données d'inscription avec 3 champs téléphone séparés
   const [signupData, setSignupData] = useState({
     // Authentification
     email: '',
@@ -409,9 +408,9 @@ export default function LoginPage() {
     
     // Contact
     country: '',
-    countryCode: '',      // ✅ NOUVEAU: Indicatif pays (+1, +33, etc.)
-    areaCode: '',         // ✅ NOUVEAU: Indicatif régional (555)
-    phoneNumber: '',      // ✅ NOUVEAU: Numéro (1234567)
+    countryCode: '',      
+    areaCode: '',         
+    phoneNumber: '',      
     
     // Entreprise
     companyName: '',
@@ -425,7 +424,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // ✅ MODIFICATION: useEffect avec chargement des données "Se souvenir de moi"
   useEffect(() => {
     // Charger la langue sauvegardée
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -438,7 +436,7 @@ export default function LoginPage() {
       }
     }
 
-    // ✅ NOUVEAU: Charger les données "Se souvenir de moi"
+    // Charger les données "Se souvenir de moi"
     const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
     const lastEmail = localStorage.getItem('intelia-last-email') || ''
     
@@ -469,7 +467,6 @@ export default function LoginPage() {
     if (success) setSuccess('')
   }
 
-  // ✅ VALIDATION SIGNUP MODIFIÉE pour les nouveaux champs téléphone
   const validateSignupForm = (): string | null => {
     const { 
       email, password, confirmPassword, firstName, lastName, country, 
@@ -489,7 +486,6 @@ export default function LoginPage() {
     if (!lastName.trim()) return t.lastNameRequired
     if (!country) return t.countryRequired
     
-    // ✅ VALIDATION TÉLÉPHONE ADAPTÉE
     if (!validatePhone(countryCode, areaCode, phoneNumber)) {
       return 'Format de téléphone invalide. Si vous renseignez le téléphone, tous les champs (indicatif pays, indicatif régional, numéro) sont requis.'
     }
@@ -501,7 +497,6 @@ export default function LoginPage() {
     return null
   }
 
-  // ✅ FONCTION DE CRÉATION DE COMPTE MODIFIÉE avec les nouveaux champs
   const handleSignup = async () => {
     setError('')
     setSuccess('')
@@ -517,7 +512,6 @@ export default function LoginPage() {
     try {
       console.log('📝 Création de compte avec profil complet:', signupData.email)
       
-      // ✅ CRÉATION DE COMPTE AVEC NOUVEAUX CHAMPS TÉLÉPHONE
       const { data, error } = await supabase.auth.signUp({
         email: signupData.email.trim(),
         password: signupData.password,
@@ -531,9 +525,9 @@ export default function LoginPage() {
             
             // Contact avec nouveaux champs téléphone
             country: signupData.country,
-            country_code: signupData.countryCode.trim(),     // ✅ NOUVEAU
-            area_code: signupData.areaCode.trim(),           // ✅ NOUVEAU  
-            phone_number: signupData.phoneNumber.trim(),     // ✅ NOUVEAU
+            country_code: signupData.countryCode.trim(),     
+            area_code: signupData.areaCode.trim(),           
+            phone_number: signupData.phoneNumber.trim(),     
             // Garder aussi l'ancien champ pour compatibilité
             phone: signupData.countryCode && signupData.areaCode && signupData.phoneNumber 
               ? `${signupData.countryCode.trim()} ${signupData.areaCode.trim()} ${signupData.phoneNumber.trim()}`
@@ -574,7 +568,7 @@ export default function LoginPage() {
 
       if (data.user && !data.user.email_confirmed_at) {
         setSuccess(t.accountCreated)
-        // ✅ RÉINITIALISER LE FORMULAIRE avec les nouveaux champs
+        // Réinitialiser le formulaire
         setSignupData({
           email: '', password: '', confirmPassword: '',
           firstName: '', lastName: '', linkedinProfile: '',
@@ -601,7 +595,6 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ FONCTION DE CONNEXION avec "Se souvenir de moi"
   const handleLogin = async () => {
     setError('')
     setSuccess('')
@@ -631,7 +624,6 @@ export default function LoginPage() {
     try {
       console.log('🔐 Tentative de connexion:', loginData.email, 'Remember me:', loginData.rememberMe)
       
-      // ✅ CORRECTION: Connexion simple sans options de persistance
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
         password: loginData.password
@@ -661,7 +653,7 @@ export default function LoginPage() {
 
       console.log('✅ Connexion réussie:', data.user.email)
       
-      // ✅ FONCTIONNALITÉ: Gestion "Se souvenir de moi"
+      // Gestion "Se souvenir de moi"
       if (loginData.rememberMe) {
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', loginData.email.trim())
@@ -696,13 +688,11 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ MODIFICATION: Toggle mode avec préservation des préférences "remember me"
   const toggleMode = () => {
     setIsSignupMode(!isSignupMode)
     setError('')
     setSuccess('')
     
-    // ✅ AMÉLIORATION: Préserver l'email et remember me en mode connexion
     if (!isSignupMode) {
       // Passer en mode signup - vider tout
       setLoginData({ email: '', password: '', rememberMe: false })
@@ -718,7 +708,7 @@ export default function LoginPage() {
       })
     }
     
-    // ✅ VIDER LE FORMULAIRE D'INSCRIPTION avec les nouveaux champs
+    // Vider le formulaire d'inscription
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
@@ -905,7 +895,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ✅ FORMULAIRE D'INSCRIPTION MODIFIÉ avec nouveaux champs téléphone */}
+            {/* FORMULAIRE D'INSCRIPTION */}
             {isSignupMode && (
               <div className="space-y-6">
                 
@@ -1011,7 +1001,7 @@ export default function LoginPage() {
                     </select>
                   </div>
 
-                  {/* ✅ NOUVEAUX CHAMPS TÉLÉPHONE - Organisés visuellement sur une ligne */}
+                  {/* Champs téléphone - Organisés visuellement sur une ligne */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Téléphone <span className="text-gray-500 text-xs">{t.optional}</span>
@@ -1144,10 +1134,21 @@ export default function LoginPage() {
                           )}
                         </button>
                       </div>
-                      {/* Indicateur de confirmation */}
-                      {signupData.confirmPassword && (
-                        <div className="mt-2">
-                          {signupData.password === signupData.confirmPassword ? (
+                      {/* Indicateurs de validation mot de passe */}
+                      {signupData.password && (
+                        <div className="mt-2 space-y-1">
+                          {(() => {
+                            const validation = validatePassword(signupData.password)
+                            return validation.errors.map((error, index) => (
+                              <div key={index} className="flex items-center text-xs text-red-600">
+                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                {error}
+                              </div>
+                            ))
+                          })()}
+                          {validatePassword(signupData.password).isValid && (
                             <div className="flex items-center text-xs text-green-600">
                               <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -1300,31 +1301,7 @@ export default function LoginPage() {
       </div>
     </>
   )
-}="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateurs de validation mot de passe */}
-                      {signupData.password && (
-                        <div className="mt-2 space-y-1">
-                          {(() => {
-                            const validation = validatePassword(signupData.password)
-                            return validation.errors.map((error, index) => (
-                              <div key={index} className="flex items-center text-xs text-red-600">
-                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                                {error}
-                              </div>
-                            ))
-                          })()}
-                          {validatePassword(signupData.password).isValid && (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+}.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                               </svg>
                               Mot de passe valide
                             </div>
@@ -1360,4 +1337,17 @@ export default function LoginPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
                             </svg>
                           ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill
+                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {/* Indicateur de confirmation */}
+                      {signupData.confirmPassword && (
+                        <div className="mt-2">
+                          {signupData.password === signupData.confirmPassword ? (
+                            <div className="flex items-center text-xs text-green-600">
+                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10
