@@ -19,7 +19,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    // ✅ CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
+    // ✅ CHAMPS TÉLÉPHONE SÉPARÉS MAINTENANT TYPÉS CORRECTEMENT
     country_code: user?.country_code || '',
     area_code: user?.area_code || '',
     phone_number: user?.phone_number || '',
