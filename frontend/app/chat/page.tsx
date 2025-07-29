@@ -290,47 +290,6 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout: numb
   }
 }
 
-// Gestion des erreurs HTTP avec retry pour 401
-async function handleHttpErrors(response: Response) {
-  if (response.status === 401) {
-    console.error('❌ Erreur 401 - Token invalide, tentative de refresh...')
-    
-    try {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError || !refreshData.session) {
-        throw new AuthError('Refresh token failed')
-      }
-      
-      console.log('✅ Token refreshed avec succès')
-      throw new RetryError('Token refreshed, retry needed', refreshData.session.access_token)
-      
-    } catch (refreshError) {
-      console.error('❌ Impossible de refresh le token:', refreshError)
-      await supabase.auth.signOut()
-      throw new AuthError('Session expirée - redirection vers connexion')
-    }
-  }
-  
-  if (response.status === 403) {
-    throw new AuthError('Accès refusé. Vérifiez vos permissions.')
-  }
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Erreur inconnue')
-    throw new ApiError(`Erreur serveur (${response.status}): ${errorText}`)
-  }
-}
-
-// Parse JSON avec gestion d'erreur
-async function parseJsonResponse(response: Response) {
-  try {
-    return await response.json()
-  } catch (parseError) {
-    console.error('❌ Erreur parsing JSON:', parseError)
-    throw new ApiError('Réponse serveur invalide')
-  }
-}
-
 // Sauvegarde conversation sécurisée
 async function saveConversationSafely(user: any, question: string, response: ExpertApiResponse) {
   if (!user?.id || !response.conversation_id) {
@@ -354,47 +313,6 @@ async function saveConversationSafely(user: any, question: string, response: Exp
   } catch (saveError) {
     console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
     // Continue sans bloquer l'UX
-  }
-}
-
-// Gestion centralisée des erreurs
-function handleApiError(error: any): Error {
-  if (error instanceof AuthError) {
-    // Pour les erreurs d'auth, redirection différée pour éviter les crashs
-    setTimeout(() => {
-      window.location.href = '/'
-    }, 1000)
-    return new Error('Session expirée - redirection vers connexion dans 1 seconde...')
-  }
-  
-  if (error instanceof TimeoutError) {
-    return new Error('Timeout - le serveur met trop de temps à répondre. Réessayez.')
-  }
-  
-  if (error instanceof RetryError) {
-    return new Error('Token refresh nécessaire - veuillez réessayer.')
-  }
-  
-  if (error.message?.includes('Failed to fetch')) {
-    return new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
-  }
-  
-  return new Error(`Erreur technique: ${error.message}`)
-}
-
-// Fonction helper pour adapter la réponse
-function adaptResponse(data: any, originalQuestion: string): ExpertApiResponse {
-  return {
-    question: data.question || originalQuestion,
-    response: data.response || "Réponse reçue mais vide",
-    conversation_id: data.conversation_id || `conv_${Date.now()}`,
-    rag_used: data.rag_used || false,
-    rag_score: data.rag_score,
-    timestamp: data.timestamp || new Date().toISOString(),
-    language: data.language || 'fr',
-    response_time_ms: data.response_time_ms || 0,
-    mode: data.mode || 'secured',
-    user: data.user
   }
 }
 
@@ -2590,14 +2508,6 @@ export default function ChatInterface() {
       timestamp: new Date()
     }])
     
-  const handleNewConversation = () => {
-    setMessages([{
-      id: '1',
-      content: t('chat.welcome'),
-      isUser: false,
-      timestamp: new Date()
-    }])
-    
     // ✅ RÉACTIVER L'AUTO-SCROLL POUR NOUVELLE CONVERSATION
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
@@ -2673,6 +2583,8 @@ export default function ChatInterface() {
               {messages.map((message, index) => (
                 <div key={message.id}>
                   <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!message.isUser && (
+                      <div className="relative">
                     {!message.isUser && (
                       <div className="relative">
                         <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
