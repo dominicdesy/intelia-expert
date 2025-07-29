@@ -3,15 +3,13 @@ import { useAuthStore } from '../../hooks/useAuthStore'
 import { useTranslation } from '../../hooks/useTranslation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { UserInfoModalProps } from '../../types'
-import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 
 const supabase = createClientComponentClient()
 
-// ==================== MODAL PROFIL AVEC PHONE INPUT INTÉGRÉ ====================
+// ==================== MODAL PROFIL ÉTENDU AVEC ONGLETS ====================
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
-  const { validatePhoneFields } = usePhoneValidation()
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
@@ -19,10 +17,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    // ✅ CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
-    country_code: user?.country_code || '',
-    area_code: user?.area_code || '',
-    phone_number: user?.phone_number || '',
+    phone: user?.phone || '',
     country: user?.country || '',
     linkedinProfile: user?.linkedinProfile || '',
     companyName: user?.companyName || '',
@@ -37,7 +32,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
   })
 
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
-  const [formErrors, setFormErrors] = useState<string[]>([])
 
   const validatePassword = (password: string): string[] => {
     const errors: string[] = []
@@ -61,57 +55,9 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     return errors
   }
 
-  // ✅ GESTIONNAIRE CHANGEMENT TÉLÉPHONE
-  const handlePhoneChange = (phoneData: { country_code: string; area_code: string; phone_number: string }) => {
-    console.log('📞 [UserInfoModal] Changement téléphone:', phoneData)
-    setFormData(prev => ({
-      ...prev,
-      country_code: phoneData.country_code,
-      area_code: phoneData.area_code,
-      phone_number: phoneData.phone_number
-    }))
-  }
-
   const handleProfileSave = async () => {
     setIsLoading(true)
-    setFormErrors([])
-    
     try {
-      // ✅ VALIDATION CHAMPS OBLIGATOIRES
-      const errors: string[] = []
-      
-      if (!formData.firstName.trim()) {
-        errors.push('Le prénom est requis')
-      }
-      if (!formData.lastName.trim()) {
-        errors.push('Le nom est requis')
-      }
-      if (!formData.email.trim()) {
-        errors.push('L\'email est requis')
-      }
-      
-      // ✅ VALIDATION TÉLÉPHONE OPTIONNELLE MAIS COHÉRENTE
-      const phoneValidation = validatePhoneFields(
-        formData.country_code, 
-        formData.area_code, 
-        formData.phone_number
-      )
-      
-      if (!phoneValidation.isValid) {
-        errors.push(...phoneValidation.errors.map(err => `Téléphone: ${err}`))
-      }
-      
-      if (errors.length > 0) {
-        setFormErrors(errors)
-        return
-      }
-
-      console.log('💾 [UserInfoModal] Sauvegarde profil avec téléphone:', {
-        country_code: formData.country_code,
-        area_code: formData.area_code, 
-        phone_number: formData.phone_number
-      })
-
       const result = await updateProfile(formData)
       if (result.success) {
         alert(t('profile.title') + ' mis à jour avec succès!')
@@ -215,35 +161,19 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         </nav>
       </div>
 
-      {/* Erreurs de validation globales */}
-      {formErrors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3">
-          <div className="text-sm text-red-800">
-            <p className="font-medium mb-1">Erreurs de validation :</p>
-            <ul className="list-disc list-inside space-y-0.5">
-              {formErrors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
       {/* Contenu des onglets */}
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+      <div className="space-y-6 max-h-[60vh] overflow-y-auto">
         {activeTab === 'profile' && (
           <>
             {/* Section Informations Personnelles */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                {t('profile.personalInfo')} <span className="text-red-500">*</span>
+                {t('profile.personalInfo')}
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('profile.firstName')} <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.firstName')}</label>
                   <input
                     type="text"
                     value={formData.firstName}
@@ -254,9 +184,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('profile.lastName')} <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.lastName')}</label>
                   <input
                     type="text"
                     value={formData.lastName}
@@ -268,9 +196,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.email')} <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.email')}</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -280,44 +206,41 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                 />
               </div>
 
-              {/* ✅ NOUVEAU COMPOSANT TÉLÉPHONE INTÉGRÉ */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.phone')} <span className="text-gray-500 text-xs">(optionnel)</span>
-                </label>
-                <PhoneInput
-                  countryCode={formData.country_code}
-                  areaCode={formData.area_code}
-                  phoneNumber={formData.phone_number}
-                  onChange={handlePhoneChange}
-                  className="bg-gray-50 p-3 rounded-lg"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.phone')}</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('profile.country')}</label>
+                  <select
+                    value={formData.country}
+                    onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sélectionner un pays</option>
+                    <option value="CA">🇨🇦 Canada</option>
+                    <option value="US">🇺🇸 États-Unis</option>
+                    <option value="FR">🇫🇷 France</option>
+                    <option value="BE">🇧🇪 Belgique</option>
+                    <option value="CH">🇨🇭 Suisse</option>
+                    <option value="MX">🇲🇽 Mexique</option>
+                    <option value="BR">🇧🇷 Brésil</option>
+                    <option value="other">🌍 Autre</option>
+                  </select>
+                </div>
               </div>
 
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('profile.country')} <span className="text-gray-500 text-xs">(optionnel)</span>
-                </label>
-                <select
-                  value={formData.country}
-                  onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Sélectionner un pays</option>
-                  <option value="CA">🇨🇦 Canada</option>
-                  <option value="US">🇺🇸 États-Unis</option>
-                  <option value="FR">🇫🇷 France</option>
-                  <option value="BE">🇧🇪 Belgique</option>
-                  <option value="CH">🇨🇭 Suisse</option>
-                  <option value="MX">🇲🇽 Mexique</option>
-                  <option value="BR">🇧🇷 Brésil</option>
-                  <option value="other">🌍 Autre</option>
-                </select>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Profil LinkedIn Personnel <span className="text-gray-500 text-xs">(optionnel)</span>
+                  Profil LinkedIn Personnel
                 </label>
                 <input
                   type="url"
@@ -332,7 +255,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
             {/* Section Entreprise */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                {t('profile.company')} <span className="text-gray-500 text-xs">(optionnel)</span>
+                {t('profile.company')}
               </h3>
               
               <div>

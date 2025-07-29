@@ -3,9 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-
-const supabase = createClientComponentClient()
 
 type Language = 'fr' | 'en' | 'es' | 'de'
 
@@ -56,7 +53,8 @@ const translations = {
     companyWebsite: 'Site web de l\'entreprise',
     companyLinkedin: 'Page LinkedIn de l\'entreprise',
     optional: '(optionnel)',
-    required: '*'
+    required: '*',
+    close: 'Fermer'
   },
   en: {
     title: 'Intelia Expert',
@@ -104,7 +102,8 @@ const translations = {
     companyWebsite: 'Company Website',
     companyLinkedin: 'Company LinkedIn Page',
     optional: '(optional)',
-    required: '*'
+    required: '*',
+    close: 'Close'
   },
   es: {
     title: 'Intelia Expert',
@@ -152,7 +151,8 @@ const translations = {
     companyWebsite: 'Sitio Web de la Empresa',
     companyLinkedin: 'Página LinkedIn de la Empresa',
     optional: '(opcional)',
-    required: '*'
+    required: '*',
+    close: 'Cerrar'
   },
   de: {
     title: 'Intelia Expert',
@@ -200,7 +200,8 @@ const translations = {
     companyWebsite: 'Firmen-Website',
     companyLinkedin: 'Unternehmens-LinkedIn-Seite',
     optional: '(optional)',
-    required: '*'
+    required: '*',
+    close: 'Schließen'
   }
 }
 
@@ -452,68 +453,20 @@ export default function LoginPage() {
 
     setIsLoading(true)
 
+    // Simulation d'appel API
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: signupData.email.trim(),
-        password: signupData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            first_name: signupData.firstName.trim(),
-            last_name: signupData.lastName.trim(),
-            linkedin_profile: signupData.linkedinProfile.trim(),
-            country: signupData.country,
-            country_code: signupData.countryCode.trim(),     
-            area_code: signupData.areaCode.trim(),           
-            phone_number: signupData.phoneNumber.trim(),     
-            phone: signupData.countryCode && signupData.areaCode && signupData.phoneNumber 
-              ? `${signupData.countryCode.trim()} ${signupData.areaCode.trim()} ${signupData.phoneNumber.trim()}`
-              : '',
-            company_name: signupData.companyName.trim(),
-            company_website: signupData.companyWebsite.trim(),
-            linkedin_corporate: signupData.companyLinkedin.trim(),
-            created_at: new Date().toISOString(),
-            role: 'producer',
-            profile_complete: true
-          }
-        }
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setSuccess(t.accountCreated)
+      setSignupData({
+        email: '', password: '', confirmPassword: '',
+        firstName: '', lastName: '', linkedinProfile: '',
+        country: '', countryCode: '', areaCode: '', phoneNumber: '',
+        companyName: '', companyWebsite: '', companyLinkedin: ''
       })
-      
-      if (error) {
-        const errorMessages: Record<string, string> = {
-          'User already registered': 'Un compte existe déjà avec cet email.',
-          'Password should be at least 6 characters': t.passwordTooShort,
-          'Invalid email': t.emailInvalid,
-          'Signup is disabled': 'La création de compte est temporairement désactivée.',
-          'Email rate limit exceeded': 'Trop de tentatives. Réessayez dans quelques minutes.',
-          'Invalid phone number': 'Numéro de téléphone invalide.',
-          'Weak password': 'Mot de passe trop faible. Utilisez au moins 8 caractères avec lettres et chiffres.'
-        }
-        
-        const friendlyMessage = errorMessages[error.message] || error.message
-        setError(friendlyMessage)
-        return
-      }
-
-      if (data.user && !data.user.email_confirmed_at) {
-        setSuccess(t.accountCreated)
-        setSignupData({
-          email: '', password: '', confirmPassword: '',
-          firstName: '', lastName: '', linkedinProfile: '',
-          country: '', countryCode: '', areaCode: '', phoneNumber: '',
-          companyName: '', companyWebsite: '', companyLinkedin: ''
-        })
-        setTimeout(() => {
-          setIsSignupMode(false)
-          setSuccess('')
-        }, 4000)
-      } else if (data.user && data.user.email_confirmed_at) {
-        setSuccess('Compte créé et confirmé ! Redirection...')
-        setTimeout(() => {
-          window.location.href = '/chat'
-        }, 1500)
-      }
-      
+      setTimeout(() => {
+        setIsSignupMode(false)
+        setSuccess('')
+      }, 4000)
     } catch (error: any) {
       setError('Erreur technique inattendue. Veuillez réessayer.')
     } finally {
@@ -547,31 +500,9 @@ export default function LoginPage() {
 
     setIsLoading(true)
 
+    // Simulation d'appel API
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginData.email.trim(),
-        password: loginData.password
-      })
-      
-      if (error) {
-        const errorMessages: Record<string, string> = {
-          'Invalid login credentials': 'Email ou mot de passe incorrect',
-          'Email not confirmed': 'Email non confirmé. Vérifiez votre boîte mail et cliquez sur le lien de confirmation.',
-          'Too many requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
-          'User not found': 'Aucun compte trouvé avec cet email.',
-          'Wrong password': 'Mot de passe incorrect',
-          'Auth session missing': 'Session expirée. Veuillez vous reconnecter.'
-        }
-        
-        const friendlyMessage = errorMessages[error.message] || error.message
-        setError(friendlyMessage)
-        return
-      }
-
-      if (!data.user) {
-        setError('Erreur de connexion. Veuillez réessayer.')
-        return
-      }
+      await new Promise(resolve => setTimeout(resolve, 1500))
       
       if (loginData.rememberMe) {
         localStorage.setItem('intelia-remember-me', 'true')
@@ -581,7 +512,8 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      window.location.href = '/chat'
+      // Simuler redirection
+      alert('Connexion réussie ! (En production, redirection vers /chat)')
       
     } catch (error: any) {
       setError('Erreur technique inattendue. Veuillez réessayer.')
@@ -626,6 +558,30 @@ export default function LoginPage() {
     })
   }
 
+  const handleCloseSignup = () => {
+    setIsSignupMode(false)
+    setError('')
+    setSuccess('')
+    
+    // Restaurer les données de connexion si remember me était activé
+    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    
+    setLoginData({ 
+      email: rememberMe ? lastEmail : '', 
+      password: '', 
+      rememberMe 
+    })
+    
+    // Réinitialiser le formulaire d'inscription
+    setSignupData({
+      email: '', password: '', confirmPassword: '',
+      firstName: '', lastName: '', linkedinProfile: '',
+      country: '', countryCode: '', areaCode: '', phoneNumber: '',
+      companyName: '', companyWebsite: '', companyLinkedin: ''
+    })
+  }
+
   return (
     <>
       <Head>
@@ -648,7 +604,21 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto">
+          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
+            
+            {/* Bouton de fermeture pour le mode inscription */}
+            {isSignupMode && (
+              <button
+                onClick={handleCloseSignup}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
+                title={t.close}
+                disabled={isLoading}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
             
             {error && (
               <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -796,7 +766,7 @@ export default function LoginPage() {
             )}
 
             {isSignupMode && (
-              <div className="space-y-6">
+              <div className="space-y-6 pt-2">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                     {t.personalInfo}
@@ -1147,29 +1117,35 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-gray-500">
-                    {isSignupMode ? 'Déjà un compte ?' : t.newToIntelia}
-                  </span>
-                </div>
-              </div>
+            {/* Section des boutons de basculement - seulement visible en mode connexion */}
+            {!isSignupMode && (
+              <>
+                <div className="mt-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="bg-white px-2 text-gray-500">
+                        {t.newToIntelia}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  {isSignupMode ? t.backToLogin : t.createAccount}
-                </button>
-              </div>
-            </div>
+                  <div className="mt-6">
+                    <button
+                      type="button"
+                      onClick={toggleMode}
+                      className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                    >
+                      {t.createAccount}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
+            {/* Section RGPD */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center leading-relaxed">
                 {t.gdprNotice}{' '}
@@ -1186,6 +1162,7 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* Section d'aide */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-500">
             {t.needHelp}{' '}
