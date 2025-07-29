@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 // Instance Supabase
+// Instance Supabase
 const supabase = createClientComponentClient()
 
 // ==================== TYPES ÉTENDUS POUR LOGGING ====================
