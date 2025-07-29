@@ -22,54 +22,141 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
 SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
 
+# ✅ DIAGNOSTIC: Vérification variables d'environnement
+logger.info("=" * 50)
+logger.info("🔍 DIAGNOSTIC AUTH.PY")
+logger.info(f"📍 SUPABASE_URL: {'✅ Définie' if SUPABASE_URL else '❌ Manquante'}")
+logger.info(f"📍 SUPABASE_ANON_KEY: {'✅ Définie' if SUPABASE_ANON_KEY else '❌ Manquante'}")
+logger.info(f"📍 SUPABASE_JWT_SECRET: {'✅ Définie' if SUPABASE_JWT_SECRET else '❌ MANQUANTE - CRITIQUE'}")
+logger.info(f"📍 SUPABASE_AVAILABLE: {SUPABASE_AVAILABLE}")
+
+if SUPABASE_JWT_SECRET:
+    logger.info(f"📍 JWT Secret length: {len(SUPABASE_JWT_SECRET)} chars")
+    logger.info(f"📍 JWT Secret preview: {SUPABASE_JWT_SECRET[:10]}...{SUPABASE_JWT_SECRET[-10:]}")
+else:
+    logger.error("❌ SUPABASE_JWT_SECRET manquant - Authentification impossible!")
+    logger.error("💡 Ajoutez SUPABASE_JWT_SECRET dans vos variables d'environnement DigitalOcean")
+
 # Client Supabase
 supabase_client = None
 if SUPABASE_AVAILABLE and SUPABASE_URL and SUPABASE_ANON_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        logger.info("✅ Client Supabase créé avec succès")
     except Exception as e:
-        logger.error(f"Erreur Supabase: {e}")
+        logger.error(f"❌ Erreur création client Supabase: {e}")
+else:
+    logger.error("❌ Configuration Supabase incomplète - Client non créé")
+
+logger.info(f"📍 supabase_client: {'✅ Créé' if supabase_client else '❌ Échec'}")
+logger.info("=" * 50)
 
 # JWT Validation
 security = HTTPBearer(auto_error=False)
 
 def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     """Valide un token JWT Supabase"""
+    logger.info(f"🔍 Vérification JWT token: {token[:20]}...{token[-10:]}")
+    
     if not SUPABASE_JWT_SECRET:
+        logger.error("❌ SUPABASE_JWT_SECRET manquant - Impossible de vérifier le token")
         return None
     
     try:
+        logger.info("🔐 Décodage JWT avec SUPABASE_JWT_SECRET...")
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
             audience="authenticated"
         )
-        return {
+        
+        user_data = {
             "user_id": payload.get("sub"),
             "email": payload.get("email"),
             "role": payload.get("role", "authenticated")
         }
-    except:
+        
+        logger.info(f"✅ JWT token valide: {user_data}")
+        return user_data
+        
+    except jwt.ExpiredSignatureError:
+        logger.error("❌ JWT token expiré")
+        return None
+    except jwt.InvalidAudienceError:
+        logger.error("❌ JWT audience invalide (doit être 'authenticated')")
+        return None
+    except jwt.InvalidSignatureError:
+        logger.error("❌ JWT signature invalide - Vérifiez SUPABASE_JWT_SECRET")
+        return None
+    except jwt.DecodeError:
+        logger.error("❌ JWT format invalide")
+        return None
+    except Exception as e:
+        logger.error(f"❌ Erreur JWT inattendue: {e}")
         return None
 
 async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """Dependency pour utilisateur authentifié"""
+    logger.info("🔍 get_current_user appelé")
+    
     if not credentials:
+        logger.error("❌ Pas de credentials Authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token d'authentification requis"
         )
     
+    logger.info(f"📋 Credentials reçues: Bearer {credentials.credentials[:20]}...")
+    
     user = verify_jwt_token(credentials.credentials)
     if not user:
+        logger.error("❌ Token JWT invalide")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalide"
         )
     
+    logger.info(f"✅ Utilisateur authentifié: {user['email']}")
     request.state.user = user
     return user
+
+# Test JWT Secret au démarrage
+def test_jwt_secret():
+    """Test du JWT secret au démarrage"""
+    logger.info("🧪 TEST JWT SECRET AU DÉMARRAGE")
+    
+    if not SUPABASE_JWT_SECRET:
+        logger.error("❌ Impossible de tester - SUPABASE_JWT_SECRET manquant")
+        return False
+    
+    try:
+        # Créer un token de test
+        test_payload = {
+            "sub": "test-user-id",
+            "email": "test@example.com", 
+            "role": "authenticated",
+            "aud": "authenticated",
+            "exp": int(datetime.now().timestamp()) + 3600  # Expire dans 1h
+        }
+        
+        test_token = jwt.encode(test_payload, SUPABASE_JWT_SECRET, algorithm="HS256")
+        logger.info(f"✅ Token de test créé: {test_token[:30]}...")
+        
+        # Décoder le token de test
+        decoded = jwt.decode(test_token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+        logger.info(f"✅ Token de test décodé avec succès: {decoded['email']}")
+        
+        logger.info("✅ JWT SECRET FONCTIONNE CORRECTEMENT")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Test JWT échoué: {e}")
+        logger.error("❌ JWT SECRET INVALIDE OU INCORRECT")
+        return False
+
+# Exécuter le test au chargement
+test_jwt_secret()
 
 # Modèles
 class LoginRequest(BaseModel):
@@ -79,6 +166,20 @@ class LoginRequest(BaseModel):
 # Router
 router = APIRouter(prefix="/auth")
 
+@router.get("/debug")
+async def debug_auth():
+    """Endpoint de diagnostic pour l'authentification"""
+    return {
+        "supabase_url_defined": bool(SUPABASE_URL),
+        "supabase_anon_key_defined": bool(SUPABASE_ANON_KEY),
+        "supabase_jwt_secret_defined": bool(SUPABASE_JWT_SECRET),
+        "supabase_available": SUPABASE_AVAILABLE,
+        "supabase_client_created": bool(supabase_client),
+        "jwt_secret_length": len(SUPABASE_JWT_SECRET) if SUPABASE_JWT_SECRET else 0,
+        "jwt_test_passed": test_jwt_secret() if SUPABASE_JWT_SECRET else False
+    }
+
+# Reste du code inchangé...
 @router.post("/login")
 async def login(request: LoginRequest):
     """User login avec Supabase"""

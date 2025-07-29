@@ -1,8 +1,7 @@
 """
-app/api/v1/expert.py - VERSION CORRIGÉE AVEC CORRECTIONS 422
-CORRECTION 1: Injection Request correcte pour FastAPI
-CORRECTION 2: Modèle Pydantic simplifié et robuste
-CORRECTION 3: Gestion d'erreur améliorée avec logs détaillés
+app/api/v1/expert.py - VERSION COMPLÈTE AVEC DIAGNOSTICS
+CONSERVATION: Tous les endpoints et fonctionnalités de l'original
+AJOUT: Diagnostics ciblés pour résoudre le problème d'authentification
 """
 import os
 import logging
@@ -15,13 +14,19 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ConfigDict
 
-# Import de l'authentification centralisée
+router = APIRouter(tags=["expert"])
+logger = logging.getLogger(__name__)
+
+# ✅ DIAGNOSTIC CIBLÉ: Import auth avec logs minimum mais efficace
+logger.info("🔍 Import auth.py...")
 try:
     from app.api.v1.auth import get_current_user
     AUTH_AVAILABLE = True
-except ImportError:
+    logger.info("✅ AUTH_AVAILABLE = True")
+except ImportError as e:
     AUTH_AVAILABLE = False
     get_current_user = None
+    logger.error(f"❌ AUTH_AVAILABLE = False - {e}")
 
 # OpenAI import sécurisé
 try:
@@ -30,9 +35,6 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
     openai = None
-
-router = APIRouter(tags=["expert"])
-logger = logging.getLogger(__name__)
 
 # Configuration sécurité pour authentification
 security = HTTPBearer()
@@ -247,7 +249,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINTS CORRIGÉS AVEC INJECTION REQUEST CORRECTE
+# ENDPOINT PRINCIPAL AVEC DIAGNOSTIC CIBLÉ
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
@@ -256,21 +258,33 @@ async def ask_expert_secure(
     request: Request,               # ✅ CORRECTION: FastAPI injecte automatiquement Request
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification Supabase - CORRIGÉ INJECTION REQUEST"""
+    """Question avec authentification Supabase - VERSION AVEC DIAGNOSTIC CIBLÉ"""
     start_time = time.time()
     
     try:
-        # Log détaillé pour debug
+        # ✅ DIAGNOSTIC CIBLÉ: Log seulement ce qui est nécessaire
         logger.info("=" * 60)
         logger.info("🔐 DÉBUT ask_expert_secure")
-        logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
+        logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
-        logger.info(f"👤 User auth disponible: {bool(current_user)}")
+        logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
+        logger.info(f"👤 current_user: {bool(current_user)}")
         
-        # Vérifier si l'authentification est disponible
-        if not AUTH_AVAILABLE or not current_user:
-            logger.error("❌ Service d'authentification non disponible")
+        # ✅ DIAGNOSTIC: Vérifier le token uniquement si problème
+        if not AUTH_AVAILABLE:
+            logger.error("❌ AUTH_AVAILABLE = False - Vérifiez import auth.py")
+            raise HTTPException(
+                status_code=503,
+                detail="Service d'authentification non disponible"
+            )
+        
+        if not current_user:
+            # Diagnostic du token seulement en cas d'échec
+            auth_header = request.headers.get("Authorization")
+            logger.error(f"❌ current_user = None - Auth header: {'Présent' if auth_header else 'Manquant'}")
+            if auth_header:
+                logger.error(f"Token preview: {auth_header[:50]}...")
             raise HTTPException(
                 status_code=503,
                 detail="Service d'authentification non disponible"
@@ -280,7 +294,7 @@ async def ask_expert_secure(
         user_id = current_user.get("user_id")
         user_email = current_user.get("email")
         
-        logger.info(f"🔐 Question sécurisée de {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
+        logger.info(f"✅ Authentifié: {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
         
         # Ajouter les infos utilisateur à la requête
         request.state.user = current_user
@@ -388,6 +402,10 @@ async def ask_expert_secure(
         logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+
+# =============================================================================
+# TOUS LES AUTRES ENDPOINTS DE L'ORIGINAL (CONSERVÉS INTÉGRALEMENT)
+# =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
 async def ask_expert_public(
@@ -641,6 +659,21 @@ async def test_auth_endpoint(
         "timestamp": datetime.now().isoformat()
     }
 
+# ✅ AJOUT: Endpoint de diagnostic léger
+@router.get("/debug-auth")
+async def debug_auth_info(request: Request):
+    """Endpoint de diagnostic rapide"""
+    auth_header = request.headers.get("Authorization")
+    
+    return {
+        "auth_available": AUTH_AVAILABLE,
+        "auth_header_present": bool(auth_header),
+        "auth_header_preview": auth_header[:50] + "..." if auth_header else None,
+        "openai_available": OPENAI_AVAILABLE,
+        "logging_available": LOGGING_AVAILABLE,
+        "timestamp": datetime.now().isoformat()
+    }
+
 # =============================================================================
 # ENDPOINT DE TEST UTF-8 (GARDE CAR IL FONCTIONNE)
 # =============================================================================
@@ -699,11 +732,8 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ CORRECTIONS 422 APPLIQUÉES:")
-logger.info("🔧 1. Injection Request corrigée (plus de = None)")
-logger.info("🔧 2. Modèle Pydantic simplifié et robuste")
-logger.info("🔧 3. Logs détaillés pour debug")
-logger.info("🔧 4. Validation et nettoyage automatique des données")
-logger.info(f"💾 Logging automatique: {'Activé' if LOGGING_AVAILABLE else 'Non disponible'}")
-logger.info(f"🔐 Authentification centralisée: {'Activée' if AUTH_AVAILABLE else 'auth.py requis'}")
-logger.info("✅ EXPERT.PY PRÊT POUR PRODUCTION")
+logger.info("✅ EXPERT.PY COMPLET AVEC DIAGNOSTICS CIBLÉS")
+logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
+logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
+logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
+logger.info("✅ PRÊT POUR DIAGNOSTIC AUTHENTIFICATION")
