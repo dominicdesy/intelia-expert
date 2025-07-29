@@ -51,8 +51,9 @@ const translations = {
     linkedinProfile: 'Profil LinkedIn personnel',
     contact: 'Contact',
     country: 'Pays',
-    phone: 'Téléphone',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
+    countryCode: 'Indicatif pays',
+    areaCode: 'Indicatif régional',
+    phoneNumber: 'Numéro de téléphone',
     company: 'Entreprise',
     companyName: 'Nom de l\'entreprise',
     companyWebsite: 'Site web de l\'entreprise',
@@ -99,8 +100,9 @@ const translations = {
     linkedinProfile: 'Personal LinkedIn Profile',
     contact: 'Contact',
     country: 'Country',
-    phone: 'Phone',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
+    countryCode: 'Country Code',
+    areaCode: 'Area Code',
+    phoneNumber: 'Phone Number',
     company: 'Company',
     companyName: 'Company Name',
     companyWebsite: 'Company Website',
@@ -147,8 +149,9 @@ const translations = {
     linkedinProfile: 'Perfil Personal de LinkedIn',
     contact: 'Contacto',
     country: 'País',
-    phone: 'Teléfono',
-    phoneFormat: 'Formato: +1 (XXX) XXX-XXXX',
+    countryCode: 'Código de País',
+    areaCode: 'Código de Área',
+    phoneNumber: 'Número de Teléfono',
     company: 'Empresa',
     companyName: 'Nombre de la Empresa',
     companyWebsite: 'Sitio Web de la Empresa',
@@ -195,8 +198,9 @@ const translations = {
     linkedinProfile: 'Persönliches LinkedIn-Profil',
     contact: 'Kontakt',
     country: 'Land',
-    phone: 'Telefon',
-    phoneFormat: 'Format: +1 (XXX) XXX-XXXX',
+    countryCode: 'Ländercode',
+    areaCode: 'Vorwahl',
+    phoneNumber: 'Telefonnummer',
     company: 'Unternehmen',
     companyName: 'Firmenname',
     companyWebsite: 'Firmen-Website',
@@ -315,7 +319,7 @@ const LanguageSelector = ({ onLanguageChange }: { onLanguageChange: (lang: Langu
   )
 }
 
-// ==================== VALIDATION FUNCTIONS ====================
+// ==================== VALIDATION FUNCTIONS MODIFIÉES ====================
 const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -339,10 +343,32 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
   }
 }
 
-const validatePhone = (phone: string): boolean => {
-  if (!phone.trim()) return true // Optional field
-  // Format: +1 (XXX) XXX-XXXX or variations
-  return /^[\+]?[1-9][\d]{0,3}[\s\(\-]?[\d]{3}[\s\)\-]?[\d]{3}[\s\-]?[\d]{4}$/.test(phone.replace(/\s/g, ''))
+// ✅ FONCTION validatePhone ADAPTÉE pour les 3 champs séparés
+const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
+  // Si tous les champs sont vides, c'est valide (optionnel)
+  if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
+    return true
+  }
+  
+  // Si un des champs est rempli, tous doivent être valides
+  if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
+    // Country code: doit commencer par + et avoir 1-4 chiffres
+    if (!countryCode.trim() || !/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
+      return false
+    }
+    
+    // Area code: doit avoir exactement 3 chiffres
+    if (!areaCode.trim() || !/^\d{3}$/.test(areaCode.trim())) {
+      return false
+    }
+    
+    // Phone number: doit avoir exactement 7 chiffres
+    if (!phoneNumber.trim() || !/^\d{7}$/.test(phoneNumber.trim())) {
+      return false
+    }
+  }
+  
+  return true
 }
 
 const validateLinkedIn = (url: string): boolean => {
@@ -369,7 +395,7 @@ export default function LoginPage() {
     rememberMe: false
   })
 
-  // Données d'inscription complètes
+  // ✅ DONNÉES D'INSCRIPTION MODIFIÉES avec 3 champs téléphone séparés
   const [signupData, setSignupData] = useState({
     // Authentification
     email: '',
@@ -383,7 +409,9 @@ export default function LoginPage() {
     
     // Contact
     country: '',
-    phone: '',
+    countryCode: '',      // ✅ NOUVEAU: Indicatif pays (+1, +33, etc.)
+    areaCode: '',         // ✅ NOUVEAU: Indicatif régional (555)
+    phoneNumber: '',      // ✅ NOUVEAU: Numéro (1234567)
     
     // Entreprise
     companyName: '',
@@ -441,9 +469,13 @@ export default function LoginPage() {
     if (success) setSuccess('')
   }
 
-  // VALIDATION SIGNUP COMPLET
+  // ✅ VALIDATION SIGNUP MODIFIÉE pour les nouveaux champs téléphone
   const validateSignupForm = (): string | null => {
-    const { email, password, confirmPassword, firstName, lastName, country, phone, linkedinProfile, companyWebsite, companyLinkedin } = signupData
+    const { 
+      email, password, confirmPassword, firstName, lastName, country, 
+      countryCode, areaCode, phoneNumber,
+      linkedinProfile, companyWebsite, companyLinkedin 
+    } = signupData
 
     if (!email.trim()) return t.emailRequired
     if (!validateEmail(email)) return t.emailInvalid
@@ -456,7 +488,12 @@ export default function LoginPage() {
     if (!firstName.trim()) return t.firstNameRequired
     if (!lastName.trim()) return t.lastNameRequired
     if (!country) return t.countryRequired
-    if (!validatePhone(phone)) return t.phoneInvalid
+    
+    // ✅ VALIDATION TÉLÉPHONE ADAPTÉE
+    if (!validatePhone(countryCode, areaCode, phoneNumber)) {
+      return 'Format de téléphone invalide. Si vous renseignez le téléphone, tous les champs (indicatif pays, indicatif régional, numéro) sont requis.'
+    }
+    
     if (linkedinProfile && !validateLinkedIn(linkedinProfile)) return 'Format LinkedIn invalide'
     if (companyWebsite && !validateWebsite(companyWebsite)) return 'Format de site web invalide'
     if (companyLinkedin && !validateLinkedIn(companyLinkedin)) return 'Format LinkedIn entreprise invalide'
@@ -464,7 +501,7 @@ export default function LoginPage() {
     return null
   }
 
-  // FONCTION DE CRÉATION DE COMPTE AMÉLIORÉE
+  // ✅ FONCTION DE CRÉATION DE COMPTE MODIFIÉE avec les nouveaux champs
   const handleSignup = async () => {
     setError('')
     setSuccess('')
@@ -480,7 +517,7 @@ export default function LoginPage() {
     try {
       console.log('📝 Création de compte avec profil complet:', signupData.email)
       
-      // CRÉATION DE COMPTE AVEC MÉTADONNÉES COMPLÈTES
+      // ✅ CRÉATION DE COMPTE AVEC NOUVEAUX CHAMPS TÉLÉPHONE
       const { data, error } = await supabase.auth.signUp({
         email: signupData.email.trim(),
         password: signupData.password,
@@ -492,14 +529,20 @@ export default function LoginPage() {
             last_name: signupData.lastName.trim(),
             linkedin_profile: signupData.linkedinProfile.trim(),
             
-            // Contact
+            // Contact avec nouveaux champs téléphone
             country: signupData.country,
-            phone: signupData.phone.trim(),
+            country_code: signupData.countryCode.trim(),     // ✅ NOUVEAU
+            area_code: signupData.areaCode.trim(),           // ✅ NOUVEAU  
+            phone_number: signupData.phoneNumber.trim(),     // ✅ NOUVEAU
+            // Garder aussi l'ancien champ pour compatibilité
+            phone: signupData.countryCode && signupData.areaCode && signupData.phoneNumber 
+              ? `${signupData.countryCode.trim()} ${signupData.areaCode.trim()} ${signupData.phoneNumber.trim()}`
+              : '',
             
             // Entreprise
             company_name: signupData.companyName.trim(),
             company_website: signupData.companyWebsite.trim(),
-            company_linkedin: signupData.companyLinkedin.trim(),
+            linkedin_corporate: signupData.companyLinkedin.trim(),
             
             // Métadonnées
             created_at: new Date().toISOString(),
@@ -531,11 +574,11 @@ export default function LoginPage() {
 
       if (data.user && !data.user.email_confirmed_at) {
         setSuccess(t.accountCreated)
-        // Réinitialiser le formulaire
+        // ✅ RÉINITIALISER LE FORMULAIRE avec les nouveaux champs
         setSignupData({
           email: '', password: '', confirmPassword: '',
           firstName: '', lastName: '', linkedinProfile: '',
-          country: '', phone: '',
+          country: '', countryCode: '', areaCode: '', phoneNumber: '',
           companyName: '', companyWebsite: '', companyLinkedin: ''
         })
         // Passer en mode login après 4 secondes
@@ -675,11 +718,11 @@ export default function LoginPage() {
       })
     }
     
-    // Vider le formulaire d'inscription
+    // ✅ VIDER LE FORMULAIRE D'INSCRIPTION avec les nouveaux champs
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
-      country: '', phone: '',
+      country: '', countryCode: '', areaCode: '', phoneNumber: '',
       companyName: '', companyWebsite: '', companyLinkedin: ''
     })
   }
@@ -862,7 +905,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* FORMULAIRE D'INSCRIPTION COMPLET */}
+            {/* ✅ FORMULAIRE D'INSCRIPTION MODIFIÉ avec nouveaux champs téléphone */}
             {isSignupMode && (
               <div className="space-y-6">
                 
@@ -946,44 +989,121 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Pays */}
-                    <div>
-                      <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                        {t.country} <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="country"
-                        required
-                        value={signupData.country}
-                        onChange={(e) => handleSignupChange('country', e.target.value)}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      >
-                        <option value="">Sélectionner...</option>
-                        {countries.map((country) => (
-                          <option key={country.value} value={country.value}>
-                            {country.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  {/* Pays */}
+                  <div className="mb-4">
+                    <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                      {t.country} <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="country"
+                      required
+                      value={signupData.country}
+                      onChange={(e) => handleSignupChange('country', e.target.value)}
+                      className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isLoading}
+                    >
+                      <option value="">Sélectionner...</option>
+                      {countries.map((country) => (
+                        <option key={country.value} value={country.value}>
+                          {country.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    {/* Téléphone */}
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                        {t.phone} <span className="text-gray-500 text-xs">{t.optional}</span>
-                      </label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        value={signupData.phone}
-                        onChange={(e) => handleSignupChange('phone', e.target.value)}
-                        placeholder={t.phoneFormat}
-                        className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isLoading}
-                      />
+                  {/* ✅ NOUVEAUX CHAMPS TÉLÉPHONE - Organisés visuellement sur une ligne */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Téléphone <span className="text-gray-500 text-xs">{t.optional}</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Country Code */}
+                      <div>
+                        <label htmlFor="countryCode" className="block text-xs font-medium text-gray-600 mb-1">
+                          {t.countryCode}
+                        </label>
+                        <select
+                          id="countryCode"
+                          value={signupData.countryCode}
+                          onChange={(e) => handleSignupChange('countryCode', e.target.value)}
+                          className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 bg-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                          disabled={isLoading}
+                        >
+                          <option value="">+</option>
+                          <option value="+1">+1</option>
+                          <option value="+33">+33</option>
+                          <option value="+32">+32</option>
+                          <option value="+41">+41</option>
+                          <option value="+52">+52</option>
+                          <option value="+55">+55</option>
+                          <option value="+44">+44</option>
+                          <option value="+49">+49</option>
+                          <option value="+39">+39</option>
+                          <option value="+34">+34</option>
+                        </select>
+                      </div>
+                      
+                      {/* Area Code */}
+                      <div>
+                        <label htmlFor="areaCode" className="block text-xs font-medium text-gray-600 mb-1">
+                          {t.areaCode}
+                        </label>
+                        <input
+                          id="areaCode"
+                          type="tel"
+                          value={signupData.areaCode}
+                          onChange={(e) => handleSignupChange('areaCode', e.target.value)}
+                          placeholder="555"
+                          maxLength={3}
+                          className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                          disabled={isLoading}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                          {signupData.areaCode.length}/3
+                        </div>
+                      </div>
+                      
+                      {/* Phone Number */}
+                      <div>
+                        <label htmlFor="phoneNumber" className="block text-xs font-medium text-gray-600 mb-1">
+                          {t.phoneNumber}
+                        </label>
+                        <input
+                          id="phoneNumber"
+                          type="tel"
+                          value={signupData.phoneNumber}
+                          onChange={(e) => handleSignupChange('phoneNumber', e.target.value)}
+                          placeholder="1234567"
+                          maxLength={7}
+                          className="block w-full appearance-none rounded-md border border-gray-300 px-2 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 text-sm"
+                          disabled={isLoading}
+                        />
+                        <div className="text-xs text-gray-400 mt-1">
+                          {signupData.phoneNumber.length}/7
+                        </div>
+                      </div>
                     </div>
+                    
+                    {/* Validation téléphone en temps réel */}
+                    {(signupData.countryCode || signupData.areaCode || signupData.phoneNumber) && (
+                      <div className="mt-2">
+                        {validatePhone(signupData.countryCode, signupData.areaCode, signupData.phoneNumber) ? (
+                          <div className="flex items-center text-xs text-green-600">
+                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Format téléphone valide
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-xs text-red-600">
+                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                            Tous les champs téléphone sont requis si vous renseignez le téléphone
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1013,66 +1133,6 @@ export default function LoginPage() {
                           tabIndex={-1}
                         >
                           {showPassword ? (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {/* Indicateurs de validation mot de passe */}
-                      {signupData.password && (
-                        <div className="mt-2 space-y-1">
-                          {(() => {
-                            const validation = validatePassword(signupData.password)
-                            return validation.errors.map((error, index) => (
-                              <div key={index} className="flex items-center text-xs text-red-600">
-                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                </svg>
-                                {error}
-                              </div>
-                            ))
-                          })()}
-                          {validatePassword(signupData.password).isValid && (
-                            <div className="flex items-center text-xs text-green-600">
-                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              Mot de passe valide
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Confirmation mot de passe */}
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                        {t.confirmPassword} <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1 relative">
-                        <input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          required
-                          value={signupData.confirmPassword}
-                          onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? (
                             <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
                             </svg>
@@ -1240,4 +1300,64 @@ export default function LoginPage() {
       </div>
     </>
   )
-}
+}="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {/* Indicateurs de validation mot de passe */}
+                      {signupData.password && (
+                        <div className="mt-2 space-y-1">
+                          {(() => {
+                            const validation = validatePassword(signupData.password)
+                            return validation.errors.map((error, index) => (
+                              <div key={index} className="flex items-center text-xs text-red-600">
+                                <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                                {error}
+                              </div>
+                            ))
+                          })()}
+                          {validatePassword(signupData.password).isValid && (
+                            <div className="flex items-center text-xs text-green-600">
+                              <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              Mot de passe valide
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirmation mot de passe */}
+                    <div>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                        {t.confirmPassword} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="mt-1 relative">
+                        <input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          required
+                          value={signupData.confirmPassword}
+                          onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
+                          className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          placeholder="••••••••"
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          tabIndex={-1}
+                        >
+                          {showConfirmPassword ? (
+                            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4 text-gray-400" fill

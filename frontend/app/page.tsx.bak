@@ -397,8 +397,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Charger la langue sauvegardée au montage
+  // ✅ MODIFICATION: useEffect avec chargement des données "Se souvenir de moi"
   useEffect(() => {
+    // Charger la langue sauvegardée
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -407,6 +408,19 @@ export default function LoginPage() {
       if (translations[browserLanguage]) {
         setCurrentLanguage(browserLanguage)
       }
+    }
+
+    // ✅ NOUVEAU: Charger les données "Se souvenir de moi"
+    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    
+    if (rememberMe && lastEmail) {
+      setLoginData(prev => ({
+        ...prev,
+        email: lastEmail,
+        rememberMe: true
+      }))
+      console.log('✅ Données "Se souvenir de moi" chargées:', lastEmail)
     }
   }, [])
 
@@ -544,7 +558,7 @@ export default function LoginPage() {
     }
   }
 
-  // FONCTION DE CONNEXION
+  // ✅ FONCTION DE CONNEXION avec "Se souvenir de moi"
   const handleLogin = async () => {
     setError('')
     setSuccess('')
@@ -572,8 +586,9 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      console.log('🔐 Tentative de connexion:', loginData.email)
+      console.log('🔐 Tentative de connexion:', loginData.email, 'Remember me:', loginData.rememberMe)
       
+      // ✅ CORRECTION: Connexion simple sans options de persistance
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
         password: loginData.password
@@ -602,6 +617,18 @@ export default function LoginPage() {
       }
 
       console.log('✅ Connexion réussie:', data.user.email)
+      
+      // ✅ FONCTIONNALITÉ: Gestion "Se souvenir de moi"
+      if (loginData.rememberMe) {
+        localStorage.setItem('intelia-remember-me', 'true')
+        localStorage.setItem('intelia-last-email', loginData.email.trim())
+        console.log('💾 Email sauvegardé pour prochaine connexion')
+      } else {
+        localStorage.removeItem('intelia-remember-me')
+        localStorage.removeItem('intelia-last-email')
+        console.log('🗑️ Préférences supprimées')
+      }
+      
       window.location.href = '/chat'
       
     } catch (error: any) {
@@ -626,11 +653,29 @@ export default function LoginPage() {
     }
   }
 
+  // ✅ MODIFICATION: Toggle mode avec préservation des préférences "remember me"
   const toggleMode = () => {
     setIsSignupMode(!isSignupMode)
     setError('')
     setSuccess('')
-    setLoginData({ email: '', password: '', rememberMe: false })
+    
+    // ✅ AMÉLIORATION: Préserver l'email et remember me en mode connexion
+    if (!isSignupMode) {
+      // Passer en mode signup - vider tout
+      setLoginData({ email: '', password: '', rememberMe: false })
+    } else {
+      // Passer en mode login - recharger les préférences "remember me" si elles existent
+      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+      const lastEmail = localStorage.getItem('intelia-last-email') || ''
+      
+      setLoginData({ 
+        email: rememberMe ? lastEmail : '', 
+        password: '', 
+        rememberMe 
+      })
+    }
+    
+    // Vider le formulaire d'inscription
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
