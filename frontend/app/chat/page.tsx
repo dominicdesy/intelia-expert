@@ -2587,3 +2587,5 @@ export default function ChatInterface() {
       content: t('chat.welcome'),
       isUser: false,
       timestamp: new Date()
+    }])
+  }
