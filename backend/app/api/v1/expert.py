@@ -17,9 +17,9 @@ from pydantic import BaseModel, Field, ConfigDict
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
-# ✅ DIAGNOSTIC DÉTAILLÉ: Import auth avec analyse complète
+# ✅ DIAGNOSTIC DÉTAILLÉ: Import auth avec plusieurs méthodes
 logger.info("=" * 60)
-logger.info("🔍 DIAGNOSTIC IMPORT AUTH.PY")
+logger.info("🔍 DIAGNOSTIC IMPORT AUTH.PY - MÉTHODES MULTIPLES")
 
 # Vérifier si le fichier auth.py existe
 import os
@@ -28,41 +28,77 @@ auth_file_path = os.path.join(os.path.dirname(__file__), "auth.py")
 logger.info(f"📁 Chemin auth.py: {auth_file_path}")
 logger.info(f"📁 Fichier existe: {'✅' if os.path.exists(auth_file_path) else '❌'}")
 
-# Vérifier le chemin Python
-logger.info(f"🐍 Python path: {sys.path[:3]}...")  # Premiers 3 éléments
+# Méthode 1: Import direct relatif
+AUTH_AVAILABLE = False
+get_current_user = None
+
+logger.info("🔍 Méthode 1: Import direct relatif")
+try:
+    from .auth import get_current_user
+    AUTH_AVAILABLE = True
+    logger.info("✅ Méthode 1 réussie: Import direct relatif")
+except ImportError as e:
+    logger.error(f"❌ Méthode 1 échouée: {e}")
+except Exception as e:
+    logger.error(f"❌ Méthode 1 erreur critique: {e}")
+
+# Méthode 2: Import absolu (si méthode 1 échoue)
+if not AUTH_AVAILABLE:
+    logger.info("🔍 Méthode 2: Import absolu")
+    try:
+        from app.api.v1.auth import get_current_user
+        AUTH_AVAILABLE = True
+        logger.info("✅ Méthode 2 réussie: Import absolu")
+    except ImportError as e:
+        logger.error(f"❌ Méthode 2 échouée: {e}")
+    except Exception as e:
+        logger.error(f"❌ Méthode 2 erreur critique: {e}")
+
+# Méthode 3: Import par importlib (si méthodes 1&2 échouent)
+if not AUTH_AVAILABLE:
+    logger.info("🔍 Méthode 3: Import par importlib")
+    try:
+        import importlib
+        auth_module = importlib.import_module(".auth", package="app.api.v1")
+        get_current_user = getattr(auth_module, "get_current_user", None)
+        if get_current_user:
+            AUTH_AVAILABLE = True
+            logger.info("✅ Méthode 3 réussie: Import par importlib")
+        else:
+            logger.error("❌ Méthode 3: get_current_user non trouvé dans le module")
+    except ImportError as e:
+        logger.error(f"❌ Méthode 3 échouée: {e}")
+    except Exception as e:
+        logger.error(f"❌ Méthode 3 erreur critique: {e}")
+
+# Vérifier le chemin Python et diagnostics supplémentaires
+logger.info(f"🐍 Python path: {sys.path[:3]}...")
 logger.info(f"🐍 Current working dir: {os.getcwd()}")
 logger.info(f"🐍 __file__ location: {__file__}")
 
+# Test d'import étape par étape
+logger.info("🔍 Tests d'import étape par étape:")
 try:
-    from app.api.v1.auth import get_current_user
-    AUTH_AVAILABLE = True
-    logger.info("✅ AUTH_AVAILABLE = True")
-    logger.info("✅ Import get_current_user réussi")
-except ImportError as e:
-    AUTH_AVAILABLE = False
-    get_current_user = None
-    logger.error(f"❌ AUTH_AVAILABLE = False")
-    logger.error(f"❌ ImportError détaillé: {e}")
-    logger.error(f"❌ Type d'erreur: {type(e).__name__}")
-    
-    # Diagnostics supplémentaires
-    try:
-        import app.api.v1
-        logger.info("✅ app.api.v1 importable")
-    except ImportError as e2:
-        logger.error(f"❌ app.api.v1 non importable: {e2}")
-    
-    try:
-        import app.api.v1.auth
-        logger.info("✅ app.api.v1.auth module importable")
-    except ImportError as e3:
-        logger.error(f"❌ app.api.v1.auth module non importable: {e3}")
+    import app
+    logger.info("✅ import app")
 except Exception as e:
-    AUTH_AVAILABLE = False
-    get_current_user = None
-    logger.error(f"❌ Erreur critique import auth: {e}")
-    logger.error(f"❌ Type d'erreur: {type(e).__name__}")
+    logger.error(f"❌ import app: {e}")
 
+try:
+    import app.api
+    logger.info("✅ import app.api")
+except Exception as e:
+    logger.error(f"❌ import app.api: {e}")
+
+try:
+    import app.api.v1
+    logger.info("✅ import app.api.v1")
+except Exception as e:
+    logger.error(f"❌ import app.api.v1: {e}")
+
+# Résultat final
+logger.info(f"🎯 AUTH_AVAILABLE final: {AUTH_AVAILABLE}")
+logger.info(f"🎯 get_current_user: {'✅ Disponible' if get_current_user else '❌ Non disponible'}")
 logger.info("=" * 60)
 
 # OpenAI import sécurisé
@@ -712,7 +748,7 @@ async def debug_system_info():
     except:
         files_in_dir = ["Erreur lecture répertoire"]
     
-    # Test d'import détaillé
+    # Test d'import détaillé avec analyse __init__.py
     import_tests = {}
     
     # Test 1: app
@@ -729,26 +765,61 @@ async def debug_system_info():
     except Exception as e:
         import_tests["app.api"] = f"❌ {str(e)}"
     
-    # Test 3: app.api.v1
+    # Test 3: app.api.v1 (ici c'est critique)
     try:
         import app.api.v1
         import_tests["app.api.v1"] = "✅ OK"
+        
+        # Vérifier les attributs disponibles dans __init__.py
+        v1_attrs = dir(app.api.v1)
+        import_tests["app.api.v1.attributes"] = [attr for attr in v1_attrs if not attr.startswith('_')]
+        
+        # Vérifier spécifiquement AUTH_AVAILABLE dans __init__.py
+        if hasattr(app.api.v1, 'AUTH_AVAILABLE'):
+            import_tests["app.api.v1.AUTH_AVAILABLE"] = f"✅ {getattr(app.api.v1, 'AUTH_AVAILABLE')}"
+        else:
+            import_tests["app.api.v1.AUTH_AVAILABLE"] = "❌ Non défini"
+            
     except Exception as e:
         import_tests["app.api.v1"] = f"❌ {str(e)}"
     
-    # Test 4: app.api.v1.auth
+    # Test 4: app.api.v1.auth (module direct)
     try:
         import app.api.v1.auth
         import_tests["app.api.v1.auth"] = "✅ OK"
+        
+        # Vérifier les fonctions disponibles dans auth.py
+        auth_attrs = dir(app.api.v1.auth)
+        auth_functions = [attr for attr in auth_attrs if not attr.startswith('_') and callable(getattr(app.api.v1.auth, attr, None))]
+        import_tests["app.api.v1.auth.functions"] = auth_functions
+        
     except Exception as e:
         import_tests["app.api.v1.auth"] = f"❌ {str(e)}"
     
-    # Test 5: get_current_user function
+    # Test 5: get_current_user function (direct)
     try:
         from app.api.v1.auth import get_current_user
         import_tests["get_current_user"] = "✅ OK"
+        import_tests["get_current_user.type"] = str(type(get_current_user))
     except Exception as e:
         import_tests["get_current_user"] = f"❌ {str(e)}"
+    
+    # Test 6: Import relatif
+    try:
+        # Simuler l'import relatif depuis le contexte expert.py
+        current_dir = os.path.dirname(__file__)
+        auth_py_path = os.path.join(current_dir, "auth.py")
+        if os.path.exists(auth_py_path):
+            import_tests["relative_auth_file"] = "✅ Fichier auth.py existe"
+            try:
+                from .auth import get_current_user as relative_get_current_user
+                import_tests["relative_import"] = "✅ Import relatif réussi"
+            except Exception as rel_e:
+                import_tests["relative_import"] = f"❌ Import relatif échoué: {rel_e}"
+        else:
+            import_tests["relative_auth_file"] = "❌ Fichier auth.py manquant"
+    except Exception as e:
+        import_tests["relative_import_test"] = f"❌ {str(e)}"
     
     return {
         "auth_available": AUTH_AVAILABLE,
