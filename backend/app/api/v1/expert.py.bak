@@ -3,6 +3,7 @@ app/api/v1/expert.py - VERSION CORRIGÉE AVEC AUTHENTIFICATION auth.py
 CORRECTION: Utilise get_current_user de auth.py au lieu de dupliquer l'authentification
 SOLUTION UTF-8: Validation Pydantic ultra-permissive fonctionnelle
 MODIFICATION LIGNÉE GÉNÉTIQUE: Prompts adaptés pour éviter références spécifiques
+CORRECTION 422: Renommage des paramètres request → question_data
 """
 import os
 import logging
@@ -159,15 +160,15 @@ async def save_conversation_auto(
         logger.error(f"❌ Erreur sauvegarde: {e}")
         return False
 
-def get_user_id_from_request(request: Request) -> str:
+def get_user_id_from_request(fastapi_request: Request) -> str:
     """Extrait l'ID utilisateur"""
     try:
-        user = getattr(request.state, "user", None)
+        user = getattr(fastapi_request.state, "user", None)
         if user:
             return str(user.get("id", user.get("user_id", "authenticated_user")))
         
-        client_ip = request.client.host if request.client else "unknown"
-        user_agent = request.headers.get("user-agent", "unknown")
+        client_ip = fastapi_request.client.host if fastapi_request.client else "unknown"
+        user_agent = fastapi_request.headers.get("user-agent", "unknown")
         
         import hashlib
         anonymous_data = f"{client_ip}_{user_agent}_{datetime.now().strftime('%Y-%m-%d')}"
@@ -270,7 +271,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
-    request: QuestionRequest, 
+    question_data: QuestionRequest,
     fastapi_request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
@@ -295,7 +296,7 @@ async def ask_expert_secure(
         fastapi_request.state.user = current_user
         
         # Récupération directe de la question
-        question_text = request.text
+        question_text = question_data.text
         
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
@@ -322,8 +323,8 @@ async def ask_expert_secure(
                 result = await process_rag(
                     question=question_text,
                     user=current_user,  # Passer current_user de auth.py
-                    language=request.language,
-                    speed_mode=request.speed_mode
+                    language=question_data.language,
+                    speed_mode=question_data.speed_mode
                 )
                 
                 answer = str(result.get("response", ""))
@@ -337,16 +338,16 @@ async def ask_expert_secure(
                 logger.error(f"❌ Erreur RAG pour utilisateur authentifié: {rag_error}")
                 answer = await process_question_openai(
                     question_text, 
-                    request.language,
-                    request.speed_mode
+                    question_data.language,
+                    question_data.speed_mode
                 )
                 mode = "authenticated_fallback_openai"
         else:
             logger.info("⚠️ RAG non disponible, utilisation OpenAI pour utilisateur authentifié")
             answer = await process_question_openai(
                 question_text,
-                request.language,
-                request.speed_mode
+                question_data.language,
+                question_data.speed_mode
             )
             mode = "authenticated_direct_openai"
         
@@ -358,7 +359,7 @@ async def ask_expert_secure(
             question=question_text,
             response=answer,
             user_id=user_id or "authenticated_user",  # user_id de auth.py
-            language=request.language,
+            language=question_data.language,
             rag_used=rag_used,
             rag_score=rag_score,
             response_time_ms=response_time_ms
@@ -372,7 +373,7 @@ async def ask_expert_secure(
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
-            language=request.language,
+            language=question_data.language,
             response_time_ms=response_time_ms,
             mode=mode,
             user=user_email,  # Email de l'utilisateur authentifié via auth.py
@@ -388,13 +389,13 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/ask-public", response_model=ExpertResponse)
-async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
+async def ask_expert_public(question_data: QuestionRequest, fastapi_request: Request):
     """Question publique avec validation text FONCTIONNELLE"""
     start_time = time.time()
     
     try:
         # Récupération directe - plus de problème d'initialisation
-        question_text = request.text
+        question_text = question_data.text
         
         if not question_text:
             raise HTTPException(status_code=400, detail="Question text is required")
@@ -424,8 +425,8 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
                 result = await process_rag(
                     question=question_text,
                     user=user,
-                    language=request.language,
-                    speed_mode=request.speed_mode
+                    language=question_data.language,
+                    speed_mode=question_data.speed_mode
                 )
                 
                 answer = str(result.get("response", ""))
@@ -439,15 +440,15 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
                 logger.error(f"❌ Erreur RAG: {rag_error}")
                 answer = await process_question_openai(
                     question_text, 
-                    request.language,
-                    request.speed_mode
+                    question_data.language,
+                    question_data.speed_mode
                 )
         else:
             logger.info("⚠️ RAG non disponible, utilisation OpenAI")
             answer = await process_question_openai(
                 question_text,
-                request.language,
-                request.speed_mode
+                question_data.language,
+                question_data.speed_mode
             )
         
         response_time_ms = int((time.time() - start_time) * 1000)
@@ -458,7 +459,7 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
             question=question_text,
             response=answer,
             user_id=user_id,
-            language=request.language,
+            language=question_data.language,
             rag_used=rag_used,
             rag_score=rag_score,
             response_time_ms=response_time_ms
@@ -472,7 +473,7 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
-            language=request.language,
+            language=question_data.language,
             response_time_ms=response_time_ms,
             mode=mode,
             user=str(user) if user else None,
@@ -488,22 +489,22 @@ async def ask_expert_public(request: QuestionRequest, fastapi_request: Request):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @router.post("/feedback")
-async def submit_feedback(request: FeedbackRequest):
+async def submit_feedback(feedback_data: FeedbackRequest):
     """Submit feedback"""
     try:
-        logger.info(f"📊 Feedback reçu: {request.rating}")
+        logger.info(f"📊 Feedback reçu: {feedback_data.rating}")
         
         feedback_updated = False
-        if request.conversation_id and LOGGING_AVAILABLE and logger_instance:
+        if feedback_data.conversation_id and LOGGING_AVAILABLE and logger_instance:
             try:
                 rating_numeric = {
                     "positive": 1,
                     "negative": -1,
                     "neutral": 0
-                }.get(request.rating, 0)
+                }.get(feedback_data.rating, 0)
                 
                 feedback_updated = logger_instance.update_feedback(
-                    request.conversation_id, 
+                    feedback_data.conversation_id, 
                     rating_numeric
                 )
                 
@@ -513,9 +514,9 @@ async def submit_feedback(request: FeedbackRequest):
         return {
             "success": True,
             "message": "Feedback enregistré avec succès",
-            "rating": request.rating,
-            "comment": request.comment,
-            "conversation_id": request.conversation_id,
+            "rating": feedback_data.rating,
+            "comment": feedback_data.comment,
+            "conversation_id": feedback_data.conversation_id,
             "feedback_updated_in_db": feedback_updated,
             "timestamp": datetime.now().isoformat()
         }
@@ -574,11 +575,11 @@ async def get_suggested_topics(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 @router.get("/history")
-async def get_conversation_history(request: Request, limit: int = 10):
+async def get_conversation_history(fastapi_request: Request, limit: int = 10):
     """Get conversation history"""
     try:
         if LOGGING_AVAILABLE and logger_instance:
-            user_id = get_user_id_from_request(request)
+            user_id = get_user_id_from_request(fastapi_request)
             
             try:
                 conversations = logger_instance.get_user_conversations(user_id, limit)
@@ -645,7 +646,7 @@ async def get_auth_status(current_user: Dict[str, Any] = Depends(get_current_use
 
 @router.post("/test-auth")
 async def test_auth_endpoint(
-    request: QuestionRequest,
+    question_data: QuestionRequest,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
     """Endpoint de test pour vérifier l'authentification - REQUIERT TOKEN"""
@@ -660,9 +661,9 @@ async def test_auth_endpoint(
         "message": "🔐 Authentification fonctionnelle via auth.py !",
         "user_email": current_user.get('email'),
         "user_id": str(current_user.get('user_id', ''))[:8] + "...",
-        "question_received": request.text,
-        "question_length": len(request.text),
-        "special_chars": [c for c in request.text if ord(c) > 127],
+        "question_received": question_data.text,
+        "question_length": len(question_data.text),
+        "special_chars": [c for c in question_data.text if ord(c) > 127],
         "timestamp": datetime.now().isoformat()
     }
 
@@ -733,3 +734,4 @@ logger.info(f"🔐 Authentification centralisée: {'Activée' if AUTH_AVAILABLE 
 logger.info(f"🛡️ Sécurité /ask: Authentification via auth.py")
 logger.info(f"🌐 Endpoint public /ask-public: Toujours disponible sans auth")
 logger.info(f"📝 Topics suggérés: Terminologie générique (poulets de chair/broiler chickens/pollos de engorde)")
+logger.info("🔧 CORRECTION 422: Paramètres renommés request → question_data/feedback_data")
