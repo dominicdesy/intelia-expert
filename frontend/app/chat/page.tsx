@@ -1,455 +1,3 @@
-'use client'
-
-import React, { useState, useEffect, useRef } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-
-// Instance Supabase
-const supabase = createClientComponentClient()
-
-// ==================== TYPES ÉTENDUS POUR LOGGING ====================
-interface Message {
-  id: string
-  content: string
-  isUser: boolean
-  timestamp: Date
-  feedback?: 'positive' | 'negative' | null
-  conversation_id?: string  // ID pour le tracking des conversations
-}
-
-interface ExpertApiResponse {
-  question: string
-  response: string
-  conversation_id: string
-  rag_used: boolean
-  rag_score?: number
-  timestamp: string
-  language: string
-  response_time_ms: number
-  mode: string
-  user?: string
-}
-
-interface ConversationData {
-  user_id: string
-  question: string
-  response: string
-  conversation_id: string
-  confidence_score?: number
-  response_time_ms?: number
-  language?: string
-  rag_used?: boolean
-}
-
-// ==================== SERVICE DE LOGGING AVEC URL CORRIGÉE ====================
-class ConversationService {
-  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"
-  private loggingEnabled = true
-
-  async saveConversation(data: ConversationData): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('📝 Logging désactivé - conversation non sauvegardée:', data.conversation_id)
-      return
-    }
-
-    try {
-      console.log('💾 Sauvegarde conversation:', data.conversation_id)
-      console.log('📡 URL de sauvegarde:', `${this.baseUrl}/logging/conversation`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/conversation`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: data.user_id,
-          question: data.question,
-          response: data.response,
-          conversation_id: data.conversation_id,
-          confidence_score: data.confidence_score,
-          response_time_ms: data.response_time_ms,
-          language: data.language || 'fr',
-          rag_used: data.rag_used !== undefined ? data.rag_used : true
-        })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Conversation sauvegardée:', result.message)
-      
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde conversation:', error)
-      // Ne pas bloquer l'UX si le logging échoue
-    }
-  }
-
-  async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('📊 Logging désactivé - feedback non envoyé:', conversationId)
-      return
-    }
-
-    try {
-      console.log('📊 Envoi feedback:', conversationId, feedback)
-      console.log('📡 URL feedback:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ feedback })
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Feedback enregistré:', result.message)
-      
-    } catch (error) {
-      console.error('❌ Erreur envoi feedback:', error)
-      throw error  // Propager pour afficher erreur à l'utilisateur
-    }
-  }
-
-  async getUserConversations(userId: string, limit = 50): Promise<any[]> {
-    if (!this.loggingEnabled) {
-      console.log('🔍 Logging désactivé - conversations non récupérées')
-      return []
-    }
-
-    try {
-      console.log('🔍 Récupération conversations pour:', userId)
-      console.log('📡 URL conversations:', `${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`, {
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('✅ Conversations récupérées:', data.count)
-      return data.conversations || []
-      
-    } catch (error) {
-      console.error('❌ Erreur récupération conversations:', error)
-      return []
-    }
-  }
-
-  async deleteConversation(conversationId: string): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('🗑️ Logging désactivé - conversation non supprimée:', conversationId)
-      return
-    }
-
-    try {
-      console.log('🗑️ Suppression conversation serveur:', conversationId)
-      console.log('📡 URL suppression:', `${this.baseUrl}/logging/conversation/${conversationId}`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}`, {
-        method: 'DELETE',
-        headers: { 
-          'Accept': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        // Si l'endpoint n'existe pas (404), on continue sans erreur
-        if (response.status === 404) {
-          console.warn('⚠️ Endpoint de suppression non disponible sur le serveur')
-          return
-        }
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Conversation supprimée du serveur:', result.message)
-      
-    } catch (error) {
-      console.error('❌ Erreur suppression conversation serveur:', error)
-      throw error  // Propager pour que l'UI puisse gérer l'erreur
-    }
-  }
-
-  async clearAllUserConversations(userId: string): Promise<void> {
-    if (!this.loggingEnabled) {
-      console.log('🗑️ Logging désactivé - conversations non supprimées:', userId)
-      return
-    }
-
-    try {
-      console.log('🗑️ Suppression toutes conversations serveur pour:', userId)
-      console.log('📡 URL suppression globale:', `${this.baseUrl}/logging/user/${userId}/conversations`)
-      
-      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations`, {
-        method: 'DELETE',
-        headers: { 
-          'Accept': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('✅ Toutes conversations supprimées du serveur:', result.message, 'Count:', result.deleted_count)
-      
-    } catch (error) {
-      console.error('❌ Erreur suppression toutes conversations serveur:', error)
-      throw error  // Propager pour que l'UI puisse gérer l'erreur
-    }
-  }
-}
-
-// Instance globale du service
-const conversationService = new ConversationService()
-
-// ==================== CONFIGURATION API ====================
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
-const API_TIMEOUT = 30000 // 30 secondes
-
-// ==================== CLASSES D'ERREUR PERSONNALISÉES ====================
-class AuthError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'AuthError'
-  }
-}
-
-class TimeoutError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'TimeoutError'
-  }
-}
-
-class ApiError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-
-class RetryError extends Error {
-  public newToken: string
-  
-  constructor(message: string, newToken: string) {
-    super(message)
-    this.name = 'RetryError'
-    this.newToken = newToken
-  }
-}
-
-// ==================== FONCTIONS UTILITAIRES POUR L'API ====================
-
-// Récupération session avec gestion d'erreur propre
-async function getValidSession() {
-  try {
-    const { data, error } = await supabase.auth.getSession()
-    if (error) throw error
-    return data.session
-  } catch (sessionError) {
-    console.error('❌ Erreur session:', sessionError)
-    throw new AuthError('Impossible de récupérer la session utilisateur')
-  }
-}
-
-// Fetch avec timeout
-async function fetchWithTimeout(url: string, options: RequestInit, timeout: number) {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    })
-    clearTimeout(timeoutId)
-    return response
-  } catch (error) {
-    clearTimeout(timeoutId)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError('Timeout - le serveur met trop de temps à répondre')
-    }
-    throw error
-  }
-}
-
-// Gestion des erreurs HTTP avec retry pour 401
-async function handleHttpErrors(response: Response) {
-  if (response.status === 401) {
-    console.error('❌ Erreur 401 - Token invalide, tentative de refresh...')
-    
-    try {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError || !refreshData.session) {
-        throw new AuthError('Refresh token failed')
-      }
-      
-      console.log('✅ Token refreshed avec succès')
-      throw new RetryError('Token refreshed, retry needed', refreshData.session.access_token)
-      
-    } catch (refreshError) {
-      console.error('❌ Impossible de refresh le token:', refreshError)
-      await supabase.auth.signOut()
-      throw new AuthError('Session expirée - redirection vers connexion')
-    }
-  }
-  
-  if (response.status === 403) {
-    throw new AuthError('Accès refusé. Vérifiez vos permissions.')
-  }
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Erreur inconnue')
-    throw new ApiError(`Erreur serveur (${response.status}): ${errorText}`)
-  }
-}
-
-// Parse JSON avec gestion d'erreur
-async function parseJsonResponse(response: Response) {
-  try {
-    return await response.json()
-  } catch (parseError) {
-    console.error('❌ Erreur parsing JSON:', parseError)
-    throw new ApiError('Réponse serveur invalide')
-  }
-}
-
-// Sauvegarde conversation sécurisée
-async function saveConversationSafely(user: any, question: string, response: ExpertApiResponse) {
-  if (!user?.id || !response.conversation_id) {
-    console.warn('⚠️ Pas de user.id ou conversation_id - historique non sauvegardé')
-    return
-  }
-  
-  try {
-    console.log('💾 Sauvegarde conversation pour historique...')
-    await conversationService.saveConversation({
-      user_id: user.id,
-      question: question,
-      response: response.response,
-      conversation_id: response.conversation_id,
-      confidence_score: response.rag_score,
-      response_time_ms: response.response_time_ms,
-      language: response.language,
-      rag_used: response.rag_used
-    })
-    console.log('✅ Conversation sauvegardée:', response.conversation_id)
-  } catch (saveError) {
-    console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
-    // Continue sans bloquer l'UX
-  }
-}
-
-// Gestion centralisée des erreurs
-function handleApiError(error: any): Error {
-  if (error instanceof AuthError) {
-    // Pour les erreurs d'auth, redirection différée pour éviter les crashs
-    setTimeout(() => {
-      window.location.href = '/'
-    }, 1000)
-    return new Error('Session expirée - redirection vers connexion dans 1 seconde...')
-  }
-  
-  if (error instanceof TimeoutError) {
-    return new Error('Timeout - le serveur met trop de temps à répondre. Réessayez.')
-  }
-  
-  if (error instanceof RetryError) {
-    return new Error('Token refresh nécessaire - veuillez réessayer.')
-  }
-  
-  if (error.message?.includes('Failed to fetch')) {
-    return new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
-  }
-  
-  return new Error(`Erreur technique: ${error.message}`)
-}
-
-// ==================== FONCTION generateAIResponse CORRIGÉE ====================
-const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
-  const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
-  
-  console.log('🔒 Envoi question au RAG Intelia (endpoint sécurisé):', question.substring(0, 50) + '...')
-  
-  try {
-    // ===== 1. RÉCUPÉRATION SESSION SÉCURISÉE =====
-    const session = await getValidSession()
-    if (!session?.access_token) {
-      throw new AuthError('Session expirée - reconnexion nécessaire')
-    }
-    
-    console.log('✅ Token récupéré, longueur:', session.access_token.length)
-    
-    // ===== 2. PRÉPARATION REQUÊTE =====
-    const requestBody = {
-      text: question.trim(),
-      language: user?.language || 'fr',
-      speed_mode: 'balanced'
-    }
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
-    }
-    
-    console.log('📤 Envoi requête sécurisée...')
-    
-    // ===== 3. REQUÊTE AVEC TIMEOUT =====
-    const response = await fetchWithTimeout(apiUrl, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(requestBody)
-    }, API_TIMEOUT)
-    
-    console.log('📊 Réponse:', response.status, response.statusText)
-    
-    // ===== 4. GESTION ERREURS HTTP =====
-    await handleHttpErrors(response)
-    
-    // ===== 5. TRAITEMENT RÉPONSE =====
-    const data = await parseJsonResponse(response)
-    console.log('✅ Réponse RAG reçue avec succès')
-    
-    const adaptedResponse: ExpertApiResponse = {
-      question: data.question || question,
-      response: data.response || "Réponse reçue mais vide",
-      conversation_id: data.conversation_id || `conv_${Date.now()}`,
-      rag_used: data.rag_used || false,
-      rag_score: data.rag_score,
-      timestamp: data.timestamp || new Date().toISOString(),
-      language: data.language || 'fr',
-      response_time_ms: data.response_time_ms || 0,
-      mode: data.mode || 'secured',
-      user: data.user
-    }
-    
-    // ===== 6. SAUVEGARDE CONVERSATION =====
-    await saveConversationSafely(user, question, adaptedResponse)
-    
-    return adaptedResponse
-    
-  } catch (error: any) {
-    console.error('❌ Erreur dans generateAIResponse:', error.message)
-    throw handleApiError(error)
-  }
 }
 
 // ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
@@ -2677,4 +2225,661 @@ export default function ChatInterface() {
       </div>
     </>
   )
+}'use client'
+
+import React, { useState, useEffect, useRef } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+// Instance Supabase
+const supabase = createClientComponentClient()
+
+// ==================== TYPES ÉTENDUS POUR LOGGING ====================
+interface Message {
+  id: string
+  content: string
+  isUser: boolean
+  timestamp: Date
+  feedback?: 'positive' | 'negative' | null
+  conversation_id?: string  // ID pour le tracking des conversations
+}
+
+interface ExpertApiResponse {
+  question: string
+  response: string
+  conversation_id: string
+  rag_used: boolean
+  rag_score?: number
+  timestamp: string
+  language: string
+  response_time_ms: number
+  mode: string
+  user?: string
+}
+
+interface ConversationData {
+  user_id: string
+  question: string
+  response: string
+  conversation_id: string
+  confidence_score?: number
+  response_time_ms?: number
+  language?: string
+  rag_used?: boolean
+}
+
+// ==================== SERVICE DE LOGGING AVEC URL CORRIGÉE ====================
+class ConversationService {
+  private baseUrl = "https://expert-app-cngws.ondigitalocean.app/api/v1"
+  private loggingEnabled = true
+
+  async saveConversation(data: ConversationData): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('📝 Logging désactivé - conversation non sauvegardée:', data.conversation_id)
+      return
+  // ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
+const translations = {
+  fr: {
+    'chat.welcome': 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?',
+    'chat.placeholder': 'Posez votre question à l\'expert...',
+    'chat.loading': 'Chargement...',
+    'chat.errorMessage': 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
+    'chat.helpfulResponse': 'Réponse utile',
+    'chat.notHelpfulResponse': 'Réponse non utile',
+
+    'chat.noConversations': 'Aucune conversation',
+    'nav.newConversation': 'Nouvelle conversation',
+    'nav.history': 'Historique',
+    'nav.clearAll': 'Tout effacer',
+    'nav.profile': 'Profil',
+    'nav.contact': 'Contact',
+    'nav.legal': 'Mentions légales',
+    'nav.logout': 'Déconnexion',
+    'nav.language': 'Langue',
+    'subscription.title': 'Abonnement',
+    'subscription.currentPlan': 'Forfait actuel',
+    'subscription.modify': 'Modifier le forfait',
+    'subscription.update': 'Mettre à jour',
+    'plan.essential': 'Essentiel',
+    'plan.pro': 'Pro',
+    'plan.max': 'Max',
+    'profile.title': 'Profil utilisateur',
+    'profile.personalInfo': 'Informations personnelles',
+    'profile.firstName': 'Prénom',
+    'profile.lastName': 'Nom',
+    'profile.email': 'Email',
+    'profile.phone': 'Téléphone',
+    'profile.country': 'Pays',
+    'profile.company': 'Entreprise',
+    'profile.companyName': 'Nom de l\'entreprise',
+    'profile.companyWebsite': 'Site web',
+    'profile.password': 'Changer le mot de passe',
+    'profile.currentPassword': 'Mot de passe actuel',
+    'profile.newPassword': 'Nouveau mot de passe',
+    'profile.confirmPassword': 'Confirmer le mot de passe',
+    'contact.title': 'Nous joindre',
+    'contact.phone': 'Nous appeler',
+    'contact.phoneDescription': 'Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.',
+    'contact.email': 'Nous écrire',
+    'contact.emailDescription': 'Envoyez-nous un message détaillé et nous vous répondrons rapidement.',
+    'contact.website': 'Visiter notre site web',
+    'contact.websiteDescription': 'Pour en savoir plus sur nous et la plateforme Intelia, visitez notre site.',
+    'modal.close': 'Fermer',
+    'modal.save': 'Sauvegarder',
+    'modal.cancel': 'Annuler',
+    'modal.loading': 'Chargement...',
+    'language.title': 'Changer la langue',
+    'language.description': 'Sélectionnez votre langue préférée pour l\'interface Intelia Expert'
+  },
+  en: {
+    'chat.welcome': 'Hello! How can I help you today?',
+    'chat.placeholder': 'Ask your question to the expert...',
+    'chat.loading': 'Loading...',
+    'chat.errorMessage': 'Sorry, I\'m experiencing a technical issue. Please try again in a few moments.',
+    'chat.helpfulResponse': 'Helpful response',
+    'chat.notHelpfulResponse': 'Not helpful response',
+
+    'chat.noConversations': 'No conversations',
+    'nav.newConversation': 'New conversation',
+    'nav.history': 'History',
+    'nav.clearAll': 'Clear all',
+    'nav.profile': 'Profile',
+    'nav.contact': 'Contact',
+    'nav.legal': 'Legal notices',
+    'nav.logout': 'Logout',
+    'nav.language': 'Language',
+    'subscription.title': 'Subscription',
+    'subscription.currentPlan': 'Current plan',
+    'subscription.modify': 'Modify plan',
+    'subscription.update': 'Update',
+    'plan.essential': 'Essential',
+    'plan.pro': 'Pro',
+    'plan.max': 'Max',
+    'profile.title': 'User profile',
+    'profile.personalInfo': 'Personal information',
+    'profile.firstName': 'First name',
+    'profile.lastName': 'Last name',
+    'profile.email': 'Email',
+    'profile.phone': 'Phone',
+    'profile.country': 'Country',
+    'profile.company': 'Company',
+    'profile.companyName': 'Company name',
+    'profile.companyWebsite': 'Website',
+    'profile.password': 'Change password',
+    'profile.currentPassword': 'Current password',
+    'profile.newPassword': 'New password',
+    'profile.confirmPassword': 'Confirm password',
+    'contact.title': 'Contact us',
+    'contact.phone': 'Call us',
+    'contact.phoneDescription': 'If you can\'t find a solution, call us to speak directly with our team.',
+    'contact.email': 'Email us',
+    'contact.emailDescription': 'Send us a detailed message and we\'ll respond quickly.',
+    'contact.website': 'Visit our website',
+    'contact.websiteDescription': 'To learn more about us and the Intelia platform, visit our site.',
+    'modal.close': 'Close',
+    'modal.save': 'Save',
+    'modal.cancel': 'Cancel',
+    'modal.loading': 'Loading...',
+    'language.title': 'Change language',
+    'language.description': 'Select your preferred language for the Intelia Expert interface'
+  },
+  es: {
+    'chat.welcome': '¡Hola! ¿Cómo puedo ayudarte hoy?',
+    'chat.placeholder': 'Haz tu pregunta al experto...',
+    'chat.loading': 'Cargando...',
+    'chat.errorMessage': 'Lo siento, tengo un problema técnico. Por favor, inténtalo de nuevo en unos momentos.',
+    'chat.helpfulResponse': 'Respuesta útil',
+    'chat.notHelpfulResponse': 'Respuesta no útil',
+
+    'chat.noConversations': 'Sin conversaciones',
+    'nav.newConversation': 'Nueva conversación',
+    'nav.history': 'Historial',
+    'nav.clearAll': 'Borrar todo',
+    'nav.profile': 'Perfil',
+    'nav.contact': 'Contacto',
+    'nav.legal': 'Aviso legal',
+    'nav.logout': 'Cerrar sesión',
+    'nav.language': 'Idioma',
+    'subscription.title': 'Suscripción',
+    'subscription.currentPlan': 'Plan actual',
+    'subscription.modify': 'Modificar plan',
+    'subscription.update': 'Actualizar',
+    'plan.essential': 'Esencial',
+    'plan.pro': 'Pro',
+    'plan.max': 'Máximo',
+    'profile.title': 'Perfil de usuario',
+    'profile.personalInfo': 'Información personal',
+    'profile.firstName': 'Nombre',
+    'profile.lastName': 'Apellido',
+    'profile.email': 'Email',
+    'profile.phone': 'Teléfono',
+    'profile.country': 'País',
+    'profile.company': 'Empresa',
+    'profile.companyName': 'Nombre de la empresa',
+    'profile.companyWebsite': 'Sitio web',
+    'profile.password': 'Cambiar contraseña',
+    'profile.currentPassword': 'Contraseña actual',
+    'profile.newPassword': 'Nueva contraseña',
+    'profile.confirmPassword': 'Confirmar contraseña',
+    'contact.title': 'Contáctanos',
+    'contact.phone': 'Llámanos',
+    'contact.phoneDescription': 'Si no encuentras una solución, llámanos para hablar directamente con nuestro equipo.',
+    'contact.email': 'Escríbenos',
+    'contact.emailDescription': 'Envíanos un mensaje detallado y te responderemos rápidamente.',
+    'contact.website': 'Visita nuestro sitio web',
+    'contact.websiteDescription': 'Para saber más sobre nosotros y la plataforma Intelia, visita nuestro sitio.',
+    'modal.close': 'Cerrar',
+    'modal.save': 'Guardar',
+    'modal.cancel': 'Cancelar',
+    'modal.loading': 'Cargando...',
+    'language.title': 'Cambiar idioma',
+    'language.description': 'Selecciona tu idioma preferido para la interfaz de Intelia Expert'
+  }
+}
+
+// Hook de traduction simple
+const useTranslation = () => {
+  const [currentLanguage, setCurrentLanguage] = useState('fr')
+  
+  const t = (key: string): string => {
+    return translations[currentLanguage as keyof typeof translations]?.[key as keyof typeof translations['fr']] || key
+  }
+  
+  const changeLanguage = (lang: string) => {
+    console.log('🌐 [useTranslation] changeLanguage appelée:', currentLanguage, '→', lang)
+    setCurrentLanguage(lang)
+    localStorage.setItem('intelia_language', lang)
+    console.log('✅ [useTranslation] État langue mis à jour:', lang)
+    
+    // Force un re-render de tous les composants qui utilisent ce hook
+    window.dispatchEvent(new Event('languageChanged'))
+  }
+  
+  useEffect(() => {
+    const savedLang = localStorage.getItem('intelia_language')
+    if (savedLang && translations[savedLang as keyof typeof translations]) {
+      console.log('🔄 [useTranslation] Chargement langue sauvegardée:', savedLang)
+      setCurrentLanguage(savedLang)
+    }
+  }, [])
+
+  // Écouter les changements de langue globaux
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      const savedLang = localStorage.getItem('intelia_language')
+      if (savedLang && savedLang !== currentLanguage) {
+        console.log('🔄 [useTranslation] Mise à jour depuis événement global:', savedLang)
+        setCurrentLanguage(savedLang)
+      }
+    }
+
+    window.addEventListener('languageChanged', handleLanguageChange)
+    return () => window.removeEventListener('languageChanged', handleLanguageChange)
+  }, [currentLanguage])
+  
+  return { t, changeLanguage, currentLanguage }
+}
+
+    try {
+      console.log('💾 Sauvegarde conversation:', data.conversation_id)
+      console.log('📡 URL de sauvegarde:', `${this.baseUrl}/logging/conversation`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: data.user_id,
+          question: data.question,
+          response: data.response,
+          conversation_id: data.conversation_id,
+          confidence_score: data.confidence_score,
+          response_time_ms: data.response_time_ms,
+          language: data.language || 'fr',
+          rag_used: data.rag_used !== undefined ? data.rag_used : true
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation sauvegardée:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde conversation:', error)
+      // Ne pas bloquer l'UX si le logging échoue
+    }
+  }
+
+  async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('📊 Logging désactivé - feedback non envoyé:', conversationId)
+      return
+    }
+
+    try {
+      console.log('📊 Envoi feedback:', conversationId, feedback)
+      console.log('📡 URL feedback:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ feedback })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Feedback enregistré:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi feedback:', error)
+      throw error  // Propager pour afficher erreur à l'utilisateur
+    }
+  }
+
+  async getUserConversations(userId: string, limit = 50): Promise<any[]> {
+    if (!this.loggingEnabled) {
+      console.log('🔍 Logging désactivé - conversations non récupérées')
+      return []
+    }
+
+    try {
+      console.log('🔍 Récupération conversations pour:', userId)
+      console.log('📡 URL conversations:', `${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('✅ Conversations récupérées:', data.count)
+      return data.conversations || []
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération conversations:', error)
+      return []
+    }
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversation non supprimée:', conversationId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression conversation serveur:', conversationId)
+      console.log('📡 URL suppression:', `${this.baseUrl}/logging/conversation/${conversationId}`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        // Si l'endpoint n'existe pas (404), on continue sans erreur
+        if (response.status === 404) {
+          console.warn('⚠️ Endpoint de suppression non disponible sur le serveur')
+          return
+        }
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation supprimée du serveur:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression conversation serveur:', error)
+      throw error  // Propager pour que l'UI puisse gérer l'erreur
+    }
+  }
+
+  async clearAllUserConversations(userId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversations non supprimées:', userId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression toutes conversations serveur pour:', userId)
+      console.log('📡 URL suppression globale:', `${this.baseUrl}/logging/user/${userId}/conversations`)
+      
+      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Toutes conversations supprimées du serveur:', result.message, 'Count:', result.deleted_count)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression toutes conversations serveur:', error)
+      throw error  // Propager pour que l'UI puisse gérer l'erreur
+    }
+  }
+}
+
+// Instance globale du service
+const conversationService = new ConversationService()
+
+// ==================== CONFIGURATION API ====================
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+const API_TIMEOUT = 30000 // 30 secondes
+
+// ==================== CLASSES D'ERREUR PERSONNALISÉES ====================
+class AuthError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AuthError'
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TimeoutError'
+  }
+}
+
+class ApiError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+class RetryError extends Error {
+  public newToken: string
+  
+  constructor(message: string, newToken: string) {
+    super(message)
+    this.name = 'RetryError'
+    this.newToken = newToken
+  }
+}
+
+// ==================== FONCTIONS UTILITAIRES POUR L'API ====================
+
+// Récupération session avec gestion d'erreur propre
+async function getValidSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw error
+    return data.session
+  } catch (sessionError) {
+    console.error('❌ Erreur session:', sessionError)
+    throw new AuthError('Impossible de récupérer la session utilisateur')
+  }
+}
+
+// Fetch avec timeout
+async function fetchWithTimeout(url: string, options: RequestInit, timeout: number) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError('Timeout - le serveur met trop de temps à répondre')
+    }
+    throw error
+  }
+}
+
+// Gestion des erreurs HTTP avec retry pour 401
+async function handleHttpErrors(response: Response) {
+  if (response.status === 401) {
+    console.error('❌ Erreur 401 - Token invalide, tentative de refresh...')
+    
+    try {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError || !refreshData.session) {
+        throw new AuthError('Refresh token failed')
+      }
+      
+      console.log('✅ Token refreshed avec succès')
+      throw new RetryError('Token refreshed, retry needed', refreshData.session.access_token)
+      
+    } catch (refreshError) {
+      console.error('❌ Impossible de refresh le token:', refreshError)
+      await supabase.auth.signOut()
+      throw new AuthError('Session expirée - redirection vers connexion')
+    }
+  }
+  
+  if (response.status === 403) {
+    throw new AuthError('Accès refusé. Vérifiez vos permissions.')
+  }
+  
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Erreur inconnue')
+    throw new ApiError(`Erreur serveur (${response.status}): ${errorText}`)
+  }
+}
+
+// Parse JSON avec gestion d'erreur
+async function parseJsonResponse(response: Response) {
+  try {
+    return await response.json()
+  } catch (parseError) {
+    console.error('❌ Erreur parsing JSON:', parseError)
+    throw new ApiError('Réponse serveur invalide')
+  }
+}
+
+// Sauvegarde conversation sécurisée
+async function saveConversationSafely(user: any, question: string, response: ExpertApiResponse) {
+  if (!user?.id || !response.conversation_id) {
+    console.warn('⚠️ Pas de user.id ou conversation_id - historique non sauvegardé')
+    return
+  }
+  
+  try {
+    console.log('💾 Sauvegarde conversation pour historique...')
+    await conversationService.saveConversation({
+      user_id: user.id,
+      question: question,
+      response: response.response,
+      conversation_id: response.conversation_id,
+      confidence_score: response.rag_score,
+      response_time_ms: response.response_time_ms,
+      language: response.language,
+      rag_used: response.rag_used
+    })
+    console.log('✅ Conversation sauvegardée:', response.conversation_id)
+  } catch (saveError) {
+    console.warn('⚠️ Erreur sauvegarde (non bloquante):', saveError)
+    // Continue sans bloquer l'UX
+  }
+}
+
+// Gestion centralisée des erreurs
+function handleApiError(error: any): Error {
+  if (error instanceof AuthError) {
+    // Pour les erreurs d'auth, redirection différée pour éviter les crashs
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 1000)
+    return new Error('Session expirée - redirection vers connexion dans 1 seconde...')
+  }
+  
+  if (error instanceof TimeoutError) {
+    return new Error('Timeout - le serveur met trop de temps à répondre. Réessayez.')
+  }
+  
+  if (error instanceof RetryError) {
+    return new Error('Token refresh nécessaire - veuillez réessayer.')
+  }
+  
+  if (error.message?.includes('Failed to fetch')) {
+    return new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
+  }
+  
+  return new Error(`Erreur technique: ${error.message}`)
+}
+
+// ==================== FONCTION generateAIResponse CORRIGÉE UTF-8 ====================
+const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
+  const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
+  
+  console.log('🔒 Envoi question au RAG Intelia (endpoint sécurisé):', question.substring(0, 50) + '...')
+  
+  try {
+    // ===== 1. RÉCUPÉRATION SESSION SÉCURISÉE =====
+    const session = await getValidSession()
+    if (!session?.access_token) {
+      throw new AuthError('Session expirée - reconnexion nécessaire')
+    }
+    
+    console.log('✅ Token récupéré, longueur:', session.access_token.length)
+    
+    // ===== 2. PRÉPARATION REQUÊTE AVEC NETTOYAGE UTF-8 =====
+    const cleanQuestion = question.trim().normalize('NFC')
+    
+    const requestBody = {
+      text: cleanQuestion,
+      language: user?.language || 'fr',
+      speed_mode: 'balanced'
+    }
+    
+    // ✅ CORRECTION: Headers avec charset UTF-8 explicite
+    const headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`
+    }
+    
+    console.log('📤 Envoi requête avec encodage UTF-8...')
+    console.log('🔤 Caractères spéciaux:', [...cleanQuestion].filter(c => c.charCodeAt(0) > 127))
+    
+    // ===== 3. REQUÊTE AVEC TIMEOUT =====
+    const response = await fetchWithTimeout(apiUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(requestBody)
+    }, API_TIMEOUT)
+    
+    console.log('📊 Réponse:', response.status, response.statusText)
+    
+    // ===== 4. GESTION ERREURS HTTP =====
+    await handleHttpErrors(response)
+    
+    // ===== 5. TRAITEMENT RÉPONSE =====
+    const data = await parseJsonResponse(response)
+    console.log('✅ Réponse RAG reçue avec succès')
+    
+    const adaptedResponse: ExpertApiResponse = {
+      question: data.question || cleanQuestion,
+      response: data.response || "Réponse reçue mais vide",
+      conversation_id: data.conversation_id || `conv_${Date.now()}`,
+      rag_used: data.rag_used || false,
+      rag_score: data.rag_score,
+      timestamp: data.timestamp || new Date().toISOString(),
+      language: data.language || 'fr',
+      response_time_ms: data.response_time_ms || 0,
+      mode: data.mode || 'secured',
+      user: data.user
+    }
+    
+    // ===== 6. SAUVEGARDE CONVERSATION =====
+    await saveConversationSafely(user, cleanQuestion, adaptedResponse)
+    
+    return adaptedResponse
+    
+  } catch (error: any) {
+    console.error('❌ Erreur dans generateAIResponse:', error.message)
+    throw handleApiError(error)
+  }
 }
