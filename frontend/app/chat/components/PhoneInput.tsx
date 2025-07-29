@@ -15,7 +15,7 @@ interface PhoneValidation {
   errors: string[]
 }
 
-// ==================== COMPOSANT PHONE INPUT AVEC 3 CHAMPS ====================
+// ==================== COMPOSANT PHONE INPUT AVEC STYLING CORRIGÉ ====================
 export const PhoneInput: React.FC<PhoneInputProps> = ({
   countryCode,
   areaCode,
@@ -32,16 +32,16 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Codes de pays populaires pour l'agriculture
   const countryCodes = [
-    { code: '+1', country: '🇨🇦🇺🇸 Canada/USA', flag: '🇨🇦' },
-    { code: '+33', country: '🇫🇷 France', flag: '🇫🇷' },
-    { code: '+32', country: '🇧🇪 Belgique', flag: '🇧🇪' },
-    { code: '+41', country: '🇨🇭 Suisse', flag: '🇨🇭' },
-    { code: '+52', country: '🇲🇽 Mexique', flag: '🇲🇽' },
-    { code: '+55', country: '🇧🇷 Brésil', flag: '🇧🇷' },
-    { code: '+34', country: '🇪🇸 Espagne', flag: '🇪🇸' },
-    { code: '+49', country: '🇩🇪 Allemagne', flag: '🇩🇪' },
-    { code: '+44', country: '🇬🇧 Royaume-Uni', flag: '🇬🇧' },
-    { code: '+39', country: '🇮🇹 Italie', flag: '🇮🇹' }
+    { code: '+1', country: 'Canada/USA', flag: '🇨🇦🇺🇸' },
+    { code: '+33', country: 'France', flag: '🇫🇷' },
+    { code: '+32', country: 'Belgique', flag: '🇧🇪' },
+    { code: '+41', country: 'Suisse', flag: '🇨🇭' },
+    { code: '+52', country: 'Mexique', flag: '🇲🇽' },
+    { code: '+55', country: 'Brésil', flag: '🇧🇷' },
+    { code: '+34', country: 'Espagne', flag: '🇪🇸' },
+    { code: '+49', country: 'Allemagne', flag: '🇩🇪' },
+    { code: '+44', country: 'Royaume-Uni', flag: '🇬🇧' },
+    { code: '+39', country: 'Italie', flag: '🇮🇹' }
   ]
 
   // Fonction de validation des 3 champs séparés
@@ -130,36 +130,36 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   }
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      {/* Affichage mobile optimisé - Layout vertical sur petit écran */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-        {/* Code pays - Plus large sur mobile */}
-        <div className="lg:col-span-4">
+    <div className={`space-y-4 ${className}`}>
+      {/* Layout responsive corrigé */}
+      <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-3">
+        {/* Code pays - Meilleur affichage */}
+        <div className="sm:col-span-5">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Code pays
           </label>
           <select
             value={countryCode}
             onChange={(e) => handleChange('country', e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white ${
               !validation.isValidCountry ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
           >
             <option value="">Sélectionner</option>
-            {countryCodes.map(({ code, country }) => (
+            {countryCodes.map(({ code, country, flag }) => (
               <option key={code} value={code}>
-                {code} {country}
+                {code} {flag} {country}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Code régional - Conditionnel selon le pays */}
-        <div className="lg:col-span-3">
+        {/* Code régional - Largeur fixe */}
+        <div className="sm:col-span-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Code régional
-            {countryCode === '+1' && <span className="text-xs text-gray-500 ml-1">(3 chiffres)</span>}
-            {countryCode === '+33' && <span className="text-xs text-gray-500 ml-1">(1-2 chiffres)</span>}
+            {countryCode === '+1' && <span className="text-xs text-gray-500 block">(3 chiffres)</span>}
+            {countryCode === '+33' && <span className="text-xs text-gray-500 block">(1-2 chiffres)</span>}
           </label>
           <input
             type="text"
@@ -178,12 +178,12 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           />
         </div>
 
-        {/* Numéro principal */}
-        <div className="lg:col-span-5">
+        {/* Numéro principal - Ajusté */}
+        <div className="sm:col-span-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Numéro de téléphone
-            {countryCode === '+1' && <span className="text-xs text-gray-500 ml-1">(7 chiffres)</span>}
-            {countryCode === '+33' && <span className="text-xs text-gray-500 ml-1">(8 chiffres)</span>}
+            {countryCode === '+1' && <span className="text-xs text-gray-500 block">(7 chiffres)</span>}
+            {countryCode === '+33' && <span className="text-xs text-gray-500 block">(8 chiffres)</span>}
           </label>
           <input
             type="tel"
@@ -205,10 +205,13 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
       {/* Aperçu du numéro formaté */}
       {getFormattedDisplay() && (
-        <div className="bg-gray-50 px-3 py-2 rounded-md">
-          <span className="text-sm text-gray-600 font-mono">
-            📞 {getFormattedDisplay()}
-          </span>
+        <div className="bg-blue-50 border border-blue-200 px-3 py-2 rounded-md">
+          <div className="flex items-center space-x-2">
+            <span className="text-blue-600">📞</span>
+            <span className="text-sm text-blue-800 font-medium">
+              {getFormattedDisplay()}
+            </span>
+          </div>
         </div>
       )}
 
@@ -216,8 +219,11 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       {validation.errors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-md p-3">
           <div className="text-sm text-red-800">
-            <p className="font-medium mb-1">Format de téléphone :</p>
-            <ul className="list-disc list-inside space-y-0.5">
+            <p className="font-medium mb-1 flex items-center">
+              <span className="text-red-500 mr-1">⚠️</span>
+              Format de téléphone :
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 ml-4">
               {validation.errors.map((error, index) => (
                 <li key={index} className="text-xs">{error}</li>
               ))}
@@ -228,9 +234,11 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
       {/* Aide contextuelle selon le pays sélectionné */}
       {countryCode && (
-        <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded-md">
-          <strong>Exemples pour {countryCodes.find(c => c.code === countryCode)?.country} :</strong>
-          <div className="mt-1 space-y-1">
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+          <p className="text-xs font-medium text-gray-700 mb-2">
+            💡 Exemples pour {countryCodes.find(c => c.code === countryCode)?.flag} {countryCodes.find(c => c.code === countryCode)?.country} :
+          </p>
+          <div className="text-xs text-gray-600 space-y-1">
             {countryCode === '+1' && (
               <>
                 <div>🇨🇦 Montréal: +1 (514) 123-4567</div>
@@ -245,6 +253,12 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             )}
             {countryCode === '+32' && (
               <div>🇧🇪 Bruxelles: +32 2 123 45 67</div>
+            )}
+            {countryCode === '+41' && (
+              <div>🇨🇭 Genève: +41 22 123 45 67</div>
+            )}
+            {countryCode === '+52' && (
+              <div>🇲🇽 Mexico: +52 55 1234 5678</div>
             )}
           </div>
         </div>
