@@ -86,58 +86,5 @@ class Settings:
     def is_supabase_configured(self) -> bool:
         """Check if Supabase is configured."""
         return bool(self.supabase_url and self.supabase_anon_key)
-    
-    # ✅ NOUVEAU: Configuration Validation Agricole
-    @property
-    def agricultural_validation_enabled(self) -> bool:
-        """Check if agricultural domain validation is enabled."""
-        return self._get_secret("ENABLE_AGRICULTURAL_VALIDATION", "true").lower() == "true"
-    
-    @property
-    def agricultural_validation_strictness(self) -> float:
-        """Get agricultural validation strictness threshold (0-100)."""
-        try:
-            return float(self._get_secret("VALIDATION_STRICTNESS", "15.0"))
-        except (ValueError, TypeError):
-            return 15.0
-    
-    @property
-    def agricultural_validation_override_allowed(self) -> bool:
-        """Check if users can override agricultural validation."""
-        return self._get_secret("ALLOW_VALIDATION_OVERRIDE", "false").lower() == "true"
-    
-    @property
-    def agricultural_validation_log_all(self) -> bool:
-        """Check if all validations should be logged."""
-        return self._get_secret("LOG_ALL_VALIDATIONS", "true").lower() == "true"
-    
-    @property
-    def agricultural_validation_log_dir(self) -> str:
-        """Get directory for agricultural validation logs."""
-        return self._get_secret("VALIDATION_LOGS_DIR", "logs")
-    
-    @property
-    def agricultural_validation_log_max_size(self) -> int:
-        """Get max size for validation log files in bytes."""
-        try:
-            return int(self._get_secret("VALIDATION_LOG_MAX_SIZE", "10485760"))  # 10MB
-        except (ValueError, TypeError):
-            return 10485760
-    
-    @property
-    def agricultural_validation_log_backup_count(self) -> int:
-        """Get number of backup log files to keep."""
-        try:
-            return int(self._get_secret("VALIDATION_LOG_BACKUP_COUNT", "5"))
-        except (ValueError, TypeError):
-            return 5
-    
-    @property
-    def is_agricultural_validation_configured(self) -> bool:
-        """Check if agricultural validation is properly configured."""
-        return (
-            self.agricultural_validation_enabled and
-            0 <= self.agricultural_validation_strictness <= 100
-        )
 
 settings = Settings()
