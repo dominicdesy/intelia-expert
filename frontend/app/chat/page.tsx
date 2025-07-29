@@ -2360,7 +2360,7 @@ const UserMenuButton = () => {
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL AVEC TOUTES LES FONCTIONNALITÉS ====================
+// ==================== COMPOSANT PRINCIPAL AVEC SCROLL INTELLIGENT ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
@@ -2370,7 +2370,13 @@ export default function ChatInterface() {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
+  
+  // ✅ NOUVEAUX ÉTATS POUR LE SCROLL INTELLIGENT
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  const [isUserScrolling, setIsUserScrolling] = useState(false)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
   useEffect(() => {
@@ -2395,9 +2401,45 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // ✅ SCROLL INTELLIGENT - Scroll automatique uniquement si nécessaire
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    if (shouldAutoScroll && !isUserScrolling) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [messages, shouldAutoScroll, isUserScrolling])
+
+  // ✅ DÉTECTION DU SCROLL MANUEL DE L'UTILISATEUR
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current
+    if (!chatContainer) return
+
+    let scrollTimeout: NodeJS.Timeout
+
+    const handleScroll = () => {
+      setIsUserScrolling(true)
+      setShouldAutoScroll(false)
+      
+      // Réactiver l'auto-scroll si l'utilisateur est proche du bas
+      clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = chatContainer
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+        
+        if (isNearBottom) {
+          setShouldAutoScroll(true)
+          setIsUserScrolling(false)
+        } else {
+          setIsUserScrolling(false)
+        }
+      }, 150)
+    }
+
+    chatContainer.addEventListener('scroll', handleScroll)
+    return () => {
+      chatContainer.removeEventListener('scroll', handleScroll)
+      clearTimeout(scrollTimeout)
+    }
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -2462,6 +2504,10 @@ export default function ChatInterface() {
     setMessages(prev => [...prev, userMessage])
     setInputMessage('')
     setIsLoadingChat(true)
+    
+    // ✅ FORCER L'AUTO-SCROLL POUR LES NOUVEAUX MESSAGES
+    setShouldAutoScroll(true)
+    setIsUserScrolling(false)
 
     try {
       console.log('🔒 [handleSendMessage] Envoi question via endpoint sécurisé avec JWT')
@@ -2477,6 +2523,10 @@ export default function ChatInterface() {
 
       setMessages(prev => [...prev, aiMessage])
       console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
+      
+      // ✅ FORCER L'AUTO-SCROLL POUR LA RÉPONSE
+      setShouldAutoScroll(true)
+      setIsUserScrolling(false)
       
       // ✅ CORRECTION: Ajouter conversation à l'historique local aussi
       if (user && response.conversation_id) {
@@ -2539,6 +2589,18 @@ export default function ChatInterface() {
       isUser: false,
       timestamp: new Date()
     }])
+    
+  const handleNewConversation = () => {
+    setMessages([{
+      id: '1',
+      content: t('chat.welcome'),
+      isUser: false,
+      timestamp: new Date()
+    }])
+    
+    // ✅ RÉACTIVER L'AUTO-SCROLL POUR NOUVELLE CONVERSATION
+    setShouldAutoScroll(true)
+    setIsUserScrolling(false)
   }
 
   const getCurrentDate = () => {
@@ -2547,6 +2609,13 @@ export default function ChatInterface() {
       month: 'long', 
       year: 'numeric' 
     })
+  }
+
+  // ✅ FONCTION POUR REVENIR EN BAS MANUELLEMENT
+  const scrollToBottom = () => {
+    setShouldAutoScroll(true)
+    setIsUserScrolling(false)
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
   return (
@@ -2584,9 +2653,13 @@ export default function ChatInterface() {
           </div>
         </header>
 
-        {/* Zone de messages */}
+        {/* Zone de messages avec scroll intelligent */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto px-4 py-6"
+            style={{ scrollBehavior: 'smooth' }}
+          >
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Date */}
               {messages.length > 0 && (
@@ -2674,6 +2747,21 @@ export default function ChatInterface() {
               <div ref={messagesEndRef} />
             </div>
           </div>
+
+          {/* ✅ BOUTON FLOTTANT "REVENIR EN BAS" */}
+          {!shouldAutoScroll && (
+            <div className="fixed bottom-24 right-8 z-10">
+              <button
+                onClick={scrollToBottom}
+                className="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+                title="Revenir en bas"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Zone de saisie */}
           <div className="px-4 py-4 bg-white border-t border-gray-100">
