@@ -1,7 +1,9 @@
-// services/apiService.ts - VERSION AVEC SUPPORT LANGUE
+// services/apiService.ts - VERSION CORRIGÉE AVEC SUPABASE AUTH HELPERS + LANGUE
 
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { User } from '../types'
 
+const supabase = createClientComponentClient()
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface AIResponse {
@@ -18,74 +20,110 @@ interface AIResponse {
   logged: boolean
 }
 
-// ✅ AJOUT DU PARAMÈTRE LANGUAGE AVEC VALEUR PAR DÉFAUT
+// ✅ FONCTION HELPER POUR RÉCUPÉRER SESSION SUPABASE
+async function getValidSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) {
+      console.error('❌ [apiService] Erreur session Supabase:', error)
+      throw error
+    }
+    return data.session
+  } catch (sessionError) {
+    console.error('❌ [apiService] Impossible de récupérer la session:', sessionError)
+    throw new Error('Session expirée - reconnexion nécessaire')
+  }
+}
+
+// ✅ FONCTION FETCH AVEC TIMEOUT
+async function fetchWithTimeout(url: string, options: RequestInit, timeout: number = 30000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Timeout - le serveur met trop de temps à répondre')
+    }
+    throw error
+  }
+}
+
+// ✅ FONCTION PRINCIPALE AVEC LANGUE + AUTH SUPABASE
 export async function generateAIResponse(
   question: string, 
   user?: User | null,
-  language: string = 'fr' // ✅ NOUVEAU PARAMÈTRE AVEC DÉFAUT
+  language: string = 'fr'
 ): Promise<AIResponse> {
   try {
-    console.log('🔒 [apiService] Envoi question avec authentification')
-    console.log('🌐 [apiService] Langue transmise:', language) // ✅ LOG DE DEBUG
+    console.log('🔒 [apiService] Envoi question avec authentification Supabase')
+    console.log('🌐 [apiService] Langue transmise:', language)
     
-    // Vérifier l'authentification
-    const token = localStorage.getItem('supabase.auth.token')
+    // ✅ RÉCUPÉRATION SESSION SUPABASE (MÉTHODE CORRECTE)
+    const session = await getValidSession()
+    if (!session?.access_token) {
+      throw new Error('Session expirée - reconnexion nécessaire')
+    }
+
+    console.log('✅ [apiService] Token Supabase récupéré, longueur:', session.access_token.length)
+
+    // ✅ PRÉPARATION REQUÊTE AVEC LANGUE
+    const cleanQuestion = question.trim().normalize('NFC')
     
-    if (!token) {
-      throw new Error('Token d\'authentification manquant')
+    const requestBody = {
+      text: cleanQuestion,
+      language: language, // ✅ PARAMÈTRE LANGUE AJOUTÉ
+      speed_mode: 'balanced'
     }
 
-    let parsedToken
-    try {
-      parsedToken = JSON.parse(token)
-    } catch (e) {
-      throw new Error('Token d\'authentification invalide')
+    // ✅ HEADERS AVEC TOKEN SUPABASE
+    const headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${session.access_token}` // ✅ TOKEN SUPABASE AUTOMATIQUE
     }
 
-    const accessToken = parsedToken?.access_token
-    if (!accessToken) {
-      throw new Error('Access token manquant')
-    }
+    console.log('📤 [apiService] Données envoyées:', JSON.stringify(requestBody, null, 2))
 
-    console.log('🔑 [apiService] Token trouvé:', accessToken.substring(0, 20) + '...')
-
-    // ✅ REQUÊTE AVEC LANGUAGE INCLUS DANS LE BODY
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/ask`, {
+    // ✅ REQUÊTE AVEC TIMEOUT
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/expert/ask`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`, // Format Bearer correct
-      },
-      body: JSON.stringify({
-        text: question,
-        language: language, // ✅ TRANSMISSION DE LA LANGUE
-        speed_mode: 'balanced'
-      }),
+      headers: headers,
+      body: JSON.stringify(requestBody)
     })
 
     console.log('📡 [apiService] Statut réponse:', response.status)
 
+    // ✅ GESTION ERREURS HTTP
     if (!response.ok) {
       const errorText = await response.text()
       console.error('❌ [apiService] Erreur API:', response.status, errorText)
       
       if (response.status === 401) {
-        // Rediriger vers login si non authentifié
-        localStorage.removeItem('supabase.auth.token')
-        window.location.href = '/login'
+        // Session expirée, forcer refresh
+        await supabase.auth.signOut()
+        window.location.href = '/'
         throw new Error('Session expirée. Redirection vers la connexion...')
       }
       
       throw new Error(`Erreur API (${response.status}): ${errorText}`)
     }
 
+    // ✅ TRAITEMENT RÉPONSE
     const data: AIResponse = await response.json()
     
     console.log('✅ [apiService] Réponse reçue:', {
       question: data.question?.substring(0, 50) + '...',
       response: data.response?.substring(0, 100) + '...',
       conversation_id: data.conversation_id,
-      language: data.language, // ✅ LOG DE LA LANGUE RETOURNÉE
+      language: data.language, // ✅ LANGUE RETOURNÉE
       rag_used: data.rag_used,
       logged: data.logged
     })
@@ -96,6 +134,10 @@ export async function generateAIResponse(
     console.error('❌ [apiService] Erreur génération réponse:', error)
     
     if (error instanceof Error) {
+      // Gestion erreurs spécifiques
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
+      }
       throw error
     }
     
@@ -103,24 +145,27 @@ export async function generateAIResponse(
   }
 }
 
-// ✅ FONCTION PUBLIQUE AUSSI MISE À JOUR (si elle existe)
+// ✅ FONCTION PUBLIQUE AVEC LANGUE (si nécessaire)
 export async function generateAIResponsePublic(
   question: string,
-  language: string = 'fr' // ✅ SUPPORT LANGUE AUSSI
+  language: string = 'fr'
 ): Promise<AIResponse> {
   try {
     console.log('🌐 [apiService] Envoi question publique avec langue:', language)
     
-    const response = await fetch(`${API_BASE_URL}/api/v1/expert/ask-public`, {
+    const requestBody = {
+      text: question.trim().normalize('NFC'),
+      language: language,
+      speed_mode: 'balanced'
+    }
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/expert/ask-public`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        text: question,
-        language: language, // ✅ TRANSMISSION DE LA LANGUE
-        speed_mode: 'balanced'
-      }),
+      body: JSON.stringify(requestBody)
     })
 
     if (!response.ok) {
@@ -130,7 +175,6 @@ export async function generateAIResponsePublic(
     }
 
     const data: AIResponse = await response.json()
-    
     console.log('✅ [apiService] Réponse publique reçue avec langue:', data.language)
 
     return data
