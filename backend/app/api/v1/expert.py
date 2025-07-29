@@ -272,8 +272,8 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
     question_data: QuestionRequest,
-    fastapi_request: Request,
-    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None,
+    fastapi_request: Request = None
 ):
     """Question avec authentification Supabase via auth.py"""
     start_time = time.time()
@@ -292,8 +292,9 @@ async def ask_expert_secure(
         
         logger.info(f"🔐 Question sécurisée de {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
         
-        # Ajouter les infos utilisateur à la requête
-        fastapi_request.state.user = current_user
+        # Ajouter les infos utilisateur à la requête (si disponible)
+        if fastapi_request:
+            fastapi_request.state.user = current_user
         
         # Récupération directe de la question
         question_text = question_data.text
@@ -313,37 +314,47 @@ async def ask_expert_secure(
         answer = ""
         mode = "authenticated_direct_openai"
         
-        # Essayer RAG d'abord
-        app = fastapi_request.app
-        process_rag = getattr(app.state, 'process_question_with_rag', None)
-        
-        if process_rag:
-            try:
-                logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
-                result = await process_rag(
-                    question=question_text,
-                    user=current_user,  # Passer current_user de auth.py
-                    language=question_data.language,
-                    speed_mode=question_data.speed_mode
-                )
-                
-                answer = str(result.get("response", ""))
-                rag_used = result.get("mode", "").startswith("rag")
-                rag_score = result.get("score")
-                mode = f"authenticated_{result.get('mode', 'rag_enhanced')}"
-                
-                logger.info(f"✅ RAG traité pour utilisateur authentifié - Score: {rag_score}")
-                
-            except Exception as rag_error:
-                logger.error(f"❌ Erreur RAG pour utilisateur authentifié: {rag_error}")
+        # Essayer RAG d'abord (si fastapi_request disponible)
+        if fastapi_request:
+            app = fastapi_request.app
+            process_rag = getattr(app.state, 'process_question_with_rag', None)
+            
+            if process_rag:
+                try:
+                    logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
+                    result = await process_rag(
+                        question=question_text,
+                        user=current_user,  # Passer current_user de auth.py
+                        language=question_data.language,
+                        speed_mode=question_data.speed_mode
+                    )
+                    
+                    answer = str(result.get("response", ""))
+                    rag_used = result.get("mode", "").startswith("rag")
+                    rag_score = result.get("score")
+                    mode = f"authenticated_{result.get('mode', 'rag_enhanced')}"
+                    
+                    logger.info(f"✅ RAG traité pour utilisateur authentifié - Score: {rag_score}")
+                    
+                except Exception as rag_error:
+                    logger.error(f"❌ Erreur RAG pour utilisateur authentifié: {rag_error}")
+                    answer = await process_question_openai(
+                        question_text, 
+                        question_data.language,
+                        question_data.speed_mode
+                    )
+                    mode = "authenticated_fallback_openai"
+            else:
+                logger.info("⚠️ RAG non disponible, utilisation OpenAI pour utilisateur authentifié")
                 answer = await process_question_openai(
-                    question_text, 
+                    question_text,
                     question_data.language,
                     question_data.speed_mode
                 )
-                mode = "authenticated_fallback_openai"
+                mode = "authenticated_direct_openai"
         else:
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI pour utilisateur authentifié")
+            # Pas de fastapi_request, utilisation directe OpenAI
+            logger.info("⚠️ Pas de fastapi_request, utilisation OpenAI direct")
             answer = await process_question_openai(
                 question_text,
                 question_data.language,
