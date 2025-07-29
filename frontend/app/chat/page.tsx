@@ -31,6 +31,43 @@ export default function ChatInterface() {
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   
+  // ✅ NOUVEAUX ÉTATS POUR LE SCROLL INTELLIGENT
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  const [isUserScrolling, setIsUserScrolling] = useState(false)
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
+  useEffect(() => {
+    const detectMobileDevice = () => {
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+      const isTabletScreen = window.innerWidth <= 1024
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+      const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
+      
+      return (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
+    }
+    
+    setIsMobileDevice(detectMobileDevice())
+    
+    const handleResize = () => {
+      setIsMobileDevice(detectMobileDevice())
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // ✅ SCROLL INTELLIGENT - Scroll automatique uniquement si nécessaire
+  useEffect(() => {
+    if (shouldAutoScroll && !isUserScrolling) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [messages, shouldAutoScroll, isUserScrolling])
+
   // ✅ DÉTECTION DU SCROLL MANUEL DE L'UTILISATEUR
   useEffect(() => {
     const chatContainer = chatContainerRef.current
@@ -416,41 +453,4 @@ export default function ChatInterface() {
       </div>
     </>
   )
-} NOUVEAUX ÉTATS POUR LE SCROLL INTELLIGENT
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
-  const [isUserScrolling, setIsUserScrolling] = useState(false)
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-
-  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
-  useEffect(() => {
-    const detectMobileDevice = () => {
-      const userAgent = navigator.userAgent.toLowerCase()
-      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
-      const isTabletScreen = window.innerWidth <= 1024
-      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-      const isDesktopTouchscreen = window.innerWidth > 1200 && navigator.maxTouchPoints > 0 && !isIPadOS
-      
-      return (isMobileUA || isIPadOS || (isTabletScreen && hasTouchScreen)) && !isDesktopTouchscreen
-    }
-    
-    setIsMobileDevice(detectMobileDevice())
-    
-    const handleResize = () => {
-      setIsMobileDevice(detectMobileDevice())
-    }
-    
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  // ✅ SCROLL INTELLIGENT - Scroll automatique uniquement si nécessaire
-  useEffect(() => {
-    if (shouldAutoScroll && !isUserScrolling) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [messages, shouldAutoScroll, isUserScrolling])
-
-  // ✅
+}
