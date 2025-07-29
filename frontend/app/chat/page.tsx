@@ -236,7 +236,7 @@ export default function ChatInterface() {
     })
   }
 
-  // ✅ FONCTION SOUMISSION FEEDBACK AVEC COMMENTAIRE
+  // ✅ FONCTION SOUMISSION FEEDBACK AVEC COMMENTAIRE - CORRIGÉE
   const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
     if (!messageId) return
@@ -244,8 +244,7 @@ export default function ChatInterface() {
     const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
       console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
-      alert('Impossible d\'enregistrer le feedback - ID de conversation manquant')
-      return
+      return // ✅ ENLEVÉ L'ALERT QUI CAUSAIT L'ERREUR
     }
 
     setIsSubmittingFeedback(true)
@@ -265,40 +264,42 @@ export default function ChatInterface() {
         } : msg
       ))
 
-      // ✅ ENVOIS SÉPARÉS : FEEDBACK + COMMENTAIRE (SI FOURNI)
+      // ✅ ENVOI FEEDBACK SEULEMENT (commentaire pour plus tard)
       const feedbackValue = feedback === 'positive' ? 1 : -1
       
-      // 1. Envoyer le feedback principal
-      await conversationService.sendFeedback(message.conversation_id, feedbackValue)
-      console.log('✅ Feedback principal enregistré')
-
-      // 2. Envoyer le commentaire si fourni (extension future du service)
-      if (comment && comment.trim()) {
-        try {
-          // Essayer d'envoyer le commentaire (méthode à développer côté serveur)
-          await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
-          console.log('✅ Commentaire feedback enregistré')
-        } catch (commentError) {
-          console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
-          // Le feedback principal est déjà enregistré, continuer
+      try {
+        await conversationService.sendFeedback(message.conversation_id, feedbackValue)
+        console.log('✅ Feedback principal enregistré')
+        
+        // Optionnel : essayer d'envoyer le commentaire
+        if (comment && comment.trim()) {
+          try {
+            await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
+            console.log('✅ Commentaire feedback enregistré')
+          } catch (commentError) {
+            console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
+            // Ne pas faire échouer pour le commentaire
+          }
         }
+      } catch (feedbackError) {
+        console.error('❌ Erreur envoi feedback:', feedbackError)
+        // Rollback en cas d'erreur
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId ? { 
+            ...msg, 
+            feedback: null,
+            feedbackComment: undefined 
+          } : msg
+        ))
+        throw feedbackError // ✅ PROPAGER L'ERREUR POUR QUE LA MODAL GÈRE
       }
       
       console.log(`✅ Feedback ${feedback} avec commentaire enregistré pour conversation ${message.conversation_id}`)
       
     } catch (error) {
-      console.error('❌ Erreur envoi feedback:', error)
-      
-      // ✅ ROLLBACK EN CAS D'ERREUR
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { 
-          ...msg, 
-          feedback: null,
-          feedbackComment: undefined 
-        } : msg
-      ))
-      
-      alert('Erreur lors de l\'envoi du feedback. Veuillez réessayer.')
+      console.error('❌ Erreur générale feedback:', error)
+      // L'erreur sera gérée par la modal qui ne fermera pas
+      throw error
     } finally {
       setIsSubmittingFeedback(false)
     }

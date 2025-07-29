@@ -131,13 +131,15 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Layout responsive avec espacement généreux */}
-      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-10 lg:gap-6">
-        {/* Code pays - Plus d'espace */}
+      {/* Layout responsive avec hauteurs alignées */}
+      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-10 lg:gap-6 lg:items-end">
+        {/* Code pays */}
         <div className="lg:col-span-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Code pays
           </label>
+          {/* Espace réservé pour maintenir l'alignement */}
+          <div className="h-4 mb-1"></div>
           <select
             value={countryCode}
             onChange={(e) => handleChange('country', e.target.value)}
@@ -154,16 +156,17 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           </select>
         </div>
 
-        {/* Code régional - Espace réduit mais suffisant */}
+        {/* Code régional */}
         <div className="lg:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Code régional
-            <span className="text-xs text-gray-500 block mt-0.5">
-              {countryCode === '+1' && '(3 chiffres)'}
-              {countryCode === '+33' && '(1-2 chiffres)'}
-              {!countryCode && '\u00A0'} {/* Espace insécable pour maintenir la hauteur */}
-            </span>
           </label>
+          {/* Zone d'information avec hauteur fixe */}
+          <div className="h-4 mb-1 text-xs text-gray-500">
+            {countryCode === '+1' && '(3 chiffres)'}
+            {countryCode === '+33' && '(1-2 chiffres)'}
+            {!countryCode && '\u00A0'} {/* Espace insécable */}
+          </div>
           <input
             type="text"
             value={areaCode}
@@ -181,16 +184,17 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           />
         </div>
 
-        {/* Numéro principal - Maximum d'espace */}
+        {/* Numéro principal */}
         <div className="lg:col-span-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Numéro de téléphone
-            <span className="text-xs text-gray-500 block mt-0.5">
-              {countryCode === '+1' && '(7 chiffres)'}
-              {countryCode === '+33' && '(8 chiffres)'}
-              {!countryCode && '\u00A0'} {/* Espace insécable pour maintenir la hauteur */}
-            </span>
           </label>
+          {/* Zone d'information avec hauteur fixe */}
+          <div className="h-4 mb-1 text-xs text-gray-500">
+            {countryCode === '+1' && '(7 chiffres)'}
+            {countryCode === '+33' && '(8 chiffres)'}
+            {!countryCode && '\u00A0'} {/* Espace insécable */}
+          </div>
           <input
             type="tel"
             value={phoneNumber}
