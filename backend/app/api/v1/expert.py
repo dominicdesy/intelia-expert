@@ -17,16 +17,53 @@ from pydantic import BaseModel, Field, ConfigDict
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
-# ✅ DIAGNOSTIC CIBLÉ: Import auth avec logs minimum mais efficace
-logger.info("🔍 Import auth.py...")
+# ✅ DIAGNOSTIC DÉTAILLÉ: Import auth avec analyse complète
+logger.info("=" * 60)
+logger.info("🔍 DIAGNOSTIC IMPORT AUTH.PY")
+
+# Vérifier si le fichier auth.py existe
+import os
+import sys
+auth_file_path = os.path.join(os.path.dirname(__file__), "auth.py")
+logger.info(f"📁 Chemin auth.py: {auth_file_path}")
+logger.info(f"📁 Fichier existe: {'✅' if os.path.exists(auth_file_path) else '❌'}")
+
+# Vérifier le chemin Python
+logger.info(f"🐍 Python path: {sys.path[:3]}...")  # Premiers 3 éléments
+logger.info(f"🐍 Current working dir: {os.getcwd()}")
+logger.info(f"🐍 __file__ location: {__file__}")
+
 try:
     from app.api.v1.auth import get_current_user
     AUTH_AVAILABLE = True
     logger.info("✅ AUTH_AVAILABLE = True")
+    logger.info("✅ Import get_current_user réussi")
 except ImportError as e:
     AUTH_AVAILABLE = False
     get_current_user = None
-    logger.error(f"❌ AUTH_AVAILABLE = False - {e}")
+    logger.error(f"❌ AUTH_AVAILABLE = False")
+    logger.error(f"❌ ImportError détaillé: {e}")
+    logger.error(f"❌ Type d'erreur: {type(e).__name__}")
+    
+    # Diagnostics supplémentaires
+    try:
+        import app.api.v1
+        logger.info("✅ app.api.v1 importable")
+    except ImportError as e2:
+        logger.error(f"❌ app.api.v1 non importable: {e2}")
+    
+    try:
+        import app.api.v1.auth
+        logger.info("✅ app.api.v1.auth module importable")
+    except ImportError as e3:
+        logger.error(f"❌ app.api.v1.auth module non importable: {e3}")
+except Exception as e:
+    AUTH_AVAILABLE = False
+    get_current_user = None
+    logger.error(f"❌ Erreur critique import auth: {e}")
+    logger.error(f"❌ Type d'erreur: {type(e).__name__}")
+
+logger.info("=" * 60)
 
 # OpenAI import sécurisé
 try:
@@ -659,7 +696,74 @@ async def test_auth_endpoint(
         "timestamp": datetime.now().isoformat()
     }
 
-# ✅ AJOUT: Endpoint de diagnostic léger
+# ✅ AJOUT: Endpoint de diagnostic complet
+@router.get("/debug-system")
+async def debug_system_info():
+    """Endpoint de diagnostic système complet"""
+    import os
+    import sys
+    
+    auth_file_path = os.path.join(os.path.dirname(__file__), "auth.py")
+    
+    # Liste des fichiers dans le répertoire
+    current_dir = os.path.dirname(__file__)
+    try:
+        files_in_dir = os.listdir(current_dir)
+    except:
+        files_in_dir = ["Erreur lecture répertoire"]
+    
+    # Test d'import détaillé
+    import_tests = {}
+    
+    # Test 1: app
+    try:
+        import app
+        import_tests["app"] = "✅ OK"
+    except Exception as e:
+        import_tests["app"] = f"❌ {str(e)}"
+    
+    # Test 2: app.api
+    try:
+        import app.api
+        import_tests["app.api"] = "✅ OK"
+    except Exception as e:
+        import_tests["app.api"] = f"❌ {str(e)}"
+    
+    # Test 3: app.api.v1
+    try:
+        import app.api.v1
+        import_tests["app.api.v1"] = "✅ OK"
+    except Exception as e:
+        import_tests["app.api.v1"] = f"❌ {str(e)}"
+    
+    # Test 4: app.api.v1.auth
+    try:
+        import app.api.v1.auth
+        import_tests["app.api.v1.auth"] = "✅ OK"
+    except Exception as e:
+        import_tests["app.api.v1.auth"] = f"❌ {str(e)}"
+    
+    # Test 5: get_current_user function
+    try:
+        from app.api.v1.auth import get_current_user
+        import_tests["get_current_user"] = "✅ OK"
+    except Exception as e:
+        import_tests["get_current_user"] = f"❌ {str(e)}"
+    
+    return {
+        "auth_available": AUTH_AVAILABLE,
+        "current_directory": current_dir,
+        "auth_file_path": auth_file_path,
+        "auth_file_exists": os.path.exists(auth_file_path),
+        "files_in_directory": files_in_dir,
+        "python_path_sample": sys.path[:3],
+        "working_directory": os.getcwd(),
+        "import_tests": import_tests,
+        "openai_available": OPENAI_AVAILABLE,
+        "logging_available": LOGGING_AVAILABLE,
+        "timestamp": datetime.now().isoformat()
+    }
+
 @router.get("/debug-auth")
 async def debug_auth_info(request: Request):
     """Endpoint de diagnostic rapide"""
