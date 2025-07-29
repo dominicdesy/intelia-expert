@@ -1,7 +1,7 @@
 """
-app/api/v1/expert.py - VERSION NETTOYÉE
-SUPPRESSION: Endpoints non-utilisés qui échouent dans les tests
-CONSERVATION: Tous les endpoints fonctionnels et diagnostic auth (car il fonctionne)
+app/api/v1/expert.py - VERSION AVEC VALIDATION AGRICOLE INTÉGRÉE
+INTÉGRATION: agricultural_domain_validator dans TOUS les endpoints
+FILTRAGE: Toutes les questions passent par le validateur avant traitement
 """
 import os
 import logging
@@ -17,91 +17,55 @@ from pydantic import BaseModel, Field, ConfigDict
 router = APIRouter(tags=["expert"])
 logger = logging.getLogger(__name__)
 
-# ✅ DIAGNOSTIC DÉTAILLÉ: Import auth avec plusieurs méthodes
+# =============================================================================
+# IMPORT VALIDATEUR AGRICOLE - PRIORITÉ ABSOLUE
+# =============================================================================
+
+try:
+    from app.api.v1.agricultural_domain_validator import (
+        validate_agricultural_question,
+        get_agricultural_validator_stats,
+        is_agricultural_validation_enabled
+    )
+    AGRICULTURAL_VALIDATOR_AVAILABLE = True
+    logger.info("✅ [Expert] Validateur agricole importé avec succès")
+    logger.info(f"✅ [Expert] Validation agricole: {'ACTIVE' if is_agricultural_validation_enabled() else 'INACTIVE'}")
+except ImportError as e:
+    AGRICULTURAL_VALIDATOR_AVAILABLE = False
+    logger.error(f"❌ [Expert] ERREUR CRITIQUE - Validateur agricole non disponible: {e}")
+    logger.error("❌ [Expert] Toutes les questions seront acceptées sans filtrage!")
+except Exception as e:
+    AGRICULTURAL_VALIDATOR_AVAILABLE = False
+    logger.error(f"❌ [Expert] Erreur inattendue import validateur: {e}")
+
+# =============================================================================
+# IMPORT AUTH (existant)
+# =============================================================================
+
 logger.info("=" * 60)
 logger.info("🔍 DIAGNOSTIC IMPORT AUTH.PY - MÉTHODES MULTIPLES")
 
-# Vérifier si le fichier auth.py existe
-import os
-import sys
-auth_file_path = os.path.join(os.path.dirname(__file__), "auth.py")
-logger.info(f"📁 Chemin auth.py: {auth_file_path}")
-logger.info(f"📁 Fichier existe: {'✅' if os.path.exists(auth_file_path) else '❌'}")
-
-# Méthode 1: Import direct relatif
 AUTH_AVAILABLE = False
 get_current_user = None
 
-logger.info("🔍 Méthode 1: Import direct relatif")
+# Import auth (code existant conservé)
 try:
     from .auth import get_current_user
     AUTH_AVAILABLE = True
     logger.info("✅ Méthode 1 réussie: Import direct relatif")
 except ImportError as e:
     logger.error(f"❌ Méthode 1 échouée: {e}")
-except Exception as e:
-    logger.error(f"❌ Méthode 1 erreur critique: {e}")
-
-# Méthode 2: Import absolu (si méthode 1 échoue)
-if not AUTH_AVAILABLE:
-    logger.info("🔍 Méthode 2: Import absolu")
     try:
         from app.api.v1.auth import get_current_user
         AUTH_AVAILABLE = True
         logger.info("✅ Méthode 2 réussie: Import absolu")
-    except ImportError as e:
-        logger.error(f"❌ Méthode 2 échouée: {e}")
-    except Exception as e:
-        logger.error(f"❌ Méthode 2 erreur critique: {e}")
+    except ImportError as e2:
+        logger.error(f"❌ Méthode 2 échouée: {e2}")
 
-# Méthode 3: Import par importlib (si méthodes 1&2 échouent)
-if not AUTH_AVAILABLE:
-    logger.info("🔍 Méthode 3: Import par importlib")
-    try:
-        import importlib
-        auth_module = importlib.import_module(".auth", package="app.api.v1")
-        get_current_user = getattr(auth_module, "get_current_user", None)
-        if get_current_user:
-            AUTH_AVAILABLE = True
-            logger.info("✅ Méthode 3 réussie: Import par importlib")
-        else:
-            logger.error("❌ Méthode 3: get_current_user non trouvé dans le module")
-    except ImportError as e:
-        logger.error(f"❌ Méthode 3 échouée: {e}")
-    except Exception as e:
-        logger.error(f"❌ Méthode 3 erreur critique: {e}")
-
-# Vérifier le chemin Python et diagnostics supplémentaires
-logger.info(f"🐍 Python path: {sys.path[:3]}...")
-logger.info(f"🐍 Current working dir: {os.getcwd()}")
-logger.info(f"🐍 __file__ location: {__file__}")
-
-# Test d'import étape par étape
-logger.info("🔍 Tests d'import étape par étape:")
-try:
-    import app
-    logger.info("✅ import app")
-except Exception as e:
-    logger.error(f"❌ import app: {e}")
-
-try:
-    import app.api
-    logger.info("✅ import app.api")
-except Exception as e:
-    logger.error(f"❌ import app.api: {e}")
-
-try:
-    import app.api.v1
-    logger.info("✅ import app.api.v1")
-except Exception as e:
-    logger.error(f"❌ import app.api.v1: {e}")
-
-# Résultat final
 logger.info(f"🎯 AUTH_AVAILABLE final: {AUTH_AVAILABLE}")
-logger.info(f"🎯 get_current_user: {'✅ Disponible' if get_current_user else '❌ Non disponible'}")
 logger.info("=" * 60)
 
-# OpenAI import sécurisé
+# OpenAI import sécurisé (existant)
 try:
     import openai
     OPENAI_AVAILABLE = True
@@ -113,7 +77,7 @@ except ImportError:
 security = HTTPBearer()
 
 # =============================================================================
-# MODÈLES PYDANTIC CORRIGÉS - VERSION SIMPLE ET ROBUSTE
+# MODÈLES PYDANTIC (existants - conservés)
 # =============================================================================
 
 class QuestionRequest(BaseModel):
@@ -123,18 +87,14 @@ class QuestionRequest(BaseModel):
     speed_mode: Optional[str] = Field("balanced", description="Speed mode (fast, balanced, quality)")
 
     model_config = ConfigDict(
-        str_strip_whitespace=True,  # Nettoie automatiquement les espaces
-        validate_default=True,      # Valide les valeurs par défaut
-        extra="ignore"              # Ignore les champs supplémentaires
+        str_strip_whitespace=True,
+        validate_default=True,
+        extra="ignore"
     )
 
     def model_post_init(self, __context) -> None:
-        """Post-validation pour nettoyer et valider les champs"""
-        # Validation et nettoyage de la langue
         if self.language not in ['fr', 'en', 'es']:
             self.language = 'fr'
-        
-        # Validation et nettoyage du mode de vitesse
         if self.speed_mode not in ['fast', 'balanced', 'quality']:
             self.speed_mode = 'balanced'
 
@@ -151,6 +111,8 @@ class ExpertResponse(BaseModel):
     mode: str = "expert_router_corrected"
     user: Optional[str] = None
     logged: bool = False
+    validation_passed: Optional[bool] = None
+    validation_confidence: Optional[float] = None
 
 class FeedbackRequest(BaseModel):
     """Feedback model standard"""
@@ -164,12 +126,11 @@ class FeedbackRequest(BaseModel):
     )
 
     def model_post_init(self, __context) -> None:
-        """Post-validation pour le rating"""
         if self.rating not in ['positive', 'negative', 'neutral']:
             self.rating = 'neutral'
 
 # =============================================================================
-# IMPORT LOGGING
+# IMPORT LOGGING (existant - conservé)
 # =============================================================================
 
 try:
@@ -238,7 +199,69 @@ def get_user_id_from_request(fastapi_request: Request) -> str:
         return f"anon_{uuid.uuid4().hex[:8]}"
 
 # =============================================================================
-# PROMPTS MULTI-LANGUES
+# FONCTION DE VALIDATION AGRICOLE CENTRALISÉE
+# =============================================================================
+
+async def validate_question_agricultural_domain(
+    question: str, 
+    language: str, 
+    user_id: str, 
+    request_ip: str
+) -> tuple[bool, str, float]:
+    """
+    Valide qu'une question concerne le domaine agricole
+    
+    Returns:
+        tuple[bool, str, float]: (is_valid, rejection_message_or_empty, confidence)
+    """
+    
+    # Si le validateur n'est pas disponible, REJETER par sécurité
+    if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+        logger.error("❌ [Validation] Validateur agricole non disponible - REJET par sécurité")
+        
+        rejection_messages = {
+            "fr": "Service temporairement indisponible. Veuillez réessayer plus tard.",
+            "en": "Service temporarily unavailable. Please try again later.",
+            "es": "Servicio temporalmente no disponible. Por favor, inténtelo más tarde."
+        }
+        
+        return False, rejection_messages.get(language, rejection_messages["fr"]), 0.0
+    
+    # Si la validation est désactivée, accepter
+    if not is_agricultural_validation_enabled():
+        logger.info("🔧 [Validation] Validation agricole désactivée - question acceptée")
+        return True, "", 100.0
+    
+    try:
+        # Utiliser le validateur
+        validation_result = validate_agricultural_question(
+            question=question,
+            language=language,
+            user_id=user_id,
+            request_ip=request_ip
+        )
+        
+        logger.info(f"🔍 [Validation] Résultat: {validation_result.is_valid} (confiance: {validation_result.confidence:.1f}%)")
+        
+        if validation_result.is_valid:
+            return True, "", validation_result.confidence
+        else:
+            return False, validation_result.reason or "Question hors domaine agricole", validation_result.confidence
+    
+    except Exception as e:
+        logger.error(f"❌ [Validation] Erreur validateur: {e}")
+        
+        # En cas d'erreur du validateur, rejeter par sécurité
+        rejection_messages = {
+            "fr": "Erreur de validation. Veuillez reformuler votre question sur le domaine avicole.",
+            "en": "Validation error. Please rephrase your question about the poultry domain.",
+            "es": "Error de validación. Por favor, reformule su pregunta sobre el dominio avícola."
+        }
+        
+        return False, rejection_messages.get(language, rejection_messages["fr"]), 0.0
+
+# =============================================================================
+# PROMPTS MULTI-LANGUES (existants - conservés)
 # =============================================================================
 
 EXPERT_PROMPTS = {
@@ -263,11 +286,11 @@ def get_expert_prompt(language: str) -> str:
     return EXPERT_PROMPTS.get(language.lower(), EXPERT_PROMPTS["fr"])
 
 # =============================================================================
-# FONCTIONS HELPER
+# FONCTIONS HELPER (simplifiées - plus de filtrage manuel)
 # =============================================================================
 
 def get_fallback_response(question: str, language: str = "fr") -> str:
-    """Réponse de fallback"""
+    """Réponse de fallback - utilisée seulement si OpenAI échoue"""
     try:
         safe_question = str(question)[:50] if question else "votre question"
     except:
@@ -281,54 +304,11 @@ def get_fallback_response(question: str, language: str = "fr") -> str:
     return fallback_responses.get(language.lower(), fallback_responses["fr"])
 
 async def process_question_openai(question: str, language: str = "fr", speed_mode: str = "balanced") -> str:
-    """Process question using OpenAI"""
+    """Process question using OpenAI - FILTRAGE RETIRÉ (fait par le validateur)"""
     
-    # 🛡️ VÉRIFICATION DOMAINE AVANT OPENAI
-    question_lower = question.lower()
-    
-    # Liste de mots-clés non-agricoles
-    non_agricultural_keywords = [
-        'crypto', 'bitcoin', 'ethereum', 'finance', 'banque', 'investissement',
-        'politique', 'élection', 'sport', 'football', 'beauté', 'maquillage',
-        'technologie', 'informatique', 'smartphone', 'voiture', 'auto',
-        'immobilier', 'maison', 'appartement', 'cinéma', 'film', 'musique'
-    ]
-    
-    # Vérifier si la question contient des mots non-agricoles
-    if any(keyword in question_lower for keyword in non_agricultural_keywords):
-        logger.info(f"🚫 Question hors contexte détectée: {question[:50]}...")
-        
-        # Message exact que vous voulez
-        if language == "en":
-            return "I am an expert in the poultry field, so I am not specialized in cryptocurrency. If you have questions about the poultry field, I would be happy to help you."
-        elif language == "es":
-            return "Soy un experto en el campo avícola, por lo que no me especializo en criptomonedas. Si tienes preguntas sobre el campo avícola, estaría encantado de ayudarte."
-        else:  # français par défaut
-            return "Je suis un expert dans le domaine avicole, donc je ne suis pas spécialisé dans la cryptomonnaie. Si vous avez des questions sur le domaine avicole, je serais ravi de vous aider."
-    
-    # Vérifier s'il y a des mots-clés agricoles
-    agricultural_keywords = [
-        'poulet', 'poule', 'volaille', 'aviculture', 'élevage', 'ferme',
-        'nutrition', 'alimentation', 'vaccination', 'maladie', 'mortalité',
-        'température', 'ventilation', 'chicken', 'poultry', 'farm', 'breeding'
-    ]
-    
-    # Si pas de mots agricoles, retourner le message standard
-    if not any(keyword in question_lower for keyword in agricultural_keywords):
-        logger.info(f"🚫 Question trop générale détectée: {question[:50]}...")
-        
-        if language == "en":
-            return "I am an expert in the poultry field, so I am not specialized in cryptocurrency. If you have questions about the poultry field, I would be happy to help you."
-        elif language == "es":
-            return "Soy un experto en el campo avícola, por lo que no me especializo en criptomonedas. Si tienes preguntas sobre el campo avícola, estaría encantado de ayudarte."
-        else:  # français par défaut
-            return "Je suis un expert dans le domaine avicole, donc je ne suis pas spécialisé dans la cryptomonnaie. Si vous avez des questions sur le domaine avicole, je serais ravi de vous aider."
-    
-    # Si c'est agricole, continuer avec OpenAI normal...
     if not OPENAI_AVAILABLE or not openai:
         return get_fallback_response(question, language)
     
-    # Code OpenAI complet
     try:
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
@@ -366,50 +346,40 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINT PRINCIPAL AVEC DIAGNOSTIC CIBLÉ
+# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE INTÉGRÉE
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
 async def ask_expert_secure(
-    request_data: QuestionRequest,  # ✅ CORRECTION: FastAPI mappe automatiquement le JSON
-    request: Request,               # ✅ CORRECTION: FastAPI injecte automatiquement Request
+    request_data: QuestionRequest,
+    request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification Supabase - VERSION AVEC DIAGNOSTIC CIBLÉ"""
+    """Question avec authentification + validation agricole obligatoire"""
     start_time = time.time()
     
     try:
-        # ✅ DIAGNOSTIC CIBLÉ: Log seulement ce qui est nécessaire
         logger.info("=" * 60)
-        logger.info("🔐 DÉBUT ask_expert_secure")
+        logger.info("🔐 DÉBUT ask_expert_secure avec validation agricole")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
         logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
-        logger.info(f"👤 current_user: {bool(current_user)}")
+        logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
         
-        # ✅ DIAGNOSTIC: Vérifier le token uniquement si problème
+        # Vérification auth
         if not AUTH_AVAILABLE:
-            logger.error("❌ AUTH_AVAILABLE = False - Vérifiez import auth.py")
-            raise HTTPException(
-                status_code=503,
-                detail="Service d'authentification non disponible"
-            )
+            logger.error("❌ AUTH_AVAILABLE = False")
+            raise HTTPException(status_code=503, detail="Service d'authentification non disponible")
         
         if not current_user:
-            # Diagnostic du token seulement en cas d'échec
-            auth_header = request.headers.get("Authorization")
-            logger.error(f"❌ current_user = None - Auth header: {'Présent' if auth_header else 'Manquant'}")
-            if auth_header:
-                logger.error(f"Token preview: {auth_header[:50]}...")
-            raise HTTPException(
-                status_code=503,
-                detail="Service d'authentification non disponible"
-            )
+            logger.error("❌ current_user = None")
+            raise HTTPException(status_code=503, detail="Service d'authentification non disponible")
         
-        # L'utilisateur est authentifié via auth.py
+        # L'utilisateur est authentifié
         user_id = current_user.get("user_id")
         user_email = current_user.get("email")
+        request_ip = request.client.host if request.client else "unknown"
         
         logger.info(f"✅ Authentifié: {user_email} ({user_id[:8] if user_id else 'N/A'}...)")
         
@@ -424,10 +394,58 @@ async def ask_expert_secure(
             raise HTTPException(status_code=400, detail="Question text is required")
         
         conversation_id = str(uuid.uuid4())
-        
         logger.info(f"🆔 Conversation ID: {conversation_id}")
-        logger.info(f"🔤 Caractères spéciaux détectés: {[c for c in question_text if ord(c) > 127]}")
         
+        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
+        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole...")
+        
+        is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
+            question=question_text,
+            language=request_data.language,
+            user_id=user_id or "authenticated_user",
+            request_ip=request_ip
+        )
+        
+        if not is_valid:
+            logger.warning(f"🚫 [VALIDATION] Question rejetée: {rejection_message}")
+            
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Sauvegarde du rejet pour analytics
+            await save_conversation_auto(
+                conversation_id=conversation_id,
+                question=question_text,
+                response=rejection_message,
+                user_id=user_id or "authenticated_user",
+                language=request_data.language,
+                rag_used=False,
+                rag_score=None,
+                response_time_ms=response_time_ms
+            )
+            
+            response_obj = ExpertResponse(
+                question=str(question_text),
+                response=str(rejection_message),
+                conversation_id=conversation_id,
+                rag_used=False,
+                rag_score=None,
+                timestamp=datetime.now().isoformat(),
+                language=request_data.language,
+                response_time_ms=response_time_ms,
+                mode="agricultural_validation_rejected",
+                user=user_email,
+                logged=True,
+                validation_passed=False,
+                validation_confidence=validation_confidence
+            )
+            
+            logger.info("🚫 [VALIDATION] Question rejetée et loggée")
+            logger.info("=" * 60)
+            return response_obj
+        
+        logger.info(f"✅ [VALIDATION] Question validée (confiance: {validation_confidence:.1f}%)")
+        
+        # === TRAITEMENT NORMAL (RAG/OpenAI) ===
         # Variables par défaut
         rag_used = False
         rag_score = None
@@ -473,7 +491,6 @@ async def ask_expert_secure(
             mode = "authenticated_direct_openai"
         
         response_time_ms = int((time.time() - start_time) * 1000)
-        
         logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
         
         # Sauvegarde automatique
@@ -502,10 +519,12 @@ async def ask_expert_secure(
             response_time_ms=response_time_ms,
             mode=mode,
             user=user_email,
-            logged=logged
+            logged=logged,
+            validation_passed=True,
+            validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_secure - Succès")
+        logger.info("✅ FIN ask_expert_secure - Succès avec validation")
         logger.info("=" * 60)
         
         return response_obj
@@ -521,24 +540,24 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# TOUS LES AUTRES ENDPOINTS FONCTIONNELS (CONSERVÉS INTÉGRALEMENT)
+# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE INTÉGRÉE
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
 async def ask_expert_public(
-    request_data: QuestionRequest,  # ✅ CORRECTION: Mapping automatique
-    request: Request                # ✅ CORRECTION: Injection correcte
+    request_data: QuestionRequest,
+    request: Request
 ):
-    """Question publique - CORRIGÉ INJECTION REQUEST"""
+    """Question publique avec validation agricole obligatoire"""
     start_time = time.time()
     
     try:
-        # Log détaillé pour debug
         logger.info("=" * 60)
-        logger.info("🌐 DÉBUT ask_expert_public")
+        logger.info("🌐 DÉBUT ask_expert_public avec validation agricole")
         logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
+        logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
         
         # Récupération de la question avec validation
         question_text = request_data.text.strip()
@@ -549,11 +568,61 @@ async def ask_expert_public(
         
         conversation_id = str(uuid.uuid4())
         user_id = get_user_id_from_request(request)
+        request_ip = request.client.host if request.client else "unknown"
         
         logger.info(f"🆔 Conversation ID: {conversation_id}")
         logger.info(f"👤 User ID: {user_id}")
-        logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
         
+        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
+        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole...")
+        
+        is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
+            question=question_text,
+            language=request_data.language,
+            user_id=user_id,
+            request_ip=request_ip
+        )
+        
+        if not is_valid:
+            logger.warning(f"🚫 [VALIDATION] Question publique rejetée: {rejection_message}")
+            
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Sauvegarde du rejet pour analytics
+            await save_conversation_auto(
+                conversation_id=conversation_id,
+                question=question_text,
+                response=rejection_message,
+                user_id=user_id,
+                language=request_data.language,
+                rag_used=False,
+                rag_score=None,
+                response_time_ms=response_time_ms
+            )
+            
+            response_obj = ExpertResponse(
+                question=str(question_text),
+                response=str(rejection_message),
+                conversation_id=conversation_id,
+                rag_used=False,
+                rag_score=None,
+                timestamp=datetime.now().isoformat(),
+                language=request_data.language,
+                response_time_ms=response_time_ms,
+                mode="public_agricultural_validation_rejected",
+                user=None,
+                logged=True,
+                validation_passed=False,
+                validation_confidence=validation_confidence
+            )
+            
+            logger.info("🚫 [VALIDATION] Question publique rejetée et loggée")
+            logger.info("=" * 60)
+            return response_obj
+        
+        logger.info(f"✅ [VALIDATION] Question publique validée (confiance: {validation_confidence:.1f}%)")
+        
+        # === TRAITEMENT NORMAL (RAG/OpenAI) ===
         user = getattr(request.state, "user", None)
         
         # Variables par défaut
@@ -568,7 +637,7 @@ async def ask_expert_public(
         
         if process_rag:
             try:
-                logger.info("🔍 Utilisation du système RAG...")
+                logger.info("🔍 Utilisation du système RAG public...")
                 result = await process_rag(
                     question=question_text,
                     user=user,
@@ -599,7 +668,6 @@ async def ask_expert_public(
             )
         
         response_time_ms = int((time.time() - start_time) * 1000)
-        
         logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
         
         # Sauvegarde automatique
@@ -628,10 +696,12 @@ async def ask_expert_public(
             response_time_ms=response_time_ms,
             mode=mode,
             user=str(user) if user else None,
-            logged=logged
+            logged=logged,
+            validation_passed=True,
+            validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_public - Succès")
+        logger.info("✅ FIN ask_expert_public - Succès avec validation")
         logger.info("=" * 60)
         
         return response_obj
@@ -645,6 +715,10 @@ async def ask_expert_public(
         logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+
+# =============================================================================
+# AUTRES ENDPOINTS (conservés identiques)
+# =============================================================================
 
 @router.post("/feedback")
 async def submit_feedback(feedback_data: FeedbackRequest):
@@ -726,6 +800,7 @@ async def get_suggested_topics(language: str = "fr"):
             "topics": topics,
             "language": lang,
             "count": len(topics),
+            "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else False,
             "note": "Topics génériques pour tous poulets de chair"
         }
     except Exception as e:
@@ -733,118 +808,135 @@ async def get_suggested_topics(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 # =============================================================================
-# ENDPOINTS DEBUG UTILES (CONSERVÉS CAR FONCTIONNELS)
+# NOUVEAUX ENDPOINTS DE DIAGNOSTIC VALIDATEUR
+# =============================================================================
+
+@router.get("/validation-stats")
+async def get_validation_stats():
+    """Statistiques du validateur agricole"""
+    try:
+        if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+            return {
+                "error": "Validateur agricole non disponible",
+                "available": False,
+                "stats": None
+            }
+        
+        stats = get_agricultural_validator_stats()
+        
+        return {
+            "available": True,
+            "validation_enabled": is_agricultural_validation_enabled(),
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur stats validation: {e}")
+        raise HTTPException(status_code=500, detail="Erreur récupération stats")
+
+@router.post("/test-validation")
+async def test_validation(
+    request_data: QuestionRequest,
+    request: Request
+):
+    """Test endpoint pour tester la validation sans traitement"""
+    try:
+        question_text = request_data.text.strip()
+        user_id = get_user_id_from_request(request)
+        request_ip = request.client.host if request.client else "unknown"
+        
+        if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+            return {
+                "error": "Validateur agricole non disponible",
+                "available": False
+            }
+        
+        # Test de validation
+        is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
+            question=question_text,
+            language=request_data.language,
+            user_id=user_id,
+            request_ip=request_ip
+        )
+        
+        return {
+            "question": question_text,
+            "language": request_data.language,
+            "validation_passed": is_valid,
+            "confidence": validation_confidence,
+            "rejection_message": rejection_message if not is_valid else None,
+            "validator_available": True,
+            "validation_enabled": is_agricultural_validation_enabled(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur test validation: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur test validation: {str(e)}")
+
+# =============================================================================
+# ENDPOINTS DEBUG (conservés)
 # =============================================================================
 
 @router.get("/debug-system")
 async def debug_system_info():
-    """Endpoint de diagnostic système complet"""
+    """Endpoint de diagnostic système complet avec validateur"""
     import os
     import sys
     
-    auth_file_path = os.path.join(os.path.dirname(__file__), "auth.py")
-    
-    # Liste des fichiers dans le répertoire
-    current_dir = os.path.dirname(__file__)
-    try:
-        files_in_dir = os.listdir(current_dir)
-    except:
-        files_in_dir = ["Erreur lecture répertoire"]
-    
-    # Test d'import détaillé avec analyse __init__.py
+    # Tests d'import détaillés (code existant conservé)
     import_tests = {}
     
-    # Test 1: app
     try:
         import app
         import_tests["app"] = "✅ OK"
     except Exception as e:
         import_tests["app"] = f"❌ {str(e)}"
     
-    # Test 2: app.api
-    try:
-        import app.api
-        import_tests["app.api"] = "✅ OK"
-    except Exception as e:
-        import_tests["app.api"] = f"❌ {str(e)}"
-    
-    # Test 3: app.api.v1 (ici c'est critique)
-    try:
-        import app.api.v1
-        import_tests["app.api.v1"] = "✅ OK"
-        
-        # Vérifier les attributs disponibles dans __init__.py
-        v1_attrs = dir(app.api.v1)
-        import_tests["app.api.v1.attributes"] = [attr for attr in v1_attrs if not attr.startswith('_')]
-        
-        # Vérifier spécifiquement AUTH_AVAILABLE dans __init__.py
-        if hasattr(app.api.v1, 'AUTH_AVAILABLE'):
-            import_tests["app.api.v1.AUTH_AVAILABLE"] = f"✅ {getattr(app.api.v1, 'AUTH_AVAILABLE')}"
-        else:
-            import_tests["app.api.v1.AUTH_AVAILABLE"] = "❌ Non défini"
-            
-    except Exception as e:
-        import_tests["app.api.v1"] = f"❌ {str(e)}"
-    
-    # Test 4: app.api.v1.auth (module direct)
     try:
         import app.api.v1.auth
         import_tests["app.api.v1.auth"] = "✅ OK"
-        
-        # Vérifier les fonctions disponibles dans auth.py
         auth_attrs = dir(app.api.v1.auth)
         auth_functions = [attr for attr in auth_attrs if not attr.startswith('_') and callable(getattr(app.api.v1.auth, attr, None))]
         import_tests["app.api.v1.auth.functions"] = auth_functions
-        
     except Exception as e:
         import_tests["app.api.v1.auth"] = f"❌ {str(e)}"
     
-    # Test 5: get_current_user function (direct)
+    # Test spécifique du validateur agricole
     try:
-        from app.api.v1.auth import get_current_user
-        import_tests["get_current_user"] = "✅ OK"
-        import_tests["get_current_user.type"] = str(type(get_current_user))
+        import app.api.v1.agricultural_domain_validator
+        import_tests["agricultural_validator_module"] = "✅ OK"
+        
+        validator_attrs = dir(app.api.v1.agricultural_domain_validator)
+        validator_functions = [attr for attr in validator_attrs if not attr.startswith('_')]
+        import_tests["agricultural_validator_functions"] = validator_functions
+        
     except Exception as e:
-        import_tests["get_current_user"] = f"❌ {str(e)}"
-    
-    # Test 6: Import relatif
-    try:
-        # Simuler l'import relatif depuis le contexte expert.py
-        current_dir = os.path.dirname(__file__)
-        auth_py_path = os.path.join(current_dir, "auth.py")
-        if os.path.exists(auth_py_path):
-            import_tests["relative_auth_file"] = "✅ Fichier auth.py existe"
-            try:
-                from .auth import get_current_user as relative_get_current_user
-                import_tests["relative_import"] = "✅ Import relatif réussi"
-            except Exception as rel_e:
-                import_tests["relative_import"] = f"❌ Import relatif échoué: {rel_e}"
-        else:
-            import_tests["relative_auth_file"] = "❌ Fichier auth.py manquant"
-    except Exception as e:
-        import_tests["relative_import_test"] = f"❌ {str(e)}"
+        import_tests["agricultural_validator_module"] = f"❌ {str(e)}"
     
     return {
         "auth_available": AUTH_AVAILABLE,
-        "current_directory": current_dir,
-        "auth_file_path": auth_file_path,
-        "auth_file_exists": os.path.exists(auth_file_path),
-        "files_in_directory": files_in_dir,
-        "python_path_sample": sys.path[:3],
-        "working_directory": os.getcwd(),
-        "import_tests": import_tests,
+        "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
+        "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
+        "current_directory": os.path.dirname(__file__),
+        "python_path_sample": sys.path[:3],
+        "import_tests": import_tests,
+        "validator_stats": get_agricultural_validator_stats() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "timestamp": datetime.now().isoformat()
     }
 
 @router.get("/debug-auth")
 async def debug_auth_info(request: Request):
-    """Endpoint de diagnostic rapide"""
+    """Endpoint de diagnostic rapide avec validation"""
     auth_header = request.headers.get("Authorization")
     
     return {
         "auth_available": AUTH_AVAILABLE,
+        "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
+        "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "auth_header_present": bool(auth_header),
         "auth_header_preview": auth_header[:50] + "..." if auth_header else None,
         "openai_available": OPENAI_AVAILABLE,
@@ -852,13 +944,9 @@ async def debug_auth_info(request: Request):
         "timestamp": datetime.now().isoformat()
     }
 
-# =============================================================================
-# ENDPOINT DE TEST UTF-8 (GARDE CAR IL FONCTIONNE)
-# =============================================================================
-
 @router.post("/test-utf8")
-async def test_utf8_direct(request: Request):  # ✅ CORRECTION: Injection correcte
-    """Test endpoint pour UTF-8 direct"""
+async def test_utf8_direct(request: Request):
+    """Test endpoint pour UTF-8 direct avec validation"""
     try:
         # Récupérer le body brut
         body = await request.body()
@@ -876,15 +964,40 @@ async def test_utf8_direct(request: Request):  # ✅ CORRECTION: Injection corre
         logger.info(f"📝 Question extraite: {question_text}")
         logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
         
-        # Traitement direct
+        # Test de validation
+        user_id = get_user_id_from_request(request)
+        request_ip = request.client.host if request.client else "unknown"
+        
+        is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
+            question=question_text,
+            language=language,
+            user_id=user_id,
+            request_ip=request_ip
+        )
+        
+        if not is_valid:
+            return {
+                "success": False,
+                "question_received": question_text,
+                "special_chars_detected": [c for c in question_text if ord(c) > 127],
+                "validation_passed": False,
+                "rejection_message": rejection_message,
+                "confidence": validation_confidence,
+                "method": "direct_body_parsing_with_validation",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Traitement direct seulement si validé
         answer = await process_question_openai(question_text, language, "fast")
         
         return {
             "success": True,
             "question_received": question_text,
             "special_chars_detected": [c for c in question_text if ord(c) > 127],
+            "validation_passed": True,
+            "confidence": validation_confidence,
             "response": answer,
-            "method": "direct_body_parsing",
+            "method": "direct_body_parsing_with_validation",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -910,8 +1023,10 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ EXPERT.PY NETTOYÉ - ENDPOINTS INUTILES SUPPRIMÉS")
+logger.info("✅ EXPERT.PY AVEC VALIDATION AGRICOLE INTÉGRÉE")
 logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
+logger.info(f"🌾 AGRICULTURAL_VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
+logger.info(f"🌾 VALIDATION_ENABLED: {is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else 'N/A'}")
 logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
 logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
-logger.info("✅ ENDPOINTS SUPPRIMÉS: /auth-status, /test-auth (retournaient 401/503)")
+logger.info("🚨 TOUTES LES QUESTIONS PASSENT MAINTENANT PAR LE VALIDATEUR AGRICOLE")
