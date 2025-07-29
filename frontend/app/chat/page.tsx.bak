@@ -20,10 +20,10 @@ import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 
-// ==================== COMPOSANT PRINCIPAL AVEC TRANSMISSION LANGUE CORRIGÉE ====================
+// ==================== COMPOSANT PRINCIPAL AVEC SCROLL INTELLIGENT CORRIGÉ ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
-  const { t, currentLanguage } = useTranslation() // ✅ RÉCUPÉRATION currentLanguage
+  const { t, currentLanguage } = useTranslation()
   const { addConversation } = useChatStore()
   
   const [messages, setMessages] = useState<Message[]>([])
@@ -31,7 +31,7 @@ export default function ChatInterface() {
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   
-  // États pour le scroll intelligent
+  // ✅ ÉTATS POUR LE SCROLL INTELLIGENT CORRIGÉS
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [isUserScrolling, setIsUserScrolling] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -40,7 +40,7 @@ export default function ChatInterface() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // [TOUT LE CODE DE DÉTECTION MOBILE ET SCROLL RESTE IDENTIQUE]
+  // Hook pour détecter si on est sur mobile/tablette (safe pour SSR)
   useEffect(() => {
     const detectMobileDevice = () => {
       const userAgent = navigator.userAgent.toLowerCase()
@@ -63,7 +63,12 @@ export default function ChatInterface() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // ✅ SCROLL AUTOMATIQUE UNIQUEMENT POUR NOUVEAUX MESSAGES
   useEffect(() => {
+    // Ne scroll automatiquement que si :
+    // 1. Il y a de nouveaux messages
+    // 2. L'utilisateur n'est pas en train de scroller manuellement
+    // 3. L'auto-scroll est activé
     if (messages.length > lastMessageCountRef.current && shouldAutoScroll && !isUserScrolling) {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -71,8 +76,9 @@ export default function ChatInterface() {
     }
     
     lastMessageCountRef.current = messages.length
-  }, [messages.length])
+  }, [messages.length]) // ✅ Uniquement déclenché par changement du nombre de messages
 
+  // ✅ DÉTECTION DU SCROLL MANUEL CORRIGÉE
   useEffect(() => {
     const chatContainer = chatContainerRef.current
     if (!chatContainer) return
@@ -85,19 +91,23 @@ export default function ChatInterface() {
       const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
 
+      // ✅ Marquer que l'utilisateur scrolle
       if (!isScrolling) {
         setIsUserScrolling(true)
         isScrolling = true
       }
       
+      // ✅ Afficher/masquer le bouton de retour en bas
       setShowScrollButton(!isNearBottom && messages.length > 3)
       
+      // ✅ Gérer l'auto-scroll uniquement si proche du bas
       if (isAtBottom) {
         setShouldAutoScroll(true)
       } else {
         setShouldAutoScroll(false)
       }
 
+      // ✅ Délai pour marquer la fin du scroll
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
         setIsUserScrolling(false)
@@ -112,6 +122,7 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
+  // ✅ INITIALISATION DU MESSAGE DE BIENVENUE
   useEffect(() => {
     if (isAuthenticated && messages.length === 0) {
       const welcomeMessage: Message = {
@@ -126,6 +137,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, t, currentLanguage])
 
+  // ✅ MISE À JOUR DU MESSAGE DE BIENVENUE POUR CHANGEMENT DE LANGUE
   useEffect(() => {
     if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
       setMessages(prev => prev.map((msg, index) => 
@@ -134,6 +146,7 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t])
 
+  // ✅ GESTION DU LOADING STATE
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -145,6 +158,7 @@ export default function ChatInterface() {
     )
   }
 
+  // ✅ GESTION DE L'ÉTAT NON AUTHENTIFIÉ
   if (!isAuthenticated) {
     useEffect(() => {
       window.location.href = '/'
@@ -160,7 +174,7 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ FONCTION ENVOI DE MESSAGE AVEC TRANSMISSION DE LA LANGUE
+  // ✅ FONCTION ENVOI DE MESSAGE
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -175,14 +189,13 @@ export default function ChatInterface() {
     setInputMessage('')
     setIsLoadingChat(true)
     
+    // ✅ ACTIVER L'AUTO-SCROLL POUR NOUVEAUX MESSAGES UNIQUEMENT
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
 
     try {
-      console.log('🔒 [handleSendMessage] Envoi question avec langue:', currentLanguage)
-      
-      // ✅ CORRECTION PRINCIPALE: Passer currentLanguage à l'API
-      const response = await generateAIResponse(text.trim(), user, currentLanguage)
+      console.log('🔒 [handleSendMessage] Envoi question via endpoint sécurisé avec JWT')
+      const response = await generateAIResponse(text.trim(), user)
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -194,7 +207,6 @@ export default function ChatInterface() {
 
       setMessages(prev => [...prev, aiMessage])
       console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
-      console.log('🌐 [handleSendMessage] Langue utilisée:', currentLanguage)
       
       if (user && response.conversation_id) {
         console.log('📂 [handleSendMessage] Ajout à l\'historique local:', response.conversation_id)
@@ -215,7 +227,7 @@ export default function ChatInterface() {
     }
   }
 
-  // [TOUTES LES AUTRES FONCTIONS RESTENT IDENTIQUES]
+  // ✅ FONCTION FEEDBACK
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     const message = messages.find(msg => msg.id === messageId)
     
@@ -248,6 +260,7 @@ export default function ChatInterface() {
     }
   }
 
+  // ✅ FONCTION NOUVELLE CONVERSATION
   const handleNewConversation = () => {
     const welcomeMessage = {
       id: '1',
@@ -259,11 +272,13 @@ export default function ChatInterface() {
     setMessages([welcomeMessage])
     lastMessageCountRef.current = 1
     
+    // ✅ RÉACTIVER L'AUTO-SCROLL
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
     setShowScrollButton(false)
   }
 
+  // ✅ FONCTION POUR REVENIR EN BAS MANUELLEMENT
   const scrollToBottom = () => {
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
@@ -271,6 +286,7 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // ✅ FONCTION GET DATE
   const getCurrentDate = () => {
     return new Date().toLocaleDateString('fr-FR', { 
       day: 'numeric', 
@@ -279,7 +295,7 @@ export default function ChatInterface() {
     })
   }
 
-  // [LE RESTE DU COMPOSANT RESTE IDENTIQUE]
+  // ✅ RENDU PRINCIPAL
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
@@ -288,6 +304,7 @@ export default function ChatInterface() {
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-4 py-3">
           <div className="flex items-center justify-between">
+            {/* Boutons gauche */}
             <div className="flex items-center space-x-2">
               <HistoryMenu />
               <button
@@ -299,6 +316,7 @@ export default function ChatInterface() {
               </button>
             </div>
 
+            {/* Titre centré avec logo */}
             <div className="flex-1 flex justify-center items-center space-x-3">
               <InteliaLogo className="w-8 h-8" />
               <div className="text-center">
@@ -306,6 +324,7 @@ export default function ChatInterface() {
               </div>
             </div>
             
+            {/* Avatar utilisateur à droite */}
             <div className="flex items-center">
               <UserMenuButton />
             </div>
@@ -406,7 +425,7 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* Bouton flottant "revenir en bas" */}
+          {/* ✅ BOUTON FLOTTANT "REVENIR EN BAS" CORRIGÉ */}
           {showScrollButton && (
             <div className="fixed bottom-24 right-8 z-10">
               <button
