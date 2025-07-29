@@ -476,7 +476,11 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       mode: data.mode || 'secured',
       user: data.user
     }
+
+    // ===== 6. SAUVEGARDE CONVERSATION =====
+    await saveConversationSafely(user, cleanQuestion, adaptedResponse)
     
+   
     return adaptedResponse
     
   } catch (error: any) {

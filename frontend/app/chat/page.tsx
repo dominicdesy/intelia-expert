@@ -398,9 +398,8 @@ function adaptResponse(data: any, originalQuestion: string): ExpertApiResponse {
   }
 }
 
-// ==================== FONCTION generateAIResponse CORRIGÉE AVEC DEBUG 422 ====================
-// ==================== CORRECTION ERREUR 422 ====================
-// Remplacer la fonction generateAIResponse dans votre fichier page.tsx
+// ==================== FONCTION generateAIResponse ====================
+// ==================== CORRECTION generateAIResponse - ÉLIMINER request_data ====================
 
 const generateAIResponse = async (question: string, user: any): Promise<ExpertApiResponse> => {
   const apiUrl = `${API_BASE_URL}/api/v1/expert/ask`
@@ -416,16 +415,14 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     
     console.log('✅ Token récupéré, longueur:', session.access_token.length)
     
-    // ===== 2. PRÉPARATION REQUÊTE AVEC FORMAT CORRECT =====
+    // ===== 2. PRÉPARATION REQUÊTE AVEC FORMAT CORRIGÉ =====
     const cleanQuestion = question.trim().normalize('NFC')
     
-    // ✅ CORRECTION: Format exact attendu par le backend
+    // ✅ CORRECTION CRITIQUE: Supprimer request_data wrapper
     const requestBody = {
-      request_data: {
-        text: cleanQuestion,
-        language: user?.language || 'fr',
-        speed_mode: 'balanced'
-      }
+      text: cleanQuestion,                    // ✅ Direct, pas dans request_data
+      language: user?.language || 'fr',       // ✅ Direct, pas dans request_data  
+      speed_mode: 'balanced'                  // ✅ Direct, pas dans request_data
     }
     
     // ✅ Headers avec charset UTF-8 explicite
@@ -435,7 +432,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
       'Authorization': `Bearer ${session.access_token}`
     }
     
-    console.log('📤 Données envoyées (format corrigé):', JSON.stringify(requestBody, null, 2))
+    console.log('📤 Données envoyées (format corrigé SANS request_data):', JSON.stringify(requestBody, null, 2))
     console.log('📡 URL complète:', apiUrl)
     
     // ===== 3. REQUÊTE AVEC TIMEOUT =====
@@ -480,7 +477,6 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     // ===== 6. SAUVEGARDE CONVERSATION =====
     await saveConversationSafely(user, cleanQuestion, adaptedResponse)
     
-   
     return adaptedResponse
     
   } catch (error: any) {
@@ -493,6 +489,7 @@ const generateAIResponse = async (question: string, user: any): Promise<ExpertAp
     throw new Error(`Erreur technique: ${error.message}`)
   }
 }
+
 
 // ==================== TRANSLATIONS COMPLÈTES 3 LANGUES ====================
 const translations = {
