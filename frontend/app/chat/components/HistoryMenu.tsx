@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
 import { useConversationGroups, useConversationActions, useCurrentConversation } from '../hooks/useChatStore'
 import { useAuthStore } from '../hooks/useAuthStore'
-import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons.tsx'
+import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons'
 import { Conversation, ConversationGroup } from '../types'
 
 // ==================== MENU HISTORIQUE CONVERSATIONS STYLE CLAUDE.AI ====================
