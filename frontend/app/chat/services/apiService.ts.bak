@@ -6,16 +6,24 @@ const API_BASE_URL = 'https://expert-app-cngws.ondigitalocean.app/api/v1'
 // ✅ NOUVEAU: Fonction pour récupérer le token d'authentification
 const getAuthToken = (): string | null => {
   try {
-    // Essayer d'abord le token depuis les cookies Supabase
+    // 🔧 PRIORITÉ: Token depuis les cookies (URL-décodé)
+    const cookieToken = getCookieToken()
+    if (cookieToken) {
+      console.log('[getAuthToken] Token trouvé dans cookies')
+      return cookieToken
+    }
+
+    // Essayer le token depuis localStorage
     const sbToken = localStorage.getItem('sb-cdrmjshmkdfwwtsfdvbl-auth-token')
     if (sbToken) {
       try {
         const parsed = JSON.parse(sbToken)
         if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
+          console.log('[getAuthToken] Token trouvé dans localStorage')
           return parsed[0]
         }
       } catch (e) {
-        console.warn('[getAuthToken] Failed to parse sb token:', e)
+        console.warn('[getAuthToken] Failed to parse sb localStorage token:', e)
       }
     }
 
@@ -24,6 +32,7 @@ const getAuthToken = (): string | null => {
     if (supabaseToken) {
       const parsed = JSON.parse(supabaseToken)
       if (parsed.access_token && parsed.access_token !== 'mock-jwt-token-for-development') {
+        console.log('[getAuthToken] Token trouvé dans supabase.auth.token')
         return parsed.access_token
       }
     }
@@ -33,13 +42,48 @@ const getAuthToken = (): string | null => {
     if (authStorage) {
       const parsed = JSON.parse(authStorage)
       if (parsed?.state?.token) {
+        console.log('[getAuthToken] Token trouvé dans intelia-auth-storage')
         return parsed.state.token
       }
     }
 
+    console.warn('[getAuthToken] Aucun token trouvé dans toutes les sources')
     return null
   } catch (error) {
     console.error('[getAuthToken] Error getting auth token:', error)
+    return null
+  }
+}
+
+// ✅ NOUVEAU: Fonction pour récupérer le token depuis les cookies
+const getCookieToken = (): string | null => {
+  try {
+    // Récupérer le cookie Supabase
+    const cookies = document.cookie.split(';')
+    const sbCookie = cookies.find(cookie => 
+      cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
+    )
+    
+    if (sbCookie) {
+      // Extraire la valeur du cookie
+      const cookieValue = sbCookie.split('=')[1]
+      
+      // Décoder l'URL
+      const decodedValue = decodeURIComponent(cookieValue)
+      console.log('[getCookieToken] Cookie value décodé:', decodedValue.substring(0, 50) + '...')
+      
+      // Parser le JSON
+      const parsed = JSON.parse(decodedValue)
+      
+      if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
+        console.log('[getCookieToken] Token valide trouvé dans cookie')
+        return parsed[0]
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('[getCookieToken] Error parsing cookie token:', error)
     return null
   }
 }
@@ -101,7 +145,7 @@ export const generateAIResponse = async (
 
   try {
     const requestBody = {
-      question: question.trim(),
+      text: question.trim(),  // ✅ CORRIGÉ: text au lieu de question
       user_id: user.id,
       language: language,
       ...(conversationId && { conversation_id: conversationId })
