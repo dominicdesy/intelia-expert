@@ -222,7 +222,10 @@ export const useChatStore = (): ChatStore => {
    * ✅ VERSION ULTRA-MINIMALISTE: addMessage sans aucun log
    */
   const addMessage = (message: Message): void => {
+    console.log('🔥 addMessage APPELÉ')
+    
     if (!currentConversation) {
+      console.log('🔥 PAS DE CONVERSATION - création temp')
       const tempConversation: ConversationWithMessages = {
         id: 'temp-' + Date.now(),
         title: message.isUser ? message.content.substring(0, 60) + '...' : 'Nouvelle conversation',
@@ -236,14 +239,17 @@ export const useChatStore = (): ChatStore => {
       }
       
       setCurrentConversation(tempConversation)
+      console.log('🔥 CONVERSATION TEMP CRÉÉE')
       return
     }
     
-    // Vérification doublons simple
+    console.log('🔥 CONVERSATION EXISTE - ajout message')
     const messageExists = currentConversation.messages?.some(m => m.id === message.id)
-    if (messageExists) return
+    if (messageExists) {
+      console.log('🔥 MESSAGE DOUBLON - ignoré')
+      return
+    }
     
-    // Mise à jour conversation
     const updatedMessages = [...(currentConversation.messages || []), message]
     
     const updatedConversation: ConversationWithMessages = {
@@ -260,6 +266,7 @@ export const useChatStore = (): ChatStore => {
     }
     
     setCurrentConversation(updatedConversation)
+    console.log('🔥 CONVERSATION MISE À JOUR - messages:', updatedMessages.length)
   }
 
   /**
