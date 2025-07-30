@@ -451,32 +451,30 @@ async def log_conversation_endpoint(conversation: ConversationCreate):
         raise HTTPException(status_code=500, detail=f"Erreur enregistrement: {str(e)}")
 
 @router.patch("/conversation/{conversation_id}/feedback")
-async def update_conversation_feedback(conversation_id: str, feedback_data: FeedbackUpdate):
-    """Endpoint pour mettre à jour le feedback - CORRIGÉ"""
+async def update_conversation_feedback(conversation_id: str, feedback_data: dict):
+    """Endpoint pour mettre à jour le feedback - VERSION FLEXIBLE CORRIGÉE"""
     try:
         print(f"📊 [logging] Réception feedback pour: {conversation_id}")
-        print(f"📊 [logging] Feedback: {feedback_data.feedback}")
+        print(f"📊 [logging] Données reçues: {feedback_data}")
+        print(f"📊 [logging] Type: {type(feedback_data)}")
         
-        success = logger_instance.update_feedback(conversation_id, feedback_data.feedback)
+        # Extraire le feedback - support multiple formats
+        feedback_value = None
         
-        if success:
-            print(f"✅ [logging] Feedback mis à jour: {conversation_id}")
-            return {
-                "status": "success",
-                "message": "Feedback mis à jour avec succès", 
-                "conversation_id": conversation_id,
-                "feedback": feedback_data.feedback,
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            print(f"❌ [logging] Conversation non trouvée: {conversation_id}")
-            raise HTTPException(status_code=404, detail="Conversation non trouvée")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ [logging] Erreur mise à jour feedback: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur mise à jour: {str(e)}")
+        if isinstance(feedback_data, dict):
+            # Format 1: {"feedback": 1}
+            if "feedback" in feedback_data:
+                feedback_value = feedback_data["feedback"]
+                print(f"📊 [logging] Format détecté: 'feedback' -> {feedback_value}")
+            # Format 2: {"rating": "positive"}
+            elif "rating" in feedback_data:
+                rating_map = {"positive": 1, "negative": -1, "neutral": 0}
+                feedback_value = rating_map.get(feedback_data["rating"], 0)
+                print(f"📊 [logging] Format détecté: 'rating' -> {feedback_data['rating']} -> {feedback_value}")
+            # Format 3: {"vote": "up"}
+            elif "vote" in feedback_data:
+                vote_map = {"up": 1, "down": -1, "neutral": 0}
+                feedback_value = vote_map.get(feedback_data["vote"], 0
 
 @router.get("/conversation/{conversation_id}")
 async def get_conversation_endpoint(conversation_id: str):

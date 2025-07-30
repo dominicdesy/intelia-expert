@@ -25,9 +25,12 @@ export const FeedbackModal = ({
     try {
       await onSubmit(feedbackType, comment.trim() || undefined)
       setComment('')
-      onClose()
+      onClose() // ✅ Fermer la modal après succès
     } catch (error) {
       console.error('Erreur envoi feedback:', error)
+      // ✅ CORRECTION: Fermer la modal même en cas d'erreur
+      setComment('')
+      onClose()
       // Ne pas afficher d'alert ici, laisser la fonction parent gérer
     } finally {
       setIsLoading(false)
