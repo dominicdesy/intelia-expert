@@ -18,8 +18,41 @@ export class ConversationService {
   // ==================== NOUVELLES MÉTHODES POUR CONVERSATIONS ====================
 
   private getAuthToken(): string {
-    // Récupérer le token d'auth depuis le localStorage ou le store
-    return localStorage.getItem('authToken') || ''
+    try {
+      // 1. Essayer le token depuis les cookies (comme dans apiService)
+      const cookies = document.cookie.split(';')
+      const sbCookie = cookies.find(cookie => 
+        cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
+      )
+      
+      if (sbCookie) {
+        const cookieValue = sbCookie.split('=')[1]
+        const decodedValue = decodeURIComponent(cookieValue)
+        const parsed = JSON.parse(decodedValue)
+        
+        if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
+          return parsed[0]
+        }
+      }
+
+      // 2. Fallback vers localStorage
+      const sbToken = localStorage.getItem('sb-cdrmjshmkdfwwtsfdvbl-auth-token')
+      if (sbToken) {
+        try {
+          const parsed = JSON.parse(sbToken)
+          if (Array.isArray(parsed) && parsed[0]) {
+            return parsed[0]
+          }
+        } catch (e) {
+          console.warn('[ConversationService] Failed to parse localStorage token')
+        }
+      }
+
+      return ''
+    } catch (error) {
+      console.error('[ConversationService] Error getting auth token:', error)
+      return ''
+    }
   }
 
   /**
@@ -156,7 +189,10 @@ export class ConversationService {
       console.log('📡 URL conversations:', `${this.baseUrl}/conversations/user/${userId}?limit=${limit}`)
       
       const response = await fetch(`${this.baseUrl}/conversations/user/${userId}?limit=${limit}`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
+        }
       })
       
       if (!response.ok) {
@@ -249,7 +285,8 @@ export class ConversationService {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({
           user_id: data.user_id,
@@ -290,7 +327,8 @@ export class ConversationService {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({ feedback })
       })
@@ -323,7 +361,8 @@ export class ConversationService {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({ 
           comment: comment,
@@ -366,7 +405,8 @@ export class ConversationService {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         },
         body: JSON.stringify({ 
           feedback,
@@ -410,7 +450,8 @@ export class ConversationService {
       const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
         method: 'DELETE',
         headers: { 
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         }
       })
       
@@ -445,7 +486,8 @@ export class ConversationService {
       const response = await fetch(`${this.baseUrl}/conversations/user/${userId}`, {
         method: 'DELETE',
         headers: { 
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
         }
       })
       
@@ -478,7 +520,10 @@ export class ConversationService {
       console.log('📊 Récupération stats feedback:', url)
       
       const response = await fetch(url, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
+        }
       })
       
       if (!response.ok) {
@@ -504,7 +549,10 @@ export class ConversationService {
       console.log('🔍 Test connectivité service logging...')
       
       const response = await fetch(`${this.baseUrl}/test-comments`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.getAuthToken()}`
+        }
       })
       
       if (response.ok) {
