@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Message } from './types'
 import { useAuthStore } from './hooks/useAuthStore'
 import { useTranslation } from './hooks/useTranslation'
-import { useCurrentConversation, useConversationActions, useChatStore } from './hooks/useChatStore'
+import { useChatStore } from './hooks/useChatStore' // ✅ UN SEUL HOOK
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 import { 
@@ -21,15 +21,20 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ==================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ====================
+// ==================== COMPOSANT PRINCIPAL AVEC HOOKS UNIFIÉS ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   
-  // ✅ Hooks pour conversations
-  const { currentConversation, setCurrentConversation, addMessage, updateMessage } = useCurrentConversation()
-  const { createNewConversation } = useConversationActions()
-  const { loadConversations } = useChatStore()
+  // ✅ CORRECTION : Un seul hook pour tout le store
+  const {
+    currentConversation,
+    setCurrentConversation,
+    addMessage,
+    updateMessage,
+    createNewConversation,
+    loadConversations
+  } = useChatStore()
   
   // États locaux pour l'interface
   const [inputMessage, setInputMessage] = useState('')
@@ -52,7 +57,7 @@ export default function ChatInterface() {
     feedbackType: null
   })
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
-  const [forceRender, setForceRender] = useState(0) // ✅ NOUVEAU: Force re-render
+  const [forceRender, setForceRender] = useState(0)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -62,7 +67,7 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  // ==================== EFFECTS ====================
+  // ==================== EFFECTS (IDENTIQUES) ====================
   
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -94,7 +99,7 @@ export default function ChatInterface() {
     }
     
     lastMessageCountRef.current = messages.length
-  }, [messages.length, messages, shouldAutoScroll, isUserScrolling]) // ✅ CORRECTION: Ajouter messages dans les dépendances
+  }, [messages.length, messages, shouldAutoScroll, isUserScrolling])
 
   useEffect(() => {
     const chatContainer = chatContainerRef.current
@@ -135,7 +140,6 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
-  // ✅ Effect pour initialiser une conversation vide au démarrage
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages) {
       const welcomeMessage: Message = {
@@ -162,7 +166,6 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // ✅ Effect pour mettre à jour le message de bienvenue lors du changement de langue
   useEffect(() => {
     if (currentConversation?.id === 'welcome' && currentConversation.messages.length === 1) {
       const updatedMessage: Message = {
@@ -179,13 +182,10 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
 
-  // ✅ Effect pour forcer le re-render quand la conversation change
   useEffect(() => {
-    // Force le composant à se re-rendre quand currentConversation change
     console.log('🔄 Conversation changée, force re-render')
   }, [currentConversation?.messages?.length, currentConversation?.id])
 
-  // ✅ Effect pour charger l'historique des conversations au démarrage
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       const loadTimer = setTimeout(() => {
@@ -199,7 +199,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, user?.id, loadConversations])
 
-  // ==================== HANDLERS ====================
+  // ==================== HANDLERS (IDENTIQUES) ====================
 
   if (isLoading) {
     return (
@@ -227,7 +227,6 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ CORRECTION FINALE: handleSendMessage simplifié sans logs qui causent la boucle
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -238,7 +237,6 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    // Détection du type de conversation
     let conversationIdToSend: string | undefined = undefined
     let isFirstMessage = false
 
@@ -250,7 +248,6 @@ export default function ChatInterface() {
       isFirstMessage = true
     }
 
-    // Ajouter le message utilisateur
     addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
@@ -280,7 +277,6 @@ export default function ChatInterface() {
       addMessage(aiMessage)
       console.log('🔥 APRÈS addMessage')
       
-      // ✅ FORCE RE-RENDER
       setForceRender(prev => {
         console.log('🔥 FORCE RENDER:', prev + 1)
         return prev + 1
@@ -297,7 +293,6 @@ export default function ChatInterface() {
         setCurrentConversation(updatedConversation)
         console.log('🔥 CONVERSATION MISE À JOUR')
         
-        // ✅ FORCE RE-RENDER
         setForceRender(prev => {
           console.log('🔥 FORCE RENDER CONVERSATION:', prev + 1)
           return prev + 1
@@ -318,7 +313,6 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ GESTION FEEDBACK (conservée)
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     setFeedbackModal({
       isOpen: true,
@@ -381,7 +375,6 @@ export default function ChatInterface() {
     })
   }
 
-  // ✅ Gestion nouvelle conversation
   const handleNewConversation = () => {
     createNewConversation()
     
@@ -427,7 +420,7 @@ export default function ChatInterface() {
     })
   }
 
-  // ==================== RENDER ====================
+  // ==================== RENDER (IDENTIQUE) ====================
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
@@ -478,6 +471,7 @@ export default function ChatInterface() {
                 <br />
                 Messages: {messages.map(m => `${m.isUser ? 'User' : 'AI'}: ${m.content.substring(0, 20)}...`).join(' | ')}
               </div>
+
               {/* Date */}
               {hasMessages && (
                 <div className="text-center">
