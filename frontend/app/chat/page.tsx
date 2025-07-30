@@ -15,7 +15,7 @@ import {
   ArrowDownIcon,
   ThumbUpIcon,
   ThumbDownIcon
-} from './utils/icons.tsx'
+} from './utils/icons'  // ✅ CORRECTION: Suppression de .tsx
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
