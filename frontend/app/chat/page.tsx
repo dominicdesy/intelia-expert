@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Message } from './types'
 import { useAuthStore } from './hooks/useAuthStore'
 import { useTranslation } from './hooks/useTranslation'
-import { useChatStore } from './hooks/useChatStore' // ✅ UN SEUL HOOK
+import { useChatStore } from './hooks/useChatStore' // ? UN SEUL HOOK
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 import { 
@@ -21,12 +21,12 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ==================== COMPOSANT PRINCIPAL AVEC HOOKS UNIFIÉS ====================
+// ==================== COMPOSANT PRINCIPAL AVEC HOOKS UNIFI�S ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   
-  // ✅ CORRECTION : Un seul hook pour tout le store
+  // ? CORRECTION : Un seul hook pour tout le store
   const {
     currentConversation,
     setCurrentConversation,
@@ -36,17 +36,17 @@ export default function ChatInterface() {
     loadConversations
   } = useChatStore()
   
-  // États locaux pour l'interface
+  // �tats locaux pour l'interface
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   
-  // États pour le scroll intelligent
+  // �tats pour le scroll intelligent
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [isUserScrolling, setIsUserScrolling] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
   
-  // États pour la modal feedback
+  // �tats pour la modal feedback
   const [feedbackModal, setFeedbackModal] = useState<{
     isOpen: boolean
     messageId: string | null
@@ -57,13 +57,12 @@ export default function ChatInterface() {
     feedbackType: null
   })
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
-  const [forceRender, setForceRender] = useState(0)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // ✅ Calculer les messages à afficher
+  // ? Calculer les messages � afficher
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
@@ -186,16 +185,16 @@ export default function ChatInterface() {
   }, [currentLanguage, t])
 
   useEffect(() => {
-    console.log('🔄 Conversation changée, force re-render')
+    console.log('?? Conversation chang�e, force re-render')
   }, [currentConversation?.messages?.length, currentConversation?.id])
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       const loadTimer = setTimeout(() => {
-        console.log('🔄 [ChatInterface] Chargement historique pour:', user.id)
+        console.log('?? [ChatInterface] Chargement historique pour:', user.id)
         loadConversations(user.id)
-          .then(() => console.log('✅ Historique conversations chargé'))
-          .catch(err => console.error('❌ Erreur chargement historique:', err))
+          .then(() => console.log('? Historique conversations charg�'))
+          .catch(err => console.error('? Erreur chargement historique:', err))
       }, 800)
 
       return () => clearTimeout(loadTimer)
@@ -266,7 +265,7 @@ export default function ChatInterface() {
         conversationIdToSend
       )
 
-      console.log('🔥 APRÈS API - avant addMessage')
+      console.log('?? APR�S API - avant addMessage')
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -276,14 +275,9 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      console.log('🔥 AVANT addMessage - message créé')
+      console.log('?? AVANT addMessage - message cr��')
       addMessage(aiMessage)
-      console.log('🔥 APRÈS addMessage')
-      
-      setForceRender(prev => {
-        console.log('🔥 FORCE RENDER:', prev + 1)
-        return prev + 1
-      })
+      console.log('?? APR�S addMessage')
 
       if (isFirstMessage && response.conversation_id && currentConversation) {
         const updatedConversation = {
@@ -294,16 +288,11 @@ export default function ChatInterface() {
         }
         
         setCurrentConversation(updatedConversation)
-        console.log('🔥 CONVERSATION MISE À JOUR')
-        
-        setForceRender(prev => {
-          console.log('🔥 FORCE RENDER CONVERSATION:', prev + 1)
-          return prev + 1
-        })
+        console.log('?? CONVERSATION MISE � JOUR')
       }
       
     } catch (error) {
-      console.error('❌ [handleSendMessage] Erreur:', error)
+      console.error('? [handleSendMessage] Erreur:', error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: error instanceof Error ? error.message : t('chat.errorMessage'),
@@ -330,7 +319,7 @@ export default function ChatInterface() {
 
     const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
-      console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
+      console.warn('?? Conversation ID non trouv� pour le feedback', messageId)
       return
     }
 
@@ -350,11 +339,11 @@ export default function ChatInterface() {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
           } catch (commentError) {
-            console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
+            console.warn('?? Commentaire non envoy� (endpoint manquant):', commentError)
           }
         }
       } catch (feedbackError) {
-        console.error('❌ Erreur envoi feedback:', feedbackError)
+        console.error('? Erreur envoi feedback:', feedbackError)
         updateMessage(messageId, { 
           feedback: null,
           feedbackComment: undefined 
@@ -363,7 +352,7 @@ export default function ChatInterface() {
       }
       
     } catch (error) {
-      console.error('❌ Erreur générale feedback:', error)
+      console.error('? Erreur g�n�rale feedback:', error)
       throw error
     } finally {
       setIsSubmittingFeedback(false)
@@ -467,10 +456,10 @@ export default function ChatInterface() {
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto px-4 py-6"
           >
-            <div className="max-w-4xl mx-auto space-y-6" key={forceRender}>
+            <div className="max-w-4xl mx-auto space-y-6">
               {/* DEBUG temporaire */}
               <div className="text-xs text-gray-400 text-center">
-                DEBUG: {messages.length} messages - Render: {forceRender}
+                DEBUG: {messages.length} messages - Conversation: {currentConversation?.id}
                 <br />
                 Messages: {messages.map(m => `${m.isUser ? 'User' : 'AI'}: ${m.content.substring(0, 20)}...`).join(' | ')}
               </div>
@@ -488,7 +477,7 @@ export default function ChatInterface() {
               {currentConversation && currentConversation.id !== 'welcome' && (
                 <div className="text-center">
                   <div className="inline-flex items-center space-x-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-full">
-                    <span>📖</span>
+                    <span>??</span>
                     <span>Conversation : {currentConversation.title}</span>
                     <span className="text-blue-400">({currentConversation.message_count} messages)</span>
                   </div>
@@ -498,7 +487,7 @@ export default function ChatInterface() {
               {/* Messages */}
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <div className="text-sm">Aucun message à afficher</div>
+                  <div className="text-sm">Aucun message � afficher</div>
                 </div>
               ) : (
                 messages.map((message, index) => (
@@ -547,7 +536,7 @@ export default function ChatInterface() {
                                 </span>
                                 {message.feedbackComment && (
                                   <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                    💬
+                                    ??
                                   </span>
                                 )}
                               </div>

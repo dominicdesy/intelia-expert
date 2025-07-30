@@ -1,7 +1,6 @@
 """
-app/api/v1/expert.py - VERSION COMPLÈTE AVEC SYSTÈME DE CLARIFICATION
+app/api/v1/expert.py - VERSION COMPLÈTE RÉÉCRITE AVEC CORRECTIONS
 CORRECTIONS: save_conversation et update_feedback
-NOUVEAU: Système de clarification intelligent intégré
 CONSERVATION: Toutes les autres fonctionnalités existantes
 """
 import os
@@ -38,27 +37,6 @@ except ImportError as e:
 except Exception as e:
     AGRICULTURAL_VALIDATOR_AVAILABLE = False
     logger.error(f"❌ [Expert] Erreur inattendue import validateur: {e}")
-
-# =============================================================================
-# IMPORT SYSTÈME DE CLARIFICATION - NOUVEAU
-# =============================================================================
-
-try:
-    from app.api.v1.question_clarification_system import (
-        analyze_question_for_clarification,
-        format_clarification_response,
-        is_clarification_system_enabled,
-        get_clarification_system_stats
-    )
-    CLARIFICATION_SYSTEM_AVAILABLE = True
-    logger.info("✅ [Expert] Système de clarification importé avec succès")
-    logger.info(f"✅ [Expert] Clarification: {'ACTIVE' if is_clarification_system_enabled() else 'INACTIVE'}")
-except ImportError as e:
-    CLARIFICATION_SYSTEM_AVAILABLE = False
-    logger.warning(f"⚠️ [Expert] Système de clarification non disponible: {e}")
-except Exception as e:
-    CLARIFICATION_SYSTEM_AVAILABLE = False
-    logger.error(f"❌ [Expert] Erreur inattendue import clarification: {e}")
 
 # =============================================================================
 # IMPORT AUTH
@@ -410,7 +388,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE + CLARIFICATION INTÉGRÉE
+# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE INTÉGRÉE
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
@@ -419,18 +397,17 @@ async def ask_expert_secure(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification + validation agricole + clarification intelligente"""
+    """Question avec authentification + validation agricole obligatoire"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🔐 DÉBUT ask_expert_secure avec validation agricole + clarification")
+        logger.info("🔐 DÉBUT ask_expert_secure avec validation agricole")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
         logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
         logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
-        logger.info(f"❓ CLARIFICATION_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABLE}")
         
         # Vérification auth
         if not AUTH_AVAILABLE:
@@ -476,6 +453,7 @@ async def ask_expert_secure(
             
             response_time_ms = int((time.time() - start_time) * 1000)
             
+            # Sauvegarde du rejet pour analytics
             await save_conversation_auto(
                 conversation_id=conversation_id,
                 question=question_text,
@@ -509,65 +487,7 @@ async def ask_expert_secure(
         
         logger.info(f"✅ [VALIDATION] Question validée (confiance: {validation_confidence:.1f}%)")
         
-        # ===🆕 NOUVEAU: VÉRIFICATION DE CLARIFICATION ===
-        if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
-            logger.info("❓ [CLARIFICATION] Vérification besoin de clarification...")
-            
-            clarification_result = await analyze_question_for_clarification(
-                question=question_text,
-                language=request_data.language,
-                user_id=user_id or "authenticated_user",
-                conversation_id=conversation_id
-            )
-            
-            if clarification_result.needs_clarification:
-                logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
-                
-                clarification_response = format_clarification_response(
-                    questions=clarification_result.questions,
-                    language=request_data.language,
-                    original_question=question_text
-                )
-                
-                response_time_ms = int((time.time() - start_time) * 1000)
-                
-                await save_conversation_auto(
-                    conversation_id=conversation_id,
-                    question=question_text,
-                    response=clarification_response,
-                    user_id=user_id or "authenticated_user",
-                    language=request_data.language,
-                    rag_used=False,
-                    rag_score=None,
-                    response_time_ms=response_time_ms
-                )
-                
-                response_obj = ExpertResponse(
-                    question=str(question_text),
-                    response=str(clarification_response),
-                    conversation_id=conversation_id,
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=response_time_ms,
-                    mode="clarification_needed_authenticated",
-                    user=user_email,
-                    logged=True,
-                    validation_passed=True,
-                    validation_confidence=validation_confidence
-                )
-                
-                logger.info("❓ [CLARIFICATION] Demande envoyée et loggée")
-                logger.info("=" * 60)
-                return response_obj
-            
-            logger.info("✅ [CLARIFICATION] Question suffisamment claire")
-        # ===🆕 FIN CLARIFICATION ===
-        
         # === TRAITEMENT NORMAL (RAG/OpenAI) ===
-        user = getattr(request.state, "user", None)
-        
         # Variables par défaut
         rag_used = False
         rag_score = None
@@ -646,7 +566,7 @@ async def ask_expert_secure(
             validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_secure - Succès avec validation + clarification")
+        logger.info("✅ FIN ask_expert_secure - Succès avec validation")
         logger.info("=" * 60)
         
         return response_obj
@@ -662,7 +582,7 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE + CLARIFICATION INTÉGRÉE
+# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE INTÉGRÉE
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
@@ -670,19 +590,18 @@ async def ask_expert_public(
     request_data: QuestionRequest,
     request: Request
 ):
-    """Question publique avec validation agricole + clarification intelligente"""
+    """Question publique avec validation agricole obligatoire"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🌐 DÉBUT ask_expert_public avec validation agricole + clarification")
+        logger.info("🌐 DÉBUT ask_expert_public avec validation agricole")
         logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
         logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
-        logger.info(f"❓ CLARIFICATION_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABLE}")
         
-        # Validation de la question
+        # Récupération de la question avec validation
         question_text = request_data.text.strip()
         
         if not question_text:
@@ -711,6 +630,7 @@ async def ask_expert_public(
             
             response_time_ms = int((time.time() - start_time) * 1000)
             
+            # Sauvegarde du rejet pour analytics
             await save_conversation_auto(
                 conversation_id=conversation_id,
                 question=question_text,
@@ -743,62 +663,6 @@ async def ask_expert_public(
             return response_obj
         
         logger.info(f"✅ [VALIDATION] Question publique validée (confiance: {validation_confidence:.1f}%)")
-        
-        # ===🆕 NOUVEAU: VÉRIFICATION DE CLARIFICATION ===
-        if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
-            logger.info("❓ [CLARIFICATION] Vérification besoin de clarification...")
-            
-            clarification_result = await analyze_question_for_clarification(
-                question=question_text,
-                language=request_data.language,
-                user_id=user_id,
-                conversation_id=conversation_id
-            )
-            
-            if clarification_result.needs_clarification:
-                logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
-                
-                clarification_response = format_clarification_response(
-                    questions=clarification_result.questions,
-                    language=request_data.language,
-                    original_question=question_text
-                )
-                
-                response_time_ms = int((time.time() - start_time) * 1000)
-                
-                await save_conversation_auto(
-                    conversation_id=conversation_id,
-                    question=question_text,
-                    response=clarification_response,
-                    user_id=user_id,
-                    language=request_data.language,
-                    rag_used=False,
-                    rag_score=None,
-                    response_time_ms=response_time_ms
-                )
-                
-                response_obj = ExpertResponse(
-                    question=str(question_text),
-                    response=str(clarification_response),
-                    conversation_id=conversation_id,
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=response_time_ms,
-                    mode="clarification_needed_public",
-                    user=None,
-                    logged=True,
-                    validation_passed=True,
-                    validation_confidence=validation_confidence
-                )
-                
-                logger.info("❓ [CLARIFICATION] Demande publique envoyée et loggée")
-                logger.info("=" * 60)
-                return response_obj
-            
-            logger.info("✅ [CLARIFICATION] Question suffisamment claire")
-        # ===🆕 FIN CLARIFICATION ===
         
         # === TRAITEMENT NORMAL (RAG/OpenAI) ===
         user = getattr(request.state, "user", None)
@@ -879,7 +743,7 @@ async def ask_expert_public(
             validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_public - Succès avec validation + clarification")
+        logger.info("✅ FIN ask_expert_public - Succès avec validation")
         logger.info("=" * 60)
         
         return response_obj
@@ -1029,7 +893,6 @@ async def get_suggested_topics(language: str = "fr"):
             "language": lang,
             "count": len(topics),
             "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else False,
-            "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else False,
             "note": "Topics génériques pour tous poulets de chair"
         }
     except Exception as e:
@@ -1037,7 +900,7 @@ async def get_suggested_topics(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 # =============================================================================
-# NOUVEAUX ENDPOINTS DE DIAGNOSTIC ET CLARIFICATION
+# NOUVEAUX ENDPOINTS DE DIAGNOSTIC
 # =============================================================================
 
 @router.get("/validation-stats")
@@ -1063,103 +926,6 @@ async def get_validation_stats():
     except Exception as e:
         logger.error(f"❌ Erreur stats validation: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération stats")
-
-@router.post("/test-clarification")
-async def test_clarification_system(
-    request_data: QuestionRequest,
-    request: Request
-):
-    """Endpoint de test pour le système de clarification"""
-    try:
-        question_text = request_data.text.strip()
-        user_id = get_user_id_from_request(request)
-        conversation_id = str(uuid.uuid4())
-        
-        if not CLARIFICATION_SYSTEM_AVAILABLE:
-            return {
-                "system_available": False,
-                "message": "Système de clarification non disponible",
-                "question": question_text,
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        if not is_clarification_system_enabled():
-            return {
-                "system_available": True,
-                "system_enabled": False,
-                "message": "Système de clarification désactivé",
-                "question": question_text,
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        # Test de clarification
-        clarification_result = await analyze_question_for_clarification(
-            question=question_text,
-            language=request_data.language,
-            user_id=user_id,
-            conversation_id=conversation_id
-        )
-        
-        if clarification_result.needs_clarification:
-            formatted_response = format_clarification_response(
-                questions=clarification_result.questions,
-                language=request_data.language,
-                original_question=question_text
-            )
-            
-            return {
-                "system_available": True,
-                "system_enabled": True,
-                "needs_clarification": True,
-                "question": question_text,
-                "language": request_data.language,
-                "clarification_questions": clarification_result.questions,
-                "formatted_response": formatted_response,
-                "confidence_score": clarification_result.confidence_score,
-                "processing_time_ms": clarification_result.processing_time_ms,
-                "model_used": clarification_result.model_used,
-                "system_stats": get_clarification_system_stats(),
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            return {
-                "system_available": True,
-                "system_enabled": True,
-                "needs_clarification": False,
-                "question": question_text,
-                "language": request_data.language,
-                "reason": clarification_result.reason,
-                "processing_time_ms": clarification_result.processing_time_ms,
-                "system_stats": get_clarification_system_stats(),
-                "timestamp": datetime.now().isoformat()
-            }
-    
-    except Exception as e:
-        logger.error(f"❌ [Clarification] Erreur test: {e}")
-        return {
-            "system_available": CLARIFICATION_SYSTEM_AVAILABLE,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-@router.get("/clarification-status")
-async def get_clarification_status():
-    """Retourne le statut du système de clarification"""
-    if not CLARIFICATION_SYSTEM_AVAILABLE:
-        return {
-            "system_available": False,
-            "message": "Module de clarification non importé",
-            "timestamp": datetime.now().isoformat()
-        }
-    
-    return {
-        "system_available": True,
-        "clarification_system": get_clarification_system_stats(),
-        "configuration_source": "environment_variables_and_settings",
-        "can_be_disabled": True,
-        "disable_instruction": "Set ENABLE_CLARIFICATION_SYSTEM=false in .env",
-        "timestamp": datetime.now().isoformat()
-    }
 
 @router.post("/test-validation")
 async def test_validation(
@@ -1202,7 +968,7 @@ async def test_validation(
         raise HTTPException(status_code=500, detail=f"Erreur test validation: {str(e)}")
 
 # =============================================================================
-# ENDPOINTS DEBUG (conservés identiques)
+# ENDPOINTS DEBUG
 # =============================================================================
 
 @router.get("/debug-database")
@@ -1276,7 +1042,7 @@ async def debug_database_info():
 
 @router.get("/debug-system")
 async def debug_system_info():
-    """Endpoint de diagnostic système complet avec validateur et clarification"""
+    """Endpoint de diagnostic système complet avec validateur"""
     import os
     import sys
     
@@ -1310,45 +1076,28 @@ async def debug_system_info():
     except Exception as e:
         import_tests["agricultural_validator_module"] = f"❌ {str(e)}"
     
-    # Test spécifique du système de clarification
-    try:
-        import app.api.v1.question_clarification_system
-        import_tests["clarification_system_module"] = "✅ OK"
-        
-        clarification_attrs = dir(app.api.v1.question_clarification_system)
-        clarification_functions = [attr for attr in clarification_attrs if not attr.startswith('_')]
-        import_tests["clarification_system_functions"] = clarification_functions
-        
-    except Exception as e:
-        import_tests["clarification_system_module"] = f"❌ {str(e)}"
-    
     return {
         "auth_available": AUTH_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
-        "clarification_system_available": CLARIFICATION_SYSTEM_AVAILABLE,
-        "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else None,
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
         "current_directory": os.path.dirname(__file__),
         "python_path_sample": sys.path[:3],
         "import_tests": import_tests,
         "validator_stats": get_agricultural_validator_stats() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
-        "clarification_stats": get_clarification_system_stats() if CLARIFICATION_SYSTEM_AVAILABLE else None,
         "timestamp": datetime.now().isoformat()
     }
 
 @router.get("/debug-auth")
 async def debug_auth_info(request: Request):
-    """Endpoint de diagnostic rapide avec validation et clarification"""
+    """Endpoint de diagnostic rapide avec validation"""
     auth_header = request.headers.get("Authorization")
     
     return {
         "auth_available": AUTH_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
-        "clarification_system_available": CLARIFICATION_SYSTEM_AVAILABLE,
-        "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else None,
         "auth_header_present": bool(auth_header),
         "auth_header_preview": auth_header[:50] + "..." if auth_header else None,
         "openai_available": OPENAI_AVAILABLE,
@@ -1358,7 +1107,7 @@ async def debug_auth_info(request: Request):
 
 @router.post("/test-utf8")
 async def test_utf8_direct(request: Request):
-    """Test endpoint pour UTF-8 direct avec validation et clarification"""
+    """Test endpoint pour UTF-8 direct avec validation"""
     try:
         # Récupérer le body brut
         body = await request.body()
@@ -1399,30 +1148,7 @@ async def test_utf8_direct(request: Request):
                 "timestamp": datetime.now().isoformat()
             }
         
-        # Test de clarification si disponible
-        clarification_result = None
-        if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
-            clarification_result = await analyze_question_for_clarification(
-                question=question_text,
-                language=language,
-                user_id=user_id,
-                conversation_id=str(uuid.uuid4())
-            )
-        
-        # Traitement direct seulement si validé et pas de clarification
-        if clarification_result and clarification_result.needs_clarification:
-            return {
-                "success": True,
-                "question_received": question_text,
-                "special_chars_detected": [c for c in question_text if ord(c) > 127],
-                "validation_passed": True,
-                "confidence": validation_confidence,
-                "needs_clarification": True,
-                "clarification_questions": clarification_result.questions,
-                "method": "direct_body_parsing_with_validation_and_clarification",
-                "timestamp": datetime.now().isoformat()
-            }
-        
+        # Traitement direct seulement si validé
         answer = await process_question_openai(question_text, language, "fast")
         
         return {
@@ -1431,9 +1157,8 @@ async def test_utf8_direct(request: Request):
             "special_chars_detected": [c for c in question_text if ord(c) > 127],
             "validation_passed": True,
             "confidence": validation_confidence,
-            "needs_clarification": False,
             "response": answer,
-            "method": "direct_body_parsing_with_validation_and_clarification",
+            "method": "direct_body_parsing_with_validation",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -1459,12 +1184,10 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ EXPERT.PY COMPLET AVEC SYSTÈME DE CLARIFICATION INTÉGRÉ")
+logger.info("✅ EXPERT.PY RÉÉCRIT AVEC CORRECTIONS COMPLÈTES")
 logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
 logger.info(f"🌾 AGRICULTURAL_VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
 logger.info(f"🌾 VALIDATION_ENABLED: {is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else 'N/A'}")
-logger.info(f"❓ CLARIFICATION_SYSTEM_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABLE}")
-logger.info(f"❓ CLARIFICATION_ENABLED: {is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else 'N/A'}")
 logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
 logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
-logger.info("🔧 NOUVELLES FONCTIONNALITÉS: Clarification intelligente intégrée + Validation + Logging")
+logger.info("🔧 CORRECTIONS APPLIQUÉES: save_conversation_auto + submit_feedback")
