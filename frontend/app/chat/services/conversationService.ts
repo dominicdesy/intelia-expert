@@ -1,5 +1,3 @@
-// ==================== SERVICE CONVERSATIONS COMPLET ====================
-
 import { 
   Conversation, 
   ConversationWithMessages, 
@@ -10,7 +8,7 @@ import {
   Message,
   ConversationData,
   API_CONFIG
-} from './types'
+} from '../types'
 
 // ==================== SERVICE CONVERSATIONS COMPLET INTÉGRÉ ====================
 export class ConversationService {
@@ -144,8 +142,9 @@ export class ConversationService {
     return groups.filter(group => group.conversations.length > 0)
   }
 
-  // ==================== MÉTHODES EXISTANTES ADAPTÉES ====================
-
+  /**
+   * Récupère les conversations utilisateur (version simplifiée pour compatibilité)
+   */
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.loggingEnabled) {
       console.log('🔍 Logging désactivé - conversations non récupérées')
