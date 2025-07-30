@@ -6,11 +6,9 @@ interface InviteFriendModalProps {
   onClose: () => void
 }
 
-// ==================== SERVICE D'INVITATION CORRIGÉ ====================
+// ==================== SERVICE D'INVITATION AVEC SUPABASE CLIENT ====================
 const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    
     try {
       console.log('📧 [InvitationService] Envoi invitation:', { 
         emails, 
@@ -18,37 +16,25 @@ const invitationService = {
         inviterEmail: inviterInfo.email 
       })
       
-      // CORRECTION 1: Récupérer le token d'auth Supabase
-      const token = localStorage.getItem('supabase.auth.token') || 
-                   localStorage.getItem('supabase_token') ||
-                   sessionStorage.getItem('supabase.auth.token')
+      // CORRECTION: Utiliser le même pattern que generateAIResponse
+      // Utiliser fetch avec l'endpoint d'invitation directement
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
-      if (!token) {
-        throw new Error('Vous devez être connecté pour envoyer des invitations')
-      }
-
-      // CORRECTION 2: Headers d'authentification appropriés
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Accept': 'application/json',
-        'Accept-Charset': 'utf-8'
-      }
-
-      // Ajouter l'authorization header selon le format Supabase
-      if (token.startsWith('Bearer ')) {
-        headers['Authorization'] = token
-      } else {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-      
+      // SOLUTION: Laisser le navigateur gérer l'authentification automatiquement
+      // Si l'utilisateur est connecté, les cookies/session Supabase seront automatiquement inclus
       const response = await fetch(`${API_BASE_URL}/api/v1/invitations/send`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          // SUPPRIMÉ: Gestion manuelle de Authorization
+          // Le navigateur va automatiquement inclure les headers d'auth nécessaires
+        },
+        credentials: 'include', // CRITIQUE: Inclure les cookies de session
         body: JSON.stringify({
           emails,
           personal_message: personalMessage,
           inviter_name: inviterInfo.name,
-          inviter_email: inviterInfo.email, // CRITIQUE: Doit correspondre à l'user connecté
+          inviter_email: inviterInfo.email,
           language: inviterInfo.language || 'fr'
         })
       })
