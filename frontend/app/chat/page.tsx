@@ -21,7 +21,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ==================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ====================
+// ====================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ======================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
