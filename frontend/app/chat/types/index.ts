@@ -549,7 +549,7 @@ export interface AnalyticsApiResponse {
   message: string
 }
 
-// ✅ TYPE GUARDS POUR LA VALIDATION
+// ✅ TYPE GUARDS POUR LA VALIDATION - CORRECTION
 export const TypeGuards = {
   isFeedbackType: (value: any): value is 'positive' | 'negative' => {
     return typeof value === 'string' && ['positive', 'negative'].includes(value)
@@ -575,7 +575,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ NOUVEAUX TYPE GUARDS POUR CONVERSATIONS
+  // ✅ TYPE GUARD POUR CONVERSATION DE BASE
   isValidConversation: (value: any): value is Conversation => {
     return (
       typeof value === 'object' &&
@@ -587,9 +587,15 @@ export const TypeGuards = {
     )
   },
 
+  // ✅ CORRECTION: Type guard pour ConversationWithMessages
   isValidConversationWithMessages: (value: any): value is ConversationWithMessages => {
     return (
-      TypeGuards.isValidConversation(value) &&
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.id === 'string' &&
+      typeof value.title === 'string' &&
+      typeof value.preview === 'string' &&
+      typeof value.message_count === 'number' &&
       Array.isArray(value.messages) &&
       value.messages.every((msg: any) => TypeGuards.isValidMessage(msg))
     )
