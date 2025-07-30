@@ -397,3 +397,132 @@ export class ConversationService {
       throw error
     }
   }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversation non supprimée:', conversationId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression conversation serveur:', conversationId)
+      console.log('📡 URL suppression:', `${this.baseUrl}/conversation/${conversationId}`)
+      
+      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn('⚠️ Endpoint de suppression non disponible sur le serveur')
+          return
+        }
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Conversation supprimée du serveur:', result.message)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression conversation serveur:', error)
+      throw error
+    }
+  }
+
+  async clearAllUserConversations(userId: string): Promise<void> {
+    if (!this.loggingEnabled) {
+      console.log('🗑️ Logging désactivé - conversations non supprimées:', userId)
+      return
+    }
+
+    try {
+      console.log('🗑️ Suppression toutes conversations serveur pour:', userId)
+      console.log('📡 URL suppression globale:', `${this.baseUrl}/conversations/user/${userId}`)
+      
+      const response = await fetch(`${this.baseUrl}/conversations/user/${userId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Toutes conversations supprimées du serveur:', result.message, 'Count:', result.deleted_count)
+      
+    } catch (error) {
+      console.error('❌ Erreur suppression toutes conversations serveur:', error)
+      throw error
+    }
+  }
+
+  async getFeedbackStats(userId?: string, days: number = 7): Promise<any> {
+    if (!this.loggingEnabled) {
+      console.log('📊 Logging désactivé - stats feedback non récupérées')
+      return null
+    }
+
+    try {
+      const params = new URLSearchParams()
+      if (userId) params.append('user_id', userId)
+      params.append('days', days.toString())
+      
+      const url = `${this.baseUrl}/analytics/feedback?${params.toString()}`
+      console.log('📊 Récupération stats feedback:', url)
+      
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn('⚠️ Endpoint stats feedback pas encore implémenté')
+          return null
+        }
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('✅ Stats feedback récupérées:', data)
+      return data
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération stats feedback:', error)
+      return null
+    }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('🔍 Test connectivité service logging...')
+      
+      const response = await fetch(`${this.baseUrl}/test-comments`, {
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('✅ Service logging opérationnel:', data.message)
+        return true
+      } else {
+        console.warn('⚠️ Service logging indisponible:', response.status)
+        return false
+      }
+      
+    } catch (error) {
+      console.error('❌ Erreur test connectivité:', error)
+      return false
+    }
+  }
+}
+
+// Instance globale du service
+export const conversationService = new ConversationService()
