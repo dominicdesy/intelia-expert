@@ -286,31 +286,24 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      // ✅ CORRECTION: Gestion synchronisée des conversations
-      if (isFirstMessage && response.conversation_id) {
-        console.log('🔄 [handleSendMessage] Mise à jour conversation avec ID backend:', response.conversation_id)
+      // ✅ CORRECTION: Toujours ajouter le message AI, puis gérer la conversation
+      addMessage(aiMessage)
+      console.log('✅ [handleSendMessage] Message AI ajouté')
+
+      // ✅ CORRECTION: Si première question, mettre à jour l'ID de conversation
+      if (isFirstMessage && response.conversation_id && currentConversation) {
+        console.log('🔄 [handleSendMessage] Mise à jour ID conversation:', response.conversation_id)
         
-        // Créer/mettre à jour la conversation avec l'ID réel du backend
-        const realConversation = {
+        // Mettre à jour la conversation existante avec l'ID réel du backend
+        const updatedConversation = {
+          ...currentConversation,
           id: response.conversation_id,
           title: text.trim().substring(0, 60) + (text.trim().length > 60 ? '...' : ''),
-          preview: text.trim(),
-          message_count: 2,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          language: currentLanguage,
-          status: 'active' as const,
-          last_message_preview: response.response.substring(0, 100) + '...',
-          messages: [userMessage, aiMessage] // ✅ CORRECTION: Inclure les deux messages
+          updated_at: new Date().toISOString()
         }
         
-        setCurrentConversation(realConversation)
-        console.log('✅ [handleSendMessage] Conversation complète créée avec', realConversation.messages.length, 'messages')
-        
-      } else {
-        // Pour conversation existante, juste ajouter le message AI
-        addMessage(aiMessage)
-        console.log('✅ [handleSendMessage] Message AI ajouté à conversation existante')
+        setCurrentConversation(updatedConversation)
+        console.log('✅ [handleSendMessage] ID conversation mis à jour vers:', response.conversation_id)
       }
       
     } catch (error) {

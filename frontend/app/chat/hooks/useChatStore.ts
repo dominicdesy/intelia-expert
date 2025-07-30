@@ -245,7 +245,7 @@ export const useChatStore = (): ChatStore => {
    * Ajoute un message à la conversation courante
    */
   const addMessage = (message: Message): void => {
-    console.log('💬 [addMessage] Tentative ajout:', {
+    console.log('💬 [addMessage] DÉBUT - Tentative ajout:', {
       messageId: message.id,
       isUser: message.isUser,
       content: message.content.substring(0, 50) + '...',
@@ -276,13 +276,20 @@ export const useChatStore = (): ChatStore => {
     // Vérification doublons améliorée
     const messageExists = currentConversation.messages?.some(m => 
       m.id === message.id || 
-      (m.content === message.content && m.isUser === message.isUser)
+      (m.content === message.content && m.isUser === message.isUser && Math.abs(new Date(m.timestamp).getTime() - message.timestamp.getTime()) < 1000)
     )
     
     if (messageExists) {
       console.warn('⚠️ [addMessage] Message doublon détecté, ignoré:', message.id)
       return
     }
+    
+    // ✅ CORRECTION: Log avant mise à jour
+    console.log('🔄 [addMessage] AVANT mise à jour:', {
+      conversationId: currentConversation.id,
+      currentMessages: currentConversation.messages?.length || 0,
+      newMessageId: message.id
+    })
     
     // Mise à jour conversation avec nouveau message
     const updatedMessages = [...(currentConversation.messages || []), message]
@@ -300,22 +307,17 @@ export const useChatStore = (): ChatStore => {
         : currentConversation.last_message_preview || currentConversation.preview
     }
     
-    console.log('🔄 [addMessage] Conversation mise à jour:', {
+    console.log('🔄 [addMessage] APRÈS mise à jour:', {
       id: updatedConversation.id,
       messageCount: updatedConversation.messages.length,
-      title: updatedConversation.title.substring(0, 30) + '...'
+      title: updatedConversation.title.substring(0, 30) + '...',
+      lastMessage: updatedConversation.messages[updatedConversation.messages.length - 1]?.content.substring(0, 30) + '...'
     })
     
     setCurrentConversation(updatedConversation)
     
-    // Force re-render avec log de vérification
-    setTimeout(() => {
-      console.log('🔍 [addMessage] Vérification post-ajout:', {
-        conversationId: updatedConversation.id,
-        messagesInState: updatedConversation.messages.length,
-        lastMessage: updatedConversation.messages[updatedConversation.messages.length - 1]?.content.substring(0, 30) + '...'
-      })
-    }, 100)
+    // ✅ CORRECTION: Vérification immédiate post-mise à jour
+    console.log('✅ [addMessage] FINAL - Message ajouté, nouvelle longueur:', updatedConversation.messages.length)
   }
 
   /**
