@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ThumbUpIcon, ThumbDownIcon } from '../../utils/icons'
+import { ThumbUpIcon, ThumbDownIcon } from '../utils/icons'
 
 interface FeedbackModalProps {
   isOpen: boolean
