@@ -277,19 +277,11 @@ export default function ChatInterface() {
 
       addMessage(aiMessage)
 
-      // ✅ CORRECTION: Mise à jour de l'ID de conversation SEULEMENT si nouvelle
+      // ✅ CORRECTION CRITIQUE: NE PAS utiliser setCurrentConversation après addMessage
+      // La méthode addMessage gère déjà la mise à jour de l'ID et du titre
       if (!conversationIdToSend && response.conversation_id) {
         console.log('🆕 [handleSendMessage] Nouvelle conversation créée:', response.conversation_id)
-        
-        // Mettre à jour l'ID de la conversation courante
-        if (currentConversation) {
-          const updatedConversation = {
-            ...currentConversation,
-            id: response.conversation_id,
-            title: text.length > 60 ? text.substring(0, 60) + '...' : text
-          }
-          setCurrentConversation(updatedConversation)
-        }
+        // addMessage a déjà mis à jour l'ID via message.conversation_id
       } else {
         console.log('✅ [handleSendMessage] Conversation existante mise à jour:', response.conversation_id)
       }
