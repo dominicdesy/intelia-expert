@@ -259,6 +259,8 @@ export default function ChatInterface() {
         conversationIdToSend
       )
 
+      console.log('🔥 APRÈS API - avant addMessage')
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response.response,
@@ -267,10 +269,10 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      // Toujours ajouter le message AI
+      console.log('🔥 AVANT addMessage - message créé')
       addMessage(aiMessage)
+      console.log('🔥 APRÈS addMessage')
 
-      // Si première question, mettre à jour l'ID de conversation
       if (isFirstMessage && response.conversation_id && currentConversation) {
         const updatedConversation = {
           ...currentConversation,
@@ -280,6 +282,7 @@ export default function ChatInterface() {
         }
         
         setCurrentConversation(updatedConversation)
+        console.log('🔥 CONVERSATION MISE À JOUR')
       }
       
     } catch (error) {

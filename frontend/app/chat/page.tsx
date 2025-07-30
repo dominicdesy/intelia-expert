@@ -52,6 +52,7 @@ export default function ChatInterface() {
     feedbackType: null
   })
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
+  const [forceRender, setForceRender] = useState(0) // ✅ NOUVEAU: Force re-render
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -93,7 +94,7 @@ export default function ChatInterface() {
     }
     
     lastMessageCountRef.current = messages.length
-  }, [messages.length, shouldAutoScroll, isUserScrolling])
+  }, [messages.length, messages, shouldAutoScroll, isUserScrolling]) // ✅ CORRECTION: Ajouter messages dans les dépendances
 
   useEffect(() => {
     const chatContainer = chatContainerRef.current
@@ -177,6 +178,12 @@ export default function ChatInterface() {
       setCurrentConversation(updatedConversation)
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
+
+  // ✅ Effect pour forcer le re-render quand la conversation change
+  useEffect(() => {
+    // Force le composant à se re-rendre quand currentConversation change
+    console.log('🔄 Conversation changée, force re-render')
+  }, [currentConversation?.messages?.length, currentConversation?.id])
 
   // ✅ Effect pour charger l'historique des conversations au démarrage
   useEffect(() => {
@@ -272,6 +279,9 @@ export default function ChatInterface() {
       console.log('🔥 AVANT addMessage - message créé')
       addMessage(aiMessage)
       console.log('🔥 APRÈS addMessage')
+      
+      // ✅ FORCE RE-RENDER
+      setForceRender(prev => prev + 1)
 
       if (isFirstMessage && response.conversation_id && currentConversation) {
         const updatedConversation = {
@@ -283,6 +293,9 @@ export default function ChatInterface() {
         
         setCurrentConversation(updatedConversation)
         console.log('🔥 CONVERSATION MISE À JOUR')
+        
+        // ✅ FORCE RE-RENDER
+        setForceRender(prev => prev + 1)
       }
       
     } catch (error) {
@@ -452,7 +465,11 @@ export default function ChatInterface() {
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto px-4 py-6"
           >
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6" key={forceRender}>
+              {/* DEBUG temporaire */}
+              <div className="text-xs text-gray-400 text-center">
+                DEBUG: {messages.length} messages - Render: {forceRender}
+              </div>
               {/* Date */}
               {hasMessages && (
                 <div className="text-center">
