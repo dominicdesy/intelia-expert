@@ -23,18 +23,14 @@ export const useChatStore = (): ChatStore => {
     }
 
     setIsLoading(true)
-    setIsLoadingHistory(true) // ✅ NOUVEAU: état pour l'historique
+    setIsLoadingHistory(true)
     
     try {
-      console.log('🔄 [useChatStore] Chargement conversations pour userId:', userId)
       const userConversations = await conversationService.getUserConversations(userId, 100)
       
-      console.log('📊 [useChatStore] Conversations brutes reçues:', userConversations.length, userConversations)
-      
       if (!userConversations || userConversations.length === 0) {
-        console.log('📭 [useChatStore] Aucune conversation trouvée')
         setConversations([])
-        setConversationGroups([]) // ✅ NOUVEAU: vider les groupes
+        setConversationGroups([])
         return
       }
       
@@ -68,9 +64,6 @@ export const useChatStore = (): ChatStore => {
       const groups = groupConversationsByDate(userConversations)
       setConversationGroups(groups)
       
-      console.log('✅ [useChatStore] Conversations formatées et triées:', sortedConversations.length)
-      console.log('✅ [useChatStore] Groupes créés:', groups.length)
-      
     } catch (error) {
       console.error('❌ [useChatStore] Erreur chargement conversations:', error)
       setConversations([])
@@ -83,8 +76,6 @@ export const useChatStore = (): ChatStore => {
 
   const deleteConversation = async (id: string): Promise<void> => {
     try {
-      console.log('🗑️ [useChatStore] Suppression conversation:', id)
-      
       // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations(prev => prev.filter(conv => conv.id !== id))
       
@@ -104,8 +95,6 @@ export const useChatStore = (): ChatStore => {
       // 2. Suppression côté serveur
       await conversationService.deleteConversation(id)
       
-      console.log('✅ [useChatStore] Conversation supprimée du serveur:', id)
-      
     } catch (error) {
       console.error('❌ [useChatStore] Erreur suppression conversation serveur:', error)
     }
@@ -113,8 +102,6 @@ export const useChatStore = (): ChatStore => {
 
   const clearAllConversations = async (userId?: string): Promise<void> => {
     try {
-      console.log('🗑️ [useChatStore] Suppression toutes conversations')
-      
       // 1. Mise à jour optimiste de l'UI (suppression immédiate)
       setConversations([])
       setConversationGroups([]) // ✅ NOUVEAU: vider les groupes
@@ -123,9 +110,6 @@ export const useChatStore = (): ChatStore => {
       // 2. Suppression côté serveur si userId disponible
       if (userId) {
         await conversationService.clearAllUserConversations(userId)
-        console.log('✅ [useChatStore] Toutes conversations supprimées du serveur')
-      } else {
-        console.warn('⚠️ [useChatStore] Pas d\'userId pour suppression serveur')
       }
       
     } catch (error) {
@@ -134,7 +118,6 @@ export const useChatStore = (): ChatStore => {
   }
 
   const refreshConversations = async (userId: string): Promise<void> => {
-    console.log('🔄 [useChatStore] Rechargement forcé des conversations')
     await loadConversations(userId)
   }
 
@@ -173,8 +156,6 @@ export const useChatStore = (): ChatStore => {
       const allConversations = [newFormatConversation, ...prev.flatMap(g => g.conversations)]
       return groupConversationsByDate(allConversations)
     })
-    
-    console.log('✅ [useChatStore] Nouvelle conversation ajoutée localement:', conversationId)
   }
 
   // ==================== NOUVELLES FONCTIONS POUR CONVERSATIONS STYLE CLAUDE.AI ====================
@@ -191,8 +172,6 @@ export const useChatStore = (): ChatStore => {
     setIsLoadingConversation(true)
     
     try {
-      console.log('📖 [useChatStore] Chargement conversation:', conversationId)
-      
       // Chercher dans les conversations existantes (format ancien)
       const existingConv = conversations.find(c => c.id === conversationId)
       
@@ -221,7 +200,6 @@ export const useChatStore = (): ChatStore => {
         }
         
         setCurrentConversation(conversationWithMessages)
-        console.log('✅ [useChatStore] Conversation chargée:', conversationWithMessages.message_count, 'messages')
       } else {
         throw new Error('Conversation non trouvée dans l\'historique')
       }
@@ -237,25 +215,14 @@ export const useChatStore = (): ChatStore => {
    * Crée une nouvelle conversation vide
    */
   const createNewConversation = (): void => {
-    console.log('✨ [useChatStore] Création nouvelle conversation')
     setCurrentConversation(null)
   }
 
   /**
-   * Ajoute un message à la conversation courante
+   * ✅ CORRECTION FINALE: addMessage sans logs qui causent la boucle infinie
    */
   const addMessage = (message: Message): void => {
-    console.log('💬 [addMessage] DÉBUT - Tentative ajout:', {
-      messageId: message.id,
-      isUser: message.isUser,
-      content: message.content.substring(0, 50) + '...',
-      conversationId: currentConversation?.id,
-      currentMessagesCount: currentConversation?.messages?.length || 0
-    })
-    
     if (!currentConversation) {
-      console.warn('⚠️ [addMessage] Aucune conversation - création temporaire')
-      
       const tempConversation: ConversationWithMessages = {
         id: 'temp-' + Date.now(),
         title: message.isUser ? message.content.substring(0, 60) + '...' : 'Nouvelle conversation',
@@ -269,27 +236,18 @@ export const useChatStore = (): ChatStore => {
       }
       
       setCurrentConversation(tempConversation)
-      console.log('✅ [addMessage] Conversation temporaire créée avec message')
       return
     }
     
-    // Vérification doublons améliorée
+    // Vérification doublons
     const messageExists = currentConversation.messages?.some(m => 
       m.id === message.id || 
       (m.content === message.content && m.isUser === message.isUser && Math.abs(new Date(m.timestamp).getTime() - message.timestamp.getTime()) < 1000)
     )
     
     if (messageExists) {
-      console.warn('⚠️ [addMessage] Message doublon détecté, ignoré:', message.id)
       return
     }
-    
-    // ✅ CORRECTION: Log avant mise à jour
-    console.log('🔄 [addMessage] AVANT mise à jour:', {
-      conversationId: currentConversation.id,
-      currentMessages: currentConversation.messages?.length || 0,
-      newMessageId: message.id
-    })
     
     // Mise à jour conversation avec nouveau message
     const updatedMessages = [...(currentConversation.messages || []), message]
@@ -307,17 +265,7 @@ export const useChatStore = (): ChatStore => {
         : currentConversation.last_message_preview || currentConversation.preview
     }
     
-    console.log('🔄 [addMessage] APRÈS mise à jour:', {
-      id: updatedConversation.id,
-      messageCount: updatedConversation.messages.length,
-      title: updatedConversation.title.substring(0, 30) + '...',
-      lastMessage: updatedConversation.messages[updatedConversation.messages.length - 1]?.content.substring(0, 30) + '...'
-    })
-    
     setCurrentConversation(updatedConversation)
-    
-    // ✅ CORRECTION: Vérification immédiate post-mise à jour
-    console.log('✅ [addMessage] FINAL - Message ajouté, nouvelle longueur:', updatedConversation.messages.length)
   }
 
   /**
@@ -325,7 +273,6 @@ export const useChatStore = (): ChatStore => {
    */
   const updateMessage = (messageId: string, updates: Partial<Message>): void => {
     if (!currentConversation) {
-      console.warn('⚠️ [useChatStore] Aucune conversation courante pour mettre à jour message')
       return
     }
     
@@ -340,7 +287,6 @@ export const useChatStore = (): ChatStore => {
     }
     
     setCurrentConversation(updatedConversation)
-    console.log('✏️ [useChatStore] Message mis à jour:', messageId)
   }
 
   // ==================== FONCTION UTILITAIRE POUR GROUPEMENT ====================
