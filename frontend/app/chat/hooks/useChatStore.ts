@@ -219,10 +219,17 @@ export const useChatStore = (): ChatStore => {
   }
 
   /**
-   * ✅ CORRECTION FINALE: addMessage sans logs qui causent la boucle infinie
+   * ✅ CORRECTION FINALE: addMessage avec logs de debug
    */
   const addMessage = (message: Message): void => {
+    console.log('💬 [addMessage] DÉBUT - Tentative ajout:', {
+      messageId: message.id,
+      isUser: message.isUser,
+      conversationId: currentConversation?.id
+    })
+    
     if (!currentConversation) {
+      console.log('⚠️ [addMessage] Aucune conversation - création temporaire')
       const tempConversation: ConversationWithMessages = {
         id: 'temp-' + Date.now(),
         title: message.isUser ? message.content.substring(0, 60) + '...' : 'Nouvelle conversation',
@@ -236,6 +243,7 @@ export const useChatStore = (): ChatStore => {
       }
       
       setCurrentConversation(tempConversation)
+      console.log('✅ [addMessage] Conversation temporaire créée')
       return
     }
     
@@ -246,9 +254,11 @@ export const useChatStore = (): ChatStore => {
     )
     
     if (messageExists) {
+      console.warn('⚠️ [addMessage] Message doublon détecté, ignoré')
       return
     }
     
+    console.log('🔄 [addMessage] Ajout du message à la conversation existante')
     // Mise à jour conversation avec nouveau message
     const updatedMessages = [...(currentConversation.messages || []), message]
     
@@ -265,7 +275,9 @@ export const useChatStore = (): ChatStore => {
         : currentConversation.last_message_preview || currentConversation.preview
     }
     
+    console.log('✅ [addMessage] Conversation mise à jour - nouveaux messages:', updatedMessages.length)
     setCurrentConversation(updatedConversation)
+    console.log('✅ [addMessage] setCurrentConversation appelé')
   }
 
   /**
