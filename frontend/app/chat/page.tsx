@@ -31,6 +31,13 @@ export default function ChatInterface() {
   const { createNewConversation } = useConversationActions()
   const { loadConversations } = useChatStore()
   
+  // ✅ DEBUG: Vérifier que les hooks sont bien connectés
+  console.log('🔗 [ChatInterface] Hooks connectés:', {
+    hasCurrentConversation: !!currentConversation,
+    hasAddMessage: typeof addMessage === 'function',
+    hasSetCurrentConversation: typeof setCurrentConversation === 'function'
+  })
+  
   // États locaux pour l'interface
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
@@ -252,6 +259,7 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
+      console.log('📤 [handleSendMessage] Appel API...')
       const response = await generateAIResponse(
         text.trim(), 
         user, 
@@ -259,6 +267,7 @@ export default function ChatInterface() {
         conversationIdToSend
       )
 
+      console.log('✅ [handleSendMessage] Réponse API reçue, création message AI...')
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response.response,
@@ -267,11 +276,13 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
+      console.log('💬 [handleSendMessage] Ajout message AI:', aiMessage.content.substring(0, 50) + '...')
       // Toujours ajouter le message AI
       addMessage(aiMessage)
 
       // Si première question, mettre à jour l'ID de conversation
       if (isFirstMessage && response.conversation_id && currentConversation) {
+        console.log('🔄 [handleSendMessage] Mise à jour ID conversation:', response.conversation_id)
         const updatedConversation = {
           ...currentConversation,
           id: response.conversation_id,
@@ -280,7 +291,10 @@ export default function ChatInterface() {
         }
         
         setCurrentConversation(updatedConversation)
+        console.log('✅ [handleSendMessage] Conversation mise à jour avec ID backend')
       }
+      
+      console.log('✅ [handleSendMessage] Traitement terminé avec succès')
       
     } catch (error) {
       console.error('❌ [handleSendMessage] Erreur:', error)
