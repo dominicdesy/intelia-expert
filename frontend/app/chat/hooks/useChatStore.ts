@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { ConversationItem, ChatStore, Conversation, ConversationWithMessages, ConversationGroup, ConversationGroupingOptions, Message } from '../types'
 import { conversationService } from '../services/conversationService'
 
@@ -245,21 +245,59 @@ export const useChatStore = (): ChatStore => {
    * Ajoute un message à la conversation courante
    */
   const addMessage = (message: Message): void => {
+    console.log('💬 [addMessage] Ajout message:', {
+      messageId: message.id,
+      isUser: message.isUser,
+      conversationId: currentConversation?.id,
+      currentMessagesCount: currentConversation?.messages?.length || 0
+    })
+    
     if (!currentConversation) {
-      console.warn('⚠️ [useChatStore] Aucune conversation courante pour ajouter message')
+      console.warn('⚠️ [addMessage] Aucune conversation active - création conversation temporaire')
+      
+      const tempConversation: ConversationWithMessages = {
+        id: 'temp-' + Date.now(),
+        title: 'Nouvelle conversation',
+        preview: message.content,
+        message_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        language: 'fr',
+        status: 'active',
+        messages: [message]
+      }
+      
+      setCurrentConversation(tempConversation)
+      return
+    }
+    
+    // Vérifier si le message existe déjà pour éviter les doublons
+    const messageExists = currentConversation.messages?.some(m => m.id === message.id)
+    if (messageExists) {
+      console.warn('⚠️ [addMessage] Message déjà présent, ignoré:', message.id)
       return
     }
     
     const updatedConversation: ConversationWithMessages = {
       ...currentConversation,
-      messages: [...currentConversation.messages, message],
-      message_count: currentConversation.message_count + 1,
+      messages: [...(currentConversation.messages || []), message],
+      message_count: (currentConversation.messages?.length || 0) + 1,
       updated_at: new Date().toISOString(),
-      last_message_preview: message.content.substring(0, 100) + '...'
+      title: currentConversation.id === 'welcome' && message.isUser 
+        ? message.content.substring(0, 60) + (message.content.length > 60 ? '...' : '')
+        : currentConversation.title,
+      last_message_preview: !message.isUser 
+        ? message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
+        : currentConversation.last_message_preview
     }
     
+    console.log('🔄 [addMessage] Conversation mise à jour:', {
+      id: updatedConversation.id,
+      messageCount: updatedConversation.messages.length,
+      title: updatedConversation.title
+    })
+    
     setCurrentConversation(updatedConversation)
-    console.log('➕ [useChatStore] Message ajouté à la conversation courante')
   }
 
   /**

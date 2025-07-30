@@ -15,7 +15,7 @@ import {
   ArrowDownIcon,
   ThumbUpIcon,
   ThumbDownIcon
-} from './utils/icons'  // ✅ CORRECTION: Suppression de .tsx
+} from './utils/icons'
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
@@ -207,9 +207,11 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ NOUVEAU: Gestion d'envoi de message avec conversation
+  // ✅ CORRECTION: Gestion conversation_id dans handleSendMessage
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
+
+    console.log('🔥 [handleSendMessage] DÉBUT - État conversation:', currentConversation?.id)
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -218,12 +220,27 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    // ✅ NOUVEAU: Si c'est la conversation de bienvenue, créer une nouvelle conversation
+    // ✅ CORRECTION: Gestion intelligente des conversations
+    let conversationIdToSend: string | undefined = undefined
+    let isFirstMessage = false
+
+    // Cas 1: Conversation welcome (première vraie question)
     if (currentConversation?.id === 'welcome') {
-      createNewConversation()
+      isFirstMessage = true
+      console.log('🆕 [handleSendMessage] Première question - nouvelle conversation')
+    }
+    // Cas 2: Conversation existante avec ID réel
+    else if (currentConversation?.id && currentConversation.id !== 'welcome') {
+      conversationIdToSend = currentConversation.id
+      console.log('🔄 [handleSendMessage] Continuation conversation:', conversationIdToSend)
+    }
+    // Cas 3: Aucune conversation
+    else {
+      isFirstMessage = true
+      console.log('🆕 [handleSendMessage] Aucune conversation - création nouvelle')
     }
 
-    // Ajouter le message utilisateur
+    // Ajouter le message utilisateur IMMÉDIATEMENT
     addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
@@ -232,10 +249,22 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
-      console.log('🔒 [handleSendMessage] Envoi question avec langue:', currentLanguage)
+      console.log('📤 [handleSendMessage] Envoi avec conversation_id:', conversationIdToSend)
       
-      const response = await generateAIResponse(text.trim(), user, currentLanguage)
+      // ✅ CORRECTION: Passer le conversation_id au service API
+      const response = await generateAIResponse(
+        text.trim(), 
+        user, 
+        currentLanguage, 
+        conversationIdToSend
+      )
       
+      console.log('📨 [handleSendMessage] Réponse API:', {
+        conversation_id: response.conversation_id,
+        was_first_message: isFirstMessage,
+        sent_id: conversationIdToSend
+      })
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response.response,
@@ -244,9 +273,30 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
+      // ✅ CORRECTION: Si première question, créer la vraie conversation avec l'ID backend
+      if (isFirstMessage && response.conversation_id) {
+        console.log('🔄 [handleSendMessage] Création conversation avec ID backend:', response.conversation_id)
+        
+        const realConversation = {
+          id: response.conversation_id,
+          title: text.trim().substring(0, 60) + (text.trim().length > 60 ? '...' : ''),
+          preview: text.trim(),
+          message_count: 2, // user + ai message
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          language: currentLanguage,
+          status: 'active' as const,
+          last_message_preview: response.response.substring(0, 100) + '...',
+          messages: [userMessage] // Le message utilisateur déjà ajouté
+        }
+        
+        setCurrentConversation(realConversation)
+        console.log('✅ [handleSendMessage] Conversation mise à jour avec ID réel')
+      }
+
       // Ajouter le message de réponse
       addMessage(aiMessage)
-      console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
+      console.log('✅ [handleSendMessage] Messages ajoutés - Total:', (currentConversation?.messages?.length || 0) + 2)
       
     } catch (error) {
       console.error('❌ [handleSendMessage] Error generating response:', error)
