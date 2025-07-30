@@ -1,16 +1,15 @@
-# app/api/v1/invitations.py - CORRECTIONS CRITIQUES
+# app/api/v1/invitations.py - CORRECTIONS CRITIQUES + IMPORTS EMAIL
 """
-Router Invitations pour Intelia Expert - CORRECTIONS AUTHENTIFICATION
-Version corrigée pour résoudre l'erreur 403 "Vous ne pouvez envoyer des invitations qu'en votre nom"
+Router Invitations pour Intelia Expert - CORRECTIONS AUTHENTIFICATION + IMPORTS EMAIL
+Version corrigée pour résoudre l'erreur 'MimeMultipart' + authentification
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
 import smtplib
-import email
-import email.mime
-import email.mime.text
-import email.mime.multipart
+# CORRECTION CRITIQUE: Imports email corrects
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime
 import logging
 import os

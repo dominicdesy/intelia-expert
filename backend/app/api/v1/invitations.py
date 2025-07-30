@@ -1,13 +1,13 @@
-# app/api/v1/invitations.py - CORRECTIONS CRITIQUES + IMPORTS EMAIL
+# app/api/v1/invitations.py - CORRECTION COMPLÈTE IMPORTS EMAIL
 """
-Router Invitations pour Intelia Expert - CORRECTIONS AUTHENTIFICATION + IMPORTS EMAIL
-Version corrigée pour résoudre l'erreur 'MimeMultipart' + authentification
+Router Invitations pour Intelia Expert - CORRECTION COMPLÈTE
+Version corrigée avec imports email propres et authentification fonctionnelle
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
 import smtplib
-# CORRECTION CRITIQUE: Imports email corrects
+# CORRECTION: Imports email directs et propres
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
@@ -120,7 +120,7 @@ class InvitationResponse(BaseModel):
     failed_emails: List[str] = []
     message: str
 
-# ==================== SERVICE EMAIL IDENTIQUE ====================
+# ==================== SERVICE EMAIL CORRIGÉ COMPLÈTEMENT ====================
 class EmailService:
     def __init__(self):
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -191,18 +191,48 @@ class EmailService:
             
             {personal_section}
             
+            <!-- Features -->
+            <div style="background-color: #f9fafb; padding: 25px; border-radius: 8px; margin: 25px 0;">
+                <h3 style="color: #1f2937; margin-top: 0; margin-bottom: 20px;">✨ Avec Intelia Expert, vous pouvez :</h3>
+                <ul style="color: #4b5563; padding-left: 0; list-style: none;">
+                    <li style="margin: 12px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #10b981;">🎯</span>
+                        Poser des questions d'expert en santé animale 24/7
+                    </li>
+                    <li style="margin: 12px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #10b981;">📚</span>
+                        Accéder à une base de connaissances spécialisée
+                    </li>
+                    <li style="margin: 12px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #10b981;">🌍</span>
+                        Obtenir des réponses en français, anglais ou espagnol
+                    </li>
+                    <li style="margin: 12px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #10b981;">📱</span>
+                        Utiliser l'interface sur mobile, tablette et ordinateur
+                    </li>
+                </ul>
+            </div>
+            
             <!-- CTA Button -->
             <div style="text-align: center; margin: 30px 0;">
                 <a href="{signup_url}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                   style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
                     🚀 Créer mon compte gratuitement
                 </a>
+                <p style="color: #6b7280; font-size: 14px; margin-top: 15px;">
+                    Inscription rapide - Aucune carte de crédit requise
+                </p>
             </div>
             
             <!-- Footer -->
             <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
                 <p style="margin: 10px 0;">
                     Cet email vous a été envoyé par <strong>{inviter_name}</strong> via Intelia Expert
+                </p>
+                <p style="margin: 10px 0;">
+                    <a href="https://www.intelia.com" style="color: #3b82f6; text-decoration: none;">www.intelia.com</a> | 
+                    <a href="mailto:support@intelia.com" style="color: #3b82f6; text-decoration: none;">support@intelia.com</a>
                 </p>
                 <p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;">
                     © 2024 Intelia Inc. Tous droits réservés.
@@ -216,42 +246,170 @@ class EmailService:
         signup_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com") + "/register"
         personal_section = f"\n\nMessage personnel de {inviter_name} :\n{personal_message}\n" if personal_message.strip() else ""
         
-        return f"""Bonjour !\n\n{inviter_name} vous invite à découvrir Intelia Expert, le premier assistant IA spécialisé en santé et nutrition animale.{personal_section}\n\nCréer votre compte gratuitement : {signup_url}\n\nCet email vous a été envoyé par {inviter_name} via Intelia Expert.\n\n© 2024 Intelia Inc. Tous droits réservés."""
+        return f"""Bonjour !
+
+{inviter_name} vous invite à découvrir Intelia Expert, le premier assistant IA spécialisé en santé et nutrition animale.
+
+{personal_section}
+
+Avec Intelia Expert, vous pouvez :
+• Poser des questions d'expert en santé animale 24/7
+• Accéder à une base de connaissances spécialisée  
+• Obtenir des réponses en français, anglais ou espagnol
+• Utiliser l'interface sur mobile, tablette et ordinateur
+
+Créer votre compte gratuitement : {signup_url}
+
+Cet email vous a été envoyé par {inviter_name} via Intelia Expert.
+www.intelia.com | support@intelia.com
+
+© 2024 Intelia Inc. Tous droits réservés.
+        """
     
     def _get_english_template(self, inviter_name: str, personal_message: str) -> str:
-        # Templates anglais et espagnols raccourcis pour l'espace
         signup_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com") + "/register"
-        return f"<html><body><h1>Intelia Expert Invitation</h1><p>{inviter_name} invites you to try Intelia Expert!</p><a href='{signup_url}'>Sign up free</a></body></html>"
+        personal_section = ""
+        if personal_message.strip():
+            personal_section = f'<div style="background: #f8fafc; padding: 20px; border-left: 4px solid #3b82f6; margin: 20px 0;"><h3 style="color: #1e40af;">Personal message from {inviter_name}:</h3><p style="font-style: italic;">{personal_message}</p></div>'
+        
+        return f"""<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 12px; color: white;">
+        <h1>🚀 Intelia Expert</h1>
+        <p>AI specialized in animal health and nutrition</p>
+    </div>
+    
+    <h2>Hello! 👋</h2>
+    <p><strong>{inviter_name}</strong> invites you to discover <strong>Intelia Expert</strong>, the first AI assistant specialized in animal health and nutrition.</p>
+    
+    {personal_section}
+    
+    <div style="background: #f9fafb; padding: 25px; border-radius: 8px; margin: 25px 0;">
+        <h3>✨ With Intelia Expert, you can:</h3>
+        <ul style="list-style: none; padding: 0;">
+            <li>🎯 Ask expert questions about animal health 24/7</li>
+            <li>📚 Access a specialized knowledge base</li>
+            <li>🌍 Get answers in French, English, or Spanish</li>
+            <li>📱 Use on mobile, tablet, and computer</li>
+        </ul>
+    </div>
+    
+    <div style="text-align: center;">
+        <a href="{signup_url}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600;">🚀 Create my free account</a>
+    </div>
+    
+    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
+        <p>This email was sent by <strong>{inviter_name}</strong> via Intelia Expert</p>
+        <p><a href="https://www.intelia.com">www.intelia.com</a> | <a href="mailto:support@intelia.com">support@intelia.com</a></p>
+        <p>© 2024 Intelia Inc. All rights reserved.</p>
+    </div>
+</body>
+</html>"""
     
     def _get_english_text_template(self, inviter_name: str, personal_message: str) -> str:
         signup_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com") + "/register"
-        return f"{inviter_name} invites you to try Intelia Expert! Sign up: {signup_url}"
+        personal_section = f"\n\nPersonal message from {inviter_name}:\n{personal_message}\n" if personal_message.strip() else ""
+        
+        return f"""Hello!
+
+{inviter_name} invites you to discover Intelia Expert, the first AI assistant specialized in animal health and nutrition.{personal_section}
+
+With Intelia Expert, you can:
+• Ask expert questions about animal health 24/7
+• Access a specialized knowledge base
+• Get answers in French, English, or Spanish
+• Use the interface on mobile, tablet, and computer
+
+Create your free account: {signup_url}
+
+This email was sent by {inviter_name} via Intelia Expert.
+www.intelia.com | support@intelia.com
+
+© 2024 Intelia Inc. All rights reserved."""
     
     def _get_spanish_template(self, inviter_name: str, personal_message: str) -> str:
         signup_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com") + "/register"
-        return f"<html><body><h1>Invitación Intelia Expert</h1><p>{inviter_name} te invita a probar Intelia Expert!</p><a href='{signup_url}'>Registrarse gratis</a></body></html>"
+        personal_section = ""
+        if personal_message.strip():
+            personal_section = f'<div style="background: #f8fafc; padding: 20px; border-left: 4px solid #3b82f6; margin: 20px 0;"><h3 style="color: #1e40af;">Mensaje personal de {inviter_name}:</h3><p style="font-style: italic;">{personal_message}</p></div>'
+        
+        return f"""<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 12px; color: white;">
+        <h1>🚀 Intelia Expert</h1>
+        <p>IA especializada en salud y nutrición animal</p>
+    </div>
+    
+    <h2>¡Hola! 👋</h2>
+    <p><strong>{inviter_name}</strong> te invita a descubrir <strong>Intelia Expert</strong>, el primer asistente IA especializado en salud y nutrición animal.</p>
+    
+    {personal_section}
+    
+    <div style="background: #f9fafb; padding: 25px; border-radius: 8px; margin: 25px 0;">
+        <h3>✨ Con Intelia Expert, puedes:</h3>
+        <ul style="list-style: none; padding: 0;">
+            <li>🎯 Hacer preguntas expertas sobre salud animal 24/7</li>
+            <li>📚 Acceder a una base de conocimiento especializada</li>
+            <li>🌍 Obtener respuestas en francés, inglés o español</li>
+            <li>📱 Usar en móvil, tableta y computadora</li>
+        </ul>
+    </div>
+    
+    <div style="text-align: center;">
+        <a href="{signup_url}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-weight: 600;">🚀 Crear mi cuenta gratuita</a>
+    </div>
+    
+    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
+        <p>Este email fue enviado por <strong>{inviter_name}</strong> vía Intelia Expert</p>
+        <p><a href="https://www.intelia.com">www.intelia.com</a> | <a href="mailto:support@intelia.com">support@intelia.com</a></p>
+        <p>© 2024 Intelia Inc. Todos los derechos reservados.</p>
+    </div>
+</body>
+</html>"""
     
     def _get_spanish_text_template(self, inviter_name: str, personal_message: str) -> str:
         signup_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com") + "/register"
-        return f"{inviter_name} te invita a probar Intelia Expert! Regístrate: {signup_url}"
+        personal_section = f"\n\nMensaje personal de {inviter_name}:\n{personal_message}\n" if personal_message.strip() else ""
+        
+        return f"""¡Hola!
+
+{inviter_name} te invita a descubrir Intelia Expert, el primer asistente IA especializado en salud y nutrición animal.{personal_section}
+
+Con Intelia Expert, puedes:
+• Hacer preguntas expertas sobre salud animal 24/7
+• Acceder a una base de conocimiento especializada
+• Obtener respuestas en francés, inglés o español
+• Usar en móvil, tableta y computadora
+
+Crear tu cuenta gratuita: {signup_url}
+
+Este email fue enviado por {inviter_name} vía Intelia Expert.
+www.intelia.com | support@intelia.com
+
+© 2024 Intelia Inc. Todos los derechos reservados."""
     
     async def send_invitation_email(self, to_email: str, inviter_name: str, personal_message: str, language: str) -> bool:
-        """Envoie un email d'invitation"""
+        """Envoie un email d'invitation - ENTIÈREMENT CORRIGÉ"""
         try:
             template = self.get_email_template(language, inviter_name, personal_message)
             
-            msg = email.mime.multipart.MimeMultipart('alternative')
+            # CORRECTION FINALE: Utilisation des imports directs
+            msg = MIMEMultipart('alternative')
             msg['Subject'] = template['subject']
             msg['From'] = f"{self.from_name} <{self.from_email}>"
             msg['To'] = to_email
             msg['Reply-To'] = self.from_email
             
-            text_part = email.mime.text.MimeText(template['text_body'], 'plain', 'utf-8')
-            html_part = email.mime.text.MimeText(template['html_body'], 'html', 'utf-8')
+            # Ajouter les parties texte et HTML avec imports corrects
+            text_part = MIMEText(template['text_body'], 'plain', 'utf-8')
+            html_part = MIMEText(template['html_body'], 'html', 'utf-8')
             
             msg.attach(text_part)
             msg.attach(html_part)
             
+            # Envoyer l'email
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.smtp_username, self.smtp_password)
