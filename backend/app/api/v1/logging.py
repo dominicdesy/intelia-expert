@@ -471,10 +471,42 @@ async def update_conversation_feedback(conversation_id: str, feedback_data: dict
                 rating_map = {"positive": 1, "negative": -1, "neutral": 0}
                 feedback_value = rating_map.get(feedback_data["rating"], 0)
                 print(f"📊 [logging] Format détecté: 'rating' -> {feedback_data['rating']} -> {feedback_value}")
-            # Format 3: {"vote": "up"}
+            # Format 3: {"vote": "up"} - LIGNE CORRIGÉE
             elif "vote" in feedback_data:
                 vote_map = {"up": 1, "down": -1, "neutral": 0}
-                feedback_value = vote_map.get(feedback_data["vote"], 0
+                feedback_value = vote_map.get(feedback_data["vote"], 0)  # ✅ PARENTHÈSE AJOUTÉE
+                print(f"📊 [logging] Format détecté: 'vote' -> {feedback_data['vote']} -> {feedback_value}")
+        
+        # Validation du feedback
+        if feedback_value is None:
+            print(f"❌ [logging] Format feedback non reconnu: {feedback_data}")
+            raise HTTPException(status_code=400, detail="Format feedback invalide")
+        
+        if feedback_value not in [-1, 0, 1]:
+            print(f"❌ [logging] Valeur feedback invalide: {feedback_value}")
+            raise HTTPException(status_code=400, detail="Valeur feedback doit être -1, 0 ou 1")
+        
+        # Mettre à jour le feedback
+        success = logger_instance.update_feedback(conversation_id, feedback_value)
+        
+        if success:
+            print(f"✅ [logging] Feedback mis à jour: {conversation_id} -> {feedback_value}")
+            return {
+                "status": "success",
+                "message": "Feedback mis à jour avec succès",
+                "conversation_id": conversation_id,
+                "feedback": feedback_value,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print(f"❌ [logging] Conversation non trouvée: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation non trouvée")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [logging] Erreur mise à jour feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur feedback: {str(e)}")
 
 @router.get("/conversation/{conversation_id}")
 async def get_conversation_endpoint(conversation_id: str):
