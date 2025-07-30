@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Message } from './types'
 import { useAuthStore } from './hooks/useAuthStore'
 import { useTranslation } from './hooks/useTranslation'
-import { useCurrentConversation, useConversationActions } from './hooks/useChatStore'
+import { useCurrentConversation, useConversationActions, useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 import { 
