@@ -1,35 +1,51 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '../../hooks/useAuthStore'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface InviteFriendModalProps {
   onClose: () => void
 }
 
-// ==================== SERVICE D'INVITATION AVEC SUPABASE CLIENT ====================
+// ==================== SERVICE D'INVITATION AVEC MÊME AUTH QUE CHAT ====================
 const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
     try {
-      console.log('📧 [InvitationService] Envoi invitation:', { 
+      console.log('📧 [InvitationService] Envoi invitation avec auth Supabase:', { 
         emails, 
         hasMessage: !!personalMessage,
         inviterEmail: inviterInfo.email 
       })
       
-      // CORRECTION: Utiliser le même pattern que generateAIResponse
-      // Utiliser fetch avec l'endpoint d'invitation directement
+      // SOLUTION: Utiliser exactement la même méthode que generateAIResponse
+      const supabase = createClientComponentClient()
+      
+      // Récupérer la session Supabase comme dans apiService
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error('❌ [InvitationService] Erreur session Supabase:', error)
+        throw new Error('Session expirée - reconnexion nécessaire')
+      }
+      
+      const session = data.session
+      if (!session?.access_token) {
+        throw new Error('Session expirée - reconnexion nécessaire')
+      }
+
+      console.log('✅ [InvitationService] Token Supabase récupéré, longueur:', session.access_token.length)
+      
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
-      // SOLUTION: Laisser le navigateur gérer l'authentification automatiquement
-      // Si l'utilisateur est connecté, les cookies/session Supabase seront automatiquement inclus
+      // Headers identiques à apiService
+      const headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${session.access_token}` // ✅ MÊME TOKEN QUE LE CHAT
+      }
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/invitations/send`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // SUPPRIMÉ: Gestion manuelle de Authorization
-          // Le navigateur va automatiquement inclure les headers d'auth nécessaires
-        },
-        credentials: 'include', // CRITIQUE: Inclure les cookies de session
+        headers,
         body: JSON.stringify({
           emails,
           personal_message: personalMessage,
@@ -41,8 +57,16 @@ const invitationService = {
 
       if (!response.ok) {
         const errorText = await response.text()
-        let errorMessage = 'Erreur lors de l\'envoi des invitations'
+        console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorText)
         
+        if (response.status === 401) {
+          // Même gestion d'erreur que apiService
+          await supabase.auth.signOut()
+          window.location.href = '/'
+          throw new Error('Session expirée. Redirection vers la connexion...')
+        }
+        
+        let errorMessage = 'Erreur lors de l\'envoi des invitations'
         try {
           const errorJson = JSON.parse(errorText)
           errorMessage = errorJson.detail || errorJson.message || errorMessage
@@ -50,7 +74,6 @@ const invitationService = {
           // Si ce n'est pas du JSON, garder le message par défaut
         }
         
-        console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorMessage)
         throw new Error(errorMessage)
       }
 
