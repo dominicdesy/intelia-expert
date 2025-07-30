@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '../../hooks/useAuthStore'
 
@@ -89,8 +89,35 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [errors, setErrors] = useState<string[]>([])
   const [successMessage, setSuccessMessage] = useState('')
 
-  // CORRECTION 3: Vérification que l'utilisateur est connecté avec fallback
-  React.useEffect(() => {
+  // CORRECTION: Calcul de currentUser avec useMemo - DÉCLARÉ EN PREMIER
+  const currentUser = useMemo(() => {
+    // Essayer plusieurs sources pour les données utilisateur
+    if (user?.email) {
+      return user
+    }
+    
+    // Fallback: essayer de récupérer depuis localStorage/sessionStorage
+    try {
+      const supabaseAuth = localStorage.getItem('supabase.auth.token') || sessionStorage.getItem('supabase.auth.token')
+      if (supabaseAuth) {
+        const authData = JSON.parse(supabaseAuth)
+        if (authData.user?.email) {
+          return {
+            email: authData.user.email,
+            name: authData.user.user_metadata?.name || authData.user.name || authData.user.email.split('@')[0],
+            id: authData.user.id
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Erreur récupération auth depuis storage:', e)
+    }
+    
+    return null
+  }, [user])
+
+  // CORRECTION: useEffect utilise currentUser - DÉCLARÉ APRÈS currentUser
+  useEffect(() => {
     if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
     } else {
@@ -124,7 +151,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     setErrors([])
     setSuccessMessage('')
     
-    // CORRECTION 4: Validation utilisateur connecté avec fallback
+    // CORRECTION 4: Validation utilisateur connecté avec currentUser
     if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
       return
@@ -164,7 +191,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         userName: currentUser.name
       })
       
-      // CORRECTION 5: Utiliser les vraies données utilisateur avec fallback
+      // CORRECTION 5: Utiliser currentUser
       const result = await invitationService.sendInvitation(
         valid, 
         personalMessage.trim(), 
@@ -232,36 +259,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return valid.length
   }
 
-  // CORRECTION: Récupération flexible des données utilisateur
-  const getCurrentUser = () => {
-    // Essayer plusieurs sources pour les données utilisateur
-    if (user?.email) {
-      return user
-    }
-    
-    // Fallback: essayer de récupérer depuis localStorage/sessionStorage
-    try {
-      const supabaseAuth = localStorage.getItem('supabase.auth.token') || sessionStorage.getItem('supabase.auth.token')
-      if (supabaseAuth) {
-        const authData = JSON.parse(supabaseAuth)
-        if (authData.user?.email) {
-          return {
-            email: authData.user.email,
-            name: authData.user.user_metadata?.name || authData.user.name || authData.user.email.split('@')[0],
-            id: authData.user.id
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Erreur récupération auth depuis storage:', e)
-    }
-    
-    return null
-  }
-
-  const currentUser = getCurrentUser()
-
-  // CORRECTION 6: Affichage désactivé si vraiment pas d'utilisateur
+  // CORRECTION 6: Affichage conditionnel si pas d'utilisateur
   if (!currentUser?.email) {
     return (
       <div className="space-y-6">
@@ -277,9 +275,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
           <p className="text-sm text-gray-600 mb-4">
             Vous devez être connecté pour envoyer des invitations
           </p>
-          <div className="text-xs text-gray-500">
-            Debug: user={JSON.stringify(user)}<br/>
-            localStorage auth: {localStorage.getItem('supabase.auth.token') ? 'présent' : 'absent'}
+          <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+            <strong>Debug:</strong><br/>
+            user: {user ? JSON.stringify({email: user.email, name: user.name}) : 'null'}<br/>
+            localStorage auth: {typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? 'présent' : 'absent'}
           </div>
         </div>
         
@@ -391,8 +390,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
             </span>
           </div>
         </div>
-
-
       </div>
 
       {/* Boutons d'action */}
