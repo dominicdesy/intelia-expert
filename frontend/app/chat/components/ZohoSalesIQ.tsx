@@ -14,6 +14,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const isReloadingRef = useRef(false)
   const currentScriptRef = useRef<HTMLScriptElement | null>(null)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const configureAttemptsRef = useRef(0) // ✅ NOUVEAU : Compteur de tentatives
   
   // Fonction pour mapper les codes de langue vers les codes Zoho
   const getZohoLanguage = (lang: string): string => {
@@ -76,6 +77,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
     
     isReloadingRef.current = true
+    configureAttemptsRef.current = 0 // ✅ RESET : Nouveau chargement = reset compteur
     console.log('🚀 [ZohoSalesIQ] DEBUT loadZohoWithLanguage avec langue:', targetLanguage)
     console.log('👤 [ZohoSalesIQ] User présent:', !!user, user?.email)
     
@@ -84,7 +86,16 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     
     // ✅ NOUVELLE APPROCHE : Configurer $zoho APRÈS le chargement du script
     const configureZohoWidget = () => {
-      console.log('🔧 [ZohoSalesIQ] Configuration post-chargement du widget...')
+      configureAttemptsRef.current++
+      console.log(`🔧 [ZohoSalesIQ] Configuration post-chargement du widget... (Tentative ${configureAttemptsRef.current})`)
+      
+      // ✅ MONITORING : Vérifier le nombre de tentatives
+      if (configureAttemptsRef.current > 3) {
+        console.error('❌ [ZohoSalesIQ] Impossible d\'initialiser le widget après 3 tentatives.')
+        setHasError(true)
+        isReloadingRef.current = false
+        return
+      }
       
       try {
         const zoho = globalWindow.$zoho?.salesiq
@@ -111,21 +122,40 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
             console.log('👁️ [ZohoSalesIQ] Bouton flotant affiché')
           }
           
-          // Marquer comme prêt
+          // ✅ SUGGESTION 2 : Vérifier si le widget est effectivement visible
+          if (document.querySelectorAll('[id*="zsiq"]').length === 0) {
+            console.warn('🚫 [ZohoSalesIQ] Aucune trace de widget visible après configuration. Tentative de réaffichage forcée.')
+            if (zoho.floatbutton?.visible) {
+              zoho.floatbutton.visible('show')
+            }
+          }
+          
+          // ✅ SUCCÈS : Réinitialiser le compteur
+          configureAttemptsRef.current = 0
           setIsZohoReady(true)
           setHasError(false)
           console.log('✅ [ZohoSalesIQ] Widget complètement initialisé et visible')
         } else {
-          console.warn('⚠️ [ZohoSalesIQ] Objet Zoho pas encore disponible, tentative dans 500ms...')
+          console.warn(`⚠️ [ZohoSalesIQ] Objet Zoho pas encore disponible, tentative ${configureAttemptsRef.current}/3 dans 500ms...`)
           // Réessayer si Zoho n'est pas encore prêt
           setTimeout(configureZohoWidget, 500)
         }
       } catch (error) {
-        console.error('❌ [ZohoSalesIQ] Erreur configuration:', error)
-        setHasError(true)
+        console.error(`❌ [ZohoSalesIQ] Erreur configuration (tentative ${configureAttemptsRef.current}/3):`, error)
+        
+        // Si c'est la dernière tentative, marquer comme erreur
+        if (configureAttemptsRef.current >= 3) {
+          setHasError(true)
+        } else {
+          // Sinon, réessayer
+          setTimeout(configureZohoWidget, 1000)
+        }
       } finally {
-        isReloadingRef.current = false
-        console.log('🔄 [ZohoSalesIQ] isReloadingRef réinitialisé')
+        // Ne réinitialiser isReloadingRef que si on arrête les tentatives
+        if (configureAttemptsRef.current >= 3 || isZohoReady) {
+          isReloadingRef.current = false
+          console.log('🔄 [ZohoSalesIQ] isReloadingRef réinitialisé')
+        }
       }
     }
     
@@ -162,8 +192,12 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       // ✅ FALLBACK : Si ready n'est pas appelé dans les 3 secondes, forcer la configuration
       setTimeout(() => {
         if (!isZohoReady && !hasError) {
-          console.log('⚠️ [ZohoSalesIQ] Ready callback non déclenché, configuration manuelle...')
-          configureZohoWidget()
+          console.warn('⚠️ [ZohoSalesIQ] Ready non déclenché, tentative forcée de configuration')
+          if ((window as any).$zoho?.salesiq) {
+            configureZohoWidget()
+          } else {
+            console.error('❌ [ZohoSalesIQ] $zoho.salesiq encore indisponible après script.onload')
+          }
         }
       }, 3000)
     }
@@ -188,11 +222,17 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     // 1. Nettoyer complètement
     cleanupZoho()
     
+    // ✅ NOUVELLE PROTECTION : Vérifier qu'aucun autre rechargement n'est en cours
+    if (isReloadingRef.current) {
+      console.warn('⚠️ [ZohoSalesIQ] Un autre rechargement est en cours, skip.')
+      return
+    }
+    
     // 2. Attendre puis recharger
     setTimeout(() => {
       console.log('⏰ [ZohoSalesIQ] Démarrage rechargement après nettoyage')
       loadZohoWithLanguage(newLanguage)
-    }, 500)
+    }, 800)
   }
   
   // ✅ CORRECTION PRINCIPALE : UseEffect séparé pour initialisation et changements

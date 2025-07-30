@@ -21,7 +21,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ====================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ======================
+// ==================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
@@ -180,8 +180,6 @@ export default function ChatInterface() {
   // ✅ Effect pour charger l'historique des conversations au démarrage
   useEffect(() => {
     if (isAuthenticated && user?.id) {
-      const { loadConversations } = useChatStore()
-      
       const loadTimer = setTimeout(() => {
         console.log('🔄 [ChatInterface] Chargement historique pour:', user.id)
         loadConversations(user.id)
@@ -191,7 +189,7 @@ export default function ChatInterface() {
 
       return () => clearTimeout(loadTimer)
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, user?.id, loadConversations])
 
   // ==================== HANDLERS ====================
 
