@@ -56,7 +56,7 @@ export class ConversationService {
   }
 
   /**
-   * ✅ NOUVELLE MÉTHODE AJOUTÉE - Récupère une conversation avec messages complets
+   * ✅ MÉTHODE CORRIGÉE - Récupère une conversation avec messages complets
    */
   async getConversationWithMessages(conversationId: string): Promise<ConversationWithMessages | null> {
     try {
@@ -72,17 +72,22 @@ export class ConversationService {
       
       if (response.ok) {
         const data = await response.json()
+        
+        // ✅ CORRECTION: Accéder aux données dans data.conversation
         console.log('✅ [ConversationService] Données récupérées:', {
-          id: data.conversation_id,
-          questionLength: data.question?.length || 0,
-          responseLength: data.response?.length || 0
+          id: data.conversation?.conversation_id,
+          questionLength: data.conversation?.question?.length || 0,
+          responseLength: data.conversation?.response?.length || 0
         })
         
-        const conversationWithMessages = this.transformToConversationWithMessages(data)
-        
-        if (conversationWithMessages.messages.length > 0) {
-          console.log('✅ [ConversationService] Conversation transformée avec messages complets')
-          return conversationWithMessages
+        // ✅ CORRECTION: Passer data.conversation à la méthode transform
+        if (data.conversation && data.conversation.question && data.conversation.response) {
+          const conversationWithMessages = this.transformToConversationWithMessages(data.conversation)
+          
+          if (conversationWithMessages.messages.length > 0) {
+            console.log('✅ [ConversationService] Conversation transformée avec messages complets')
+            return conversationWithMessages
+          }
         }
       }
       
@@ -216,7 +221,7 @@ export class ConversationService {
   }
 
   /**
-   * Récupère les conversations utilisateur - LIMITES AUGMENTÉES
+   * Récupère les conversations utilisateur - AVEC REGROUPEMENT
    */
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.loggingEnabled) {
@@ -242,21 +247,22 @@ export class ConversationService {
       const data = await response.json()
       console.log('✅ Conversations récupérées:', data.count)
       
-      // ✅ LIMITES AUGMENTÉES
+      // ✅ CORRECTION: Les conversations sont maintenant regroupées côté backend
       const conversations: Conversation[] = (data.conversations || []).map((conv: any) => {
-        const title = conv.question 
-          ? conv.question.length > 100 ? conv.question.substring(0, 100) + '...' : conv.question
-          : 'Conversation sans titre'
-
-        const lastMessagePreview = conv.response 
-          ? conv.response.length > 300 ? conv.response.substring(0, 300) + '...' : conv.response
-          : 'Aucune réponse'
+        // Extraire la première question pour le titre
+        const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
+        const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
+        
+        // Extraire la dernière réponse pour l'aperçu
+        const responses = conv.response?.split('\n--- Réponse suivante ---\n') || [conv.response]
+        const lastResponse = responses[responses.length - 1] || 'Aucune réponse'
+        const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
 
         return {
           id: conv.conversation_id || conv.id,
           title: title,
-          preview: conv.question || 'Aucun aperçu disponible',
-          message_count: 2,
+          preview: firstQuestion,
+          message_count: conv.message_count || 2,
           created_at: conv.timestamp || new Date().toISOString(),
           updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
           feedback: conv.feedback,
@@ -275,47 +281,56 @@ export class ConversationService {
   }
 
   /**
-   * Transforme une conversation en ConversationWithMessages - LIMITES AUGMENTÉES
+   * Transforme une conversation en ConversationWithMessages - AVEC PARSING DES MESSAGES MULTIPLES
    */
   transformToConversationWithMessages(conversationData: any): ConversationWithMessages {
     const messages: Message[] = []
     
-    // ✅ PRÉSERVER LE CONTENU COMPLET
-    if (conversationData.question) {
-      messages.push({
-        id: `${conversationData.conversation_id || conversationData.id}_user`,
-        content: conversationData.question,
-        isUser: true,
-        timestamp: new Date(conversationData.timestamp || new Date()),
-        conversation_id: conversationData.conversation_id || conversationData.id
-      })
-    }
-    
-    if (conversationData.response) {
-      messages.push({
-        id: `${conversationData.conversation_id || conversationData.id}_assistant`,
-        content: conversationData.response,
-        isUser: false,
-        timestamp: new Date(conversationData.timestamp || new Date()),
-        conversation_id: conversationData.conversation_id || conversationData.id,
-        feedback: conversationData.feedback === 1 ? 'positive' : conversationData.feedback === -1 ? 'negative' : null,
-        feedbackComment: conversationData.feedback_comment
-      })
+    if (conversationData.question && conversationData.response) {
+      // ✅ NOUVEAU: Parser les questions et réponses multiples
+      const questions = conversationData.question.split('\n--- Question suivante ---\n')
+      const responses = conversationData.response.split('\n--- Réponse suivante ---\n')
+      
+      // Créer des messages alternés (question/réponse)
+      for (let i = 0; i < Math.max(questions.length, responses.length); i++) {
+        if (questions[i]) {
+          messages.push({
+            id: `${conversationData.conversation_id || conversationData.id}_user_${i}`,
+            content: questions[i].trim(),
+            isUser: true,
+            timestamp: new Date(conversationData.timestamp || new Date()),
+            conversation_id: conversationData.conversation_id || conversationData.id
+          })
+        }
+        
+        if (responses[i]) {
+          messages.push({
+            id: `${conversationData.conversation_id || conversationData.id}_assistant_${i}`,
+            content: responses[i].trim(),
+            isUser: false,
+            timestamp: new Date(conversationData.timestamp || new Date()),
+            conversation_id: conversationData.conversation_id || conversationData.id,
+            feedback: i === responses.length - 1 && conversationData.feedback === 1 ? 'positive' 
+                    : i === responses.length - 1 && conversationData.feedback === -1 ? 'negative' 
+                    : null,
+            feedbackComment: i === responses.length - 1 ? conversationData.feedback_comment : undefined
+          })
+        }
+      }
     }
 
-    // ✅ LIMITES AUGMENTÉES
-    const title = conversationData.question 
-      ? conversationData.question.length > 100 ? conversationData.question.substring(0, 100) + '...' : conversationData.question
-      : 'Conversation'
+    // Premier message pour le titre
+    const firstQuestion = messages.find(m => m.isUser)?.content || 'Conversation'
+    const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
 
-    const lastMessagePreview = conversationData.response 
-      ? conversationData.response.length > 300 ? conversationData.response.substring(0, 300) + '...' : conversationData.response
-      : 'Aucune réponse'
+    // Dernière réponse pour l'aperçu
+    const lastResponse = messages.filter(m => !m.isUser).pop()?.content || 'Aucune réponse'
+    const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
 
     return {
       id: conversationData.conversation_id || conversationData.id,
       title: title,
-      preview: conversationData.question || 'Aucun aperçu',
+      preview: firstQuestion,
       message_count: messages.length,
       created_at: conversationData.timestamp || new Date().toISOString(),
       updated_at: conversationData.updated_at || conversationData.timestamp || new Date().toISOString(),
