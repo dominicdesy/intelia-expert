@@ -271,20 +271,9 @@ export default function ChatInterface() {
       addMessage(aiMessage)
       console.log('APRES addMessage')
 
-      if (isFirstMessage && response.conversation_id && currentConversation) {
-        // ✅ CORRECTION: Garder les messages existants + ajouter les nouveaux
-        const updatedConversation = {
-          ...currentConversation,
-          id: response.conversation_id,
-          title: text.trim().substring(0, 60) + (text.trim().length > 60 ? '...' : ''),
-          updated_at: new Date().toISOString(),
-          // ✅ IMPORTANT: Garder tous les messages existants
-          messages: currentConversation.messages || []
-        }
-        
-        setCurrentConversation(updatedConversation)
-        console.log('CONVERSATION MISE A JOUR avec ID:', response.conversation_id, 'Messages:', updatedConversation.messages.length)
-      }
+      // ✅ CORRECTION: Ne plus appeler setCurrentConversation qui écrase les messages
+      // Le store addMessage a déjà mis à jour l'ID et les messages correctement
+      console.log('CONVERSATION MISE A JOUR avec ID:', response.conversation_id, 'Messages conservés automatiquement')
       
     } catch (error) {
       console.error('[handleSendMessage] Erreur:', error)
