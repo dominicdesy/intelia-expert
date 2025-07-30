@@ -356,7 +356,7 @@ export const useChatStore = create<ChatStoreState>()((set, get) => ({
     console.log('🔄 [ChatStore] setCurrentConversation appelé:', conversation?.id, 'Messages:', conversation?.messages?.length || 0)
     set({ currentConversation: conversation })
   }
-}}))))
+})))
 
 // ==================== HOOKS UTILITAIRES ====================
 

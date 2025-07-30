@@ -62,8 +62,8 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
   return groups.filter(group => group.conversations.length > 0)
 }
 
-// ==================== STORE ZUSTAND CENTRALISÉ ====================
-export const useChatStore = create<ChatStoreState>((set, get) => ({
+// ==================== STORE ZUSTAND CENTRALISÉ AVEC RÉACTIVITÉ ====================
+export const useChatStore = create<ChatStoreState>()((set, get) => ({
   // États initiaux
   conversations: [],
   isLoading: false,
@@ -321,6 +321,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       messages: updatedMessages,
       message_count: updatedMessages.length,
       updated_at: new Date().toISOString(),
+      // ✅ CORRECTION: Mettre à jour l'ID si c'est un message avec conversation_id
+      id: message.conversation_id || state.currentConversation.id,
       title: state.currentConversation.id === 'welcome' && message.isUser 
         ? message.content.substring(0, 60) + (message.content.length > 60 ? '...' : '')
         : state.currentConversation.title,
@@ -330,6 +332,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }
     
     set({ currentConversation: updatedConversation })
+    console.log('✅ [ChatStore] Conversation mise à jour - Messages:', updatedMessages.length, 'ID:', updatedConversation.id)
   },
 
   updateMessage: (messageId: string, updates: Partial<Message>) => {
@@ -350,9 +353,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   setCurrentConversation: (conversation: ConversationWithMessages | null) => {
+    console.log('🔄 [ChatStore] setCurrentConversation appelé:', conversation?.id, 'Messages:', conversation?.messages?.length || 0)
     set({ currentConversation: conversation })
   }
-}))
+}}))))
 
 // ==================== HOOKS UTILITAIRES ====================
 
