@@ -26,7 +26,7 @@ export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   
-  // ✅ NOUVEAU: Hooks pour conversations
+  // ✅ Hooks pour conversations
   const { currentConversation, setCurrentConversation, addMessage, updateMessage } = useCurrentConversation()
   const { createNewConversation } = useConversationActions()
   
@@ -56,20 +56,11 @@ export default function ChatInterface() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // ✅ NOUVEAU: Calculer les messages à afficher avec debug
+  // ✅ Calculer les messages à afficher
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  // Debug pour tracer le problème d'affichage
-  console.log('🎨 [RENDER] État affichage:', {
-    currentConversationId: currentConversation?.id,
-    messagesLength: messages.length,
-    hasMessages,
-    isLoadingChat,
-    isAuthenticated
-  })
-
-  // ==================== EFFECTS EXISTANTS ====================
+  // ==================== EFFECTS ====================
   
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -101,7 +92,7 @@ export default function ChatInterface() {
     }
     
     lastMessageCountRef.current = messages.length
-  }, [messages.length])
+  }, [messages.length, shouldAutoScroll, isUserScrolling])
 
   useEffect(() => {
     const chatContainer = chatContainerRef.current
@@ -142,10 +133,9 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
-  // ✅ NOUVEAU: Effect pour initialiser une conversation vide au démarrage
+  // ✅ Effect pour initialiser une conversation vide au démarrage
   useEffect(() => {
     if (isAuthenticated && !currentConversation && !hasMessages) {
-      // Créer un message de bienvenue temporaire si aucune conversation active
       const welcomeMessage: Message = {
         id: 'welcome',
         content: t('chat.welcome'),
@@ -153,7 +143,6 @@ export default function ChatInterface() {
         timestamp: new Date()
       }
       
-      // Créer une conversation temporaire avec le message de bienvenue
       const welcomeConversation = {
         id: 'welcome',
         title: 'Nouvelle conversation',
@@ -171,7 +160,7 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
-  // ✅ NOUVEAU: Effect pour mettre à jour le message de bienvenue lors du changement de langue
+  // ✅ Effect pour mettre à jour le message de bienvenue lors du changement de langue
   useEffect(() => {
     if (currentConversation?.id === 'welcome' && currentConversation.messages.length === 1) {
       const updatedMessage: Message = {
@@ -187,6 +176,22 @@ export default function ChatInterface() {
       setCurrentConversation(updatedConversation)
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation])
+
+  // ✅ Effect pour charger l'historique des conversations au démarrage
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      const { loadConversations } = useChatStore()
+      
+      const loadTimer = setTimeout(() => {
+        console.log('🔄 [ChatInterface] Chargement historique pour:', user.id)
+        loadConversations(user.id)
+          .then(() => console.log('✅ Historique conversations chargé'))
+          .catch(err => console.error('❌ Erreur chargement historique:', err))
+      }, 800)
+
+      return () => clearTimeout(loadTimer)
+    }
+  }, [isAuthenticated, user?.id])
 
   // ==================== HANDLERS ====================
 
@@ -216,14 +221,9 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ CORRECTION: Gestion conversation_id dans handleSendMessage
+  // ✅ CORRECTION FINALE: handleSendMessage simplifié sans logs qui causent la boucle
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
-
-    console.log('🔥 [handleSendMessage] DÉBUT:', {
-      conversationId: currentConversation?.id,
-      messagesCount: currentConversation?.messages?.length || 0
-    })
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -232,25 +232,19 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    // ✅ CORRECTION: Détection plus précise du type de conversation
+    // Détection du type de conversation
     let conversationIdToSend: string | undefined = undefined
     let isFirstMessage = false
 
     if (!currentConversation || currentConversation.id === 'welcome') {
-      // Première question ou conversation de bienvenue
       isFirstMessage = true
-      console.log('🆕 [handleSendMessage] Première question détectée')
     } else if (currentConversation.id && !currentConversation.id.startsWith('temp-') && !currentConversation.id.startsWith('welcome')) {
-      // Conversation existante avec un vrai ID du backend
       conversationIdToSend = currentConversation.id
-      console.log('🔄 [handleSendMessage] Continuation conversation:', conversationIdToSend)
     } else {
-      // Conversation temporaire - traiter comme première question
       isFirstMessage = true
-      console.log('🆕 [handleSendMessage] Conversation temporaire - traiter comme première')
     }
 
-    // Ajouter le message utilisateur AVANT l'appel API
+    // Ajouter le message utilisateur
     addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
@@ -259,24 +253,12 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
-      console.log('📤 [handleSendMessage] Appel API avec:', {
-        question: text.trim().substring(0, 50) + '...',
-        language: currentLanguage,
-        conversationId: conversationIdToSend
-      })
-      
       const response = await generateAIResponse(
         text.trim(), 
         user, 
         currentLanguage, 
         conversationIdToSend
       )
-      
-      console.log('📨 [handleSendMessage] Réponse API reçue:', {
-        conversation_id: response.conversation_id,
-        response_length: response.response?.length,
-        isFirstMessage
-      })
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -286,15 +268,11 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      // ✅ CORRECTION: Toujours ajouter le message AI, puis gérer la conversation
+      // Toujours ajouter le message AI
       addMessage(aiMessage)
-      console.log('✅ [handleSendMessage] Message AI ajouté')
 
-      // ✅ CORRECTION: Si première question, mettre à jour l'ID de conversation
+      // Si première question, mettre à jour l'ID de conversation
       if (isFirstMessage && response.conversation_id && currentConversation) {
-        console.log('🔄 [handleSendMessage] Mise à jour ID conversation:', response.conversation_id)
-        
-        // Mettre à jour la conversation existante avec l'ID réel du backend
         const updatedConversation = {
           ...currentConversation,
           id: response.conversation_id,
@@ -303,7 +281,6 @@ export default function ChatInterface() {
         }
         
         setCurrentConversation(updatedConversation)
-        console.log('✅ [handleSendMessage] ID conversation mis à jour vers:', response.conversation_id)
       }
       
     } catch (error) {
@@ -322,8 +299,6 @@ export default function ChatInterface() {
 
   // ✅ GESTION FEEDBACK (conservée)
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
-    console.log('👆 [handleFeedbackClick] Ouverture modal feedback:', messageId, feedback)
-    
     setFeedbackModal({
       isOpen: true,
       messageId,
@@ -343,44 +318,31 @@ export default function ChatInterface() {
 
     setIsSubmittingFeedback(true)
     try {
-      console.log('📊 [handleFeedbackSubmit] Envoi feedback avec commentaire:', {
-        conversation_id: message.conversation_id,
-        feedback,
-        comment: comment || 'Aucun commentaire'
-      })
-      
-      // Mise à jour immédiate de l'UI
       updateMessage(messageId, { 
         feedback,
         feedbackComment: comment 
       })
 
-      // Envoi feedback
       const feedbackValue = feedback === 'positive' ? 1 : -1
       
       try {
         await conversationService.sendFeedback(message.conversation_id, feedbackValue)
-        console.log('✅ Feedback principal enregistré')
         
         if (comment && comment.trim()) {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
-            console.log('✅ Commentaire feedback enregistré')
           } catch (commentError) {
             console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
           }
         }
       } catch (feedbackError) {
         console.error('❌ Erreur envoi feedback:', feedbackError)
-        // Rollback en cas d'erreur
         updateMessage(messageId, { 
           feedback: null,
           feedbackComment: undefined 
         })
         throw feedbackError
       }
-      
-      console.log(`✅ Feedback ${feedback} avec commentaire enregistré pour conversation ${message.conversation_id}`)
       
     } catch (error) {
       console.error('❌ Erreur générale feedback:', error)
@@ -398,12 +360,10 @@ export default function ChatInterface() {
     })
   }
 
-  // ✅ NOUVEAU: Gestion nouvelle conversation
+  // ✅ Gestion nouvelle conversation
   const handleNewConversation = () => {
-    console.log('✨ [handleNewConversation] Création nouvelle conversation')
     createNewConversation()
     
-    // Créer le message de bienvenue
     const welcomeMessage: Message = {
       id: 'welcome',
       content: t('chat.welcome'),
@@ -470,7 +430,6 @@ export default function ChatInterface() {
               <InteliaLogo className="w-8 h-8" />
               <div className="text-center">
                 <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
-                {/* ✅ NOUVEAU: Affichage titre conversation courante */}
                 {currentConversation && currentConversation.id !== 'welcome' && (
                   <p className="text-xs text-gray-500 truncate max-w-xs">
                     {currentConversation.title}
@@ -501,7 +460,7 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* ✅ NOUVEAU: Indicateur conversation si pas bienvenue */}
+              {/* Indicateur conversation si pas bienvenue */}
               {currentConversation && currentConversation.id !== 'welcome' && (
                 <div className="text-center">
                   <div className="inline-flex items-center space-x-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-full">
@@ -512,87 +471,75 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* Messages avec debug temporaire */}
+              {/* Messages */}
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
                   <div className="text-sm">Aucun message à afficher</div>
-                  <div className="text-xs mt-2 text-gray-400">
-                    Conversation: {currentConversation?.id || 'Aucune'}<br/>
-                    Messages dans l'état: {currentConversation?.messages?.length || 0}
-                  </div>
                 </div>
               ) : (
-                messages.map((message, index) => {
-                  console.log(`🎨 [RENDER] Message ${index}:`, {
-                    id: message.id,
-                    isUser: message.isUser,
-                    content: message.content.substring(0, 30) + '...'
-                  })
-                  
-                  return (
-                    <div key={`${message.id}-${index}`}>
-                      <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                        {!message.isUser && (
-                          <div className="relative">
-                            <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                          </div>
-                        )}
-                        
-                        <div className="max-w-xs lg:max-w-2xl">
-                          <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                            <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                              {message.content}
-                            </p>
-                          </div>
-                          
-                          {/* Boutons de feedback */}
-                          {!message.isUser && index > 0 && message.conversation_id && (
-                            <div className="flex items-center space-x-2 mt-2 ml-2">
-                              <button
-                                onClick={() => handleFeedbackClick(message.id, 'positive')}
-                                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                                  message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
-                                }`}
-                                title={t('chat.helpfulResponse')}
-                              >
-                                <ThumbUpIcon />
-                              </button>
-                              <button
-                                onClick={() => handleFeedbackClick(message.id, 'negative')}
-                                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                                  message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
-                                }`}
-                                title={t('chat.notHelpfulResponse')}
-                              >
-                                <ThumbDownIcon />
-                              </button>
-                              
-                              {/* Status feedback */}
-                              {message.feedback && (
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs text-gray-500">
-                                    Merci pour votre retour !
-                                  </span>
-                                  {message.feedbackComment && (
-                                    <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                      💬
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                messages.map((message, index) => (
+                  <div key={`${message.id}-${index}`}>
+                    <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                      {!message.isUser && (
+                        <div className="relative">
+                          <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
                         </div>
-
-                        {message.isUser && (
-                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                            <UserIcon className="w-5 h-5 text-white" />
+                      )}
+                      
+                      <div className="max-w-xs lg:max-w-2xl">
+                        <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                          <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                            {message.content}
+                          </p>
+                        </div>
+                        
+                        {/* Boutons de feedback */}
+                        {!message.isUser && index > 0 && message.conversation_id && (
+                          <div className="flex items-center space-x-2 mt-2 ml-2">
+                            <button
+                              onClick={() => handleFeedbackClick(message.id, 'positive')}
+                              className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                                message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
+                              }`}
+                              title={t('chat.helpfulResponse')}
+                            >
+                              <ThumbUpIcon />
+                            </button>
+                            <button
+                              onClick={() => handleFeedbackClick(message.id, 'negative')}
+                              className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                                message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
+                              }`}
+                              title={t('chat.notHelpfulResponse')}
+                            >
+                              <ThumbDownIcon />
+                            </button>
+                            
+                            {/* Status feedback */}
+                            {message.feedback && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500">
+                                  Merci pour votre retour !
+                                </span>
+                                {message.feedbackComment && (
+                                  <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                                    💬
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
+
+                      {message.isUser && (
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <UserIcon className="w-5 h-5 text-white" />
+                        </div>
+                      )}
                     </div>
-                  )
-                })
+                  </div>
+                ))
               )}
 
               {/* Indicateur de frappe */}
