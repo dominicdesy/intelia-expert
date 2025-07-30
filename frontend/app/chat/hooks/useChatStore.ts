@@ -245,19 +245,20 @@ export const useChatStore = (): ChatStore => {
    * Ajoute un message à la conversation courante
    */
   const addMessage = (message: Message): void => {
-    console.log('💬 [addMessage] Ajout message:', {
+    console.log('💬 [addMessage] Tentative ajout:', {
       messageId: message.id,
       isUser: message.isUser,
+      content: message.content.substring(0, 50) + '...',
       conversationId: currentConversation?.id,
       currentMessagesCount: currentConversation?.messages?.length || 0
     })
     
     if (!currentConversation) {
-      console.warn('⚠️ [addMessage] Aucune conversation active - création conversation temporaire')
+      console.warn('⚠️ [addMessage] Aucune conversation - création temporaire')
       
       const tempConversation: ConversationWithMessages = {
         id: 'temp-' + Date.now(),
-        title: 'Nouvelle conversation',
+        title: message.isUser ? message.content.substring(0, 60) + '...' : 'Nouvelle conversation',
         preview: message.content,
         message_count: 1,
         created_at: new Date().toISOString(),
@@ -268,36 +269,53 @@ export const useChatStore = (): ChatStore => {
       }
       
       setCurrentConversation(tempConversation)
+      console.log('✅ [addMessage] Conversation temporaire créée avec message')
       return
     }
     
-    // Vérifier si le message existe déjà pour éviter les doublons
-    const messageExists = currentConversation.messages?.some(m => m.id === message.id)
+    // Vérification doublons améliorée
+    const messageExists = currentConversation.messages?.some(m => 
+      m.id === message.id || 
+      (m.content === message.content && m.isUser === message.isUser)
+    )
+    
     if (messageExists) {
-      console.warn('⚠️ [addMessage] Message déjà présent, ignoré:', message.id)
+      console.warn('⚠️ [addMessage] Message doublon détecté, ignoré:', message.id)
       return
     }
+    
+    // Mise à jour conversation avec nouveau message
+    const updatedMessages = [...(currentConversation.messages || []), message]
     
     const updatedConversation: ConversationWithMessages = {
       ...currentConversation,
-      messages: [...(currentConversation.messages || []), message],
-      message_count: (currentConversation.messages?.length || 0) + 1,
+      messages: updatedMessages,
+      message_count: updatedMessages.length,
       updated_at: new Date().toISOString(),
       title: currentConversation.id === 'welcome' && message.isUser 
         ? message.content.substring(0, 60) + (message.content.length > 60 ? '...' : '')
         : currentConversation.title,
       last_message_preview: !message.isUser 
         ? message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
-        : currentConversation.last_message_preview
+        : currentConversation.last_message_preview || currentConversation.preview
     }
     
     console.log('🔄 [addMessage] Conversation mise à jour:', {
       id: updatedConversation.id,
       messageCount: updatedConversation.messages.length,
-      title: updatedConversation.title
+      title: updatedConversation.title.substring(0, 30) + '...'
     })
     
     setCurrentConversation(updatedConversation)
+    
+    // Force re-render avec log de vérification
+    setTimeout(() => {
+      console.log('🔍 [addMessage] Vérification post-ajout:', {
+        conversationId: updatedConversation.id,
+        messagesInState: updatedConversation.messages.length,
+        lastMessage: updatedConversation.messages[updatedConversation.messages.length - 1]?.content.substring(0, 30) + '...'
+      })
+    }, 100)
   }
 
   /**

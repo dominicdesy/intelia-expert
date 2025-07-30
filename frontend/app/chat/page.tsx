@@ -56,9 +56,18 @@ export default function ChatInterface() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // ✅ NOUVEAU: Calculer les messages à afficher
+  // ✅ NOUVEAU: Calculer les messages à afficher avec debug
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
+
+  // Debug pour tracer le problème d'affichage
+  console.log('🎨 [RENDER] État affichage:', {
+    currentConversationId: currentConversation?.id,
+    messagesLength: messages.length,
+    hasMessages,
+    isLoadingChat,
+    isAuthenticated
+  })
 
   // ==================== EFFECTS EXISTANTS ====================
   
@@ -211,7 +220,10 @@ export default function ChatInterface() {
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
-    console.log('🔥 [handleSendMessage] DÉBUT - État conversation:', currentConversation?.id)
+    console.log('🔥 [handleSendMessage] DÉBUT:', {
+      conversationId: currentConversation?.id,
+      messagesCount: currentConversation?.messages?.length || 0
+    })
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -220,27 +232,25 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    // ✅ CORRECTION: Gestion intelligente des conversations
+    // ✅ CORRECTION: Détection plus précise du type de conversation
     let conversationIdToSend: string | undefined = undefined
     let isFirstMessage = false
 
-    // Cas 1: Conversation welcome (première vraie question)
-    if (currentConversation?.id === 'welcome') {
+    if (!currentConversation || currentConversation.id === 'welcome') {
+      // Première question ou conversation de bienvenue
       isFirstMessage = true
-      console.log('🆕 [handleSendMessage] Première question - nouvelle conversation')
-    }
-    // Cas 2: Conversation existante avec ID réel
-    else if (currentConversation?.id && currentConversation.id !== 'welcome') {
+      console.log('🆕 [handleSendMessage] Première question détectée')
+    } else if (currentConversation.id && !currentConversation.id.startsWith('temp-') && !currentConversation.id.startsWith('welcome')) {
+      // Conversation existante avec un vrai ID du backend
       conversationIdToSend = currentConversation.id
       console.log('🔄 [handleSendMessage] Continuation conversation:', conversationIdToSend)
-    }
-    // Cas 3: Aucune conversation
-    else {
+    } else {
+      // Conversation temporaire - traiter comme première question
       isFirstMessage = true
-      console.log('🆕 [handleSendMessage] Aucune conversation - création nouvelle')
+      console.log('🆕 [handleSendMessage] Conversation temporaire - traiter comme première')
     }
 
-    // Ajouter le message utilisateur IMMÉDIATEMENT
+    // Ajouter le message utilisateur AVANT l'appel API
     addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
@@ -249,9 +259,12 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
-      console.log('📤 [handleSendMessage] Envoi avec conversation_id:', conversationIdToSend)
+      console.log('📤 [handleSendMessage] Appel API avec:', {
+        question: text.trim().substring(0, 50) + '...',
+        language: currentLanguage,
+        conversationId: conversationIdToSend
+      })
       
-      // ✅ CORRECTION: Passer le conversation_id au service API
       const response = await generateAIResponse(
         text.trim(), 
         user, 
@@ -259,10 +272,10 @@ export default function ChatInterface() {
         conversationIdToSend
       )
       
-      console.log('📨 [handleSendMessage] Réponse API:', {
+      console.log('📨 [handleSendMessage] Réponse API reçue:', {
         conversation_id: response.conversation_id,
-        was_first_message: isFirstMessage,
-        sent_id: conversationIdToSend
+        response_length: response.response?.length,
+        isFirstMessage
       })
 
       const aiMessage: Message = {
@@ -273,33 +286,35 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      // ✅ CORRECTION: Si première question, créer la vraie conversation avec l'ID backend
+      // ✅ CORRECTION: Gestion synchronisée des conversations
       if (isFirstMessage && response.conversation_id) {
-        console.log('🔄 [handleSendMessage] Création conversation avec ID backend:', response.conversation_id)
+        console.log('🔄 [handleSendMessage] Mise à jour conversation avec ID backend:', response.conversation_id)
         
+        // Créer/mettre à jour la conversation avec l'ID réel du backend
         const realConversation = {
           id: response.conversation_id,
           title: text.trim().substring(0, 60) + (text.trim().length > 60 ? '...' : ''),
           preview: text.trim(),
-          message_count: 2, // user + ai message
+          message_count: 2,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           language: currentLanguage,
           status: 'active' as const,
           last_message_preview: response.response.substring(0, 100) + '...',
-          messages: [userMessage] // Le message utilisateur déjà ajouté
+          messages: [userMessage, aiMessage] // ✅ CORRECTION: Inclure les deux messages
         }
         
         setCurrentConversation(realConversation)
-        console.log('✅ [handleSendMessage] Conversation mise à jour avec ID réel')
+        console.log('✅ [handleSendMessage] Conversation complète créée avec', realConversation.messages.length, 'messages')
+        
+      } else {
+        // Pour conversation existante, juste ajouter le message AI
+        addMessage(aiMessage)
+        console.log('✅ [handleSendMessage] Message AI ajouté à conversation existante')
       }
-
-      // Ajouter le message de réponse
-      addMessage(aiMessage)
-      console.log('✅ [handleSendMessage] Messages ajoutés - Total:', (currentConversation?.messages?.length || 0) + 2)
       
     } catch (error) {
-      console.error('❌ [handleSendMessage] Error generating response:', error)
+      console.error('❌ [handleSendMessage] Erreur:', error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: error instanceof Error ? error.message : t('chat.errorMessage'),
@@ -504,69 +519,88 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {messages.map((message, index) => (
-                <div key={message.id}>
-                  <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                    {!message.isUser && (
-                      <div className="relative">
-                        <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
-                      </div>
-                    )}
-                    
-                    <div className="max-w-xs lg:max-w-2xl">
-                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                          {message.content}
-                        </p>
-                      </div>
-                      
-                      {/* Boutons de feedback */}
-                      {!message.isUser && index > 0 && message.conversation_id && (
-                        <div className="flex items-center space-x-2 mt-2 ml-2">
-                          <button
-                            onClick={() => handleFeedbackClick(message.id, 'positive')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                              message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
-                            }`}
-                            title={t('chat.helpfulResponse')}
-                          >
-                            <ThumbUpIcon />
-                          </button>
-                          <button
-                            onClick={() => handleFeedbackClick(message.id, 'negative')}
-                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                              message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
-                            }`}
-                            title={t('chat.notHelpfulResponse')}
-                          >
-                            <ThumbDownIcon />
-                          </button>
+              {/* Messages avec debug temporaire */}
+              {messages.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  <div className="text-sm">Aucun message à afficher</div>
+                  <div className="text-xs mt-2 text-gray-400">
+                    Conversation: {currentConversation?.id || 'Aucune'}<br/>
+                    Messages dans l'état: {currentConversation?.messages?.length || 0}
+                  </div>
+                </div>
+              ) : (
+                messages.map((message, index) => {
+                  console.log(`🎨 [RENDER] Message ${index}:`, {
+                    id: message.id,
+                    isUser: message.isUser,
+                    content: message.content.substring(0, 30) + '...'
+                  })
+                  
+                  return (
+                    <div key={`${message.id}-${index}`}>
+                      <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                        {!message.isUser && (
+                          <div className="relative">
+                            <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
+                          </div>
+                        )}
+                        
+                        <div className="max-w-xs lg:max-w-2xl">
+                          <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                            <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                              {message.content}
+                            </p>
+                          </div>
                           
-                          {/* Status feedback */}
-                          {message.feedback && (
-                            <div className="flex items-center space-x-2">
-                              <span className="text-xs text-gray-500">
-                                Merci pour votre retour !
-                              </span>
-                              {message.feedbackComment && (
-                                <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                  💬
-                                </span>
+                          {/* Boutons de feedback */}
+                          {!message.isUser && index > 0 && message.conversation_id && (
+                            <div className="flex items-center space-x-2 mt-2 ml-2">
+                              <button
+                                onClick={() => handleFeedbackClick(message.id, 'positive')}
+                                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                                  message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
+                                }`}
+                                title={t('chat.helpfulResponse')}
+                              >
+                                <ThumbUpIcon />
+                              </button>
+                              <button
+                                onClick={() => handleFeedbackClick(message.id, 'negative')}
+                                className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                                  message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
+                                }`}
+                                title={t('chat.notHelpfulResponse')}
+                              >
+                                <ThumbDownIcon />
+                              </button>
+                              
+                              {/* Status feedback */}
+                              {message.feedback && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-500">
+                                    Merci pour votre retour !
+                                  </span>
+                                  {message.feedbackComment && (
+                                    <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                                      💬
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
 
-                    {message.isUser && (
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                        <UserIcon className="w-5 h-5 text-white" />
+                        {message.isUser && (
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                            <UserIcon className="w-5 h-5 text-white" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    </div>
+                  )
+                })
+              )}
 
               {/* Indicateur de frappe */}
               {isLoadingChat && (
