@@ -25,14 +25,13 @@ export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   
-  const {
-    currentConversation,
-    setCurrentConversation,
-    addMessage,
-    updateMessage,
-    createNewConversation,
-    loadConversations
-  } = useChatStore()
+  // ✅ SÉLECTEURS ZUSTAND RÉACTIFS - UN PAR UN
+  const currentConversation = useChatStore(state => state.currentConversation)
+  const setCurrentConversation = useChatStore(state => state.setCurrentConversation)
+  const addMessage = useChatStore(state => state.addMessage)
+  const updateMessage = useChatStore(state => state.updateMessage)
+  const createNewConversation = useChatStore(state => state.createNewConversation)
+  const loadConversations = useChatStore(state => state.loadConversations)
   
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
@@ -59,6 +58,9 @@ export default function ChatInterface() {
 
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
+
+  // ✅ DEBUG LOG POUR TRACER LES RE-RENDERS
+  console.log('🔍 [Render] Messages actuels:', messages.length, 'Conversation ID:', currentConversation?.id)
 
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -461,7 +463,7 @@ export default function ChatInterface() {
               {currentConversation && currentConversation.id !== 'welcome' && (
                 <div className="text-center">
                   <div className="inline-flex items-center space-x-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-full">
-                    <span>??</span>
+                    <span>📖</span>
                     <span>Conversation : {currentConversation.title}</span>
                     <span className="text-blue-400">({currentConversation.message_count} messages)</span>
                   </div>
@@ -517,7 +519,7 @@ export default function ChatInterface() {
                                 </span>
                                 {message.feedbackComment && (
                                   <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                    ??
+                                    💬
                                   </span>
                                 )}
                               </div>
