@@ -1,9 +1,9 @@
-// ==================== API SERVICE AVEC AUTHENTIFICATION ====================
+// ==================== API SERVICE AVEC AUTHENTIFICATION + CONVERSATION_ID ====================
 
 // Configuration de base
 const API_BASE_URL = 'https://expert-app-cngws.ondigitalocean.app/api/v1'
 
-// ✅ NOUVEAU: Fonction pour récupérer le token d'authentification
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION
 const getAuthToken = (): string | null => {
   try {
     // 🔧 PRIORITÉ: Token depuis les cookies (URL-décodé)
@@ -55,7 +55,7 @@ const getAuthToken = (): string | null => {
   }
 }
 
-// ✅ NOUVEAU: Fonction pour récupérer le token depuis les cookies
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN DEPUIS LES COOKIES
 const getCookieToken = (): string | null => {
   try {
     // Récupérer le cookie Supabase
@@ -88,7 +88,7 @@ const getCookieToken = (): string | null => {
   }
 }
 
-// ✅ NOUVEAU: Fonction pour créer les headers avec authentification
+// ✅ FONCTION POUR CRÉER LES HEADERS AVEC AUTHENTIFICATION
 const getAuthHeaders = (): Record<string, string> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -123,13 +123,13 @@ interface APIError {
 }
 
 /**
- * Génère une réponse IA via l'API Expert
+ * Génère une réponse IA via l'API Expert avec support conversation_id
  */
 export const generateAIResponse = async (
   question: string,
   user: any,
   language: string = 'fr',
-  conversationId?: string
+  conversationId?: string  // ✅ PARAMÈTRE POUR CONTINUATION CONVERSATION
 ): Promise<AIResponse> => {
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
@@ -144,11 +144,13 @@ export const generateAIResponse = async (
   console.log('🔥 [apiService] Conversation ID:', conversationId || 'Nouvelle conversation')
 
   try {
+    // ✅ CORRECTION CRITIQUE: Inclure conversation_id ET user_id dans le body
     const requestBody = {
-      text: question.trim(),  // ✅ CORRIGÉ: text au lieu de question
-      user_id: user.id,
+      text: question.trim(),
+      user_id: user.id,  // ✅ AJOUT: user_id explicite
       language: language,
-      ...(conversationId && { conversation_id: conversationId })
+      speed_mode: 'balanced',  // ✅ AJOUT: mode par défaut
+      ...(conversationId && { conversation_id: conversationId })  // ✅ AJOUT: conversation_id si fourni
     }
 
     const headers = getAuthHeaders()
@@ -224,13 +226,14 @@ export const sendFeedback = async (
 
   try {
     const requestBody = {
-      feedback,
+      rating: feedback === 1 ? 'positive' : 'negative',  // ✅ CORRIGÉ: utiliser 'rating' comme attendu
+      conversation_id: conversationId,
       ...(comment && { comment: comment.trim() })
     }
 
     const headers = getAuthHeaders()
 
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/feedback`, {
+    const response = await fetch(`${API_BASE_URL}/expert/feedback`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody)
@@ -329,6 +332,65 @@ export const checkAPIHealth = async (): Promise<boolean> => {
 }
 
 /**
+ * ✅ NOUVELLE FONCTION: Test de l'API avec conversation_id
+ */
+export const testConversationContinuity = async (
+  user: any,
+  language: string = 'fr'
+): Promise<{
+  first_conversation_id: string,
+  second_conversation_id: string,
+  same_id: boolean,
+  success: boolean
+}> => {
+  try {
+    console.log('🧪 [apiService] Test continuité conversation...')
+    
+    // Première question
+    const firstResponse = await generateAIResponse(
+      "Test question 1: Qu'est-ce que Ross 308 ?",
+      user,
+      language
+    )
+    
+    // Attendre un peu
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Deuxième question avec le même conversation_id
+    const secondResponse = await generateAIResponse(
+      "Test question 2: Quel est leur poids à 12 jours ?",
+      user,
+      language,
+      firstResponse.conversation_id  // ✅ PASSER L'ID DE LA PREMIÈRE RÉPONSE
+    )
+    
+    const sameId = firstResponse.conversation_id === secondResponse.conversation_id
+    
+    console.log('🧪 [apiService] Test résultat:', {
+      first_id: firstResponse.conversation_id,
+      second_id: secondResponse.conversation_id,
+      same_id: sameId
+    })
+    
+    return {
+      first_conversation_id: firstResponse.conversation_id,
+      second_conversation_id: secondResponse.conversation_id,
+      same_id: sameId,
+      success: true
+    }
+    
+  } catch (error) {
+    console.error('❌ [apiService] Erreur test continuité:', error)
+    return {
+      first_conversation_id: '',
+      second_conversation_id: '',
+      same_id: false,
+      success: false
+    }
+  }
+}
+
+/**
  * Utilitaire pour gérer les erreurs réseau
  */
 export const handleNetworkError = (error: any): string => {
@@ -345,6 +407,21 @@ export const handleNetworkError = (error: any): string => {
   }
   
   return error?.message || 'Une erreur inattendue s\'est produite.'
+}
+
+/**
+ * ✅ NOUVELLE FONCTION: Debug conversation_id dans la console
+ */
+export const debugConversationFlow = (
+  step: string,
+  conversationId: string | undefined,
+  additionalInfo?: any
+) => {
+  console.log(`🔍 [Conversation Debug] ${step}:`, {
+    conversation_id: conversationId || 'NOUVEAU',
+    timestamp: new Date().toISOString(),
+    ...additionalInfo
+  })
 }
 
 // Export par défaut de la fonction principale
