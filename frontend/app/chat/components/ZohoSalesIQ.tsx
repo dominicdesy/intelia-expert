@@ -38,7 +38,8 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       // Supprimer les scripts Zoho existants
       const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"], script#zsiqscript')
       existingScripts.forEach(script => {
-        console.log('🗑️ [ZohoSalesIQ] Suppression script:', script.id || script.src)
+        const scriptElement = script as HTMLScriptElement
+        console.log('🗑️ [ZohoSalesIQ] Suppression script:', scriptElement.id || scriptElement.src)
         script.remove()
       })
       
