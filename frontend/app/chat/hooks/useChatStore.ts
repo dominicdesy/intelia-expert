@@ -1,142 +1,377 @@
-import { useState } from 'react'
-import { ConversationItem, ChatStore } from '../types'
+// ==================== STORE CHAT MIS À JOUR POUR CONVERSATIONS ====================
+
+import { create } from 'zustand'
 import { conversationService } from '../services/conversationService'
+import { 
+  Conversation,
+  ConversationWithMessages, 
+  ConversationGroup,
+  ConversationGroupingOptions,
+  Message,
+  ConversationItem // Import pour compatibilité
+} from '../types'
 
-// ==================== HOOK CHAT AVEC LOGGING AMÉLIORÉ ====================
-export const useChatStore = (): ChatStore => {
-  const [conversations, setConversations] = useState<ConversationItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+interface ChatStore {
+  // ✅ NOUVEAU: États pour les conversations
+  conversations: Conversation[]
+  conversationGroups: ConversationGroup[]
+  currentConversation: ConversationWithMessages | null
+  
+  // États de chargement
+  isLoading: boolean
+  isLoadingHistory: boolean
+  isLoadingConversation: boolean
+  error: string | null
+  
+  // ✅ NOUVEAU: Actions principales pour conversations
+  loadConversations: (userId: string, options?: ConversationGroupingOptions) => Promise<void>
+  loadConversation: (conversationId: string) => Promise<void>
+  setCurrentConversation: (conversation: ConversationWithMessages | null) => void
+  createNewConversation: () => void
+  
+  // Actions de gestion
+  deleteConversation: (conversationId: string) => Promise<void>
+  clearAllConversations: (userId: string) => Promise<void>
+  refreshConversations: (userId: string) => Promise<void>
+  
+  // Actions pour messages dans la conversation courante
+  addMessage: (message: Message) => void
+  updateMessage: (messageId: string, updates: Partial<Message>) => void
+  
+  // ✅ HÉRITÉES: Actions pour compatibilité avec l'existant
+  addConversation: (conversationId: string, question: string, response: string) => void
+}
 
-  const loadConversations = async (userId: string): Promise<void> => {
+export const useChatStore = create<ChatStore>((set, get) => ({
+  // États initiaux
+  conversations: [],
+  conversationGroups: [],
+  currentConversation: null,
+  isLoading: false,
+  isLoadingHistory: false,
+  isLoadingConversation: false,
+  error: null,
+
+  // ==================== ACTIONS PRINCIPALES ====================
+
+  /**
+   * Charge l'historique des conversations pour un utilisateur
+   */
+  loadConversations: async (userId: string, options?: ConversationGroupingOptions) => {
     if (!userId) {
-      console.warn('⚠️ [useChatStore] Pas d\'userId fourni pour charger les conversations')
+      console.warn('⚠️ [ChatStore] User ID requis pour charger conversations')
       return
     }
 
-    setIsLoading(true)
+    set({ isLoadingHistory: true, error: null })
+    
     try {
-      console.log('🔄 [useChatStore] Chargement conversations pour userId:', userId)
-      const userConversations = await conversationService.getUserConversations(userId, 100) // Augmenter la limite
+      console.log('📂 [ChatStore] Chargement conversations pour:', userId)
       
-      console.log('📊 [useChatStore] Conversations brutes reçues:', userConversations.length, userConversations)
+      // Utiliser la méthode existante avec transformation
+      const rawConversations = await conversationService.getUserConversations(userId, options?.limit || 50)
       
-      if (!userConversations || userConversations.length === 0) {
-        console.log('📭 [useChatStore] Aucune conversation trouvée')
-        setConversations([])
-        return
-      }
+      // Grouper par date
+      const groups = conversationService.groupConversationsByDate(rawConversations)
       
-      const formattedConversations: ConversationItem[] = userConversations.map(conv => {
-        const title = conv.question && conv.question.length > 0 
-          ? (conv.question.length > 50 ? conv.question.substring(0, 50) + '...' : conv.question)
-          : 'Conversation sans titre'
-          
-        return {
-          id: conv.conversation_id || conv.id || Date.now().toString(),
-          title: title,
-          messages: [
-            { id: `${conv.conversation_id}-q`, role: 'user', content: conv.question || 'Question non disponible' },
-            { id: `${conv.conversation_id}-a`, role: 'assistant', content: conv.response || 'Réponse non disponible' }
-          ],
-          updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
-          created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
-          feedback: conv.feedback || null
-        }
+      set({
+        conversations: rawConversations,
+        conversationGroups: groups,
+        isLoadingHistory: false,
+        error: null
       })
       
-      // Trier par date de mise à jour (plus récent en premier)
-      const sortedConversations = formattedConversations.sort((a, b) => 
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      )
-      
-      setConversations(sortedConversations)
-      console.log('✅ [useChatStore] Conversations formatées et triées:', sortedConversations.length)
+      console.log('✅ [ChatStore] Conversations chargées:', rawConversations.length, 'conversations,', groups.length, 'groupes')
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur chargement conversations:', error)
-      setConversations([])
-    } finally {
-      setIsLoading(false)
+      console.error('❌ [ChatStore] Erreur chargement conversations:', error)
+      set({
+        isLoadingHistory: false,
+        error: error instanceof Error ? error.message : 'Erreur de chargement'
+      })
     }
-  }
+  },
 
-  const deleteConversation = async (id: string): Promise<void> => {
-    try {
-      console.log('🗑️ [useChatStore] Suppression conversation:', id)
-      
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
-      setConversations(prev => prev.filter(conv => conv.id !== id))
-      
-      // 2. Suppression côté serveur
-      await conversationService.deleteConversation(id)
-      
-      console.log('✅ [useChatStore] Conversation supprimée du serveur:', id)
-      
-    } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversation serveur:', error)
-      
-      // En cas d'erreur serveur, on pourrait remettre la conversation dans la liste
-      // mais pour l'instant on garde la suppression locale même si le serveur échoue
-      // pour éviter de confuser l'utilisateur
-      
-      // Optionnel: alerter l'utilisateur
-      // alert('Erreur lors de la suppression sur le serveur, mais conversation supprimée localement')
+  /**
+   * Charge une conversation spécifique avec tous ses messages
+   */
+  loadConversation: async (conversationId: string) => {
+    if (!conversationId) {
+      console.warn('⚠️ [ChatStore] ID conversation requis')
+      return
     }
-  }
 
-  const clearAllConversations = async (userId?: string): Promise<void> => {
+    set({ isLoadingConversation: true, error: null })
+    
     try {
-      console.log('🗑️ [useChatStore] Suppression toutes conversations')
+      console.log('📖 [ChatStore] Chargement conversation:', conversationId)
       
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
-      setConversations([])
+      // Chercher dans les conversations existantes
+      const { conversations } = get()
+      const existingConv = conversations.find(c => c.id === conversationId)
       
-      // 2. Suppression côté serveur si userId disponible
-      if (userId) {
-        await conversationService.clearAllUserConversations(userId)
-        console.log('✅ [useChatStore] Toutes conversations supprimées du serveur')
+      if (existingConv) {
+        // Récupérer les données complètes depuis le service
+        const rawData = await conversationService.getUserConversations('temp')
+        const fullData = rawData.find((c: any) => c.id === conversationId)
+        
+        if (fullData) {
+          const conversationWithMessages = conversationService.transformToConversationWithMessages(fullData)
+          
+          set({
+            currentConversation: conversationWithMessages,
+            isLoadingConversation: false,
+            error: null
+          })
+          
+          console.log('✅ [ChatStore] Conversation chargée:', conversationWithMessages.message_count, 'messages')
+        } else {
+          throw new Error('Conversation non trouvée')
+        }
       } else {
-        console.warn('⚠️ [useChatStore] Pas d\'userId pour suppression serveur')
+        throw new Error('Conversation non trouvée dans l\'historique')
       }
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversations serveur:', error)
-      // Même principe: on garde la suppression locale
+      console.error('❌ [ChatStore] Erreur chargement conversation:', error)
+      set({
+        isLoadingConversation: false,
+        error: error instanceof Error ? error.message : 'Erreur de chargement'
+      })
     }
-  }
+  },
 
-  // Fonction pour forcer le rechargement
-  const refreshConversations = async (userId: string): Promise<void> => {
-    console.log('🔄 [useChatStore] Rechargement forcé des conversations')
-    await loadConversations(userId)
-  }
+  /**
+   * Définit la conversation courante
+   */
+  setCurrentConversation: (conversation: ConversationWithMessages | null) => {
+    console.log('🔄 [ChatStore] Définition conversation courante:', conversation?.id || 'null')
+    set({ currentConversation: conversation })
+  },
 
-  // ✅ CORRECTION: Fonction pour ajouter une nouvelle conversation à la liste locale
-  const addConversation = (conversationId: string, question: string, response: string): void => {
-    const newConversation: ConversationItem = {
-      id: conversationId,
-      title: question.length > 50 ? question.substring(0, 50) + '...' : question,
-      messages: [
-        { id: `${conversationId}-q`, role: 'user', content: question },
-        { id: `${conversationId}-a`, role: 'assistant', content: response }
-      ],
-      updated_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      feedback: null
+  /**
+   * Crée une nouvelle conversation vide
+   */
+  createNewConversation: () => {
+    console.log('✨ [ChatStore] Création nouvelle conversation')
+    set({ currentConversation: null })
+  },
+
+  // ==================== ACTIONS DE GESTION ====================
+
+  /**
+   * Supprime une conversation
+   */
+  deleteConversation: async (conversationId: string) => {
+    try {
+      console.log('🗑️ [ChatStore] Suppression conversation:', conversationId)
+      
+      // Supprimer côté serveur
+      await conversationService.deleteConversation(conversationId)
+      
+      // Mettre à jour le store
+      const { conversations, conversationGroups, currentConversation } = get()
+      
+      const updatedConversations = conversations.filter(c => c.id !== conversationId)
+      const updatedGroups = conversationService.groupConversationsByDate(updatedConversations)
+      
+      set({
+        conversations: updatedConversations,
+        conversationGroups: updatedGroups,
+        currentConversation: currentConversation?.id === conversationId ? null : currentConversation
+      })
+      
+      console.log('✅ [ChatStore] Conversation supprimée')
+      
+    } catch (error) {
+      console.error('❌ [ChatStore] Erreur suppression conversation:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Supprime toutes les conversations d'un utilisateur
+   */
+  clearAllConversations: async (userId: string) => {
+    try {
+      console.log('🗑️ [ChatStore] Suppression toutes conversations pour:', userId)
+      
+      // Supprimer côté serveur
+      await conversationService.clearAllUserConversations(userId)
+      
+      // Vider le store
+      set({
+        conversations: [],
+        conversationGroups: [],
+        currentConversation: null
+      })
+      
+      console.log('✅ [ChatStore] Toutes conversations supprimées')
+      
+    } catch (error) {
+      console.error('❌ [ChatStore] Erreur suppression toutes conversations:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Rafraîchit l'historique des conversations
+   */
+  refreshConversations: async (userId: string) => {
+    console.log('🔄 [ChatStore] Rafraîchissement conversations')
+    await get().loadConversations(userId)
+  },
+
+  // ==================== ACTIONS POUR MESSAGES ====================
+
+  /**
+   * Ajoute un message à la conversation courante
+   */
+  addMessage: (message: Message) => {
+    const { currentConversation } = get()
+    
+    if (!currentConversation) {
+      console.warn('⚠️ [ChatStore] Aucune conversation courante pour ajouter message')
+      return
     }
     
-    // Ajouter en première position (plus récent)
-    setConversations(prev => [newConversation, ...prev])
-    console.log('✅ [useChatStore] Nouvelle conversation ajoutée localement:', conversationId)
-  }
+    const updatedConversation: ConversationWithMessages = {
+      ...currentConversation,
+      messages: [...currentConversation.messages, message],
+      message_count: currentConversation.message_count + 1,
+      updated_at: new Date().toISOString(),
+      last_message_preview: message.content.substring(0, 100) + '...'
+    }
+    
+    set({ currentConversation: updatedConversation })
+    console.log('➕ [ChatStore] Message ajouté à la conversation courante')
+  },
 
+  /**
+   * Met à jour un message dans la conversation courante
+   */
+  updateMessage: (messageId: string, updates: Partial<Message>) => {
+    const { currentConversation } = get()
+    
+    if (!currentConversation) {
+      console.warn('⚠️ [ChatStore] Aucune conversation courante pour mettre à jour message')
+      return
+    }
+    
+    const updatedMessages = currentConversation.messages.map(msg =>
+      msg.id === messageId ? { ...msg, ...updates } : msg
+    )
+    
+    const updatedConversation: ConversationWithMessages = {
+      ...currentConversation,
+      messages: updatedMessages,
+      updated_at: new Date().toISOString()
+    }
+    
+    set({ currentConversation: updatedConversation })
+    console.log('✏️ [ChatStore] Message mis à jour:', messageId)
+  },
+
+  // ==================== MÉTHODES DE COMPATIBILITÉ ====================
+
+  /**
+   * Ajoute une conversation (format hérité pour compatibilité)
+   */
+  addConversation: (conversationId: string, question: string, response: string) => {
+    console.log('📝 [ChatStore] Ajout conversation (compatibilité):', conversationId)
+    
+    const { conversations } = get()
+    
+    // Vérifier si la conversation existe déjà
+    const existingIndex = conversations.findIndex(c => c.id === conversationId)
+    
+    const newConversation: Conversation = {
+      id: conversationId,
+      title: question.substring(0, 60) + (question.length > 60 ? '...' : ''),
+      preview: question,
+      message_count: 2, // question + réponse
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      language: 'fr',
+      last_message_preview: response.substring(0, 100) + (response.length > 100 ? '...' : ''),
+      status: 'active'
+    }
+    
+    let updatedConversations: Conversation[]
+    
+    if (existingIndex >= 0) {
+      // Mettre à jour l'existante
+      updatedConversations = conversations.map((conv, index) =>
+        index === existingIndex ? { ...newConversation, created_at: conv.created_at } : conv
+      )
+    } else {
+      // Ajouter la nouvelle en première position
+      updatedConversations = [newConversation, ...conversations]
+    }
+    
+    // Regrouper les conversations
+    const groups = conversationService.groupConversationsByDate(updatedConversations)
+    
+    set({
+      conversations: updatedConversations,
+      conversationGroups: groups
+    })
+    
+    console.log('✅ [ChatStore] Conversation ajoutée/mise à jour')
+  }
+}))
+
+// ==================== HOOKS UTILITAIRES ====================
+
+/**
+ * Hook pour obtenir les conversations groupées
+ */
+export const useConversationGroups = () => {
+  const conversationGroups = useChatStore(state => state.conversationGroups)
+  const isLoadingHistory = useChatStore(state => state.isLoadingHistory)
+  const loadConversations = useChatStore(state => state.loadConversations)
+  
   return {
-    conversations,
-    isLoading,
-    loadConversations,
+    conversationGroups,
+    isLoadingHistory,
+    loadConversations
+  }
+}
+
+/**
+ * Hook pour obtenir la conversation courante
+ */
+export const useCurrentConversation = () => {
+  const currentConversation = useChatStore(state => state.currentConversation)
+  const isLoadingConversation = useChatStore(state => state.isLoadingConversation)
+  const setCurrentConversation = useChatStore(state => state.setCurrentConversation)
+  const loadConversation = useChatStore(state => state.loadConversation)
+  const addMessage = useChatStore(state => state.addMessage)
+  const updateMessage = useChatStore(state => state.updateMessage)
+  
+  return {
+    currentConversation,
+    isLoadingConversation,
+    setCurrentConversation,
+    loadConversation,
+    addMessage,
+    updateMessage
+  }
+}
+
+/**
+ * Hook pour les actions de gestion des conversations
+ */
+export const useConversationActions = () => {
+  const deleteConversation = useChatStore(state => state.deleteConversation)
+  const clearAllConversations = useChatStore(state => state.clearAllConversations)
+  const refreshConversations = useChatStore(state => state.refreshConversations)
+  const createNewConversation = useChatStore(state => state.createNewConversation)
+  
+  return {
     deleteConversation,
     clearAllConversations,
     refreshConversations,
-    addConversation
+    createNewConversation
   }
 }

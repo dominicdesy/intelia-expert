@@ -5,7 +5,7 @@ interface ZohoSalesIQProps {
   language: string
 }
 
-// ==================== COMPOSANT ZOHO SALESIQ - VERSION FINALE OPTIMISÉE V5 ====================
+// ==================== COMPOSANT ZOHO SALESIQ - VERSION CORRIGÉE V6 ====================
 export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const [isZohoReady, setIsZohoReady] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -65,7 +65,6 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     // Réinitialiser les états
     setIsZohoReady(false)
     setHasError(false)
-    isReloadingRef.current = false
     console.log('🔄 [ZohoSalesIQ] États réinitialisés')
   }
   
@@ -178,47 +177,56 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }, 500)
   }
   
-  // Fonction debounced pour éviter les changements rapides
-  const debouncedLoadZoho = (targetLanguage: string) => {
-    // Annuler le timeout précédent s'il existe
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current)
-      console.log('🚫 [ZohoSalesIQ] Changement de langue rapide détecté - debounce activé')
-    }
-    
-    // Programmer le nouveau chargement
-    debounceTimeoutRef.current = setTimeout(() => {
-      console.log('⏰ [ZohoSalesIQ] Debounce terminé - chargement de la langue:', targetLanguage)
-      
-      if (!initializationRef.current) {
-        // Première initialisation
-        initializationRef.current = true
-        lastLanguageRef.current = targetLanguage
-        loadZohoWithLanguage(targetLanguage)
-      } else {
-        // Changement de langue
-        if (targetLanguage !== lastLanguageRef.current) {
-          lastLanguageRef.current = targetLanguage
-          reloadZohoWithLanguage(targetLanguage)
-        }
-      }
-      
-      debounceTimeoutRef.current = null
-    }, 300) // Debounce de 300ms pour éviter les changements rapides
-  }
-  
-  // ✅ UseEffect unifié pour la gestion de la langue (suppression du double appel)
+  // ✅ CORRECTION PRINCIPALE : UseEffect séparé pour initialisation et changements
   useEffect(() => {
     if (!language) {
       console.log('⏭️ [ZohoSalesIQ] Pas de langue fournie, initialisation reportée')
       return
     }
     
-    console.log('🌐 [ZohoSalesIQ] Langue reçue via props:', language)
-    console.log('👤 [ZohoSalesIQ] User disponible:', !!user, user?.email || 'N/A')
+    console.log('🌐 [ZohoSalesIQ] Changement de langue détecté:', language)
+    console.log('📊 [ZohoSalesIQ] État actuel - initialisé:', initializationRef.current, 'dernière langue:', lastLanguageRef.current)
     
-    // Utiliser la fonction debounced pour tous les changements
-    debouncedLoadZoho(language)
+    // ✅ LOGIQUE CORRIGÉE
+    if (!initializationRef.current) {
+      // ✅ PREMIÈRE INITIALISATION
+      console.log('🎯 [ZohoSalesIQ] PREMIÈRE INITIALISATION avec langue:', language)
+      initializationRef.current = true
+      lastLanguageRef.current = language
+      
+      // Debounce pour la première fois aussi
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+      
+      debounceTimeoutRef.current = setTimeout(() => {
+        loadZohoWithLanguage(language)
+        debounceTimeoutRef.current = null
+      }, 300)
+      
+    } else if (language !== lastLanguageRef.current) {
+      // ✅ CHANGEMENT DE LANGUE
+      console.log('🔄 [ZohoSalesIQ] CHANGEMENT DE LANGUE détecté:', lastLanguageRef.current, '→', language)
+      
+      // Annuler le debounce en cours
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+        console.log('🚫 [ZohoSalesIQ] Debounce annulé pour changement de langue')
+      }
+      
+      // Mettre à jour la référence AVANT le rechargement
+      lastLanguageRef.current = language
+      
+      // Programmer le rechargement avec debounce
+      debounceTimeoutRef.current = setTimeout(() => {
+        console.log('⏰ [ZohoSalesIQ] Exécution rechargement après debounce pour langue:', language)
+        reloadZohoWithLanguage(language)
+        debounceTimeoutRef.current = null
+      }, 300)
+      
+    } else {
+      console.log('✅ [ZohoSalesIQ] Langue inchangée, pas d\'action requise')
+    }
     
   }, [language]) // Réagit seulement aux changements de la prop language
 
@@ -234,6 +242,11 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       }
       
       cleanupZoho()
+      
+      // Réinitialiser les refs pour éviter les fuites
+      initializationRef.current = false
+      lastLanguageRef.current = ''
+      isReloadingRef.current = false
     }
   }, [])
 
