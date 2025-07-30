@@ -1,40 +1,105 @@
-import { useState, useCallback } from 'react'
-import { ConversationItem, ChatStore, Conversation, ConversationWithMessages, ConversationGroup, ConversationGroupingOptions, Message } from '../types'
+import { create } from 'zustand'
+import { ConversationItem, Conversation, ConversationWithMessages, ConversationGroup, Message } from '../types'
 import { conversationService } from '../services/conversationService'
 
-// ==================== HOOK CHAT AMÉLIORÉ AVEC CONVERSATIONS STYLE CLAUDE.AI ====================
-export const useChatStore = (): ChatStore => {
-  // ✅ ÉTATS EXISTANTS CONSERVÉS
-  const [conversations, setConversations] = useState<ConversationItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+// ==================== INTERFACE DU STORE ====================
+interface ChatStoreState {
+  // États existants
+  conversations: ConversationItem[]
+  isLoading: boolean
+  
+  // Nouveaux états pour conversations style Claude.ai
+  conversationGroups: ConversationGroup[]
+  currentConversation: ConversationWithMessages | null
+  isLoadingHistory: boolean
+  isLoadingConversation: boolean
+  
+  // Actions
+  loadConversations: (userId: string) => Promise<void>
+  deleteConversation: (id: string) => Promise<void>
+  clearAllConversations: (userId?: string) => Promise<void>
+  refreshConversations: (userId: string) => Promise<void>
+  addConversation: (conversationId: string, question: string, response: string) => void
+  loadConversation: (conversationId: string) => Promise<void>
+  createNewConversation: () => void
+  addMessage: (message: Message) => void
+  updateMessage: (messageId: string, updates: Partial<Message>) => void
+  setCurrentConversation: (conversation: ConversationWithMessages | null) => void
+}
 
-  // ✅ NOUVEAUX ÉTATS POUR CONVERSATIONS STYLE CLAUDE.AI
-  const [conversationGroups, setConversationGroups] = useState<ConversationGroup[]>([])
-  const [currentConversation, setCurrentConversation] = useState<ConversationWithMessages | null>(null)
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
+// ==================== FONCTION UTILITAIRE GROUPEMENT ====================
+const groupConversationsByDate = (conversations: Conversation[]): ConversationGroup[] => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+  const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  // ==================== FONCTIONS EXISTANTES CONSERVÉES ====================
+  const groups: ConversationGroup[] = [
+    { title: "Aujourd'hui", conversations: [] },
+    { title: "Hier", conversations: [] },
+    { title: "Cette semaine", conversations: [] },
+    { title: "Ce mois-ci", conversations: [] },
+    { title: "Plus ancien", conversations: [] }
+  ]
 
-  const loadConversations = async (userId: string): Promise<void> => {
+  conversations.forEach(conv => {
+    const convDate = new Date(conv.updated_at)
+    
+    if (convDate >= today) {
+      groups[0].conversations.push(conv)
+    } else if (convDate >= yesterday) {
+      groups[1].conversations.push(conv)
+    } else if (convDate >= thisWeek) {
+      groups[2].conversations.push(conv)
+    } else if (convDate >= thisMonth) {
+      groups[3].conversations.push(conv)
+    } else {
+      groups[4].conversations.push(conv)
+    }
+  })
+
+  return groups.filter(group => group.conversations.length > 0)
+}
+
+// ==================== STORE ZUSTAND CENTRALISÉ ====================
+export const useChatStore = create<ChatStoreState>((set, get) => ({
+  // États initiaux
+  conversations: [],
+  isLoading: false,
+  conversationGroups: [],
+  currentConversation: null,
+  isLoadingHistory: false,
+  isLoadingConversation: false,
+
+  // ==================== ACTIONS EXISTANTES ====================
+  
+  loadConversations: async (userId: string) => {
     if (!userId) {
-      console.warn('⚠️ [useChatStore] Pas d\'userId fourni pour charger les conversations')
+      console.warn('⚠️ [ChatStore] Pas d\'userId fourni pour charger les conversations')
       return
     }
 
-    setIsLoading(true)
-    setIsLoadingHistory(true)
+    set({ isLoading: true, isLoadingHistory: true })
     
     try {
+      console.log('📡 [ChatStore] Chargement conversations pour:', userId)
       const userConversations = await conversationService.getUserConversations(userId, 100)
       
       if (!userConversations || userConversations.length === 0) {
-        setConversations([])
-        setConversationGroups([])
+        console.log('📭 [ChatStore] Aucune conversation trouvée')
+        set({ 
+          conversations: [], 
+          conversationGroups: [],
+          isLoading: false,
+          isLoadingHistory: false
+        })
         return
       }
       
-      // ✅ LOGIQUE EXISTANTE CONSERVÉE
+      console.log('✅ [ChatStore] Conversations récupérées:', userConversations.length)
+      
+      // Format ancien pour compatibilité
       const formattedConversations: ConversationItem[] = userConversations.map(conv => {
         const title = conv.title && conv.title.length > 0 
           ? (conv.title.length > 50 ? conv.title.substring(0, 50) + '...' : conv.title)
@@ -53,75 +118,82 @@ export const useChatStore = (): ChatStore => {
         }
       })
       
-      // Trier par date de mise à jour (plus récent en premier)
       const sortedConversations = formattedConversations.sort((a, b) => 
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
       
-      setConversations(sortedConversations)
-      
-      // ✅ NOUVEAU: Grouper par date
       const groups = groupConversationsByDate(userConversations)
-      setConversationGroups(groups)
+      
+      set({ 
+        conversations: sortedConversations,
+        conversationGroups: groups,
+        isLoading: false,
+        isLoadingHistory: false
+      })
+      
+      console.log('✅ [ChatStore] État mis à jour - Conversations:', sortedConversations.length, 'Groupes:', groups.length)
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur chargement conversations:', error)
-      setConversations([])
-      setConversationGroups([])
-    } finally {
-      setIsLoading(false)
-      setIsLoadingHistory(false)
+      console.error('❌ [ChatStore] Erreur chargement conversations:', error)
+      set({ 
+        conversations: [],
+        conversationGroups: [],
+        isLoading: false,
+        isLoadingHistory: false
+      })
     }
-  }
+  },
 
-  const deleteConversation = async (id: string): Promise<void> => {
+  deleteConversation: async (id: string) => {
     try {
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
-      setConversations(prev => prev.filter(conv => conv.id !== id))
+      console.log('🗑️ [ChatStore] Suppression conversation:', id)
       
-      // ✅ NOUVEAU: Supprimer des groupes aussi
-      setConversationGroups(prev => 
-        prev.map(group => ({
-          ...group,
-          conversations: group.conversations.filter(conv => conv.id !== id)
-        })).filter(group => group.conversations.length > 0)
-      )
+      const state = get()
+      const updatedConversations = state.conversations.filter(conv => conv.id !== id)
+      const updatedGroups = state.conversationGroups.map(group => ({
+        ...group,
+        conversations: group.conversations.filter(conv => conv.id !== id)
+      })).filter(group => group.conversations.length > 0)
       
-      // ✅ NOUVEAU: Si c'est la conversation courante, la déselectionner
-      if (currentConversation?.id === id) {
-        setCurrentConversation(null)
-      }
+      set({ 
+        conversations: updatedConversations,
+        conversationGroups: updatedGroups,
+        currentConversation: state.currentConversation?.id === id ? null : state.currentConversation
+      })
       
-      // 2. Suppression côté serveur
       await conversationService.deleteConversation(id)
+      console.log('✅ [ChatStore] Conversation supprimée côté serveur')
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversation serveur:', error)
+      console.error('❌ [ChatStore] Erreur suppression conversation:', error)
     }
-  }
+  },
 
-  const clearAllConversations = async (userId?: string): Promise<void> => {
+  clearAllConversations: async (userId?: string) => {
     try {
-      // 1. Mise à jour optimiste de l'UI (suppression immédiate)
-      setConversations([])
-      setConversationGroups([]) // ✅ NOUVEAU: vider les groupes
-      setCurrentConversation(null) // ✅ NOUVEAU: déselectionner conversation courante
+      console.log('🗑️ [ChatStore] Suppression toutes conversations')
       
-      // 2. Suppression côté serveur si userId disponible
+      set({ 
+        conversations: [],
+        conversationGroups: [],
+        currentConversation: null
+      })
+      
       if (userId) {
         await conversationService.clearAllUserConversations(userId)
+        console.log('✅ [ChatStore] Toutes conversations supprimées côté serveur')
       }
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur suppression conversations serveur:', error)
+      console.error('❌ [ChatStore] Erreur suppression conversations:', error)
     }
-  }
+  },
 
-  const refreshConversations = async (userId: string): Promise<void> => {
-    await loadConversations(userId)
-  }
+  refreshConversations: async (userId: string) => {
+    await get().loadConversations(userId)
+  },
 
-  const addConversation = (conversationId: string, question: string, response: string): void => {
+  addConversation: (conversationId: string, question: string, response: string) => {
     const newConversation: ConversationItem = {
       id: conversationId,
       title: question.length > 50 ? question.substring(0, 50) + '...' : question,
@@ -134,10 +206,9 @@ export const useChatStore = (): ChatStore => {
       feedback: null
     }
     
-    // Ajouter en première position (plus récent)
-    setConversations(prev => [newConversation, ...prev])
+    const state = get()
+    const updatedConversations = [newConversation, ...state.conversations]
 
-    // ✅ NOUVEAU: Ajouter au nouveau format aussi
     const newFormatConversation: Conversation = {
       id: conversationId,
       title: question.length > 60 ? question.substring(0, 60) + '...' : question,
@@ -150,33 +221,32 @@ export const useChatStore = (): ChatStore => {
       status: 'active'
     }
 
-    // Mettre à jour les groupes
-    setConversationGroups(prev => {
-      // Créer une nouvelle liste avec la nouvelle conversation
-      const allConversations = [newFormatConversation, ...prev.flatMap(g => g.conversations)]
-      return groupConversationsByDate(allConversations)
+    const allConversations = [newFormatConversation, ...state.conversationGroups.flatMap(g => g.conversations)]
+    const updatedGroups = groupConversationsByDate(allConversations)
+
+    set({ 
+      conversations: updatedConversations,
+      conversationGroups: updatedGroups
     })
-  }
+  },
 
-  // ==================== NOUVELLES FONCTIONS POUR CONVERSATIONS STYLE CLAUDE.AI ====================
+  // ==================== NOUVELLES ACTIONS STYLE CLAUDE.AI ====================
 
-  /**
-   * Charge une conversation spécifique avec tous ses messages
-   */
-  const loadConversation = async (conversationId: string): Promise<void> => {
+  loadConversation: async (conversationId: string) => {
     if (!conversationId) {
-      console.warn('⚠️ [useChatStore] ID conversation requis')
+      console.warn('⚠️ [ChatStore] ID conversation requis')
       return
     }
 
-    setIsLoadingConversation(true)
+    set({ isLoadingConversation: true })
     
     try {
-      // Chercher dans les conversations existantes (format ancien)
-      const existingConv = conversations.find(c => c.id === conversationId)
+      console.log('📖 [ChatStore] Chargement conversation:', conversationId)
+      
+      const state = get()
+      const existingConv = state.conversations.find(c => c.id === conversationId)
       
       if (existingConv) {
-        // Transformer vers le nouveau format avec messages
         const conversationWithMessages: ConversationWithMessages = {
           id: existingConv.id,
           title: existingConv.title,
@@ -199,33 +269,29 @@ export const useChatStore = (): ChatStore => {
           }))
         }
         
-        setCurrentConversation(conversationWithMessages)
+        set({ currentConversation: conversationWithMessages, isLoadingConversation: false })
+        console.log('✅ [ChatStore] Conversation chargée:', conversationId)
       } else {
-        throw new Error('Conversation non trouvée dans l\'historique')
+        throw new Error('Conversation non trouvée')
       }
       
     } catch (error) {
-      console.error('❌ [useChatStore] Erreur chargement conversation:', error)
-    } finally {
-      setIsLoadingConversation(false)
+      console.error('❌ [ChatStore] Erreur chargement conversation:', error)
+      set({ isLoadingConversation: false })
     }
-  }
+  },
 
-  /**
-   * Crée une nouvelle conversation vide
-   */
-  const createNewConversation = (): void => {
-    setCurrentConversation(null)
-  }
+  createNewConversation: () => {
+    console.log('✨ [ChatStore] Nouvelle conversation')
+    set({ currentConversation: null })
+  },
 
-  /**
-   * ✅ VERSION ULTRA-MINIMALISTE: addMessage sans aucun log
-   */
-  const addMessage = (message: Message): void => {
-    console.log('🔥 addMessage APPELÉ')
+  addMessage: (message: Message) => {
+    console.log('💬 [ChatStore] Ajout message:', message.id)
     
-    if (!currentConversation) {
-      console.log('🔥 PAS DE CONVERSATION - création temp')
+    const state = get()
+    
+    if (!state.currentConversation) {
       const tempConversation: ConversationWithMessages = {
         id: 'temp-' + Date.now(),
         title: message.isUser ? message.content.substring(0, 60) + '...' : 'Nouvelle conversation',
@@ -238,164 +304,94 @@ export const useChatStore = (): ChatStore => {
         messages: [message]
       }
       
-      setCurrentConversation(tempConversation)
-      console.log('🔥 CONVERSATION TEMP CRÉÉE')
+      set({ currentConversation: tempConversation })
       return
     }
     
-    console.log('🔥 CONVERSATION EXISTE - ajout message')
-    const messageExists = currentConversation.messages?.some(m => m.id === message.id)
+    const messageExists = state.currentConversation.messages?.some(m => m.id === message.id)
     if (messageExists) {
-      console.log('🔥 MESSAGE DOUBLON - ignoré')
+      console.log('⚠️ [ChatStore] Message déjà existant, ignoré')
       return
     }
     
-    const updatedMessages = [...(currentConversation.messages || []), message]
+    const updatedMessages = [...(state.currentConversation.messages || []), message]
     
     const updatedConversation: ConversationWithMessages = {
-      ...currentConversation,
+      ...state.currentConversation,
       messages: updatedMessages,
       message_count: updatedMessages.length,
       updated_at: new Date().toISOString(),
-      title: currentConversation.id === 'welcome' && message.isUser 
+      title: state.currentConversation.id === 'welcome' && message.isUser 
         ? message.content.substring(0, 60) + (message.content.length > 60 ? '...' : '')
-        : currentConversation.title,
+        : state.currentConversation.title,
       last_message_preview: !message.isUser 
         ? message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
-        : currentConversation.last_message_preview || currentConversation.preview
+        : state.currentConversation.last_message_preview || state.currentConversation.preview
     }
     
-    setCurrentConversation(updatedConversation)
-    console.log('🔥 CONVERSATION MISE À JOUR - messages:', updatedMessages.length)
-  }
+    set({ currentConversation: updatedConversation })
+  },
 
-  /**
-   * Met à jour un message dans la conversation courante
-   */
-  const updateMessage = (messageId: string, updates: Partial<Message>): void => {
-    if (!currentConversation) {
-      return
-    }
+  updateMessage: (messageId: string, updates: Partial<Message>) => {
+    const state = get()
+    if (!state.currentConversation) return
     
-    const updatedMessages = currentConversation.messages.map(msg =>
+    const updatedMessages = state.currentConversation.messages.map(msg =>
       msg.id === messageId ? { ...msg, ...updates } : msg
     )
     
     const updatedConversation: ConversationWithMessages = {
-      ...currentConversation,
+      ...state.currentConversation,
       messages: updatedMessages,
       updated_at: new Date().toISOString()
     }
     
-    setCurrentConversation(updatedConversation)
+    set({ currentConversation: updatedConversation })
+  },
+
+  setCurrentConversation: (conversation: ConversationWithMessages | null) => {
+    set({ currentConversation: conversation })
   }
+}))
 
-  // ==================== FONCTION UTILITAIRE POUR GROUPEMENT ====================
+// ==================== HOOKS UTILITAIRES ====================
 
-  /**
-   * Groupe les conversations par date
-   */
-  const groupConversationsByDate = (conversations: Conversation[]): ConversationGroup[] => {
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
-    const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+export const useConversationGroups = () => {
+  const conversationGroups = useChatStore(state => state.conversationGroups)
+  const isLoadingHistory = useChatStore(state => state.isLoadingHistory)
+  const loadConversations = useChatStore(state => state.loadConversations)
+  
+  return { conversationGroups, isLoadingHistory, loadConversations }
+}
 
-    const groups: ConversationGroup[] = [
-      { title: "Aujourd'hui", conversations: [] },
-      { title: "Hier", conversations: [] },
-      { title: "Cette semaine", conversations: [] },
-      { title: "Ce mois-ci", conversations: [] },
-      { title: "Plus ancien", conversations: [] }
-    ]
-
-    conversations.forEach(conv => {
-      const convDate = new Date(conv.updated_at)
-      
-      if (convDate >= today) {
-        groups[0].conversations.push(conv)
-      } else if (convDate >= yesterday) {
-        groups[1].conversations.push(conv)
-      } else if (convDate >= thisWeek) {
-        groups[2].conversations.push(conv)
-      } else if (convDate >= thisMonth) {
-        groups[3].conversations.push(conv)
-      } else {
-        groups[4].conversations.push(conv)
-      }
-    })
-
-    // Filtrer les groupes vides
-    return groups.filter(group => group.conversations.length > 0)
-  }
-
-  // ==================== RETOUR INTERFACE ÉTENDUE ====================
-
+export const useCurrentConversation = () => {
+  const currentConversation = useChatStore(state => state.currentConversation)
+  const isLoadingConversation = useChatStore(state => state.isLoadingConversation)
+  const setCurrentConversation = useChatStore(state => state.setCurrentConversation)
+  const loadConversation = useChatStore(state => state.loadConversation)
+  const addMessage = useChatStore(state => state.addMessage)
+  const updateMessage = useChatStore(state => state.updateMessage)
+  
   return {
-    // ✅ PROPRIÉTÉS EXISTANTES CONSERVÉES
-    conversations,
-    isLoading,
-    loadConversations,
+    currentConversation,
+    isLoadingConversation,
+    setCurrentConversation,
+    loadConversation,
+    addMessage,
+    updateMessage
+  }
+}
+
+export const useConversationActions = () => {
+  const deleteConversation = useChatStore(state => state.deleteConversation)
+  const clearAllConversations = useChatStore(state => state.clearAllConversations)
+  const refreshConversations = useChatStore(state => state.refreshConversations)
+  const createNewConversation = useChatStore(state => state.createNewConversation)
+  
+  return {
     deleteConversation,
     clearAllConversations,
     refreshConversations,
-    addConversation,
-
-    // ✅ NOUVELLES PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
-    conversationGroups,
-    currentConversation,
-    isLoadingHistory,
-    isLoadingConversation,
-    loadConversation,
-    createNewConversation,
-    addMessage,
-    updateMessage,
-    setCurrentConversation
-  }
-}
-
-// ==================== HOOKS UTILITAIRES POUR CONVERSATIONS ====================
-
-/**
- * Hook pour obtenir les conversations groupées
- */
-export const useConversationGroups = () => {
-  const store = useChatStore()
-  
-  return {
-    conversationGroups: store.conversationGroups,
-    isLoadingHistory: store.isLoadingHistory,
-    loadConversations: store.loadConversations
-  }
-}
-
-/**
- * Hook pour obtenir la conversation courante
- */
-export const useCurrentConversation = () => {
-  const store = useChatStore()
-  
-  return {
-    currentConversation: store.currentConversation,
-    isLoadingConversation: store.isLoadingConversation,
-    setCurrentConversation: store.setCurrentConversation,
-    loadConversation: store.loadConversation,
-    addMessage: store.addMessage,
-    updateMessage: store.updateMessage
-  }
-}
-
-/**
- * Hook pour les actions de gestion des conversations
- */
-export const useConversationActions = () => {
-  const store = useChatStore()
-  
-  return {
-    deleteConversation: store.deleteConversation,
-    clearAllConversations: store.clearAllConversations,
-    refreshConversations: store.refreshConversations,
-    createNewConversation: store.createNewConversation
+    createNewConversation
   }
 }
