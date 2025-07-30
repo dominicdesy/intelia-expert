@@ -56,13 +56,12 @@ export class ConversationService {
   }
 
   /**
-   * 🔥 NOUVELLE MÉTHODE CRITIQUE - Récupère une conversation complète avec tous ses messages NON TRONQUÉS
+   * ✅ NOUVELLE MÉTHODE AJOUTÉE - Récupère une conversation avec messages complets
    */
   async getConversationWithMessages(conversationId: string): Promise<ConversationWithMessages | null> {
     try {
       console.log('📖 [ConversationService] Chargement conversation complète:', conversationId)
       
-      // ✅ ÉTAPE 1: Essayer de récupérer depuis votre système de logging
       const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
         method: 'GET',
         headers: { 
@@ -73,71 +72,17 @@ export class ConversationService {
       
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ [ConversationService] Données conversation récupérées:', {
+        console.log('✅ [ConversationService] Données récupérées:', {
           id: data.conversation_id,
           questionLength: data.question?.length || 0,
           responseLength: data.response?.length || 0
         })
         
-        // ✅ CORRECTION CRITIQUE: Vérifier que les contenus ne sont pas tronqués
-        if (data.question && data.response) {
-          // Vérifier si les contenus semblent tronqués
-          const questionTruncated = data.question.length < 50 && data.question.endsWith('...')
-          const responseTruncated = data.response.length < 100 && data.response.endsWith('...')
-          
-          if (questionTruncated || responseTruncated) {
-            console.warn('⚠️ [ConversationService] Contenus possiblement tronqués détectés')
-          }
-          
-          // Utiliser votre méthode existante pour transformer
-          const conversationWithMessages = this.transformToConversationWithMessages(data)
-          
-          // ✅ AMÉLIORATION: S'assurer que les messages complets sont présents
-          if (conversationWithMessages.messages.length >= 2) {
-            console.log('✅ [ConversationService] Conversation transformée avec messages complets')
-            return conversationWithMessages
-          }
-        }
-      }
-      
-      // ✅ ÉTAPE 2: Si votre système de logging ne fonctionne pas, essayer l'API principale
-      console.log('📡 [ConversationService] Tentative via API principale:', conversationId)
-      
-      const mainApiResponse = await fetch(`https://expert-app-cngws.ondigitalocean.app/api/v1/conversations/${conversationId}/messages`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (mainApiResponse.ok) {
-        const apiData = await mainApiResponse.json()
-        console.log('✅ [ConversationService] Données API principale:', {
-          messageCount: apiData.messages?.length || 0,
-          firstMessageLength: apiData.messages?.[0]?.content?.length || 0
-        })
+        const conversationWithMessages = this.transformToConversationWithMessages(data)
         
-        // Transformer les données de l'API principale
-        const messages: Message[] = apiData.messages?.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content || '[Message vide]',
-          isUser: msg.role === 'user',
-          timestamp: new Date(msg.created_at),
-          conversation_id: conversationId,
-          feedback: msg.feedback === 1 ? 'positive' : msg.feedback === -1 ? 'negative' : null
-        })) || []
-
-        return {
-          id: apiData.id,
-          title: apiData.title || 'Conversation sans titre',
-          preview: apiData.preview || messages.find(m => m.isUser)?.content?.substring(0, 100) || 'Aucun aperçu',
-          message_count: messages.length,
-          created_at: apiData.created_at,
-          updated_at: apiData.updated_at,
-          language: apiData.language || 'fr',
-          status: apiData.status || 'active',
-          messages: messages
+        if (conversationWithMessages.messages.length > 0) {
+          console.log('✅ [ConversationService] Conversation transformée avec messages complets')
+          return conversationWithMessages
         }
       }
       
@@ -271,7 +216,7 @@ export class ConversationService {
   }
 
   /**
-   * Récupère les conversations utilisateur (version simplifiée pour compatibilité) - CORRIGÉE
+   * Récupère les conversations utilisateur - LIMITES AUGMENTÉES
    */
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.loggingEnabled) {
@@ -297,23 +242,21 @@ export class ConversationService {
       const data = await response.json()
       console.log('✅ Conversations récupérées:', data.count)
       
-      // ✅ CORRECTION: Ne pas tronquer les titres et aperçus
+      // ✅ LIMITES AUGMENTÉES
       const conversations: Conversation[] = (data.conversations || []).map((conv: any) => {
-        // ✅ AMÉLIORATION: Titre complet si possible
         const title = conv.question 
-          ? conv.question.length > 80 ? conv.question.substring(0, 80) + '...' : conv.question
+          ? conv.question.length > 100 ? conv.question.substring(0, 100) + '...' : conv.question
           : 'Conversation sans titre'
 
-        // ✅ AMÉLIORATION: Aperçu complet de la réponse
         const lastMessagePreview = conv.response 
-          ? conv.response.length > 150 ? conv.response.substring(0, 150) + '...' : conv.response
+          ? conv.response.length > 300 ? conv.response.substring(0, 300) + '...' : conv.response
           : 'Aucune réponse'
 
         return {
           id: conv.conversation_id || conv.id,
           title: title,
           preview: conv.question || 'Aucun aperçu disponible',
-          message_count: 2, // Question + réponse minimum
+          message_count: 2,
           created_at: conv.timestamp || new Date().toISOString(),
           updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
           feedback: conv.feedback,
@@ -332,27 +275,26 @@ export class ConversationService {
   }
 
   /**
-   * Transforme une conversation en ConversationWithMessages - CORRIGÉE
+   * Transforme une conversation en ConversationWithMessages - LIMITES AUGMENTÉES
    */
   transformToConversationWithMessages(conversationData: any): ConversationWithMessages {
     const messages: Message[] = []
     
-    // ✅ CORRECTION: Préserver le contenu COMPLET
+    // ✅ PRÉSERVER LE CONTENU COMPLET
     if (conversationData.question) {
       messages.push({
         id: `${conversationData.conversation_id || conversationData.id}_user`,
-        content: conversationData.question, // ✅ CONTENU COMPLET - pas de troncature
+        content: conversationData.question,
         isUser: true,
         timestamp: new Date(conversationData.timestamp || new Date()),
         conversation_id: conversationData.conversation_id || conversationData.id
       })
     }
     
-    // ✅ CORRECTION: Préserver la réponse COMPLÈTE
     if (conversationData.response) {
       messages.push({
         id: `${conversationData.conversation_id || conversationData.id}_assistant`,
-        content: conversationData.response, // ✅ RÉPONSE COMPLÈTE - pas de troncature
+        content: conversationData.response,
         isUser: false,
         timestamp: new Date(conversationData.timestamp || new Date()),
         conversation_id: conversationData.conversation_id || conversationData.id,
@@ -361,13 +303,13 @@ export class ConversationService {
       })
     }
 
-    // ✅ CORRECTION: Titre et aperçus complets
+    // ✅ LIMITES AUGMENTÉES
     const title = conversationData.question 
-      ? conversationData.question.length > 80 ? conversationData.question.substring(0, 80) + '...' : conversationData.question
+      ? conversationData.question.length > 100 ? conversationData.question.substring(0, 100) + '...' : conversationData.question
       : 'Conversation'
 
     const lastMessagePreview = conversationData.response 
-      ? conversationData.response.length > 200 ? conversationData.response.substring(0, 200) + '...' : conversationData.response
+      ? conversationData.response.length > 300 ? conversationData.response.substring(0, 300) + '...' : conversationData.response
       : 'Aucune réponse'
 
     return {
@@ -381,7 +323,7 @@ export class ConversationService {
       language: conversationData.language || 'fr',
       last_message_preview: lastMessagePreview,
       status: 'active',
-      messages // ✅ MESSAGES COMPLETS
+      messages
     }
   }
 

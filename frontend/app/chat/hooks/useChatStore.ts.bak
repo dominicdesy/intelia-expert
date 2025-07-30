@@ -25,6 +25,7 @@ interface ChatStoreState {
   addMessage: (message: Message) => void
   updateMessage: (messageId: string, updates: Partial<Message>) => void
   setCurrentConversation: (conversation: ConversationWithMessages | null) => void
+  syncConversationToHistory: (conversation: ConversationWithMessages) => void
 }
 
 // ==================== FONCTION UTILITAIRE GROUPEMENT ====================
@@ -43,7 +44,12 @@ const groupConversationsByDate = (conversations: Conversation[]): ConversationGr
     { title: "Plus ancien", conversations: [] }
   ]
 
-  conversations.forEach(conv => {
+  // ✅ CORRECTION: Trier par date AVANT groupement
+  const sortedConversations = [...conversations].sort((a, b) => 
+    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  )
+
+  sortedConversations.forEach(conv => {
     const convDate = new Date(conv.updated_at)
     
     if (convDate >= today) {
@@ -229,7 +235,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     })
   },
 
-  // ==================== NOUVELLES ACTIONS STYLE CLAUDE.AI ====================
+  // ==================== NOUVELLE ACTION CORRIGÉE - loadConversation ====================
 
   loadConversation: async (conversationId: string) => {
     if (!conversationId) {
@@ -240,43 +246,64 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set({ isLoadingConversation: true })
     
     try {
-      console.log('📖 [ChatStore] Chargement conversation:', conversationId)
+      console.log('📖 [ChatStore] Chargement conversation complète:', conversationId)
       
-      const state = get()
-      const existingConv = state.conversations.find(c => c.id === conversationId)
+      // ✅ CORRECTION CRITIQUE: Utiliser la nouvelle méthode getConversationWithMessages
+      const fullConversation = await conversationService.getConversationWithMessages(conversationId)
       
-      if (existingConv) {
-        const conversationWithMessages: ConversationWithMessages = {
-          id: existingConv.id,
-          title: existingConv.title,
-          preview: existingConv.messages.find(m => m.role === 'user')?.content || 'Aucun aperçu',
-          message_count: existingConv.messages.length,
-          created_at: existingConv.created_at,
-          updated_at: existingConv.updated_at,
-          language: 'fr',
-          status: 'active',
-          feedback: existingConv.feedback,
-          messages: existingConv.messages.map(msg => ({
-            id: msg.id,
-            content: msg.content,
-            isUser: msg.role === 'user',
-            timestamp: new Date(existingConv.updated_at),
-            conversation_id: conversationId,
-            feedback: msg.role === 'assistant' && existingConv.feedback === 1 ? 'positive' 
-                    : msg.role === 'assistant' && existingConv.feedback === -1 ? 'negative' 
-                    : null
-          }))
-        }
-        
-        set({ currentConversation: conversationWithMessages, isLoadingConversation: false })
-        console.log('✅ [ChatStore] Conversation chargée:', conversationId)
-      } else {
-        throw new Error('Conversation non trouvée')
+      if (fullConversation && fullConversation.messages && fullConversation.messages.length > 0) {
+        console.log('✅ [ChatStore] Conversation chargée depuis serveur:', fullConversation.messages.length, 'messages')
+        set({ currentConversation: fullConversation, isLoadingConversation: false })
+        return
       }
+      
+      // ✅ CORRECTION: Fallback amélioré - ne pas utiliser les aperçus tronqués
+      console.warn('⚠️ [ChatStore] Serveur non disponible, mais éviter les aperçus tronqués')
+      
+      // Créer une conversation avec message d'erreur informatif
+      const fallbackConversation: ConversationWithMessages = {
+        id: conversationId,
+        title: 'Conversation non disponible',
+        preview: 'Impossible de charger les messages complets',
+        message_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        language: 'fr',
+        status: 'active',
+        messages: [{
+          id: 'error-' + Date.now(),
+          content: '❌ Impossible de charger cette conversation. Les messages complets ne sont pas disponibles. Veuillez réessayer ou commencer une nouvelle conversation.',
+          isUser: false,
+          timestamp: new Date(),
+          conversation_id: conversationId
+        }]
+      }
+      
+      set({ currentConversation: fallbackConversation, isLoadingConversation: false })
       
     } catch (error) {
       console.error('❌ [ChatStore] Erreur chargement conversation:', error)
-      set({ isLoadingConversation: false })
+      
+      // Message d'erreur utilisateur-friendly
+      const errorConversation: ConversationWithMessages = {
+        id: conversationId,
+        title: 'Erreur de chargement',
+        preview: 'Une erreur est survenue',
+        message_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        language: 'fr',
+        status: 'active',
+        messages: [{
+          id: 'error-' + Date.now(),
+          content: '❌ Une erreur est survenue lors du chargement de cette conversation. Veuillez réessayer plus tard.',
+          isUser: false,
+          timestamp: new Date(),
+          conversation_id: conversationId
+        }]
+      }
+      
+      set({ currentConversation: errorConversation, isLoadingConversation: false })
     }
   },
 
@@ -286,7 +313,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   addMessage: (message: Message) => {
-    console.log('💬 [ChatStore] Ajout message:', message.id)
+    console.log('💬 [ChatStore] Ajout message:', message.id, 'User:', message.isUser)
     
     const state = get()
     
@@ -330,7 +357,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }
     
     set({ currentConversation: updatedConversation })
-    console.log('✅ [ChatStore] Conversation mise à jour - Messages:', updatedMessages.length, 'ID:', updatedConversation.id)
+    
+    // ✅ NOUVEAU: Synchroniser avec l'historique si conversation confirmée
+    if (message.conversation_id && !message.conversation_id.startsWith('temp-')) {
+      get().syncConversationToHistory(updatedConversation)
+    }
+    
+    console.log('✅ [ChatStore] Message ajouté - Total:', updatedMessages.length, 'Conv ID:', updatedConversation.id)
   },
 
   updateMessage: (messageId: string, updates: Partial<Message>) => {
@@ -348,11 +381,75 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     }
     
     set({ currentConversation: updatedConversation })
+    
+    // Synchroniser vers historique si conversation confirmée
+    if (updatedConversation.id && !updatedConversation.id.startsWith('temp-')) {
+      get().syncConversationToHistory(updatedConversation)
+    }
   },
 
   setCurrentConversation: (conversation: ConversationWithMessages | null) => {
     console.log('🔄 [ChatStore] setCurrentConversation appelé:', conversation?.id, 'Messages:', conversation?.messages?.length || 0)
     set({ currentConversation: conversation })
+  },
+
+  // ==================== NOUVELLE ACTION: Synchroniser conversation vers historique ====================
+  syncConversationToHistory: (conversation: ConversationWithMessages) => {
+    if (!conversation.id || conversation.id.startsWith('temp-') || conversation.id === 'welcome') {
+      return
+    }
+
+    const state = get()
+    
+    // Convertir en format pour l'historique
+    const historyItem: ConversationItem = {
+      id: conversation.id,
+      title: conversation.title,
+      messages: conversation.messages.map(msg => ({
+        id: msg.id,
+        role: msg.isUser ? 'user' : 'assistant',
+        content: msg.content
+      })),
+      updated_at: conversation.updated_at,
+      created_at: conversation.created_at,
+      feedback: null // À récupérer depuis les messages si nécessaire
+    }
+
+    // Mettre à jour ou ajouter dans l'historique
+    const existingIndex = state.conversations.findIndex(c => c.id === conversation.id)
+    let updatedConversations: ConversationItem[]
+
+    if (existingIndex >= 0) {
+      // Mettre à jour conversation existante
+      updatedConversations = [...state.conversations]
+      updatedConversations[existingIndex] = historyItem
+    } else {
+      // Ajouter nouvelle conversation en tête
+      updatedConversations = [historyItem, ...state.conversations]
+    }
+
+    // Regrouper pour l'affichage
+    const serverFormat: Conversation = {
+      id: conversation.id,
+      title: conversation.title,
+      preview: conversation.preview,
+      message_count: conversation.message_count,
+      created_at: conversation.created_at,
+      updated_at: conversation.updated_at,
+      language: conversation.language,
+      status: conversation.status,
+      last_message_preview: conversation.last_message_preview || conversation.preview
+    }
+
+    const allConversations = [serverFormat, ...state.conversationGroups.flatMap(g => g.conversations).filter(c => c.id !== conversation.id)]
+    const updatedGroups = groupConversationsByDate(allConversations)
+
+    set({ 
+      conversations: updatedConversations,
+      conversationGroups: updatedGroups
+    })
+
+    console.log('🔄 [ChatStore] Conversation synchronisée vers historique:', conversation.id)
   }
 }))
 
