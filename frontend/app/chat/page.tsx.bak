@@ -281,7 +281,10 @@ export default function ChatInterface() {
       console.log('🔥 APRÈS addMessage')
       
       // ✅ FORCE RE-RENDER
-      setForceRender(prev => prev + 1)
+      setForceRender(prev => {
+        console.log('🔥 FORCE RENDER:', prev + 1)
+        return prev + 1
+      })
 
       if (isFirstMessage && response.conversation_id && currentConversation) {
         const updatedConversation = {
@@ -295,7 +298,10 @@ export default function ChatInterface() {
         console.log('🔥 CONVERSATION MISE À JOUR')
         
         // ✅ FORCE RE-RENDER
-        setForceRender(prev => prev + 1)
+        setForceRender(prev => {
+          console.log('🔥 FORCE RENDER CONVERSATION:', prev + 1)
+          return prev + 1
+        })
       }
       
     } catch (error) {
@@ -469,6 +475,8 @@ export default function ChatInterface() {
               {/* DEBUG temporaire */}
               <div className="text-xs text-gray-400 text-center">
                 DEBUG: {messages.length} messages - Render: {forceRender}
+                <br />
+                Messages: {messages.map(m => `${m.isUser ? 'User' : 'AI'}: ${m.content.substring(0, 20)}...`).join(' | ')}
               </div>
               {/* Date */}
               {hasMessages && (
