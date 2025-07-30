@@ -231,15 +231,17 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
+    // ✅ CORRECTION PRINCIPALE: Déterminer le conversation_id AVANT l'appel API
     let conversationIdToSend: string | undefined = undefined
-    let isFirstMessage = false
-
-    if (!currentConversation || currentConversation.id === 'welcome') {
-      isFirstMessage = true
-    } else if (currentConversation.id && !currentConversation.id.startsWith('temp-') && !currentConversation.id.startsWith('welcome')) {
+    
+    // Si on a une conversation active ET que ce n'est pas la conversation welcome
+    if (currentConversation && 
+        currentConversation.id !== 'welcome' && 
+        !currentConversation.id.startsWith('temp-')) {
       conversationIdToSend = currentConversation.id
+      console.log('🔄 [handleSendMessage] Continuation conversation existante:', conversationIdToSend)
     } else {
-      isFirstMessage = true
+      console.log('🆕 [handleSendMessage] Première question - nouvelle conversation')
     }
 
     addMessage(userMessage)
@@ -250,14 +252,20 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
+      console.log('📤 [handleSendMessage] Envoi à API avec conversation_id:', conversationIdToSend || 'nouveau')
+      
       const response = await generateAIResponse(
         text.trim(), 
         user, 
         currentLanguage, 
-        conversationIdToSend
+        conversationIdToSend  // ✅ CRITIQUE: Passer l'ID existant
       )
 
-      console.log('APRES API - avant addMessage')
+      console.log('📥 [handleSendMessage] Réponse API reçue:', {
+        conversation_id: response.conversation_id,
+        is_new: !conversationIdToSend,
+        response_length: response.response?.length || 0
+      })
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -267,13 +275,24 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      console.log('AVANT addMessage - message cree')
       addMessage(aiMessage)
-      console.log('APRES addMessage')
 
-      // ✅ CORRECTION: Ne plus appeler setCurrentConversation qui écrase les messages
-      // Le store addMessage a déjà mis à jour l'ID et les messages correctement
-      console.log('CONVERSATION MISE A JOUR avec ID:', response.conversation_id, 'Messages conservés automatiquement')
+      // ✅ CORRECTION: Mise à jour de l'ID de conversation SEULEMENT si nouvelle
+      if (!conversationIdToSend && response.conversation_id) {
+        console.log('🆕 [handleSendMessage] Nouvelle conversation créée:', response.conversation_id)
+        
+        // Mettre à jour l'ID de la conversation courante
+        if (currentConversation) {
+          const updatedConversation = {
+            ...currentConversation,
+            id: response.conversation_id,
+            title: text.length > 60 ? text.substring(0, 60) + '...' : text
+          }
+          setCurrentConversation(updatedConversation)
+        }
+      } else {
+        console.log('✅ [handleSendMessage] Conversation existante mise à jour:', response.conversation_id)
+      }
       
     } catch (error) {
       console.error('[handleSendMessage] Erreur:', error)
@@ -438,10 +457,11 @@ export default function ChatInterface() {
             className="flex-1 overflow-y-auto px-4 py-6"
           >
             <div className="max-w-4xl mx-auto space-y-6">
+              {/* ✅ DEBUG INFO - À RETIRER EN PRODUCTION */}
               <div className="text-xs text-gray-400 text-center">
                 DEBUG: {messages.length} messages - Conversation: {currentConversation?.id}
                 <br />
-                Messages: {messages.map(m => `${m.isUser ? 'User' : 'AI'}: ${m.content.substring(0, 20)}...`).join(' | ')}
+                {currentConversation?.id !== 'welcome' && `Conversation active: ${currentConversation?.id}`}
               </div>
 
               {hasMessages && (
