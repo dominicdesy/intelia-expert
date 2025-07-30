@@ -1,6 +1,6 @@
 // ==================== TYPES PRINCIPAUX ====================
 
-// ✅ INTERFACE MESSAGE ÉTENDUE AVEC COMMENTAIRES FEEDBACK
+// ✅ INTERFACE MESSAGE ÉTENDUE AVEC COMMENTAIRES FEEDBACK ET CLARIFICATIONS
 export interface Message {
   id: string
   content: string
@@ -9,6 +9,11 @@ export interface Message {
   feedback?: 'positive' | 'negative' | null
   conversation_id?: string
   feedbackComment?: string  // ✅ NOUVEAU: Commentaire associé au feedback
+  // 🆕 NOUVEAUX CHAMPS POUR CLARIFICATION
+  is_clarification_request?: boolean
+  clarification_questions?: string[]
+  clarification_answers?: Record<string, string>
+  original_question?: string
 }
 
 export interface ExpertApiResponse {
@@ -22,6 +27,12 @@ export interface ExpertApiResponse {
   response_time_ms: number
   mode: string
   user?: string
+  logged: boolean
+  validation_passed?: boolean
+  validation_confidence?: number
+  // 🆕 NOUVEAUX CHAMPS POUR CLARIFICATION
+  is_clarification_request?: boolean
+  clarification_questions?: string[]
 }
 
 // ✅ INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
@@ -113,6 +124,41 @@ export interface ConversationStats {
   most_active_day: string
   favorite_topics: string[]
   satisfaction_rate: number
+}
+
+// ==================== TYPES POUR CLARIFICATIONS INLINE ====================
+
+// ✅ Interface simplifiée pour clarifications inline (REMPLACE ClarificationModalProps)
+export interface ClarificationInlineProps {
+  questions: string[]
+  originalQuestion: string
+  language: string
+  onSubmit: (answers: Record<string, string>) => Promise<void>
+  onSkip: () => Promise<void>
+  isSubmitting?: boolean
+  conversationId?: string
+}
+
+// ✅ Interface pour les réponses de clarification
+export interface ClarificationResponse {
+  needs_clarification: boolean
+  questions?: string[]
+  confidence_score?: number
+  processing_time_ms?: number
+  model_used?: string
+}
+
+// ✅ Interface pour l'état des clarifications
+export interface ClarificationState {
+  pendingClarification: ExpertApiResponse | null
+  isProcessingClarification: boolean
+  clarificationHistory: Array<{
+    original_question: string
+    clarification_questions: string[]
+    answers: Record<string, string>
+    final_response: string
+    timestamp: string
+  }>
 }
 
 // ==================== TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
@@ -437,6 +483,52 @@ export const FEEDBACK_CONFIG = {
   PRIVACY_POLICY_URL: 'https://intelia.com/privacy-policy/'
 } as const
 
+// ✅ CONFIGURATION DES CLARIFICATIONS
+export const CLARIFICATION_TEXTS = {
+  fr: {
+    title: "Informations supplémentaires requises",
+    subtitle: "Pour vous donner la meilleure réponse, veuillez répondre à ces questions :",
+    placeholder: "Tapez votre réponse ici...",
+    submit: "Obtenir ma réponse",
+    skip: "Passer et obtenir une réponse générale",
+    optional: "(optionnel)",
+    required: "Répondez à au moins la moitié des questions",
+    processing: "Traitement en cours...",
+    validationError: "Veuillez répondre à au moins {count} questions"
+  },
+  en: {
+    title: "Additional information required",
+    subtitle: "To give you the best answer, please answer these questions:",
+    placeholder: "Type your answer here...",
+    submit: "Get my answer",
+    skip: "Skip and get a general answer",
+    optional: "(optional)",
+    required: "Answer at least half of the questions",
+    processing: "Processing...",
+    validationError: "Please answer at least {count} questions"
+  },
+  es: {
+    title: "Información adicional requerida",
+    subtitle: "Para darle la mejor respuesta, por favor responda estas preguntas:",
+    placeholder: "Escriba su respuesta aquí...",
+    submit: "Obtener mi respuesta",
+    skip: "Omitir y obtener una respuesta general",
+    optional: "(opcional)",
+    required: "Responda al menos la mitad de las preguntas",
+    processing: "Procesando...",
+    validationError: "Por favor responda al menos {count} preguntas"
+  }
+} as const
+
+export const CLARIFICATION_CONFIG = {
+  MAX_QUESTIONS: 4,
+  MIN_ANSWER_LENGTH: 0,
+  MAX_ANSWER_LENGTH: 200,
+  REQUIRED_ANSWER_PERCENTAGE: 0.5, // 50% des questions doivent être répondues
+  AUTO_SCROLL_DELAY: 300,
+  VALIDATION_DEBOUNCE: 500
+} as const
+
 // ✅ UTILITAIRES ANALYTICS
 export const ANALYTICS_UTILS = {
   calculateSatisfactionRate: (positive: number, negative: number): number => {
@@ -475,6 +567,79 @@ export const ANALYTICS_UTILS = {
   }
 } as const
 
+// ✅ UTILITAIRES POUR CLARIFICATIONS
+export const ClarificationUtils = {
+  isClarificationResponse: (response: ExpertApiResponse): boolean => {
+    return (
+      response.mode?.includes("clarification_needed") ||
+      response.response?.includes("❓") ||
+      response.response?.includes("précisions") ||
+      response.response?.includes("clarification") ||
+      response.response?.includes("aclaraciones") ||
+      response.is_clarification_request === true
+    )
+  },
+
+  extractClarificationQuestions: (response: ExpertApiResponse): string[] => {
+    if (response.clarification_questions) {
+      return response.clarification_questions
+    }
+    
+    const questions: string[] = []
+    const lines = response.response.split('\n')
+    
+    for (const line of lines) {
+      const cleaned = line.trim()
+      if (cleaned.startsWith('• ') || cleaned.startsWith('- ')) {
+        const question = cleaned.replace(/^[•-]\s*/, '').trim()
+        if (question.length > 5) {
+          questions.push(question)
+        }
+      }
+    }
+    
+    return questions
+  },
+
+  buildEnrichedQuestion: (
+    originalQuestion: string, 
+    clarificationAnswers: Record<string, string>, 
+    clarificationQuestions: string[]
+  ): string => {
+    let enrichedQuestion = originalQuestion + "\n\nInformations supplémentaires :"
+    
+    Object.entries(clarificationAnswers).forEach(([index, answer]) => {
+      if (answer && answer.trim()) {
+        try {
+          const questionIndex = parseInt(index)
+          if (questionIndex >= 0 && questionIndex < clarificationQuestions.length) {
+            const question = clarificationQuestions[questionIndex]
+            enrichedQuestion += `\n- ${question}: ${answer.trim()}`
+          }
+        } catch {
+          // Ignorer les index invalides
+        }
+      }
+    })
+    
+    return enrichedQuestion
+  },
+
+  validateClarificationAnswers: (
+    answers: Record<string, string>, 
+    questions: string[]
+  ): { isValid: boolean; requiredCount: number; answeredCount: number } => {
+    const answeredCount = Object.values(answers).filter(a => a && a.trim().length > 0).length
+    const requiredCount = Math.ceil(questions.length * 0.5) // Au moins 50% des questions
+    
+    return {
+      isValid: answeredCount >= requiredCount,
+      requiredCount,
+      answeredCount
+    }
+  }
+} as const
+
 // ✅ CONSTANTES DE VALIDATION
 export const VALIDATION_RULES = {
   FEEDBACK: {
@@ -495,6 +660,13 @@ export const VALIDATION_RULES = {
     MESSAGE_MAX_LENGTH: 5000,
     MAX_CONVERSATIONS_PER_USER: 1000,
     AUTO_DELETE_DAYS: 30
+  },
+  // ✅ NOUVELLES RÈGLES POUR CLARIFICATIONS
+  CLARIFICATION: {
+    MIN_ANSWER_LENGTH: 0,
+    MAX_ANSWER_LENGTH: 200,
+    MAX_QUESTIONS: 4,
+    REQUIRED_ANSWER_PERCENTAGE: 0.5
   }
 } as const
 
@@ -516,6 +688,13 @@ export const ERROR_MESSAGES = {
     EMPTY_MESSAGE: 'Le message ne peut pas être vide',
     MESSAGE_TOO_LONG: `Le message ne peut pas dépasser ${VALIDATION_RULES.CONVERSATION.MESSAGE_MAX_LENGTH} caractères`,
     CREATION_FAILED: 'Erreur lors de la création de la conversation'
+  },
+  // ✅ NOUVEAUX MESSAGES POUR CLARIFICATIONS
+  CLARIFICATION: {
+    PROCESSING_FAILED: 'Erreur lors du traitement des clarifications',
+    INVALID_ANSWERS: 'Réponses invalides. Veuillez vérifier vos réponses.',
+    SUBMISSION_FAILED: 'Erreur lors de l\'envoi des clarifications',
+    TIMEOUT: 'Timeout lors du traitement des clarifications'
   },
   GENERAL: {
     UNAUTHORIZED: 'Session expirée - reconnexion nécessaire',
@@ -549,7 +728,7 @@ export interface AnalyticsApiResponse {
   message: string
 }
 
-// ✅ TYPE GUARDS POUR LA VALIDATION - CORRECTION
+// ✅ TYPE GUARDS POUR LA VALIDATION
 export const TypeGuards = {
   isFeedbackType: (value: any): value is 'positive' | 'negative' => {
     return typeof value === 'string' && ['positive', 'negative'].includes(value)
@@ -587,7 +766,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CORRECTION: Type guard pour ConversationWithMessages
+  // ✅ Type guard pour ConversationWithMessages
   isValidConversationWithMessages: (value: any): value is ConversationWithMessages => {
     return (
       typeof value === 'object' &&
@@ -608,6 +787,15 @@ export const TypeGuards = {
       typeof value.title === 'string' &&
       Array.isArray(value.conversations) &&
       value.conversations.every((conv: any) => TypeGuards.isValidConversation(conv))
+    )
+  },
+
+  // ✅ NOUVEAU: Type guard pour clarifications
+  isValidClarificationResponse: (value: any): value is ClarificationResponse => {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.needs_clarification === 'boolean'
     )
   }
 } as const
