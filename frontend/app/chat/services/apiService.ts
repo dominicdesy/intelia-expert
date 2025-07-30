@@ -1,194 +1,307 @@
-// services/apiService.ts - VERSION CORRIGÉE AVEC SUPABASE AUTH HELPERS + LANGUE
+// ==================== API SERVICE AVEC AUTHENTIFICATION ====================
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { User } from '../types'
+// Configuration de base
+const API_BASE_URL = 'https://expert-app-cngws.ondigitalocean.app/api/v1'
 
-const supabase = createClientComponentClient()
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// ✅ NOUVEAU: Fonction pour récupérer le token d'authentification
+const getAuthToken = (): string | null => {
+  try {
+    // Essayer d'abord le token depuis les cookies Supabase
+    const sbToken = localStorage.getItem('sb-cdrmjshmkdfwwtsfdvbl-auth-token')
+    if (sbToken) {
+      try {
+        const parsed = JSON.parse(sbToken)
+        if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
+          return parsed[0]
+        }
+      } catch (e) {
+        console.warn('[getAuthToken] Failed to parse sb token:', e)
+      }
+    }
 
+    // Ensuite essayer le token Supabase standard
+    const supabaseToken = localStorage.getItem('supabase.auth.token')
+    if (supabaseToken) {
+      const parsed = JSON.parse(supabaseToken)
+      if (parsed.access_token && parsed.access_token !== 'mock-jwt-token-for-development') {
+        return parsed.access_token
+      }
+    }
+
+    // Enfin essayer le token depuis l'auth storage Intelia
+    const authStorage = localStorage.getItem('intelia-auth-storage')
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage)
+      if (parsed?.state?.token) {
+        return parsed.state.token
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('[getAuthToken] Error getting auth token:', error)
+    return null
+  }
+}
+
+// ✅ NOUVEAU: Fonction pour créer les headers avec authentification
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  const authToken = getAuthToken()
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
+    console.log('🔑 [apiService] Token ajouté aux headers')
+  } else {
+    console.warn('⚠️ [apiService] Aucun token trouvé - requête sans auth')
+  }
+
+  return headers
+}
+
+// Interface pour la réponse de l'API
 interface AIResponse {
-  question: string
   response: string
   conversation_id: string
-  rag_used: boolean
-  rag_score?: number
-  timestamp: string
   language: string
-  response_time_ms: number
-  mode: string
-  user?: string
-  logged: boolean
+  rag_used?: boolean
+  sources?: string[]
 }
 
-// ✅ FONCTION HELPER POUR RÉCUPÉRER SESSION SUPABASE
-async function getValidSession() {
-  try {
-    const { data, error } = await supabase.auth.getSession()
-    if (error) {
-      console.error('❌ [apiService] Erreur session Supabase:', error)
-      throw error
-    }
-    return data.session
-  } catch (sessionError) {
-    console.error('❌ [apiService] Impossible de récupérer la session:', sessionError)
-    throw new Error('Session expirée - reconnexion nécessaire')
-  }
+// Interface pour les erreurs API
+interface APIError {
+  detail: string
+  timestamp: string
+  path: string
+  version: string
 }
 
-// ✅ FONCTION FETCH AVEC TIMEOUT
-async function fetchWithTimeout(url: string, options: RequestInit, timeout: number = 30000) {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    })
-    clearTimeout(timeoutId)
-    return response
-  } catch (error) {
-    clearTimeout(timeoutId)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Timeout - le serveur met trop de temps à répondre')
-    }
-    throw error
-  }
-}
-
-// ✅ FONCTION PRINCIPALE AVEC LANGUE + AUTH SUPABASE + CONVERSATION_ID
-export async function generateAIResponse(
-  question: string, 
-  user?: User | null,
+/**
+ * Génère une réponse IA via l'API Expert
+ */
+export const generateAIResponse = async (
+  question: string,
+  user: any,
   language: string = 'fr',
   conversationId?: string
-): Promise<AIResponse> {
+): Promise<AIResponse> => {
+  if (!question || question.trim() === '') {
+    throw new Error('Question requise')
+  }
+
+  if (!user || !user.id) {
+    throw new Error('Utilisateur requis')
+  }
+
+  console.log('🔥 [apiService] Envoi question:', question.substring(0, 50) + '...')
+  console.log('🔥 [apiService] User ID:', user.id)
+  console.log('🔥 [apiService] Conversation ID:', conversationId || 'Nouvelle conversation')
+
   try {
-    console.log('🔒 [apiService] Envoi question avec authentification Supabase')
-    console.log('🌐 [apiService] Langue transmise:', language)
-    console.log('💬 [apiService] Conversation ID:', conversationId || 'Nouvelle conversation')
-    
-    // ✅ RÉCUPÉRATION SESSION SUPABASE (MÉTHODE CORRECTE)
-    const session = await getValidSession()
-    if (!session?.access_token) {
-      throw new Error('Session expirée - reconnexion nécessaire')
-    }
-
-    console.log('✅ [apiService] Token Supabase récupéré, longueur:', session.access_token.length)
-
-    // ✅ PRÉPARATION REQUÊTE AVEC LANGUE + CONVERSATION_ID
-    const cleanQuestion = question.trim().normalize('NFC')
-    
     const requestBody = {
-      text: cleanQuestion,
+      question: question.trim(),
+      user_id: user.id,
       language: language,
-      speed_mode: 'balanced',
       ...(conversationId && { conversation_id: conversationId })
     }
 
-    // ✅ HEADERS AVEC TOKEN SUPABASE
-    const headers = {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
-    }
+    const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Données envoyées:', JSON.stringify(requestBody, null, 2))
+    console.log('📤 [apiService] Body:', requestBody)
+    console.log('📤 [apiService] Headers:', Object.keys(headers))
 
-    // ✅ REQUÊTE AVEC TIMEOUT
-    const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/expert/ask`, {
+    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
       method: 'POST',
-      headers: headers,
+      headers,
       body: JSON.stringify(requestBody)
     })
 
     console.log('📡 [apiService] Statut réponse:', response.status)
 
-    // ✅ GESTION ERREURS HTTP
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur API:', response.status, errorText)
+      console.error('❌ [apiService] Erreur réponse:', errorText)
       
       if (response.status === 401) {
-        // Session expirée, forcer refresh
-        await supabase.auth.signOut()
-        window.location.href = '/'
-        throw new Error('Session expirée. Redirection vers la connexion...')
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
-      throw new Error(`Erreur API (${response.status}): ${errorText}`)
+      if (response.status === 403) {
+        throw new Error('Accès non autorisé.')
+      }
+      
+      let errorMessage = `Erreur API: ${response.status}`
+      try {
+        const errorData: APIError = JSON.parse(errorText)
+        errorMessage = errorData.detail || errorMessage
+      } catch (e) {
+        errorMessage = errorText || errorMessage
+      }
+      
+      throw new Error(errorMessage)
     }
 
-    // ✅ TRAITEMENT RÉPONSE
     const data: AIResponse = await response.json()
-    
     console.log('✅ [apiService] Réponse reçue:', {
-      question: data.question?.substring(0, 50) + '...',
-      response: data.response?.substring(0, 100) + '...',
       conversation_id: data.conversation_id,
       language: data.language,
       rag_used: data.rag_used,
-      logged: data.logged
+      response_length: data.response?.length || 0
     })
 
     return data
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur génération réponse:', error)
+    console.error('❌ [apiService] Erreur complète:', error)
     
     if (error instanceof Error) {
-      // Gestion erreurs spécifiques
-      if (error.message.includes('Failed to fetch')) {
-        throw new Error('Problème de connexion réseau. Vérifiez votre connexion internet.')
-      }
       throw error
     }
     
-    throw new Error('Erreur de connexion au service IA')
+    throw new Error('Erreur de communication avec le serveur')
   }
 }
 
-// ✅ FONCTION PUBLIQUE AVEC LANGUE (si nécessaire)
-export async function generateAIResponsePublic(
-  question: string,
-  language: string = 'fr'
-): Promise<AIResponse> {
+/**
+ * Envoie un feedback pour une conversation
+ */
+export const sendFeedback = async (
+  conversationId: string,
+  feedback: 1 | -1,
+  comment?: string
+): Promise<void> => {
+  if (!conversationId) {
+    throw new Error('ID de conversation requis')
+  }
+
+  console.log('👍👎 [apiService] Envoi feedback:', feedback, 'pour conversation:', conversationId)
+
   try {
-    console.log('🌐 [apiService] Envoi question publique avec langue:', language)
-    
     const requestBody = {
-      text: question.trim().normalize('NFC'),
-      language: language,
-      speed_mode: 'balanced'
+      feedback,
+      ...(comment && { comment: comment.trim() })
     }
 
-    const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/expert/ask-public`, {
+    const headers = getAuthHeaders()
+
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/feedback`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Accept': 'application/json'
-      },
+      headers,
       body: JSON.stringify(requestBody)
     })
 
+    console.log('📡 [apiService] Feedback statut:', response.status)
+
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur API publique:', response.status, errorText)
-      throw new Error(`Erreur API publique (${response.status}): ${errorText}`)
+      console.error('❌ [apiService] Erreur feedback:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
+      }
+      
+      throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    const data: AIResponse = await response.json()
-    console.log('✅ [apiService] Réponse publique reçue avec langue:', data.language)
-
-    return data
+    console.log('✅ [apiService] Feedback envoyé avec succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur génération réponse publique:', error)
-    
-    if (error instanceof Error) {
-      throw error
-    }
-    
-    throw new Error('Erreur de connexion au service IA')
+    console.error('❌ [apiService] Erreur feedback:', error)
+    throw error
   }
 }
+
+/**
+ * Récupère les suggestions de sujets populaires
+ */
+export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
+  console.log('💡 [apiService] Récupération suggestions sujets:', language)
+
+  try {
+    const headers = getAuthHeaders()
+
+    const response = await fetch(`${API_BASE_URL}/expert/topics?language=${language}`, {
+      method: 'GET',
+      headers
+    })
+
+    if (!response.ok) {
+      console.warn('⚠️ [apiService] Erreur récupération sujets:', response.status)
+      
+      // Retourner des sujets par défaut en cas d'erreur
+      return [
+        "Problèmes de croissance poulets",
+        "Conditions environnementales optimales",
+        "Protocoles de vaccination",
+        "Diagnostic problèmes de santé",
+        "Nutrition et alimentation",
+        "Gestion de la mortalité"
+      ]
+    }
+
+    const data = await response.json()
+    console.log('✅ [apiService] Sujets récupérés:', data.topics?.length || 0)
+
+    return Array.isArray(data.topics) ? data.topics : []
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur sujets:', error)
+    
+    // Retourner des sujets par défaut en cas d'erreur
+    return [
+      "Problèmes de croissance poulets",
+      "Conditions environnementales optimales", 
+      "Protocoles de vaccination",
+      "Diagnostic problèmes de santé",
+      "Nutrition et alimentation",
+      "Gestion de la mortalité"
+    ]
+  }
+}
+
+/**
+ * Vérifie l'état de santé de l'API
+ */
+export const checkAPIHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/system/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const isHealthy = response.ok
+    console.log('🏥 [apiService] API Health:', isHealthy ? 'OK' : 'KO')
+    
+    return isHealthy
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur health check:', error)
+    return false
+  }
+}
+
+/**
+ * Utilitaire pour gérer les erreurs réseau
+ */
+export const handleNetworkError = (error: any): string => {
+  if (error?.message?.includes('Failed to fetch')) {
+    return 'Problème de connexion. Vérifiez votre connexion internet.'
+  }
+  
+  if (error?.message?.includes('Session expirée')) {
+    return 'Votre session a expiré. Veuillez vous reconnecter.'
+  }
+  
+  if (error?.message?.includes('Accès non autorisé')) {
+    return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
+  }
+  
+  return error?.message || 'Une erreur inattendue s\'est produite.'
+}
+
+// Export par défaut de la fonction principale
+export default generateAIResponse
