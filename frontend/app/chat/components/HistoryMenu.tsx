@@ -85,7 +85,7 @@ export const HistoryMenu = () => {
     try {
       console.log('📖 [HistoryMenu] Clic sur conversation:', conversation.id)
       
-      // Charger la conversation complète
+      // ✅ CORRECTION: Charger la conversation complète avec getConversationWithMessages
       await loadConversation(conversation.id)
       
       // Fermer le menu
