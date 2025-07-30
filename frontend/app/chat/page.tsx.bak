@@ -167,7 +167,10 @@ export default function ChatInterface() {
   }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
   useEffect(() => {
-    if (currentConversation?.id === 'welcome' && currentConversation.messages.length === 1) {
+    if (currentConversation?.id === 'welcome' && 
+        currentConversation.messages.length === 1 &&
+        currentConversation.messages[0].content !== t('chat.welcome')) {
+      
       const updatedMessage: Message = {
         ...currentConversation.messages[0],
         content: t('chat.welcome')
@@ -180,7 +183,7 @@ export default function ChatInterface() {
       
       setCurrentConversation(updatedConversation)
     }
-  }, [currentLanguage, t, currentConversation, setCurrentConversation])
+  }, [currentLanguage, t])
 
   useEffect(() => {
     console.log('🔄 Conversation changée, force re-render')
