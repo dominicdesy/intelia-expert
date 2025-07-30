@@ -445,11 +445,6 @@ export default function ChatInterface() {
                             <ThumbDownIcon />
                           </button>
                           
-                          {/* DEBUG TEMPORAIRE */}
-                          <span className="text-xs text-red-600">
-                            DEBUG: feedback={message.feedback || 'null'}, id={message.conversation_id ? 'OK' : 'MISSING'}
-                          </span>
-                          
                           {/* ✅ AFFICHAGE STATUS FEEDBACK */}
                           {message.feedback && (
                             <div className="flex items-center space-x-2">

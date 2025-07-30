@@ -13,9 +13,10 @@ export class ConversationService {
 
     try {
       console.log('💾 Sauvegarde conversation:', data.conversation_id)
-      console.log('📡 URL de sauvegarde:', `${this.baseUrl}/logging/conversation`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL de sauvegarde:', `${this.baseUrl}/conversation`)
       
-      const response = await fetch(`${this.baseUrl}/logging/conversation`, {
+      const response = await fetch(`${this.baseUrl}/conversation`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -55,9 +56,10 @@ export class ConversationService {
 
     try {
       console.log('📊 Envoi feedback:', conversationId, feedback)
-      console.log('📡 URL feedback:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL feedback:', `${this.baseUrl}/conversation/${conversationId}/feedback`)
       
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback`, {
+      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/feedback`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -89,9 +91,10 @@ export class ConversationService {
 
     try {
       console.log('💬 Envoi commentaire feedback:', conversationId, comment.substring(0, 50) + '...')
-      console.log('📡 URL commentaire:', `${this.baseUrl}/logging/conversation/${conversationId}/comment`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL commentaire:', `${this.baseUrl}/conversation/${conversationId}/comment`)
       
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/comment`, {
+      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/comment`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -136,9 +139,10 @@ export class ConversationService {
 
     try {
       console.log('📊💬 Envoi feedback avec commentaire:', conversationId, feedback, comment ? 'avec commentaire' : 'sans commentaire')
-      console.log('📡 URL feedback combiné:', `${this.baseUrl}/logging/conversation/${conversationId}/feedback-with-comment`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL feedback combiné:', `${this.baseUrl}/conversation/${conversationId}/feedback-with-comment`)
       
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}/feedback-with-comment`, {
+      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/feedback-with-comment`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -182,9 +186,10 @@ export class ConversationService {
 
     try {
       console.log('🔍 Récupération conversations pour:', userId)
-      console.log('📡 URL conversations:', `${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL conversations:', `${this.baseUrl}/conversations/user/${userId}?limit=${limit}`)
       
-      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations?limit=${limit}`, {
+      const response = await fetch(`${this.baseUrl}/conversations/user/${userId}?limit=${limit}`, {
         headers: { 'Accept': 'application/json' }
       })
       
@@ -210,9 +215,10 @@ export class ConversationService {
 
     try {
       console.log('🗑️ Suppression conversation serveur:', conversationId)
-      console.log('📡 URL suppression:', `${this.baseUrl}/logging/conversation/${conversationId}`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL suppression:', `${this.baseUrl}/conversation/${conversationId}`)
       
-      const response = await fetch(`${this.baseUrl}/logging/conversation/${conversationId}`, {
+      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
         method: 'DELETE',
         headers: { 
           'Accept': 'application/json'
@@ -246,9 +252,10 @@ export class ConversationService {
 
     try {
       console.log('🗑️ Suppression toutes conversations serveur pour:', userId)
-      console.log('📡 URL suppression globale:', `${this.baseUrl}/logging/user/${userId}/conversations`)
+      // ✅ CORRIGÉ: Enlevé /logging/
+      console.log('📡 URL suppression globale:', `${this.baseUrl}/conversations/user/${userId}`)
       
-      const response = await fetch(`${this.baseUrl}/logging/user/${userId}/conversations`, {
+      const response = await fetch(`${this.baseUrl}/conversations/user/${userId}`, {
         method: 'DELETE',
         headers: { 
           'Accept': 'application/json'
@@ -281,7 +288,8 @@ export class ConversationService {
       if (userId) params.append('user_id', userId)
       params.append('days', days.toString())
       
-      const url = `${this.baseUrl}/logging/analytics/feedback?${params.toString()}`
+      // ✅ CORRIGÉ: Enlevé /logging/
+      const url = `${this.baseUrl}/analytics/feedback?${params.toString()}`
       console.log('📊 Récupération stats feedback:', url)
       
       const response = await fetch(url, {
@@ -311,7 +319,8 @@ export class ConversationService {
     try {
       console.log('🔍 Test connectivité service logging...')
       
-      const response = await fetch(`${this.baseUrl}/logging/test`, {
+      // ✅ CORRIGÉ: Enlevé /logging/
+      const response = await fetch(`${this.baseUrl}/test-comments`, {
         headers: { 'Accept': 'application/json' }
       })
       

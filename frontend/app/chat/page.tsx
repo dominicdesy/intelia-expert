@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Message } from './types'
 import { useAuthStore } from './hooks/useAuthStore'
 import { useTranslation } from './hooks/useTranslation'
-import { useChatStore } from './hooks/useChatStore'
+import { useCurrentConversation, useConversationActions } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 import { 
@@ -21,13 +21,16 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// ==================== COMPOSANT PRINCIPAL AVEC MODAL FEEDBACK ====================
+// ==================== COMPOSANT PRINCIPAL AVEC GESTION CONVERSATIONS ====================
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
-  const { addConversation } = useChatStore()
   
-  const [messages, setMessages] = useState<Message[]>([])
+  // ✅ NOUVEAU: Hooks pour conversations
+  const { currentConversation, setCurrentConversation, addMessage, updateMessage } = useCurrentConversation()
+  const { createNewConversation } = useConversationActions()
+  
+  // États locaux pour l'interface
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
@@ -37,7 +40,7 @@ export default function ChatInterface() {
   const [isUserScrolling, setIsUserScrolling] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
   
-  // ✅ NOUVEAUX ÉTATS POUR LA MODAL FEEDBACK
+  // États pour la modal feedback
   const [feedbackModal, setFeedbackModal] = useState<{
     isOpen: boolean
     messageId: string | null
@@ -53,7 +56,12 @@ export default function ChatInterface() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // [TOUT LE CODE DE DÉTECTION MOBILE ET SCROLL RESTE IDENTIQUE]
+  // ✅ NOUVEAU: Calculer les messages à afficher
+  const messages: Message[] = currentConversation?.messages || []
+  const hasMessages = messages.length > 0
+
+  // ==================== EFFECTS EXISTANTS ====================
+  
   useEffect(() => {
     const detectMobileDevice = () => {
       const userAgent = navigator.userAgent.toLowerCase()
@@ -125,27 +133,53 @@ export default function ChatInterface() {
     }
   }, [messages.length])
 
+  // ✅ NOUVEAU: Effect pour initialiser une conversation vide au démarrage
   useEffect(() => {
-    if (isAuthenticated && messages.length === 0) {
+    if (isAuthenticated && !currentConversation && !hasMessages) {
+      // Créer un message de bienvenue temporaire si aucune conversation active
       const welcomeMessage: Message = {
-        id: '1',
+        id: 'welcome',
         content: t('chat.welcome'),
         isUser: false,
         timestamp: new Date()
       }
       
-      setMessages([welcomeMessage])
+      // Créer une conversation temporaire avec le message de bienvenue
+      const welcomeConversation = {
+        id: 'welcome',
+        title: 'Nouvelle conversation',
+        preview: 'Commencez par poser une question',
+        message_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        language: currentLanguage,
+        status: 'active' as const,
+        messages: [welcomeMessage]
+      }
+      
+      setCurrentConversation(welcomeConversation)
       lastMessageCountRef.current = 1
     }
-  }, [isAuthenticated, t, currentLanguage])
+  }, [isAuthenticated, currentConversation, hasMessages, t, currentLanguage, setCurrentConversation])
 
+  // ✅ NOUVEAU: Effect pour mettre à jour le message de bienvenue lors du changement de langue
   useEffect(() => {
-    if (messages.length > 0 && messages[0].id === '1' && !messages[0].isUser) {
-      setMessages(prev => prev.map((msg, index) => 
-        index === 0 ? { ...msg, content: t('chat.welcome') } : msg
-      ))
+    if (currentConversation?.id === 'welcome' && currentConversation.messages.length === 1) {
+      const updatedMessage: Message = {
+        ...currentConversation.messages[0],
+        content: t('chat.welcome')
+      }
+      
+      const updatedConversation = {
+        ...currentConversation,
+        messages: [updatedMessage]
+      }
+      
+      setCurrentConversation(updatedConversation)
     }
-  }, [currentLanguage, t])
+  }, [currentLanguage, t, currentConversation, setCurrentConversation])
+
+  // ==================== HANDLERS ====================
 
   if (isLoading) {
     return (
@@ -173,7 +207,7 @@ export default function ChatInterface() {
     )
   }
 
-  // FONCTION ENVOI DE MESSAGE (RESTE IDENTIQUE)
+  // ✅ NOUVEAU: Gestion d'envoi de message avec conversation
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim()) return
 
@@ -184,7 +218,13 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    setMessages(prev => [...prev, userMessage])
+    // ✅ NOUVEAU: Si c'est la conversation de bienvenue, créer une nouvelle conversation
+    if (currentConversation?.id === 'welcome') {
+      createNewConversation()
+    }
+
+    // Ajouter le message utilisateur
+    addMessage(userMessage)
     setInputMessage('')
     setIsLoadingChat(true)
     
@@ -204,12 +244,9 @@ export default function ChatInterface() {
         conversation_id: response.conversation_id
       }
 
-      setMessages(prev => [...prev, aiMessage])
+      // Ajouter le message de réponse
+      addMessage(aiMessage)
       console.log('✅ [handleSendMessage] Message ajouté avec conversation_id:', response.conversation_id)
-      
-      if (user && response.conversation_id) {
-        addConversation(response.conversation_id, text.trim(), response.response)
-      }
       
     } catch (error) {
       console.error('❌ [handleSendMessage] Error generating response:', error)
@@ -219,13 +256,13 @@ export default function ChatInterface() {
         isUser: false,
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMessage])
+      addMessage(errorMessage)
     } finally {
       setIsLoadingChat(false)
     }
   }
 
-  // ✅ NOUVELLE FONCTION GESTION FEEDBACK AVEC MODAL
+  // ✅ GESTION FEEDBACK (conservée)
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     console.log('👆 [handleFeedbackClick] Ouverture modal feedback:', messageId, feedback)
     
@@ -236,7 +273,6 @@ export default function ChatInterface() {
     })
   }
 
-  // ✅ FONCTION SOUMISSION FEEDBACK AVEC COMMENTAIRE - CORRIGÉE
   const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
     if (!messageId) return
@@ -244,7 +280,7 @@ export default function ChatInterface() {
     const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
       console.warn('⚠️ Conversation ID non trouvé pour le feedback', messageId)
-      return // ✅ ENLEVÉ L'ALERT QUI CAUSAIT L'ERREUR
+      return
     }
 
     setIsSubmittingFeedback(true)
@@ -255,57 +291,47 @@ export default function ChatInterface() {
         comment: comment || 'Aucun commentaire'
       })
       
-      // ✅ MISE À JOUR IMMÉDIATE DE L'UI
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { 
-          ...msg, 
-          feedback,
-          feedbackComment: comment 
-        } : msg
-      ))
+      // Mise à jour immédiate de l'UI
+      updateMessage(messageId, { 
+        feedback,
+        feedbackComment: comment 
+      })
 
-      // ✅ ENVOI FEEDBACK SEULEMENT (commentaire pour plus tard)
+      // Envoi feedback
       const feedbackValue = feedback === 'positive' ? 1 : -1
       
       try {
         await conversationService.sendFeedback(message.conversation_id, feedbackValue)
         console.log('✅ Feedback principal enregistré')
         
-        // Optionnel : essayer d'envoyer le commentaire
         if (comment && comment.trim()) {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
             console.log('✅ Commentaire feedback enregistré')
           } catch (commentError) {
             console.warn('⚠️ Commentaire non envoyé (endpoint manquant):', commentError)
-            // Ne pas faire échouer pour le commentaire
           }
         }
       } catch (feedbackError) {
         console.error('❌ Erreur envoi feedback:', feedbackError)
         // Rollback en cas d'erreur
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { 
-            ...msg, 
-            feedback: null,
-            feedbackComment: undefined 
-          } : msg
-        ))
-        throw feedbackError // ✅ PROPAGER L'ERREUR POUR QUE LA MODAL GÈRE
+        updateMessage(messageId, { 
+          feedback: null,
+          feedbackComment: undefined 
+        })
+        throw feedbackError
       }
       
       console.log(`✅ Feedback ${feedback} avec commentaire enregistré pour conversation ${message.conversation_id}`)
       
     } catch (error) {
       console.error('❌ Erreur générale feedback:', error)
-      // L'erreur sera gérée par la modal qui ne fermera pas
       throw error
     } finally {
       setIsSubmittingFeedback(false)
     }
   }
 
-  // ✅ FERMETURE MODAL FEEDBACK
   const handleFeedbackModalClose = () => {
     setFeedbackModal({
       isOpen: false,
@@ -314,16 +340,32 @@ export default function ChatInterface() {
     })
   }
 
-  // [AUTRES FONCTIONS RESTENT IDENTIQUES]
+  // ✅ NOUVEAU: Gestion nouvelle conversation
   const handleNewConversation = () => {
-    const welcomeMessage = {
-      id: '1',
+    console.log('✨ [handleNewConversation] Création nouvelle conversation')
+    createNewConversation()
+    
+    // Créer le message de bienvenue
+    const welcomeMessage: Message = {
+      id: 'welcome',
       content: t('chat.welcome'),
       isUser: false,
       timestamp: new Date()
     }
     
-    setMessages([welcomeMessage])
+    const welcomeConversation = {
+      id: 'welcome',
+      title: 'Nouvelle conversation',
+      preview: 'Commencez par poser une question',
+      message_count: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      language: currentLanguage,
+      status: 'active' as const,
+      messages: [welcomeMessage]
+    }
+    
+    setCurrentConversation(welcomeConversation)
     lastMessageCountRef.current = 1
     
     setShouldAutoScroll(true)
@@ -346,7 +388,7 @@ export default function ChatInterface() {
     })
   }
 
-  // [LE RESTE DU COMPOSANT AVEC MODAL AJOUTÉE]
+  // ==================== RENDER ====================
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
@@ -370,6 +412,12 @@ export default function ChatInterface() {
               <InteliaLogo className="w-8 h-8" />
               <div className="text-center">
                 <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+                {/* ✅ NOUVEAU: Affichage titre conversation courante */}
+                {currentConversation && currentConversation.id !== 'welcome' && (
+                  <p className="text-xs text-gray-500 truncate max-w-xs">
+                    {currentConversation.title}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -379,7 +427,7 @@ export default function ChatInterface() {
           </div>
         </header>
 
-        {/* Zone de messages avec scroll intelligent */}
+        {/* Zone de messages */}
         <div className="flex-1 overflow-hidden flex flex-col">
           <div 
             ref={chatContainerRef}
@@ -387,11 +435,22 @@ export default function ChatInterface() {
           >
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Date */}
-              {messages.length > 0 && (
+              {hasMessages && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
                     {getCurrentDate()}
                   </span>
+                </div>
+              )}
+
+              {/* ✅ NOUVEAU: Indicateur conversation si pas bienvenue */}
+              {currentConversation && currentConversation.id !== 'welcome' && (
+                <div className="text-center">
+                  <div className="inline-flex items-center space-x-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-full">
+                    <span>📖</span>
+                    <span>Conversation : {currentConversation.title}</span>
+                    <span className="text-blue-400">({currentConversation.message_count} messages)</span>
+                  </div>
                 </div>
               )}
 
@@ -411,41 +470,29 @@ export default function ChatInterface() {
                         </p>
                       </div>
                       
-                      {/* ✅ BOUTONS DE FEEDBACK AVEC MODAL */}
+                      {/* Boutons de feedback */}
                       {!message.isUser && index > 0 && message.conversation_id && (
                         <div className="flex items-center space-x-2 mt-2 ml-2">
                           <button
-                            onClick={() => {
-                              console.log('👍 Clic bouton positif pour message:', message.id)
-                              console.log('👍 Message feedback actuel:', message.feedback)
-                              console.log('👍 Message conversation_id:', message.conversation_id)
-                              handleFeedbackClick(message.id, 'positive')
-                            }}
+                            onClick={() => handleFeedbackClick(message.id, 'positive')}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
                               message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
                             }`}
                             title={t('chat.helpfulResponse')}
-                            disabled={false}
                           >
                             <ThumbUpIcon />
                           </button>
                           <button
-                            onClick={() => {
-                              console.log('👎 Clic bouton négatif pour message:', message.id)
-                              console.log('👎 Message feedback actuel:', message.feedback)
-                              console.log('👎 Message conversation_id:', message.conversation_id)
-                              handleFeedbackClick(message.id, 'negative')
-                            }}
+                            onClick={() => handleFeedbackClick(message.id, 'negative')}
                             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
                               message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
                             }`}
                             title={t('chat.notHelpfulResponse')}
-                            disabled={false}
                           >
                             <ThumbDownIcon />
                           </button>
                           
-                          {/* ✅ AFFICHAGE STATUS FEEDBACK */}
+                          {/* Status feedback */}
                           {message.feedback && (
                             <div className="flex items-center space-x-2">
                               <span className="text-xs text-gray-500">
@@ -457,12 +504,6 @@ export default function ChatInterface() {
                                 </span>
                               )}
                             </div>
-                          )}
-                          
-                          {message.conversation_id && (
-                            <span className="text-xs text-gray-400 ml-2" title={`ID: ${message.conversation_id}`}>
-                              🔗
-                            </span>
                           )}
                         </div>
                       )}
@@ -497,7 +538,7 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* Bouton flottant "revenir en bas" */}
+          {/* Bouton flottant scroll */}
           {showScrollButton && (
             <div className="fixed bottom-24 right-8 z-10">
               <button
@@ -544,7 +585,7 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      {/* ✅ MODAL FEEDBACK */}
+      {/* Modal Feedback */}
       <FeedbackModal
         isOpen={feedbackModal.isOpen}
         onClose={handleFeedbackModalClose}
