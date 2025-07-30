@@ -229,7 +229,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     })
   },
 
-  // ==================== MODIFICATION MINIMALE - loadConversation ====================
+  // ==================== MÉTHODE CORRIGÉE loadConversation ====================
 
   loadConversation: async (conversationId: string) => {
     if (!conversationId) {
@@ -242,7 +242,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       console.log('📖 [ChatStore] Chargement conversation:', conversationId)
       
-      // ✅ OPTION 1: Essayer la nouvelle méthode getConversationWithMessages
+      // ✅ ESSAYER MÉTHODE getConversationWithMessages DU SERVICE
       try {
         const fullConversation = await conversationService.getConversationWithMessages?.(conversationId)
         
@@ -255,7 +255,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         console.warn('⚠️ [ChatStore] Service getConversationWithMessages non disponible:', serviceError)
       }
       
-      // ✅ OPTION 2: Fallback vers logique existante
+      // ✅ FALLBACK: Chercher dans les conversations locales
       const state = get()
       const existingConv = state.conversations.find(c => c.id === conversationId)
       
@@ -287,7 +287,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         return
       }
       
-      // ✅ OPTION 3: Message d'erreur si rien ne fonctionne
+      // ✅ Si rien ne fonctionne, message d'erreur
       const errorConversation: ConversationWithMessages = {
         id: conversationId,
         title: 'Conversation non disponible',
@@ -319,8 +319,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set({ currentConversation: null })
   },
 
+  // ==================== MÉTHODE CORRIGÉE addMessage ====================
   addMessage: (message: Message) => {
-    console.log('💬 [ChatStore] Ajout message:', message.id)
+    console.log('💬 [ChatStore] Ajout message:', message.id, 'User:', message.isUser)
     
     const state = get()
     
@@ -338,6 +339,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }
       
       set({ currentConversation: tempConversation })
+      console.log('🆕 [ChatStore] Conversation temporaire créée:', tempConversation.id)
       return
     }
     
@@ -349,12 +351,22 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     
     const updatedMessages = [...(state.currentConversation.messages || []), message]
     
+    // ✅ CORRECTION: Mise à jour de l'ID SEULEMENT si on a un conversation_id de retour
+    let updatedId = state.currentConversation.id
+    
+    if (message.conversation_id && 
+        (state.currentConversation.id === 'welcome' || 
+         state.currentConversation.id.startsWith('temp-'))) {
+      updatedId = message.conversation_id
+      console.log('🔄 [ChatStore] ID conversation mis à jour:', state.currentConversation.id, '→', updatedId)
+    }
+    
     const updatedConversation: ConversationWithMessages = {
       ...state.currentConversation,
+      id: updatedId,
       messages: updatedMessages,
       message_count: updatedMessages.length,
       updated_at: new Date().toISOString(),
-      id: message.conversation_id || state.currentConversation.id,
       title: state.currentConversation.id === 'welcome' && message.isUser 
         ? message.content.substring(0, 60) + (message.content.length > 60 ? '...' : '')
         : state.currentConversation.title,
