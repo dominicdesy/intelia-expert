@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
 import { useConversationGroups, useConversationActions, useCurrentConversation } from '../hooks/useChatStore'
 import { useAuthStore } from '../hooks/useAuthStore'
-import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons'
+import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons.tsx'
 import { Conversation, ConversationGroup } from '../types'
 
 // ==================== MENU HISTORIQUE CONVERSATIONS STYLE CLAUDE.AI ====================
@@ -236,7 +236,7 @@ export const HistoryMenu = () => {
                       {group.conversations.map((conv: Conversation) => (
                         <div 
                           key={conv.id} 
-                          className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                          className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors group ${
                             currentConversation?.id === conv.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                           }`}
                           onClick={(e) => handleConversationClick(conv, e)}
