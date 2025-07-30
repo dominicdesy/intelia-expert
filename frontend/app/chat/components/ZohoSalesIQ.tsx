@@ -1,4 +1,4 @@
-// components/ZohoSalesIQ.tsx - VERSION CORRIGÉE avec initialisation appropriée
+// components/ZohoSalesIQ.tsx - VERSION STABLE: Langue fixe pour la session
 
 import { useEffect, useRef, useCallback } from 'react'
 
@@ -9,7 +9,7 @@ interface ZohoSalesIQProps {
 
 export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const isInitializedRef = useRef(false)
-  const currentLanguageRef = useRef<string | null>(null)
+  const sessionLanguageRef = useRef<string | null>(null)
   const widgetLoadedRef = useRef(false)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -20,64 +20,20 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   }, [])
 
-  const cleanupZoho = useCallback(() => {
-    console.log('🧹 [ZohoSalesIQ] NETTOYAGE complet')
+  const ensureFloatButtonVisible = useCallback(() => {
+    console.log('🔧 [ZohoSalesIQ] Vérification visibilité bouton flottant')
     
-    try {
-      clearRetryTimeout()
-      
-      // Cacher le widget si disponible
-      if (window.$zoho?.salesiq?.floatwindow) {
-        try {
-          window.$zoho.salesiq.floatwindow.visible('hide')
-        } catch (e) {
-          console.warn('⚠️ [ZohoSalesIQ] Erreur hide widget:', e)
-        }
-      }
-      
-      // Supprimer les scripts Zoho existants
-      const existingScripts = document.querySelectorAll('script[src*="salesiq.zohopublic.com"], script#zsiqscript')
-      existingScripts.forEach(script => {
-        const scriptElement = script as HTMLScriptElement
-        console.log('🗑️ [ZohoSalesIQ] Suppression script:', scriptElement.id || scriptElement.src)
-        script.remove()
-      })
-      
-      // Supprimer le script d'initialisation personnalisé
-      const initScript = document.querySelector('#zoho-init-script')
-      if (initScript) {
-        initScript.remove()
-      }
-      
-      // Supprimer les éléments DOM du widget
-      const selectors = [
-        '[id*="zsiq"]', '[class*="zsiq"]', '[id*="siq"]', '[class*="siq"]',
-        '#salesiq-chat', '.salesiq-widget', '.zoho-salesiq'
-      ]
-      
-      selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector)
-        elements.forEach(element => element.remove())
-      })
-      
-      // ✅ CORRECTION: NE PAS supprimer $zoho complètement, juste le réinitialiser
-      if (window.$zoho) {
-        window.$zoho.salesiq = { ready: function(){} }
-      }
-      
-      widgetLoadedRef.current = false
-      
-      console.log('✅ [ZohoSalesIQ] Nettoyage terminé')
-      
-    } catch (error) {
-      console.error('❌ [ZohoSalesIQ] Erreur lors du nettoyage:', error)
+    const floatButton = document.querySelector('#zsiq_float')
+    if (floatButton && floatButton.classList.contains('zsiq-hide')) {
+      console.log('📌 [ZohoSalesIQ] Retrait classe zsiq-hide pour rendre visible')
+      floatButton.classList.remove('zsiq-hide')
+      console.log('✅ [ZohoSalesIQ] Bouton flottant maintenant visible')
     }
-  }, [clearRetryTimeout])
+  }, [])
 
   const initializeZohoObject = useCallback(() => {
     console.log('🔧 [ZohoSalesIQ] Initialisation objet $zoho')
     
-    // ✅ CORRECTION: Initialiser $zoho EXACTEMENT comme Zoho le fait
     if (!document.querySelector('#zoho-init-script')) {
       const initScript = document.createElement('script')
       initScript.id = 'zoho-init-script'
@@ -101,7 +57,6 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       attempts++
       console.log(`🔧 [ZohoSalesIQ] Tentative de configuration ${attempts}/${maxAttempts}`)
       
-      // ✅ CORRECTION: Vérification plus appropriée après initialisation
       if (window.$zoho && 
           window.$zoho.salesiq && 
           typeof window.$zoho.salesiq.visitor?.info === 'function' &&
@@ -130,6 +85,16 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
               if (window.$zoho?.salesiq?.floatwindow) {
                 window.$zoho.salesiq.floatwindow.visible('show')
                 console.log('👁️ [ZohoSalesIQ] Widget affiché')
+                
+                // ✅ CORRECTION: S'assurer que le bouton flottant reste visible
+                setTimeout(() => {
+                  ensureFloatButtonVisible()
+                }, 1000)
+                
+                // ✅ CORRECTION: Vérification supplémentaire après 5 secondes
+                setTimeout(() => {
+                  ensureFloatButtonVisible()
+                }, 5000)
               }
             } catch (showError) {
               console.error('❌ [ZohoSalesIQ] Erreur affichage:', showError)
@@ -159,10 +124,10 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
     
     configureAttempt()
-  }, [user])
+  }, [user, ensureFloatButtonVisible])
 
   const loadZohoWithLanguage = useCallback((lang: string) => {
-    console.log('🚀 [ZohoSalesIQ] Chargement widget avec langue:', lang)
+    console.log('🚀 [ZohoSalesIQ] Chargement widget avec langue de session:', lang)
     
     if (!user?.email) {
       console.warn('⚠️ [ZohoSalesIQ] Pas d\'utilisateur, abandon')
@@ -170,17 +135,17 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
 
     try {
-      // ✅ ÉTAPE 1: Initialiser l'objet $zoho AVANT le script
+      // Initialiser l'objet $zoho AVANT le script
       initializeZohoObject()
       
-      // ✅ ÉTAPE 2: Créer le script principal avec la structure Zoho
+      // Créer le script principal
       const script = document.createElement('script')
       script.id = 'zsiqscript'
       script.async = true
       script.defer = true
       
-      // ✅ CORRECTION: Utiliser l'URL de base sans locale d'abord
-      script.src = `https://salesiq.zohopublic.com/widget?wc=siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f`
+      // ✅ CORRECTION: URL avec locale pour forcer la langue
+      script.src = `https://salesiq.zohopublic.com/widget?wc=siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f&locale=${lang}`
       
       console.log('📡 [ZohoSalesIQ] Chargement script principal:', script.src)
       
@@ -200,13 +165,6 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       script.onerror = (error) => {
         console.error('❌ [ZohoSalesIQ] Erreur chargement script principal:', error)
         clearTimeout(loadTimeout)
-        
-        // Retry après erreur
-        setTimeout(() => {
-          console.log('🔄 [ZohoSalesIQ] Retry après erreur')
-          cleanupZoho()
-          setTimeout(() => loadZohoWithLanguage(lang), 2000)
-        }, 5000)
       }
       
       // Timeout de sécurité
@@ -220,51 +178,61 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     } catch (error) {
       console.error('❌ [ZohoSalesIQ] Erreur création script:', error)
     }
-  }, [user, initializeZohoObject, configureWidget, cleanupZoho])
+  }, [user, initializeZohoObject, configureWidget])
 
-  // Effet principal avec protection boucle infinie
+  // ✅ EFFET PRINCIPAL: Langue fixe pour la session
   useEffect(() => {
-    console.log('🌐 [ZohoSalesIQ] Effet déclenché - Langue:', language, 'User:', !!user?.email)
+    console.log('🌐 [ZohoSalesIQ] Effet déclenché - Langue courante:', language, 'User:', !!user?.email)
     
-    // Protection contre les changements inutiles
-    if (currentLanguageRef.current === language && isInitializedRef.current) {
-      console.log('👍 [ZohoSalesIQ] Pas de changement nécessaire')
-      return
-    }
-    
-    // Si changement de langue sur widget déjà chargé
-    if (widgetLoadedRef.current && currentLanguageRef.current && currentLanguageRef.current !== language) {
-      console.log('🔄 [ZohoSalesIQ] Rechargement pour nouvelle langue:', currentLanguageRef.current, '→', language)
-      
-      currentLanguageRef.current = language
-      clearRetryTimeout()
-      cleanupZoho()
-      
-      setTimeout(() => {
-        loadZohoWithLanguage(language)
-      }, 1000)
-      
-      return
-    }
-    
-    // Première initialisation
+    // ✅ CAPTURE de la langue à la première initialisation
     if (!isInitializedRef.current && user?.email) {
-      console.log('🎯 [ZohoSalesIQ] PREMIÈRE INITIALISATION avec langue:', language)
+      console.log('🎯 [ZohoSalesIQ] PREMIÈRE INITIALISATION - Fixation langue session à:', language)
+      
       isInitializedRef.current = true
-      currentLanguageRef.current = language
+      sessionLanguageRef.current = language
+      
+      console.log('📌 [ZohoSalesIQ] Langue de session fixée:', sessionLanguageRef.current)
+      
+      // ✅ CORRECTION: Stocker dans window pour debug
+      window.ZOHO_SESSION_LANGUAGE = language
+      console.log('🌍 [ZohoSalesIQ] Variable globale stockée:', window.ZOHO_SESSION_LANGUAGE)
+      
       loadZohoWithLanguage(language)
+      
+      return
     }
     
-  }, [language, user?.email, loadZohoWithLanguage, cleanupZoho, clearRetryTimeout])
+    // ✅ IGNORER tous les changements de langue ultérieurs
+    if (isInitializedRef.current && sessionLanguageRef.current) {
+      if (language !== sessionLanguageRef.current) {
+        console.log('🚫 [ZohoSalesIQ] CHANGEMENT DE LANGUE IGNORÉ:', sessionLanguageRef.current, '→', language)
+        console.log('📌 [ZohoSalesIQ] Widget reste en:', sessionLanguageRef.current)
+        console.log('💡 [ZohoSalesIQ] Nouvelle langue sera effective à la prochaine session')
+      } else {
+        console.log('👍 [ZohoSalesIQ] Langue inchangée, widget stable')
+      }
+      
+      return
+    }
+    
+  }, [language, user?.email, loadZohoWithLanguage])
 
-  // Nettoyage à la destruction
+  // Nettoyage à la destruction du composant
   useEffect(() => {
     return () => {
-      console.log('🧹 [ZohoSalesIQ] Destruction composant')
+      console.log('🧹 [ZohoSalesIQ] Destruction composant - nettoyage session')
       clearRetryTimeout()
-      cleanupZoho()
+      
+      // Réinitialiser les refs pour la prochaine session
+      isInitializedRef.current = false
+      sessionLanguageRef.current = null
+      widgetLoadedRef.current = false
+      
+      if (window.ZOHO_SESSION_LANGUAGE) {
+        delete window.ZOHO_SESSION_LANGUAGE
+      }
     }
-  }, [cleanupZoho, clearRetryTimeout])
+  }, [clearRetryTimeout])
 
   return null
 }
@@ -283,5 +251,6 @@ declare global {
         }
       }
     }
+    ZOHO_SESSION_LANGUAGE?: string
   }
 }
