@@ -89,7 +89,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [errors, setErrors] = useState<string[]>([])
   const [successMessage, setSuccessMessage] = useState('')
 
-  // CORRECTION: Calcul de currentUser avec useMemo - DÉCLARÉ EN PREMIER
+  // CORRECTION: Calcul de currentUser avec useMemo - AVEC LANGUE
   const currentUser = useMemo(() => {
     // Essayer plusieurs sources pour les données utilisateur
     if (user?.email) {
@@ -102,10 +102,20 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       if (supabaseAuth) {
         const authData = JSON.parse(supabaseAuth)
         if (authData.user?.email) {
+          // Récupérer la langue depuis plusieurs sources
+          const userLanguage = 
+            authData.user.user_metadata?.language ||
+            authData.user.language ||
+            localStorage.getItem('intelia_language') ||
+            localStorage.getItem('preferred_language') ||
+            (navigator.language.startsWith('en') ? 'en' : 
+             navigator.language.startsWith('es') ? 'es' : 'fr')
+
           return {
             email: authData.user.email,
             name: authData.user.user_metadata?.name || authData.user.name || authData.user.email.split('@')[0],
-            id: authData.user.id
+            id: authData.user.id,
+            language: userLanguage // AJOUT: propriété language
           }
         }
       }
@@ -188,17 +198,18 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       console.log('🚀 [InviteFriendModal] Début envoi invitations:', {
         emails: valid,
         userEmail: currentUser.email,
-        userName: currentUser.name
+        userName: currentUser.name,
+        userLanguage: currentUser.language
       })
       
-      // CORRECTION 5: Utiliser currentUser
+      // CORRECTION 5: Utiliser currentUser avec langue détectée
       const result = await invitationService.sendInvitation(
         valid, 
         personalMessage.trim(), 
         {
           name: currentUser.name || currentUser.email?.split('@')[0] || 'Utilisateur Intelia',
           email: currentUser.email, // CRITIQUE: Email exact de l'utilisateur connecté
-          language: currentUser.language || 'fr'
+          language: currentUser.language || 'fr' // CORRECTION: Langue de l'utilisateur
         }
       )
       
