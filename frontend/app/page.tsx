@@ -259,8 +259,49 @@ export default function LoginPage() {
           localStorage.removeItem('intelia-last-email')
         }
         
-        // Redirection directe
-        router.push('/chat')
+        // 🚨 REDIRECTION MULTIPLE AVEC VÉRIFICATION
+        console.log('🚀 [Minimal] Tentative redirection vers /chat')
+        
+        try {
+          // Essayer d'abord /chat
+          router.push('/chat')
+          
+          // Si ça ne marche pas après 2 secondes, essayer alternatives
+          setTimeout(() => {
+            const currentPath = window.location.pathname
+            console.log('🔍 [Minimal] Path actuel après redirection:', currentPath)
+            
+            if (currentPath === '/' || currentPath === '/auth/login') {
+              console.log('⚠️ [Minimal] Redirection /chat échouée, essai alternatives')
+              
+              // Essayer différentes routes possibles
+              const possibleRoutes = ['/dashboard', '/home', '/app', '/main']
+              let tried = false
+              
+              for (const route of possibleRoutes) {
+                if (!tried) {
+                  console.log(`🔄 [Minimal] Essai redirection vers ${route}`)
+                  router.push(route)
+                  tried = true
+                  break
+                }
+              }
+              
+              // Si toujours rien, afficher un message
+              if (!tried || currentPath === '/') {
+                setLocalSuccess('Connexion réussie ! Redirection en cours...')
+                setTimeout(() => {
+                  setLocalError('Page /chat introuvable. Vérifiez que le fichier existe dans /app/chat/page.tsx')
+                }, 1000)
+              }
+            }
+          }, 2000)
+          
+        } catch (routerError) {
+          console.error('❌ [Minimal] Erreur router:', routerError)
+          setLocalError('Erreur de redirection. Page /chat introuvable.')
+        }
+        
         return
       }
 
@@ -459,7 +500,7 @@ export default function LoginPage() {
 
             <div className="mt-6">
               <Link
-                href="/signup"
+                href="/auth/signup"
                 className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
               >
                 {t.createAccount}
