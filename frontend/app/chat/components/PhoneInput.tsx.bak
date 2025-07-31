@@ -7,7 +7,7 @@ interface PhoneInputProps {
   onChange: (data: { country_code: string; area_code: string; phone_number: string }) => void
 }
 
-// ==================== COMPOSANT PHONE INPUT - CORRIGÉ POUR MICROSOFT EDGE ====================
+// ==================== COMPOSANT PHONE INPUT SIMPLE ET FINAL ====================
 export const PhoneInput: React.FC<PhoneInputProps> = ({
   countryCode,
   areaCode,
@@ -31,26 +31,17 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     })
   }
 
-  // ✅ IDs uniques pour les labels - FIX MICROSOFT EDGE
-  const componentId = `phone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  const countryId = `${componentId}-country`
-  const areaId = `${componentId}-area`
-  const numberId = `${componentId}-number`
-
   return (
     <div className="grid grid-cols-12 gap-3 items-end">
-      {/* ✅ Code pays - AVEC ID ET LABEL ASSOCIÉ */}
+      {/* Code pays */}
       <div className="col-span-4">
-        <label htmlFor={countryId} className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Code pays
         </label>
         <select
-          id={countryId}
-          name="countryCode"
           value={countryCode}
           onChange={(e) => handleChange('country', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white h-10"
-          aria-describedby={`${countryId}-help`}
         >
           <option value="">Sélectionner</option>
           {countryCodes.map(({ code, country }) => (
@@ -59,59 +50,44 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             </option>
           ))}
         </select>
-        <div id={`${countryId}-help`} className="sr-only">
-          Sélectionnez le code pays pour votre numéro de téléphone
-        </div>
       </div>
 
-      {/* ✅ Code régional - AVEC ID ET LABEL ASSOCIÉ */}
+      {/* Code régional */}
       <div className="col-span-3">
-        <label htmlFor={areaId} className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Code régional
         </label>
         <input
           type="text"
-          id={areaId}
-          name="areaCode"
           value={areaCode}
           onChange={(e) => handleChange('area', e.target.value.replace(/\D/g, ''))}
           placeholder="Code"
           disabled={!countryCode}
           maxLength={4}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-500 h-10"
-          aria-describedby={`${areaId}-help`}
         />
-        <div id={`${areaId}-help`} className="sr-only">
-          Code régional de votre région (optionnel)
-        </div>
       </div>
 
-      {/* ✅ Numéro principal - AVEC ID ET LABEL ASSOCIÉ */}
+      {/* Numéro principal */}
       <div className="col-span-5">
-        <label htmlFor={numberId} className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Numéro de téléphone
         </label>
         <input
           type="tel"
-          id={numberId}
-          name="phoneNumber"
           value={phoneNumber}
           onChange={(e) => handleChange('number', e.target.value.replace(/\D/g, ''))}
           placeholder="Numéro principal"
           disabled={!countryCode}
           maxLength={10}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-500 h-10"
-          aria-describedby={`${numberId}-help`}
         />
-        <div id={`${numberId}-help`} className="sr-only">
-          Votre numéro de téléphone principal
-        </div>
       </div>
     </div>
   )
 }
 
-// Hook simple - INCHANGÉ
+// Hook simple
 export const usePhoneValidation = () => {
   const validatePhoneFields = (countryCode: string, areaCode: string, phoneNumber: string) => {
     const hasAnyField = countryCode || areaCode || phoneNumber
