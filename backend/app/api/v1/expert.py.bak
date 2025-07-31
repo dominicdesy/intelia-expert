@@ -1,7 +1,7 @@
 """
-app/api/v1/expert.py - VERSION COMPLÈTE AVEC SYSTÈME DE CLARIFICATION
-CORRECTIONS: save_conversation et update_feedback
-NOUVEAU: Système de clarification intelligent intégré
+app/api/v1/expert.py - VERSION COMPLÈTE AVEC SYSTÈME DE CLARIFICATION + CONVERSATION_ID
+CORRECTIONS: Ajout support conversation_id pour continuité des conversations
+NOUVEAU: Support user_id dans les requêtes + gestion conversation_id
 CONSERVATION: Toutes les autres fonctionnalités existantes
 """
 import os
@@ -98,14 +98,18 @@ except ImportError:
 security = HTTPBearer()
 
 # =============================================================================
-# MODÈLES PYDANTIC
+# MODÈLES PYDANTIC - CORRIGÉS AVEC CONVERSATION_ID + USER_ID
 # =============================================================================
 
 class QuestionRequest(BaseModel):
-    """Request model simplifié et robuste"""
+    """Request model avec support conversation_id et user_id"""
     text: str = Field(..., min_length=1, max_length=5000, description="Question text")
     language: Optional[str] = Field("fr", description="Response language (fr, en, es)")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode (fast, balanced, quality)")
+    
+    # ✅ NOUVEAUX CHAMPS CRITIQUES
+    conversation_id: Optional[str] = Field(None, description="Optional conversation ID to continue existing conversation")
+    user_id: Optional[str] = Field(None, description="User ID for conversation tracking")
 
     model_config = ConfigDict(
         str_strip_whitespace=True,
@@ -410,7 +414,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE + CLARIFICATION INTÉGRÉE
+# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE + CLARIFICATION + CONVERSATION_ID
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
@@ -419,18 +423,17 @@ async def ask_expert_secure(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification + validation agricole + clarification intelligente"""
+    """Question avec authentification + validation agricole + clarification + conversation_id"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🔐 DÉBUT ask_expert_secure avec validation agricole + clarification")
+        logger.info("🔐 DÉBUT ask_expert_secure avec support conversation_id")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
+        logger.info(f"🆔 Conversation ID fourni: {request_data.conversation_id}")
+        logger.info(f"👤 User ID fourni: {request_data.user_id}")
         logger.info(f"🌐 Langue: {request_data.language}")
         logger.info(f"⚡ Mode: {request_data.speed_mode}")
-        logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
-        logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
-        logger.info(f"❓ CLARIFICATION_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABLE}")
         
         # Vérification auth
         if not AUTH_AVAILABLE:
@@ -442,7 +445,7 @@ async def ask_expert_secure(
             raise HTTPException(status_code=503, detail="Service d'authentification non disponible")
         
         # L'utilisateur est authentifié
-        user_id = current_user.get("user_id")
+        user_id = current_user.get("user_id") or request_data.user_id
         user_email = current_user.get("email")
         request_ip = request.client.host if request.client else "unknown"
         
@@ -458,8 +461,15 @@ async def ask_expert_secure(
             logger.error("❌ Question vide après nettoyage")
             raise HTTPException(status_code=400, detail="Question text is required")
         
-        conversation_id = str(uuid.uuid4())
-        logger.info(f"🆔 Conversation ID: {conversation_id}")
+        # ✅ CORRECTION CRITIQUE: Gestion du conversation_id
+        if request_data.conversation_id and request_data.conversation_id.strip():
+            # RÉUTILISER l'ID existant fourni par le client
+            conversation_id = request_data.conversation_id.strip()
+            logger.info(f"🔄 [conversation_id] CONTINUATION conversation: {conversation_id}")
+        else:
+            # CRÉER un nouveau conversation_id seulement si pas fourni
+            conversation_id = str(uuid.uuid4())
+            logger.info(f"🆕 [conversation_id] NOUVELLE conversation: {conversation_id}")
         
         # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
         logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole...")
@@ -585,7 +595,8 @@ async def ask_expert_secure(
                     question=question_text,
                     user=current_user,
                     language=request_data.language,
-                    speed_mode=request_data.speed_mode
+                    speed_mode=request_data.speed_mode,
+                    conversation_id=conversation_id
                 )
                 
                 answer = str(result.get("response", ""))
@@ -615,7 +626,7 @@ async def ask_expert_secure(
         response_time_ms = int((time.time() - start_time) * 1000)
         logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
         
-        # Sauvegarde automatique
+        # Sauvegarde automatique avec le conversation_id approprié
         logged = await save_conversation_auto(
             conversation_id=conversation_id,
             question=question_text,
@@ -629,11 +640,11 @@ async def ask_expert_secure(
         
         logger.info(f"💾 Sauvegarde: {'✅ Réussie' if logged else '❌ Échouée'}")
         
-        # Retourner la réponse
+        # Retourner la réponse avec le MÊME conversation_id
         response_obj = ExpertResponse(
             question=str(question_text),
             response=str(answer),
-            conversation_id=conversation_id,
+            conversation_id=conversation_id,  # ✅ MÊME ID que reçu ou nouveau
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
@@ -646,7 +657,7 @@ async def ask_expert_secure(
             validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_secure - Succès avec validation + clarification")
+        logger.info(f"✅ FIN ask_expert_secure - conversation_id retourné: {conversation_id}")
         logger.info("=" * 60)
         
         return response_obj
@@ -662,7 +673,7 @@ async def ask_expert_secure(
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE + CLARIFICATION INTÉGRÉE
+# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE + CLARIFICATION + CONVERSATION_ID
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
@@ -670,17 +681,16 @@ async def ask_expert_public(
     request_data: QuestionRequest,
     request: Request
 ):
-    """Question publique avec validation agricole + clarification intelligente"""
+    """Question publique avec validation agricole + clarification + conversation_id"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🌐 DÉBUT ask_expert_public avec validation agricole + clarification")
+        logger.info("🌐 DÉBUT ask_expert_public avec support conversation_id")
         logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
+        logger.info(f"🆔 Conversation ID fourni: {request_data.conversation_id}")
+        logger.info(f"👤 User ID fourni: {request_data.user_id}")
         logger.info(f"🌐 Langue: {request_data.language}")
-        logger.info(f"⚡ Mode: {request_data.speed_mode}")
-        logger.info(f"🌾 VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
-        logger.info(f"❓ CLARIFICATION_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABLE}")
         
         # Validation de la question
         question_text = request_data.text.strip()
@@ -689,11 +699,20 @@ async def ask_expert_public(
             logger.error("❌ Question vide après nettoyage")
             raise HTTPException(status_code=400, detail="Question text is required")
         
-        conversation_id = str(uuid.uuid4())
-        user_id = get_user_id_from_request(request)
+        # ✅ CORRECTION CRITIQUE: Gestion du conversation_id
+        if request_data.conversation_id and request_data.conversation_id.strip():
+            # RÉUTILISER l'ID existant fourni par le client
+            conversation_id = request_data.conversation_id.strip()
+            logger.info(f"🔄 [conversation_id] CONTINUATION conversation publique: {conversation_id}")
+        else:
+            # CRÉER un nouveau conversation_id seulement si pas fourni
+            conversation_id = str(uuid.uuid4())
+            logger.info(f"🆕 [conversation_id] NOUVELLE conversation publique: {conversation_id}")
+        
+        # User ID depuis requête ou généré
+        user_id = request_data.user_id or get_user_id_from_request(request)
         request_ip = request.client.host if request.client else "unknown"
         
-        logger.info(f"🆔 Conversation ID: {conversation_id}")
         logger.info(f"👤 User ID: {user_id}")
         
         # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
@@ -820,7 +839,8 @@ async def ask_expert_public(
                     question=question_text,
                     user=user,
                     language=request_data.language,
-                    speed_mode=request_data.speed_mode
+                    speed_mode=request_data.speed_mode,
+                    conversation_id=conversation_id
                 )
                 
                 answer = str(result.get("response", ""))
@@ -866,7 +886,7 @@ async def ask_expert_public(
         response_obj = ExpertResponse(
             question=str(question_text),
             response=str(answer),
-            conversation_id=conversation_id,
+            conversation_id=conversation_id,  # ✅ MÊME ID que reçu ou nouveau
             rag_used=rag_used,
             rag_score=rag_score,
             timestamp=datetime.now().isoformat(),
@@ -879,7 +899,7 @@ async def ask_expert_public(
             validation_confidence=validation_confidence
         )
         
-        logger.info("✅ FIN ask_expert_public - Succès avec validation + clarification")
+        logger.info(f"✅ FIN ask_expert_public - conversation_id retourné: {conversation_id}")
         logger.info("=" * 60)
         
         return response_obj
@@ -1330,6 +1350,8 @@ async def debug_system_info():
         "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else None,
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
+        "conversation_id_support": "✅ Activé dans cette version",
+        "user_id_support": "✅ Activé dans cette version",
         "current_directory": os.path.dirname(__file__),
         "python_path_sample": sys.path[:3],
         "import_tests": import_tests,
@@ -1353,6 +1375,8 @@ async def debug_auth_info(request: Request):
         "auth_header_preview": auth_header[:50] + "..." if auth_header else None,
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
+        "conversation_id_support": "✅ Activé",
+        "user_id_support": "✅ Activé",
         "timestamp": datetime.now().isoformat()
     }
 
@@ -1459,7 +1483,7 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ EXPERT.PY COMPLET AVEC SYSTÈME DE CLARIFICATION INTÉGRÉ")
+logger.info("✅ EXPERT.PY COMPLET AVEC CONVERSATION_ID + USER_ID SUPPORT")
 logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
 logger.info(f"🌾 AGRICULTURAL_VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
 logger.info(f"🌾 VALIDATION_ENABLED: {is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else 'N/A'}")
@@ -1467,4 +1491,17 @@ logger.info(f"❓ CLARIFICATION_SYSTEM_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABL
 logger.info(f"❓ CLARIFICATION_ENABLED: {is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else 'N/A'}")
 logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
 logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
-logger.info("🔧 NOUVELLES FONCTIONNALITÉS: Clarification intelligente intégrée + Validation + Logging")
+logger.info("🔧 NOUVELLES FONCTIONNALITÉS: conversation_id + user_id + continuité conversations")
+logger.info("🔧 ENDPOINTS DISPONIBLES:")
+logger.info("   - POST /ask (authentifié) + conversation_id")
+logger.info("   - POST /ask-public (public) + conversation_id") 
+logger.info("   - POST /feedback (amélioration avec conversation_id)")
+logger.info("   - GET /topics (suggestions sujets)")
+logger.info("   - GET /validation-stats (stats validateur)")
+logger.info("   - POST /test-clarification (test clarifications)")
+logger.info("   - GET /clarification-status (status clarifications)")
+logger.info("   - POST /test-validation (test validation)")
+logger.info("   - GET /debug-database (debug base données)")
+logger.info("   - GET /debug-system (diagnostic complet)")
+logger.info("   - GET /debug-auth (diagnostic auth)")
+logger.info("   - POST /test-utf8 (test encodage UTF-8)")
