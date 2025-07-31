@@ -1,4 +1,4 @@
-// ==================== API SERVICE AVEC AUTHENTIFICATION + CONVERSATION_ID ====================
+// ==================== API SERVICE AVEC AUTHENTIFICATION + CONVERSATION_ID + SAUVEGARDE ====================
 
 // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
 const getApiConfig = () => {
@@ -136,7 +136,7 @@ interface APIError {
 }
 
 /**
- * Génère une réponse IA via l'API Expert avec support conversation_id
+ * Génère une réponse IA via l'API Expert avec support conversation_id + SAUVEGARDE AUTOMATIQUE
  */
 export const generateAIResponse = async (
   question: string,
@@ -210,6 +210,35 @@ export const generateAIResponse = async (
       response_length: data.response?.length || 0
     })
 
+    // 🎯 CORRECTION CRITIQUE: SAUVEGARDER LA CONVERSATION AUTOMATIQUEMENT
+    try {
+      console.log('💾 [apiService] Sauvegarde conversation en cours...')
+      
+      const saveResponse = await fetch(`${API_BASE_URL}/conversation`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          conversation_id: data.conversation_id,
+          user_id: user.id,
+          question: question.trim(),
+          response: data.response,
+          language: language
+        })
+      })
+
+      if (saveResponse.ok) {
+        const saveData = await saveResponse.json()
+        console.log('✅ [apiService] Conversation sauvegardée:', saveData.record_id)
+      } else {
+        const saveError = await saveResponse.text()
+        console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
+        // Ne pas faire échouer la requête principale si la sauvegarde échoue
+      }
+    } catch (saveError) {
+      console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
+      // Ne pas faire échouer la requête principale si la sauvegarde échoue
+    }
+
     return data
 
   } catch (error) {
@@ -269,6 +298,52 @@ export const sendFeedback = async (
 
   } catch (error) {
     console.error('❌ [apiService] Erreur feedback:', error)
+    throw error
+  }
+}
+
+/**
+ * ✅ NOUVELLE FONCTION: Chargement conversations avec URL CORRIGÉE
+ */
+export const loadUserConversations = async (userId: string): Promise<any> => {
+  if (!userId) {
+    throw new Error('User ID requis')
+  }
+
+  console.log('📂 [apiService] Chargement conversations pour:', userId)
+
+  try {
+    const headers = getAuthHeaders()
+
+    // ✅ CORRECTION CRITIQUE: Utiliser la bonne URL depuis la documentation
+    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
+      method: 'GET',
+      headers
+    })
+
+    console.log('📡 [apiService] Conversations statut:', response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [apiService] Erreur conversations:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
+      }
+      
+      throw new Error(`Erreur chargement conversations: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ [apiService] Conversations chargées:', {
+      count: data.count,
+      conversations: data.conversations?.length || 0
+    })
+
+    return data
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur chargement conversations:', error)
     throw error
   }
 }
@@ -435,6 +510,20 @@ export const debugConversationFlow = (
     timestamp: new Date().toISOString(),
     ...additionalInfo
   })
+}
+
+/**
+ * ✅ FONCTION UTILITAIRE: Debug configuration API
+ */
+export const debugAPIConfiguration = () => {
+  console.group('🔧 [apiService] Configuration API')
+  console.log('API_BASE_URL:', API_BASE_URL)
+  console.log('Expected endpoints:')
+  console.log('- Load conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
+  console.log('- Save conversation:', `${API_BASE_URL}/conversation`)
+  console.log('- Ask enhanced:', `${API_BASE_URL}/expert-enhanced/ask-enhanced`)
+  console.log('- Send feedback:', `${API_BASE_URL}/expert/feedback`)
+  console.groupEnd()
 }
 
 // Export par défaut de la fonction principale
