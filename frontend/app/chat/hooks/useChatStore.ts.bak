@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { ConversationItem, Conversation, ConversationWithMessages, ConversationGroup, Message } from '../types'
 import { conversationService } from '../services/conversationService'
-import { loadUserConversations } from '../services/apiService' // ✅ AJOUT: Import de la nouvelle fonction
 
 // ==================== INTERFACE DU STORE ====================
 interface ChatStoreState {
@@ -73,7 +72,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   isLoadingHistory: false,
   isLoadingConversation: false,
 
-  // ==================== MÉTHODE CORRIGÉE loadConversations ====================
+  // ==================== ACTIONS EXISTANTES ====================
   
   loadConversations: async (userId: string) => {
     if (!userId) {
@@ -85,11 +84,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     
     try {
       console.log('📡 [ChatStore] Chargement conversations pour:', userId)
+      const userConversations = await conversationService.getUserConversations(userId, 100)
       
-      // ✅ CORRECTION CRITIQUE: Utiliser la nouvelle fonction avec URL corrigée
-      const conversationsData = await loadUserConversations(userId)
-      
-      if (!conversationsData || !conversationsData.conversations || conversationsData.conversations.length === 0) {
+      if (!userConversations || userConversations.length === 0) {
         console.log('📭 [ChatStore] Aucune conversation trouvée')
         set({ 
           conversations: [], 
@@ -100,7 +97,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         return
       }
       
-      const userConversations = conversationsData.conversations
       console.log('✅ [ChatStore] Conversations récupérées:', userConversations.length)
       
       const formattedConversations: ConversationItem[] = userConversations.map(conv => {

@@ -24,7 +24,7 @@ router = APIRouter(tags=["expert-enhanced"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# IMPORT SYSTÈME DE CLARIFICATION AMÉLIORÉ
+# IMPORT SYSTÈME DE CLARIFICATION AMÉLIORÉ - CORRIGÉ
 # =============================================================================
 
 try:
@@ -45,7 +45,7 @@ except ImportError as e:
     logger.warning(f"⚠️ [Expert Enhanced] Clarification améliorée non disponible: {e}")
 
 # =============================================================================
-# IMPORT MÉMOIRE CONVERSATIONNELLE INTELLIGENTE
+# IMPORT MÉMOIRE CONVERSATIONNELLE INTELLIGENTE - CORRIGÉ
 # =============================================================================
 
 try:
