@@ -1,117 +1,142 @@
-```python
+"""
+
+API v1 - Intelia Expert
+Module d'initialisation pour les endpoints de l'API v1
+
+Expert System - Architecture Modulaire
+
+Vue d'ensemble:
+Le système expert a été refactorisé pour être modulaire, maintenable et extensible,
+tout en conservant une compatibilité 100% avec le frontend existant.
+
+Structure des Fichiers:
+- expert.py                      : FICHIER PRINCIPAL (nom conservé)
+- expert_models.py              : Modèles Pydantic
+- expert_services.py            : Logique métier
+- expert_utils.py               : Fonctions utilitaires
+- expert_integrations.py        : Gestionnaire intégrations
+- expert_debug.py               : Endpoints de debugging
+- __init__.py                   : Imports simplifiés (ce fichier)
+
+Avantages de la Refactorisation:
+✅ Maintenabilité - Séparation des préoccupations
+✅ Compatibilité - Mêmes endpoints et imports
+✅ Extensibilité - Ajout facile de nouvelles fonctionnalités
+
+"""
+
 # Le frontend continue à utiliser les mêmes imports
-from app.api.v1.expert import router  # ✅ Fonctionne toujours
-from app.api.v1 import expert_router   # ✅ Fonctionne toujours
+# from app.api.v1.expert import router  ✅ Fonctionne toujours
+# from app.api.v1 import expert_router   ✅ Fonctionne toujours
 
-# Les endpoints restent identiques
-POST /api/v1/expert/ask  # 🏗️ Expert System - Architecture Modulaire
+# Les endpoints restent identiques:
+# POST /api/v1/expert/ask
+# POST /api/v1/expert/ask-public
+# POST /api/v1/expert/ask-enhanced
+# POST /api/v1/expert/ask-enhanced-public
+# POST /api/v1/expert/feedback
+# GET /api/v1/expert/topics
 
-## 📋 Vue d'ensemble
+# Import du routeur principal expert
+try:
+    from .expert import router as expert_router
+    from .expert import router  # Pour compatibilité with "from .expert import router"
+except ImportError as e:
+    print(f"Warning: Could not import expert router: {e}")
+    expert_router = None
+    router = None
 
-Le système expert a été refactorisé pour être **modulaire**, **maintenable** et **extensible**, tout en conservant une **compatibilité 100%** avec le frontend existant.
+# Imports optionnels des autres modules
+try:
+    from .auth import router as auth_router
+except ImportError:
+    auth_router = None
 
-## 🗂️ Structure des Fichiers
+try:
+    from .admin import router as admin_router
+except ImportError:
+    admin_router = None
 
-```
-app/api/v1/
-├── expert.py                      # 🎯 FICHIER PRINCIPAL (nom conservé)
-├── expert_models.py               # 📝 Modèles Pydantic
-├── expert_services.py             # 🔧 Logique métier
-├── expert_utils.py                # 🛠️ Fonctions utilitaires
-├── expert_integrations.py         # 🔌 Gestionnaire intégrations
-├── expert_debug.py                # 🐛 Endpoints de debugging
-├── __init__.py                    # 📦 Imports simplifiés
-└── README_EXPERT_MODULAR.md       # 📚 Cette documentation
-```
+try:
+    from .logging import router as logging_router
+except ImportError:
+    logging_router = None
 
-## 🎯 Avantages de la Refactorisation
+# Import des modules expert refactorisés (optionnels)
+try:
+    from .expert_models import *
+except ImportError:
+    pass
 
-### ✅ **Maintenabilité**
-- **Séparation des préoccupations** : Chaque fichier a une responsabilité claire
-- **Code plus court** : ~200 lignes par fichier vs 1000+ lignes originales
-- **Navigation facile** : Trouver rapidement le code à modifier
-- **Tests simplifiés** : Tester chaque module indépendamment
+try:
+    from .expert_services import ExpertService
+except ImportError:
+    ExpertService = None
 
-### ✅ **Compatibilité**
-- **Nom original conservé** : `expert.py` reste le point d'entrée
-- **Mêmes endpoints** : Aucun changement pour le frontend
-- **Mêmes imports** : `from .expert import router` fonctionne toujours
-- **Mêmes réponses** : Format de réponse identique
+try:
+    from .expert_utils import *
+except ImportError:
+    pass
 
-### ✅ **Extensibilité**
-- **Ajout facile** : Nouvelles fonctionnalités dans des modules dédiés
-- **Intégrations isolées** : Nouveau module = nouvelle intégration
-- **Configuration centralisée** : `IntegrationsManager` pour tout gérer
+try:
+    from .expert_integrations import IntegrationsManager
+except ImportError:
+    IntegrationsManager = None
 
-## 📁 Détail des Modules
+try:
+    from .expert_debug import router as debug_router
+except ImportError:
+    debug_router = None
 
-### 🎯 `expert.py` - Point d'Entrée Principal
-**Responsabilité** : Endpoints principaux du système expert
-```python
-# Endpoints principaux (compatibilité 100%)
-POST /ask-enhanced          # Version améliorée authentifiée
-POST /ask-enhanced-public    # Version améliorée publique  
-POST /ask                   # Compatible original (redirige)
-POST /ask-public            # Compatible original (redirige)
-POST /feedback              # Feedback amélioré
-GET /topics                 # Topics enrichis
-```
+# Liste des modules/routeurs disponibles pour debugging
+available_modules = {
+    "expert_router": expert_router is not None,
+    "auth_router": auth_router is not None,
+    "admin_router": admin_router is not None,
+    "logging_router": logging_router is not None,
+    "debug_router": debug_router is not None,
+    "expert_service": ExpertService is not None,
+    "integrations_manager": IntegrationsManager is not None,
+}
 
-### 📝 `expert_models.py` - Modèles de Données
-**Responsabilité** : Tous les modèles Pydantic
-```python
-# Modèles principaux
-- EnhancedQuestionRequest   # Requête avec contexte intelligent
-- EnhancedExpertResponse    # Réponse avec métriques avancées
-- FeedbackRequest          # Feedback utilisateur
-- ValidationResult         # Résultat validation
-- SystemStats             # Statistiques système
-```
+# Routeurs actifs
+active_routers = []
+if expert_router:
+    active_routers.append(("expert", expert_router))
+if auth_router:
+    active_routers.append(("auth", auth_router))
+if admin_router:
+    active_routers.append(("admin", admin_router))
+if logging_router:
+    active_routers.append(("logging", logging_router))
+if debug_router:
+    active_routers.append(("debug", debug_router))
 
-### 🔧 `expert_services.py` - Logique Métier
-**Responsabilité** : Orchestration et logique business
-```python
-class ExpertService:
-    async def process_expert_question()     # Traitement principal
-    async def process_feedback()            # Gestion feedback
-    async def get_suggested_topics()        # Topics enrichis
-```
+# Export public - maintient la compatibilité
+__all__ = [
+    # Routeurs principaux
+    "expert_router",
+    "router",  # Alias pour expert_router
+    "auth_router", 
+    "admin_router",
+    "logging_router",
+    "debug_router",
+    
+    # Services
+    "ExpertService",
+    "IntegrationsManager",
+    
+    # Informations système
+    "available_modules",
+    "active_routers"
+]
 
-### 🛠️ `expert_utils.py` - Fonctions Utilitaires
-**Responsabilité** : Fonctions réutilisables et helpers
-```python
-# Fonctions principales
-- get_user_id_from_request()               # Extraction user ID
-- process_question_with_enhanced_prompt()  # Traitement OpenAI
-- build_enriched_question_from_clarification() # Construction questions
-- get_enhanced_topics_by_language()        # Topics par langue
-- save_conversation_auto_enhanced()        # Sauvegarde compatible
-```
-
-### 🔌 `expert_integrations.py` - Gestionnaire Intégrations
-**Responsabilité** : Interface avec tous les modules externes
-```python
-class IntegrationsManager:
-    # Gère les intégrations avec :
-    - question_clarification_system_enhanced  # Clarification IA
-    - conversation_memory_enhanced            # Mémoire intelligente
-    - agricultural_domain_validator           # Validation agricole
-    - auth                                   # Authentification
-    - logging                               # Sauvegarde conversations
-```
-
-### 🐛 `expert_debug.py` - Endpoints de Debugging
-**Responsabilité** : Diagnostic et tests système
-```python
-# Endpoints de diagnostic
-GET /enhanced-stats              # Statistiques système
-GET /validation-stats           # Stats validateur
-POST /test-enhanced-flow        # Test complet
-GET /debug-system              # Diagnostic système
-GET /debug-database            # Debug base données
-```
-
-## 🚀 Migration et Utilisation
-
-### ✅ **Aucune Modification Requise**
-Le frontend continue à fonctionner **exactement comme avant** :
+# Message de debug au démarrage (optionnel)
+def get_module_status():
+    """Retourne le statut des modules chargés"""
+    return {
+        "loaded_modules": sum(available_modules.values()),
+        "total_modules": len(available_modules),
+        "details": available_modules,
+        "active_routers_count": len(active_routers)
+    }
