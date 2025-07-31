@@ -1,5 +1,3 @@
-// Login
-
 'use client'
 
 import React, { useState, useEffect } from 'react'
@@ -261,48 +259,21 @@ export default function LoginPage() {
           localStorage.removeItem('intelia-last-email')
         }
         
-        // 🚨 REDIRECTION MULTIPLE AVEC VÉRIFICATION
-        console.log('🚀 [Minimal] Tentative redirection vers /chat')
+        // 🚨 REDIRECTION SIMPLE ET SÉCURISÉE
+        setLocalSuccess('Connexion réussie ! Redirection...')
         
-        try {
-          // Essayer d'abord /chat
-          router.push('/chat')
+        // Attendre un peu avant redirection pour éviter les conflits
+        setTimeout(() => {
+          console.log('🚀 [Minimal] Redirection vers /chat')
           
-          // Si ça ne marche pas après 2 secondes, essayer alternatives
-          setTimeout(() => {
-            const currentPath = window.location.pathname
-            console.log('🔍 [Minimal] Path actuel après redirection:', currentPath)
-            
-            if (currentPath === '/' || currentPath === '/auth/login') {
-              console.log('⚠️ [Minimal] Redirection /chat échouée, essai alternatives')
-              
-              // Essayer différentes routes possibles
-              const possibleRoutes = ['/dashboard', '/home', '/app', '/main']
-              let tried = false
-              
-              for (const route of possibleRoutes) {
-                if (!tried) {
-                  console.log(`🔄 [Minimal] Essai redirection vers ${route}`)
-                  router.push(route)
-                  tried = true
-                  break
-                }
-              }
-              
-              // Si toujours rien, afficher un message
-              if (!tried || currentPath === '/') {
-                setLocalSuccess('Connexion réussie ! Redirection en cours...')
-                setTimeout(() => {
-                  setLocalError('Page /chat introuvable. Vérifiez que le fichier existe dans /app/chat/page.tsx')
-                }, 1000)
-              }
-            }
-          }, 2000)
-          
-        } catch (routerError) {
-          console.error('❌ [Minimal] Erreur router:', routerError)
-          setLocalError('Erreur de redirection. Page /chat introuvable.')
-        }
+          try {
+            // UNE SEULE redirection, pas de setTimeout multiples
+            window.location.href = '/chat'
+          } catch (error) {
+            console.error('❌ [Minimal] Erreur redirection:', error)
+            setLocalError('Erreur de redirection. Essayez de naviguer manuellement vers /chat')
+          }
+        }, 1000)
         
         return
       }
