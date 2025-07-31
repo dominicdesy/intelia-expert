@@ -1,4 +1,4 @@
-// lib/stores/auth.ts - Store d'authentification complet avec initializeSession
+// lib/stores/auth.ts - Store d'authentification CORRIGÉ pour éviter l'erreur de déconnexion
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { User, RGPDConsent } from '@/types'
@@ -25,6 +25,9 @@ interface AuthState {
   deleteUserData: () => Promise<void>
   exportUserData: () => Promise<any>
   updateConsent: (consent: RGPDConsent) => Promise<void>
+  
+  // Action de nettoyage
+  clearAuth: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -36,12 +39,22 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       hasHydrated: false,
 
+      // Nettoyage complet de l'authentification
+      clearAuth: () => {
+        console.log('🧹 [Auth] Nettoyage complet de l\'authentification')
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false
+        })
+      },
+
       // Marquer l'hydratation comme terminée
       setHasHydrated: (hasHydrated: boolean) => {
         set({ hasHydrated })
       },
 
-      // 🔄 INITIALISATION SESSION (fonction manquante ajoutée)
+      // 🔄 INITIALISATION SESSION
       initializeSession: async (): Promise<boolean> => {
         try {
           console.log('🔄 Initialisation session...')
@@ -241,40 +254,102 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🚪 DÉCONNEXION
+      // 🚪 DÉCONNEXION CORRIGÉE - Solution principale pour éviter l'erreur "Application error"
       logout: async () => {
+        console.log('🚪 [Auth] Début déconnexion sécurisée')
+        
+        // Éviter les appels multiples
+        const { isLoading } = get()
+        if (isLoading) {
+          console.log('⚠️ [Auth] Déconnexion déjà en cours, ignorée')
+          return
+        }
+
+        set({ isLoading: true })
+
         try {
-          console.log('🚪 Déconnexion...')
+          // 1. Nettoyer l'état local IMMÉDIATEMENT
+          console.log('🧹 [Auth] Nettoyage état local prioritaire')
+          get().clearAuth()
           
-          const result = await auth.signOut()
-          
-          if (!result.success) {
-            console.error('❌ Erreur déconnexion Supabase:', result.error)
+          // 2. Nettoyer localStorage
+          try {
+            localStorage.removeItem('intelia-remember-me')
+            localStorage.removeItem('intelia-last-email')
+            localStorage.removeItem('supabase.auth.token')
+            localStorage.removeItem('intelia-auth-storage')
+            
+            // Nettoyer toutes les clés Supabase
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('sb-') || key.includes('supabase')) {
+                localStorage.removeItem(key)
+              }
+            })
+          } catch (localStorageError) {
+            console.warn('⚠️ [Auth] Erreur nettoyage localStorage:', localStorageError)
           }
 
-          set({ 
-            user: null, 
-            isAuthenticated: false 
+          // 3. Appels de déconnexion avec gestion d'erreur robuste
+          try {
+            // Votre méthode auth.signOut()
+            console.log('🔄 [Auth] Appel auth.signOut()')
+            const result = await auth.signOut()
+            
+            if (!result.success) {
+              console.warn('⚠️ [Auth] Erreur auth.signOut (non bloquante):', result.error)
+            } else {
+              console.log('✅ [Auth] auth.signOut() réussi')
+            }
+          } catch (authError) {
+            console.warn('⚠️ [Auth] Erreur auth.signOut (non bloquante):', authError)
+          }
+
+          try {
+            // Supabase direct en backup
+            console.log('🔄 [Auth] Appel supabase.auth.signOut()')
+            const { error } = await supabase.auth.signOut({
+              scope: 'local' // Déconnexion locale uniquement
+            })
+            
+            if (error) {
+              console.warn('⚠️ [Auth] Erreur Supabase logout (non bloquante):', error.message)
+            } else {
+              console.log('✅ [Auth] Supabase logout réussi')
+            }
+          } catch (supabaseError) {
+            console.warn('⚠️ [Auth] Erreur Supabase logout (non bloquante):', supabaseError)
+          }
+
+          // 4. S'assurer que l'état est bien nettoyé
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
           })
 
+          // 5. Toast de succès
           toast.success('Déconnexion réussie', {
             icon: '👋',
             duration: 2000
           })
-          console.log('✅ Déconnexion terminée')
+          
+          console.log('✅ [Auth] Déconnexion complète réussie')
 
         } catch (error: any) {
-          console.error('❌ Erreur déconnexion:', error)
+          console.error('❌ [Auth] Erreur critique during logout:', error)
           
-          set({ 
-            user: null, 
-            isAuthenticated: false 
-          })
+          // Même en cas d'erreur, forcer le nettoyage complet
+          get().clearAuth()
+          set({ isLoading: false })
           
+          // Toast d'erreur mais on continue
           toast.error('Erreur de déconnexion, mais vous êtes déconnecté localement', {
             icon: '⚠️',
             duration: 3000
           })
+          
+          // ❌ NE PAS THROW - C'est ça qui causait l'Application error !
+          console.log('🔧 [Auth] Déconnexion forcée malgré erreur - pas de throw')
         }
       },
 
@@ -490,3 +565,40 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+// 🔄 Listener pour les changements d'auth Supabase
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('🔔 [Auth] État changé:', event)
+    
+    const store = useAuthStore.getState()
+    
+    if (event === 'SIGNED_OUT') {
+      console.log('🚪 [Auth] Événement SIGNED_OUT détecté')
+      store.clearAuth()
+    } else if (event === 'SIGNED_IN' && session) {
+      console.log('🔑 [Auth] Événement SIGNED_IN détecté')
+      const user: User = {
+        id: session.user.id,
+        email: session.user.email!,
+        name: session.user.user_metadata?.name || session.user.email!.split('@')[0],
+        user_type: session.user.user_metadata?.user_type || 'producer',
+        language: session.user.user_metadata?.language || 'fr',
+        avatar_url: session.user.user_metadata?.avatar_url || undefined,
+        created_at: session.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        consent_given: true,
+        consent_date: new Date().toISOString()
+      }
+      
+      useAuthStore.setState({
+        user: user,
+        isAuthenticated: true,
+        isLoading: false
+      })
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      console.log('🔄 [Auth] Token rafraîchi')
+      // Pas besoin de mettre à jour l'utilisateur pour un refresh
+    }
+  })
+}
