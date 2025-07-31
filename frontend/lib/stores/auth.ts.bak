@@ -89,7 +89,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔐 CONNEXION
+      // 🔐 CONNEXION ORIGINALE (Supabase direct)
       login: async (email: string, password: string) => {
         try {
           set({ isLoading: true })
