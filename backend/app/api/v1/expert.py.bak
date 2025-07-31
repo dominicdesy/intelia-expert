@@ -1,8 +1,8 @@
 """
-app/api/v1/expert.py - VERSION COMPLÈTE AVEC SYSTÈME DE CLARIFICATION + CONVERSATION_ID
-CORRECTIONS: Ajout support conversation_id pour continuité des conversations
-NOUVEAU: Support user_id dans les requêtes + gestion conversation_id
-CONSERVATION: Toutes les autres fonctionnalités existantes
+app/api/v1/expert.py - VERSION COMPLÈTE AVEC SYSTÈME DE MÉMOIRE CONVERSATIONNELLE
+NOUVEAU: Intégration système de mémoire conversationnelle pour continuité contextuelle
+CORRECTIONS: Support conversation_id pour mémoire + validation/clarification avec contexte
+CONSERVATION: Toutes les autres fonctionnalités existantes (auth, validation, clarification, RAG)
 """
 import os
 import logging
@@ -59,6 +59,28 @@ except ImportError as e:
 except Exception as e:
     CLARIFICATION_SYSTEM_AVAILABLE = False
     logger.error(f"❌ [Expert] Erreur inattendue import clarification: {e}")
+
+# =============================================================================
+# IMPORT SYSTÈME DE MÉMOIRE CONVERSATIONNELLE - NOUVEAU
+# =============================================================================
+
+try:
+    from app.api.v1.conversation_memory import (
+        add_message_to_conversation,
+        get_conversation_context,
+        get_context_for_clarification,
+        get_context_for_rag,
+        get_conversation_memory_stats,
+        cleanup_expired_conversations
+    )
+    CONVERSATION_MEMORY_AVAILABLE = True
+    logger.info("✅ [Expert] Système de mémoire conversationnelle importé avec succès")
+except ImportError as e:
+    CONVERSATION_MEMORY_AVAILABLE = False
+    logger.warning(f"⚠️ [Expert] Système de mémoire non disponible: {e}")
+except Exception as e:
+    CONVERSATION_MEMORY_AVAILABLE = False
+    logger.error(f"❌ [Expert] Erreur inattendue import mémoire: {e}")
 
 # =============================================================================
 # IMPORT AUTH
@@ -267,17 +289,18 @@ def get_user_id_from_request(fastapi_request: Request) -> str:
         return f"anon_{uuid.uuid4().hex[:8]}"
 
 # =============================================================================
-# FONCTION DE VALIDATION AGRICOLE CENTRALISÉE
+# FONCTION DE VALIDATION AGRICOLE CENTRALISÉE AVEC MÉMOIRE
 # =============================================================================
 
 async def validate_question_agricultural_domain(
     question: str, 
     language: str, 
     user_id: str, 
-    request_ip: str
+    request_ip: str,
+    conversation_id: str = None  # ✅ NOUVEAU PARAMÈTRE pour contexte
 ) -> tuple[bool, str, float]:
     """
-    Valide qu'une question concerne le domaine agricole
+    Valide qu'une question concerne le domaine agricole avec contexte conversationnel
     
     Returns:
         tuple[bool, str, float]: (is_valid, rejection_message_or_empty, confidence)
@@ -295,15 +318,26 @@ async def validate_question_agricultural_domain(
         
         return False, rejection_messages.get(language, rejection_messages["fr"]), 0.0
     
+    # ✅ NOUVEAU: Enrichir la question avec le contexte de conversation
+    enriched_question = question
+    if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+        try:
+            conversation_context = get_context_for_rag(conversation_id)
+            if conversation_context:
+                enriched_question = f"{question}\n\nContexte de conversation:\n{conversation_context}"
+                logger.info(f"🧠 [Validation] Question enrichie avec contexte conversationnel")
+        except Exception as e:
+            logger.warning(f"⚠️ [Validation] Erreur enrichissement contexte: {e}")
+    
     # Si la validation est désactivée, accepter
     if not is_agricultural_validation_enabled():
         logger.info("🔧 [Validation] Validation agricole désactivée - question acceptée")
         return True, "", 100.0
     
     try:
-        # Utiliser le validateur
+        # Utiliser le validateur avec la question enrichie
         validation_result = validate_agricultural_question(
-            question=question,
+            question=enriched_question,  # ✅ Question avec contexte
             language=language,
             user_id=user_id,
             request_ip=request_ip
@@ -414,7 +448,7 @@ async def process_question_openai(question: str, language: str = "fr", speed_mod
         return get_fallback_response(question, language)
 
 # =============================================================================
-# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE + CLARIFICATION + CONVERSATION_ID
+# ENDPOINT PRINCIPAL AVEC VALIDATION AGRICOLE + CLARIFICATION + MÉMOIRE CONVERSATIONNELLE
 # =============================================================================
 
 @router.post("/ask", response_model=ExpertResponse)
@@ -423,12 +457,12 @@ async def ask_expert_secure(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None
 ):
-    """Question avec authentification + validation agricole + clarification + conversation_id"""
+    """Question avec authentification + validation agricole + clarification + MÉMOIRE CONVERSATIONNELLE"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🔐 DÉBUT ask_expert_secure avec support conversation_id")
+        logger.info("🧠 DÉBUT ask_expert_secure avec MÉMOIRE CONVERSATIONNELLE")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🆔 Conversation ID fourni: {request_data.conversation_id}")
         logger.info(f"👤 User ID fourni: {request_data.user_id}")
@@ -471,20 +505,50 @@ async def ask_expert_secure(
             conversation_id = str(uuid.uuid4())
             logger.info(f"🆕 [conversation_id] NOUVELLE conversation: {conversation_id}")
         
-        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
-        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole...")
+        # ✅ NOUVEAU: Enregistrer le message utilisateur dans la mémoire conversationnelle
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+            try:
+                conversation_context = add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id or "authenticated_user",
+                    message=question_text,
+                    role="user",
+                    language=request_data.language
+                )
+                logger.info(f"🧠 [Memory] Message utilisateur enregistré dans conversation {conversation_id}")
+                logger.info(f"🧠 [Memory] Entités connues: {conversation_context.extracted_entities}")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur enregistrement message: {e}")
+        
+        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE AVEC CONTEXTE ===
+        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole avec mémoire...")
         
         is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
             question=question_text,
             language=request_data.language,
             user_id=user_id or "authenticated_user",
-            request_ip=request_ip
+            request_ip=request_ip,
+            conversation_id=conversation_id  # ✅ NOUVEAU: Contexte conversationnel
         )
         
         if not is_valid:
             logger.warning(f"🚫 [VALIDATION] Question rejetée: {rejection_message}")
             
             response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # ✅ NOUVEAU: Enregistrer aussi la réponse de rejet dans la mémoire
+            if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                try:
+                    add_message_to_conversation(
+                        conversation_id=conversation_id,
+                        user_id=user_id or "authenticated_user",
+                        message=rejection_message,
+                        role="assistant",
+                        language=request_data.language
+                    )
+                    logger.info(f"🧠 [Memory] Rejet enregistré dans conversation {conversation_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Memory] Erreur enregistrement rejet: {e}")
             
             await save_conversation_auto(
                 conversation_id=conversation_id,
@@ -506,125 +570,192 @@ async def ask_expert_secure(
                 timestamp=datetime.now().isoformat(),
                 language=request_data.language,
                 response_time_ms=response_time_ms,
-                mode="agricultural_validation_rejected",
+                mode="agricultural_validation_rejected_with_memory",
                 user=user_email,
                 logged=True,
                 validation_passed=False,
                 validation_confidence=validation_confidence
             )
             
-            logger.info("🚫 [VALIDATION] Question rejetée et loggée")
+            logger.info("🚫 [VALIDATION] Question rejetée et loggée avec mémoire")
             logger.info("=" * 60)
             return response_obj
         
-        logger.info(f"✅ [VALIDATION] Question validée (confiance: {validation_confidence:.1f}%)")
+        logger.info(f"✅ [VALIDATION] Question validée avec mémoire (confiance: {validation_confidence:.1f}%)")
         
-        # ===🆕 NOUVEAU: VÉRIFICATION DE CLARIFICATION ===
+        # ===🆕 SYSTÈME DE CLARIFICATION AVEC MÉMOIRE CONVERSATIONNELLE ===
         if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
-            logger.info("❓ [CLARIFICATION] Vérification besoin de clarification...")
+            logger.info("❓ [CLARIFICATION] Vérification avec contexte conversationnel...")
             
-            clarification_result = await analyze_question_for_clarification(
-                question=question_text,
-                language=request_data.language,
-                user_id=user_id or "authenticated_user",
-                conversation_id=conversation_id
-            )
+            # ✅ NOUVEAU: Récupérer le contexte conversationnel pour clarification
+            conversation_context = {}
+            if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                try:
+                    conversation_context = get_context_for_clarification(conversation_id)
+                    if conversation_context:
+                        logger.info(f"🧠 [Clarification] Contexte trouvé: {conversation_context}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Clarification] Erreur récupération contexte: {e}")
             
-            if clarification_result.needs_clarification:
-                logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
-                
-                clarification_response = format_clarification_response(
-                    questions=clarification_result.questions,
-                    language=request_data.language,
-                    original_question=question_text
-                )
-                
-                response_time_ms = int((time.time() - start_time) * 1000)
-                
-                await save_conversation_auto(
-                    conversation_id=conversation_id,
+            # ✅ NOUVEAU: Si le contexte contient déjà les infos principales, pas de clarification
+            if conversation_context.get("breed") and conversation_context.get("age"):
+                logger.info(f"🧠 [Clarification] Contexte conversationnel suffisant - pas de clarification")
+                logger.info(f"🧠 [Clarification] Informations connues: {conversation_context}")
+            else:
+                # Analyse normale de clarification
+                clarification_result = await analyze_question_for_clarification(
                     question=question_text,
-                    response=clarification_response,
+                    language=request_data.language,
                     user_id=user_id or "authenticated_user",
-                    language=request_data.language,
-                    rag_used=False,
-                    rag_score=None,
-                    response_time_ms=response_time_ms
+                    conversation_id=conversation_id
                 )
                 
-                response_obj = ExpertResponse(
-                    question=str(question_text),
-                    response=str(clarification_response),
-                    conversation_id=conversation_id,
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=response_time_ms,
-                    mode="clarification_needed_authenticated",
-                    user=user_email,
-                    logged=True,
-                    validation_passed=True,
-                    validation_confidence=validation_confidence
-                )
+                if clarification_result.needs_clarification:
+                    logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
+                    
+                    clarification_response = format_clarification_response(
+                        questions=clarification_result.questions,
+                        language=request_data.language,
+                        original_question=question_text
+                    )
+                    
+                    response_time_ms = int((time.time() - start_time) * 1000)
+                    
+                    # ✅ NOUVEAU: Enregistrer la demande de clarification dans la mémoire
+                    if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                        try:
+                            add_message_to_conversation(
+                                conversation_id=conversation_id,
+                                user_id=user_id or "authenticated_user",
+                                message=clarification_response,
+                                role="assistant",
+                                language=request_data.language
+                            )
+                            logger.info(f"🧠 [Memory] Clarification enregistrée dans conversation {conversation_id}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ [Memory] Erreur enregistrement clarification: {e}")
+                    
+                    await save_conversation_auto(
+                        conversation_id=conversation_id,
+                        question=question_text,
+                        response=clarification_response,
+                        user_id=user_id or "authenticated_user",
+                        language=request_data.language,
+                        rag_used=False,
+                        rag_score=None,
+                        response_time_ms=response_time_ms
+                    )
+                    
+                    response_obj = ExpertResponse(
+                        question=str(question_text),
+                        response=str(clarification_response),
+                        conversation_id=conversation_id,
+                        rag_used=False,
+                        rag_score=None,
+                        timestamp=datetime.now().isoformat(),
+                        language=request_data.language,
+                        response_time_ms=response_time_ms,
+                        mode="clarification_needed_authenticated_with_memory",
+                        user=user_email,
+                        logged=True,
+                        validation_passed=True,
+                        validation_confidence=validation_confidence
+                    )
+                    
+                    logger.info("❓ [CLARIFICATION] Demande envoyée et loggée avec mémoire")
+                    logger.info("=" * 60)
+                    return response_obj
                 
-                logger.info("❓ [CLARIFICATION] Demande envoyée et loggée")
-                logger.info("=" * 60)
-                return response_obj
-            
-            logger.info("✅ [CLARIFICATION] Question suffisamment claire")
-        # ===🆕 FIN CLARIFICATION ===
+                logger.info("✅ [CLARIFICATION] Question suffisamment claire avec contexte")
+        # ===🆕 FIN CLARIFICATION AVEC MÉMOIRE ===
         
-        # === TRAITEMENT NORMAL (RAG/OpenAI) ===
+        # === TRAITEMENT NORMAL (RAG/OpenAI) AVEC CONTEXTE CONVERSATIONNEL ===
         user = getattr(request.state, "user", None)
         
         # Variables par défaut
         rag_used = False
         rag_score = None
         answer = ""
-        mode = "authenticated_direct_openai"
+        mode = "authenticated_direct_openai_with_memory"
         
-        # Essayer RAG d'abord
+        # Essayer RAG d'abord avec contexte conversationnel
         app = request.app
         process_rag = getattr(app.state, 'process_question_with_rag', None)
         
         if process_rag:
             try:
-                logger.info("🔍 Utilisation du système RAG pour utilisateur authentifié...")
-                result = await process_rag(
-                    question=question_text,
-                    user=current_user,
-                    language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id
-                )
+                logger.info("🔍 Utilisation du système RAG avec contexte conversationnel...")
+                
+                # ✅ NOUVEAU: Obtenir le contexte pour RAG
+                rag_context = ""
+                if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                    try:
+                        rag_context = get_context_for_rag(conversation_id)
+                        if rag_context:
+                            logger.info(f"🧠 [RAG] Contexte conversationnel ajouté: {len(rag_context)} caractères")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [RAG] Erreur contexte conversationnel: {e}")
+                
+                # Appel RAG avec possibilité de contexte supplémentaire
+                try:
+                    result = await process_rag(
+                        question=question_text,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id,
+                        context=rag_context  # ✅ NOUVEAU: Contexte conversationnel pour RAG
+                    )
+                except TypeError:
+                    # Si process_rag ne supporte pas le paramètre context, l'ignorer
+                    result = await process_rag(
+                        question=question_text,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id
+                    )
                 
                 answer = str(result.get("response", ""))
                 rag_used = result.get("mode", "").startswith("rag")
                 rag_score = result.get("score")
-                mode = f"authenticated_{result.get('mode', 'rag_enhanced')}"
+                mode = f"authenticated_{result.get('mode', 'rag_enhanced')}_with_memory"
                 
-                logger.info(f"✅ RAG traité - Mode: {mode}, Score: {rag_score}")
+                logger.info(f"✅ RAG traité avec mémoire - Mode: {mode}, Score: {rag_score}")
                 
             except Exception as rag_error:
-                logger.error(f"❌ Erreur RAG: {rag_error}")
+                logger.error(f"❌ Erreur RAG avec mémoire: {rag_error}")
                 answer = await process_question_openai(
                     question_text, 
                     request_data.language,
                     request_data.speed_mode
                 )
-                mode = "authenticated_fallback_openai"
+                mode = "authenticated_fallback_openai_with_memory"
         else:
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct")
+            logger.info("⚠️ RAG non disponible, utilisation OpenAI direct avec mémoire")
             answer = await process_question_openai(
                 question_text,
                 request_data.language,
                 request_data.speed_mode
             )
-            mode = "authenticated_direct_openai"
+            mode = "authenticated_direct_openai_with_memory"
         
         response_time_ms = int((time.time() - start_time) * 1000)
         logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
+        
+        # ✅ NOUVEAU: Enregistrer la réponse dans la mémoire conversationnelle
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id and answer:
+            try:
+                add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id or "authenticated_user",
+                    message=answer,
+                    role="assistant",
+                    language=request_data.language
+                )
+                logger.info(f"🧠 [Memory] Réponse enregistrée dans conversation {conversation_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur enregistrement réponse: {e}")
         
         # Sauvegarde automatique avec le conversation_id approprié
         logged = await save_conversation_auto(
@@ -640,6 +771,9 @@ async def ask_expert_secure(
         
         logger.info(f"💾 Sauvegarde: {'✅ Réussie' if logged else '❌ Échouée'}")
         
+        # ✅ MODIFIÉ: Mode enrichi avec information mémoire
+        mode_with_memory = f"{mode}_memory_{'enabled' if CONVERSATION_MEMORY_AVAILABLE else 'disabled'}"
+        
         # Retourner la réponse avec le MÊME conversation_id
         response_obj = ExpertResponse(
             question=str(question_text),
@@ -650,14 +784,14 @@ async def ask_expert_secure(
             timestamp=datetime.now().isoformat(),
             language=request_data.language,
             response_time_ms=response_time_ms,
-            mode=mode,
+            mode=mode_with_memory,  # ✅ MODIFIÉ avec info mémoire
             user=user_email,
             logged=logged,
             validation_passed=True,
             validation_confidence=validation_confidence
         )
         
-        logger.info(f"✅ FIN ask_expert_secure - conversation_id retourné: {conversation_id}")
+        logger.info(f"✅ FIN ask_expert_secure avec MÉMOIRE - conversation_id retourné: {conversation_id}")
         logger.info("=" * 60)
         
         return response_obj
@@ -666,14 +800,14 @@ async def ask_expert_secure(
         logger.info("=" * 60)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask expert sécurisé: {e}")
+        logger.error(f"❌ Erreur critique ask expert sécurisé avec mémoire: {e}")
         import traceback
         logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
         logger.info("=" * 60)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE + CLARIFICATION + CONVERSATION_ID
+# ENDPOINT PUBLIC AVEC VALIDATION AGRICOLE + CLARIFICATION + MÉMOIRE CONVERSATIONNELLE
 # =============================================================================
 
 @router.post("/ask-public", response_model=ExpertResponse)
@@ -681,12 +815,12 @@ async def ask_expert_public(
     request_data: QuestionRequest,
     request: Request
 ):
-    """Question publique avec validation agricole + clarification + conversation_id"""
+    """Question publique avec validation agricole + clarification + MÉMOIRE CONVERSATIONNELLE"""
     start_time = time.time()
     
     try:
         logger.info("=" * 60)
-        logger.info("🌐 DÉBUT ask_expert_public avec support conversation_id")
+        logger.info("🧠 DÉBUT ask_expert_public avec MÉMOIRE CONVERSATIONNELLE")
         logger.info(f"📝 Question reçue: {request_data.text[:100]}...")
         logger.info(f"🆔 Conversation ID fourni: {request_data.conversation_id}")
         logger.info(f"👤 User ID fourni: {request_data.user_id}")
@@ -715,20 +849,50 @@ async def ask_expert_public(
         
         logger.info(f"👤 User ID: {user_id}")
         
-        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE ===
-        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole...")
+        # ✅ NOUVEAU: Enregistrer le message utilisateur dans la mémoire conversationnelle
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+            try:
+                conversation_context = add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=question_text,
+                    role="user",
+                    language=request_data.language
+                )
+                logger.info(f"🧠 [Memory] Message public enregistré dans conversation {conversation_id}")
+                logger.info(f"🧠 [Memory] Entités connues: {conversation_context.extracted_entities}")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur enregistrement message public: {e}")
+        
+        # 🌾 === VALIDATION AGRICOLE OBLIGATOIRE AVEC CONTEXTE ===
+        logger.info("🌾 [VALIDATION] Démarrage validation domaine agricole avec mémoire...")
         
         is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
             question=question_text,
             language=request_data.language,
             user_id=user_id,
-            request_ip=request_ip
+            request_ip=request_ip,
+            conversation_id=conversation_id  # ✅ NOUVEAU: Contexte conversationnel
         )
         
         if not is_valid:
             logger.warning(f"🚫 [VALIDATION] Question publique rejetée: {rejection_message}")
             
             response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # ✅ NOUVEAU: Enregistrer aussi la réponse de rejet dans la mémoire
+            if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                try:
+                    add_message_to_conversation(
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        message=rejection_message,
+                        role="assistant",
+                        language=request_data.language
+                    )
+                    logger.info(f"🧠 [Memory] Rejet public enregistré dans conversation {conversation_id}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Memory] Erreur enregistrement rejet public: {e}")
             
             await save_conversation_auto(
                 conversation_id=conversation_id,
@@ -750,123 +914,192 @@ async def ask_expert_public(
                 timestamp=datetime.now().isoformat(),
                 language=request_data.language,
                 response_time_ms=response_time_ms,
-                mode="public_agricultural_validation_rejected",
+                mode="public_agricultural_validation_rejected_with_memory",
                 user=None,
                 logged=True,
                 validation_passed=False,
                 validation_confidence=validation_confidence
             )
             
-            logger.info("🚫 [VALIDATION] Question publique rejetée et loggée")
+            logger.info("🚫 [VALIDATION] Question publique rejetée et loggée avec mémoire")
             logger.info("=" * 60)
             return response_obj
         
-        logger.info(f"✅ [VALIDATION] Question publique validée (confiance: {validation_confidence:.1f}%)")
+        logger.info(f"✅ [VALIDATION] Question publique validée avec mémoire (confiance: {validation_confidence:.1f}%)")
         
-        # ===🆕 NOUVEAU: VÉRIFICATION DE CLARIFICATION ===
+        # ===🆕 SYSTÈME DE CLARIFICATION AVEC MÉMOIRE CONVERSATIONNELLE ===
         if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
-            logger.info("❓ [CLARIFICATION] Vérification besoin de clarification...")
+            logger.info("❓ [CLARIFICATION] Vérification avec contexte conversationnel...")
             
-            clarification_result = await analyze_question_for_clarification(
-                question=question_text,
-                language=request_data.language,
-                user_id=user_id,
-                conversation_id=conversation_id
-            )
+            # ✅ NOUVEAU: Récupérer le contexte conversationnel pour clarification
+            conversation_context = {}
+            if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                try:
+                    conversation_context = get_context_for_clarification(conversation_id)
+                    if conversation_context:
+                        logger.info(f"🧠 [Clarification] Contexte public trouvé: {conversation_context}")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Clarification] Erreur récupération contexte public: {e}")
             
-            if clarification_result.needs_clarification:
-                logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
-                
-                clarification_response = format_clarification_response(
-                    questions=clarification_result.questions,
-                    language=request_data.language,
-                    original_question=question_text
-                )
-                
-                response_time_ms = int((time.time() - start_time) * 1000)
-                
-                await save_conversation_auto(
-                    conversation_id=conversation_id,
+            # ✅ NOUVEAU: Si le contexte contient déjà les infos principales, pas de clarification
+            if conversation_context.get("breed") and conversation_context.get("age"):
+                logger.info(f"🧠 [Clarification] Contexte conversationnel public suffisant - pas de clarification")
+                logger.info(f"🧠 [Clarification] Informations connues: {conversation_context}")
+            else:
+                # Analyse normale de clarification
+                clarification_result = await analyze_question_for_clarification(
                     question=question_text,
-                    response=clarification_response,
+                    language=request_data.language,
                     user_id=user_id,
-                    language=request_data.language,
-                    rag_used=False,
-                    rag_score=None,
-                    response_time_ms=response_time_ms
+                    conversation_id=conversation_id
                 )
                 
-                response_obj = ExpertResponse(
-                    question=str(question_text),
-                    response=str(clarification_response),
-                    conversation_id=conversation_id,
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=response_time_ms,
-                    mode="clarification_needed_public",
-                    user=None,
-                    logged=True,
-                    validation_passed=True,
-                    validation_confidence=validation_confidence
-                )
+                if clarification_result.needs_clarification:
+                    logger.info(f"❓ [CLARIFICATION] {len(clarification_result.questions)} questions générées")
+                    
+                    clarification_response = format_clarification_response(
+                        questions=clarification_result.questions,
+                        language=request_data.language,
+                        original_question=question_text
+                    )
+                    
+                    response_time_ms = int((time.time() - start_time) * 1000)
+                    
+                    # ✅ NOUVEAU: Enregistrer la demande de clarification dans la mémoire
+                    if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                        try:
+                            add_message_to_conversation(
+                                conversation_id=conversation_id,
+                                user_id=user_id,
+                                message=clarification_response,
+                                role="assistant",
+                                language=request_data.language
+                            )
+                            logger.info(f"🧠 [Memory] Clarification publique enregistrée dans conversation {conversation_id}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ [Memory] Erreur enregistrement clarification publique: {e}")
+                    
+                    await save_conversation_auto(
+                        conversation_id=conversation_id,
+                        question=question_text,
+                        response=clarification_response,
+                        user_id=user_id,
+                        language=request_data.language,
+                        rag_used=False,
+                        rag_score=None,
+                        response_time_ms=response_time_ms
+                    )
+                    
+                    response_obj = ExpertResponse(
+                        question=str(question_text),
+                        response=str(clarification_response),
+                        conversation_id=conversation_id,
+                        rag_used=False,
+                        rag_score=None,
+                        timestamp=datetime.now().isoformat(),
+                        language=request_data.language,
+                        response_time_ms=response_time_ms,
+                        mode="clarification_needed_public_with_memory",
+                        user=None,
+                        logged=True,
+                        validation_passed=True,
+                        validation_confidence=validation_confidence
+                    )
+                    
+                    logger.info("❓ [CLARIFICATION] Demande publique envoyée et loggée avec mémoire")
+                    logger.info("=" * 60)
+                    return response_obj
                 
-                logger.info("❓ [CLARIFICATION] Demande publique envoyée et loggée")
-                logger.info("=" * 60)
-                return response_obj
-            
-            logger.info("✅ [CLARIFICATION] Question suffisamment claire")
-        # ===🆕 FIN CLARIFICATION ===
+                logger.info("✅ [CLARIFICATION] Question publique suffisamment claire avec contexte")
+        # ===🆕 FIN CLARIFICATION AVEC MÉMOIRE ===
         
-        # === TRAITEMENT NORMAL (RAG/OpenAI) ===
+        # === TRAITEMENT NORMAL (RAG/OpenAI) AVEC CONTEXTE CONVERSATIONNEL ===
         user = getattr(request.state, "user", None)
         
         # Variables par défaut
         rag_used = False
         rag_score = None
         answer = ""
-        mode = "direct_openai"
+        mode = "direct_openai_with_memory"
         
-        # Essayer RAG d'abord
+        # Essayer RAG d'abord avec contexte conversationnel
         app = request.app
         process_rag = getattr(app.state, 'process_question_with_rag', None)
         
         if process_rag:
             try:
-                logger.info("🔍 Utilisation du système RAG public...")
-                result = await process_rag(
-                    question=question_text,
-                    user=user,
-                    language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id
-                )
+                logger.info("🔍 Utilisation du système RAG public avec contexte conversationnel...")
+                
+                # ✅ NOUVEAU: Obtenir le contexte pour RAG
+                rag_context = ""
+                if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+                    try:
+                        rag_context = get_context_for_rag(conversation_id)
+                        if rag_context:
+                            logger.info(f"🧠 [RAG] Contexte conversationnel public ajouté: {len(rag_context)} caractères")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [RAG] Erreur contexte conversationnel public: {e}")
+                
+                # Appel RAG avec possibilité de contexte supplémentaire
+                try:
+                    result = await process_rag(
+                        question=question_text,
+                        user=user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id,
+                        context=rag_context  # ✅ NOUVEAU: Contexte conversationnel pour RAG
+                    )
+                except TypeError:
+                    # Si process_rag ne supporte pas le paramètre context, l'ignorer
+                    result = await process_rag(
+                        question=question_text,
+                        user=user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id
+                    )
                 
                 answer = str(result.get("response", ""))
                 rag_used = result.get("mode", "").startswith("rag")
                 rag_score = result.get("score")
-                mode = result.get("mode", "rag_enhanced")
+                mode = f"{result.get('mode', 'rag_enhanced')}_with_memory"
                 
-                logger.info(f"✅ RAG traité - Mode: {mode}, Score: {rag_score}")
+                logger.info(f"✅ RAG public traité avec mémoire - Mode: {mode}, Score: {rag_score}")
                 
             except Exception as rag_error:
-                logger.error(f"❌ Erreur RAG: {rag_error}")
+                logger.error(f"❌ Erreur RAG public avec mémoire: {rag_error}")
                 answer = await process_question_openai(
                     question_text, 
                     request_data.language,
                     request_data.speed_mode
                 )
+                mode = "fallback_openai_with_memory"
         else:
-            logger.info("⚠️ RAG non disponible, utilisation OpenAI")
+            logger.info("⚠️ RAG non disponible, utilisation OpenAI public avec mémoire")
             answer = await process_question_openai(
                 question_text,
                 request_data.language,
                 request_data.speed_mode
             )
+            mode = "direct_openai_with_memory"
         
         response_time_ms = int((time.time() - start_time) * 1000)
         logger.info(f"⏱️ Temps de traitement: {response_time_ms}ms")
+        
+        # ✅ NOUVEAU: Enregistrer la réponse dans la mémoire conversationnelle
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id and answer:
+            try:
+                add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=answer,
+                    role="assistant",
+                    language=request_data.language
+                )
+                logger.info(f"🧠 [Memory] Réponse publique enregistrée dans conversation {conversation_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur enregistrement réponse publique: {e}")
         
         # Sauvegarde automatique
         logged = await save_conversation_auto(
@@ -882,6 +1115,9 @@ async def ask_expert_public(
         
         logger.info(f"💾 Sauvegarde: {'✅ Réussie' if logged else '❌ Échouée'}")
         
+        # ✅ MODIFIÉ: Mode enrichi avec information mémoire
+        mode_with_memory = f"{mode}_memory_{'enabled' if CONVERSATION_MEMORY_AVAILABLE else 'disabled'}"
+        
         # Retourner la réponse
         response_obj = ExpertResponse(
             question=str(question_text),
@@ -892,14 +1128,14 @@ async def ask_expert_public(
             timestamp=datetime.now().isoformat(),
             language=request_data.language,
             response_time_ms=response_time_ms,
-            mode=mode,
+            mode=mode_with_memory,  # ✅ MODIFIÉ avec info mémoire
             user=str(user) if user else None,
             logged=logged,
             validation_passed=True,
             validation_confidence=validation_confidence
         )
         
-        logger.info(f"✅ FIN ask_expert_public - conversation_id retourné: {conversation_id}")
+        logger.info(f"✅ FIN ask_expert_public avec MÉMOIRE - conversation_id retourné: {conversation_id}")
         logger.info("=" * 60)
         
         return response_obj
@@ -908,7 +1144,7 @@ async def ask_expert_public(
         logger.info("=" * 60)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask expert public: {e}")
+        logger.error(f"❌ Erreur critique ask expert public avec mémoire: {e}")
         import traceback
         logger.error(f"❌ Traceback complet: {traceback.format_exc()}")
         logger.info("=" * 60)
@@ -1050,11 +1286,113 @@ async def get_suggested_topics(language: str = "fr"):
             "count": len(topics),
             "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else False,
             "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else False,
+            "memory_enabled": CONVERSATION_MEMORY_AVAILABLE,  # ✅ NOUVEAU
             "note": "Topics génériques pour tous poulets de chair"
         }
     except Exception as e:
         logger.error(f"❌ Erreur topics: {e}")
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
+
+# =============================================================================
+# NOUVEAUX ENDPOINTS MÉMOIRE CONVERSATIONNELLE
+# =============================================================================
+
+@router.get("/conversation/{conversation_id}/context")
+async def get_conversation_context_endpoint(conversation_id: str):
+    """Récupère le contexte d'une conversation"""
+    try:
+        if not CONVERSATION_MEMORY_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Service de mémoire non disponible")
+        
+        context = get_conversation_context(conversation_id)
+        
+        if not context:
+            raise HTTPException(status_code=404, detail="Conversation non trouvée")
+        
+        return {
+            "conversation_id": conversation_id,
+            "context": context.to_dict(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération contexte: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+
+@router.get("/memory/stats")
+async def get_memory_stats():
+    """Statistiques du système de mémoire conversationnelle"""
+    try:
+        if not CONVERSATION_MEMORY_AVAILABLE:
+            return {
+                "memory_available": False,
+                "message": "Système de mémoire non disponible"
+            }
+        
+        stats = get_conversation_memory_stats()
+        
+        return {
+            "memory_available": True,
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur stats mémoire: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur stats: {str(e)}")
+
+@router.post("/memory/cleanup")
+async def cleanup_expired_conversations_endpoint():
+    """Nettoie les conversations expirées"""
+    try:
+        if not CONVERSATION_MEMORY_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Service de mémoire non disponible")
+        
+        cleanup_expired_conversations()
+        
+        return {
+            "success": True,
+            "message": "Nettoyage des conversations expirées effectué",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur nettoyage mémoire: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur nettoyage: {str(e)}")
+
+@router.get("/conversation/{conversation_id}/history")
+async def get_conversation_history(conversation_id: str, limit: int = Query(10, ge=1, le=50)):
+    """Récupère l'historique d'une conversation"""
+    try:
+        if not CONVERSATION_MEMORY_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Service de mémoire non disponible")
+        
+        context = get_conversation_context(conversation_id)
+        
+        if not context:
+            raise HTTPException(status_code=404, detail="Conversation non trouvée")
+        
+        # Limiter les messages retournés
+        messages = context.messages[-limit:] if context.messages else []
+        
+        return {
+            "conversation_id": conversation_id,
+            "messages": messages,
+            "message_count": len(messages),
+            "total_messages": len(context.messages),
+            "extracted_entities": context.extracted_entities,
+            "language": context.language,
+            "last_activity": context.last_activity.isoformat(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur historique conversation: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
 # NOUVEAUX ENDPOINTS DE DIAGNOSTIC ET CLARIFICATION
@@ -1093,7 +1431,7 @@ async def test_clarification_system(
     try:
         question_text = request_data.text.strip()
         user_id = get_user_id_from_request(request)
-        conversation_id = str(uuid.uuid4())
+        conversation_id = request_data.conversation_id or str(uuid.uuid4())
         
         if not CLARIFICATION_SYSTEM_AVAILABLE:
             return {
@@ -1139,6 +1477,7 @@ async def test_clarification_system(
                 "processing_time_ms": clarification_result.processing_time_ms,
                 "model_used": clarification_result.model_used,
                 "system_stats": get_clarification_system_stats(),
+                "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE and conversation_id else None,  # ✅ NOUVEAU
                 "timestamp": datetime.now().isoformat()
             }
         else:
@@ -1151,6 +1490,7 @@ async def test_clarification_system(
                 "reason": clarification_result.reason,
                 "processing_time_ms": clarification_result.processing_time_ms,
                 "system_stats": get_clarification_system_stats(),
+                "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE and conversation_id else None,  # ✅ NOUVEAU
                 "timestamp": datetime.now().isoformat()
             }
     
@@ -1191,6 +1531,7 @@ async def test_validation(
         question_text = request_data.text.strip()
         user_id = get_user_id_from_request(request)
         request_ip = request.client.host if request.client else "unknown"
+        conversation_id = request_data.conversation_id or str(uuid.uuid4())  # ✅ NOUVEAU
         
         if not AGRICULTURAL_VALIDATOR_AVAILABLE:
             return {
@@ -1198,12 +1539,13 @@ async def test_validation(
                 "available": False
             }
         
-        # Test de validation
+        # Test de validation avec contexte conversationnel
         is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
             question=question_text,
             language=request_data.language,
             user_id=user_id,
-            request_ip=request_ip
+            request_ip=request_ip,
+            conversation_id=conversation_id  # ✅ NOUVEAU
         )
         
         return {
@@ -1214,6 +1556,8 @@ async def test_validation(
             "rejection_message": rejection_message if not is_valid else None,
             "validator_available": True,
             "validation_enabled": is_agricultural_validation_enabled(),
+            "conversation_id": conversation_id,
+            "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE and conversation_id else None,  # ✅ NOUVEAU
             "timestamp": datetime.now().isoformat()
         }
         
@@ -1296,7 +1640,7 @@ async def debug_database_info():
 
 @router.get("/debug-system")
 async def debug_system_info():
-    """Endpoint de diagnostic système complet avec validateur et clarification"""
+    """Endpoint de diagnostic système complet avec validateur, clarification et MÉMOIRE"""
     import os
     import sys
     
@@ -1342,27 +1686,42 @@ async def debug_system_info():
     except Exception as e:
         import_tests["clarification_system_module"] = f"❌ {str(e)}"
     
+    # ✅ NOUVEAU: Test spécifique du système de mémoire conversationnelle
+    try:
+        import app.api.v1.conversation_memory
+        import_tests["conversation_memory_module"] = "✅ OK"
+        
+        memory_attrs = dir(app.api.v1.conversation_memory)
+        memory_functions = [attr for attr in memory_attrs if not attr.startswith('_')]
+        import_tests["conversation_memory_functions"] = memory_functions
+        
+    except Exception as e:
+        import_tests["conversation_memory_module"] = f"❌ {str(e)}"
+    
     return {
         "auth_available": AUTH_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "clarification_system_available": CLARIFICATION_SYSTEM_AVAILABLE,
         "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else None,
+        "conversation_memory_available": CONVERSATION_MEMORY_AVAILABLE,  # ✅ NOUVEAU
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
         "conversation_id_support": "✅ Activé dans cette version",
         "user_id_support": "✅ Activé dans cette version",
+        "memory_conversational_support": "✅ Activé avec continuité contextuelle",  # ✅ NOUVEAU
         "current_directory": os.path.dirname(__file__),
         "python_path_sample": sys.path[:3],
         "import_tests": import_tests,
         "validator_stats": get_agricultural_validator_stats() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "clarification_stats": get_clarification_system_stats() if CLARIFICATION_SYSTEM_AVAILABLE else None,
+        "memory_stats": get_conversation_memory_stats() if CONVERSATION_MEMORY_AVAILABLE else None,  # ✅ NOUVEAU
         "timestamp": datetime.now().isoformat()
     }
 
 @router.get("/debug-auth")
 async def debug_auth_info(request: Request):
-    """Endpoint de diagnostic rapide avec validation et clarification"""
+    """Endpoint de diagnostic rapide avec validation, clarification et MÉMOIRE"""
     auth_header = request.headers.get("Authorization")
     
     return {
@@ -1371,18 +1730,20 @@ async def debug_auth_info(request: Request):
         "validation_enabled": is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else None,
         "clarification_system_available": CLARIFICATION_SYSTEM_AVAILABLE,
         "clarification_enabled": is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else None,
+        "conversation_memory_available": CONVERSATION_MEMORY_AVAILABLE,  # ✅ NOUVEAU
         "auth_header_present": bool(auth_header),
         "auth_header_preview": auth_header[:50] + "..." if auth_header else None,
         "openai_available": OPENAI_AVAILABLE,
         "logging_available": LOGGING_AVAILABLE,
         "conversation_id_support": "✅ Activé",
         "user_id_support": "✅ Activé",
+        "conversational_memory_support": "✅ Activé avec continuité contextuelle",  # ✅ NOUVEAU
         "timestamp": datetime.now().isoformat()
     }
 
 @router.post("/test-utf8")
 async def test_utf8_direct(request: Request):
-    """Test endpoint pour UTF-8 direct avec validation et clarification"""
+    """Test endpoint pour UTF-8 direct avec validation, clarification et MÉMOIRE"""
     try:
         # Récupérer le body brut
         body = await request.body()
@@ -1396,19 +1757,36 @@ async def test_utf8_direct(request: Request):
         
         question_text = data.get('text', '')
         language = data.get('language', 'fr')
+        conversation_id = data.get('conversation_id', str(uuid.uuid4()))  # ✅ NOUVEAU
         
         logger.info(f"📝 Question extraite: {question_text}")
         logger.info(f"🔤 Caractères spéciaux: {[c for c in question_text if ord(c) > 127]}")
+        logger.info(f"🆔 Conversation ID: {conversation_id}")
         
         # Test de validation
         user_id = get_user_id_from_request(request)
         request_ip = request.client.host if request.client else "unknown"
         
+        # ✅ NOUVEAU: Enregistrer le message dans la mémoire
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id:
+            try:
+                conversation_context = add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=question_text,
+                    role="user",
+                    language=language
+                )
+                logger.info(f"🧠 [Memory] Message test UTF-8 enregistré: {conversation_context.extracted_entities}")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur test UTF-8: {e}")
+        
         is_valid, rejection_message, validation_confidence = await validate_question_agricultural_domain(
             question=question_text,
             language=language,
             user_id=user_id,
-            request_ip=request_ip
+            request_ip=request_ip,
+            conversation_id=conversation_id  # ✅ NOUVEAU: Avec contexte
         )
         
         if not is_valid:
@@ -1419,18 +1797,20 @@ async def test_utf8_direct(request: Request):
                 "validation_passed": False,
                 "rejection_message": rejection_message,
                 "confidence": validation_confidence,
-                "method": "direct_body_parsing_with_validation",
+                "conversation_id": conversation_id,
+                "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE else None,  # ✅ NOUVEAU
+                "method": "direct_body_parsing_with_validation_and_memory",
                 "timestamp": datetime.now().isoformat()
             }
         
-        # Test de clarification si disponible
+        # Test de clarification si disponible avec mémoire
         clarification_result = None
         if CLARIFICATION_SYSTEM_AVAILABLE and is_clarification_system_enabled():
             clarification_result = await analyze_question_for_clarification(
                 question=question_text,
                 language=language,
                 user_id=user_id,
-                conversation_id=str(uuid.uuid4())
+                conversation_id=conversation_id  # ✅ NOUVEAU: Avec contexte
             )
         
         # Traitement direct seulement si validé et pas de clarification
@@ -1443,11 +1823,27 @@ async def test_utf8_direct(request: Request):
                 "confidence": validation_confidence,
                 "needs_clarification": True,
                 "clarification_questions": clarification_result.questions,
-                "method": "direct_body_parsing_with_validation_and_clarification",
+                "conversation_id": conversation_id,
+                "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE else None,  # ✅ NOUVEAU
+                "method": "direct_body_parsing_with_validation_clarification_and_memory",
                 "timestamp": datetime.now().isoformat()
             }
         
         answer = await process_question_openai(question_text, language, "fast")
+        
+        # ✅ NOUVEAU: Enregistrer la réponse dans la mémoire
+        if CONVERSATION_MEMORY_AVAILABLE and conversation_id and answer:
+            try:
+                add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=answer,
+                    role="assistant",
+                    language=language
+                )
+                logger.info(f"🧠 [Memory] Réponse test UTF-8 enregistrée")
+            except Exception as e:
+                logger.warning(f"⚠️ [Memory] Erreur enregistrement réponse test: {e}")
         
         return {
             "success": True,
@@ -1457,7 +1853,9 @@ async def test_utf8_direct(request: Request):
             "confidence": validation_confidence,
             "needs_clarification": False,
             "response": answer,
-            "method": "direct_body_parsing_with_validation_and_clarification",
+            "conversation_id": conversation_id,
+            "memory_context": get_context_for_clarification(conversation_id) if CONVERSATION_MEMORY_AVAILABLE else None,  # ✅ NOUVEAU
+            "method": "direct_body_parsing_with_validation_clarification_and_memory",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -1483,7 +1881,8 @@ if OPENAI_AVAILABLE and openai:
 else:
     logger.warning("⚠️ Module OpenAI non disponible")
 
-logger.info("✅ EXPERT.PY COMPLET AVEC CONVERSATION_ID + USER_ID SUPPORT")
+logger.info("✅ EXPERT.PY AVEC SYSTÈME DE MÉMOIRE CONVERSATIONNELLE INTÉGRÉ")
+logger.info(f"🧠 CONVERSATION_MEMORY_AVAILABLE: {CONVERSATION_MEMORY_AVAILABLE}")
 logger.info(f"🔧 AUTH_AVAILABLE: {AUTH_AVAILABLE}")
 logger.info(f"🌾 AGRICULTURAL_VALIDATOR_AVAILABLE: {AGRICULTURAL_VALIDATOR_AVAILABLE}")
 logger.info(f"🌾 VALIDATION_ENABLED: {is_agricultural_validation_enabled() if AGRICULTURAL_VALIDATOR_AVAILABLE else 'N/A'}")
@@ -1491,17 +1890,50 @@ logger.info(f"❓ CLARIFICATION_SYSTEM_AVAILABLE: {CLARIFICATION_SYSTEM_AVAILABL
 logger.info(f"❓ CLARIFICATION_ENABLED: {is_clarification_system_enabled() if CLARIFICATION_SYSTEM_AVAILABLE else 'N/A'}")
 logger.info(f"💾 LOGGING_AVAILABLE: {LOGGING_AVAILABLE}")
 logger.info(f"🤖 OPENAI_AVAILABLE: {OPENAI_AVAILABLE}")
-logger.info("🔧 NOUVELLES FONCTIONNALITÉS: conversation_id + user_id + continuité conversations")
+logger.info("🔧 FONCTIONNALITÉS CONVERSATIONNELLES ACTIVÉES:")
+logger.info("   - 🧠 Mémoire conversationnelle avec extraction d'entités")
+logger.info("   - 🔄 Continuité contextuelle entre questions d'une même conversation")
+logger.info("   - 📊 Validation agricole enrichie avec contexte conversationnel")
+logger.info("   - ❓ Clarification intelligente basée sur l'historique")
+logger.info("   - 🏗️ RAG enrichi avec contexte de conversation")
+logger.info("   - 💾 Persistance automatique avec expiration (24h)")
+logger.info("   - 🗑️ Nettoyage automatique des conversations expirées")
 logger.info("🔧 ENDPOINTS DISPONIBLES:")
-logger.info("   - POST /ask (authentifié) + conversation_id")
-logger.info("   - POST /ask-public (public) + conversation_id") 
+logger.info("   - POST /ask (authentifié) + mémoire conversationnelle")
+logger.info("   - POST /ask-public (public) + mémoire conversationnelle") 
 logger.info("   - POST /feedback (amélioration avec conversation_id)")
 logger.info("   - GET /topics (suggestions sujets)")
 logger.info("   - GET /validation-stats (stats validateur)")
-logger.info("   - POST /test-clarification (test clarifications)")
+logger.info("   - POST /test-clarification (test clarifications + mémoire)")
 logger.info("   - GET /clarification-status (status clarifications)")
 logger.info("   - POST /test-validation (test validation)")
+logger.info("🔧 NOUVEAUX ENDPOINTS MÉMOIRE:")
+logger.info("   - GET /conversation/{id}/context (contexte conversationnel)")
+logger.info("   - GET /conversation/{id}/history (historique messages)")
+logger.info("   - GET /memory/stats (statistiques mémoire)")
+logger.info("   - POST /memory/cleanup (nettoyage conversations expirées)")
 logger.info("   - GET /debug-database (debug base données)")
-logger.info("   - GET /debug-system (diagnostic complet)")
-logger.info("   - GET /debug-auth (diagnostic auth)")
-logger.info("   - POST /test-utf8 (test encodage UTF-8)")
+logger.info("   - GET /debug-system (diagnostic complet + mémoire)")
+logger.info("   - GET /debug-auth (diagnostic auth + mémoire)")
+logger.info("   - POST /test-utf8 (test encodage UTF-8 + mémoire)")
+
+if CONVERSATION_MEMORY_AVAILABLE:
+    try:
+        memory_stats = get_conversation_memory_stats()
+        logger.info(f"📊 [Memory] Statistiques système: {memory_stats}")
+        logger.info("🎉 [Memory] Système de mémoire conversationnelle pleinement opérationnel!")
+        logger.info("🔧 [Memory] Configuration:")
+        logger.info(f"   - Messages max par conversation: {memory_stats.get('max_messages_in_memory', 'N/A')}")
+        logger.info(f"   - Expiration conversations: {memory_stats.get('context_expiry_hours', 'N/A')}h")
+        logger.info(f"   - Extraction entités: {'✅ Activée' if memory_stats.get('enabled', False) else '❌ Désactivée'}")
+        logger.info(f"   - Base de données: {memory_stats.get('database_path', 'N/A')}")
+    except Exception as e:
+        logger.warning(f"⚠️ [Memory] Erreur récupération stats: {e}")
+else:
+    logger.warning("⚠️ [Memory] Système de mémoire conversationnelle NON DISPONIBLE")
+    logger.warning("⚠️ [Memory] Les conversations seront traitées de manière indépendante")
+    logger.warning("⚠️ [Memory] Pour activer: créer app/api/v1/conversation_memory.py")
+
+logger.info("🚀 [Expert] Système Expert Intelia avec mémoire conversationnelle prêt!")
+logger.info("🎯 [Expert] Résolution du problème: Plus de questions redondantes sur la race/âge!")
+logger.info("🧠 [Expert] Continuité conversationnelle: Ross 308 mentionné une fois = retenu pour la conversation")
