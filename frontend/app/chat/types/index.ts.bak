@@ -398,30 +398,13 @@ export class TimeoutError extends Error {
   }
 }
 
-// ==================== CONSTANTES API SÉCURISÉES ====================
+// ==================== CONSTANTES API ====================
 
-// ✅ SÉCURISÉ: Configuration API dynamique depuis environnement
-const getApiConfig = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  
-  if (!baseUrl) {
-    console.error('❌ NEXT_PUBLIC_API_BASE_URL environment variable missing')
-    return {
-      BASE_URL: 'http://localhost:8000', // Fallback développement
-      TIMEOUT: 30000,
-      LOGGING_BASE_URL: 'http://localhost:8000/api/v1'
-    }
-  }
-  
-  return {
-    BASE_URL: baseUrl,
-    TIMEOUT: 30000,
-    LOGGING_BASE_URL: `${baseUrl}/api/${version}`
-  }
-}
-
-export const API_CONFIG = getApiConfig()
+export const API_CONFIG = {
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app',
+  TIMEOUT: 30000,
+  LOGGING_BASE_URL: 'https://expert-app-cngws.ondigitalocean.app/api/v1'
+} as const
 
 // ✅ NOUVEAUX ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {

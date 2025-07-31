@@ -6,29 +6,14 @@ import {
   ConversationDetailResponse,
   ConversationGroupingOptions,
   Message,
-  ConversationData
+  ConversationData,
+  API_CONFIG
 } from '../types'
 
 // ==================== SERVICE CONVERSATIONS COMPLET INTÉGRÉ ====================
 export class ConversationService {
-  private baseUrl: string
+  private baseUrl = API_CONFIG.LOGGING_BASE_URL
   private loggingEnabled = true
-
-  constructor() {
-    // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-    const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-    
-    if (!apiBaseUrl) {
-      console.error('❌ NEXT_PUBLIC_API_BASE_URL environment variable missing')
-      this.loggingEnabled = false
-      this.baseUrl = ''
-      return
-    }
-    
-    this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`
-    console.log('✅ ConversationService configuré:', this.baseUrl)
-  }
 
   // ==================== NOUVELLES MÉTHODES POUR CONVERSATIONS ====================
 

@@ -1,4 +1,4 @@
-// components/ZohoSalesIQ.tsx - VERSION STABLE: Langue fixe pour la session + Corrections Sécurité
+// components/ZohoSalesIQ.tsx - VERSION STABLE: Langue fixe pour la session + Corrections Accessibilité
 
 import { useEffect, useRef, useCallback } from 'react'
 
@@ -127,13 +127,14 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
                 window.$zoho.salesiq.floatwindow.visible('show')
                 console.log('👁️ [ZohoSalesIQ] Widget affiché')
                 
+                // ✅ CORRECTION: S'assurer que le bouton flottant reste visible
                 setTimeout(() => {
                   ensureFloatButtonVisible()
                   // ✅ NOUVEAU: Appliquer les fixes d'accessibilité
                   fixZohoAccessibility()
                 }, 1000)
                 
-                // Vérification supplémentaire avec fixes accessibilité
+                // ✅ CORRECTION: Vérification supplémentaire après 5 secondes
                 setTimeout(() => {
                   ensureFloatButtonVisible()
                   fixZohoAccessibility() // ✅ NOUVEAU: Fix accessibilité répété
@@ -152,7 +153,15 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
         }
       } else if (attempts < maxAttempts) {
         console.log('⏳ [ZohoSalesIQ] Widget pas encore prêt, retry...')
+        console.log('🔍 [ZohoSalesIQ] État:', {
+          zoho: !!window.$zoho,
+          salesiq: !!window.$zoho?.salesiq,
+          visitor: typeof window.$zoho?.salesiq?.visitor,
+          floatwindow: typeof window.$zoho?.salesiq?.floatwindow
+        })
+        
         retryTimeoutRef.current = setTimeout(configureAttempt, checkInterval)
+        
       } else {
         console.error('❌ [ZohoSalesIQ] Échec configuration après', maxAttempts, 'tentatives')
       }
@@ -169,18 +178,6 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       return
     }
 
-    // ✅ SÉCURISÉ: Variables depuis environnement
-    const widgetBaseUrl = process.env.NEXT_PUBLIC_ZOHO_WIDGET_BASE_URL
-    const widgetId = process.env.NEXT_PUBLIC_ZOHO_WIDGET_ID
-    
-    if (!widgetBaseUrl || !widgetId) {
-      console.error('❌ [ZohoSalesIQ] Variables Zoho manquantes:', {
-        baseUrl: !!widgetBaseUrl,
-        widgetId: !!widgetId
-      })
-      return
-    }
-
     try {
       // Initialiser l'objet $zoho AVANT le script
       initializeZohoObject()
@@ -191,10 +188,10 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       script.async = true
       script.defer = true
       
-      // ✅ SÉCURISÉ: URL construite depuis variables env
-      script.src = `${widgetBaseUrl}?wc=${widgetId}&locale=${lang}`
+      // ✅ CORRECTION: URL avec locale pour forcer la langue
+      script.src = `https://salesiq.zohopublic.com/widget?wc=siq31d58179214fbbfbb0a5b5eb16ab9173ba0ee84601e9d7d04840d96541bc7e4f&locale=${lang}`
       
-      console.log('📡 [ZohoSalesIQ] Chargement script principal depuis env vars')
+      console.log('📡 [ZohoSalesIQ] Chargement script principal:', script.src)
       
       let loadTimeout: NodeJS.Timeout
       
