@@ -1,94 +1,140 @@
 """
-app/api/v1/__init__.py
-Configuration des imports pour les modules API v1 d'Intelia Expert
-STRUCTURE CORRIGÉE - Import des modules du même dossier
+API v1 - Intelia Expert
+Module d'initialisation pour les endpoints de l'API v1
+
+Expert System - Architecture Modulaire
+
+Vue d'ensemble:
+Le système expert a été refactorisé pour être modulaire, maintenable et extensible,
+tout en conservant une compatibilité 100% avec le frontend existant.
+
+Structure des Fichiers:
+- expert.py                      : FICHIER PRINCIPAL (nom conservé)
+- expert_models.py              : Modèles Pydantic
+- expert_services.py            : Logique métier
+- expert_utils.py               : Fonctions utilitaires
+- expert_integrations.py        : Gestionnaire intégrations
+- expert_debug.py               : Endpoints de debugging
+- __init__.py                   : Imports simplifiés (ce fichier)
+
+Avantages de la Refactorisation:
+✅ Maintenabilité - Séparation des préoccupations
+✅ Compatibilité - Mêmes endpoints et imports
+✅ Extensibilité - Ajout facile de nouvelles fonctionnalités
 """
 
-# Import conditionnel de tous les modules disponibles dans v1/
+# Le frontend continue à utiliser les mêmes imports
+# from app.api.v1.expert import router  ✅ Fonctionne toujours
+# from app.api.v1 import expert_router   ✅ Fonctionne toujours
+
+# Les endpoints restent identiques:
+# POST /api/v1/expert/ask
+# POST /api/v1/expert/ask-public
+# POST /api/v1/expert/ask-enhanced
+# POST /api/v1/expert/ask-enhanced-public
+# POST /api/v1/expert/feedback
+# GET /api/v1/expert/topics
+
+# Import du routeur principal expert
 try:
     from .expert import router as expert_router
-    print("✅ Module expert v1 importé")
-    EXPERT_AVAILABLE = True
+    from .expert import router  # Pour compatibilité with "from .expert import router"
 except ImportError as e:
-    print(f"❌ Erreur import expert v1: {e}")
+    print(f"Warning: Could not import expert router: {e}")
     expert_router = None
-    EXPERT_AVAILABLE = False
+    router = None
 
+# Imports optionnels des autres modules
 try:
     from .auth import router as auth_router
-    print("✅ Module auth v1 importé")
-    AUTH_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Erreur import auth v1: {e}")
+except ImportError:
     auth_router = None
-    AUTH_AVAILABLE = False
 
 try:
     from .admin import router as admin_router
-    print("✅ Module admin v1 importé")
-    ADMIN_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Erreur import admin v1: {e}")
+except ImportError:
     admin_router = None
-    ADMIN_AVAILABLE = False
-
-try:
-    from .health import router as health_router
-    print("✅ Module health v1 importé")
-    HEALTH_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Erreur import health v1: {e}")
-    health_router = None
-    HEALTH_AVAILABLE = False
-
-try:
-    from .system import router as system_router
-    print("✅ Module system v1 importé")
-    SYSTEM_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Erreur import system v1: {e}")
-    system_router = None
-    SYSTEM_AVAILABLE = False
 
 try:
     from .logging import router as logging_router
-    print("✅ Module logging v1 importé")
-    LOGGING_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Erreur import logging v1: {e}")
+except ImportError:
     logging_router = None
-    LOGGING_AVAILABLE = False
 
-# Export des routers disponibles
-__all__ = []
+# Import des modules expert refactorisés (optionnels)
+try:
+    from .expert_models import *
+except ImportError:
+    pass
 
-if EXPERT_AVAILABLE:
-    __all__.append('expert_router')
-if AUTH_AVAILABLE:
-    __all__.append('auth_router') 
-if ADMIN_AVAILABLE:
-    __all__.append('admin_router')
-if HEALTH_AVAILABLE:
-    __all__.append('health_router')
-if SYSTEM_AVAILABLE:
-    __all__.append('system_router')
-if LOGGING_AVAILABLE:
-    __all__.append('logging_router')
+try:
+    from .expert_services import ExpertService
+except ImportError:
+    ExpertService = None
 
-# Aussi exporter les modules pour compatibilité
-if EXPERT_AVAILABLE:
-    from . import expert
-if AUTH_AVAILABLE:
-    from . import auth
-if ADMIN_AVAILABLE:
-    from . import admin
-if HEALTH_AVAILABLE:
-    from . import health
-if SYSTEM_AVAILABLE:
-    from . import system
-if LOGGING_AVAILABLE:
-    from . import logging
+try:
+    from .expert_utils import *
+except ImportError:
+    pass
 
-print(f"📦 Modules API v1 disponibles: {__all__}")
-print(f"🔧 Status: Expert={EXPERT_AVAILABLE}, Auth={AUTH_AVAILABLE}, Admin={ADMIN_AVAILABLE}")
-print(f"🔧 Status: Health={HEALTH_AVAILABLE}, System={SYSTEM_AVAILABLE}, Logging={LOGGING_AVAILABLE}")
+try:
+    from .expert_integrations import IntegrationsManager
+except ImportError:
+    IntegrationsManager = None
+
+try:
+    from .expert_debug import router as debug_router
+except ImportError:
+    debug_router = None
+
+# Liste des modules/routeurs disponibles pour debugging
+available_modules = {
+    "expert_router": expert_router is not None,
+    "auth_router": auth_router is not None,
+    "admin_router": admin_router is not None,
+    "logging_router": logging_router is not None,
+    "debug_router": debug_router is not None,
+    "expert_service": ExpertService is not None,
+    "integrations_manager": IntegrationsManager is not None,
+}
+
+# Routeurs actifs
+active_routers = []
+if expert_router:
+    active_routers.append(("expert", expert_router))
+if auth_router:
+    active_routers.append(("auth", auth_router))
+if admin_router:
+    active_routers.append(("admin", admin_router))
+if logging_router:
+    active_routers.append(("logging", logging_router))
+if debug_router:
+    active_routers.append(("debug", debug_router))
+
+# Export public - maintient la compatibilité
+__all__ = [
+    # Routeurs principaux
+    "expert_router",
+    "router",  # Alias pour expert_router
+    "auth_router", 
+    "admin_router",
+    "logging_router",
+    "debug_router",
+    
+    # Services
+    "ExpertService",
+    "IntegrationsManager",
+    
+    # Informations système
+    "available_modules",
+    "active_routers"
+]
+
+# Message de debug au démarrage (optionnel)
+def get_module_status():
+    """Retourne le statut des modules chargés"""
+    return {
+        "loaded_modules": sum(available_modules.values()),
+        "total_modules": len(available_modules),
+        "details": available_modules,
+        "active_routers_count": len(active_routers)
+    }
