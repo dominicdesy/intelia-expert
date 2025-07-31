@@ -23,7 +23,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const ensureFloatButtonVisible = useCallback(() => {
     console.log('🔧 [ZohoSalesIQ] Vérification visibilité bouton flottant')
     
-    const floatButton = document.querySelector('#zsiq_float')
+    const floatButton = document.querySelector('#zsiq_float') as HTMLElement
     if (floatButton && floatButton.classList.contains('zsiq-hide')) {
       console.log('📌 [ZohoSalesIQ] Retrait classe zsiq-hide pour rendre visible')
       floatButton.classList.remove('zsiq-hide')
@@ -36,7 +36,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     console.log('🔧 [ZohoSalesIQ] Vérification et masquage fenêtre chat si ouverte')
     
     // Masquer la fenêtre principale de chat si elle est ouverte
-    const chatWindow = document.querySelector('#zsiq_agelif, .zsiq_theme1, .siq-widgetwindow')
+    const chatWindow = document.querySelector('#zsiq_agelif, .zsiq_theme1, .siq-widgetwindow') as HTMLElement
     if (chatWindow && !chatWindow.classList.contains('zsiq-hide')) {
       console.log('📌 [ZohoSalesIQ] Masquage fenêtre de chat automatiquement ouverte')
       
@@ -65,7 +65,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     console.log('🔧 [ZohoSalesIQ] Application fixes accessibilité Microsoft Edge')
     
     // ✅ FIX 1: Interactive controls must not be nested
-    const floatButton = document.querySelector('#zsiq_float')
+    const floatButton = document.querySelector('#zsiq_float') as HTMLElement
     if (floatButton) {
       // Supprimer les attributs role imbriqués problématiques
       const nestedControls = floatButton.querySelectorAll('[role="button"]')
