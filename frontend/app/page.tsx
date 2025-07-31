@@ -772,124 +772,7 @@ export default function LoginPage() {
                 </label>
                 <div className="mt-1">
                   <input
-                    id="companyLinkedin"
-                    type="url"
-                    value={signupData.companyLinkedin}
-                    onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
-                    placeholder="https://linkedin.com/company/votre-entreprise"
-                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="button"
-                  onClick={handleSignup}
-                  disabled={isLoading}
-                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>{t.creating}</span>
-                    </div>
-                  ) : (
-                    t.signup
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Section des boutons de basculement - seulement visible en mode connexion */}
-          {!isSignupMode && (
-            <>
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="bg-white px-2 text-gray-500">
-                      {t.newToIntelia}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    onClick={toggleMode}
-                    className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                  >
-                    {t.createAccount}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Toggle pour revenir au login depuis signup */}
-          {isSignupMode && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-gray-500">
-                    {t.alreadyHaveAccount}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                >
-                  {t.backToLogin}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Section RGPD */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center leading-relaxed">
-              {t.gdprNotice}{' '}
-              <a href="/terms" className="text-blue-600 hover:text-blue-500 transition-colors">
-                {t.terms}
-              </a>{' '}
-              et notre{' '}
-              <a href="/privacy" className="text-blue-600 hover:text-blue-500 transition-colors">
-                {t.privacy}
-              </a>
-              .
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Section d'aide */}
-      <div className="mt-8 text-center">
-        <p className="text-xs text-gray-500">
-          {t.needHelp}{' '}
-          <button
-            type="button"
-            onClick={() => window.open('mailto:support@intelia.com', '_blank')}
-            className="text-blue-600 hover:underline font-medium"
-          >
-            {t.contactSupport}
-          </button>
-        </p>
-      </div>
-    </div>
-  )
-}d="email"
+                    id="email"
                     name="email"
                     type="email"
                     autoComplete="email"
@@ -989,7 +872,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Formulaire d'inscription - identique à votre code existant */}
+          {/* Formulaire d'inscription */}
           {isSignupMode && (
             <div className="space-y-6 pt-2">
               {/* Section: Informations personnelles */}
@@ -1315,4 +1198,121 @@ export default function LoginPage() {
                     {t.companyLinkedin} <span className="text-gray-500 text-xs">{t.optional}</span>
                   </label>
                   <input
-                    i
+                    id="companyLinkedin"
+                    type="url"
+                    value={signupData.companyLinkedin}
+                    onChange={(e) => handleSignupChange('companyLinkedin', e.target.value)}
+                    placeholder="https://linkedin.com/company/votre-entreprise"
+                    className="mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={handleSignup}
+                  disabled={isLoading}
+                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>{t.creating}</span>
+                    </div>
+                  ) : (
+                    t.signup
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Section des boutons de basculement - seulement visible en mode connexion */}
+          {!isSignupMode && (
+            <>
+              <div className="mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="bg-white px-2 text-gray-500">
+                      {t.newToIntelia}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={toggleMode}
+                    className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                  >
+                    {t.createAccount}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Toggle pour revenir au login depuis signup */}
+          {isSignupMode && (
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-2 text-gray-500">
+                    {t.alreadyHaveAccount}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  {t.backToLogin}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Section RGPD */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-xs text-gray-500 text-center leading-relaxed">
+              {t.gdprNotice}{' '}
+              <a href="/terms" className="text-blue-600 hover:text-blue-500 transition-colors">
+                {t.terms}
+              </a>{' '}
+              et notre{' '}
+              <a href="/privacy" className="text-blue-600 hover:text-blue-500 transition-colors">
+                {t.privacy}
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section d'aide */}
+      <div className="mt-8 text-center">
+        <p className="text-xs text-gray-500">
+          {t.needHelp}{' '}
+          <button
+            type="button"
+            onClick={() => window.open('mailto:support@intelia.com', '_blank')}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            {t.contactSupport}
+          </button>
+        </p>
+      </div>
+    </div>
+  )
+}
