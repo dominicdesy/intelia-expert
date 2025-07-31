@@ -1,20 +1,7 @@
 // ==================== API SERVICE AVEC AUTHENTIFICATION + CONVERSATION_ID ====================
 
-// ✅ SÉCURISÉ: Configuration depuis variables d'environnement
-const getApiConfig = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  
-  if (!baseUrl) {
-    console.error('❌ NEXT_PUBLIC_API_BASE_URL environment variable is required')
-    throw new Error('API configuration missing - check environment variables')
-  }
-  
-  return `${baseUrl}/api/${version}`
-}
-
-// ✅ VALIDATION CONFIGURATION AU RUNTIME
-const API_BASE_URL = getApiConfig()
+// Configuration de base
+const API_BASE_URL = 'https://expert-app-cngws.ondigitalocean.app/api/v1'
 
 // ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION
 const getAuthToken = (): string | null => {
