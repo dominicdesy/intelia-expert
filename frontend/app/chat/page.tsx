@@ -449,28 +449,11 @@ export default function ChatInterface() {
             className="flex-1 overflow-y-auto px-4 py-6"
           >
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* ✅ DEBUG INFO - À RETIRER EN PRODUCTION */}
-              <div className="text-xs text-gray-400 text-center">
-                DEBUG: {messages.length} messages - Conversation: {currentConversation?.id}
-                <br />
-                {currentConversation?.id !== 'welcome' && `Conversation active: ${currentConversation?.id}`}
-              </div>
-
               {hasMessages && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
                     {getCurrentDate()}
                   </span>
-                </div>
-              )}
-
-              {currentConversation && currentConversation.id !== 'welcome' && (
-                <div className="text-center">
-                  <div className="inline-flex items-center space-x-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-full">
-                    <span>📖</span>
-                    <span>Conversation : {currentConversation.title}</span>
-                    <span className="text-blue-400">({currentConversation.message_count} messages)</span>
-                  </div>
                 </div>
               )}
 
