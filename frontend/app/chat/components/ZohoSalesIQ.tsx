@@ -1,4 +1,4 @@
-// components/ZohoSalesIQ.tsx - VERSION STABLE: Langue fixe pour la session + Corrections Sécurité
+// components/ZohoSalesIQ.tsx - VERSION CORRIGÉE POUR MICROSOFT EDGE
 
 import { useEffect, useRef, useCallback } from 'react'
 
@@ -31,43 +31,64 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   }, [])
 
-  // ✅ NOUVELLE FONCTION: Fix accessibilité widget Zoho
+  // ✅ NOUVEAU: Fix accessibilité Microsoft Edge
   const fixZohoAccessibility = useCallback(() => {
-    console.log('🔧 [ZohoSalesIQ] Application fixes accessibilité')
+    console.log('🔧 [ZohoSalesIQ] Application fixes accessibilité Microsoft Edge')
     
-    // ✅ FIX #2: ARIA commands must have accessible name
-    const closeButton = document.querySelector('#hide-widget.siqico-close')
-    if (closeButton && !closeButton.getAttribute('aria-label')) {
-      closeButton.setAttribute('aria-label', 'Fermer le widget de discussion')
-      closeButton.setAttribute('title', 'Fermer le widget de discussion')
-      console.log('✅ [ZohoSalesIQ] aria-label ajouté au bouton fermer')
-    }
-
-    // ✅ FIX #3: Interactive controls must not be nested
+    // ✅ FIX 1: Interactive controls must not be nested
     const floatButton = document.querySelector('#zsiq_float')
     if (floatButton) {
-      // Vérifier s'il y a des éléments imbriqués avec tabindex négatif
-      const nestedElements = floatButton.querySelectorAll('[tabindex="-1"]')
-      nestedElements.forEach((element) => {
-        // Retirer tabindex négatif des éléments imbriqués
-        element.removeAttribute('tabindex')
-        console.log('✅ [ZohoSalesIQ] tabindex négatif retiré d\'élément imbriqué')
+      // Supprimer les attributs role imbriqués problématiques
+      const nestedControls = floatButton.querySelectorAll('[role="button"]')
+      nestedControls.forEach((control, index) => {
+        if (index > 0) { // Garder le premier, supprimer les autres
+          control.removeAttribute('role')
+          control.removeAttribute('tabindex')
+          console.log('✅ [ZohoSalesIQ] Contrôle imbriqué corrigé')
+        }
       })
-
-      // S'assurer que le bouton flottant a les bons attributs ARIA
+      
+      // S'assurer d'un seul point d'interaction
       if (!floatButton.getAttribute('aria-label')) {
-        floatButton.setAttribute('aria-label', 'Ouvrir le widget de discussion')
-        floatButton.setAttribute('title', 'Ouvrir le widget de discussion')
-        console.log('✅ [ZohoSalesIQ] aria-label ajouté au bouton flottant')
+        floatButton.setAttribute('aria-label', 'Ouvrir le support chat')
+        floatButton.setAttribute('title', 'Ouvrir le support chat')
       }
+      
+      // Supprimer les éléments interactifs redondants
+      const redundantButtons = floatButton.querySelectorAll('div[onclick], span[onclick]')
+      redundantButtons.forEach(btn => {
+        btn.removeAttribute('onclick')
+        btn.removeAttribute('role')
+        btn.removeAttribute('tabindex')
+      })
     }
 
-    // Rechercher d'autres éléments Zoho qui pourraient avoir besoin de labels
-    const zohoElements = document.querySelectorAll('[class*="zsiq"], [id*="zsiq"]')
-    zohoElements.forEach((element) => {
-      if (element.getAttribute('role') === 'button' && !element.getAttribute('aria-label')) {
-        element.setAttribute('aria-label', 'Widget de discussion')
-        console.log('✅ [ZohoSalesIQ] aria-label ajouté à élément Zoho')
+    // ✅ FIX 2: ARIA commands must have accessible name
+    const interactiveElements = document.querySelectorAll('#zsiq_float [role="button"], .siqico-close, [class*="zsiq"][onclick]')
+    interactiveElements.forEach(element => {
+      if (!element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby')) {
+        const className = element.className
+        let label = 'Élément interactif du chat'
+        
+        if (className.includes('close')) {
+          label = 'Fermer le chat'
+        } else if (className.includes('minimize')) {
+          label = 'Réduire le chat'
+        } else if (className.includes('maximize')) {
+          label = 'Agrandir le chat'
+        }
+        
+        element.setAttribute('aria-label', label)
+        element.setAttribute('title', label)
+        console.log('✅ [ZohoSalesIQ] aria-label ajouté:', label)
+      }
+    })
+
+    // ✅ FIX 3: Supprimer les tabindex négatifs qui causent des problèmes
+    const negativeTabIndex = document.querySelectorAll('[tabindex="-1"]')
+    negativeTabIndex.forEach(element => {
+      if (element.closest('#zsiq_float')) {
+        element.removeAttribute('tabindex')
       }
     })
   }, [])
@@ -127,13 +148,13 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
                 window.$zoho.salesiq.floatwindow.visible('show')
                 console.log('👁️ [ZohoSalesIQ] Widget affiché')
                 
+                // ✅ APPLIQUER LES FIXES APRÈS AFFICHAGE
                 setTimeout(() => {
                   ensureFloatButtonVisible()
-                  // ✅ NOUVEAU: Appliquer les fixes d'accessibilité
-                  fixZohoAccessibility()
+                  fixZohoAccessibility() // ✅ NOUVEAU: Fix accessibilité
                 }, 1000)
                 
-                // Vérification supplémentaire avec fixes accessibilité
+                // ✅ VÉRIFICATION SUPPLÉMENTAIRE
                 setTimeout(() => {
                   ensureFloatButtonVisible()
                   fixZohoAccessibility() // ✅ NOUVEAU: Fix accessibilité répété
@@ -159,7 +180,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
     
     configureAttempt()
-  }, [user, ensureFloatButtonVisible, fixZohoAccessibility])
+  }, [user, ensureFloatButtonVisible, fixZohoAccessibility]) // ✅ AJOUT fixZohoAccessibility
 
   const loadZohoWithLanguage = useCallback((lang: string) => {
     console.log('🚀 [ZohoSalesIQ] Chargement widget avec langue de session:', lang)
@@ -227,6 +248,24 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   }, [user, initializeZohoObject, configureWidget])
 
+  // ✅ NOUVEAU: Observer DOM pour fixes continus
+  useEffect(() => {
+    if (!widgetLoadedRef.current) return
+
+    const observer = new MutationObserver(() => {
+      setTimeout(fixZohoAccessibility, 500)
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    })
+
+    return () => observer.disconnect()
+  }, [fixZohoAccessibility])
+
   // ✅ EFFET PRINCIPAL: Langue fixe pour la session
   useEffect(() => {
     console.log('🌐 [ZohoSalesIQ] Effet déclenché - Langue courante:', language, 'User:', !!user?.email)
@@ -263,32 +302,6 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
     
   }, [language, user?.email, loadZohoWithLanguage])
-
-  // ✅ NOUVEAU: Observer les changements DOM pour appliquer les fixes
-  useEffect(() => {
-    if (!widgetLoadedRef.current) return
-
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList') {
-          // Appliquer les fixes quand le DOM change
-          setTimeout(() => {
-            fixZohoAccessibility()
-          }, 500)
-        }
-      })
-    })
-
-    // Observer les changements dans le body pour détecter l'ajout du widget
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    })
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [fixZohoAccessibility])
 
   // Nettoyage à la destruction du composant
   useEffect(() => {
