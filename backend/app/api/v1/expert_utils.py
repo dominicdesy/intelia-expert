@@ -1,77 +1,4 @@
-"""
-app/api/v1/expert_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
-
-Fonctions utilitaires communes pour le système expert
-"""
-
-import os
-import logging
-import uuid
-import hashlib
-from datetime import datetime
-from typing import Optional, Dict, Any
-
-from fastapi import Request
-
-logger = logging.getLogger(__name__)
-
-# =============================================================================
-# FONCTIONS UTILITAIRES GÉNÉRALES
-# =============================================================================
-
-def get_user_id_from_request(fastapi_request: Request) -> str:
-    """Extrait l'ID utilisateur de la requête"""
-    try:
-        user = getattr(fastapi_request.state, "user", None)
-        if user:
-            return str(user.get("id", user.get("user_id", "authenticated_user")))
-        
-        client_ip = fastapi_request.client.host if fastapi_request.client else "unknown"
-        user_agent = fastapi_request.headers.get("user-agent", "unknown")
-        
-        anonymous_data = f"{client_ip}_{user_agent}_{datetime.now().strftime('%Y-%m-%d')}"
-        anonymous_id = f"anon_{hashlib.md5(anonymous_data.encode()).hexdigest()[:8]}"
-        
-        return anonymous_id
-        
-    except Exception as e:
-        logger.warning(f"⚠️ [Expert Utils] Erreur génération user_id: {e}")
-        return f"anon_{uuid.uuid4().hex[:8]}"
-
-def build_enriched_question_from_clarification(
-    original_question: str,
-    clarification_response: str,
-    conversation_context: str = ""
-) -> str:
-    """Construit une question enrichie après clarification"""
-    
-    enriched_parts = [original_question]
-    
-    if clarification_response.strip():
-        enriched_parts.append(f"Information supplémentaire: {clarification_response.strip()}")
-    
-    if conversation_context.strip():
-        enriched_parts.append(f"Contexte: {conversation_context.strip()}")
-    
-    return "\n\n".join(enriched_parts)
-
-def get_fallback_response_enhanced(question: str, language: str = "fr") -> str:
-    """Réponse de fallback améliorée"""
-    try:
-        safe_question = str(question)[:50] if question else "votre question"
-    except:
-        safe_question = "votre question"
-    
-    fallback_responses = {
-        "fr": f"Je suis un expert vétérinaire spécialisé en aviculture. Pour votre question '{safe_question}...', je recommande de surveiller attentivement les paramètres de performance et de maintenir des conditions d'élevage optimales. Pour une réponse plus précise, pourriez-vous spécifier la race et l'âge de vos poulets ?",
-        "en": f"I am a veterinary expert specialized in poultry. For your question '{safe_question}...', I recommend closely monitoring performance parameters and maintaining optimal breeding conditions. For a more precise answer, could you specify the breed and age of your chickens?",
-        "es": f"Soy un experto veterinario especializado en avicultura. Para su pregunta '{safe_question}...', recomiendo monitorear cuidadosamente los parámetros de rendimiento y mantener condiciones óptimas de crianza. Para una respuesta más precisa, ¿podría especificar la raza y edad de sus pollos?"
-    }
-    return fallback_responses.get(language.lower(), fallback_responses["fr"])
-
-# =============================================================================
-# FONCTIONS DE TRAITEMENT OPENAI
-# =============================================================================
+# Dans expert_utils.py, remplacer la fonction process_question_with_enhanced_prompt
 
 async def process_question_with_enhanced_prompt(
     question: str, 
@@ -80,7 +7,7 @@ async def process_question_with_enhanced_prompt(
     extracted_entities: Dict = None,
     conversation_context: str = ""
 ) -> str:
-    """Traite une question avec prompt amélioré pour données numériques"""
+    """Traite une question avec prompt amélioré AVEC DONNÉES DE RÉFÉRENCE ROSS 308"""
     
     try:
         import openai
@@ -91,49 +18,96 @@ async def process_question_with_enhanced_prompt(
         
         openai.api_key = api_key
         
-        # Prompt amélioré avec données numériques
+        # ✅ DONNÉES DE RÉFÉRENCE ROSS 308 INTÉGRÉES
+        reference_data = """
+DONNÉES DE RÉFÉRENCE AVICULTURE (UTILISATION OBLIGATOIRE) :
+
+🐔 Ross 308 - Poids Standards (À UTILISER EXACTEMENT) :
+- Jour 1: 42-45g
+- Jour 7: 160-180g  
+- Jour 12: 340-370g ← CRITIQUE ! (JAMAIS 700-900g)
+- Jour 14: 430-470g
+- Jour 21: 800-900g
+- Jour 28: 1400-1600g
+- Jour 35: 2000-2300g
+- Jour 42: 2500-2800g
+
+🐔 Cobb 500 - Poids Standards :
+- Jour 12: 320-350g
+- Jour 21: 750-850g
+- Jour 42: 2400-2700g
+
+RÈGLES CRITIQUES OBLIGATOIRES :
+- Ross 308 jour 12 = 340-370g (JAMAIS autre chose !)
+- Si contexte mentionne Ross 308 + âge = réponse PRÉCISE obligatoire
+- Utilise TOUJOURS ces données exactes, jamais d'approximations
+"""
+
+        # ✅ PROMPT AMÉLIORÉ avec détection contextuelle
         enhanced_prompts = {
-            "fr": f"""Tu es un expert vétérinaire spécialisé en santé et nutrition animale, particulièrement pour les poulets de chair. 
+            "fr": f"""{reference_data}
+
+Tu es un expert en production avicole spécialisé en santé et nutrition animale. Tu assists tous les acteurs de la filière : fermiers, vétérinaires, nutritionnistes, consultants et techniciens.
 
 CONSIGNES CRITIQUES:
-1. Si la question porte sur le poids, la croissance ou des valeurs numériques, donne TOUJOURS une réponse chiffrée précise
-2. Utilise le contexte conversationnel fourni pour personnaliser ta réponse
-3. Commence par répondre directement à la question, puis donne des conseils complémentaires
-4. Utilise tous les caractères français (é, è, à, ç, ù, etc.) et symboles (°C, %, g, kg)
+1. UTILISE OBLIGATOIREMENT les données de référence ci-dessus
+2. Si le contexte mentionne "Ross 308" et un âge, donne la réponse EXACTE
+3. Ross 308 de 12 jours = 340-370g (JAMAIS 700-900g !)
+4. Si pronom "son/sa/ses" + âge mentionné = utilise la race du contexte
+5. Commence par répondre directement avec les chiffres exacts
 
 Contexte conversationnel disponible:
 {conversation_context}
 
-IMPORTANT: Si des informations spécifiques sont mentionnées (race, âge), utilise-les pour donner une réponse précise et chiffrée.""",
+EXEMPLE CRITIQUE :
+Contexte précédent: "Ross 308"
+Question: "Quel est son poids idéal au jour 12 ?"
+Réponse CORRECTE: "Pour un Ross 308 de 12 jours, le poids idéal se situe entre 340-370 grammes selon les standards de performance. Si vos poulets pèsent moins de 320g à cet âge, cela peut indiquer un problème nutritionnel."
 
-            "en": f"""You are a veterinary expert specialized in animal health and nutrition, particularly for broiler chickens.
+IMPORTANT: 
+- Détecte les références contextuelles ("son", "sa", "ils", etc.)
+- Utilise le contexte fourni pour identifier la race
+- Donne TOUJOURS des réponses chiffrées précises
+- UTILISE les données de référence ci-dessus OBLIGATOIREMENT""",
+
+            "en": f"""{reference_data}
+
+You are an expert in poultry production specialized in animal health and nutrition. You assist all stakeholders in the industry: farmers, veterinarians, nutritionists, consultants and technicians.
 
 CRITICAL INSTRUCTIONS:
-1. If the question is about weight, growth or numerical values, ALWAYS provide precise numerical answers
-2. Use the provided conversational context to personalize your response  
-3. Start by directly answering the question, then provide additional advice
-4. Provide industry-standard data and recommendations
+1. USE the reference data above MANDATORILY
+2. If context mentions "Ross 308" and age, give EXACT answer
+3. Ross 308 at 12 days = 340-370g (NEVER 700-900g!)
+4. If pronoun "its/their" + age mentioned = use breed from context
+5. Start by directly answering with exact figures
 
 Available conversational context:
 {conversation_context}
 
-IMPORTANT: If specific information is mentioned (breed, age), use it to provide precise, numerical answers.""",
+IMPORTANT: Always use the reference data above, never approximations!""",
 
-            "es": f"""Eres un experto veterinario especializado en salud y nutrición animal, particularmente para pollos de engorde.
+            "es": f"""{reference_data}
+
+Eres un experto en producción avícola especializado en salud y nutrición animal. Asistes a todos los actores de la industria: granjeros, veterinarios, nutricionistas, consultores y técnicos.
 
 INSTRUCCIONES CRÍTICAS:
-1. Si la pregunta es sobre peso, crecimiento o valores numéricos, da SIEMPRE una respuesta numérica precisa
-2. Usa el contexto conversacional proporcionado para personalizar tu respuesta
-3. Comienza respondiendo directamente a la pregunta, luego da consejos adicionales  
-4. Usa todos los caracteres especiales del español (ñ, ¿, ¡, acentos)
+1. USA los datos de referencia arriba OBLIGATORIAMENTE
+2. Si el contexto menciona "Ross 308" y edad, da respuesta EXACTA
+3. Ross 308 a los 12 días = 340-370g (¡NUNCA 700-900g!)
+4. Si pronombre "su/sus" + edad mencionada = usa raza del contexto
+5. Comienza respondiendo directamente con cifras exactas
 
 Contexto conversacional disponible:
 {conversation_context}
 
-IMPORTANTE: Si se menciona información específica (raza, edad), úsala para dar una respuesta precisa y numérica."""
+IMPORTANTE: Usa SIEMPRE los datos de referencia arriba, ¡nunca aproximaciones!"""
         }
         
         system_prompt = enhanced_prompts.get(language.lower(), enhanced_prompts["fr"])
+        
+        # ✅ DEBUG LOG pour voir le contexte
+        logger.info(f"🔍 [Expert Utils] Question: {question}")
+        logger.info(f"🔍 [Expert Utils] Contexte: {conversation_context[:100]}...")
         
         # Configuration par mode
         model_config = {
@@ -150,114 +124,16 @@ IMPORTANTE: Si se menciona información específica (raza, edad), úsala para da
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": str(question)}
             ],
-            temperature=0.7,
+            temperature=0.1,  # ← Réduire pour plus de précision
             max_tokens=config["max_tokens"],
             timeout=20
         )
         
         answer = response.choices[0].message.content
+        logger.info(f"🤖 [Expert Utils] Réponse GPT: {answer[:100]}...")
+        
         return str(answer) if answer else get_fallback_response_enhanced(question, language)
         
     except Exception as e:
         logger.error(f"❌ [Expert Utils] Erreur OpenAI: {e}")
         return get_fallback_response_enhanced(question, language)
-
-# =============================================================================
-# FONCTIONS DE TOPICS
-# =============================================================================
-
-def get_enhanced_topics_by_language():
-    """Retourne les topics enrichis par langue"""
-    return {
-        "fr": [
-            "Poids normal Ross 308 de 12 jours (340-370g attendu)",
-            "Température optimale poulailler (32°C démarrage)",
-            "Mortalité élevée diagnostic (>5% problématique)", 
-            "Problèmes de croissance retard développement",
-            "Protocoles vaccination Gumboro + Newcastle",
-            "Indice de conversion alimentaire optimal (1.6-1.8)",
-            "Ventilation et qualité d'air bâtiment fermé",
-            "Densité élevage optimale (15-20 poulets/m²)"
-        ],
-        "en": [
-            "Normal weight Ross 308 at 12 days (340-370g expected)",
-            "Optimal broiler house temperature (32°C starter)",
-            "High mortality diagnosis (>5% problematic)",
-            "Growth problems development delays",
-            "Vaccination protocols Gumboro + Newcastle", 
-            "Optimal feed conversion ratio (1.6-1.8)",
-            "Ventilation and air quality closed buildings",
-            "Optimal stocking density (15-20 birds/m²)"
-        ],
-        "es": [
-            "Peso normal Ross 308 a los 12 días (340-370g esperado)",
-            "Temperatura óptima galpón (32°C iniciador)",
-            "Diagnóstico mortalidad alta (>5% problemático)",
-            "Problemas crecimiento retrasos desarrollo",
-            "Protocolos vacunación Gumboro + Newcastle",
-            "Índice conversión alimentaria óptimo (1.6-1.8)",
-            "Ventilación y calidad aire edificios cerrados", 
-            "Densidad crianza óptima (15-20 pollos/m²)"
-        ]
-    }
-
-# =============================================================================
-# FONCTIONS DE SAUVEGARDE
-# =============================================================================
-
-async def save_conversation_auto_enhanced(
-    conversation_id: str,
-    question: str, 
-    response: str,
-    user_id: str = "anonymous",
-    language: str = "fr",
-    rag_used: bool = False,
-    rag_score: float = None,
-    response_time_ms: int = 0
-) -> bool:
-    """Sauvegarde automatique enhanced - Compatible avec logging existant"""
-    
-    try:
-        from app.api.v1.logging import logger_instance, ConversationCreate
-        
-        if not logger_instance:
-            logger.warning("⚠️ [Expert Utils] Logging non disponible pour sauvegarde")
-            return False
-        
-        # Créer l'objet conversation
-        conversation = ConversationCreate(
-            user_id=str(user_id),
-            question=str(question),
-            response=str(response),
-            conversation_id=conversation_id,
-            confidence_score=rag_score,
-            response_time_ms=response_time_ms,
-            language=language,
-            rag_used=rag_used
-        )
-        
-        # Essayer différentes méthodes de sauvegarde
-        if hasattr(logger_instance, 'log_conversation'):
-            logger_instance.log_conversation(conversation)
-            logger.info(f"✅ [Expert Utils] Conversation sauvegardée: {conversation_id}")
-            return True
-        elif hasattr(logger_instance, 'save_conversation'):
-            logger_instance.save_conversation(conversation)
-            logger.info(f"✅ [Expert Utils] Conversation sauvegardée: {conversation_id}")
-            return True
-        else:
-            logger.warning("⚠️ [Expert Utils] Aucune méthode de sauvegarde disponible")
-            return False
-        
-    except ImportError:
-        logger.warning("⚠️ [Expert Utils] Module logging non disponible")
-        return False
-    except Exception as e:
-        logger.error(f"❌ [Expert Utils] Erreur sauvegarde: {e}")
-        return False
-
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-
-logger.info("✅ [Expert Utils] Fonctions utilitaires initialisées")
