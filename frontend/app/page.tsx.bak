@@ -30,7 +30,11 @@ const translations = {
     createAccount: 'Créer un compte',
     authSuccess: 'Connexion réussie ! Bienvenue.',
     authError: 'Erreur de connexion, veuillez réessayer.',
-    authIncomplete: 'Connexion incomplète, veuillez réessayer.'
+    authIncomplete: 'Connexion incomplète, veuillez réessayer.',
+    alreadyLoggedIn: 'Vous êtes déjà connecté !',
+    goToChat: 'Aller au Chat',
+    logout: 'Se déconnecter',
+    redirectError: 'Redirection automatique échouée'
   },
   en: {
     title: 'Intelia Expert',
@@ -55,7 +59,11 @@ const translations = {
     createAccount: 'Create account',
     authSuccess: 'Successfully logged in! Welcome.',
     authError: 'Login error, please try again.',
-    authIncomplete: 'Incomplete login, please try again.'
+    authIncomplete: 'Incomplete login, please try again.',
+    alreadyLoggedIn: 'You are already logged in!',
+    goToChat: 'Go to Chat',
+    logout: 'Logout',
+    redirectError: 'Automatic redirect failed'
   }
 }
 
@@ -135,14 +143,17 @@ export default function LoginPage() {
   // ✅ UTILISER VOTRE AUTHSTORE EXISTANT
   const { 
     login, 
+    logout,
     isLoading, 
     isAuthenticated,
     hasHydrated 
   } = useAuthStore()
 
-  // 🛡️ PROTECTION CONTRE BOUCLES - VERSION SIMPLIFIÉE
+  // 🛡️ PROTECTION ANTI-BOUCLE MAXIMALE
   const [isInitialized, setIsInitialized] = useState(false)
   const redirectInProgress = useRef(false)
+  const redirectAttempted = useRef(false)
+  const [showAlreadyLoggedIn, setShowAlreadyLoggedIn] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [localError, setLocalError] = useState('')
@@ -161,7 +172,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (isInitialized) return
     
-    console.log('🔧 [Login] Initialisation unique')
+    console.log('🔧 [Login] Initialisation unique - STOP LOOP')
     
     // Charger préférences de base
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -183,19 +194,42 @@ export default function LoginPage() {
     setIsInitialized(true)
   }, [])
 
-  // ✅ REDIRECTION PROTÉGÉE UTILISANT VOTRE AUTHSTORE
+  // 🚨 REDIRECTION CONTRÔLÉE - UNE SEULE FOIS
   useEffect(() => {
-    if (!hasHydrated || !isInitialized || redirectInProgress.current) {
+    if (!hasHydrated || !isInitialized) {
       return
     }
 
     if (isAuthenticated && !isLoading) {
-      console.log('✅ [Login] Utilisateur connecté via AuthStore, redirection')
-      redirectInProgress.current = true
+      console.log('⚠️ [Login] Utilisateur déjà connecté détecté')
       
-      setTimeout(() => {
-        window.location.href = '/chat'
-      }, 500)
+      // Si pas encore tenté de rediriger
+      if (!redirectAttempted.current && !redirectInProgress.current) {
+        console.log('🚀 [Login] Première tentative de redirection vers /chat')
+        redirectAttempted.current = true
+        redirectInProgress.current = true
+        
+        // Essayer la redirection UNE SEULE FOIS
+        setTimeout(() => {
+          try {
+            window.location.href = '/chat'
+          } catch (error) {
+            console.error('❌ [Login] Redirection échouée:', error)
+            // Si redirection échoue, afficher l'interface "déjà connecté"
+            redirectInProgress.current = false
+            setShowAlreadyLoggedIn(true)
+          }
+        }, 1000)
+        
+        // Si après 5 secondes on est toujours là, afficher l'interface
+        setTimeout(() => {
+          if (redirectInProgress.current) {
+            console.log('⏰ [Login] Timeout redirection - affichage interface manuelle')
+            redirectInProgress.current = false
+            setShowAlreadyLoggedIn(true)
+          }
+        }, 5000)
+      }
     }
   }, [isAuthenticated, isLoading, hasHydrated, isInitialized])
 
@@ -258,7 +292,12 @@ export default function LoginPage() {
         return
       }
 
-      console.log('🔐 [Login] Utilisation AuthStore login:', loginData.email)
+      console.log('🔐 [Login] Nouvelle connexion:', loginData.email)
+      
+      // Reset les flags de redirection pour nouvelle connexion
+      redirectAttempted.current = false
+      redirectInProgress.current = false
+      setShowAlreadyLoggedIn(false)
       
       // ✅ UTILISER VOTRE MÉTHODE LOGIN EXISTANTE
       await login(loginData.email.trim(), loginData.password)
@@ -273,7 +312,6 @@ export default function LoginPage() {
       }
       
       console.log('✅ [Login] Connexion AuthStore réussie')
-      // La redirection sera gérée par l'effect qui surveille isAuthenticated
       
     } catch (error: any) {
       console.error('❌ [Login] Erreur AuthStore:', error)
@@ -289,18 +327,35 @@ export default function LoginPage() {
         setLocalError(error.message || 'Erreur de connexion')
       }
       
-      // Réinitialiser les flags en cas d'erreur
+      // Reset flags en cas d'erreur
+      redirectAttempted.current = false
       redirectInProgress.current = false
     }
   }
 
+  const handleLogout = async () => {
+    try {
+      await logout()
+      redirectAttempted.current = false
+      redirectInProgress.current = false
+      setShowAlreadyLoggedIn(false)
+      setLocalSuccess('Déconnexion réussie')
+    } catch (error) {
+      setLocalError('Erreur lors de la déconnexion')
+    }
+  }
+
+  const handleManualRedirect = () => {
+    window.location.href = '/chat'
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading) {
+    if (e.key === 'Enter' && !isLoading && !showAlreadyLoggedIn) {
       handleLogin()
     }
   }
 
-  // ✅ AFFICHAGE CONDITIONNEL AMÉLIORÉ
+  // ✅ AFFICHAGE CONDITIONNEL
   if (!hasHydrated || !isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -319,7 +374,64 @@ export default function LoginPage() {
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirection...</p>
+          <p className="mt-4 text-gray-600">Redirection vers le chat...</p>
+          <p className="mt-2 text-xs text-gray-400">Si ça ne redirige pas, rafraîchissez la page</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 🎯 INTERFACE "DÉJÀ CONNECTÉ" pour éviter la boucle
+  if (showAlreadyLoggedIn && isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <InteliaLogo className="w-16 h-16" />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+            {t.title}
+          </h2>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 text-center">
+            
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex justify-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <div className="text-sm text-green-700 font-medium">
+                    {t.alreadyLoggedIn}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <button
+                onClick={handleManualRedirect}
+                className="w-full flex justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                {t.goToChat}
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                {t.logout}
+              </button>
+            </div>
+
+            <p className="mt-4 text-xs text-gray-500">
+              {t.redirectError}
+            </p>
+          </div>
         </div>
       </div>
     )
