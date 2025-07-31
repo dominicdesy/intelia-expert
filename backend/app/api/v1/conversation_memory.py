@@ -1,32 +1,27 @@
 """
-app/api/v1/question_clarification_system.py - VERSION CORRIGÉE AVEC GPT-4o-mini
+app/api/v1/conversation_memory_enhanced.py - VERSION AMÉLIORÉE AVEC IA
 
-CORRECTIONS MAJEURES:
-1. GPT-4o-mini par défaut pour meilleure intelligence
-2. Prompts plus stricts et exigeants
-3. Seuils optimisés pour moins de faux positifs
-4. Meilleure détection des races génériques vs spécifiques
-5. Système de validation renforcé
+AMÉLIORATIONS MAJEURES:
+1. Extraction d'entités intelligente via OpenAI (plus que les regex de base)
+2. Raisonnement contextuel dynamique pour éviter les clarifications redondantes
+3. Fusion intelligente d'informations entre messages
+4. Mise à jour dynamique des entités au fil de la conversation
+5. Contexte optimisé pour RAG et clarification
+6. Expiration intelligente selon l'activité
 """
 
 import os
-import re
 import json
 import logging
+import sqlite3
+import re
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, asdict, field
+from contextlib import contextmanager
 import time
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-from datetime import datetime
 
-# Import des settings Intelia
-try:
-    from app.config.settings import settings
-    SETTINGS_AVAILABLE = True
-except ImportError:
-    SETTINGS_AVAILABLE = False
-    settings = None
-
-# Import OpenAI sécurisé
+# Import OpenAI sécurisé pour extraction intelligente
 try:
     import openai
     OPENAI_AVAILABLE = True
@@ -37,701 +32,1145 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 @dataclass
-class ClarificationResult:
-    """Résultat de l'analyse de clarification"""
-    needs_clarification: bool
-    questions: Optional[List[str]] = None
+class IntelligentEntities:
+    """Entités extraites intelligemment avec raisonnement contextuel"""
+    
+    # Informations de base
+    breed: Optional[str] = None
+    breed_confidence: float = 0.0
+    breed_type: Optional[str] = None  # specific/generic
+    
+    # Âge avec conversion intelligente
+    age_days: Optional[int] = None
+    age_weeks: Optional[float] = None
+    age_confidence: float = 0.0
+    age_last_updated: Optional[datetime] = None
+    
+    # Performance et croissance
+    weight_grams: Optional[float] = None
+    weight_confidence: float = 0.0
+    expected_weight_range: Optional[Tuple[float, float]] = None
+    growth_rate: Optional[str] = None  # normal/slow/fast
+    
+    # Santé et problèmes
+    mortality_rate: Optional[float] = None
+    mortality_confidence: float = 0.0
+    symptoms: List[str] = field(default_factory=list)
+    health_status: Optional[str] = None  # good/concerning/critical
+    
+    # Environnement
+    temperature: Optional[float] = None
+    humidity: Optional[float] = None
+    housing_type: Optional[str] = None
+    ventilation_quality: Optional[str] = None
+    
+    # Alimentation
+    feed_type: Optional[str] = None
+    feed_conversion: Optional[float] = None
+    water_consumption: Optional[str] = None
+    
+    # Gestion et historique
+    flock_size: Optional[int] = None
+    vaccination_status: Optional[str] = None
+    previous_treatments: List[str] = field(default_factory=list)
+    
+    # Contextuel intelligent
+    problem_duration: Optional[str] = None
+    problem_severity: Optional[str] = None  # low/medium/high/critical
+    intervention_urgency: Optional[str] = None  # none/monitor/act/urgent
+    
+    # Métadonnées IA
+    extraction_method: str = "basic"  # basic/openai/hybrid
+    last_ai_update: Optional[datetime] = None
+    confidence_overall: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit en dictionnaire pour logs et stockage"""
+        result = {}
+        for key, value in asdict(self).items():
+            if value is not None:
+                if isinstance(value, datetime):
+                    result[key] = value.isoformat()
+                elif isinstance(value, tuple):
+                    result[key] = list(value)
+                else:
+                    result[key] = value
+        return result
+    
+    def get_critical_missing_info(self, question_type: str = "general") -> List[str]:
+        """Détermine les informations critiques manquantes selon le contexte"""
+        missing = []
+        
+        # Race toujours critique
+        if not self.breed or self.breed_type == "generic" or self.breed_confidence < 0.7:
+            missing.append("breed")
+        
+        # Âge critique pour la plupart des questions
+        if not self.age_days or self.age_confidence < 0.7:
+            missing.append("age")
+        
+        # Spécifique selon le type de question
+        if question_type in ["growth", "weight", "performance"]:
+            if not self.weight_grams and not self.growth_rate:
+                missing.append("current_performance")
+        elif question_type in ["health", "mortality", "disease"]:
+            if not self.symptoms and not self.health_status:
+                missing.append("symptoms")
+            if self.mortality_rate is None and "mortality" in question_type:
+                missing.append("mortality_rate")
+        elif question_type in ["environment", "temperature", "housing"]:
+            if not self.housing_type:
+                missing.append("housing_conditions")
+        elif question_type in ["feeding", "nutrition"]:
+            if not self.feed_type:
+                missing.append("feed_information")
+        
+        return missing
+    
+    def merge_with(self, other: 'IntelligentEntities') -> 'IntelligentEntities':
+        """Fusionne intelligemment avec une autre instance d'entités"""
+        merged = IntelligentEntities()
+        
+        # Logique de fusion pour chaque champ
+        for field_name, field_value in asdict(self).items():
+            other_value = getattr(other, field_name, None)
+            
+            # Prendre la valeur avec la meilleure confiance
+            if field_name.endswith('_confidence'):
+                base_field = field_name.replace('_confidence', '')
+                self_conf = field_value or 0.0
+                other_conf = getattr(other, field_name, 0.0) or 0.0
+                
+                if other_conf > self_conf:
+                    setattr(merged, base_field, getattr(other, base_field))
+                    setattr(merged, field_name, other_conf)
+                else:
+                    setattr(merged, base_field, getattr(self, base_field))
+                    setattr(merged, field_name, self_conf)
+            
+            # Fusionner les listes
+            elif isinstance(field_value, list):
+                self_list = field_value or []
+                other_list = other_value or []
+                # Garder les éléments uniques
+                merged_list = list(set(self_list + other_list))
+                setattr(merged, field_name, merged_list)
+            
+            # Prendre la valeur la plus récente pour les dates
+            elif isinstance(field_value, datetime):
+                if other_value and (not field_value or other_value > field_value):
+                    setattr(merged, field_name, other_value)
+                else:
+                    setattr(merged, field_name, field_value)
+            
+            # Logique par défaut
+            else:
+                if other_value is not None:
+                    setattr(merged, field_name, other_value)
+                elif field_value is not None:
+                    setattr(merged, field_name, field_value)
+        
+        merged.last_ai_update = datetime.now()
+        return merged
+
+@dataclass
+class ConversationMessage:
+    """Message dans une conversation avec métadonnées"""
+    id: str
+    conversation_id: str
+    user_id: str
+    role: str  # user/assistant
+    message: str
+    timestamp: datetime
+    language: str = "fr"
+    message_type: str = "text"  # text/clarification/response
+    extracted_entities: Optional[IntelligentEntities] = None
     confidence_score: float = 0.0
-    processing_time_ms: int = 0
-    reason: Optional[str] = None
-    model_used: Optional[str] = None
-    detected_info: Optional[Dict[str, str]] = None
+    processing_method: str = "basic"  # basic/ai_enhanced
     
-    def to_dict(self) -> Dict:
-        """Convertit en dictionnaire pour les logs"""
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            "needs_clarification": self.needs_clarification,
-            "questions": self.questions,
-            "questions_count": len(self.questions) if self.questions else 0,
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "user_id": self.user_id,
+            "role": self.role,
+            "message": self.message,
+            "timestamp": self.timestamp.isoformat(),
+            "language": self.language,
+            "message_type": self.message_type,
+            "extracted_entities": self.extracted_entities.to_dict() if self.extracted_entities else None,
             "confidence_score": self.confidence_score,
-            "processing_time_ms": self.processing_time_ms,
-            "reason": self.reason,
-            "model_used": self.model_used,
-            "detected_info": self.detected_info
+            "processing_method": self.processing_method
         }
 
-class QuestionClarificationSystem:
-    """
-    Système de clarification intelligent CORRIGÉ avec GPT-4o-mini.
-    Plus strict et précis pour éviter les faux positifs.
-    """
+@dataclass
+class IntelligentConversationContext:
+    """Contexte conversationnel intelligent avec raisonnement"""
+    conversation_id: str
+    user_id: str
+    messages: List[ConversationMessage] = field(default_factory=list)
     
-    def __init__(self):
-        """Initialise le système avec GPT-4o-mini et configuration stricte"""
+    # Entités consolidées intelligemment
+    consolidated_entities: IntelligentEntities = field(default_factory=IntelligentEntities)
+    
+    # Métadonnées contextuelles
+    language: str = "fr"
+    created_at: datetime = field(default_factory=datetime.now)
+    last_activity: datetime = field(default_factory=datetime.now)
+    total_exchanges: int = 0
+    
+    # État conversationnel intelligent
+    conversation_topic: Optional[str] = None
+    conversation_urgency: Optional[str] = None  # low/medium/high/critical
+    problem_resolution_status: Optional[str] = None  # identifying/diagnosing/treating/resolved
+    
+    # Optimisations IA
+    ai_enhanced: bool = False
+    last_ai_analysis: Optional[datetime] = None
+    needs_clarification: bool = False
+    clarification_questions: List[str] = field(default_factory=list)
+    
+    def add_message(self, message: ConversationMessage):
+        """Ajoute un message et met à jour le contexte intelligemment"""
+        self.messages.append(message)
+        self.last_activity = datetime.now()
+        self.total_exchanges += 1
         
-        # ✅ NOUVELLE CONFIGURATION OPTIMISÉE
-        if SETTINGS_AVAILABLE and settings:
-            self.enabled = getattr(settings, 'clarification_system_enabled', True)
-            self.model = getattr(settings, 'clarification_model', 'gpt-4o-mini')  # ✅ CHANGÉ
-            self.timeout = getattr(settings, 'clarification_timeout', 20)  # ✅ Augmenté
-            self.max_questions = getattr(settings, 'clarification_max_questions', 3)
-            self.min_question_length = getattr(settings, 'clarification_min_length', 15)
-            self.log_all_clarifications = getattr(settings, 'clarification_log_all', True)
-            self.confidence_threshold = getattr(settings, 'clarification_confidence_threshold', 0.7)  # ✅ Réduit
-        else:
-            # ✅ FALLBACK OPTIMISÉ depuis .env
-            self.enabled = os.getenv('ENABLE_CLARIFICATION_SYSTEM', 'true').lower() == 'true'
-            self.model = os.getenv('CLARIFICATION_MODEL', 'gpt-4o-mini')  # ✅ CHANGÉ
-            self.timeout = int(os.getenv('CLARIFICATION_TIMEOUT', '20'))  # ✅ Augmenté
-            self.max_questions = int(os.getenv('CLARIFICATION_MAX_QUESTIONS', '3'))
-            self.min_question_length = int(os.getenv('CLARIFICATION_MIN_LENGTH', '15'))
-            self.log_all_clarifications = os.getenv('LOG_ALL_CLARIFICATIONS', 'true').lower() == 'true'
-            self.confidence_threshold = float(os.getenv('CLARIFICATION_CONFIDENCE_THRESHOLD', '0.7'))  # ✅ Réduit
+        # Fusionner les entités si disponibles
+        if message.extracted_entities:
+            self.consolidated_entities = self.consolidated_entities.merge_with(message.extracted_entities)
         
-        logger.info(f"🔧 [ClarificationSystem] Clarification: {'✅ Activée' if self.enabled else '❌ Désactivée'}")
-        logger.info(f"🔧 [ClarificationSystem] Modèle: {self.model}, Timeout: {self.timeout}s")
-        logger.info(f"🔧 [ClarificationSystem] Questions max: {self.max_questions}, Seuil: {self.confidence_threshold}")
+        # Mettre à jour le statut conversationnel
+        self._update_conversation_status()
+    
+    def _update_conversation_status(self):
+        """Met à jour le statut conversationnel basé sur les messages récents"""
+        if not self.messages:
+            return
         
-        self._init_patterns()
-        self._init_prompts()
-        self._init_clarification_logger()
-
-    def _init_patterns(self):
-        """✅ AMÉLIORÉ: Patterns de détection plus précis"""
+        recent_messages = self.messages[-3:]  # 3 derniers messages
         
-        # ✅ NOUVEAU: Distinction races spécifiques vs génériques
-        self.specific_breed_patterns = {
-            "fr": [
-                r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
-                r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
-                r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
-            ],
-            "en": [
-                r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
-                r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
-                r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
-            ],
-            "es": [
-                r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
-                r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
-                r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
-            ]
+        # Analyser l'urgence basée sur les mots-clés
+        urgency_keywords = {
+            "critical": ["urgence", "urgent", "critique", "emergency", "critical", "dying", "meurent"],
+            "high": ["problème", "problem", "maladie", "disease", "mortalité", "mortality"],
+            "medium": ["inquiet", "concerned", "surveillance", "monitoring"],
+            "low": ["prévention", "prevention", "routine", "normal"]
         }
         
-        # ✅ NOUVEAU: Termes génériques qui nécessitent clarification
-        self.generic_breed_patterns = {
-            "fr": [r'poulets?', r'volailles?', r'oiseaux?', r'chair'],
-            "en": [r'chickens?', r'poultry', r'birds?', r'broilers?'],
-            "es": [r'pollos?', r'aves?', r'engorde']
+        max_urgency = "low"
+        for message in recent_messages:
+            message_lower = message.message.lower()
+            for urgency, keywords in urgency_keywords.items():
+                if any(keyword in message_lower for keyword in keywords):
+                    if urgency == "critical":
+                        max_urgency = "critical"
+                        break
+                    elif urgency == "high" and max_urgency not in ["critical"]:
+                        max_urgency = "high"
+                    elif urgency == "medium" and max_urgency in ["low"]:
+                        max_urgency = "medium"
+        
+        self.conversation_urgency = max_urgency
+    
+    def get_context_for_clarification(self) -> Dict[str, Any]:
+        """Retourne le contexte optimisé pour les clarifications"""
+        return {
+            "breed": self.consolidated_entities.breed,
+            "breed_type": self.consolidated_entities.breed_type,
+            "age": self.consolidated_entities.age_days,
+            "age_confidence": self.consolidated_entities.age_confidence,
+            "weight": self.consolidated_entities.weight_grams,
+            "symptoms": self.consolidated_entities.symptoms,
+            "housing": self.consolidated_entities.housing_type,
+            "urgency": self.conversation_urgency,
+            "topic": self.conversation_topic,
+            "total_exchanges": self.total_exchanges,
+            "missing_critical": self.consolidated_entities.get_critical_missing_info(),
+            "overall_confidence": self.consolidated_entities.confidence_overall
         }
+    
+    def get_context_for_rag(self, max_chars: int = 500) -> str:
+        """Retourne le contexte optimisé pour le RAG"""
+        context_parts = []
         
-        self.age_patterns = {
-            "fr": [
-                r'(\d+)\s*jours?', r'(\d+)\s*semaines?', r'(\d+)\s*mois',
-                r'jour\s*(\d+)', r'semaine\s*(\d+)', r'âgés?\s+de\s+(\d+)',
-                r'(\d+)j', r'(\d+)sem', r'j(\d+)', r'(\d+)\s*j\b'
-            ],
-            "en": [
-                r'(\d+)\s*days?', r'(\d+)\s*weeks?', r'(\d+)\s*months?',
-                r'day\s*(\d+)', r'week\s*(\d+)', r'(\d+)\s*day\s*old',
-                r'(\d+)d', r'(\d+)w', r'd(\d+)', r'(\d+)\s*d\b'
-            ],
-            "es": [
-                r'(\d+)\s*días?', r'(\d+)\s*semanas?', r'(\d+)\s*meses?',
-                r'día\s*(\d+)', r'semana\s*(\d+)', r'(\d+)\s*días?\s*de\s*edad',
-                r'(\d+)d', r'(\d+)s', r'd(\d+)', r'(\d+)\s*d\b'
-            ]
-        }
+        # Informations de base
+        if self.consolidated_entities.breed:
+            context_parts.append(f"Race: {self.consolidated_entities.breed}")
         
-        self.weight_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:kg|kilogram|gramm?es?|g|lbs?|pound)',
-            r'pèsent?\s+(\d+(?:\.\d+)?)', r'weigh\s+(\d+(?:\.\d+)?)', r'peso\s+(\d+(?:\.\d+)?)',
-            r'(\d+(?:\.\d+)?)\s*g\b', r'(\d+(?:\.\d+)?)\s*kg\b'
-        ]
+        if self.consolidated_entities.age_days:
+            context_parts.append(f"Âge: {self.consolidated_entities.age_days} jours")
         
-        self.mortality_patterns = [
-            r'mortalité\s+(?:de\s+)?(\d+(?:\.\d+)?)%?', r'mortality\s+(?:of\s+)?(\d+(?:\.\d+)?)%?',
-            r'mortalidad\s+(?:del?\s+)?(\d+(?:\.\d+)?)%?', r'(\d+(?:\.\d+)?)%\s+mortalit[éy]',
-            r'morts?\s+(\d+)', r'dead\s+(\d+)', r'muertos?\s+(\d+)'
-        ]
-
-    def _detect_existing_info(self, question: str, language: str) -> Dict[str, str]:
-        """✅ AMÉLIORÉ: Détection plus intelligente avec distinction spécifique/générique"""
+        if self.consolidated_entities.weight_grams:
+            context_parts.append(f"Poids: {self.consolidated_entities.weight_grams}g")
         
-        detected = {}
-        question_lower = question.lower()
+        # Problèmes identifiés
+        if self.consolidated_entities.symptoms:
+            context_parts.append(f"Symptômes: {', '.join(self.consolidated_entities.symptoms)}")
         
-        # ✅ NOUVEAU: Vérifier d'abord les races SPÉCIFIQUES
-        specific_patterns = self.specific_breed_patterns.get(language, self.specific_breed_patterns["fr"])
-        for pattern in specific_patterns:
-            match = re.search(pattern, question_lower, re.IGNORECASE)
-            if match:
-                detected["breed"] = match.group(0).strip()
-                detected["breed_type"] = "specific"
-                break
+        if self.consolidated_entities.mortality_rate:
+            context_parts.append(f"Mortalité: {self.consolidated_entities.mortality_rate}%")
         
-        # ✅ NOUVEAU: Si pas de race spécifique, vérifier les termes génériques
-        if "breed" not in detected:
-            generic_patterns = self.generic_breed_patterns.get(language, self.generic_breed_patterns["fr"])
-            for pattern in generic_patterns:
-                match = re.search(pattern, question_lower, re.IGNORECASE)
-                if match:
-                    detected["breed"] = match.group(0).strip()
-                    detected["breed_type"] = "generic"  # ✅ CRITIQUE: Marqué comme générique
-                    break
+        # Environnement
+        if self.consolidated_entities.temperature:
+            context_parts.append(f"Température: {self.consolidated_entities.temperature}°C")
         
-        # Détection de l'âge
-        age_patterns = self.age_patterns.get(language, self.age_patterns["fr"])
-        for pattern in age_patterns:
-            match = re.search(pattern, question_lower, re.IGNORECASE)
-            if match:
-                detected["age"] = match.group(0).strip()
-                break
+        if self.consolidated_entities.housing_type:
+            context_parts.append(f"Logement: {self.consolidated_entities.housing_type}")
         
-        # Autres détections
-        for pattern in self.weight_patterns:
-            match = re.search(pattern, question_lower, re.IGNORECASE)
-            if match:
-                detected["weight"] = match.group(0).strip()
-                break
+        # Messages récents pertinents
+        if self.messages:
+            recent_user_messages = [m.message for m in self.messages[-3:] if m.role == "user"]
+            if recent_user_messages:
+                context_parts.append(f"Questions récentes: {' | '.join(recent_user_messages)}")
         
-        for pattern in self.mortality_patterns:
-            match = re.search(pattern, question_lower, re.IGNORECASE)
-            if match:
-                detected["mortality"] = match.group(0).strip()
-                break
+        # Assembler et limiter
+        full_context = ". ".join(context_parts)
         
-        return detected
-
-    def _init_prompts(self):
-        """✅ NOUVEAUX PROMPTS PLUS STRICTS ET INTELLIGENTS"""
+        if len(full_context) > max_chars:
+            # Tronquer intelligemment en gardant les infos les plus importantes
+            important_parts = context_parts[:4]  # Race, âge, poids, symptômes
+            full_context = ". ".join(important_parts)
+            
+            if len(full_context) > max_chars:
+                full_context = full_context[:max_chars-3] + "..."
         
-        self.clarification_prompts = {
-            "fr": """Tu es un expert vétérinaire spécialisé en aviculture. Analyse cette question pour déterminer si elle manque d'informations CRITIQUES.
-
-Question: "{question}"
-Informations détectées: {detected_info}
-
-RÈGLES STRICTES ET PRÉCISES:
-1. Si la question contient une RACE SPÉCIFIQUE (Ross 308, Cobb 500, etc.) ET un âge précis, réponds exactement: "CLEAR"
-2. Si la question contient seulement "poulet", "volaille" ou terme GÉNÉRIQUE sans race spécifique → CLARIFICATION OBLIGATOIRE
-3. Si l'âge manque pour une question sur croissance/poids/performance → CLARIFICATION OBLIGATOIRE
-4. Ne demande que les informations VRAIMENT manquantes pour donner une réponse précise
-
-EXEMPLES DE QUESTIONS COMPLÈTES (répondre "CLEAR"):
-- "Mes poulets Ross 308 de 25 jours pèsent 800g, est-ce normal?"
-- "Poids normal Ross 308 au jour 12?"
-- "Température optimale pour Cobb 500 de 3 semaines?"
-
-EXEMPLES DE QUESTIONS INCOMPLÈTES (clarifier):
-- "Poids idéal d'un poulet au jour 12?" → Manque: race spécifique
-- "Mes poulets ne grossissent pas" → Manque: race ET âge
-- "Quelle température pour mes oiseaux?" → Manque: race ET âge
-- "Mortalité élevée chez mes volailles" → Manque: race, âge, taux
-
-IMPORTANT: 
-- "poulet" seul = GÉNÉRIQUE → clarification obligatoire
-- "Ross 308" = SPÉCIFIQUE → acceptable si âge présent
-- Pour questions de poids/croissance: race ET âge sont OBLIGATOIRES
-
-Si clarification nécessaire, pose 2-3 questions précises:
-- Quelle est la race/lignée de vos poulets (Ross 308, Cobb 500, etc.) ?
-- Quel âge ont-ils actuellement (en jours) ?
-- [Question spécifique au contexte si nécessaire]
-
-Format: soit "CLEAR" soit liste de questions avec tirets.""",
-
-            "en": """You are a veterinary expert specialized in poultry farming. Analyze this question to determine if it lacks CRITICAL information.
-
-Question: "{question}"
-Detected information: {detected_info}
-
-STRICT AND PRECISE RULES:
-1. If the question contains a SPECIFIC BREED (Ross 308, Cobb 500, etc.) AND precise age, answer exactly: "CLEAR"
-2. If the question contains only "chicken", "poultry" or GENERIC term without specific breed → CLARIFICATION REQUIRED
-3. If age is missing for growth/weight/performance question → CLARIFICATION REQUIRED
-4. Only ask for information TRULY missing to give a precise answer
-
-EXAMPLES OF COMPLETE QUESTIONS (answer "CLEAR"):
-- "My Ross 308 chickens at 25 days weigh 800g, is this normal?"
-- "Normal weight Ross 308 day 12?"
-- "Optimal temperature for Cobb 500 at 3 weeks?"
-
-EXAMPLES OF INCOMPLETE QUESTIONS (clarify):
-- "Ideal weight of a chicken at day 12?" → Missing: specific breed
-- "My chickens aren't growing" → Missing: breed AND age
-- "What temperature for my birds?" → Missing: breed AND age
-- "High mortality in my poultry" → Missing: breed, age, rate
-
-IMPORTANT:
-- "chicken" alone = GENERIC → clarification required
-- "Ross 308" = SPECIFIC → acceptable if age present
-- For weight/growth questions: breed AND age are MANDATORY
-
-If clarification needed, ask 2-3 precise questions:
-- What breed/line are your chickens (Ross 308, Cobb 500, etc.)?
-- How old are they currently (in days)?
-- [Context-specific question if necessary]
-
-Format: either "CLEAR" or bulleted question list.""",
-
-            "es": """Eres un experto veterinario especializado en avicultura. Analiza esta pregunta para determinar si carece de información CRÍTICA.
-
-Pregunta: "{question}"
-Información detectada: {detected_info}
-
-REGLAS ESTRICTAS Y PRECISAS:
-1. Si la pregunta contiene una RAZA ESPECÍFICA (Ross 308, Cobb 500, etc.) Y edad precisa, responde exactamente: "CLEAR"
-2. Si la pregunta contiene solo "pollo", "ave" o término GENÉRICO sin raza específica → ACLARACIÓN OBLIGATORIA
-3. Si falta edad para pregunta sobre crecimiento/peso/rendimiento → ACLARACIÓN OBLIGATORIA
-4. Solo pide información REALMENTE faltante para dar respuesta precisa
-
-EJEMPLOS DE PREGUNTAS COMPLETAS (responder "CLEAR"):
-- "Mis pollos Ross 308 de 25 días pesan 800g, ¿es normal?"
-- "¿Peso normal Ross 308 día 12?"
-- "¿Temperatura óptima para Cobb 500 de 3 semanas?"
-
-EJEMPLOS DE PREGUNTAS INCOMPLETAS (aclarar):
-- "¿Peso ideal de un pollo al día 12?" → Falta: raza específica
-- "Mis pollos no crecen" → Falta: raza Y edad
-- "¿Qué temperatura para mis aves?" → Falta: raza Y edad
-- "Mortalidad alta en mis aves" → Falta: raza, edad, tasa
-
-IMPORTANTE:
-- "pollo" solo = GENÉRICO → aclaración obligatoria
-- "Ross 308" = ESPECÍFICO → aceptable si edad presente
-- Para preguntas peso/crecimiento: raza Y edad son OBLIGATORIAS
-
-Si necesita aclaración, haz 2-3 preguntas precisas:
-- ¿Cuál es la raza/línea de sus pollos (Ross 308, Cobb 500, etc.)?
-- ¿Qué edad tienen actualmente (en días)?
-- [Pregunta específica al contexto si necesario]
-
-Formato: "CLEAR" o lista de preguntas con guiones."""
+        return full_context
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "conversation_id": self.conversation_id,
+            "user_id": self.user_id,
+            "messages": [m.to_dict() for m in self.messages],
+            "consolidated_entities": self.consolidated_entities.to_dict(),
+            "language": self.language,
+            "created_at": self.created_at.isoformat(),
+            "last_activity": self.last_activity.isoformat(),
+            "total_exchanges": self.total_exchanges,
+            "conversation_topic": self.conversation_topic,
+            "conversation_urgency": self.conversation_urgency,
+            "problem_resolution_status": self.problem_resolution_status,
+            "ai_enhanced": self.ai_enhanced,
+            "last_ai_analysis": self.last_ai_analysis.isoformat() if self.last_ai_analysis else None,
+            "needs_clarification": self.needs_clarification,
+            "clarification_questions": self.clarification_questions
         }
 
-    def _init_clarification_logger(self):
-        """Initialise le logger spécialisé pour les clarifications"""
-        self.clarification_logger = logging.getLogger("question_clarification")
-        self.clarification_logger.setLevel(logging.INFO)
+class IntelligentConversationMemory:
+    """Système de mémoire conversationnelle intelligent avec IA"""
+    
+    def __init__(self, db_path: str = None):
+        """Initialise le système de mémoire intelligent"""
         
-        if not self.clarification_logger.handlers and self.log_all_clarifications:
-            try:
-                from logging.handlers import RotatingFileHandler
-                
-                log_dir = os.getenv('VALIDATION_LOGS_DIR', 'logs')
-                os.makedirs(log_dir, exist_ok=True)
-                
-                log_file_path = os.path.join(log_dir, 'question_clarifications.log')
-                clarification_handler = RotatingFileHandler(
-                    log_file_path,
-                    maxBytes=int(os.getenv('VALIDATION_LOG_MAX_SIZE', '10485760')),
-                    backupCount=int(os.getenv('VALIDATION_LOG_BACKUP_COUNT', '5'))
+        # Configuration
+        self.db_path = db_path or os.getenv('CONVERSATION_MEMORY_DB_PATH', 'data/conversation_memory.db')
+        self.max_messages_in_memory = int(os.getenv('MAX_MESSAGES_IN_MEMORY', '50'))
+        self.context_expiry_hours = int(os.getenv('CONTEXT_EXPIRY_HOURS', '24'))
+        self.ai_enhancement_enabled = os.getenv('AI_ENHANCEMENT_ENABLED', 'true').lower() == 'true'
+        self.ai_enhancement_model = os.getenv('AI_ENHANCEMENT_MODEL', 'gpt-4o-mini')
+        self.ai_enhancement_timeout = int(os.getenv('AI_ENHANCEMENT_TIMEOUT', '15'))
+        
+        # Cache en mémoire pour performance
+        self.conversation_cache: Dict[str, IntelligentConversationContext] = {}
+        self.cache_max_size = int(os.getenv('CONVERSATION_CACHE_SIZE', '100'))
+        
+        # Statistiques
+        self.stats = {
+            "total_conversations": 0,
+            "total_messages": 0,
+            "ai_enhancements": 0,
+            "cache_hits": 0,
+            "cache_misses": 0
+        }
+        
+        # Initialiser la base de données
+        self._init_database()
+        
+        logger.info(f"🧠 [IntelligentMemory] Système initialisé")
+        logger.info(f"🧠 [IntelligentMemory] DB: {self.db_path}")
+        logger.info(f"🧠 [IntelligentMemory] IA enhancing: {'✅' if self.ai_enhancement_enabled else '❌'}")
+        logger.info(f"🧠 [IntelligentMemory] Modèle IA: {self.ai_enhancement_model}")
+
+    def _init_database(self):
+        """Initialise la base de données avec schéma amélioré"""
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        
+        with sqlite3.connect(self.db_path) as conn:
+            # Table des conversations avec métadonnées étendues
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    conversation_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    language TEXT DEFAULT 'fr',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    total_exchanges INTEGER DEFAULT 0,
+                    
+                    -- Entités consolidées (JSON)
+                    consolidated_entities TEXT,
+                    
+                    -- État conversationnel
+                    conversation_topic TEXT,
+                    conversation_urgency TEXT,
+                    problem_resolution_status TEXT,
+                    
+                    -- Métadonnées IA
+                    ai_enhanced BOOLEAN DEFAULT FALSE,
+                    last_ai_analysis TIMESTAMP,
+                    needs_clarification BOOLEAN DEFAULT FALSE,
+                    clarification_questions TEXT,
+                    
+                    -- Performance
+                    confidence_overall REAL DEFAULT 0.0
                 )
-                clarification_formatter = logging.Formatter(
-                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            """)
+            
+            # Table des messages avec extraction d'entités
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    language TEXT DEFAULT 'fr',
+                    message_type TEXT DEFAULT 'text',
+                    
+                    -- Entités extraites (JSON)
+                    extracted_entities TEXT,
+                    confidence_score REAL DEFAULT 0.0,
+                    processing_method TEXT DEFAULT 'basic',
+                    
+                    FOREIGN KEY (conversation_id) REFERENCES conversations (conversation_id)
                 )
-                clarification_handler.setFormatter(clarification_formatter)
-                self.clarification_logger.addHandler(clarification_handler)
-                
-                logger.info(f"✅ [ClarificationSystem] Logger configuré: {log_file_path}")
-                
-            except Exception as e:
-                logger.warning(f"⚠️ [ClarificationSystem] Impossible de créer le fichier de log: {e}")
+            """)
+            
+            # Index pour performance
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_user_activity ON conversations (user_id, last_activity)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_conv_time ON conversation_messages (conversation_id, timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_urgency ON conversations (conversation_urgency, last_activity)")
+            
+        logger.info(f"✅ [IntelligentMemory] Base de données initialisée")
 
-    async def analyze_question(
+    @contextmanager
+    def _get_db_connection(self):
+        """Context manager pour les connexions DB"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    async def extract_entities_ai_enhanced(
         self, 
-        question: str, 
+        message: str, 
         language: str = "fr",
-        user_id: str = "unknown",
-        conversation_id: str = None
-    ) -> ClarificationResult:
-        """
-        ✅ ANALYSE AMÉLIORÉE avec GPT-4o-mini et logique plus stricte
-        """
+        conversation_context: Optional[IntelligentConversationContext] = None
+    ) -> IntelligentEntities:
+        """Extraction d'entités améliorée par IA"""
         
-        start_time = time.time()
-        
-        if not self.enabled:
-            logger.info(f"🔧 [ClarificationSystem] Système désactivé")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="system_disabled"
-            )
-        
-        if not question or len(question.strip()) < self.min_question_length:
-            logger.info(f"⚠️ [ClarificationSystem] Question trop courte: {len(question)}")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="question_too_short"
-            )
-        
-        # ✅ NOUVEAU: Détection intelligente améliorée
-        detected_info = self._detect_existing_info(question, language)
-        
-        logger.info(f"🔍 [ClarificationSystem] Analyse: '{question[:80]}...'")
-        logger.info(f"📊 [ClarificationSystem] Info détectées: {detected_info}")
-        
-        # ✅ NOUVELLE LOGIQUE: Race générique = clarification obligatoire
-        if detected_info.get("breed_type") == "generic":
-            logger.info(f"🚨 [ClarificationSystem] Race générique détectée - clarification obligatoire")
-            
-            generic_clarification_questions = self._generate_generic_clarification_questions(language)
-            
-            return ClarificationResult(
-                needs_clarification=True,
-                questions=generic_clarification_questions,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="generic_breed_detected",
-                model_used="rule_based",
-                detected_info=detected_info,
-                confidence_score=95.0
-            )
-        
-        # ✅ LOGIQUE CONSERVÉE: Race spécifique + âge = OK
-        if detected_info.get("breed_type") == "specific" and detected_info.get("age"):
-            logger.info(f"✅ [ClarificationSystem] Race spécifique + âge - question complète")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="specific_breed_and_age_detected",
-                detected_info=detected_info
-            )
-        
-        if not OPENAI_AVAILABLE or not openai:
-            logger.warning(f"⚠️ [ClarificationSystem] OpenAI non disponible")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="openai_unavailable",
-                detected_info=detected_info
-            )
+        if not self.ai_enhancement_enabled or not OPENAI_AVAILABLE or not openai:
+            logger.debug("🧠 [IntelligentMemory] IA désactivée, extraction basique")
+            return await self._extract_entities_basic(message, language)
         
         try:
-            # ✅ Configuration OpenAI avec GPT-4o-mini
+            # Contexte pour l'IA
+            context_info = ""
+            if conversation_context and conversation_context.consolidated_entities:
+                existing_entities = conversation_context.consolidated_entities.to_dict()
+                if existing_entities:
+                    context_info = f"\n\nEntités déjà connues dans cette conversation:\n{json.dumps(existing_entities, ensure_ascii=False, indent=2)}"
+            
+            extraction_prompt = f"""Tu es un expert en extraction d'informations vétérinaires pour l'aviculture. Analyse ce message et extrait TOUTES les informations pertinentes.
+
+Message: "{message}"{context_info}
+
+INSTRUCTIONS CRITIQUES:
+1. Extrait toutes les informations, même partielles ou implicites
+2. Utilise le contexte existant pour éviter les doublons
+3. Assigne des scores de confiance (0.0 à 1.0) basés sur la précision
+4. Inférer des informations logiques (ex: si "mes poulets Ross 308", alors breed_type="specific")
+5. Convertir automatiquement les unités (semaines -> jours, kg -> grammes)
+
+Réponds UNIQUEMENT avec ce JSON exact:
+```json
+{{
+  "breed": "race_détectée_ou_null",
+  "breed_confidence": 0.0_à_1.0,
+  "breed_type": "specific/generic/null",
+  
+  "age_days": nombre_jours_ou_null,
+  "age_weeks": nombre_semaines_ou_null,
+  "age_confidence": 0.0_à_1.0,
+  
+  "weight_grams": poids_grammes_ou_null,
+  "weight_confidence": 0.0_à_1.0,
+  "expected_weight_range": [min_grammes, max_grammes] ou null,
+  "growth_rate": "normal/slow/fast/null",
+  
+  "mortality_rate": pourcentage_ou_null,
+  "mortality_confidence": 0.0_à_1.0,
+  "symptoms": ["symptôme1", "symptôme2"] ou [],
+  "health_status": "good/concerning/critical/null",
+  
+  "temperature": celsius_ou_null,
+  "humidity": pourcentage_ou_null,
+  "housing_type": "type_ou_null",
+  "ventilation_quality": "good/poor/null",
+  
+  "feed_type": "type_ou_null",
+  "feed_conversion": ratio_ou_null,
+  "water_consumption": "normal/low/high/null",
+  
+  "flock_size": nombre_ou_null,
+  "vaccination_status": "up_to_date/delayed/unknown/null",
+  "previous_treatments": ["traitement1"] ou [],
+  
+  "problem_duration": "durée_ou_null",
+  "problem_severity": "low/medium/high/critical/null",
+  "intervention_urgency": "none/monitor/act/urgent/null",
+  
+  "extraction_method": "openai",
+  "confidence_overall": 0.0_à_1.0
+}}
+```
+
+EXEMPLES DE RAISONNEMENT:
+- "mes poulets" → breed_type="generic", breed_confidence=0.3
+- "Ross 308" → breed="Ross 308", breed_type="specific", breed_confidence=0.95
+- "3 semaines" → age_weeks=3, age_days=21, age_confidence=0.9
+- "800g" → weight_grams=800, weight_confidence=0.95
+- "mortalité élevée" → health_status="concerning", intervention_urgency="act"
+"""
+
             api_key = os.getenv('OPENAI_API_KEY')
             if not api_key:
-                logger.warning(f"⚠️ [ClarificationSystem] Clé API OpenAI manquante")
-                return ClarificationResult(
-                    needs_clarification=False,
-                    processing_time_ms=int((time.time() - start_time) * 1000),
-                    reason="openai_key_missing",
-                    detected_info=detected_info
-                )
+                return await self._extract_entities_basic(message, language)
             
             openai.api_key = api_key
             
-            # ✅ Prompt avec informations détectées
-            prompt_template = self.clarification_prompts.get(language.lower(), self.clarification_prompts["fr"])
-            detected_info_str = json.dumps(detected_info, ensure_ascii=False) if detected_info else "Aucune information spécifique détectée"
-            
-            user_prompt = prompt_template.format(
-                question=question, 
-                detected_info=detected_info_str
-            )
-            
-            system_prompt = "Tu es un assistant expert qui détermine si une question d'aviculture nécessite des clarifications. Sois très précis et strict sur les races spécifiques vs génériques."
-            
-            # ✅ Appel GPT-4o-mini avec timeout plus long
-            logger.info(f"🤖 [ClarificationSystem] Appel GPT-4o-mini...")
-            
             response = openai.chat.completions.create(
-                model=self.model,  # gpt-4o-mini
+                model=self.ai_enhancement_model,
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture. Réponds UNIQUEMENT avec du JSON valide."},
+                    {"role": "user", "content": extraction_prompt}
                 ],
-                temperature=0.1,  # Très faible pour cohérence
-                max_tokens=400,
-                timeout=self.timeout
+                temperature=0.1,
+                max_tokens=800,
+                timeout=self.ai_enhancement_timeout
             )
             
             answer = response.choices[0].message.content.strip()
-            processing_time_ms = int((time.time() - start_time) * 1000)
             
-            logger.info(f"🤖 [ClarificationSystem] Réponse GPT-4o-mini ({processing_time_ms}ms): {answer[:100]}...")
-            
-            # Analyse de la réponse
-            if answer.upper().strip() in ["CLEAR", "CLEAR.", "CLEAR !"]:
-                result = ClarificationResult(
-                    needs_clarification=False,
-                    processing_time_ms=processing_time_ms,
-                    reason="question_clear_by_gpt4o_mini",
-                    model_used=self.model,
-                    detected_info=detected_info
-                )
-                
-                logger.info(f"✅ [ClarificationSystem] Question claire selon GPT-4o-mini")
-                
-                if self.log_all_clarifications:
-                    await self._log_clarification_decision(
-                        question, language, user_id, conversation_id, result
-                    )
-                
-                return result
-            
-            # Extraire les questions de clarification
-            clarification_questions = self._extract_questions(answer)
-            
-            if clarification_questions and len(clarification_questions) > 0:
-                limited_questions = clarification_questions[:self.max_questions]
-                
-                result = ClarificationResult(
-                    needs_clarification=True,
-                    questions=limited_questions,
-                    processing_time_ms=processing_time_ms,
-                    reason="clarification_needed_by_gpt4o_mini",
-                    model_used=self.model,
-                    confidence_score=self._calculate_confidence_score(question, limited_questions, detected_info),
-                    detected_info=detected_info
-                )
-                
-                logger.info(f"❓ [ClarificationSystem] {len(limited_questions)} questions générées par GPT-4o-mini")
-                
-                if self.log_all_clarifications:
-                    await self._log_clarification_decision(
-                        question, language, user_id, conversation_id, result
-                    )
-                
-                return result
+            # Extraire le JSON
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
             else:
-                logger.info(f"✅ [ClarificationSystem] Aucune question valide - question suffisante")
-                return ClarificationResult(
-                    needs_clarification=False,
-                    processing_time_ms=processing_time_ms,
-                    reason="no_valid_questions_from_gpt4o_mini",
-                    model_used=self.model,
-                    detected_info=detected_info
+                json_match = re.search(r'\{.*\}', answer, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    logger.warning("⚠️ [IntelligentMemory] Pas de JSON trouvé dans la réponse IA")
+                    return await self._extract_entities_basic(message, language)
+            
+            # Parser et créer les entités
+            try:
+                data = json.loads(json_str)
+                
+                entities = IntelligentEntities(
+                    breed=data.get("breed"),
+                    breed_confidence=data.get("breed_confidence", 0.0),
+                    breed_type=data.get("breed_type"),
+                    
+                    age_days=data.get("age_days"),
+                    age_weeks=data.get("age_weeks"),
+                    age_confidence=data.get("age_confidence", 0.0),
+                    age_last_updated=datetime.now(),
+                    
+                    weight_grams=data.get("weight_grams"),
+                    weight_confidence=data.get("weight_confidence", 0.0),
+                    expected_weight_range=tuple(data["expected_weight_range"]) if data.get("expected_weight_range") else None,
+                    growth_rate=data.get("growth_rate"),
+                    
+                    mortality_rate=data.get("mortality_rate"),
+                    mortality_confidence=data.get("mortality_confidence", 0.0),
+                    symptoms=data.get("symptoms", []),
+                    health_status=data.get("health_status"),
+                    
+                    temperature=data.get("temperature"),
+                    humidity=data.get("humidity"),
+                    housing_type=data.get("housing_type"),
+                    ventilation_quality=data.get("ventilation_quality"),
+                    
+                    feed_type=data.get("feed_type"),
+                    feed_conversion=data.get("feed_conversion"),
+                    water_consumption=data.get("water_consumption"),
+                    
+                    flock_size=data.get("flock_size"),
+                    vaccination_status=data.get("vaccination_status"),
+                    previous_treatments=data.get("previous_treatments", []),
+                    
+                    problem_duration=data.get("problem_duration"),
+                    problem_severity=data.get("problem_severity"),
+                    intervention_urgency=data.get("intervention_urgency"),
+                    
+                    extraction_method="openai",
+                    last_ai_update=datetime.now(),
+                    confidence_overall=data.get("confidence_overall", 0.0)
                 )
+                
+                self.stats["ai_enhancements"] += 1
+                logger.info(f"🤖 [IntelligentMemory] Entités extraites par IA: {len([k for k, v in entities.to_dict().items() if v is not None])} informations")
+                
+                return entities
+                
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ [IntelligentMemory] Erreur parsing JSON IA: {e}")
+                return await self._extract_entities_basic(message, language)
         
         except Exception as e:
-            processing_time_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"❌ [ClarificationSystem] Erreur GPT-4o-mini: {e}")
-            
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=processing_time_ms,
-                reason=f"error_gpt4o_mini: {str(e)}",
-                model_used=self.model,
-                detected_info=detected_info
-            )
+            logger.error(f"❌ [IntelligentMemory] Erreur extraction IA: {e}")
+            return await self._extract_entities_basic(message, language)
 
-    def _generate_generic_clarification_questions(self, language: str) -> List[str]:
-        """✅ NOUVEAU: Génère des questions standard pour races génériques"""
+    async def _extract_entities_basic(self, message: str, language: str) -> IntelligentEntities:
+        """Extraction d'entités basique par regex (fallback)"""
         
-        questions_by_language = {
-            "fr": [
-                "Quelle est la race/lignée de vos poulets (Ross 308, Cobb 500, Hubbard, etc.) ?",
-                "Quel âge ont-ils actuellement (en jours) ?",
-                "Dans quel type d'élevage (bâtiment fermé, semi-ouvert, plein air) ?"
-            ],
-            "en": [
-                "What breed/line are your chickens (Ross 308, Cobb 500, Hubbard, etc.)?",
-                "How old are they currently (in days)?",
-                "What type of housing (closed building, semi-open, free-range)?"
-            ],
-            "es": [
-                "¿Cuál es la raza/línea de sus pollos (Ross 308, Cobb 500, Hubbard, etc.)?",
-                "¿Qué edad tienen actualmente (en días)?",
-                "¿En qué tipo de alojamiento (edificio cerrado, semi-abierto, campo libre)?"
-            ]
+        entities = IntelligentEntities(extraction_method="basic")
+        message_lower = message.lower()
+        
+        # Race spécifique
+        specific_breeds = [
+            r'ross\s*308', r'ross\s*708', r'cobb\s*500', r'cobb\s*700',
+            r'hubbard\s*flex', r'arbor\s*acres'
+        ]
+        
+        for pattern in specific_breeds:
+            match = re.search(pattern, message_lower, re.IGNORECASE)
+            if match:
+                entities.breed = match.group(0).strip()
+                entities.breed_type = "specific"
+                entities.breed_confidence = 0.9
+                break
+        
+        # Race générique
+        if not entities.breed:
+            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'pollos?']
+            for pattern in generic_patterns:
+                match = re.search(pattern, message_lower, re.IGNORECASE)
+                if match:
+                    entities.breed = match.group(0).strip()
+                    entities.breed_type = "generic"
+                    entities.breed_confidence = 0.3
+                    break
+        
+        # Âge
+        age_patterns = [
+            (r'(\d+)\s*jours?', 1, "days"),
+            (r'(\d+)\s*semaines?', 7, "weeks"),
+            (r'(\d+)\s*days?', 1, "days"),
+            (r'(\d+)\s*weeks?', 7, "weeks")
+        ]
+        
+        for pattern, multiplier, unit in age_patterns:
+            match = re.search(pattern, message_lower, re.IGNORECASE)
+            if match:
+                value = int(match.group(1))
+                if unit == "weeks":
+                    entities.age_weeks = value
+                    entities.age_days = value * 7
+                else:
+                    entities.age_days = value
+                entities.age_confidence = 0.8
+                entities.age_last_updated = datetime.now()
+                break
+        
+        # Poids
+        weight_patterns = [
+            r'(\d+(?:\.\d+)?)\s*g\b',
+            r'(\d+(?:\.\d+)?)\s*grammes?',
+            r'(\d+(?:\.\d+)?)\s*kg',
+            r'pèsent?\s+(\d+(?:\.\d+)?)',
+            r'weigh\s+(\d+(?:\.\d+)?)'
+        ]
+        
+        for pattern in weight_patterns:
+            match = re.search(pattern, message_lower, re.IGNORECASE)
+            if match:
+                weight = float(match.group(1))
+                if 'kg' in pattern:
+                    weight *= 1000
+                entities.weight_grams = weight
+                entities.weight_confidence = 0.8
+                break
+        
+        # Mortalité
+        mortality_patterns = [
+            r'mortalité\s+(?:de\s+)?(\d+(?:\.\d+)?)%?',
+            r'(\d+(?:\.\d+)?)%\s+mortalit[éy]',
+            r'mortality\s+(?:of\s+)?(\d+(?:\.\d+)?)%?'
+        ]
+        
+        for pattern in mortality_patterns:
+            match = re.search(pattern, message_lower, re.IGNORECASE)
+            if match:
+                entities.mortality_rate = float(match.group(1))
+                entities.mortality_confidence = 0.8
+                break
+        
+        # Température
+        temp_patterns = [
+            r'(\d+(?:\.\d+)?)\s*°?c',
+            r'température\s+(?:de\s+)?(\d+(?:\.\d+)?)',
+            r'temperature\s+(?:of\s+)?(\d+(?:\.\d+)?)'
+        ]
+        
+        for pattern in temp_patterns:
+            match = re.search(pattern, message_lower, re.IGNORECASE)
+            if match:
+                entities.temperature = float(match.group(1))
+                break
+        
+        # Symptômes basiques
+        symptom_keywords = {
+            "fr": ["diarrhée", "boiterie", "toux", "éternuements", "léthargie", "perte appétit"],
+            "en": ["diarrhea", "lameness", "cough", "sneezing", "lethargy", "loss appetite"],
+            "es": ["diarrea", "cojera", "tos", "estornudos", "letargo", "pérdida apetito"]
         }
         
-        return questions_by_language.get(language, questions_by_language["fr"])[:self.max_questions]
+        symptoms = symptom_keywords.get(language, symptom_keywords["fr"])
+        detected_symptoms = [symptom for symptom in symptoms if symptom in message_lower]
+        if detected_symptoms:
+            entities.symptoms = detected_symptoms
+        
+        # Calculer confiance globale
+        confidence_scores = [
+            entities.breed_confidence,
+            entities.age_confidence,
+            entities.weight_confidence,
+            entities.mortality_confidence
+        ]
+        
+        non_zero_scores = [s for s in confidence_scores if s > 0]
+        entities.confidence_overall = sum(non_zero_scores) / len(non_zero_scores) if non_zero_scores else 0.0
+        
+        return entities
 
-    def _extract_questions(self, answer: str) -> List[str]:
-        """Extrait les questions de clarification de la réponse GPT"""
-        questions = []
-        lines = answer.splitlines()
-        
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 15:  # Questions suffisamment longues
-                # Nettoyer les puces et formatage
-                cleaned_line = re.sub(r'^[-•*]\s*', '', line)
-                cleaned_line = re.sub(r'^\d+\.\s*', '', cleaned_line)
-                cleaned_line = cleaned_line.strip()
-                
-                # Vérifier que c'est une vraie question
-                if cleaned_line and len(cleaned_line) > 20 and cleaned_line not in questions:
-                    # Ajouter un point d'interrogation si manquant
-                    if not cleaned_line.endswith('?') and not cleaned_line.endswith(' ?'):
-                        if any(word in cleaned_line.lower() for word in ['quel', 'quelle', 'combien', 'comment', 'what', 'how', 'which', 'cuál', 'cómo', 'cuánto']):
-                            cleaned_line += ' ?'
-                    
-                    questions.append(cleaned_line)
-        
-        return questions
-
-    def _calculate_confidence_score(self, original_question: str, clarification_questions: List[str], detected_info: Dict[str, str]) -> float:
-        """✅ AMÉLIORÉ: Score de confiance plus intelligent"""
-        
-        # Score de base basé sur le nombre de questions
-        base_score = min(len(clarification_questions) * 25, 80)
-        
-        # Bonus pour informations génériques détectées
-        if detected_info.get("breed_type") == "generic":
-            base_score += 15  # Questions génériques = clarification très probable
-        
-        # Bonus si race spécifique manque pour questions de performance
-        performance_keywords = ['poids', 'weight', 'peso', 'croissance', 'growth', 'crecimiento', 'mortalité', 'mortality', 'mortalidad']
-        if any(keyword in original_question.lower() for keyword in performance_keywords):
-            if not detected_info.get("breed") or detected_info.get("breed_type") == "generic":
-                base_score += 10
-        
-        return min(base_score, 95.0)
-
-    def format_clarification_response(
-        self, 
-        questions: List[str], 
-        language: str, 
-        original_question: str
-    ) -> str:
-        """Formate la réponse de clarification de manière conviviale"""
-        
-        intros = {
-            "fr": "❓ Pour vous donner la réponse la plus précise possible, j'aurais besoin de quelques informations supplémentaires :",
-            "en": "❓ To give you the most accurate answer possible, I would need some additional information:",
-            "es": "❓ Para darle la respuesta más precisa posible, necesitaría información adicional:"
-        }
-        
-        outros = {
-            "fr": "\n\nCes précisions m'aideront à vous donner des conseils spécifiques et adaptés à votre situation ! 🐔",
-            "en": "\n\nThese details will help me give you specific advice tailored to your situation! 🐔",
-            "es": "\n\n¡Estos detalles me ayudarán a darle consejos específicos adaptados a su situación! 🐔"
-        }
-        
-        intro = intros.get(language, intros["fr"])
-        outro = outros.get(language, outros["fr"])
-        
-        # Formatage des questions avec puces
-        formatted_questions = "\n".join([f"• {q}" for q in questions])
-        
-        return f"{intro}\n\n{formatted_questions}{outro}"
-
-    async def _log_clarification_decision(
+    def add_message_to_conversation(
         self,
-        question: str,
-        language: str,
-        user_id: str,
         conversation_id: str,
-        result: ClarificationResult
-    ):
-        """Log détaillé des décisions de clarification"""
+        user_id: str,
+        message: str,
+        role: str = "user",
+        language: str = "fr",
+        message_type: str = "text"
+    ) -> IntelligentConversationContext:
+        """Ajoute un message à une conversation avec extraction intelligente d'entités"""
         
-        clarification_data = {
-            "timestamp": datetime.now().isoformat(),
-            "conversation_id": conversation_id,
-            "user_id": user_id,
-            "question": question,
-            "question_length": len(question),
-            "language": language,
-            "result": result.to_dict(),
-            "system_config": {
-                "enabled": self.enabled,
-                "model": self.model,
-                "max_questions": self.max_questions,
-                "confidence_threshold": self.confidence_threshold,
-                "min_question_length": self.min_question_length
-            }
-        }
-        
-        # Log structuré
-        self.clarification_logger.info(json.dumps(clarification_data, ensure_ascii=False))
-        
-        # Log standard
-        if result.needs_clarification:
-            logger.info(
-                f"❓ [ClarificationSystem] CLARIFICATION - "
-                f"User: {user_id[:8]} | Questions: {len(result.questions)} | "
-                f"Modèle: {result.model_used} | "
-                f"Confiance: {result.confidence_score:.1f}% | "
-                f"Temps: {result.processing_time_ms}ms"
+        # Récupérer ou créer le contexte
+        context = self.get_conversation_context(conversation_id)
+        if not context:
+            context = IntelligentConversationContext(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                language=language
             )
-        else:
-            logger.info(
-                f"✅ [ClarificationSystem] CLEAR - "
-                f"User: {user_id[:8]} | Raison: {result.reason} | "
-                f"Modèle: {result.model_used} | "
-                f"Temps: {result.processing_time_ms}ms"
+        
+        # Extraire les entités de manière asynchrone (simulé synchrone pour la compatibilité)
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            extracted_entities = loop.run_until_complete(
+                self.extract_entities_ai_enhanced(message, language, context)
             )
+        except RuntimeError:
+            # Si pas de loop actif, créer un nouveau
+            extracted_entities = asyncio.run(
+                self.extract_entities_ai_enhanced(message, language, context)
+            )
+        
+        # Créer le message
+        message_obj = ConversationMessage(
+            id=f"{conversation_id}_{len(context.messages)}_{int(time.time())}",
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role=role,
+            message=message,
+            timestamp=datetime.now(),
+            language=language,
+            message_type=message_type,
+            extracted_entities=extracted_entities,
+            confidence_score=extracted_entities.confidence_overall if extracted_entities else 0.0,
+            processing_method="ai_enhanced" if self.ai_enhancement_enabled else "basic"
+        )
+        
+        # Ajouter au contexte
+        context.add_message(message_obj)
+        
+        # Sauvegarder en base
+        self._save_conversation_to_db(context)
+        self._save_message_to_db(message_obj)
+        
+        # Mettre en cache
+        self.conversation_cache[conversation_id] = context
+        self._manage_cache_size()
+        
+        self.stats["total_messages"] += 1
+        
+        logger.info(f"💬 [IntelligentMemory] Message ajouté: {conversation_id} ({len(context.messages)} msgs)")
+        
+        return context
 
-    def get_stats(self) -> Dict:
-        """Retourne les statistiques du système pour monitoring"""
+    def get_conversation_context(self, conversation_id: str) -> Optional[IntelligentConversationContext]:
+        """Récupère le contexte d'une conversation"""
+        
+        # Vérifier le cache d'abord
+        if conversation_id in self.conversation_cache:
+            self.stats["cache_hits"] += 1
+            return self.conversation_cache[conversation_id]
+        
+        self.stats["cache_misses"] += 1
+        
+        # Charger depuis la DB
+        try:
+            with self._get_db_connection() as conn:
+                # Récupérer la conversation
+                conv_row = conn.execute(
+                    "SELECT * FROM conversations WHERE conversation_id = ?",
+                    (conversation_id,)
+                ).fetchone()
+                
+                if not conv_row:
+                    return None
+                
+                # Récupérer les messages
+                message_rows = conn.execute(
+                    """SELECT * FROM conversation_messages 
+                       WHERE conversation_id = ? 
+                       ORDER BY timestamp ASC 
+                       LIMIT ?""",
+                    (conversation_id, self.max_messages_in_memory)
+                ).fetchall()
+                
+                # Reconstruire le contexte
+                context = IntelligentConversationContext(
+                    conversation_id=conv_row["conversation_id"],
+                    user_id=conv_row["user_id"],
+                    language=conv_row["language"] or "fr",
+                    created_at=datetime.fromisoformat(conv_row["created_at"]),
+                    last_activity=datetime.fromisoformat(conv_row["last_activity"]),
+                    total_exchanges=conv_row["total_exchanges"] or 0,
+                    conversation_topic=conv_row["conversation_topic"],
+                    conversation_urgency=conv_row["conversation_urgency"],
+                    problem_resolution_status=conv_row["problem_resolution_status"],
+                    ai_enhanced=bool(conv_row["ai_enhanced"]),
+                    last_ai_analysis=datetime.fromisoformat(conv_row["last_ai_analysis"]) if conv_row["last_ai_analysis"] else None,
+                    needs_clarification=bool(conv_row["needs_clarification"]),
+                    clarification_questions=json.loads(conv_row["clarification_questions"]) if conv_row["clarification_questions"] else []
+                )
+                
+                # Charger les entités consolidées
+                if conv_row["consolidated_entities"]:
+                    entities_data = json.loads(conv_row["consolidated_entities"])
+                    context.consolidated_entities = self._entities_from_dict(entities_data)
+                
+                # Charger les messages
+                for msg_row in message_rows:
+                    entities = None
+                    if msg_row["extracted_entities"]:
+                        entities_data = json.loads(msg_row["extracted_entities"])
+                        entities = self._entities_from_dict(entities_data)
+                    
+                    message_obj = ConversationMessage(
+                        id=msg_row["id"],
+                        conversation_id=msg_row["conversation_id"],
+                        user_id=msg_row["user_id"],
+                        role=msg_row["role"],
+                        message=msg_row["message"],
+                        timestamp=datetime.fromisoformat(msg_row["timestamp"]),
+                        language=msg_row["language"] or "fr",
+                        message_type=msg_row["message_type"] or "text",
+                        extracted_entities=entities,
+                        confidence_score=msg_row["confidence_score"] or 0.0,
+                        processing_method=msg_row["processing_method"] or "basic"
+                    )
+                    
+                    context.messages.append(message_obj)
+                
+                # Mettre en cache
+                self.conversation_cache[conversation_id] = context
+                self._manage_cache_size()
+                
+                return context
+                
+        except Exception as e:
+            logger.error(f"❌ [IntelligentMemory] Erreur chargement conversation: {e}")
+            return None
+
+    def _entities_from_dict(self, data: Dict[str, Any]) -> IntelligentEntities:
+        """Reconstruit les entités depuis un dictionnaire"""
+        
+        # Convertir les dates
+        for date_field in ["age_last_updated", "last_ai_update"]:
+            if data.get(date_field):
+                data[date_field] = datetime.fromisoformat(data[date_field])
+        
+        # Convertir les tuples
+        if data.get("expected_weight_range") and isinstance(data["expected_weight_range"], list):
+            data["expected_weight_range"] = tuple(data["expected_weight_range"])
+        
+        # Assurer les listes
+        for list_field in ["symptoms", "previous_treatments"]:
+            if not isinstance(data.get(list_field), list):
+                data[list_field] = []
+        
+        return IntelligentEntities(**{k: v for k, v in data.items() if k in IntelligentEntities.__dataclass_fields__})
+
+    def _save_conversation_to_db(self, context: IntelligentConversationContext):
+        """Sauvegarde le contexte en base"""
+        
+        try:
+            with self._get_db_connection() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO conversations (
+                        conversation_id, user_id, language, created_at, last_activity,
+                        total_exchanges, consolidated_entities, conversation_topic,
+                        conversation_urgency, problem_resolution_status, ai_enhanced,
+                        last_ai_analysis, needs_clarification, clarification_questions,
+                        confidence_overall
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    context.conversation_id,
+                    context.user_id,
+                    context.language,
+                    context.created_at.isoformat(),
+                    context.last_activity.isoformat(),
+                    context.total_exchanges,
+                    json.dumps(context.consolidated_entities.to_dict()),
+                    context.conversation_topic,
+                    context.conversation_urgency,
+                    context.problem_resolution_status,
+                    context.ai_enhanced,
+                    context.last_ai_analysis.isoformat() if context.last_ai_analysis else None,
+                    context.needs_clarification,
+                    json.dumps(context.clarification_questions),
+                    context.consolidated_entities.confidence_overall
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"❌ [IntelligentMemory] Erreur sauvegarde conversation: {e}")
+
+    def _save_message_to_db(self, message: ConversationMessage):
+        """Sauvegarde un message en base"""
+        
+        try:
+            with self._get_db_connection() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO conversation_messages (
+                        id, conversation_id, user_id, role, message, timestamp,
+                        language, message_type, extracted_entities, confidence_score,
+                        processing_method
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    message.id,
+                    message.conversation_id,
+                    message.user_id,
+                    message.role,
+                    message.message,
+                    message.timestamp.isoformat(),
+                    message.language,
+                    message.message_type,
+                    json.dumps(message.extracted_entities.to_dict()) if message.extracted_entities else None,
+                    message.confidence_score,
+                    message.processing_method
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"❌ [IntelligentMemory] Erreur sauvegarde message: {e}")
+
+    def _manage_cache_size(self):
+        """Gère la taille du cache en mémoire"""
+        
+        if len(self.conversation_cache) > self.cache_max_size:
+            # Supprimer les plus anciennes (LRU basique)
+            sorted_conversations = sorted(
+                self.conversation_cache.items(),
+                key=lambda x: x[1].last_activity
+            )
+            
+            # Garder seulement les plus récentes
+            to_keep = sorted_conversations[-self.cache_max_size//2:]
+            self.conversation_cache = dict(to_keep)
+
+    def get_context_for_clarification(self, conversation_id: str) -> Dict[str, Any]:
+        """Retourne le contexte optimisé pour les clarifications"""
+        
+        context = self.get_conversation_context(conversation_id)
+        if not context:
+            return {}
+        
+        return context.get_context_for_clarification()
+
+    def get_context_for_rag(self, conversation_id: str, max_chars: int = 500) -> str:
+        """Retourne le contexte optimisé pour le RAG"""
+        
+        context = self.get_conversation_context(conversation_id)
+        if not context:
+            return ""
+        
+        return context.get_context_for_rag(max_chars)
+
+    def cleanup_expired_conversations(self):
+        """Nettoie les conversations expirées"""
+        
+        cutoff_time = datetime.now() - timedelta(hours=self.context_expiry_hours)
+        
+        try:
+            with self._get_db_connection() as conn:
+                # Supprimer les messages expirés
+                conn.execute("""
+                    DELETE FROM conversation_messages 
+                    WHERE conversation_id IN (
+                        SELECT conversation_id FROM conversations 
+                        WHERE last_activity < ?
+                    )
+                """, (cutoff_time.isoformat(),))
+                
+                # Supprimer les conversations expirées
+                result = conn.execute("""
+                    DELETE FROM conversations 
+                    WHERE last_activity < ?
+                """, (cutoff_time.isoformat(),))
+                
+                deleted_count = result.rowcount
+                conn.commit()
+                
+                # Nettoyer le cache
+                expired_ids = [
+                    conv_id for conv_id, context in self.conversation_cache.items()
+                    if context.last_activity < cutoff_time
+                ]
+                
+                for conv_id in expired_ids:
+                    del self.conversation_cache[conv_id]
+                
+                logger.info(f"🗑️ [IntelligentMemory] Nettoyage: {deleted_count} conversations expirées supprimées")
+                
+        except Exception as e:
+            logger.error(f"❌ [IntelligentMemory] Erreur nettoyage: {e}")
+
+    def get_conversation_memory_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques du système"""
+        
+        try:
+            with self._get_db_connection() as conn:
+                # Compter les conversations actives
+                active_conversations = conn.execute("""
+                    SELECT COUNT(*) as count FROM conversations 
+                    WHERE last_activity > ?
+                """, ((datetime.now() - timedelta(hours=24)).isoformat(),)).fetchone()["count"]
+                
+                # Compter les messages
+                total_messages = conn.execute("SELECT COUNT(*) as count FROM conversation_messages").fetchone()["count"]
+                
+                # Conversations par urgence
+                urgency_stats = {}
+                for urgency in ["low", "medium", "high", "critical"]:
+                    count = conn.execute("""
+                        SELECT COUNT(*) as count FROM conversations 
+                        WHERE conversation_urgency = ? AND last_activity > ?
+                    """, (urgency, (datetime.now() - timedelta(hours=24)).isoformat())).fetchone()["count"]
+                    urgency_stats[urgency] = count
+        
+        except Exception as e:
+            logger.error(f"❌ [IntelligentMemory] Erreur stats: {e}")
+            active_conversations = 0
+            total_messages = 0
+            urgency_stats = {}
+        
         return {
-            "enabled": self.enabled,
-            "model": self.model,  # Maintenant gpt-4o-mini
-            "timeout": self.timeout,
-            "max_questions": self.max_questions,
-            "min_question_length": self.min_question_length,
-            "confidence_threshold": self.confidence_threshold,
-            "log_all_clarifications": self.log_all_clarifications,
-            "openai_available": OPENAI_AVAILABLE,
-            "supported_languages": list(self.clarification_prompts.keys()),
-            "settings_source": "intelia_settings" if SETTINGS_AVAILABLE else "environment_variables",
-            "detection_enabled": True,
-            "specific_breed_patterns_count": sum(len(patterns) for patterns in self.specific_breed_patterns.values()),
-            "generic_breed_patterns_count": sum(len(patterns) for patterns in self.generic_breed_patterns.values()),
-            "age_patterns_count": sum(len(patterns) for patterns in self.age_patterns.values())
+            "enabled": True,
+            "ai_enhancement_enabled": self.ai_enhancement_enabled,
+            "ai_enhancement_model": self.ai_enhancement_model,
+            "database_path": self.db_path,
+            "max_messages_in_memory": self.max_messages_in_memory,
+            "context_expiry_hours": self.context_expiry_hours,
+            "cache_size": len(self.conversation_cache),
+            "cache_max_size": self.cache_max_size,
+            
+            # Statistiques d'usage
+            "active_conversations_24h": active_conversations,
+            "total_messages": total_messages,
+            "conversations_by_urgency": urgency_stats,
+            
+            # Statistiques système
+            "cache_hits": self.stats["cache_hits"],
+            "cache_misses": self.stats["cache_misses"],
+            "ai_enhancements": self.stats["ai_enhancements"],
+            "cache_hit_ratio": self.stats["cache_hits"] / (self.stats["cache_hits"] + self.stats["cache_misses"]) if (self.stats["cache_hits"] + self.stats["cache_misses"]) > 0 else 0.0,
+            
+            # Capacités
+            "intelligent_entity_extraction": True,
+            "contextual_reasoning": True,
+            "urgency_detection": True,
+            "ai_powered": OPENAI_AVAILABLE and self.ai_enhancement_enabled
         }
 
 # ==================== INSTANCE GLOBALE ====================
 
-# Instance singleton du système de clarification CORRIGÉ avec GPT-4o-mini
-clarification_system = QuestionClarificationSystem()
+# Configuration depuis l'environnement
+db_path = os.getenv('INTELLIGENT_CONVERSATION_MEMORY_DB_PATH', 'data/intelligent_conversation_memory.db')
+
+# Instance singleton
+intelligent_conversation_memory = IntelligentConversationMemory(db_path)
 
 # ==================== FONCTIONS UTILITAIRES ====================
 
-async def analyze_question_for_clarification(
-    question: str, 
+def add_message_to_conversation(
+    conversation_id: str,
+    user_id: str,
+    message: str,
+    role: str = "user",
     language: str = "fr",
-    user_id: str = "unknown", 
-    conversation_id: str = None
-) -> ClarificationResult:
-    """Fonction utilitaire pour analyser les questions avec GPT-4o-mini"""
-    return await clarification_system.analyze_question(question, language, user_id, conversation_id)
+    message_type: str = "text"
+) -> IntelligentConversationContext:
+    """Ajoute un message à une conversation intelligente"""
+    return intelligent_conversation_memory.add_message_to_conversation(
+        conversation_id, user_id, message, role, language, message_type
+    )
 
-def format_clarification_response(questions: List[str], language: str, original_question: str) -> str:
-    """Formate la réponse de clarification"""
-    return clarification_system.format_clarification_response(questions, language, original_question)
+def get_conversation_context(conversation_id: str) -> Optional[IntelligentConversationContext]:
+    """Récupère le contexte intelligent d'une conversation"""
+    return intelligent_conversation_memory.get_conversation_context(conversation_id)
 
-def get_clarification_system_stats() -> Dict:
-    """Retourne les statistiques du système"""
-    return clarification_system.get_stats()
+def get_context_for_clarification(conversation_id: str) -> Dict[str, Any]:
+    """Retourne le contexte optimisé pour les clarifications"""
+    return intelligent_conversation_memory.get_context_for_clarification(conversation_id)
 
-def is_clarification_system_enabled() -> bool:
-    """Vérifie si le système de clarification est activé"""
-    return clarification_system.enabled
+def get_context_for_rag(conversation_id: str, max_chars: int = 500) -> str:
+    """Retourne le contexte optimisé pour le RAG"""
+    return intelligent_conversation_memory.get_context_for_rag(conversation_id, max_chars)
 
-def build_enriched_question(original_question: str, clarification_answers: Dict[str, str], clarification_questions: List[str]) -> str:
-    """Construit une question enrichie avec les réponses de clarification"""
-    enriched_question = original_question + "\n\nInformations supplémentaires :"
-    
-    for index_str, answer in clarification_answers.items():
-        if answer and answer.strip():
-            try:
-                index = int(index_str)
-                if 0 <= index < len(clarification_questions):
-                    question = clarification_questions[index]
-                    enriched_question += f"\n- {question}: {answer.strip()}"
-            except (ValueError, IndexError):
-                continue
-    
-    return enriched_question
+def get_conversation_memory_stats() -> Dict[str, Any]:
+    """Retourne les statistiques du système intelligent"""
+    return intelligent_conversation_memory.get_conversation_memory_stats()
+
+def cleanup_expired_conversations():
+    """Nettoie les conversations expirées"""
+    intelligent_conversation_memory.cleanup_expired_conversations()
 
 # ==================== LOGGING DE DÉMARRAGE ====================
 
-logger.info("❓ [QuestionClarificationSystem] Module CORRIGÉ avec GPT-4o-mini initialisé")
-logger.info(f"📊 [QuestionClarificationSystem] Statistiques: {clarification_system.get_stats()}")
-logger.info("✅ [QuestionClarificationSystem] AMÉLIORATIONS APPLIQUÉES:")
-logger.info("   - 🤖 GPT-4o-mini pour meilleure intelligence")
-logger.info("   - 🔍 Détection races spécifiques vs génériques")
-logger.info("   - 🚨 Clarification obligatoire pour termes génériques")
-logger.info("   - 📏 Prompts plus stricts et précis")
-logger.info("   - ⚡ Seuils optimisés (confidence: 0.7)")
-logger.info("   - 🎯 Logique règles + IA hybride")
+logger.info("🧠 [IntelligentConversationMemory] Système de mémoire intelligent initialisé")
+logger.info(f"📊 [IntelligentConversationMemory] Statistiques: {intelligent_conversation_memory.get_conversation_memory_stats()}")
+logger.info("✅ [IntelligentConversationMemory] FONCTIONNALITÉS INTELLIGENTES:")
+logger.info("   - 🤖 Extraction d'entités par IA (OpenAI)")
+logger.info("   - 🧠 Raisonnement contextuel pour éviter clarifications redondantes")
+logger.info("   - 🔄 Fusion intelligente d'informations entre messages")
+logger.info("   - 📊 Classification automatique d'urgence et état de santé")
+logger.info("   - 🎯 Contexte optimisé pour RAG et clarifications")
+logger.info("   - 💾 Cache intelligent avec gestion LRU")
+logger.info("   - 📈 Scores de confiance dynamiques")
+logger.info("   - ⚡ Détection automatique de problèmes critiques")
