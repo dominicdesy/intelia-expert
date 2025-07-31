@@ -1,42 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  
-  // Configuration sécurité
   poweredByHeader: false,
-  
-  // Headers simplifiés
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
-          },
-          {
-            key: 'Accept-CH',
-            value: 'Sec-CH-Prefers-Color-Scheme'
-          }
-        ],
-      },
-    ]
-  },
+  reactStrictMode: true,
+  swcMinify: true,
 
-  // Configuration images optimisées
+  // Configuration images
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
-      'avatars.githubusercontent.com',
-      'salesiq.zohopublic.com',
-      'zohostatic.com',
-      'zohocdn.com'
+      'avatars.githubusercontent.com'
     ],
     formats: ['image/webp', 'image/avif'],
   },
 
-  // Variables d'environnement exposées
+  // Variables d'environnement
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
@@ -52,17 +30,8 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // Configuration experimentale optimisée
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@heroicons/react'],
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-    optimizeCss: true,
-    scrollRestoration: true
-  },
-
-  // ✅ WEBPACK SIMPLIFIÉ - SANS REDÉFINITION CSS
+  // ✅ MINIMAL WEBPACK - AUCUNE MODIFICATION CSS
   webpack: (config, { isServer }) => {
-    // Résolution des modules pour Supabase et autres packages
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -72,19 +41,10 @@ const nextConfig = {
         crypto: false,
       }
     }
-
-    // ✅ PAS DE REDÉFINITION DES RÈGLES CSS - Next.js gère PostCSS automatiquement
-    // La configuration PostCSS est prise depuis postcss.config.js
-
+    
+    // ✅ PAS DE CONFIGURATION POSTCSS - Next.js s'en charge automatiquement
     return config
-  },
-
-  // Configuration production
-  ...(process.env.NODE_ENV === 'production' && {
-    compress: true,
-    generateEtags: false,
-    distDir: '.next'
-  })
+  }
 }
 
 module.exports = nextConfig
