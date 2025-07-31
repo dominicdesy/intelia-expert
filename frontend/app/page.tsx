@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { Language } from '@/types'
+import { useAuthStore } from '@/lib/stores/auth'
+import type { Language, User } from '@/types'
 
 const translations = {
   fr: {
@@ -131,9 +132,19 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // 🚨 ÉTAT LOCAL SIMPLE - PAS DE ZUSTAND
+  // ✅ UTILISER VOTRE AUTHSTORE EXISTANT
+  const { 
+    login, 
+    isLoading, 
+    isAuthenticated,
+    hasHydrated 
+  } = useAuthStore()
+
+  // 🛡️ PROTECTION CONTRE BOUCLES - VERSION SIMPLIFIÉE
+  const [isInitialized, setIsInitialized] = useState(false)
+  const redirectInProgress = useRef(false)
+
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
-  const [isLoading, setIsLoading] = useState(false)
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   
@@ -146,9 +157,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const t = translations[currentLanguage]
 
-  // 🚨 INITIALISATION ULTRA-SIMPLE
+  // ✅ INITIALISATION SIMPLE UNE SEULE FOIS
   useEffect(() => {
-    console.log('🔧 [Minimal] Initialisation ultra-simple')
+    if (isInitialized) return
+    
+    console.log('🔧 [Login] Initialisation unique')
     
     // Charger préférences de base
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -166,16 +179,35 @@ export default function LoginPage() {
         rememberMe: true
       }))
     }
+
+    setIsInitialized(true)
   }, [])
 
-  // 🚨 GESTION URL CALLBACK SIMPLE
+  // ✅ REDIRECTION PROTÉGÉE UTILISANT VOTRE AUTHSTORE
   useEffect(() => {
+    if (!hasHydrated || !isInitialized || redirectInProgress.current) {
+      return
+    }
+
+    if (isAuthenticated && !isLoading) {
+      console.log('✅ [Login] Utilisateur connecté via AuthStore, redirection')
+      redirectInProgress.current = true
+      
+      setTimeout(() => {
+        window.location.href = '/chat'
+      }, 500)
+    }
+  }, [isAuthenticated, isLoading, hasHydrated, isInitialized])
+
+  // ✅ GESTION URL CALLBACK
+  useEffect(() => {
+    if (!isInitialized) return
+
     const authStatus = searchParams.get('auth')
     if (!authStatus) return
     
     if (authStatus === 'success') {
       setLocalSuccess(t.authSuccess)
-      router.push('/chat')
     } else if (authStatus === 'error') {
       setLocalError(t.authError)  
     } else if (authStatus === 'incomplete') {
@@ -186,7 +218,7 @@ export default function LoginPage() {
     const url = new URL(window.location.href)
     url.searchParams.delete('auth')
     window.history.replaceState({}, '', url.pathname)
-  }, [searchParams, t, router])
+  }, [searchParams, t, isInitialized])
 
   const handleLanguageChange = (newLanguage: Language) => {
     setCurrentLanguage(newLanguage)
@@ -199,13 +231,13 @@ export default function LoginPage() {
     if (localSuccess) setLocalSuccess('')
   }
 
-  // 🚨 LOGIN SIMPLIFIÉ - DIRECT VERS SUPABASE
+  // ✅ LOGIN UTILISANT VOTRE AUTHSTORE
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
-    setIsLoading(true)
     
     try {
+      // Validation locale
       if (!loginData.email.trim()) {
         setLocalError(t.emailRequired)
         return
@@ -226,65 +258,39 @@ export default function LoginPage() {
         return
       }
 
-      console.log('🔐 [Minimal] Tentative connexion directe:', loginData.email)
+      console.log('🔐 [Login] Utilisation AuthStore login:', loginData.email)
       
-      // 🚨 IMPORT DYNAMIQUE POUR ÉVITER LA BOUCLE
-      const { createClient } = await import('@supabase/supabase-js')
+      // ✅ UTILISER VOTRE MÉTHODE LOGIN EXISTANTE
+      await login(loginData.email.trim(), loginData.password)
       
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginData.email.trim(),
-        password: loginData.password,
-      })
-
-      if (error) {
-        console.error('❌ [Minimal] Erreur Supabase:', error)
-        setLocalError(error.message || 'Erreur de connexion')
-        return
+      // Gestion "Se souvenir de moi"
+      if (loginData.rememberMe) {
+        localStorage.setItem('intelia-remember-me', 'true')
+        localStorage.setItem('intelia-last-email', loginData.email.trim())
+      } else {
+        localStorage.removeItem('intelia-remember-me')
+        localStorage.removeItem('intelia-last-email')
       }
-
-      if (data.user) {
-        console.log('✅ [Minimal] Connexion réussie:', data.user.email)
-        
-        // Gestion "Se souvenir de moi"
-        if (loginData.rememberMe) {
-          localStorage.setItem('intelia-remember-me', 'true')
-          localStorage.setItem('intelia-last-email', loginData.email.trim())
-        } else {
-          localStorage.removeItem('intelia-remember-me')
-          localStorage.removeItem('intelia-last-email')
-        }
-        
-        // 🚨 REDIRECTION SIMPLE ET SÉCURISÉE
-        setLocalSuccess('Connexion réussie ! Redirection...')
-        
-        // Attendre un peu avant redirection pour éviter les conflits
-        setTimeout(() => {
-          console.log('🚀 [Minimal] Redirection vers /chat')
-          
-          try {
-            // UNE SEULE redirection, pas de setTimeout multiples
-            window.location.href = '/chat'
-          } catch (error) {
-            console.error('❌ [Minimal] Erreur redirection:', error)
-            setLocalError('Erreur de redirection. Essayez de naviguer manuellement vers /chat')
-          }
-        }, 1000)
-        
-        return
-      }
-
-      setLocalError('Connexion échouée')
+      
+      console.log('✅ [Login] Connexion AuthStore réussie')
+      // La redirection sera gérée par l'effect qui surveille isAuthenticated
       
     } catch (error: any) {
-      console.error('❌ [Minimal] Erreur connexion:', error)
-      setLocalError(error.message || 'Erreur de connexion')
-    } finally {
-      setIsLoading(false)
+      console.error('❌ [Login] Erreur AuthStore:', error)
+      
+      // Messages d'erreur personnalisés
+      if (error.message?.includes('Invalid login credentials')) {
+        setLocalError('Email ou mot de passe incorrect. Vérifiez vos identifiants.')
+      } else if (error.message?.includes('Email not confirmed')) {
+        setLocalError('Email non confirmé. Vérifiez votre boîte mail.')
+      } else if (error.message?.includes('Too many requests')) {
+        setLocalError('Trop de tentatives. Attendez quelques minutes.')
+      } else {
+        setLocalError(error.message || 'Erreur de connexion')
+      }
+      
+      // Réinitialiser les flags en cas d'erreur
+      redirectInProgress.current = false
     }
   }
 
@@ -294,7 +300,31 @@ export default function LoginPage() {
     }
   }
 
-  // 🚨 AFFICHAGE DIRECT - PAS DE CONDITIONS COMPLEXES
+  // ✅ AFFICHAGE CONDITIONNEL AMÉLIORÉ
+  if (!hasHydrated || !isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Initialisation...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (redirectInProgress.current) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirection...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
       <div className="absolute top-4 right-4">
@@ -351,7 +381,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Formulaire de connexion SIMPLIFIÉ */}
+          {/* Formulaire de connexion */}
           <div className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
