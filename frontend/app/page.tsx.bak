@@ -31,10 +31,8 @@ const translations = {
     authSuccess: 'Connexion réussie ! Bienvenue.',
     authError: 'Erreur de connexion, veuillez réessayer.',
     authIncomplete: 'Connexion incomplète, veuillez réessayer.',
-    alreadyLoggedIn: 'Vous êtes déjà connecté !',
-    goToChat: 'Aller au Chat',
-    logout: 'Se déconnecter',
-    redirectError: 'Redirection automatique échouée'
+    sessionCleared: 'Session précédente effacée',
+    forceLogout: 'Déconnexion automatique'
   },
   en: {
     title: 'Intelia Expert',
@@ -60,10 +58,8 @@ const translations = {
     authSuccess: 'Successfully logged in! Welcome.',
     authError: 'Login error, please try again.',
     authIncomplete: 'Incomplete login, please try again.',
-    alreadyLoggedIn: 'You are already logged in!',
-    goToChat: 'Go to Chat',
-    logout: 'Logout',
-    redirectError: 'Automatic redirect failed'
+    sessionCleared: 'Previous session cleared',
+    forceLogout: 'Automatic logout'
   }
 }
 
@@ -149,11 +145,9 @@ export default function LoginPage() {
     hasHydrated 
   } = useAuthStore()
 
-  // 🛡️ PROTECTION ANTI-BOUCLE MAXIMALE
+  // 🛡️ PROTECTION ANTI-BOUCLE + FORCE LOGOUT
   const [isInitialized, setIsInitialized] = useState(false)
-  const redirectInProgress = useRef(false)
-  const redirectAttempted = useRef(false)
-  const [showAlreadyLoggedIn, setShowAlreadyLoggedIn] = useState(false)
+  const [hasLoggedOut, setHasLoggedOut] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [localError, setLocalError] = useState('')
@@ -168,11 +162,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const t = translations[currentLanguage]
 
-  // ✅ INITIALISATION SIMPLE UNE SEULE FOIS
+  // ✅ INITIALISATION + FORCE LOGOUT POUR CASSER LA BOUCLE
   useEffect(() => {
     if (isInitialized) return
     
-    console.log('🔧 [Login] Initialisation unique - STOP LOOP')
+    console.log('🔧 [Login] Initialisation + Force logout pour casser boucle')
+    
+    // Si utilisateur connecté au chargement de la page, FORCE déconnexion
+    if (isAuthenticated && hasHydrated) {
+      console.log('🚨 [Login] FORCE LOGOUT pour éviter boucle redirection')
+      logout().then(() => {
+        setHasLoggedOut(true)
+        setLocalSuccess(t.sessionCleared)
+      }).catch((error) => {
+        console.error('❌ [Login] Erreur force logout:', error)
+      })
+    }
     
     // Charger préférences de base
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -192,46 +197,7 @@ export default function LoginPage() {
     }
 
     setIsInitialized(true)
-  }, [])
-
-  // 🚨 REDIRECTION CONTRÔLÉE - UNE SEULE FOIS
-  useEffect(() => {
-    if (!hasHydrated || !isInitialized) {
-      return
-    }
-
-    if (isAuthenticated && !isLoading) {
-      console.log('⚠️ [Login] Utilisateur déjà connecté détecté')
-      
-      // Si pas encore tenté de rediriger
-      if (!redirectAttempted.current && !redirectInProgress.current) {
-        console.log('🚀 [Login] Première tentative de redirection vers /chat')
-        redirectAttempted.current = true
-        redirectInProgress.current = true
-        
-        // Essayer la redirection UNE SEULE FOIS
-        setTimeout(() => {
-          try {
-            window.location.href = '/chat'
-          } catch (error) {
-            console.error('❌ [Login] Redirection échouée:', error)
-            // Si redirection échoue, afficher l'interface "déjà connecté"
-            redirectInProgress.current = false
-            setShowAlreadyLoggedIn(true)
-          }
-        }, 1000)
-        
-        // Si après 5 secondes on est toujours là, afficher l'interface
-        setTimeout(() => {
-          if (redirectInProgress.current) {
-            console.log('⏰ [Login] Timeout redirection - affichage interface manuelle')
-            redirectInProgress.current = false
-            setShowAlreadyLoggedIn(true)
-          }
-        }, 5000)
-      }
-    }
-  }, [isAuthenticated, isLoading, hasHydrated, isInitialized])
+  }, [isAuthenticated, hasHydrated, logout, t])
 
   // ✅ GESTION URL CALLBACK
   useEffect(() => {
@@ -265,7 +231,7 @@ export default function LoginPage() {
     if (localSuccess) setLocalSuccess('')
   }
 
-  // ✅ LOGIN UTILISANT VOTRE AUTHSTORE
+  // ✅ LOGIN AVEC REDIRECTION IMMÉDIATE
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -292,14 +258,9 @@ export default function LoginPage() {
         return
       }
 
-      console.log('🔐 [Login] Nouvelle connexion:', loginData.email)
+      console.log('🔐 [Login] Connexion:', loginData.email)
       
-      // Reset les flags de redirection pour nouvelle connexion
-      redirectAttempted.current = false
-      redirectInProgress.current = false
-      setShowAlreadyLoggedIn(false)
-      
-      // ✅ UTILISER VOTRE MÉTHODE LOGIN EXISTANTE
+      // ✅ LOGIN VIA AUTHSTORE
       await login(loginData.email.trim(), loginData.password)
       
       // Gestion "Se souvenir de moi"
@@ -311,10 +272,16 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      console.log('✅ [Login] Connexion AuthStore réussie')
+      console.log('✅ [Login] Connexion réussie - redirection immédiate')
+      setLocalSuccess(t.authSuccess)
+      
+      // 🚀 REDIRECTION IMMÉDIATE après connexion réussie
+      setTimeout(() => {
+        window.location.href = '/chat'
+      }, 1000)
       
     } catch (error: any) {
-      console.error('❌ [Login] Erreur AuthStore:', error)
+      console.error('❌ [Login] Erreur:', error)
       
       // Messages d'erreur personnalisés
       if (error.message?.includes('Invalid login credentials')) {
@@ -326,31 +293,11 @@ export default function LoginPage() {
       } else {
         setLocalError(error.message || 'Erreur de connexion')
       }
-      
-      // Reset flags en cas d'erreur
-      redirectAttempted.current = false
-      redirectInProgress.current = false
     }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await logout()
-      redirectAttempted.current = false
-      redirectInProgress.current = false
-      setShowAlreadyLoggedIn(false)
-      setLocalSuccess('Déconnexion réussie')
-    } catch (error) {
-      setLocalError('Erreur lors de la déconnexion')
-    }
-  }
-
-  const handleManualRedirect = () => {
-    window.location.href = '/chat'
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading && !showAlreadyLoggedIn) {
+    if (e.key === 'Enter' && !isLoading) {
       handleLogin()
     }
   }
@@ -363,75 +310,6 @@ export default function LoginPage() {
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Initialisation...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (redirectInProgress.current) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirection vers le chat...</p>
-          <p className="mt-2 text-xs text-gray-400">Si ça ne redirige pas, rafraîchissez la page</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 🎯 INTERFACE "DÉJÀ CONNECTÉ" pour éviter la boucle
-  if (showAlreadyLoggedIn && isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="flex justify-center">
-            <InteliaLogo className="w-16 h-16" />
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t.title}
-          </h2>
-        </div>
-
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 text-center">
-            
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex justify-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm text-green-700 font-medium">
-                    {t.alreadyLoggedIn}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <button
-                onClick={handleManualRedirect}
-                className="w-full flex justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-              >
-                {t.goToChat}
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="w-full flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-              >
-                {t.logout}
-              </button>
-            </div>
-
-            <p className="mt-4 text-xs text-gray-500">
-              {t.redirectError}
-            </p>
-          </div>
         </div>
       </div>
     )
