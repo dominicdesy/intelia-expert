@@ -1,4 +1,4 @@
-// middleware.ts - CORRIGÉ POUR ÉVITER LES PARAMÈTRES DE REDIRECTION INDÉSIRABLES
+// middleware.ts - CORRIGÉ POUR ZOHO SALESIQ + URL WEBSOCKET MANQUANTE
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -10,41 +10,22 @@ export async function middleware(req: NextRequest) {
     const supabase = createMiddlewareClient({ req, res })
     const { data: { session } } = await supabase.auth.getSession()
 
-    console.log('🔄 [Middleware] Vérification:', {
-      path: req.nextUrl.pathname,
-      hasSession: !!session,
-      userAgent: req.headers.get('user-agent')?.substring(0, 50)
-    })
-
     // Routes protégées
     const protectedPaths = ['/chat', '/profile', '/settings', '/admin']
     const isProtectedPath = protectedPaths.some(path => 
       req.nextUrl.pathname.startsWith(path)
     )
 
-    // ✅ CORRECTION PRINCIPALE: Redirection PROPRE sans paramètres indésirables
+    // Redirection UNIQUEMENT si pas authentifié sur route protégée
     if (isProtectedPath && !session) {
-      console.log('🚫 [Middleware] Accès refusé à route protégée:', req.nextUrl.pathname)
-      console.log('🏠 [Middleware] Redirection vers accueil SANS paramètres')
-      
-      // ✅ REDIRECTION PROPRE vers l'accueil (sans paramètres de redirect)
-      const homeUrl = new URL('/', req.url)
-      
-      // ✅ NE PAS ajouter les paramètres redirect et message qui causent le problème
-      // ❌ ANCIEN CODE qui causait le problème:
-      // redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
-      // redirectUrl.searchParams.set('message', 'login_required')
-      
-      return NextResponse.redirect(homeUrl)
+      console.log('🚫 Accès refusé - Redirection vers login')
+      const redirectUrl = new URL('/', req.url)
+      redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
+      redirectUrl.searchParams.set('message', 'login_required')
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // ✅ ÉVITER LES REDIRECTIONS INUTILES pour les utilisateurs connectés
-    if (req.nextUrl.pathname === '/' && session) {
-      console.log('✅ [Middleware] Utilisateur connecté sur accueil - Pas de redirection forcée')
-      // Laisser l'utilisateur sur la page d'accueil, ne pas forcer vers /chat
-    }
-
-    // Headers de sécurité CONSERVÉS pour Zoho SalesIQ
+    // Headers de sécurité CORRIGÉS pour Zoho SalesIQ
     const response = NextResponse.next()
     
     const cspHeader = [
@@ -56,13 +37,13 @@ export async function middleware(req: NextRequest) {
       "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
       // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
       "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-      // ✅ CONNECT-SRC CORRIGÉ - URL WEBSOCKET CONSERVÉE
+      // 🔥 CONNECT-SRC CORRIGÉ - URL WEBSOCKET MANQUANTE AJOUTÉE
       "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com",
-      // ✅ FRAME-SRC CONSERVÉ pour autoriser les iframes Zoho
+      // ✅ FRAME-SRC AJOUTÉ pour autoriser les iframes Zoho
       "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-      // ✅ CHILD-SRC CONSERVÉ pour autoriser les pop-ups Zoho
+      // ✅ CHILD-SRC AJOUTÉ pour autoriser les pop-ups Zoho
       "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
-      // ✅ WORKER-SRC CONSERVÉ pour les service workers
+      // ✅ WORKER-SRC AJOUTÉ pour les service workers
       "worker-src 'self' blob:",
       "media-src 'self' https://*.zoho.com",
       "object-src 'none'",
@@ -81,7 +62,7 @@ export async function middleware(req: NextRequest) {
     return response
 
   } catch (error) {
-    console.error('❌ [Middleware] Erreur:', error)
+    console.error('❌ Erreur middleware:', error)
     return NextResponse.next()
   }
 }

@@ -1,4 +1,4 @@
-// app/auth/callback/page.tsx - CALLBACK AUTHENTIFICATION CORRIGÉ
+// app/auth/callback/page.tsx - CALLBACK AUTHENTIFICATION SOCIALE
 'use client'
 
 import { useEffect } from 'react'
@@ -14,37 +14,32 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔄 [Callback Page] Traitement callback authentification...')
+        console.log('🔄 Traitement callback authentification...')
         
         // Gérer le callback d'authentification OAuth
         const { data, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('❌ [Callback Page] Erreur callback auth:', error)
-          // ✅ CORRECTION: Redirection PROPRE vers l'accueil (sans paramètres d'erreur)
-          router.replace('/')
+          console.error('❌ Erreur callback auth:', error)
+          router.push('/?error=auth_failed')
           return
         }
 
         if (data.session) {
-          console.log('✅ [Callback Page] Session callback trouvée, initialisation...')
+          console.log('✅ Session callback trouvée, initialisation...')
           
           // Initialiser la session (cela va récupérer ou créer le profil)
           await initializeSession()
           
-          // ✅ CORRECTION PRINCIPALE: Redirection vers l'accueil au lieu de /chat
-          // L'utilisateur pourra choisir d'aller au chat via un bouton sur l'accueil
-          console.log('🏠 [Callback Page] Redirection vers accueil après connexion réussie')
-          router.replace('/')
-          
+          // Rediriger vers le chat
+          router.push('/chat')
         } else {
-          console.log('❌ [Callback Page] Aucune session dans callback, retour accueil')
-          router.replace('/')
+          console.log('❌ Aucune session dans callback, retour login')
+          router.push('/')
         }
       } catch (error) {
-        console.error('💥 [Callback Page] Erreur traitement callback:', error)
-        // ✅ CORRECTION: Même en cas d'erreur, redirection propre vers l'accueil
-        router.replace('/')
+        console.error('💥 Erreur traitement callback:', error)
+        router.push('/?error=callback_failed')
       }
     }
 
@@ -82,9 +77,8 @@ export default function AuthCallback() {
           <div className="bg-intelia-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
         </div>
         
-        {/* ✅ MESSAGE CORRIGÉ */}
         <p className="text-xs text-gray-500">
-          Redirection en cours vers l'accueil...
+          Si cette page ne se charge pas, <a href="/" className="text-intelia-blue-600 hover:underline">cliquez ici</a>
         </p>
       </div>
     </div>
