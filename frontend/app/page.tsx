@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -366,9 +366,11 @@ export default function LoginPage() {
     initializeSession 
   } = useAuthStore()
 
-  // ✅ PROTECTION CRITIQUE : Empêcher les useEffect de boucler
-  const [isInitialized, setIsInitialized] = useState(false)
+  // 🛡️ PROTECTION CRITIQUE MAXIMALE
+  const hasInitialized = useRef(false)
+  const hasCheckedAuth = useRef(false)
   const redirectInProgress = useRef(false)
+  const sessionInitialized = useRef(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const t = translations[currentLanguage]
@@ -402,11 +404,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // ✅ EFFET PROTÉGÉ : Une seule initialisation
-  useEffect(() => {
-    if (isInitialized) return
+  // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE
+  const handleRedirectToChat = useCallback(() => {
+    if (redirectInProgress.current) {
+      console.log('⚠️ [Redirect] Redirection déjà en cours, ignorée')
+      return
+    }
+
+    console.log('🚀 [Redirect] Redirection sécurisée vers /chat')
+    redirectInProgress.current = true
     
-    console.log('🚀 [Page] Initialisation unique')
+    // Utiliser replace au lieu de push pour éviter les retours
+    router.replace('/chat')
+  }, [router])
+
+  // 🛡️ INITIALISATION UNE SEULE FOIS
+  useEffect(() => {
+    if (hasInitialized.current) return
+    
+    console.log('🔧 [Init] Initialisation unique des préférences')
     
     // Charger les préférences utilisateur
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -430,83 +446,99 @@ export default function LoginPage() {
       }))
     }
 
-    setIsInitialized(true)
-  }, []) // ✅ Dépendances vides = une seule exécution
+    hasInitialized.current = true
+  }, [])
 
-  // ✅ EFFET REDIRECTION PROTÉGÉ
+  // 🛡️ VÉRIFICATION AUTH UNE SEULE FOIS
   useEffect(() => {
-    if (!hasHydrated || !isInitialized || redirectInProgress.current) {
+    if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
       return
     }
 
-    if (isAuthenticated && !isLoading) {
-      console.log('✅ [Page] Utilisateur connecté, redirection unique vers chat')
-      redirectInProgress.current = true
-      
-      // Redirection avec délai pour éviter les conflits
-      setTimeout(() => {
-        router.replace('/chat')
-      }, 100)
-    }
-  }, [hasHydrated, isAuthenticated, isLoading, isInitialized, router])
+    console.log('🔍 [Auth] Vérification authentification unique')
+    hasCheckedAuth.current = true
 
-  // ✅ GESTION DES PARAMÈTRES AUTH CALLBACK
-  useEffect(() => {
-    if (!isInitialized) return
-
-    const handleAuthStatus = () => {
-      const authStatus = searchParams.get('auth')
-      
-      if (authStatus === 'success') {
-        console.log('✅ [Login Page] Authentification OAuth réussie détectée')
-        setLocalSuccess(t.authSuccess)
-        
-        // Nettoyer l'URL sans déclencher de navigation
-        const url = new URL(window.location.href)
-        url.searchParams.delete('auth')
-        window.history.replaceState({}, '', url.pathname)
-        
-        // Masquer le message après 3 secondes
-        setTimeout(() => {
-          setLocalSuccess('')
-        }, 3000)
-        
-      } else if (authStatus === 'error') {
-        console.log('❌ [Login Page] Erreur authentification OAuth détectée')
-        setLocalError(t.authError)
-        
-        // Nettoyer l'URL sans déclencher de navigation
-        const url = new URL(window.location.href)
-        url.searchParams.delete('auth')
-        window.history.replaceState({}, '', url.pathname)
-        
-      } else if (authStatus === 'incomplete') {
-        console.log('⚠️ [Login Page] Authentification OAuth incomplète détectée')
-        setLocalError(t.authIncomplete)
-        
-        // Nettoyer l'URL sans déclencher de navigation
-        const url = new URL(window.location.href)
-        url.searchParams.delete('auth')
-        window.history.replaceState({}, '', url.pathname)
-      }
+    // Si déjà connecté, rediriger immédiatement
+    if (isAuthenticated) {
+      console.log('✅ [Auth] Utilisateur déjà connecté')
+      handleRedirectToChat()
+      return
     }
 
-    handleAuthStatus()
-  }, [searchParams, t, isInitialized])
+    // Sinon, initialiser la session une seule fois
+    if (!sessionInitialized.current) {
+      console.log('🔄 [Session] Initialisation session')
+      sessionInitialized.current = true
+      
+      initializeSession().then((sessionFound) => {
+        if (sessionFound) {
+          console.log('✅ [Session] Session existante trouvée')
+          // La redirection sera gérée par le changement d'état isAuthenticated
+        } else {
+          console.log('ℹ️ [Session] Aucune session existante')
+        }
+      }).catch(error => {
+        console.error('❌ [Session] Erreur initialisation:', error)
+      })
+    }
+  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, handleRedirectToChat])
 
-  // ✅ INITIALISATION SESSION
+  // 🛡️ SURVEILLANCE CHANGEMENT AUTH
   useEffect(() => {
-    if (!hasHydrated || !isInitialized || isAuthenticated) return
+    if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
+      return
+    }
 
-    initializeSession().then((sessionFound) => {
-      if (sessionFound) {
-        console.log('✅ Session existante trouvée')
-        // La redirection sera gérée par l'effet précédent
-      }
-    })
-  }, [hasHydrated, isInitialized, isAuthenticated, initializeSession])
+    if (isAuthenticated && !isLoading && !redirectInProgress.current) {
+      console.log('🎯 [AuthChange] Changement détecté: utilisateur connecté')
+      handleRedirectToChat()
+    }
+  }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
 
-  // ✅ Si redirection en cours, afficher un loader
+  // 🛡️ GESTION URL CALLBACK
+  useEffect(() => {
+    if (!hasInitialized.current) return
+
+    const authStatus = searchParams.get('auth')
+    if (!authStatus) return
+    
+    console.log('🔗 [Callback] Traitement callback auth:', authStatus)
+    
+    if (authStatus === 'success') {
+      setLocalSuccess(t.authSuccess)
+    } else if (authStatus === 'error') {
+      setLocalError(t.authError)
+    } else if (authStatus === 'incomplete') {
+      setLocalError(t.authIncomplete)
+    }
+    
+    // Nettoyer l'URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('auth')
+    window.history.replaceState({}, '', url.pathname)
+    
+    // Masquer les messages après 3 secondes
+    const timer = setTimeout(() => {
+      setLocalSuccess('')
+      setLocalError('')
+    }, 3000)
+    
+    return () => clearTimeout(timer)
+  }, [searchParams, t])
+
+  // 🛡️ AFFICHAGE CONDITIONNEL
+  if (!hasHydrated || !hasInitialized.current) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Initialisation...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (redirectInProgress.current) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -591,7 +623,7 @@ export default function LoginPage() {
     }
 
     try {
-      console.log('🔐 Tentative de connexion avec store:', loginData.email)
+      console.log('🔐 [Login] Tentative de connexion:', loginData.email)
       
       await login(loginData.email.trim(), loginData.password)
       
@@ -604,11 +636,14 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      console.log('✅ Connexion réussie, redirection sera gérée automatiquement')
+      // Ne pas forcer la redirection ici, elle sera gérée automatiquement
+      console.log('✅ [Login] Connexion réussie')
       
     } catch (error: any) {
-      console.error('❌ Erreur connexion:', error)
+      console.error('❌ [Login] Erreur:', error)
       setLocalError(error.message || 'Erreur de connexion')
+      // Réinitialiser les flags en cas d'erreur
+      redirectInProgress.current = false
     }
   }
 
@@ -623,7 +658,7 @@ export default function LoginPage() {
     }
 
     try {
-      console.log('📝 Tentative d\'inscription avec store:', signupData.email)
+      console.log('📝 [Signup] Tentative d\'inscription:', signupData.email)
       
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
@@ -650,7 +685,7 @@ export default function LoginPage() {
       }, 4000)
       
     } catch (error: any) {
-      console.error('❌ Erreur inscription:', error)
+      console.error('❌ [Signup] Erreur:', error)
       setLocalError(error.message || 'Erreur lors de la création du compte')
     }
   }
@@ -715,19 +750,6 @@ export default function LoginPage() {
     })
   }
 
-  // ✅ AFFICHAGE DE CHARGEMENT PENDANT L'HYDRATATION
-  if (!hasHydrated || !isInitialized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Initialisation...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
       <div className="absolute top-4 right-4">
@@ -767,7 +789,7 @@ export default function LoginPage() {
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
+                  </svg>
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
