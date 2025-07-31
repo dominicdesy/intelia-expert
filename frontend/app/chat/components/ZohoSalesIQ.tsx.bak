@@ -1,4 +1,4 @@
-// components/ZohoSalesIQ.tsx - VERSION CORRIGÉE POUR MICROSOFT EDGE
+// components/ZohoSalesIQ.tsx - VERSION AVEC BOUTON FLOTTANT UNIQUEMENT
 
 import { useEffect, useRef, useCallback } from 'react'
 
@@ -30,6 +30,35 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       console.log('✅ [ZohoSalesIQ] Bouton flottant maintenant visible')
     }
   }, [])
+
+  // ✅ NOUVEAU: Masquer automatiquement la fenêtre de chat si elle s'ouvre
+  const hideZohoChatWindow = useCallback(() => {
+    console.log('🔧 [ZohoSalesIQ] Vérification et masquage fenêtre chat si ouverte')
+    
+    // Masquer la fenêtre principale de chat si elle est ouverte
+    const chatWindow = document.querySelector('#zsiq_agelif, .zsiq_theme1, .siq-widgetwindow')
+    if (chatWindow && !chatWindow.classList.contains('zsiq-hide')) {
+      console.log('📌 [ZohoSalesIQ] Masquage fenêtre de chat automatiquement ouverte')
+      
+      // Tenter de fermer via l'API Zoho
+      if (window.$zoho?.salesiq?.floatwindow) {
+        try {
+          window.$zoho.salesiq.floatwindow.visible('hide')
+          console.log('✅ [ZohoSalesIQ] Fenêtre fermée via API Zoho')
+        } catch (error) {
+          console.warn('⚠️ [ZohoSalesIQ] Impossible de fermer via API:', error)
+        }
+      }
+      
+      // Backup: masquer via CSS
+      chatWindow.classList.add('zsiq-hide')
+      chatWindow.style.display = 'none'
+      console.log('✅ [ZohoSalesIQ] Fenêtre masquée via CSS')
+    }
+    
+    // S'assurer que le bouton flottant reste visible
+    ensureFloatButtonVisible()
+  }, [ensureFloatButtonVisible])
 
   // ✅ NOUVEAU: Fix accessibilité Microsoft Edge
   const fixZohoAccessibility = useCallback(() => {
@@ -141,31 +170,31 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
             console.log('👤 [ZohoSalesIQ] Info utilisateur configurée avec langue:', lang)
           }
           
-          // Afficher le widget
-          setTimeout(() => {
-            try {
-              if (window.$zoho?.salesiq?.floatwindow) {
-                window.$zoho.salesiq.floatwindow.visible('show')
-                console.log('👁️ [ZohoSalesIQ] Widget affiché')
-                
-                // ✅ APPLIQUER LES FIXES APRÈS AFFICHAGE
-                setTimeout(() => {
-                  ensureFloatButtonVisible()
-                  fixZohoAccessibility() // ✅ NOUVEAU: Fix accessibilité
-                }, 1000)
-                
-                // ✅ VÉRIFICATION SUPPLÉMENTAIRE
-                setTimeout(() => {
-                  ensureFloatButtonVisible()
-                  fixZohoAccessibility() // ✅ NOUVEAU: Fix accessibilité répété
-                }, 5000)
-              }
-            } catch (showError) {
-              console.error('❌ [ZohoSalesIQ] Erreur affichage:', showError)
-            }
-          }, 500)
+          // ✅ MODIFICATION PRINCIPALE: Ne pas auto-ouvrir le widget
+          console.log('👁️ [ZohoSalesIQ] Widget configuré - BOUTON FLOTTANT UNIQUEMENT')
           
-          console.log('✅ [ZohoSalesIQ] Configuration terminée avec succès')
+          // ✅ S'assurer que seul le bouton flottant est visible
+          setTimeout(() => {
+            ensureFloatButtonVisible()
+            hideZohoChatWindow() // ✅ NOUVEAU: Masquer la fenêtre si elle s'ouvre
+            fixZohoAccessibility()
+          }, 1000)
+          
+          // ✅ VÉRIFICATION RÉPÉTÉE pour s'assurer que la fenêtre reste fermée
+          setTimeout(() => {
+            ensureFloatButtonVisible()
+            hideZohoChatWindow() // ✅ NOUVEAU: Masquer à nouveau
+            fixZohoAccessibility()
+          }, 3000)
+          
+          // ✅ VÉRIFICATION FINALE
+          setTimeout(() => {
+            ensureFloatButtonVisible()
+            hideZohoChatWindow() // ✅ NOUVEAU: Masquer une dernière fois
+            fixZohoAccessibility()
+          }, 8000)
+          
+          console.log('✅ [ZohoSalesIQ] Configuration terminée - Bouton flottant uniquement')
           return
           
         } catch (error) {
@@ -180,7 +209,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
     
     configureAttempt()
-  }, [user, ensureFloatButtonVisible, fixZohoAccessibility]) // ✅ AJOUT fixZohoAccessibility
+  }, [user, ensureFloatButtonVisible, hideZohoChatWindow, fixZohoAccessibility])
 
   const loadZohoWithLanguage = useCallback((lang: string) => {
     console.log('🚀 [ZohoSalesIQ] Chargement widget avec langue de session:', lang)
@@ -248,23 +277,53 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     }
   }, [user, initializeZohoObject, configureWidget])
 
-  // ✅ NOUVEAU: Observer DOM pour fixes continus
+  // ✅ NOUVEAU: Observer DOM pour masquer automatiquement la fenêtre de chat
   useEffect(() => {
     if (!widgetLoadedRef.current) return
 
-    const observer = new MutationObserver(() => {
-      setTimeout(fixZohoAccessibility, 500)
+    const observer = new MutationObserver((mutations) => {
+      let shouldCheck = false
+      
+      mutations.forEach((mutation) => {
+        // Vérifier si des éléments Zoho ont été ajoutés/modifiés
+        if (mutation.type === 'childList') {
+          const hasZohoElements = Array.from(mutation.addedNodes).some(node => 
+            node instanceof Element && (
+              node.id?.includes('zsiq') || 
+              node.className?.includes('zsiq') ||
+              node.className?.includes('siq-')
+            )
+          )
+          if (hasZohoElements) shouldCheck = true
+        }
+        
+        // Vérifier si des classes/styles ont changé sur des éléments Zoho
+        if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+          if (mutation.target.id?.includes('zsiq') || 
+              mutation.target.className?.includes('zsiq') ||
+              mutation.target.className?.includes('siq-')) {
+            shouldCheck = true
+          }
+        }
+      })
+      
+      if (shouldCheck) {
+        setTimeout(() => {
+          hideZohoChatWindow()
+          fixZohoAccessibility()
+        }, 500)
+      }
     })
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style']
+      attributeFilter: ['class', 'style', 'id']
     })
 
     return () => observer.disconnect()
-  }, [fixZohoAccessibility])
+  }, [hideZohoChatWindow, fixZohoAccessibility])
 
   // ✅ EFFET PRINCIPAL: Langue fixe pour la session
   useEffect(() => {
