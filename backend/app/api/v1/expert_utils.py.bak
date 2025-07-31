@@ -1,24 +1,10 @@
-# Fixed expert_utils.py - Add missing import
-import os
-import logging
-from typing import Dict  # ← Add this import!
-
-logger = logging.getLogger(__name__)
-
-def get_fallback_response_enhanced(question: str, language: str = "fr") -> str:
-    """Réponse de fallback améliorée"""
-    responses = {
-        "fr": "Je rencontre actuellement des difficultés techniques. Veuillez reformuler votre question ou réessayer dans quelques instants.",
-        "en": "I'm currently experiencing technical difficulties. Please rephrase your question or try again in a few moments.",
-        "es": "Actualmente estoy experimentando dificultades técnicas. Por favor reformule su pregunta o inténtelo de nuevo en unos momentos."
-    }
-    return responses.get(language.lower(), responses["fr"])
+# Dans expert_utils.py, remplacer la fonction process_question_with_enhanced_prompt
 
 async def process_question_with_enhanced_prompt(
     question: str, 
     language: str = "fr", 
     speed_mode: str = "balanced",
-    extracted_entities: Dict = None,  # ← Now Dict is properly imported
+    extracted_entities: Dict = None,
     conversation_context: str = ""
 ) -> str:
     """Traite une question avec prompt amélioré AVEC DONNÉES DE RÉFÉRENCE ROSS 308"""
