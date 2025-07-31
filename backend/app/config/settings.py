@@ -87,7 +87,8 @@ class Settings:
         """Check if Supabase is configured."""
         return bool(self.supabase_url and self.supabase_anon_key)
     
-    # ✅ NOUVEAU: Configuration Validation Agricole
+    # ==================== CONFIGURATION VALIDATION AGRICOLE ====================
+    
     @property
     def agricultural_validation_enabled(self) -> bool:
         """Check if agricultural domain validation is enabled."""
@@ -140,4 +141,200 @@ class Settings:
             0 <= self.agricultural_validation_strictness <= 100
         )
 
+    # ==================== CONFIGURATION SYSTÈME DE CLARIFICATION ====================
+    
+    @property
+    def clarification_system_enabled(self) -> bool:
+        """Check if question clarification system is enabled."""
+        return self._get_secret("ENABLE_CLARIFICATION_SYSTEM", "true").lower() == "true"
+    
+    @property
+    def clarification_model(self) -> str:
+        """Get OpenAI model for clarification analysis."""
+        return self._get_secret("CLARIFICATION_MODEL", "gpt-4o-mini")
+    
+    @property
+    def clarification_timeout(self) -> int:
+        """Get timeout for clarification analysis in seconds."""
+        try:
+            return int(self._get_secret("CLARIFICATION_TIMEOUT", "20"))
+        except (ValueError, TypeError):
+            return 20
+    
+    @property
+    def clarification_max_questions(self) -> int:
+        """Get maximum number of clarification questions to generate."""
+        try:
+            return int(self._get_secret("CLARIFICATION_MAX_QUESTIONS", "3"))
+        except (ValueError, TypeError):
+            return 3
+    
+    @property
+    def clarification_min_length(self) -> int:
+        """Get minimum question length to trigger clarification analysis."""
+        try:
+            return int(self._get_secret("CLARIFICATION_MIN_LENGTH", "15"))
+        except (ValueError, TypeError):
+            return 15
+    
+    @property
+    def clarification_confidence_threshold(self) -> float:
+        """Get confidence threshold for clarification decisions (0.0-1.0)."""
+        try:
+            return float(self._get_secret("CLARIFICATION_CONFIDENCE_THRESHOLD", "0.7"))
+        except (ValueError, TypeError):
+            return 0.7
+    
+    @property
+    def clarification_log_all(self) -> bool:
+        """Check if all clarification decisions should be logged."""
+        return self._get_secret("LOG_ALL_CLARIFICATIONS", "true").lower() == "true"
+    
+    @property
+    def is_clarification_system_configured(self) -> bool:
+        """Check if clarification system is properly configured."""
+        return (
+            self.clarification_system_enabled and
+            self.is_openai_configured and
+            0.0 <= self.clarification_confidence_threshold <= 1.0
+        )
+
+    # ==================== CONFIGURATION MÉMOIRE CONVERSATIONNELLE ====================
+    
+    @property
+    def conversation_memory_enabled(self) -> bool:
+        """Check if conversational memory system is enabled."""
+        return self._get_secret("ENABLE_CONVERSATION_MEMORY", "true").lower() == "true"
+    
+    @property
+    def conversation_max_messages(self) -> int:
+        """Get maximum messages to keep in conversation memory."""
+        try:
+            return int(self._get_secret("CONVERSATION_MAX_MESSAGES", "20"))
+        except (ValueError, TypeError):
+            return 20
+    
+    @property
+    def conversation_expiry_hours(self) -> int:
+        """Get conversation expiry time in hours."""
+        try:
+            return int(self._get_secret("CONVERSATION_EXPIRY_HOURS", "24"))
+        except (ValueError, TypeError):
+            return 24
+    
+    @property
+    def entity_extraction_enabled(self) -> bool:
+        """Check if entity extraction is enabled."""
+        return self._get_secret("ENABLE_ENTITY_EXTRACTION", "true").lower() == "true"
+    
+    @property
+    def memory_db_path(self) -> str:
+        """Get path for conversation memory database."""
+        return self._get_secret("MEMORY_DB_PATH", "data/conversation_memory.db")
+    
+    @property
+    def is_conversation_memory_configured(self) -> bool:
+        """Check if conversation memory is properly configured."""
+        return (
+            self.conversation_memory_enabled and
+            self.conversation_max_messages > 0 and
+            self.conversation_expiry_hours > 0
+        )
+
+    # ==================== CONFIGURATION GÉNÉRALE SYSTÈME ====================
+    
+    @property
+    def system_name(self) -> str:
+        """Get system display name."""
+        return self._get_secret("SYSTEM_NAME", "Intelia Expert")
+    
+    @property
+    def system_version(self) -> str:
+        """Get system version."""
+        return self._get_secret("SYSTEM_VERSION", "2.0.0")
+    
+    @property
+    def environment(self) -> str:
+        """Get deployment environment."""
+        return self._get_secret("ENVIRONMENT", "development")
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production."""
+        return self.environment.lower() == "production"
+    
+    @property
+    def log_level(self) -> str:
+        """Get logging level."""
+        return self._get_secret("LOG_LEVEL", "INFO")
+    
+    # ==================== MÉTHODES UTILITAIRES ====================
+    
+    def get_system_status(self) -> dict:
+        """Get complete system configuration status."""
+        return {
+            "system": {
+                "name": self.system_name,
+                "version": self.system_version,
+                "environment": self.environment,
+                "is_production": self.is_production
+            },
+            "openai": {
+                "configured": self.is_openai_configured,
+                "api_key_present": bool(self.openai_api_key)
+            },
+            "supabase": {
+                "configured": self.is_supabase_configured,
+                "url_present": bool(self.supabase_url),
+                "key_present": bool(self.supabase_anon_key)
+            },
+            "agricultural_validation": {
+                "enabled": self.agricultural_validation_enabled,
+                "configured": self.is_agricultural_validation_configured,
+                "strictness": self.agricultural_validation_strictness
+            },
+            "clarification_system": {
+                "enabled": self.clarification_system_enabled,
+                "configured": self.is_clarification_system_configured,
+                "model": self.clarification_model,
+                "confidence_threshold": self.clarification_confidence_threshold
+            },
+            "conversation_memory": {
+                "enabled": self.conversation_memory_enabled,
+                "configured": self.is_conversation_memory_configured,
+                "max_messages": self.conversation_max_messages,
+                "expiry_hours": self.conversation_expiry_hours
+            }
+        }
+    
+    def validate_configuration(self) -> tuple[bool, list]:
+        """Validate all system configuration and return status and issues."""
+        issues = []
+        
+        # Vérifications critiques
+        if not self.is_openai_configured:
+            issues.append("OpenAI API key missing or invalid")
+        
+        if not self.is_supabase_configured:
+            issues.append("Supabase configuration incomplete")
+        
+        if self.agricultural_validation_enabled and not self.is_agricultural_validation_configured:
+            issues.append("Agricultural validation enabled but misconfigured")
+        
+        if self.clarification_system_enabled and not self.is_clarification_system_configured:
+            issues.append("Clarification system enabled but misconfigured")
+        
+        if self.conversation_memory_enabled and not self.is_conversation_memory_configured:
+            issues.append("Conversation memory enabled but misconfigured")
+        
+        # Vérifications de cohérence
+        if self.clarification_confidence_threshold < 0.1 or self.clarification_confidence_threshold > 0.95:
+            issues.append(f"Clarification confidence threshold unusual: {self.clarification_confidence_threshold}")
+        
+        if self.agricultural_validation_strictness < 5.0 or self.agricultural_validation_strictness > 50.0:
+            issues.append(f"Agricultural validation strictness unusual: {self.agricultural_validation_strictness}")
+        
+        return len(issues) == 0, issues
+
+# Instance globale
 settings = Settings()
