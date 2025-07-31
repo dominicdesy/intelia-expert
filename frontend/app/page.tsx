@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -366,6 +366,10 @@ export default function LoginPage() {
     initializeSession 
   } = useAuthStore()
 
+  // ✅ PROTECTION CRITIQUE : Empêcher les useEffect de boucler
+  const [isInitialized, setIsInitialized] = useState(false)
+  const redirectInProgress = useRef(false)
+
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const t = translations[currentLanguage]
   
@@ -398,8 +402,58 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // ✅ EFFET PROTÉGÉ : Une seule initialisation
+  useEffect(() => {
+    if (isInitialized) return
+    
+    console.log('🚀 [Page] Initialisation unique')
+    
+    // Charger les préférences utilisateur
+    const savedLanguage = localStorage.getItem('intelia-language') as Language
+    if (savedLanguage && translations[savedLanguage]) {
+      setCurrentLanguage(savedLanguage)
+    } else {
+      const browserLanguage = navigator.language.substring(0, 2) as Language
+      if (translations[browserLanguage]) {
+        setCurrentLanguage(browserLanguage)
+      }
+    }
+
+    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    
+    if (rememberMe && lastEmail) {
+      setLoginData(prev => ({
+        ...prev,
+        email: lastEmail,
+        rememberMe: true
+      }))
+    }
+
+    setIsInitialized(true)
+  }, []) // ✅ Dépendances vides = une seule exécution
+
+  // ✅ EFFET REDIRECTION PROTÉGÉ
+  useEffect(() => {
+    if (!hasHydrated || !isInitialized || redirectInProgress.current) {
+      return
+    }
+
+    if (isAuthenticated && !isLoading) {
+      console.log('✅ [Page] Utilisateur connecté, redirection unique vers chat')
+      redirectInProgress.current = true
+      
+      // Redirection avec délai pour éviter les conflits
+      setTimeout(() => {
+        router.replace('/chat')
+      }, 100)
+    }
+  }, [hasHydrated, isAuthenticated, isLoading, isInitialized, router])
+
   // ✅ GESTION DES PARAMÈTRES AUTH CALLBACK
   useEffect(() => {
+    if (!isInitialized) return
+
     const handleAuthStatus = () => {
       const authStatus = searchParams.get('auth')
       
@@ -438,50 +492,32 @@ export default function LoginPage() {
     }
 
     handleAuthStatus()
-  }, [searchParams, t])
+  }, [searchParams, t, isInitialized])
 
-  // ✅ EFFET D'INITIALISATION
+  // ✅ INITIALISATION SESSION
   useEffect(() => {
-    // Charger la langue sauvegardée
-    const savedLanguage = localStorage.getItem('intelia-language') as Language
-    if (savedLanguage && translations[savedLanguage]) {
-      setCurrentLanguage(savedLanguage)
-    } else {
-      const browserLanguage = navigator.language.substring(0, 2) as Language
-      if (translations[browserLanguage]) {
-        setCurrentLanguage(browserLanguage)
+    if (!hasHydrated || !isInitialized || isAuthenticated) return
+
+    initializeSession().then((sessionFound) => {
+      if (sessionFound) {
+        console.log('✅ Session existante trouvée')
+        // La redirection sera gérée par l'effet précédent
       }
-    }
+    })
+  }, [hasHydrated, isInitialized, isAuthenticated, initializeSession])
 
-    // Charger les données "Se souvenir de moi"
-    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-    const lastEmail = localStorage.getItem('intelia-last-email') || ''
-    
-    if (rememberMe && lastEmail) {
-      setLoginData(prev => ({
-        ...prev,
-        email: lastEmail,
-        rememberMe: true
-      }))
-    }
-
-    // ✅ INITIALISER LA SESSION SI PAS ENCORE FAIT
-    if (hasHydrated && !isAuthenticated) {
-      initializeSession().then((sessionFound) => {
-        if (sessionFound) {
-          console.log('✅ Session existante trouvée, redirection vers chat')
-          router.push('/chat')
-        }
-      })
-    }
-  }, [hasHydrated, isAuthenticated, initializeSession, router])
-
-  // ✅ REDIRECTION SI DÉJÀ CONNECTÉ
-  useEffect(() => {
-    if (hasHydrated && isAuthenticated) {
-      router.push('/chat')
-    }
-  }, [isAuthenticated, hasHydrated, router])
+  // ✅ Si redirection en cours, afficher un loader
+  if (redirectInProgress.current) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirection...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleLanguageChange = (newLanguage: Language) => {
     setCurrentLanguage(newLanguage)
@@ -568,8 +604,7 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      console.log('✅ Connexion réussie, redirection vers chat')
-      router.push('/chat')
+      console.log('✅ Connexion réussie, redirection sera gérée automatiquement')
       
     } catch (error: any) {
       console.error('❌ Erreur connexion:', error)
@@ -681,13 +716,13 @@ export default function LoginPage() {
   }
 
   // ✅ AFFICHAGE DE CHARGEMENT PENDANT L'HYDRATATION
-  if (!hasHydrated) {
+  if (!hasHydrated || !isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
+          <p className="mt-4 text-gray-600">Initialisation...</p>
         </div>
       </div>
     )
@@ -732,7 +767,7 @@ export default function LoginPage() {
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
+                    </svg>
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
