@@ -5,7 +5,7 @@ const nextConfig = {
   // Configuration sécurité
   poweredByHeader: false,
   
-  // ✅ HEADERS SIMPLIFIÉS - CSP maintenant gérée par middleware.ts
+  // Headers simplifiés
   async headers() {
     return [
       {
@@ -15,8 +15,10 @@ const nextConfig = {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
           },
-          // CSP supprimée - maintenant gérée par middleware.ts
-          // Autres headers de sécurité conservés mais optionnels (redondant avec middleware)
+          {
+            key: 'Accept-CH',
+            value: 'Sec-CH-Prefers-Color-Scheme'
+          }
         ],
       },
     ]
@@ -27,7 +29,6 @@ const nextConfig = {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com',
-      // Domaines Zoho pour les images
       'salesiq.zohopublic.com',
       'zohostatic.com',
       'zohocdn.com'
@@ -51,14 +52,17 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // Optimisation bundle + Configuration Supabase
+  // Configuration experimentale optimisée
   experimental: {
     optimizePackageImports: ['lucide-react', '@heroicons/react'],
-    serverComponentsExternalPackages: ['@supabase/supabase-js']
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+    optimizeCss: true,
+    scrollRestoration: true
   },
 
-  // Configuration webpack pour Supabase
+  // ✅ WEBPACK SIMPLIFIÉ - SANS REDÉFINITION CSS
   webpack: (config, { isServer }) => {
+    // Résolution des modules pour Supabase et autres packages
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -68,8 +72,19 @@ const nextConfig = {
         crypto: false,
       }
     }
+
+    // ✅ PAS DE REDÉFINITION DES RÈGLES CSS - Next.js gère PostCSS automatiquement
+    // La configuration PostCSS est prise depuis postcss.config.js
+
     return config
   },
+
+  // Configuration production
+  ...(process.env.NODE_ENV === 'production' && {
+    compress: true,
+    generateEtags: false,
+    distDir: '.next'
+  })
 }
 
 module.exports = nextConfig
