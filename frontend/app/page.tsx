@@ -14,7 +14,7 @@ const translations = {
     confirmPassword: 'Confirmer le mot de passe',
     login: 'Se connecter',
     signup: 'Créer un compte',
-    rememberMe: 'Se souvenir de moi',
+    rememberMe: 'Se souvenir de mon email',
     forgotPassword: 'Mot de passe oublié ?',
     newToIntelia: 'Nouveau sur Intelia ?',
     connecting: 'Connexion en cours...',
@@ -56,7 +56,7 @@ const translations = {
     required: '*',
     close: 'Fermer',
     alreadyHaveAccount: 'Déjà un compte ?',
-    authSuccess: 'Connexion réussie ! Bienvenue.',
+    authSuccess: 'Connexion réussie !',
     authError: 'Erreur de connexion, veuillez réessayer.',
     authIncomplete: 'Connexion incomplète, veuillez réessayer.',
     sessionCleared: 'Session précédente effacée',
@@ -69,7 +69,7 @@ const translations = {
     confirmPassword: 'Confirm password',
     login: 'Sign in',
     signup: 'Create account',
-    rememberMe: 'Remember me',
+    rememberMe: 'Remember my email',
     forgotPassword: 'Forgot password?',
     newToIntelia: 'New to Intelia?',
     connecting: 'Signing in...',
@@ -111,7 +111,7 @@ const translations = {
     required: '*',
     close: 'Close',
     alreadyHaveAccount: 'Already have an account?',
-    authSuccess: 'Successfully logged in! Welcome.',
+    authSuccess: 'Successfully logged in!',
     authError: 'Login error, please try again.',
     authIncomplete: 'Incomplete login, please try again.',
     sessionCleared: 'Previous session cleared',
@@ -124,7 +124,7 @@ const translations = {
     confirmPassword: 'Confirmar contraseña',
     login: 'Iniciar sesión',
     signup: 'Crear cuenta',
-    rememberMe: 'Recordarme',
+    rememberMe: 'Recordar mi email',
     forgotPassword: '¿Olvidaste tu contraseña?',
     newToIntelia: '¿Nuevo en Intelia?',
     connecting: 'Iniciando sesión...',
@@ -166,7 +166,7 @@ const translations = {
     required: '*',
     close: 'Cerrar',
     alreadyHaveAccount: '¿Ya tienes cuenta?',
-    authSuccess: '¡Inicio de sesión exitoso! Bienvenido.',
+    authSuccess: '¡Inicio de sesión exitoso!',
     authError: 'Error de conexión, por favor intenta de nuevo.',
     authIncomplete: 'Inicio de sesión incompleto, por favor intenta de nuevo.',
     sessionCleared: 'Sesión anterior eliminada',
@@ -179,7 +179,7 @@ const translations = {
     confirmPassword: 'Passwort bestätigen',
     login: 'Anmelden',
     signup: 'Konto erstellen',
-    rememberMe: 'Angemeldet bleiben',
+    rememberMe: 'E-Mail merken',
     forgotPassword: 'Passwort vergessen?',
     newToIntelia: 'Neu bei Intelia?',
     connecting: 'Anmeldung läuft...',
@@ -221,7 +221,7 @@ const translations = {
     required: '*',
     close: 'Schließen',
     alreadyHaveAccount: 'Bereits ein Konto?',
-    authSuccess: 'Erfolgreich angemeldet! Willkommen.',
+    authSuccess: 'Erfolgreich angemeldet!',
     authError: 'Anmeldefehler, bitte versuchen Sie es erneut.',
     authIncomplete: 'Unvollständige Anmeldung, bitte versuchen Sie es erneut.',
     sessionCleared: 'Vorherige Sitzung gelöscht',
@@ -365,7 +365,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // ✅ UTILISER VOTRE AUTHSTORE EXISTANT (du fichier qui fonctionne)
+  // ✅ UTILISER VOTRE AUTHSTORE EXISTANT
   const { 
     login, 
     register,
@@ -375,15 +375,16 @@ export default function LoginPage() {
     hasHydrated 
   } = useAuthStore()
 
-  // 🛡️ PROTECTION ANTI-BOUCLE + FORCE LOGOUT (du fichier qui fonctionne)
+  // 🛡️ PROTECTION ANTI-BOUCLE + FORCE LOGOUT
   const [isInitialized, setIsInitialized] = useState(false)
   const [hasLoggedOut, setHasLoggedOut] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   
-  // État pour le mode inscription (du fichier de sauvegarde)
+  // État pour le mode inscription
   const [isSignupMode, setIsSignupMode] = useState(false)
   
   const [loginData, setLoginData] = useState({
@@ -392,7 +393,7 @@ export default function LoginPage() {
     rememberMe: false
   })
 
-  // Données d'inscription (du fichier de sauvegarde)
+  // Données d'inscription
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
@@ -411,17 +412,29 @@ export default function LoginPage() {
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
   const t = translations[currentLanguage]
 
-  // ✅ INITIALISATION + FORCE LOGOUT POUR CASSER LA BOUCLE (du fichier qui fonctionne)
+  // ✅ DEBUG - Afficher l'état actuel des données de login
+  useEffect(() => {
+    console.log('🔍 [Debug] LoginData état actuel:', {
+      email: loginData.email,
+      hasPassword: !!loginData.password,
+      rememberMe: loginData.rememberMe,
+      localStorage_rememberMe: localStorage.getItem('intelia-remember-me'),
+      localStorage_lastEmail: localStorage.getItem('intelia-last-email')
+    })
+  }, [loginData])
+
+  // ✅ NOUVELLE LOGIQUE D'INITIALISATION AVEC REMEMBER EMAIL
   useEffect(() => {
     if (isInitialized) return
     
-    console.log('🔧 [Login] Initialisation + Force logout pour casser boucle')
+    console.log('🔧 [Login] Initialisation + force logout systématique')
     
-    // Si utilisateur connecté au chargement de la page, FORCE déconnexion
+    // ✅ TOUJOURS forcer logout pour sécurité (pas de session persistante)
     if (isAuthenticated && hasHydrated) {
-      console.log('🚨 [Login] FORCE LOGOUT pour éviter boucle redirection')
+      console.log('🚨 [Login] FORCE LOGOUT pour sécurité - garde email si remember me')
       logout().then(() => {
         setHasLoggedOut(true)
         setLocalSuccess(t.sessionCleared)
@@ -430,7 +443,7 @@ export default function LoginPage() {
       })
     }
     
-    // Charger préférences de base (étendu avec détection de langue)
+    // Charger préférences de base
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -441,21 +454,45 @@ export default function LoginPage() {
       }
     }
 
+    // ✅ RESTAURER EMAIL si "remember me" était activé
     const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
     const lastEmail = localStorage.getItem('intelia-last-email') || ''
     
     if (rememberMe && lastEmail) {
+      console.log('💾 [Login] Restauration email depuis remember me:', lastEmail)
       setLoginData(prev => ({
         ...prev,
         email: lastEmail,
-        rememberMe: true
+        rememberMe: true,
+        password: '' // ✅ Toujours vider le mot de passe
       }))
+      
+      // ✅ Message informatif pour l'utilisateur
+      setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
+      
+      // Masquer le message après 4 secondes
+      setTimeout(() => {
+        setLocalSuccess('')
+      }, 4000)
     }
 
     setIsInitialized(true)
   }, [isAuthenticated, hasHydrated, logout, t])
 
-  // ✅ GESTION URL CALLBACK (du fichier qui fonctionne)
+  // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
+  useEffect(() => {
+    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    
+    if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
+      console.log('🎯 [UX] Focus automatique sur mot de passe')
+      setTimeout(() => {
+        passwordInputRef.current?.focus()
+      }, 500) // Délai pour laisser le temps au message de s'afficher
+    }
+  }, [loginData.email, loginData.password])
+
+  // ✅ GESTION URL CALLBACK
   useEffect(() => {
     if (!isInitialized) return
 
@@ -490,12 +527,13 @@ export default function LoginPage() {
   }
 
   const handleLoginChange = (field: string, value: string | boolean) => {
+    console.log('🔄 [LoginChange] Field:', field, 'Value:', value)
     setLoginData(prev => ({ ...prev, [field]: value }))
     if (localError) setLocalError('')
     if (localSuccess) setLocalSuccess('')
   }
 
-  // Fonctions de gestion inscription (du fichier de sauvegarde)
+  // Fonctions de gestion inscription
   const handleSignupChange = (field: string, value: string) => {
     setSignupData(prev => ({ ...prev, [field]: value }))
     if (localError) setLocalError('')
@@ -532,7 +570,7 @@ export default function LoginPage() {
     return null
   }
 
-  // ✅ LOGIN AVEC REDIRECTION IMMÉDIATE (du fichier qui fonctionne)
+  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" = EMAIL UNIQUEMENT
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -559,30 +597,31 @@ export default function LoginPage() {
         return
       }
 
-      console.log('🔐 [Login] Connexion:', loginData.email)
+      console.log('🔐 [Login] Connexion:', loginData.email, 'Remember email:', loginData.rememberMe)
       
       // ✅ LOGIN VIA AUTHSTORE
       await login(loginData.email.trim(), loginData.password)
       
-      // Gestion "Se souvenir de moi"
+      // ✅ GESTION "Se souvenir de moi" = SEULEMENT EMAIL
       if (loginData.rememberMe) {
+        console.log('💾 [Login] Sauvegarde EMAIL pour remember me')
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', loginData.email.trim())
       } else {
+        console.log('🗑️ [Login] Suppression remember me')
         localStorage.removeItem('intelia-remember-me')
         localStorage.removeItem('intelia-last-email')
       }
       
-      console.log('✅ [Login] Connexion réussie - redirection immédiate')
-      setLocalSuccess(t.authSuccess)
+      console.log('✅ [Login] Connexion réussie - redirection en cours...')
       
-      // 🚀 REDIRECTION IMMÉDIATE après connexion réussie
-      setTimeout(() => {
-        window.location.href = '/chat'
-      }, 1000)
+      // 🚀 REDIRECTION IMMÉDIATE avec indicateur de chargement
+      setIsRedirecting(true)
+      window.location.href = '/chat'
       
     } catch (error: any) {
       console.error('❌ [Login] Erreur:', error)
+      setIsRedirecting(false) // ✅ Réinitialiser l'état de redirection en cas d'erreur
       
       // Messages d'erreur personnalisés
       if (error.message?.includes('Invalid login credentials')) {
@@ -597,7 +636,7 @@ export default function LoginPage() {
     }
   }
 
-  // Fonction de gestion inscription (du fichier de sauvegarde)
+  // Fonction de gestion inscription
   const handleSignup = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -651,21 +690,29 @@ export default function LoginPage() {
     }
   }
 
-  // Fonctions de gestion des modes (du fichier de sauvegarde)
+  // ✅ GESTION MODES AVEC REMEMBER EMAIL
   const handleCloseSignup = () => {
     setIsSignupMode(false)
     setLocalError('')
     setLocalSuccess('')
     
-    // Restaurer les données de connexion si remember me était activé
+    // ✅ Restaurer EMAIL si remember me était activé
     const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
     const lastEmail = localStorage.getItem('intelia-last-email') || ''
     
+    console.log('🔄 [Signup] Fermeture signup - restore email:', lastEmail)
+    
     setLoginData({ 
       email: rememberMe ? lastEmail : '', 
-      password: '', 
+      password: '', // ✅ Toujours vider mot de passe
       rememberMe 
     })
+    
+    // Message si email restauré
+    if (rememberMe && lastEmail) {
+      setLocalSuccess(`Email restauré : ${lastEmail}`)
+      setTimeout(() => setLocalSuccess(''), 3000)
+    }
     
     // Réinitialiser le formulaire d'inscription
     setSignupData({
@@ -682,16 +729,26 @@ export default function LoginPage() {
     setLocalSuccess('')
     
     if (!isSignupMode) {
+      // Passage en mode signup - vider login
       setLoginData({ email: '', password: '', rememberMe: false })
     } else {
+      // Retour en mode login - restaurer EMAIL uniquement
       const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
       const lastEmail = localStorage.getItem('intelia-last-email') || ''
       
+      console.log('🔄 [Toggle] Retour login - restore email:', lastEmail)
+      
       setLoginData({ 
         email: rememberMe ? lastEmail : '', 
-        password: '', 
+        password: '', // ✅ Toujours vider mot de passe
         rememberMe 
       })
+      
+      // Message si email restauré
+      if (rememberMe && lastEmail) {
+        setLocalSuccess(`Email restauré : ${lastEmail}`)
+        setTimeout(() => setLocalSuccess(''), 3000)
+      }
     }
     
     setSignupData({
@@ -702,7 +759,7 @@ export default function LoginPage() {
     })
   }
 
-  // ✅ AFFICHAGE CONDITIONNEL (du fichier qui fonctionne)
+  // ✅ AFFICHAGE CONDITIONNEL
   if (!hasHydrated || !isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -710,6 +767,28 @@ export default function LoginPage() {
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Initialisation...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ ÉCRAN DE REDIRECTION
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-6 text-lg font-medium text-gray-900">Connexion réussie !</p>
+          <p className="mt-2 text-gray-600">Redirection vers votre chat...</p>
+          <div className="mt-4 bg-blue-50 rounded-lg p-4 max-w-sm mx-auto">
+            <div className="flex items-center justify-center">
+              <svg className="animate-pulse h-5 w-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-sm text-blue-700">Chargement en cours...</span>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -765,136 +844,7 @@ export default function LoginPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {localSuccess && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm text-green-700">
-                    {localSuccess}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Formulaire de connexion */}
-          {!isSignupMode && (
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  {t.email} <span className="text-red-500">*</span>
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={loginData.email}
-                    onChange={(e) => handleLoginChange('email', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder="votre@email.com"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  {t.password} <span className="text-red-500">*</span>
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    required
-                    value={loginData.password}
-                    onChange={(e) => handleLoginChange('password', e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder="••••••••"
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                    disabled={isLoading}
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    checked={loginData.rememberMe}
-                    onChange={(e) => handleLoginChange('rememberMe', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    disabled={isLoading}
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                    {t.rememberMe}
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <Link 
-                    href="/auth/forgot-password" 
-                    className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-                  >
-                    {t.forgotPassword}
-                  </Link>
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={handleLogin}
-                  disabled={isLoading || !loginData.email || !loginData.password}
-                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>{t.connecting}</span>
-                    </div>
-                  ) : (
-                    t.login
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Formulaire d'inscription - Version complète du fichier de sauvegarde */}
+          {/* Formulaire d'inscription - Version complète */}
           {isSignupMode && (
             <div className="space-y-6 pt-2">
               {/* Section: Informations personnelles */}
@@ -1338,3 +1288,138 @@ export default function LoginPage() {
     </div>
   )
 }
+
+          {localSuccess && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <div className="text-sm text-green-700">
+                    {localSuccess}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Formulaire de connexion */}
+          {!isSignupMode && (
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  {t.email} <span className="text-red-500">*</span>
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={loginData.email}
+                    onChange={(e) => handleLoginChange('email', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
+                    placeholder="votre@email.com"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  {t.password} <span className="text-red-500">*</span>
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    ref={passwordInputRef}
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={loginData.password}
+                    onChange={(e) => handleLoginChange('password', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
+                    placeholder={loginData.email ? "Entrez votre mot de passe" : "••••••••"}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
+                    disabled={isLoading}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.34 6.34m6.822 10.565l-3.536-3.536" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={loginData.rememberMe}
+                    onChange={(e) => {
+                      console.log('📝 [Checkbox] Remember me clicked:', e.target.checked)
+                      handleLoginChange('rememberMe', e.target.checked)
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                    {t.rememberMe}
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <Link 
+                    href="/auth/forgot-password" 
+                    className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                  >
+                    {t.forgotPassword}
+                  </Link>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleLogin}
+                  disabled={isLoading || isRedirecting || !loginData.email || !loginData.password}
+                  className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>{t.connecting}</span>
+                    </div>
+                  ) : isRedirecting ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Redirection...</span>
+                    </div>
+                  ) : (
+                    t.login
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
