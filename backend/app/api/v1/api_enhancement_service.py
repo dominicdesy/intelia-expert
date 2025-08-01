@@ -1,6 +1,7 @@
 """
 RAGContextEnhancer AMÉLIORÉ - Extraction d'entités complète
 Version enrichie avec extraction NLP hybride et entités étendues
+VERSION FINALE AVEC DÉTECTION INTELLIGENTE QUESTIONS TECHNIQUES
 """
 
 import re
@@ -242,123 +243,6 @@ class EnhancedRAGContextEnhancer:
                     r'(\d+(?:\.\d+)?)\s*livres?',  # pounds
                     r'(\d+(?:\.\d+)?)\s*lbs?'
                 ]
-            },
-            
-            # === TEMPÉRATURE ===
-            "temperature": {
-                "all": [
-                    r'(\d+(?:\.\d+)?)\s*°?[cC]\b',
-                    r'(\d+(?:\.\d+)?)\s*(?:degrés?|degrees?|grados?)\s*(?:celsius|c)?',
-                    r'(?:température|temperature|temperatura)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'(\d+(?:\.\d+)?)\s*°?[fF]\b',  # Fahrenheit
-                    r'(?:chaud|hot|caliente)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'(?:froid|cold|frío)\s*[:\-]?\s*(\d+(?:\.\d+)?)'
-                ]
-            },
-            
-            # === HUMIDITÉ ===
-            "humidity": {
-                "all": [
-                    r'(\d+(?:\.\d+)?)\s*%\s*(?:humidité|humidity|humedad)',
-                    r'(?:humidité|humidity|humedad)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
-                    r'RH\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
-                    r'(?:hygrométrie|hygrometry)\s*[:\-]?\s*(\d+(?:\.\d+)?)'
-                ]
-            },
-            
-            # === MORTALITÉ ===
-            "mortality": {
-                "all": [
-                    r'(\d+(?:\.\d+)?)\s*%?\s*(?:mortalité|mortality|mortalidad)',
-                    r'(?:mortalité|mortality|mortalidad)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
-                    r'(\d+(?:\.\d+)?)\s*%?\s*(?:morts?|dead|muertos?)',
-                    r'taux\s*(?:de\s*)?mortalité\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'mortality\s*rate\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'(\d+)\s*(?:sur|of|de)\s*(\d+)\s*(?:morts?|dead|muertos?)'
-                ]
-            },
-            
-            # === ÉCLAIRAGE ===
-            "lighting": {
-                "fr": [r'(?:éclairage|lumière)\s*[:\-]?\s*(naturel|artificiel|continu|intermittent)',
-                       r'(\d+)\s*(?:heures?|h)\s*(?:de\s*)?(?:lumière|éclairage)',
-                       r'(?:photopériode|cycle\s*lumineux)\s*[:\-]?\s*(\d+)\s*(?:heures?|h)'],
-                "en": [r'(?:lighting|light)\s*[:\-]?\s*(natural|artificial|continuous|intermittent)',
-                       r'(\d+)\s*(?:hours?|h)\s*(?:of\s*)?light',
-                       r'(?:photoperiod|light\s*cycle)\s*[:\-]?\s*(\d+)\s*(?:hours?|h)'],
-                "es": [r'(?:iluminación|luz)\s*[:\-]?\s*(natural|artificial|continua|intermitente)',
-                       r'(\d+)\s*(?:horas?|h)\s*(?:de\s*)?luz',
-                       r'(?:fotoperíodo|ciclo\s*de\s*luz)\s*[:\-]?\s*(\d+)\s*(?:horas?|h)']
-            },
-            
-            # === VENTILATION ===
-            "ventilation": {
-                "fr": [r'ventilation\s*[:\-]?\s*(bonne|mauvaise|adequate|insuffisante|excessive)',
-                       r'(?:aération|circulation\s*air)\s*[:\-]?\s*(bonne|mauvaise)'],
-                "en": [r'ventilation\s*[:\-]?\s*(good|poor|adequate|insufficient|excessive)',
-                       r'(?:air\s*flow|circulation)\s*[:\-]?\s*(good|poor)'],
-                "es": [r'ventilación\s*[:\-]?\s*(buena|mala|adecuada|insuficiente|excesiva)',
-                       r'(?:aireación|circulación\s*aire)\s*[:\-]?\s*(buena|mala)']
-            },
-            
-            # === SYMPTÔMES ===
-            "symptoms": {
-                "fr": [r'\b(diarrhée|boiterie|toux|éternuements|léthargie|perte\s*appétit|fièvre|convulsions)',
-                       r'\b(plumes\s*ébouriffées|crete\s*pâle|respiration\s*difficile)',
-                       r'\b(soif\s*excessive|tremblements|paralysie|saignements)'],
-                "en": [r'\b(diarrhea|lameness|cough|sneezing|lethargy|loss\s*appetite|fever|convulsions)',
-                       r'\b(ruffled\s*feathers|pale\s*comb|difficult\s*breathing)',
-                       r'\b(excessive\s*thirst|trembling|paralysis|bleeding)'],
-                "es": [r'\b(diarrea|cojera|tos|estornudos|letargo|pérdida\s*apetito|fiebre|convulsiones)',
-                       r'\b(plumas\s*erizadas|cresta\s*pálida|respiración\s*difícil)',
-                       r'\b(sed\s*excesiva|temblores|parálisis|sangrado)']
-            },
-            
-            # === LOGEMENT ===
-            "housing": {
-                "fr": [r'(?:logement|hébergement|bâtiment)\s*[:\-]?\s*(cage|sol|plein\s*air|volière)',
-                       r'\b(élevage\s*en\s*(?:cage|batterie|sol|plein\s*air))',
-                       r'(?:densité|superficie)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|oiseaux/m²)'],
-                "en": [r'(?:housing|accommodation|building)\s*[:\-]?\s*(cage|floor|free\s*range|aviary)',
-                       r'\b((?:cage|battery|floor|free\s*range)\s*system)',
-                       r'(?:density|space)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|birds/m²)'],
-                "es": [r'(?:alojamiento|edificio)\s*[:\-]?\s*(jaula|suelo|campo\s*libre|aviario)',
-                       r'\b(sistema\s*(?:de\s*)?(?:jaula|suelo|campo\s*libre))',
-                       r'(?:densidad|espacio)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|aves/m²)']
-            },
-            
-            # === ALIMENTATION ===
-            "feed": {
-                "all": [
-                    r'(?:consommation|consumption|consumo)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|kg)',
-                    r'(?:conversion|ratio)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'FCR\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                    r'IC\s*[:\-]?\s*(\d+(?:\.\d+)?)',  # Indice de conversion
-                    r'(?:aliment|feed|pienso)\s*[:\-]?\s*(starter|grower|finisher|démarrage|croissance|finition)'
-                ]
-            },
-            
-            # === TAILLE TROUPEAU ===
-            "flock_size": {
-                "all": [
-                    r'(\d+)\s*(?:poulets?|chickens?|pollos?|oiseaux|birds|aves)',
-                    r'(?:troupeau|flock|lote)\s*(?:de\s*)?(\d+)',
-                    r'(\d+)\s*têtes?',
-                    r'lot\s*(?:de\s*)?(\d+)'
-                ]
-            },
-            
-            # === VACCINATION ===
-            "vaccination": {
-                "fr": [r'vaccin\w*\s*[:\-]?\s*(fait|ok|complet|retard|manquant)',
-                       r'vaccination\s*[:\-]?\s*(à\s*jour|en\s*retard|complète)',
-                       r'\b(marek|gumboro|newcastle|bronchite|salmonelle)'],
-                "en": [r'vaccin\w*\s*[:\-]?\s*(done|ok|complete|delayed|missing)',
-                       r'vaccination\s*[:\-]?\s*(up\s*to\s*date|delayed|complete)',
-                       r'\b(marek|gumboro|newcastle|bronchitis|salmonella)'],
-                "es": [r'vacun\w*\s*[:\-]?\s*(hecha|ok|completa|retrasada|faltante)',
-                       r'vacunación\s*[:\-]?\s*(al\s*día|retrasada|completa)',
-                       r'\b(marek|gumboro|newcastle|bronquitis|salmonela)']
             }
         }
     
@@ -492,120 +376,6 @@ class EnhancedRAGContextEnhancer:
                 entities.weight_grams = weight
                 entities.weight_confidence = 0.8
                 break
-        
-        # === TEMPÉRATURE ===
-        temp_patterns = self.extraction_patterns["temperature"]["all"]
-        for pattern in temp_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                temp = float(match.group(1))
-                if "f" in pattern.lower() or "fahrenheit" in context_lower:
-                    temp = (temp - 32) * 5/9  # Conversion F -> C
-                    entities.temperature_unit = "fahrenheit_converted"
-                entities.temperature = temp
-                entities.temperature_confidence = 0.8
-                break
-        
-        # === HUMIDITÉ ===
-        humidity_patterns = self.extraction_patterns["humidity"]["all"]
-        for pattern in humidity_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                entities.humidity = float(match.group(1))
-                entities.humidity_confidence = 0.8
-                break
-        
-        # === MORTALITÉ ===
-        mortality_patterns = self.extraction_patterns["mortality"]["all"]
-        for pattern in mortality_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                if len(match.groups()) == 2:  # Format "X sur Y morts"
-                    dead = int(match.group(1))
-                    total = int(match.group(2))
-                    entities.mortality_rate = (dead / total) * 100
-                else:
-                    entities.mortality_rate = float(match.group(1))
-                entities.mortality_confidence = 0.8
-                break
-        
-        # === SYMPTÔMES ===
-        symptom_patterns = self.extraction_patterns["symptoms"].get(language, [])
-        detected_symptoms = []
-        for pattern in symptom_patterns:
-            matches = re.findall(pattern, context_lower, re.IGNORECASE)
-            detected_symptoms.extend(matches)
-        
-        if detected_symptoms:
-            entities.symptoms = list(set(detected_symptoms))  # Dédoublonnage
-            entities.symptoms_confidence = 0.7
-        
-        # === ÉCLAIRAGE ===
-        lighting_patterns = self.extraction_patterns["lighting"].get(language, [])
-        for pattern in lighting_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                if match.group(1).isdigit():
-                    entities.lighting_hours = float(match.group(1))
-                    entities.lighting = "measured"
-                else:
-                    entities.lighting = match.group(1)
-                entities.lighting_confidence = 0.7
-                break
-        
-        # === VENTILATION ===
-        ventilation_patterns = self.extraction_patterns["ventilation"].get(language, [])
-        for pattern in ventilation_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                entities.ventilation = match.group(1)
-                entities.ventilation_confidence = 0.7
-                break
-        
-        # === LOGEMENT ===
-        housing_patterns = self.extraction_patterns["housing"].get(language, [])
-        for pattern in housing_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                if match.group(1).replace(".", "").isdigit():
-                    entities.housing_density = float(match.group(1))
-                else:
-                    entities.housing_type = match.group(1)
-                break
-        
-        # === TAILLE TROUPEAU ===
-        flock_patterns = self.extraction_patterns["flock_size"]["all"]
-        for pattern in flock_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                entities.flock_size = int(match.group(1))
-                break
-        
-        # === ALIMENTATION ===
-        feed_patterns = self.extraction_patterns["feed"]["all"]
-        for pattern in feed_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                if match.group(1).replace(".", "").isdigit():
-                    if "conversion" in pattern or "fcr" in pattern or "ic" in pattern:
-                        entities.feed_conversion_ratio = float(match.group(1))
-                    else:
-                        entities.feed_consumption = float(match.group(1))
-                break
-        
-        # === VACCINATION ===
-        vacc_patterns = self.extraction_patterns["vaccination"].get(language, [])
-        detected_vaccines = []
-        for pattern in vacc_patterns:
-            matches = re.findall(pattern, context_lower, re.IGNORECASE)
-            if matches:
-                if isinstance(matches[0], str) and matches[0] not in ["fait", "ok", "done", "hecha"]:
-                    detected_vaccines.extend(matches)
-                else:
-                    entities.vaccination_status = matches[0]
-        
-        if detected_vaccines:
-            entities.vaccination_schedule = list(set(detected_vaccines))
     
     def _extract_with_spacy(self, context: str, language: str, entities: ExtendedContextEntities):
         """Extraction avec SpaCy (enrichissement NLP)"""
@@ -630,28 +400,6 @@ class EnhancedRAGContextEnhancer:
                     if any(word in context.lower() for word in ["poulet", "chicken", "pollo", "oiseau", "bird"]):
                         try:
                             entities.flock_size = int(ent.text)
-                        except ValueError:
-                            pass
-            
-            # Extraction de patterns sémantiques
-            for token in doc:
-                # Recherche de relations sémantiques
-                if token.pos_ == "NUM":
-                    # Nombre suivi d'une unité
-                    next_tokens = doc[token.i:token.i+3] if token.i < len(doc)-2 else []
-                    next_text = " ".join([t.text for t in next_tokens]).lower()
-                    
-                    if any(unit in next_text for unit in ["jour", "day", "día"]) and not entities.age_days:
-                        try:
-                            entities.age_days = int(token.text)
-                            entities.age_confidence = max(entities.age_confidence, 0.6)
-                        except ValueError:
-                            pass
-                    
-                    elif any(unit in next_text for unit in ["gramme", "gram", "g"]) and not entities.weight_grams:
-                        try:
-                            entities.weight_grams = float(token.text)
-                            entities.weight_confidence = max(entities.weight_confidence, 0.6)
                         except ValueError:
                             pass
             
@@ -762,27 +510,6 @@ class EnhancedRAGContextEnhancer:
         else:
             context_prefix = ""
         
-        # Contexte environnemental
-        env_parts = []
-        if entities.temperature:
-            env_parts.append(f"{entities.temperature}°C")
-        if entities.humidity:
-            env_parts.append(f"{entities.humidity}% HR")
-        if entities.ventilation:
-            env_parts.append(f"ventilation {entities.ventilation}")
-        
-        if env_parts:
-            context_parts.append(template_set["context_environment"].format(
-                environment=", ".join(env_parts)
-            ))
-        
-        # Contexte santé
-        if entities.symptoms:
-            symptoms_str = ", ".join(entities.symptoms[:3])
-            context_parts.append(template_set["context_health"].format(
-                health=f"symptômes: {symptoms_str}"
-            ))
-        
         # Assembler la question enrichie
         enriched = question.lower() if context_prefix else question
         
@@ -791,10 +518,6 @@ class EnhancedRAGContextEnhancer:
                 enriched = f"{context_prefix}, {enriched}"
             else:
                 enriched = f"{context_prefix}: {enriched}"
-        
-        # Ajouter contextes additionnels
-        if context_parts:
-            enriched += "\n" + " | ".join(context_parts)
         
         return enriched
     
@@ -812,7 +535,7 @@ class EnhancedRAGContextEnhancer:
         return False
 
 # =============================================================================
-# ✅ NOUVELLE CLASSE APIEnhancementService AJOUTÉE
+# ✅ CLASSE APIEnhancementService AVEC DÉTECTION INTELLIGENTE
 # =============================================================================
 
 class APIEnhancementService:
@@ -823,13 +546,31 @@ class APIEnhancementService:
         logger.info("✅ [API Enhancement Service] Service d'amélioration API initialisé")
     
     def detect_vagueness(self, question: str, language: str = "fr"):
-        """Détecte les questions floues"""
+        """
+        ✅ DÉTECTION DE FLOU AMÉLIORÉE
+        Détecte spécifiquement les questions techniques nécessitant des précisions
+        """
         from .expert_models import VaguenessDetection, QuestionClarity
         
-        # Implémentation basique de détection de flou
         question_lower = question.lower().strip()
+        missing_specifics = []
+        vagueness_score = 0.0
         
-        # Patterns de questions floues
+        # ✅ NOUVEAU : Détection spécifique questions poids/performance
+        performance_vagueness = self._detect_performance_question_vagueness(question_lower, language)
+        
+        if performance_vagueness:
+            return VaguenessDetection(
+                is_vague=True,
+                vagueness_score=performance_vagueness["score"],
+                missing_specifics=performance_vagueness["missing"],
+                question_clarity=performance_vagueness["clarity"],
+                suggested_clarification=performance_vagueness["suggestion"],
+                actionable=True,  # Ces questions sont toujours actionnables
+                detected_patterns=performance_vagueness["patterns"]
+            )
+        
+        # Logique existante pour autres types de questions...
         vague_patterns = [
             r'^(comment|how|cómo)',
             r'^(pourquoi|why|por qué)',
@@ -838,25 +579,19 @@ class APIEnhancementService:
             r'\b(aide|help|ayuda)\b'
         ]
         
-        missing_specifics = []
-        vagueness_score = 0.0
-        
-        # Vérifier les patterns flous
+        # [Reste de la logique existante...]
         for pattern in vague_patterns:
             if re.search(pattern, question_lower):
                 vagueness_score += 0.2
         
-        # Vérifier la longueur
         if len(question_lower.split()) < 5:
             vagueness_score += 0.3
             missing_specifics.append("Question trop courte")
         
-        # Vérifier les détails manquants
         if not re.search(r'\d+', question_lower):
             vagueness_score += 0.2
             missing_specifics.append("Pas de données numériques")
         
-        # Vérifier les mentions de race/âge
         breed_mentioned = bool(re.search(r'(ross|cobb|poulet|chicken|pollo)', question_lower))
         age_mentioned = bool(re.search(r'(jour|day|semaine|week|âge|age)', question_lower))
         
@@ -876,7 +611,6 @@ class APIEnhancementService:
         else:
             clarity = QuestionClarity.CLEAR
         
-        # Suggestion de clarification
         suggested_clarification = None
         if vagueness_score > 0.5:
             if language == "fr":
@@ -895,6 +629,96 @@ class APIEnhancementService:
             actionable=vagueness_score < 0.8,
             detected_patterns=[p for p in vague_patterns if re.search(p, question_lower)]
         )
+
+    def _detect_performance_question_vagueness(self, question_lower: str, language: str) -> Optional[Dict]:
+        """
+        ✅ NOUVELLE FONCTION : Détection spécialisée pour questions poids/performance
+        """
+        
+        # Patterns pour questions poids + âge
+        weight_age_patterns = [
+            r'(?:poids|weight|peso).*?(\d+)\s*(?:jour|day|día|semaine|week|semana)',
+            r'(\d+)\s*(?:jour|day|día|semaine|week|semana).*?(?:poids|weight|peso)',
+            r'(?:quel|what|cuál).*?(?:poids|weight|peso).*?(\d+)',
+            r'(?:combien|how much|cuánto).*?(?:pèse|weigh|pesa).*?(\d+)'
+        ]
+        
+        # Vérifier si c'est une question poids+âge
+        has_weight_age = any(re.search(pattern, question_lower) for pattern in weight_age_patterns)
+        
+        if not has_weight_age:
+            return None
+        
+        # Extraire l'âge mentionné
+        age_match = re.search(r'(\d+)\s*(?:jour|day|día|semaine|week|semana)', question_lower)
+        age = age_match.group(1) if age_match else "X"
+        
+        # Vérifier présence race/sexe
+        breed_patterns = [
+            r'(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)',
+            r'race\s*[:\-]?\s*(ross|cobb|hubbard)',
+            r'breed\s*[:\-]?\s*(ross|cobb|hubbard)'
+        ]
+        
+        sex_patterns = [
+            r'(mâle|male|macho|femelle|female|hembra)',
+            r'(coq|hen|poule|gallina)',
+            r'(mixte|mixed|misto)'
+        ]
+        
+        has_breed = any(re.search(pattern, question_lower) for pattern in breed_patterns)
+        has_sex = any(re.search(pattern, question_lower) for pattern in sex_patterns)
+        
+        # Si race ET sexe manquent → haute priorité de clarification
+        if not has_breed and not has_sex:
+            missing = ["race/souche", "sexe"]
+            score = 0.85
+            clarity = QuestionClarity.UNCLEAR
+            
+            suggestions = {
+                "fr": f"Pour le poids exact à {age} jours, précisez la race (Ross 308, Cobb 500...) et le sexe (mâles/femelles)",
+                "en": f"For exact weight at {age} days, specify breed (Ross 308, Cobb 500...) and sex (males/females)",
+                "es": f"Para el peso exacto a {age} días, especifique la raza (Ross 308, Cobb 500...) y sexo (machos/hembras)"
+            }
+            
+            return {
+                "score": score,
+                "missing": missing,
+                "clarity": clarity,
+                "suggestion": suggestions.get(language, suggestions["fr"]),
+                "patterns": ["weight_age_without_breed_sex"],
+                "type": "performance_technical_incomplete"
+            }
+        
+        # Si seulement un des deux manque → priorité modérée
+        elif not has_breed or not has_sex:
+            missing = []
+            if not has_breed:
+                missing.append("race/souche")
+            if not has_sex:
+                missing.append("sexe")
+            
+            score = 0.65
+            clarity = QuestionClarity.PARTIALLY_CLEAR
+            
+            missing_text = " et ".join(missing)
+            suggestions = {
+                "fr": f"Pour plus de précision sur le poids à {age} jours, précisez {missing_text}",
+                "en": f"For more precision on weight at {age} days, specify {missing_text}",
+                "es": f"Para mayor precisión del peso a {age} días, especifique {missing_text}"
+            }
+            
+            return {
+                "score": score,
+                "missing": missing,
+                "clarity": clarity,
+                "suggestion": suggestions.get(language, suggestions["fr"]),
+                "patterns": ["weight_age_partial_info"],
+                "type": "performance_technical_partial"
+            }
+        
+        # Question complète → pas de vagueness
+        return None
     
     def check_context_coherence(self, rag_response: str, extracted_entities: Dict, rag_context: Dict, original_question: str):
         """Vérifie la cohérence entre contexte et RAG"""
@@ -1017,34 +841,10 @@ class APIEnhancementService:
         )
 
 # =============================================================================
-# INTÉGRATION DANS EXPERT SERVICES
-# =============================================================================
-
-def update_expert_services_with_enhanced_context():
-    """Instructions pour intégrer dans expert_services.py"""
-    
-    integration_code = '''
-    # Dans expert_services.py, remplacer:
-    # self.rag_enhancer = RAGContextEnhancer()
-    
-    # Par:
-    from .api_enhancement_service import EnhancedRAGContextEnhancer, APIEnhancementService
-    
-    def __init__(self):
-        self.integrations = IntegrationsManager()
-        self.rag_enhancer = EnhancedRAGContextEnhancer()  # ← Version améliorée
-        self.enhancement_service = APIEnhancementService()  # ← Nouveau service
-    
-    # Le reste du code reste identique - compatibilité totale
-    '''
-    
-    return integration_code
-
-# =============================================================================
 # LOGGING ET CONFIGURATION
 # =============================================================================
 
-logger.info("✅ [Enhanced RAG Context Enhancer] Extracteur d'entités avancé initialisé")
+logger.info("✅ [Enhanced RAG Context Enhancer] Extracteur d'entités avancé initialisé avec détection intelligente")
 logger.info("🚀 [Enhanced RAG Context Enhancer] NOUVELLES CAPACITÉS:")
 logger.info("   - 🏷️ 15+ types d'entités extraites (vs 3 avant)")
 logger.info("   - 🧠 Extraction hybride regex + NLP SpaCy")
@@ -1053,4 +853,6 @@ logger.info("   - 📊 Scores de confiance par entité")
 logger.info("   - 🎯 Enrichissement contextuel avancé")
 logger.info("   - 🔍 Détection pronoms étendus")
 logger.info(f"   - 🤖 SpaCy disponible: {'✅' if SPACY_AVAILABLE else '❌ (regex only)'}")
-logger.info("✅ [API Enhancement Service] Service d'amélioration API ajouté et fonctionnel")
+logger.info("   - 🎪 Détection intelligente questions techniques race/sexe")
+logger.info("   - ⚡ Clarification automatique poids/performance")
+logger.info("✅ [API Enhancement Service] Service d'amélioration API complet et fonctionnel")

@@ -2,7 +2,7 @@
 app/api/v1/expert.py - ENDPOINTS PRINCIPAUX EXPERT SYSTEM
 
 Endpoints core pour le système expert avec fonctionnalités améliorées
-VERSION FINALE : Support complet des nouvelles améliorations API
+VERSION FINALE CORRIGÉE : Support complet des nouvelles améliorations API + Clarification intelligente
 """
 
 import os
@@ -27,7 +27,7 @@ security = HTTPBearer()
 expert_service = ExpertService()
 
 # =============================================================================
-# ENDPOINTS PRINCIPAUX AVEC AMÉLIORATIONS
+# ENDPOINTS PRINCIPAUX AVEC AMÉLIORATIONS + CLARIFICATION INTELLIGENTE
 # =============================================================================
 
 @router.post("/ask-enhanced-v2", response_model=EnhancedExpertResponse)
@@ -39,6 +39,7 @@ async def ask_expert_enhanced_v2(
     """
     Endpoint expert FINAL avec toutes les améliorations:
     - Détection de questions floues avec clarification immédiate
+    - Système de clarification intelligent race/sexe
     - Vérification de cohérence contextuelle
     - Scoring RAG détaillé avec métadonnées
     - Fallback enrichi avec diagnostics
@@ -49,7 +50,7 @@ async def ask_expert_enhanced_v2(
     
     try:
         logger.info("=" * 80)
-        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 - VERSION FINALE")
+        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 - VERSION FINALE AVEC CLARIFICATION INTELLIGENTE")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🆔 Conversation ID: {request_data.conversation_id}")
         logger.info(f"🎯 Détection flou: {request_data.enable_vagueness_detection}")
@@ -57,6 +58,7 @@ async def ask_expert_enhanced_v2(
         logger.info(f"📊 RAG détaillé: {request_data.detailed_rag_scoring}")
         logger.info(f"📈 Métriques qualité: {request_data.enable_quality_metrics}")
         logger.info(f"🐛 Mode debug: {request_data.debug_mode}")
+        logger.info(f"🎪 Réponse clarification: {request_data.is_clarification_response}")
         
         # Déléguer le traitement au service amélioré
         response = await expert_service.process_expert_question(
@@ -69,6 +71,10 @@ async def ask_expert_enhanced_v2(
         logger.info(f"✅ FIN ask_expert_enhanced_v2 - conversation_id: {response.conversation_id}")
         logger.info(f"🤖 Améliorations utilisées: {len(response.ai_enhancements_used or [])} features")
         logger.info(f"⚡ Temps total: {response.response_time_ms}ms")
+        logger.info(f"🎭 Mode final: {response.mode}")
+        
+        if response.clarification_result:
+            logger.info(f"🎯 Clarification: {response.clarification_result.get('clarification_requested', False)}")
         
         if request_data.debug_mode and response.debug_info:
             logger.info(f"🐛 Debug info disponible: {len(response.debug_info)} éléments")
@@ -90,13 +96,14 @@ async def ask_expert_enhanced_v2_public(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """Endpoint public avec toutes les améliorations"""
+    """Endpoint public avec toutes les améliorations + clarification intelligente"""
     start_time = time.time()
     
     try:
         logger.info("=" * 80)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public - VERSION FINALE PUBLIQUE")
+        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public - VERSION FINALE PUBLIQUE AVEC CLARIFICATION")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
+        logger.info(f"🎪 Réponse clarification: {request_data.is_clarification_response}")
         
         # Déléguer le traitement au service (mode public)
         response = await expert_service.process_expert_question(
@@ -158,11 +165,9 @@ async def ask_expert_compatible(
     """
     logger.info("🔄 [Expert Enhanced] Redirection compatibilité vers v2 amélioré")
     
-    # Activer les améliorations par défaut pour compatibilité
-    if not hasattr(request_data, 'enable_vagueness_detection'):
-        request_data.enable_vagueness_detection = True
-    if not hasattr(request_data, 'require_coherence_check'):
-        request_data.require_coherence_check = True
+    # ✅ CORRECTION : Activer les améliorations par défaut pour compatibilité
+    request_data.enable_vagueness_detection = True
+    request_data.require_coherence_check = True
     
     return await ask_expert_enhanced_v2(request_data, request, current_user)
 
@@ -176,11 +181,9 @@ async def ask_expert_public_compatible(
     """
     logger.info("🔄 [Expert Enhanced] Redirection compatibilité public vers v2")
     
-    # Activer les améliorations par défaut
-    if not hasattr(request_data, 'enable_vagueness_detection'):
-        request_data.enable_vagueness_detection = True
-    if not hasattr(request_data, 'require_coherence_check'):
-        request_data.require_coherence_check = True
+    # ✅ CORRECTION : Activer les améliorations par défaut
+    request_data.enable_vagueness_detection = True
+    request_data.require_coherence_check = True
     
     return await ask_expert_enhanced_v2_public(request_data, request)
 
@@ -221,12 +224,12 @@ async def get_suggested_topics_enhanced(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur récupération topics")
 
 # =============================================================================
-# NOUVEAUX ENDPOINTS DE DEBUG ET MONITORING
+# NOUVEAUX ENDPOINTS DE DEBUG ET MONITORING AVEC CLARIFICATION
 # =============================================================================
 
 @router.get("/system-status")
 async def get_system_status():
-    """Retourne le statut complet du système avec améliorations"""
+    """Retourne le statut complet du système avec améliorations + clarification"""
     try:
         # Vérifier la disponibilité de tous les services
         status = {
@@ -236,7 +239,8 @@ async def get_system_status():
                 "expert_service": True,
                 "rag_system": True,  # À vérifier réellement
                 "enhancement_service": True,
-                "integrations_manager": expert_service.integrations.get_system_status()
+                "integrations_manager": expert_service.integrations.get_system_status(),
+                "clarification_system": True
             },
             "enhanced_capabilities": [
                 "vagueness_detection",
@@ -245,7 +249,10 @@ async def get_system_status():
                 "enhanced_fallback",
                 "quality_metrics",
                 "debug_mode",
-                "performance_breakdown"
+                "performance_breakdown",
+                "smart_clarification_breed_sex",
+                "clarification_response_processing",
+                "incomplete_clarification_handling"
             ],
             "enhanced_endpoints": [
                 "/ask-enhanced-v2",
@@ -253,10 +260,17 @@ async def get_system_status():
                 "/feedback (with quality)",
                 "/topics (enhanced)",
                 "/system-status",
-                "/debug/test-enhancements"
+                "/debug/test-enhancements",
+                "/debug/test-clarification"
             ],
-            "api_version": "v2_enhanced",
-            "backward_compatibility": True
+            "api_version": "v2_enhanced_with_clarification",
+            "backward_compatibility": True,
+            "clarification_features": {
+                "breed_sex_detection": True,
+                "automatic_clarification": True,
+                "follow_up_handling": True,
+                "multilingual_support": ["fr", "en", "es"]
+            }
         }
         
         return status
@@ -329,13 +343,15 @@ async def test_enhancements(request: Request):
                 "quality_metrics": result.quality_metrics is not None,
                 "debug_info": result.debug_info is not None,
                 "performance_breakdown": result.performance_breakdown is not None,
-                "ai_enhancements_used": len(result.ai_enhancements_used or []) > 0
+                "ai_enhancements_used": len(result.ai_enhancements_used or []) > 0,
+                "clarification_system": "smart_performance_clarification" in (result.ai_enhancements_used or [])
             },
             "enhancement_results": {
                 "ai_enhancements_count": len(result.ai_enhancements_used or []),
                 "processing_steps_count": len(result.processing_steps or []),
                 "response_time_ms": result.response_time_ms,
-                "mode": result.mode
+                "mode": result.mode,
+                "clarification_triggered": result.clarification_result is not None
             },
             "errors": []
         }
@@ -364,21 +380,154 @@ async def test_enhancements(request: Request):
             "errors": [f"Erreur critique: {str(e)}"]
         }
 
+@router.post("/debug/test-clarification")
+async def test_clarification_system(request: Request):
+    """✅ NOUVEAU: Test spécifique du système de clarification intelligent"""
+    try:
+        test_results = {
+            "test_successful": True,
+            "timestamp": datetime.now().isoformat(),
+            "tests_performed": [],
+            "errors": []
+        }
+        
+        # Test 1: Question nécessitant clarification race/sexe
+        logger.info("🎯 Test 1: Question poids sans race/sexe")
+        
+        clarification_question = EnhancedQuestionRequest(
+            text="Quel est le poids d'un poulet de 12 jours ?",
+            conversation_id=str(uuid.uuid4()),
+            language="fr",
+            enable_vagueness_detection=True,
+            is_clarification_response=False
+        )
+        
+        start_time = time.time()
+        result1 = await expert_service.process_expert_question(
+            request_data=clarification_question,
+            request=request,
+            current_user=None,
+            start_time=start_time
+        )
+        
+        test1_result = {
+            "test_name": "Détection question nécessitant clarification",
+            "question": clarification_question.text,
+            "clarification_requested": result1.clarification_result is not None,
+            "mode": result1.mode,
+            "enhancements_used": result1.ai_enhancements_used or [],
+            "success": "smart_performance_clarification" in result1.mode
+        }
+        
+        test_results["tests_performed"].append(test1_result)
+        
+        if not test1_result["success"]:
+            test_results["errors"].append("Clarification automatique non déclenchée")
+        
+        # Test 2: Traitement réponse de clarification
+        if test1_result["clarification_requested"]:
+            logger.info("🎪 Test 2: Traitement réponse clarification")
+            
+            clarification_response = EnhancedQuestionRequest(
+                text="Ross 308 mâles",
+                conversation_id=clarification_question.conversation_id,
+                language="fr",
+                is_clarification_response=True,
+                original_question="Quel est le poids d'un poulet de 12 jours ?",
+                clarification_context={
+                    "missing_information": ["breed", "sex"],
+                    "clarification_type": "performance_breed_sex"
+                }
+            )
+            
+            start_time2 = time.time()
+            result2 = await expert_service.process_expert_question(
+                request_data=clarification_response,
+                request=request,
+                current_user=None,
+                start_time=start_time2
+            )
+            
+            test2_result = {
+                "test_name": "Traitement réponse clarification",
+                "clarification_response": clarification_response.text,
+                "question_enriched": "Ross 308" in result2.question and "mâles" in result2.question,
+                "rag_used": result2.rag_used,
+                "mode": result2.mode,
+                "success": result2.rag_used and "Ross 308" in result2.question
+            }
+            
+            test_results["tests_performed"].append(test2_result)
+            
+            if not test2_result["success"]:
+                test_results["errors"].append("Traitement clarification échoué")
+        
+        # Test 3: Extraction race/sexe
+        logger.info("🔍 Test 3: Extraction entités")
+        
+        from .expert_utils import extract_breed_and_sex_from_clarification
+        
+        extraction_tests = [
+            ("Ross 308 mâles", {"breed": "Ross 308", "sex": "mâles"}),
+            ("Cobb 500 femelles", {"breed": "Cobb 500", "sex": "femelles"}),
+            ("Hubbard troupeau mixte", {"breed": "Hubbard", "sex": "mixte"})
+        ]
+        
+        extraction_results = []
+        for test_text, expected in extraction_tests:
+            extracted = extract_breed_and_sex_from_clarification(test_text, "fr")
+            success = extracted["breed"] == expected["breed"] and extracted["sex"] == expected["sex"]
+            
+            extraction_results.append({
+                "input": test_text,
+                "expected": expected,
+                "extracted": extracted,
+                "success": success
+            })
+            
+            if not success:
+                test_results["errors"].append(f"Extraction échouée pour: {test_text}")
+        
+        test_results["tests_performed"].append({
+            "test_name": "Extraction breed/sex",
+            "extraction_results": extraction_results,
+            "success": all(r["success"] for r in extraction_results)
+        })
+        
+        # Résultat final
+        test_results["test_successful"] = len(test_results["errors"]) == 0
+        
+        logger.info(f"✅ [Expert Enhanced] Test clarification: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        
+        return test_results
+        
+    except Exception as e:
+        logger.error(f"❌ [Expert Enhanced] Erreur test clarification: {e}")
+        return {
+            "test_successful": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+            "tests_performed": [],
+            "errors": [f"Erreur critique: {str(e)}"]
+        }
+
 # =============================================================================
 # CONFIGURATION & LOGGING
 # =============================================================================
 
-logger.info("🚀 [EXPERT ENDPOINTS] Endpoints FINAUX initialisés avec succès!")
+logger.info("🚀 [EXPERT ENDPOINTS] Endpoints FINAUX avec CLARIFICATION INTELLIGENTE initialisés!")
 logger.info("🔧 [EXPERT ENDPOINTS] ENDPOINTS DISPONIBLES:")
-logger.info("   - POST /ask-enhanced-v2 (VERSION FINALE avec toutes améliorations)")
-logger.info("   - POST /ask-enhanced-v2-public (VERSION FINALE publique)")
+logger.info("   - POST /ask-enhanced-v2 (VERSION FINALE avec clarification intelligente)")
+logger.info("   - POST /ask-enhanced-v2-public (VERSION FINALE publique avec clarification)")
 logger.info("   - POST /ask-enhanced (compatibilité v1 → v2)")
 logger.info("   - POST /ask-enhanced-public (compatibilité v1 public → v2)")
 logger.info("   - POST /ask (compatibilité original → v2)")
 logger.info("   - POST /ask-public (compatibilité original public → v2)")
 logger.info("   - POST /feedback (amélioré avec qualité détaillée)")
 logger.info("   - GET /topics (enrichi avec statut améliorations)")
-logger.info("   - GET /system-status (monitoring complet)")
+logger.info("   - GET /system-status (monitoring complet + clarification)")
 logger.info("   - POST /debug/test-enhancements (tests automatiques)")
+logger.info("   - POST /debug/test-clarification (test système clarification)")
 logger.info("✅ [EXPERT ENDPOINTS] Rétrocompatibilité totale assurée")
+logger.info("🎯 [EXPERT ENDPOINTS] Système de clarification intelligent race/sexe opérationnel")
 logger.info("🚀 [EXPERT ENDPOINTS] Nouvelles fonctionnalités prêtes pour production")
