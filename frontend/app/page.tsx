@@ -414,16 +414,20 @@ export default function LoginPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
-  // ✅ DEBUG LOGS POUR REMEMBER ME
+  // ✅ DEBUG LOGS RENFORCÉS POUR REMEMBER ME
   useEffect(() => {
-    console.log('🔍 [Debug] LoginData état actuel:', {
-      email: loginData.email,
-      hasPassword: !!loginData.password,
-      rememberMe: loginData.rememberMe,
+    console.log('🔍 [Debug] LoginData complet:', {
+      loginData,
       localStorage_rememberMe: localStorage.getItem('intelia-remember-me'),
-      localStorage_lastEmail: localStorage.getItem('intelia-last-email')
+      localStorage_lastEmail: localStorage.getItem('intelia-last-email'),
+      timestamp: new Date().toISOString()
     })
   }, [loginData])
+
+  // 🔍 DEBUG : Surveiller spécifiquement rememberMe
+  useEffect(() => {
+    console.log('🎯 [RememberMe] Changement d\'état détecté:', loginData.rememberMe)
+  }, [loginData.rememberMe])
 
   // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE + REMEMBER ME
   const handleRedirectToChat = useCallback(() => {
@@ -614,8 +618,21 @@ export default function LoginPage() {
   }
 
   const handleLoginChange = (field: string, value: string | boolean) => {
-    console.log('🔄 [LoginChange] Field:', field, 'Value:', value)
-    setLoginData(prev => ({ ...prev, [field]: value }))
+    console.log('🔄 [LoginChange] ENTRÉE - Field:', field, 'Value:', value, 'Type:', typeof value)
+    
+    // Test direct de la checkbox
+    if (field === 'rememberMe') {
+      console.log('📝 [RememberMe] Changement détecté!')
+      console.log('📝 [RememberMe] Ancienne valeur:', loginData.rememberMe)
+      console.log('📝 [RememberMe] Nouvelle valeur:', value)
+    }
+    
+    setLoginData(prev => {
+      const newData = { ...prev, [field]: value }
+      console.log('🔄 [LoginChange] APRÈS setState:', newData)
+      return newData
+    })
+    
     if (localError) setLocalError('')
     if (localSuccess) setLocalSuccess('')
   }
@@ -982,8 +999,15 @@ export default function LoginPage() {
                     type="checkbox"
                     checked={loginData.rememberMe}
                     onChange={(e) => {
-                      console.log('📝 [Checkbox] Remember me clicked:', e.target.checked)
-                      handleLoginChange('rememberMe', e.target.checked)
+                      console.log('🎯 [Checkbox] Événement onChange déclenché!')
+                      console.log('🎯 [Checkbox] e.target.checked:', e.target.checked)
+                      console.log('🎯 [Checkbox] e.target.value:', e.target.value)
+                      console.log('🎯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
+                      
+                      // Test direct
+                      const newValue = e.target.checked
+                      console.log('🎯 [Checkbox] Appel handleLoginChange avec:', newValue)
+                      handleLoginChange('rememberMe', newValue)
                     }}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     disabled={isLoading || isRedirecting}
@@ -991,6 +1015,11 @@ export default function LoginPage() {
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                     {t.rememberMe}
                   </label>
+                  
+                  {/* Debug visuel */}
+                  <div className="ml-4 text-xs text-gray-500">
+                    Debug: {loginData.rememberMe ? '✅ TRUE' : '❌ FALSE'}
+                  </div>
                 </div>
 
                 <div className="text-sm">
