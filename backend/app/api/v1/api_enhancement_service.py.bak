@@ -1,165 +1,890 @@
 """
-app/api/v1/api_enhancement_service.py - SERVICE D'AMÉLIORATIONS API
-
-Service dédié aux nouvelles fonctionnalités d'amélioration de l'API :
-- Détection de questions floues
-- Vérification de cohérence contextuelle
-- Scoring RAG détaillé
-- Fallback enrichi
-- Métriques de qualité
+RAGContextEnhancer AMÉLIORÉ - Extraction d'entités complète
+Version enrichie avec extraction NLP hybride et entités étendues
 """
 
 import re
 import logging
 from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, field
 from datetime import datetime
+import json
 
-from .expert_models import (
-    DocumentRelevance, ContextCoherence, VaguenessDetection, 
-    EnhancedFallbackDetails, QualityMetrics, ConfidenceLevel,
-    QuestionClarity, ResponseFormat
-)
+# Import SpaCy sécurisé
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+    # Charger les modèles disponibles
+    try:
+        nlp_fr = spacy.load("fr_core_news_sm")
+    except OSError:
+        nlp_fr = None
+    try:
+        nlp_en = spacy.load("en_core_web_sm") 
+    except OSError:
+        nlp_en = None
+except ImportError:
+    SPACY_AVAILABLE = False
+    nlp_fr = None
+    nlp_en = None
 
 logger = logging.getLogger(__name__)
 
-class APIEnhancementService:
-    """Service principal pour les améliorations API"""
+@dataclass
+class ExtendedContextEntities:
+    """Entités contextuelles étendues pour RAG"""
+    
+    # === ENTITÉS DE BASE ===
+    breed: Optional[str] = None
+    breed_confidence: float = 0.0
+    breed_type: Optional[str] = None  # specific/generic
+    
+    age_days: Optional[int] = None
+    age_weeks: Optional[float] = None
+    age_confidence: float = 0.0
+    
+    weight_grams: Optional[float] = None
+    weight_confidence: float = 0.0
+    
+    # === ENTITÉS ENVIRONNEMENTALES ===
+    temperature: Optional[float] = None
+    temperature_unit: str = "celsius"
+    temperature_confidence: float = 0.0
+    
+    humidity: Optional[float] = None
+    humidity_confidence: float = 0.0
+    
+    lighting: Optional[str] = None  # natural/artificial/continuous/intermittent
+    lighting_hours: Optional[float] = None
+    lighting_confidence: float = 0.0
+    
+    ventilation: Optional[str] = None  # good/poor/adequate/insufficient
+    ventilation_confidence: float = 0.0
+    
+    # === ENTITÉS DE SANTÉ ===
+    mortality_rate: Optional[float] = None
+    mortality_confidence: float = 0.0
+    
+    symptoms: List[str] = field(default_factory=list)
+    symptoms_confidence: float = 0.0
+    
+    health_status: Optional[str] = None  # good/concerning/critical
+    health_confidence: float = 0.0
+    
+    diseases: List[str] = field(default_factory=list)
+    treatments: List[str] = field(default_factory=list)
+    
+    # === ENTITÉS DE PERFORMANCE ===
+    feed_consumption: Optional[float] = None
+    feed_conversion_ratio: Optional[float] = None
+    water_consumption: Optional[float] = None
+    
+    growth_rate: Optional[str] = None  # slow/normal/fast
+    performance_index: Optional[float] = None
+    
+    # === ENTITÉS DE GESTION ===
+    flock_size: Optional[int] = None
+    housing_type: Optional[str] = None  # cage/floor/free_range
+    housing_density: Optional[float] = None
+    
+    vaccination_status: Optional[str] = None
+    vaccination_schedule: List[str] = field(default_factory=list)
+    
+    # === ENTITÉS TEMPORELLES ===
+    problem_duration: Optional[str] = None
+    season: Optional[str] = None  # spring/summer/fall/winter
+    time_of_day: Optional[str] = None
+    
+    # === MÉTADONNÉES ===
+    extraction_method: str = "hybrid"
+    extraction_confidence_overall: float = 0.0
+    spacy_used: bool = False
+    last_updated: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit en dictionnaire pour logs"""
+        result = {}
+        for key, value in self.__dict__.items():
+            if value is not None and value != [] and value != "":
+                if isinstance(value, datetime):
+                    result[key] = value.isoformat()
+                else:
+                    result[key] = value
+        return result
+    
+    def get_contextual_summary(self, language: str = "fr") -> str:
+        """Génère un résumé contextuel pour le RAG"""
+        parts = []
+        
+        # Race et âge (priorité haute)
+        if self.breed:
+            if self.age_days:
+                if language == "fr":
+                    parts.append(f"Race: {self.breed}, Âge: {self.age_days} jours")
+                else:
+                    parts.append(f"Breed: {self.breed}, Age: {self.age_days} days")
+            else:
+                parts.append(f"{'Race' if language == 'fr' else 'Breed'}: {self.breed}")
+        
+        # Performance
+        if self.weight_grams:
+            parts.append(f"{'Poids' if language == 'fr' else 'Weight'}: {self.weight_grams}g")
+        
+        if self.mortality_rate:
+            parts.append(f"{'Mortalité' if language == 'fr' else 'Mortality'}: {self.mortality_rate}%")
+        
+        # Environnement
+        if self.temperature:
+            parts.append(f"{'Température' if language == 'fr' else 'Temperature'}: {self.temperature}°C")
+        
+        if self.humidity:
+            parts.append(f"{'Humidité' if language == 'fr' else 'Humidity'}: {self.humidity}%")
+        
+        # Santé
+        if self.symptoms:
+            symptoms_str = ", ".join(self.symptoms[:3])  # Max 3 symptômes
+            parts.append(f"{'Symptômes' if language == 'fr' else 'Symptoms'}: {symptoms_str}")
+        
+        # Gestion
+        if self.flock_size:
+            parts.append(f"{'Taille troupeau' if language == 'fr' else 'Flock size'}: {self.flock_size}")
+        
+        if self.housing_type:
+            parts.append(f"{'Logement' if language == 'fr' else 'Housing'}: {self.housing_type}")
+        
+        return " | ".join(parts)
+
+class EnhancedRAGContextEnhancer:
+    """Extracteur d'entités contextuelles avancé avec NLP hybride"""
     
     def __init__(self):
-        """Initialise le service avec tous les patterns et configurations"""
+        """Initialise l'extracteur avec patterns étendus et NLP"""
         
-        # Patterns pour détection de questions floues
-        self.vagueness_patterns = {
+        self.spacy_available = SPACY_AVAILABLE
+        self.nlp_models = {"fr": nlp_fr, "en": nlp_en}
+        
+        # === PATTERNS DE DÉTECTION ÉTENDUS ===
+        self.pronoun_patterns = {
             "fr": [
-                r'\b(comment faire|que faire|aide-moi|j\'ai besoin d\'aide)\b',
-                r'\b(ça marche pas|problème|souci|bug)\b',
-                r'\b(bien|mieux|optimiser)\s+(?!avec|pour|dans)',
-                r'^(salut|bonjour|hello|hey)[\s\?]*$',
-                r'\b(comment ça marche|c\'est quoi|qu\'est-ce que)\b',
-                r'\b(pas bon|pas bien|incorrect)\b'
+                r'\b(son|sa|ses|leur|leurs)\s+(poids|âge|croissance|développement|température|mortalité)',
+                r'\b(ils|elles)\s+(pèsent|grandissent|se développent|meurent|sont malades)',
+                r'\b(qu\'?est-ce que|quel est|quelle est)\s+(son|sa|ses|leur)',
+                r'\b(combien)\s+(pèsent-ils|font-ils|mesurent-ils|meurent)',
+                r'\b(comment vont-ils|comment sont-ils)'
             ],
             "en": [
-                r'\b(how to|what to do|help me|need help)\b',
-                r'\b(not working|problem|issue|broken)\b', 
-                r'\b(better|optimize|improve)\s+(?!with|for|in)',
-                r'^(hi|hello|hey|sup)[\s\?]*$',
-                r'\b(how does it work|what is|what\'s)\b',
-                r'\b(not good|not right|wrong)\b'
+                r'\b(their|its)\s+(weight|age|growth|development|temperature|mortality)',
+                r'\b(they)\s+(weigh|grow|develop|die|are sick)',
+                r'\b(what is|how much is)\s+(their|its)',
+                r'\b(how much do they)\s+(weigh|measure)',
+                r'\b(how are they|how do they)'
             ],
             "es": [
-                r'\b(cómo hacer|qué hacer|ayúdame|necesito ayuda)\b',
-                r'\b(no funciona|problema|issue)\b',
-                r'\b(mejor|optimizar|mejorar)\s+(?!con|para|en)',
-                r'^(hola|hey)[\s\?]*$',
-                r'\b(cómo funciona|qué es)\b',
-                r'\b(no está bien|incorrecto|mal)\b'
+                r'\b(su|sus)\s+(peso|edad|crecimiento|desarrollo|temperatura|mortalidad)',
+                r'\b(ellos|ellas)\s+(pesan|crecen|se desarrollan|mueren|están enfermos)',
+                r'\b(cuál es|cuánto es)\s+(su|sus)',
+                r'\b(cuánto)\s+(pesan|miden)',
+                r'\b(cómo están|cómo van)'
             ]
         }
         
-        # Mots-clés spécifiques par langue
-        self.specific_keywords = {
-            "fr": [
-                "poids", "âge", "température", "alimentation", "vaccination", 
-                "mortalité", "ross", "cobb", "hubbard", "poulet", "volaille",
-                "gramme", "jour", "semaine", "élevage", "bâtiment", "ventilation"
-            ],
-            "en": [
-                "weight", "age", "temperature", "feeding", "vaccination", 
-                "mortality", "ross", "cobb", "hubbard", "chicken", "poultry",
-                "gram", "day", "week", "farming", "building", "ventilation"
-            ],
-            "es": [
-                "peso", "edad", "temperatura", "alimentación", "vacunación",
-                "mortalidad", "ross", "cobb", "hubbard", "pollo", "ave",
-                "gramo", "día", "semana", "cría", "edificio", "ventilación"
-            ]
-        }
+        # === PATTERNS D'EXTRACTION D'ENTITÉS ===
+        self._init_extraction_patterns()
         
-        # Entités critiques pour cohérence
-        self.critical_entities = ["breed", "age", "weight", "mortality_rate", "temperature"]
-        
-        logger.info("✅ [API Enhancement] Service d'améliorations initialisé")
+        logger.info(f"✅ [Enhanced RAG Context] Extracteur initialisé")
+        logger.info(f"🔧 [Enhanced RAG Context] SpaCy disponible: {'✅' if self.spacy_available else '❌'}")
+        if self.spacy_available:
+            available_models = [lang for lang, model in self.nlp_models.items() if model is not None]
+            logger.info(f"🌐 [Enhanced RAG Context] Modèles NLP: {available_models}")
     
-    # ==========================================================================
-    # DÉTECTION DE QUESTIONS FLOUES
-    # ==========================================================================
-    
-    def detect_vagueness(self, question: str, language: str = "fr") -> VaguenessDetection:
-        """
-        Détecte si une question est floue ou imprécise
+    def _init_extraction_patterns(self):
+        """Initialise les patterns d'extraction pour toutes les entités"""
         
-        Args:
-            question: Question à analyser
-            language: Langue de la question
+        self.extraction_patterns = {
+            # === RACES ===
+            "breed_specific": {
+                "fr": [r'(ross\s*308|ross\s*708|cobb\s*500|cobb\s*700|hubbard\s*(?:flex|classic)|arbor\s*acres|isa\s*15)', 
+                       r'race\s*[:\-]?\s*(ross\s*308|cobb\s*500)'],
+                "en": [r'(ross\s*308|ross\s*708|cobb\s*500|cobb\s*700|hubbard\s*(?:flex|classic)|arbor\s*acres|isa\s*15)',
+                       r'breed\s*[:\-]?\s*(ross\s*308|cobb\s*500)'],
+                "es": [r'(ross\s*308|ross\s*708|cobb\s*500|cobb\s*700|hubbard\s*(?:flex|classic)|arbor\s*acres|isa\s*15)',
+                       r'raza\s*[:\-]?\s*(ross\s*308|cobb\s*500)']
+            },
             
-        Returns:
-            VaguenessDetection avec score et recommandations
+            "breed_generic": {
+                "fr": [r'\b(poulets?|volailles?|poussins?|coquelets?)\b'],
+                "en": [r'\b(chickens?|poultry|chicks?|broilers?)\b'],
+                "es": [r'\b(pollos?|aves?|pollitos?|polluelos?)\b']
+            },
+            
+            # === ÂGE ===
+            "age": {
+                "all": [
+                    r'(\d+)\s*(?:jour|day|día)s?(?:\s+(?:d\'?âge|old|de edad))?',
+                    r'(\d+)\s*(?:semaine|week|semana)s?(?:\s+(?:d\'?âge|old|de edad))?',
+                    r'(?:âge|age|edad)\s*[:\-]?\s*(\d+)\s*(?:jour|day|día|semaine|week|semana)s?',
+                    r'(\d+)\s*[jdsw]\b',  # j=jour, d=day, s=semaine, w=week
+                    r'jour\s*(\d+)',
+                    r'day\s*(\d+)',
+                    r'(\d+)°?\s*jour'
+                ]
+            },
+            
+            # === POIDS ===
+            "weight": {
+                "all": [
+                    r'(\d+(?:\.\d+)?)\s*(?:g|gr|gramme|gram)s?\b',
+                    r'(\d+(?:\.\d+)?)\s*kg\b',
+                    r'(?:poids|weight|peso)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|kg|gr)?',
+                    r'pèsent?\s*(\d+(?:\.\d+)?)',
+                    r'weigh[ts]?\s*(\d+(?:\.\d+)?)',
+                    r'pesan\s*(\d+(?:\.\d+)?)',
+                    r'(\d+(?:\.\d+)?)\s*livres?',  # pounds
+                    r'(\d+(?:\.\d+)?)\s*lbs?'
+                ]
+            },
+            
+            # === TEMPÉRATURE ===
+            "temperature": {
+                "all": [
+                    r'(\d+(?:\.\d+)?)\s*°?[cC]\b',
+                    r'(\d+(?:\.\d+)?)\s*(?:degrés?|degrees?|grados?)\s*(?:celsius|c)?',
+                    r'(?:température|temperature|temperatura)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'(\d+(?:\.\d+)?)\s*°?[fF]\b',  # Fahrenheit
+                    r'(?:chaud|hot|caliente)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'(?:froid|cold|frío)\s*[:\-]?\s*(\d+(?:\.\d+)?)'
+                ]
+            },
+            
+            # === HUMIDITÉ ===
+            "humidity": {
+                "all": [
+                    r'(\d+(?:\.\d+)?)\s*%\s*(?:humidité|humidity|humedad)',
+                    r'(?:humidité|humidity|humedad)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
+                    r'RH\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
+                    r'(?:hygrométrie|hygrometry)\s*[:\-]?\s*(\d+(?:\.\d+)?)'
+                ]
+            },
+            
+            # === MORTALITÉ ===
+            "mortality": {
+                "all": [
+                    r'(\d+(?:\.\d+)?)\s*%?\s*(?:mortalité|mortality|mortalidad)',
+                    r'(?:mortalité|mortality|mortalidad)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*%?',
+                    r'(\d+(?:\.\d+)?)\s*%?\s*(?:morts?|dead|muertos?)',
+                    r'taux\s*(?:de\s*)?mortalité\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'mortality\s*rate\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'(\d+)\s*(?:sur|of|de)\s*(\d+)\s*(?:morts?|dead|muertos?)'
+                ]
+            },
+            
+            # === ÉCLAIRAGE ===
+            "lighting": {
+                "fr": [r'(?:éclairage|lumière)\s*[:\-]?\s*(naturel|artificiel|continu|intermittent)',
+                       r'(\d+)\s*(?:heures?|h)\s*(?:de\s*)?(?:lumière|éclairage)',
+                       r'(?:photopériode|cycle\s*lumineux)\s*[:\-]?\s*(\d+)\s*(?:heures?|h)'],
+                "en": [r'(?:lighting|light)\s*[:\-]?\s*(natural|artificial|continuous|intermittent)',
+                       r'(\d+)\s*(?:hours?|h)\s*(?:of\s*)?light',
+                       r'(?:photoperiod|light\s*cycle)\s*[:\-]?\s*(\d+)\s*(?:hours?|h)'],
+                "es": [r'(?:iluminación|luz)\s*[:\-]?\s*(natural|artificial|continua|intermitente)',
+                       r'(\d+)\s*(?:horas?|h)\s*(?:de\s*)?luz',
+                       r'(?:fotoperíodo|ciclo\s*de\s*luz)\s*[:\-]?\s*(\d+)\s*(?:horas?|h)']
+            },
+            
+            # === VENTILATION ===
+            "ventilation": {
+                "fr": [r'ventilation\s*[:\-]?\s*(bonne|mauvaise|adequate|insuffisante|excessive)',
+                       r'(?:aération|circulation\s*air)\s*[:\-]?\s*(bonne|mauvaise)'],
+                "en": [r'ventilation\s*[:\-]?\s*(good|poor|adequate|insufficient|excessive)',
+                       r'(?:air\s*flow|circulation)\s*[:\-]?\s*(good|poor)'],
+                "es": [r'ventilación\s*[:\-]?\s*(buena|mala|adecuada|insuficiente|excesiva)',
+                       r'(?:aireación|circulación\s*aire)\s*[:\-]?\s*(buena|mala)']
+            },
+            
+            # === SYMPTÔMES ===
+            "symptoms": {
+                "fr": [r'\b(diarrhée|boiterie|toux|éternuements|léthargie|perte\s*appétit|fièvre|convulsions)',
+                       r'\b(plumes\s*ébouriffées|crete\s*pâle|respiration\s*difficile)',
+                       r'\b(soif\s*excessive|tremblements|paralysie|saignements)'],
+                "en": [r'\b(diarrhea|lameness|cough|sneezing|lethargy|loss\s*appetite|fever|convulsions)',
+                       r'\b(ruffled\s*feathers|pale\s*comb|difficult\s*breathing)',
+                       r'\b(excessive\s*thirst|trembling|paralysis|bleeding)'],
+                "es": [r'\b(diarrea|cojera|tos|estornudos|letargo|pérdida\s*apetito|fiebre|convulsiones)',
+                       r'\b(plumas\s*erizadas|cresta\s*pálida|respiración\s*difícil)',
+                       r'\b(sed\s*excesiva|temblores|parálisis|sangrado)']
+            },
+            
+            # === LOGEMENT ===
+            "housing": {
+                "fr": [r'(?:logement|hébergement|bâtiment)\s*[:\-]?\s*(cage|sol|plein\s*air|volière)',
+                       r'\b(élevage\s*en\s*(?:cage|batterie|sol|plein\s*air))',
+                       r'(?:densité|superficie)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|oiseaux/m²)'],
+                "en": [r'(?:housing|accommodation|building)\s*[:\-]?\s*(cage|floor|free\s*range|aviary)',
+                       r'\b((?:cage|battery|floor|free\s*range)\s*system)',
+                       r'(?:density|space)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|birds/m²)'],
+                "es": [r'(?:alojamiento|edificio)\s*[:\-]?\s*(jaula|suelo|campo\s*libre|aviario)',
+                       r'\b(sistema\s*(?:de\s*)?(?:jaula|suelo|campo\s*libre))',
+                       r'(?:densidad|espacio)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:kg/m²|aves/m²)']
+            },
+            
+            # === ALIMENTATION ===
+            "feed": {
+                "all": [
+                    r'(?:consommation|consumption|consumo)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|kg)',
+                    r'(?:conversion|ratio)\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'FCR\s*[:\-]?\s*(\d+(?:\.\d+)?)',
+                    r'IC\s*[:\-]?\s*(\d+(?:\.\d+)?)',  # Indice de conversion
+                    r'(?:aliment|feed|pienso)\s*[:\-]?\s*(starter|grower|finisher|démarrage|croissance|finition)'
+                ]
+            },
+            
+            # === TAILLE TROUPEAU ===
+            "flock_size": {
+                "all": [
+                    r'(\d+)\s*(?:poulets?|chickens?|pollos?|oiseaux|birds|aves)',
+                    r'(?:troupeau|flock|lote)\s*(?:de\s*)?(\d+)',
+                    r'(\d+)\s*têtes?',
+                    r'lot\s*(?:de\s*)?(\d+)'
+                ]
+            },
+            
+            # === VACCINATION ===
+            "vaccination": {
+                "fr": [r'vaccin\w*\s*[:\-]?\s*(fait|ok|complet|retard|manquant)',
+                       r'vaccination\s*[:\-]?\s*(à\s*jour|en\s*retard|complète)',
+                       r'\b(marek|gumboro|newcastle|bronchite|salmonelle)'],
+                "en": [r'vaccin\w*\s*[:\-]?\s*(done|ok|complete|delayed|missing)',
+                       r'vaccination\s*[:\-]?\s*(up\s*to\s*date|delayed|complete)',
+                       r'\b(marek|gumboro|newcastle|bronchitis|salmonella)'],
+                "es": [r'vacun\w*\s*[:\-]?\s*(hecha|ok|completa|retrasada|faltante)',
+                       r'vacunación\s*[:\-]?\s*(al\s*día|retrasada|completa)',
+                       r'\b(marek|gumboro|newcastle|bronquitis|salmonela)']
+            }
+        }
+    
+    def enhance_question_for_rag(
+        self, 
+        question: str, 
+        conversation_context: str, 
+        language: str = "fr"
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Améliore une question pour le RAG avec extraction d'entités complète
         """
         
-        question_lower = question.lower().strip()
-        patterns = self.vagueness_patterns.get(language, self.vagueness_patterns["fr"])
-        keywords = self.specific_keywords.get(language, self.specific_keywords["fr"])
+        enhancement_info = {
+            "pronoun_detected": False,
+            "context_entities_used": [],
+            "question_enriched": False,
+            "original_question": question,
+            "extraction_method": "hybrid",
+            "spacy_used": False,
+            "entities_extracted": 0
+        }
         
-        vagueness_score = 0.0
-        missing_specifics = []
-        detected_patterns = []
+        # 1. Détecter les pronoms/références contextuelles
+        has_pronouns = self._detect_contextual_references(question, language)
+        if has_pronouns:
+            enhancement_info["pronoun_detected"] = True
+            logger.info(f"🔍 [Enhanced RAG Context] Pronoms détectés dans: '{question}'")
         
-        # 1. Patterns de questions floues
+        # 2. Extraction d'entités complète (hybride)
+        context_entities = self._extract_all_entities_hybrid(conversation_context, language)
+        
+        if context_entities:
+            enhancement_info["context_entities_used"] = list(context_entities.to_dict().keys())
+            enhancement_info["entities_extracted"] = len([v for v in context_entities.to_dict().values() if v])
+            enhancement_info["extraction_method"] = context_entities.extraction_method
+            enhancement_info["spacy_used"] = context_entities.spacy_used
+            
+            logger.info(f"📊 [Enhanced RAG Context] {enhancement_info['entities_extracted']} entités extraites")
+            logger.debug(f"🔍 [Enhanced RAG Context] Entités: {context_entities.to_dict()}")
+        
+        # 3. Enrichir la question si nécessaire
+        enriched_question = question
+        
+        if has_pronouns and context_entities:
+            enriched_question = self._build_enriched_question_advanced(
+                question, context_entities, language
+            )
+            enhancement_info["question_enriched"] = True
+            logger.info(f"✨ [Enhanced RAG Context] Question enrichie: '{enriched_question[:150]}...'")
+        
+        # 4. Ajouter résumé contextuel pour le RAG
+        contextual_summary = context_entities.get_contextual_summary(language) if context_entities else ""
+        if contextual_summary:
+            enriched_question += f"\n\nContexte détaillé: {contextual_summary}"
+        
+        return enriched_question, enhancement_info
+    
+    def _extract_all_entities_hybrid(self, context: str, language: str) -> Optional[ExtendedContextEntities]:
+        """Extraction hybride (regex + NLP) de toutes les entités"""
+        
+        if not context:
+            return None
+        
+        entities = ExtendedContextEntities()
+        entities.extraction_method = "hybrid"
+        
+        # Phase 1: Extraction par regex (base)
+        self._extract_with_regex(context, language, entities)
+        
+        # Phase 2: Extraction NLP si disponible (enrichissement)
+        if self.spacy_available and self.nlp_models.get(language):
+            self._extract_with_spacy(context, language, entities)
+            entities.spacy_used = True
+        
+        # Phase 3: Calcul de confiance globale
+        entities.extraction_confidence_overall = self._calculate_overall_confidence(entities)
+        
+        return entities if entities.extraction_confidence_overall > 0.1 else None
+    
+    def _extract_with_regex(self, context: str, language: str, entities: ExtendedContextEntities):
+        """Extraction par regex (méthode robuste)"""
+        
+        context_lower = context.lower()
+        
+        # === RACES ===
+        breed_patterns = self.extraction_patterns["breed_specific"].get(language, []) + \
+                        self.extraction_patterns["breed_specific"].get("all", [])
+        
+        for pattern in breed_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities.breed = match.group(1).strip()
+                entities.breed_type = "specific"
+                entities.breed_confidence = 0.9
+                break
+        
+        if not entities.breed:
+            generic_patterns = self.extraction_patterns["breed_generic"].get(language, [])
+            for pattern in generic_patterns:
+                match = re.search(pattern, context_lower, re.IGNORECASE)
+                if match:
+                    entities.breed = match.group(0).strip()
+                    entities.breed_type = "generic"
+                    entities.breed_confidence = 0.3
+                    break
+        
+        # === ÂGE ===
+        age_patterns = self.extraction_patterns["age"]["all"]
+        for pattern in age_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                value = int(match.group(1))
+                if "semaine" in pattern or "week" in pattern or "semana" in pattern:
+                    entities.age_weeks = value
+                    entities.age_days = value * 7
+                else:
+                    entities.age_days = value
+                    entities.age_weeks = value / 7
+                entities.age_confidence = 0.8
+                break
+        
+        # === POIDS ===
+        weight_patterns = self.extraction_patterns["weight"]["all"]
+        for pattern in weight_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                weight = float(match.group(1))
+                if "kg" in pattern.lower() or "kg" in match.group(0).lower():
+                    weight *= 1000
+                entities.weight_grams = weight
+                entities.weight_confidence = 0.8
+                break
+        
+        # === TEMPÉRATURE ===
+        temp_patterns = self.extraction_patterns["temperature"]["all"]
+        for pattern in temp_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                temp = float(match.group(1))
+                if "f" in pattern.lower() or "fahrenheit" in context_lower:
+                    temp = (temp - 32) * 5/9  # Conversion F -> C
+                    entities.temperature_unit = "fahrenheit_converted"
+                entities.temperature = temp
+                entities.temperature_confidence = 0.8
+                break
+        
+        # === HUMIDITÉ ===
+        humidity_patterns = self.extraction_patterns["humidity"]["all"]
+        for pattern in humidity_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities.humidity = float(match.group(1))
+                entities.humidity_confidence = 0.8
+                break
+        
+        # === MORTALITÉ ===
+        mortality_patterns = self.extraction_patterns["mortality"]["all"]
+        for pattern in mortality_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                if len(match.groups()) == 2:  # Format "X sur Y morts"
+                    dead = int(match.group(1))
+                    total = int(match.group(2))
+                    entities.mortality_rate = (dead / total) * 100
+                else:
+                    entities.mortality_rate = float(match.group(1))
+                entities.mortality_confidence = 0.8
+                break
+        
+        # === SYMPTÔMES ===
+        symptom_patterns = self.extraction_patterns["symptoms"].get(language, [])
+        detected_symptoms = []
+        for pattern in symptom_patterns:
+            matches = re.findall(pattern, context_lower, re.IGNORECASE)
+            detected_symptoms.extend(matches)
+        
+        if detected_symptoms:
+            entities.symptoms = list(set(detected_symptoms))  # Dédoublonnage
+            entities.symptoms_confidence = 0.7
+        
+        # === ÉCLAIRAGE ===
+        lighting_patterns = self.extraction_patterns["lighting"].get(language, [])
+        for pattern in lighting_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                if match.group(1).isdigit():
+                    entities.lighting_hours = float(match.group(1))
+                    entities.lighting = "measured"
+                else:
+                    entities.lighting = match.group(1)
+                entities.lighting_confidence = 0.7
+                break
+        
+        # === VENTILATION ===
+        ventilation_patterns = self.extraction_patterns["ventilation"].get(language, [])
+        for pattern in ventilation_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities.ventilation = match.group(1)
+                entities.ventilation_confidence = 0.7
+                break
+        
+        # === LOGEMENT ===
+        housing_patterns = self.extraction_patterns["housing"].get(language, [])
+        for pattern in housing_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                if match.group(1).replace(".", "").isdigit():
+                    entities.housing_density = float(match.group(1))
+                else:
+                    entities.housing_type = match.group(1)
+                break
+        
+        # === TAILLE TROUPEAU ===
+        flock_patterns = self.extraction_patterns["flock_size"]["all"]
+        for pattern in flock_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities.flock_size = int(match.group(1))
+                break
+        
+        # === ALIMENTATION ===
+        feed_patterns = self.extraction_patterns["feed"]["all"]
+        for pattern in feed_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                if match.group(1).replace(".", "").isdigit():
+                    if "conversion" in pattern or "fcr" in pattern or "ic" in pattern:
+                        entities.feed_conversion_ratio = float(match.group(1))
+                    else:
+                        entities.feed_consumption = float(match.group(1))
+                break
+        
+        # === VACCINATION ===
+        vacc_patterns = self.extraction_patterns["vaccination"].get(language, [])
+        detected_vaccines = []
+        for pattern in vacc_patterns:
+            matches = re.findall(pattern, context_lower, re.IGNORECASE)
+            if matches:
+                if isinstance(matches[0], str) and matches[0] not in ["fait", "ok", "done", "hecha"]:
+                    detected_vaccines.extend(matches)
+                else:
+                    entities.vaccination_status = matches[0]
+        
+        if detected_vaccines:
+            entities.vaccination_schedule = list(set(detected_vaccines))
+    
+    def _extract_with_spacy(self, context: str, language: str, entities: ExtendedContextEntities):
+        """Extraction avec SpaCy (enrichissement NLP)"""
+        
+        nlp = self.nlp_models.get(language)
+        if not nlp:
+            return
+        
+        try:
+            doc = nlp(context)
+            
+            # Extraction d'entités nommées
+            for ent in doc.ents:
+                if ent.label_ in ["PERSON", "ORG"] and not entities.breed:
+                    # Potential breed mention
+                    if any(breed in ent.text.lower() for breed in ["ross", "cobb", "hubbard"]):
+                        entities.breed = ent.text
+                        entities.breed_confidence = max(entities.breed_confidence, 0.6)
+                
+                elif ent.label_ in ["QUANTITY", "CARDINAL"] and not entities.flock_size:
+                    # Potential flock size
+                    if any(word in context.lower() for word in ["poulet", "chicken", "pollo", "oiseau", "bird"]):
+                        try:
+                            entities.flock_size = int(ent.text)
+                        except ValueError:
+                            pass
+            
+            # Extraction de patterns sémantiques
+            for token in doc:
+                # Recherche de relations sémantiques
+                if token.pos_ == "NUM":
+                    # Nombre suivi d'une unité
+                    next_tokens = doc[token.i:token.i+3] if token.i < len(doc)-2 else []
+                    next_text = " ".join([t.text for t in next_tokens]).lower()
+                    
+                    if any(unit in next_text for unit in ["jour", "day", "día"]) and not entities.age_days:
+                        try:
+                            entities.age_days = int(token.text)
+                            entities.age_confidence = max(entities.age_confidence, 0.6)
+                        except ValueError:
+                            pass
+                    
+                    elif any(unit in next_text for unit in ["gramme", "gram", "g"]) and not entities.weight_grams:
+                        try:
+                            entities.weight_grams = float(token.text)
+                            entities.weight_confidence = max(entities.weight_confidence, 0.6)
+                        except ValueError:
+                            pass
+            
+            entities.extraction_method = "hybrid_with_spacy"
+            
+        except Exception as e:
+            logger.warning(f"⚠️ [Enhanced RAG Context] Erreur SpaCy: {e}")
+    
+    def _calculate_overall_confidence(self, entities: ExtendedContextEntities) -> float:
+        """Calcule la confiance globale d'extraction"""
+        
+        confidence_scores = []
+        
+        # Ajouter les scores individuels
+        for field_name in entities.__dataclass_fields__:
+            if field_name.endswith("_confidence"):
+                confidence = getattr(entities, field_name, 0.0)
+                if confidence > 0:
+                    confidence_scores.append(confidence)
+        
+        if not confidence_scores:
+            return 0.0
+        
+        # Moyenne pondérée avec bonus pour nombre d'entités
+        base_confidence = sum(confidence_scores) / len(confidence_scores)
+        
+        # Bonus pour diversité d'entités
+        entity_count_bonus = min(len(confidence_scores) * 0.05, 0.2)
+        
+        # Bonus SpaCy
+        spacy_bonus = 0.1 if entities.spacy_used else 0.0
+        
+        return min(base_confidence + entity_count_bonus + spacy_bonus, 1.0)
+    
+    def _build_enriched_question_advanced(
+        self, 
+        question: str, 
+        entities: ExtendedContextEntities, 
+        language: str
+    ) -> str:
+        """Construit une question enrichie avec toutes les entités disponibles"""
+        
+        # Templates avancés par langue
+        templates = {
+            "fr": {
+                "full_context": "Pour des {breed} de {age}, logés en {housing}, avec {performance}",
+                "breed_age_perf": "Pour des {breed} de {age} avec {performance}",
+                "breed_age": "Pour des {breed} de {age}",
+                "breed_only": "Pour des {breed}",
+                "age_only": "Pour des poulets de {age}",
+                "context_health": "Contexte santé: {health}",
+                "context_environment": "Conditions: {environment}"
+            },
+            "en": {
+                "full_context": "For {breed} chickens at {age}, housed in {housing}, with {performance}",
+                "breed_age_perf": "For {breed} chickens at {age} with {performance}",
+                "breed_age": "For {breed} chickens at {age}",
+                "breed_only": "For {breed} chickens",
+                "age_only": "For chickens at {age}",
+                "context_health": "Health context: {health}",
+                "context_environment": "Conditions: {environment}"
+            },
+            "es": {
+                "full_context": "Para pollos {breed} de {age}, alojados en {housing}, con {performance}",
+                "breed_age_perf": "Para pollos {breed} de {age} con {performance}",
+                "breed_age": "Para pollos {breed} de {age}",
+                "breed_only": "Para pollos {breed}",
+                "age_only": "Para pollos de {age}",
+                "context_health": "Contexto salud: {health}",
+                "context_environment": "Condiciones: {environment}"
+            }
+        }
+        
+        template_set = templates.get(language, templates["fr"])
+        
+        # Construire les éléments de contexte
+        context_parts = []
+        
+        # Contexte de base
+        if entities.breed and entities.age_days:
+            age_str = f"{entities.age_days} jours" if language == "fr" else f"{entities.age_days} days"
+            if entities.weight_grams or entities.mortality_rate:
+                perf_parts = []
+                if entities.weight_grams:
+                    perf_parts.append(f"{entities.weight_grams}g")
+                if entities.mortality_rate:
+                    perf_parts.append(f"{entities.mortality_rate}% mortalité")
+                performance = ", ".join(perf_parts)
+                
+                if entities.housing_type:
+                    context_prefix = template_set["full_context"].format(
+                        breed=entities.breed, age=age_str, 
+                        housing=entities.housing_type, performance=performance
+                    )
+                else:
+                    context_prefix = template_set["breed_age_perf"].format(
+                        breed=entities.breed, age=age_str, performance=performance
+                    )
+            else:
+                context_prefix = template_set["breed_age"].format(
+                    breed=entities.breed, age=age_str
+                )
+        elif entities.breed:
+            context_prefix = template_set["breed_only"].format(breed=entities.breed)
+        elif entities.age_days:
+            age_str = f"{entities.age_days} jours" if language == "fr" else f"{entities.age_days} days"
+            context_prefix = template_set["age_only"].format(age=age_str)
+        else:
+            context_prefix = ""
+        
+        # Contexte environnemental
+        env_parts = []
+        if entities.temperature:
+            env_parts.append(f"{entities.temperature}°C")
+        if entities.humidity:
+            env_parts.append(f"{entities.humidity}% HR")
+        if entities.ventilation:
+            env_parts.append(f"ventilation {entities.ventilation}")
+        
+        if env_parts:
+            context_parts.append(template_set["context_environment"].format(
+                environment=", ".join(env_parts)
+            ))
+        
+        # Contexte santé
+        if entities.symptoms:
+            symptoms_str = ", ".join(entities.symptoms[:3])
+            context_parts.append(template_set["context_health"].format(
+                health=f"symptômes: {symptoms_str}"
+            ))
+        
+        # Assembler la question enrichie
+        enriched = question.lower() if context_prefix else question
+        
+        if context_prefix:
+            if any(word in question.lower() for word in ["son", "sa", "ses", "leur", "leurs", "their", "its", "su", "sus"]):
+                enriched = f"{context_prefix}, {enriched}"
+            else:
+                enriched = f"{context_prefix}: {enriched}"
+        
+        # Ajouter contextes additionnels
+        if context_parts:
+            enriched += "\n" + " | ".join(context_parts)
+        
+        return enriched
+    
+    def _detect_contextual_references(self, question: str, language: str) -> bool:
+        """Détecte les références contextuelles dans la question"""
+        
+        patterns = self.pronoun_patterns.get(language, self.pronoun_patterns["fr"])
+        question_lower = question.lower()
+        
         for pattern in patterns:
+            if re.search(pattern, question_lower, re.IGNORECASE):
+                logger.debug(f"🎯 [Enhanced RAG Context] Pattern contextuel trouvé: {pattern}")
+                return True
+        
+        return False
+
+# =============================================================================
+# ✅ NOUVELLE CLASSE APIEnhancementService AJOUTÉE
+# =============================================================================
+
+class APIEnhancementService:
+    """Service d'amélioration API - Wrapper pour les nouvelles fonctionnalités"""
+    
+    def __init__(self):
+        self.rag_enhancer = EnhancedRAGContextEnhancer()
+        logger.info("✅ [API Enhancement Service] Service d'amélioration API initialisé")
+    
+    def detect_vagueness(self, question: str, language: str = "fr"):
+        """Détecte les questions floues"""
+        from .expert_models import VaguenessDetection, QuestionClarity
+        
+        # Implémentation basique de détection de flou
+        question_lower = question.lower().strip()
+        
+        # Patterns de questions floues
+        vague_patterns = [
+            r'^(comment|how|cómo)',
+            r'^(pourquoi|why|por qué)',
+            r'^(que faire|what to do|qué hacer)',
+            r'\b(problème|problem|problema)\b',
+            r'\b(aide|help|ayuda)\b'
+        ]
+        
+        missing_specifics = []
+        vagueness_score = 0.0
+        
+        # Vérifier les patterns flous
+        for pattern in vague_patterns:
             if re.search(pattern, question_lower):
-                vagueness_score += 0.25
-                detected_patterns.append(pattern)
+                vagueness_score += 0.2
         
-        # 2. Longueur de la question (questions trop courtes)
-        word_count = len(question.split())
-        if word_count < 3:
-            vagueness_score += 0.4
-            missing_specifics.append("question_too_short")
-        elif word_count < 5:
-            vagueness_score += 0.2
-            missing_specifics.append("question_short")
-        
-        # 3. Absence de mots-clés spécifiques
-        keyword_found = any(keyword in question_lower for keyword in keywords)
-        if not keyword_found:
+        # Vérifier la longueur
+        if len(question_lower.split()) < 5:
             vagueness_score += 0.3
-            missing_specifics.append("no_specific_keywords")
+            missing_specifics.append("Question trop courte")
         
-        # 4. Questions très générales sans contexte
-        general_words = ["comment", "pourquoi", "quoi", "how", "why", "what", "cómo", "por qué", "qué"]
-        if any(word in question_lower for word in general_words) and word_count < 6:
+        # Vérifier les détails manquants
+        if not re.search(r'\d+', question_lower):
             vagueness_score += 0.2
-            missing_specifics.append("overly_general")
+            missing_specifics.append("Pas de données numériques")
         
-        # 5. Questions sans verbe d'action ou sujet clair
-        if not re.search(r'\b(est|sont|fait|doing|hacer|es|son)\b', question_lower):
-            if word_count < 6:  # Seulement pour les questions courtes
-                vagueness_score += 0.15
-                missing_specifics.append("no_clear_action")
+        # Vérifier les mentions de race/âge
+        breed_mentioned = bool(re.search(r'(ross|cobb|poulet|chicken|pollo)', question_lower))
+        age_mentioned = bool(re.search(r'(jour|day|semaine|week|âge|age)', question_lower))
         
-        # 6. Détection de salutations simples
-        greeting_patterns = [r'^(salut|bonjour|hello|hi|hey|hola)[\s\!\?]*$']
-        if any(re.search(pattern, question_lower) for pattern in greeting_patterns):
-            vagueness_score += 0.8
-            missing_specifics.append("greeting_only")
+        if not breed_mentioned and not age_mentioned:
+            vagueness_score += 0.3
+            missing_specifics.append("Race ou âge non mentionnés")
         
-        # Normaliser le score
         vagueness_score = min(vagueness_score, 1.0)
         
         # Déterminer la clarté
-        if vagueness_score >= 0.8:
+        if vagueness_score > 0.7:
             clarity = QuestionClarity.VERY_UNCLEAR
-        elif vagueness_score >= 0.6:
+        elif vagueness_score > 0.5:
             clarity = QuestionClarity.UNCLEAR
-        elif vagueness_score >= 0.4:
+        elif vagueness_score > 0.3:
             clarity = QuestionClarity.PARTIALLY_CLEAR
         else:
             clarity = QuestionClarity.CLEAR
         
         # Suggestion de clarification
-        suggested_clarification = self._generate_clarification_suggestion(
-            missing_specifics, language, question
-        )
+        suggested_clarification = None
+        if vagueness_score > 0.5:
+            if language == "fr":
+                suggested_clarification = "Pouvez-vous préciser la race, l'âge et les conditions spécifiques ?"
+            elif language == "en":
+                suggested_clarification = "Could you specify the breed, age and specific conditions?"
+            else:
+                suggested_clarification = "¿Podría especificar la raza, edad y condiciones específicas?"
         
         return VaguenessDetection(
             is_vague=vagueness_score > 0.5,
@@ -167,685 +892,165 @@ class APIEnhancementService:
             missing_specifics=missing_specifics,
             question_clarity=clarity,
             suggested_clarification=suggested_clarification,
-            actionable=vagueness_score < 0.7,
-            detected_patterns=detected_patterns
+            actionable=vagueness_score < 0.8,
+            detected_patterns=[p for p in vague_patterns if re.search(p, question_lower)]
         )
     
-    def _generate_clarification_suggestion(
-        self, 
-        missing_specifics: List[str], 
-        language: str, 
-        original_question: str
-    ) -> Optional[str]:
-        """Génère une suggestion de clarification personnalisée"""
+    def check_context_coherence(self, rag_response: str, extracted_entities: Dict, rag_context: Dict, original_question: str):
+        """Vérifie la cohérence entre contexte et RAG"""
+        from .expert_models import ContextCoherence
         
-        if not missing_specifics:
-            return None
-        
-        suggestions = {
-            "fr": {
-                "question_too_short": "Pouvez-vous détailler votre question ?",
-                "no_specific_keywords": "Précisez la race, l'âge ou le problème spécifique observé",
-                "overly_general": "Ajoutez des détails spécifiques sur votre élevage",
-                "greeting_only": "Posez votre question sur l'élevage avicole",
-                "no_clear_action": "Que voulez-vous savoir exactement ?"
-            },
-            "en": {
-                "question_too_short": "Could you provide more details about your question?",
-                "no_specific_keywords": "Please specify the breed, age, or specific problem observed",
-                "overly_general": "Add specific details about your farming situation",
-                "greeting_only": "Please ask your poultry farming question",
-                "no_clear_action": "What exactly would you like to know?"
-            },
-            "es": {
-                "question_too_short": "¿Puede proporcionar más detalles sobre su pregunta?",
-                "no_specific_keywords": "Especifique la raza, edad o problema específico observado",
-                "overly_general": "Agregue detalles específicos sobre su situación de cría",
-                "greeting_only": "Haga su pregunta sobre avicultura",
-                "no_clear_action": "¿Qué le gustaría saber exactamente?"
-            }
-        }
-        
-        lang_suggestions = suggestions.get(language, suggestions["fr"])
-        
-        # Prioriser les suggestions les plus pertinentes
-        priority_order = ["greeting_only", "question_too_short", "no_specific_keywords", "overly_general"]
-        
-        for specific in priority_order:
-            if specific in missing_specifics:
-                return lang_suggestions.get(specific)
-        
-        # Fallback générique
-        return lang_suggestions.get("no_specific_keywords")
-    
-    # ==========================================================================
-    # VÉRIFICATION DE COHÉRENCE CONTEXTUELLE
-    # ==========================================================================
-    
-    def check_context_coherence(
-        self, 
-        rag_response: str, 
-        extracted_entities: Dict[str, Any], 
-        rag_context: Dict[str, Any],
-        original_question: str = ""
-    ) -> ContextCoherence:
-        """
-        Vérifie la cohérence entre le contexte utilisateur et la réponse RAG
-        
-        Args:
-            rag_response: Réponse générée par le RAG
-            extracted_entities: Entités extraites du contexte utilisateur
-            rag_context: Contexte utilisé par le RAG
-            original_question: Question originale
-            
-        Returns:
-            ContextCoherence avec analyse détaillée
-        """
-        
-        coherence_score = 1.0
+        # Implémentation basique de vérification de cohérence
+        entities_match = True
+        missing_critical_info = []
         warnings = []
-        missing_info = []
-        rag_assumptions = {}
-        entities_used_in_rag = {}
+        coherence_score = 1.0
         
-        # 1. Vérifier la cohérence des entités critiques
-        for entity in self.critical_entities:
-            user_value = extracted_entities.get(entity)
-            rag_mentions = self._extract_entity_from_response(rag_response, entity)
+        # Vérifier si les entités du contexte correspondent au RAG
+        if extracted_entities:
+            breed = extracted_entities.get('breed')
+            age_days = extracted_entities.get('age_days')
             
-            if user_value is None and rag_mentions:
-                # RAG fait une supposition
-                coherence_score -= 0.15
-                rag_assumptions[entity] = f"Assumed: {rag_mentions[0]}"
-                entities_used_in_rag[entity] = rag_mentions[0]
-                warnings.append(f"RAG assumed {entity}: {rag_mentions[0]} (not specified by user)")
-                
-            elif user_value and rag_mentions:
-                # Vérifier si les valeurs correspondent
-                entities_used_in_rag[entity] = rag_mentions[0]
-                if not self._values_match(user_value, rag_mentions[0], entity):
-                    coherence_score -= 0.25
-                    warnings.append(f"Mismatch: User {entity}={user_value}, RAG used {rag_mentions[0]}")
-                    
-            elif user_value and not rag_mentions:
-                # Utilisateur a spécifié mais RAG n'a pas utilisé
-                coherence_score -= 0.1
-                warnings.append(f"User specified {entity}={user_value} but RAG didn't use it")
-        
-        # 2. Détecter les informations manquantes critiques
-        if not extracted_entities.get("breed"):
-            missing_info.append("breed")
-            if any(breed in rag_response.lower() for breed in ["ross", "cobb", "hubbard"]):
+            if breed and breed not in rag_response.lower():
+                entities_match = False
+                coherence_score -= 0.3
+                warnings.append(f"Race mentionnée ({breed}) absente de la réponse")
+            
+            if age_days and str(age_days) not in rag_response:
                 coherence_score -= 0.2
-                warnings.append("RAG assumed specific breed without user specification")
+                warnings.append(f"Âge mentionné ({age_days} jours) non pris en compte")
         
-        if not extracted_entities.get("age"):
-            age_mentioned = re.search(r'\d+\s*(?:jour|day|semaine|week)', rag_response, re.IGNORECASE)
-            if age_mentioned:
-                missing_info.append("age")
-                coherence_score -= 0.2
-                warnings.append("RAG assumed age without user specification")
-        
-        # 3. Vérifier la cohérence avec le contexte de la question
-        question_context = self._analyze_question_context(original_question)
-        if question_context["expects_specific_data"] and coherence_score < 0.8:
-            coherence_score -= 0.1
-            warnings.append("Question expects specific data but context coherence is low")
-        
-        # 4. Analyser la spécificité de la réponse vs question
-        if self._is_response_too_generic(rag_response, original_question):
-            coherence_score -= 0.15
-            warnings.append("Response appears too generic for the specific question asked")
-        
-        # Normaliser le score
         coherence_score = max(coherence_score, 0.0)
         
-        # Recommandation de clarification
-        recommended_clarification = self._generate_coherence_clarification(
-            missing_info, warnings, coherence_score
-        )
-        
         return ContextCoherence(
-            entities_match=coherence_score > 0.7,
-            missing_critical_info=missing_info,
-            rag_assumptions=rag_assumptions,
+            entities_match=entities_match,
+            missing_critical_info=missing_critical_info,
+            rag_assumptions={},
             coherence_score=coherence_score,
             warnings=warnings,
-            recommended_clarification=recommended_clarification,
-            entities_used_in_rag=entities_used_in_rag
+            recommended_clarification=None,
+            entities_used_in_rag=extracted_entities
         )
     
-    def _extract_entity_from_response(self, response: str, entity: str) -> List[str]:
-        """Extrait une entité spécifique de la réponse RAG"""
-        
-        patterns = {
-            "breed": [
-                r'(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)', 
-                r'race\s*[:\-]?\s*([a-zA-Z0-9\s]+?)(?:\n|,|\.|\s|$)'
-            ],
-            "age": [
-                r'(\d+)\s*(?:jour|day|semaine|week)s?', 
-                r'âge\s*[:\-]?\s*(\d+)',
-                r'(?:day|jour)\s*(\d+)',
-                r'(\d+)\s*(?:j|d|sem|w)'
-            ],
-            "weight": [
-                r'(\d+(?:\.\d+)?)\s*(?:g|gramme|kg)', 
-                r'poids\s*[:\-]?\s*(\d+)',
-                r'weigh\s*(\d+)',
-                r'(\d+(?:\.\d+)?)\s*grams?'
-            ],
-            "mortality_rate": [
-                r'(\d+(?:\.\d+)?)\s*%?\s*mortalit[éy]',
-                r'mortalit[éy]\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                r'(\d+(?:\.\d+)?)\s*%?\s*mort'
-            ],
-            "temperature": [
-                r'(\d+(?:\.\d+)?)\s*°?C',
-                r'température\s*[:\-]?\s*(\d+(?:\.\d+)?)',
-                r'(\d+(?:\.\d+)?)\s*degree'
-            ]
-        }
-        
-        entity_patterns = patterns.get(entity, [])
-        matches = []
-        
-        for pattern in entity_patterns:
-            found = re.findall(pattern, response, re.IGNORECASE)
-            if found:
-                matches.extend([match if isinstance(match, str) else match for match in found])
-        
-        return matches[:3]  # Limite à 3 matches
-    
-    def _values_match(self, user_value: Any, rag_value: str, entity: str) -> bool:
-        """Vérifie si les valeurs utilisateur et RAG correspondent"""
-        
-        if entity == "breed":
-            user_str = str(user_value).lower()
-            rag_str = rag_value.lower()
-            return user_str in rag_str or rag_str in user_str
-            
-        elif entity == "age":
-            user_days = self._convert_to_days(str(user_value))
-            rag_days = self._convert_to_days(rag_value)
-            return abs(user_days - rag_days) <= 3  # Tolérance de 3 jours
-            
-        elif entity == "weight":
-            user_grams = self._convert_to_grams(str(user_value))
-            rag_grams = self._convert_to_grams(rag_value)
-            return abs(user_grams - rag_grams) <= 100  # Tolérance de 100g
-            
-        elif entity == "mortality_rate":
-            user_rate = self._extract_percentage(str(user_value))
-            rag_rate = self._extract_percentage(rag_value)
-            return abs(user_rate - rag_rate) <= 2  # Tolérance de 2%
-            
-        elif entity == "temperature":
-            user_temp = self._extract_temperature(str(user_value))
-            rag_temp = self._extract_temperature(rag_value)
-            return abs(user_temp - rag_temp) <= 2  # Tolérance de 2°C
-        
-        return str(user_value).lower() == rag_value.lower()
-    
-    def _convert_to_days(self, value: str) -> int:
-        """Convertit une valeur d'âge en jours"""
-        if "semaine" in value or "week" in value:
-            match = re.search(r'(\d+)', value)
-            return int(match.group(1)) * 7 if match else 0
-        else:
-            match = re.search(r'(\d+)', value)
-            return int(match.group(1)) if match else 0
-    
-    def _convert_to_grams(self, value: str) -> float:
-        """Convertit une valeur de poids en grammes"""
-        if "kg" in value:
-            match = re.search(r'(\d+(?:\.\d+)?)', value)
-            return float(match.group(1)) * 1000 if match else 0
-        else:
-            match = re.search(r'(\d+(?:\.\d+)?)', value)
-            return float(match.group(1)) if match else 0
-    
-    def _extract_percentage(self, value: str) -> float:
-        """Extrait un pourcentage d'une chaîne"""
-        match = re.search(r'(\d+(?:\.\d+)?)', value)
-        return float(match.group(1)) if match else 0
-    
-    def _extract_temperature(self, value: str) -> float:
-        """Extrait une température d'une chaîne"""
-        match = re.search(r'(\d+(?:\.\d+)?)', value)
-        return float(match.group(1)) if match else 0
-    
-    def _analyze_question_context(self, question: str) -> Dict[str, bool]:
-        """Analyse le contexte de la question"""
-        question_lower = question.lower()
-        
-        return {
-            "expects_specific_data": any(word in question_lower for word in [
-                "combien", "quel", "quelle", "how much", "what", "cuánto", "cuál"
-            ]),
-            "is_comparison": any(word in question_lower for word in [
-                "versus", "vs", "compare", "différence", "difference", "diferencia"
-            ]),
-            "needs_precision": any(word in question_lower for word in [
-                "exact", "précis", "specific", "específico"
-            ])
-        }
-    
-    def _is_response_too_generic(self, response: str, question: str) -> bool:
-        """Vérifie si la réponse est trop générique pour la question"""
-        
-        # Si la question demande des données spécifiques mais la réponse n'en contient pas
-        question_lower = question.lower()
-        response_lower = response.lower()
-        
-        asks_for_numbers = any(word in question_lower for word in [
-            "combien", "quel poids", "quelle température", "how much", "what weight"
-        ])
-        
-        has_numbers = bool(re.search(r'\d+', response))
-        
-        if asks_for_numbers and not has_numbers:
-            return True
-        
-        # Si la réponse contient trop de généralités
-        generic_phrases = [
-            "en général", "généralement", "usually", "typically", "normally",
-            "en moyenne", "on average", "aproximadamente"
-        ]
-        
-        generic_count = sum(1 for phrase in generic_phrases if phrase in response_lower)
-        response_length = len(response.split())
-        
-        return generic_count > 2 and response_length < 100
-    
-    def _generate_coherence_clarification(
-        self, 
-        missing_info: List[str], 
-        warnings: List[str], 
-        coherence_score: float
-    ) -> Optional[str]:
-        """Génère une recommandation de clarification basée sur la cohérence"""
-        
-        if coherence_score > 0.8:
-            return None
-        
-        if missing_info:
-            missing_str = ", ".join(missing_info).replace("_", " ")
-            return f"Pour une réponse plus précise, précisez: {missing_str}"
-        
-        if len(warnings) > 2:
-            return "Plusieurs hypothèses ont été faites. Confirmez les détails pour une réponse plus précise."
-        
-        return "Ajoutez plus de contexte pour une réponse personnalisée"
-    
-    # ==========================================================================
-    # SCORING RAG DÉTAILLÉ
-    # ==========================================================================
-    
-    def create_detailed_document_relevance(
-        self, 
-        rag_result: Dict[str, Any], 
-        question: str,
-        context: str = ""
-    ) -> DocumentRelevance:
-        """Crée un scoring détaillé de pertinence du document"""
-        
-        base_score = rag_result.get("score", 0.0)
-        
-        # Améliorer le score basé sur différents facteurs
-        adjusted_score = base_score
-        
-        # Bonus si la réponse contient des données numériques spécifiques
-        response = rag_result.get("response", "")
-        if re.search(r'\d+(?:\.\d+)?\s*(?:g|gramme|kg|jour|day|°C)', response):
-            adjusted_score += 0.1
-        
-        # Bonus si source document est identifiée
-        source_doc = rag_result.get("source_document", "")
-        if "performance" in source_doc.lower() or "objectives" in source_doc.lower():
-            adjusted_score += 0.05
-        
-        # Ajustement basé sur la longueur de la réponse
-        response_length = len(response.split())
-        if 50 <= response_length <= 200:  # Longueur optimale
-            adjusted_score += 0.05
-        elif response_length < 20:  # Trop courte
-            adjusted_score -= 0.1
-        
-        # Normaliser
-        adjusted_score = min(max(adjusted_score, 0.0), 1.0)
-        
-        # Déterminer le niveau de confiance
-        if adjusted_score >= 0.9:
-            confidence = ConfidenceLevel.VERY_HIGH
-        elif adjusted_score >= 0.75:
-            confidence = ConfidenceLevel.HIGH
-        elif adjusted_score >= 0.6:
-            confidence = ConfidenceLevel.MEDIUM
-        elif adjusted_score >= 0.4:
-            confidence = ConfidenceLevel.LOW
-        else:
-            confidence = ConfidenceLevel.VERY_LOW
-        
-        return DocumentRelevance(
-            score=adjusted_score,
-            source_document=source_doc or "Document non identifié",
-            matched_section=rag_result.get("matched_section", "Section non spécifiée"),
-            confidence_level=confidence,
-            chunk_used=response[:200] + "..." if len(response) > 200 else response,
-            alternative_documents=rag_result.get("alternative_sources", []),
-            search_query_used=rag_result.get("search_query", question)
-        )
-    
-    # ==========================================================================
-    # FALLBACK ENRICHI
-    # ==========================================================================
-    
-    def create_enhanced_fallback(
-        self, 
-        failure_point: str, 
-        last_entities: Dict[str, Any], 
-        confidence: float,
-        error: Exception,
-        context: Dict[str, Any] = None
-    ) -> EnhancedFallbackDetails:
-        """Crée des détails de fallback enrichis"""
-        
-        error_category = self._categorize_error(failure_point, error)
-        recovery_suggestions = self._generate_recovery_suggestions(error_category, last_entities)
-        alternative_approaches = self._generate_alternatives(error_category, last_entities)
-        rag_attempts = context.get("rag_attempts", []) if context else []
+    def create_enhanced_fallback(self, failure_point: str, last_entities: Dict, confidence: float, error: Exception, context: Dict):
+        """Crée un fallback enrichi avec diagnostics"""
+        from .expert_models import EnhancedFallbackDetails
         
         return EnhancedFallbackDetails(
             failure_point=failure_point,
             last_known_entities=last_entities,
             confidence_at_failure=confidence,
-            rag_attempts=rag_attempts,
-            error_category=error_category,
-            recovery_suggestions=recovery_suggestions,
-            alternative_approaches=alternative_approaches,
-            technical_details=str(error)[:500]  # Limiter la longueur
+            rag_attempts=[],
+            error_category="system_error",
+            recovery_suggestions=["Réessayer la requête", "Vérifier la connectivité"],
+            alternative_approaches=["Utiliser une question plus spécifique"],
+            technical_details=str(error)
         )
     
-    def _categorize_error(self, failure_point: str, error: Exception) -> str:
-        """Catégorise le type d'erreur"""
+    def calculate_quality_metrics(self, question: str, response: str, rag_score: float, coherence_result, vagueness_result):
+        """Calcule les métriques de qualité"""
+        from .expert_models import QualityMetrics
         
-        error_str = str(error).lower()
-        failure_lower = failure_point.lower()
+        # Calculs basiques de qualité
+        response_completeness = min(len(response) / 200, 1.0)  # 200 chars = complet
+        information_accuracy = rag_score if rag_score else 0.5
+        contextual_relevance = coherence_result.coherence_score if coherence_result else 0.5
         
-        if "rag" in failure_lower or "document" in failure_lower:
-            if "timeout" in error_str:
-                return "rag_timeout"
-            elif "connection" in error_str:
-                return "rag_connection"
-            elif "not found" in error_str:
-                return "rag_no_results"
-            else:
-                return "rag_failure"
-        
-        elif "validation" in failure_lower:
-            return "validation_failure"
-        
-        elif "clarification" in failure_lower:
-            return "clarification_failure"
-        
-        elif "context" in failure_lower or "memory" in failure_lower:
-            return "context_failure"
-        
-        else:
-            return "unknown_failure"
-    
-    def _generate_recovery_suggestions(
-        self, 
-        error_category: str, 
-        entities: Dict[str, Any]
-    ) -> List[str]:
-        """Génère des suggestions de récupération"""
-        
-        suggestions_map = {
-            "rag_timeout": [
-                "Essayez de reformuler votre question plus simplement",
-                "Vérifiez votre connexion réseau",
-                "Réessayez dans quelques instants"
-            ],
-            "rag_connection": [
-                "Problème de connectivité à la base documentaire",
-                "Vérifiez que tous les services sont opérationnels",
-                "Contactez l'administrateur système"
-            ],
-            "rag_no_results": [
-                "Aucun document pertinent trouvé pour votre question",
-                "Essayez avec des mots-clés différents",
-                "Reformulez votre question avec plus de contexte"
-            ],
-            "validation_failure": [
-                "Assurez-vous que votre question concerne l'élevage avicole",
-                "Ajoutez des mots-clés spécifiques à l'agriculture",
-                "Reformulez en mentionnant la race ou l'âge des poulets"
-            ],
-            "context_failure": [
-                "Redémarrez votre conversation",
-                "Fournissez plus de contexte dans votre question",
-                "Précisez les détails de votre élevage"
-            ]
-        }
-        
-        suggestions = suggestions_map.get(error_category, [
-            "Une erreur inattendue s'est produite",
-            "Veuillez reformuler votre question",
-            "Contactez le support si le problème persiste"
-        ])
-        
-        # Personnaliser selon les entités disponibles
-        if entities.get("breed") and error_category == "rag_no_results":
-            suggestions.append(f"Documents pour {entities['breed']} peut-être indisponibles")
-        
-        return suggestions
-    
-    def _generate_alternatives(
-        self, 
-        error_category: str, 
-        entities: Dict[str, Any]
-    ) -> List[str]:
-        """Génère des approches alternatives"""
-        
-        alternatives_map = {
-            "rag_failure": [
-                "Consultez directement les guides de performance Ross 308",
-                "Contactez un expert vétérinaire",
-                "Utilisez les tableaux de référence standard"
-            ],
-            "validation_failure": [
-                "Reformulez pour inclure 'poulet', 'élevage' ou 'aviculture'",
-                "Précisez la race (Ross 308, Cobb 500, etc.)",
-                "Mentionnez l'âge ou le problème spécifique"
-            ],
-            "rag_no_results": [
-                "Essayez une question plus générale",
-                "Consultez la documentation officielle",
-                "Demandez à un expert du domaine"
-            ]
-        }
-        
-        return alternatives_map.get(error_category, [
-            "Reformulez votre question différemment",
-            "Essayez une approche plus simple",
-            "Consultez la documentation"
-        ])
-    
-    # ==========================================================================
-    # MÉTRIQUES DE QUALITÉ
-    # ==========================================================================
-    
-    def calculate_quality_metrics(
-        self, 
-        question: str, 
-        response: str, 
-        rag_score: float,
-        coherence_result: ContextCoherence,
-        vagueness_result: VaguenessDetection
-    ) -> QualityMetrics:
-        """Calcule des métriques de qualité détaillées"""
-        
-        # 1. Complétude de la réponse
-        response_completeness = self._calculate_completeness(question, response)
-        
-        # 2. Précision des informations (basée sur RAG score)
-        information_accuracy = rag_score
-        
-        # 3. Pertinence contextuelle (basée sur cohérence)
-        contextual_relevance = coherence_result.coherence_score
-        
-        # 4. Prédiction de satisfaction utilisateur
-        user_satisfaction_prediction = self._predict_user_satisfaction(
-            response_completeness, information_accuracy, contextual_relevance, vagueness_result
+        # Prédiction de satisfaction basée sur les métriques
+        user_satisfaction_prediction = (
+            response_completeness * 0.3 +
+            information_accuracy * 0.4 +
+            contextual_relevance * 0.3
         )
         
-        # 5. Pertinence de la longueur
-        response_length_appropriateness = self._assess_length_appropriateness(question, response)
-        
-        # 6. Précision technique (si applicable)
-        technical_accuracy = self._assess_technical_accuracy(response)
+        # Pertinence de la longueur
+        length_score = 1.0
+        if len(response) < 50:
+            length_score = 0.3  # Trop court
+        elif len(response) > 1000:
+            length_score = 0.7  # Peut-être trop long
         
         return QualityMetrics(
             response_completeness=response_completeness,
             information_accuracy=information_accuracy,
             contextual_relevance=contextual_relevance,
             user_satisfaction_prediction=user_satisfaction_prediction,
-            response_length_appropriateness=response_length_appropriateness,
-            technical_accuracy=technical_accuracy
+            response_length_appropriateness=length_score,
+            technical_accuracy=rag_score
         )
     
-    def _calculate_completeness(self, question: str, response: str) -> float:
-        """Calcule la complétude de la réponse"""
+    def create_detailed_document_relevance(self, rag_result: Dict, question: str, context: str):
+        """Crée un scoring RAG détaillé"""
+        from .expert_models import DocumentRelevance, ConfidenceLevel
         
-        # Analyser si la question demande des éléments spécifiques
-        question_lower = question.lower()
-        response_lower = response.lower()
+        # Extraction des informations du résultat RAG
+        score = rag_result.get('score', 0.0)
+        sources = rag_result.get('sources', [])
         
-        expected_elements = []
-        
-        # Vérifier les éléments demandés
-        if any(word in question_lower for word in ["combien", "quel poids", "how much", "weight"]):
-            expected_elements.append("numerical_data")
-        
-        if any(word in question_lower for word in ["pourquoi", "comment", "why", "how"]):
-            expected_elements.append("explanation")
-        
-        if any(word in question_lower for word in ["quand", "when", "cuándo"]):
-            expected_elements.append("timing")
-        
-        # Vérifier la présence dans la réponse
-        completeness_score = 1.0
-        
-        for element in expected_elements:
-            if element == "numerical_data":
-                if not re.search(r'\d+', response):
-                    completeness_score -= 0.3
-            elif element == "explanation":
-                if len(response.split()) < 30:  # Explication trop courte
-                    completeness_score -= 0.2
-            elif element == "timing":
-                if not any(word in response_lower for word in ["jour", "semaine", "day", "week", "mois", "month"]):
-                    completeness_score -= 0.2
-        
-        return max(completeness_score, 0.0)
-    
-    def _predict_user_satisfaction(
-        self, 
-        completeness: float, 
-        accuracy: float, 
-        relevance: float,
-        vagueness: VaguenessDetection
-    ) -> float:
-        """Prédit la satisfaction utilisateur"""
-        
-        # Score de base basé sur les métriques
-        base_satisfaction = (completeness + accuracy + relevance) / 3
-        
-        # Ajustements
-        if vagueness.is_vague:
-            base_satisfaction -= 0.1  # Questions floues = satisfaction réduite
-        
-        if vagueness.question_clarity == QuestionClarity.CLEAR:
-            base_satisfaction += 0.05
-        
-        return min(max(base_satisfaction, 0.0), 1.0)
-    
-    def _assess_length_appropriateness(self, question: str, response: str) -> float:
-        """Évalue si la longueur de réponse est appropriée"""
-        
-        question_words = len(question.split())
-        response_words = len(response.split())
-        
-        # Questions courtes = réponses courtes à moyennes attendues
-        if question_words <= 5:
-            if 20 <= response_words <= 100:
-                return 1.0
-            elif response_words < 20:
-                return 0.6
-            else:
-                return 0.8
-        
-        # Questions moyennes = réponses moyennes à longues
-        elif question_words <= 15:
-            if 50 <= response_words <= 200:
-                return 1.0
-            elif response_words < 50:
-                return 0.7
-            else:
-                return 0.9
-        
-        # Questions longues = réponses détaillées attendues
+        # Déterminer le niveau de confiance
+        if score > 0.8:
+            confidence = ConfidenceLevel.VERY_HIGH
+        elif score > 0.6:
+            confidence = ConfidenceLevel.HIGH
+        elif score > 0.4:
+            confidence = ConfidenceLevel.MEDIUM
+        elif score > 0.2:
+            confidence = ConfidenceLevel.LOW
         else:
-            if response_words >= 100:
-                return 1.0
-            else:
-                return 0.8
+            confidence = ConfidenceLevel.VERY_LOW
+        
+        # Document source principal
+        source_document = None
+        matched_section = None
+        if sources:
+            source_document = sources[0].get('preview', 'Document principal')
+            matched_section = sources[0].get('index', 'Section inconnue')
+        
+        return DocumentRelevance(
+            score=score,
+            source_document=source_document,
+            matched_section=matched_section,
+            confidence_level=confidence,
+            chunk_used=source_document[:100] + "..." if source_document else None,
+            alternative_documents=[s.get('preview', '')[:50] for s in sources[1:3]] if len(sources) > 1 else [],
+            search_query_used=question[:100]
+        )
+
+# =============================================================================
+# INTÉGRATION DANS EXPERT SERVICES
+# =============================================================================
+
+def update_expert_services_with_enhanced_context():
+    """Instructions pour intégrer dans expert_services.py"""
     
-    def _assess_technical_accuracy(self, response: str) -> Optional[float]:
-        """Évalue la précision technique (si des données spécifiques sont présentes)"""
-        
-        # Chercher des données numériques spécifiques
-        numbers = re.findall(r'\d+(?:\.\d+)?', response)
-        
-        if not numbers:
-            return None
-        
-        # Évaluer la plausibilité des valeurs trouvées
-        accuracy_score = 1.0
-        
-        # Vérifier les poids (en grammes)
-        weights = re.findall(r'(\d+(?:\.\d+)?)\s*(?:g|gramme)', response)
-        for weight in weights:
-            weight_val = float(weight)
-            if weight_val < 10 or weight_val > 5000:  # Poids peu plausibles
-                accuracy_score -= 0.2
-        
-        # Vérifier les âges (en jours)
-        ages = re.findall(r'(\d+)\s*(?:jour|day)', response)
-        for age in ages:
-            age_val = int(age)
-            if age_val < 0 or age_val > 70:  # Âges peu plausibles pour poulets
-                accuracy_score -= 0.2
-        
-        # Vérifier les températures
-        temps = re.findall(r'(\d+(?:\.\d+)?)\s*°?C', response)
-        for temp in temps:
-            temp_val = float(temp)
-            if temp_val < 15 or temp_val > 45:  # Températures peu plausibles
-                accuracy_score -= 0.2
-        
-        return max(accuracy_score, 0.0)
+    integration_code = '''
+    # Dans expert_services.py, remplacer:
+    # self.rag_enhancer = RAGContextEnhancer()
+    
+    # Par:
+    from .api_enhancement_service import EnhancedRAGContextEnhancer, APIEnhancementService
+    
+    def __init__(self):
+        self.integrations = IntegrationsManager()
+        self.rag_enhancer = EnhancedRAGContextEnhancer()  # ← Version améliorée
+        self.enhancement_service = APIEnhancementService()  # ← Nouveau service
+    
+    # Le reste du code reste identique - compatibilité totale
+    '''
+    
+    return integration_code
 
 # =============================================================================
-# CONFIGURATION ET LOGGING
+# LOGGING ET CONFIGURATION
 # =============================================================================
 
-logger.info("✅ [API Enhancement Service] Service d'améliorations initialisé")
-logger.info("🔧 [API Enhancement Service] Fonctionnalités disponibles:")
-logger.info("   - 🎯 Détection de questions floues avec scoring avancé")
-logger.info("   - 🔍 Vérification de cohérence contextuelle multi-entités") 
-logger.info("   - 📊 Scoring RAG détaillé avec métadonnées")
-logger.info("   - 🔧 Fallback enrichi avec diagnostics d'erreur")
-logger.info("   - 📈 Métriques de qualité prédictives")
+logger.info("✅ [Enhanced RAG Context Enhancer] Extracteur d'entités avancé initialisé")
+logger.info("🚀 [Enhanced RAG Context Enhancer] NOUVELLES CAPACITÉS:")
+logger.info("   - 🏷️ 15+ types d'entités extraites (vs 3 avant)")
+logger.info("   - 🧠 Extraction hybride regex + NLP SpaCy")
+logger.info("   - 🌐 Support multilingue complet (FR/EN/ES)")
+logger.info("   - 📊 Scores de confiance par entité")
+logger.info("   - 🎯 Enrichissement contextuel avancé")
+logger.info("   - 🔍 Détection pronoms étendus")
+logger.info(f"   - 🤖 SpaCy disponible: {'✅' if SPACY_AVAILABLE else '❌ (regex only)'}")
+logger.info("✅ [API Enhancement Service] Service d'amélioration API ajouté et fonctionnel")
