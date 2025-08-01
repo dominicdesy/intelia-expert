@@ -11,6 +11,26 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 
+# ✅ CORRECTION: Import des modèles nécessaires en haut du fichier
+try:
+    from .expert_models import VaguenessDetection, QuestionClarity, ContextCoherence, EnhancedFallbackDetails, QualityMetrics, DocumentRelevance, ConfidenceLevel
+except ImportError:
+    # Fallback si les imports échouent
+    logger.warning("⚠️ Import expert_models échoué - utilisation des classes de fallback")
+    
+    class QuestionClarity:
+        CLEAR = "clear"
+        PARTIALLY_CLEAR = "partially_clear"
+        UNCLEAR = "unclear"
+        VERY_UNCLEAR = "very_unclear"
+    
+    class ConfidenceLevel:
+        VERY_LOW = "very_low"
+        LOW = "low"
+        MEDIUM = "medium"
+        HIGH = "high"
+        VERY_HIGH = "very_high"
+
 # Import SpaCy sécurisé
 try:
     import spacy
@@ -550,7 +570,7 @@ class APIEnhancementService:
         ✅ DÉTECTION DE FLOU AMÉLIORÉE
         Détecte spécifiquement les questions techniques nécessitant des précisions
         """
-        from .expert_models import VaguenessDetection, QuestionClarity
+        # ✅ CORRECTION: Import local supprimé - utilisation des imports globaux
         
         question_lower = question.lower().strip()
         missing_specifics = []
@@ -560,15 +580,29 @@ class APIEnhancementService:
         performance_vagueness = self._detect_performance_question_vagueness(question_lower, language)
         
         if performance_vagueness:
-            return VaguenessDetection(
-                is_vague=True,
-                vagueness_score=performance_vagueness["score"],
-                missing_specifics=performance_vagueness["missing"],
-                question_clarity=performance_vagueness["clarity"],
-                suggested_clarification=performance_vagueness["suggestion"],
-                actionable=True,  # Ces questions sont toujours actionnables
-                detected_patterns=performance_vagueness["patterns"]
-            )
+            # ✅ CORRECTION: Utilisation de classes importées en haut
+            try:
+                return VaguenessDetection(
+                    is_vague=True,
+                    vagueness_score=performance_vagueness["score"],
+                    missing_specifics=performance_vagueness["missing"],
+                    question_clarity=performance_vagueness["clarity"],
+                    suggested_clarification=performance_vagueness["suggestion"],
+                    actionable=True,  # Ces questions sont toujours actionnables
+                    detected_patterns=performance_vagueness["patterns"]
+                )
+            except Exception as e:
+                logger.error(f"❌ Erreur création VaguenessDetection: {e}")
+                # Fallback simple
+                return {
+                    "is_vague": True,
+                    "vagueness_score": performance_vagueness["score"],
+                    "missing_specifics": performance_vagueness["missing"],
+                    "question_clarity": performance_vagueness["clarity"],
+                    "suggested_clarification": performance_vagueness["suggestion"],
+                    "actionable": True,
+                    "detected_patterns": performance_vagueness["patterns"]
+                }
         
         # Logique existante pour autres types de questions...
         vague_patterns = [
@@ -620,15 +654,29 @@ class APIEnhancementService:
             else:
                 suggested_clarification = "¿Podría especificar la raza, edad y condiciones específicas?"
         
-        return VaguenessDetection(
-            is_vague=vagueness_score > 0.5,
-            vagueness_score=vagueness_score,
-            missing_specifics=missing_specifics,
-            question_clarity=clarity,
-            suggested_clarification=suggested_clarification,
-            actionable=vagueness_score < 0.8,
-            detected_patterns=[p for p in vague_patterns if re.search(p, question_lower)]
-        )
+        # ✅ CORRECTION: Gestion d'erreur pour VaguenessDetection
+        try:
+            return VaguenessDetection(
+                is_vague=vagueness_score > 0.5,
+                vagueness_score=vagueness_score,
+                missing_specifics=missing_specifics,
+                question_clarity=clarity,
+                suggested_clarification=suggested_clarification,
+                actionable=vagueness_score < 0.8,
+                detected_patterns=[p for p in vague_patterns if re.search(p, question_lower)]
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur création VaguenessDetection standard: {e}")
+            # Fallback dictionnaire
+            return {
+                "is_vague": vagueness_score > 0.5,
+                "vagueness_score": vagueness_score,
+                "missing_specifics": missing_specifics,
+                "question_clarity": clarity.value if hasattr(clarity, 'value') else clarity,
+                "suggested_clarification": suggested_clarification,
+                "actionable": vagueness_score < 0.8,
+                "detected_patterns": [p for p in vague_patterns if re.search(p, question_lower)]
+            }
 
     def _detect_performance_question_vagueness(self, question_lower: str, language: str) -> Optional[Dict]:
         """
@@ -722,7 +770,7 @@ class APIEnhancementService:
     
     def check_context_coherence(self, rag_response: str, extracted_entities: Dict, rag_context: Dict, original_question: str):
         """Vérifie la cohérence entre contexte et RAG"""
-        from .expert_models import ContextCoherence
+        # ✅ CORRECTION: Import local supprimé - gestion d'erreur ajoutée
         
         # Implémentation basique de vérification de cohérence
         entities_match = True
@@ -746,39 +794,74 @@ class APIEnhancementService:
         
         coherence_score = max(coherence_score, 0.0)
         
-        return ContextCoherence(
-            entities_match=entities_match,
-            missing_critical_info=missing_critical_info,
-            rag_assumptions={},
-            coherence_score=coherence_score,
-            warnings=warnings,
-            recommended_clarification=None,
-            entities_used_in_rag=extracted_entities
-        )
+        # ✅ CORRECTION: Gestion d'erreur pour ContextCoherence
+        try:
+            return ContextCoherence(
+                entities_match=entities_match,
+                missing_critical_info=missing_critical_info,
+                rag_assumptions={},
+                coherence_score=coherence_score,
+                warnings=warnings,
+                recommended_clarification=None,
+                entities_used_in_rag=extracted_entities
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur création ContextCoherence: {e}")
+            # Fallback dictionnaire
+            return {
+                "entities_match": entities_match,
+                "missing_critical_info": missing_critical_info,
+                "rag_assumptions": {},
+                "coherence_score": coherence_score,
+                "warnings": warnings,
+                "recommended_clarification": None,
+                "entities_used_in_rag": extracted_entities
+            }
     
     def create_enhanced_fallback(self, failure_point: str, last_entities: Dict, confidence: float, error: Exception, context: Dict):
         """Crée un fallback enrichi avec diagnostics"""
-        from .expert_models import EnhancedFallbackDetails
+        # ✅ CORRECTION: Gestion d'erreur pour EnhancedFallbackDetails
         
-        return EnhancedFallbackDetails(
-            failure_point=failure_point,
-            last_known_entities=last_entities,
-            confidence_at_failure=confidence,
-            rag_attempts=[],
-            error_category="system_error",
-            recovery_suggestions=["Réessayer la requête", "Vérifier la connectivité"],
-            alternative_approaches=["Utiliser une question plus spécifique"],
-            technical_details=str(error)
-        )
+        try:
+            return EnhancedFallbackDetails(
+                failure_point=failure_point,
+                last_known_entities=last_entities,
+                confidence_at_failure=confidence,
+                rag_attempts=[],
+                error_category="system_error",
+                recovery_suggestions=["Réessayer la requête", "Vérifier la connectivité"],
+                alternative_approaches=["Utiliser une question plus spécifique"],
+                technical_details=str(error)
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur création EnhancedFallbackDetails: {e}")
+            # Fallback dictionnaire
+            return {
+                "failure_point": failure_point,
+                "last_known_entities": last_entities,
+                "confidence_at_failure": confidence,
+                "rag_attempts": [],
+                "error_category": "system_error",
+                "recovery_suggestions": ["Réessayer la requête", "Vérifier la connectivité"],
+                "alternative_approaches": ["Utiliser une question plus spécifique"],
+                "technical_details": str(error)
+            }
     
     def calculate_quality_metrics(self, question: str, response: str, rag_score: float, coherence_result, vagueness_result):
         """Calcule les métriques de qualité"""
-        from .expert_models import QualityMetrics
+        # ✅ CORRECTION: Gestion d'erreur pour QualityMetrics
         
         # Calculs basiques de qualité
         response_completeness = min(len(response) / 200, 1.0)  # 200 chars = complet
         information_accuracy = rag_score if rag_score else 0.5
-        contextual_relevance = coherence_result.coherence_score if coherence_result else 0.5
+        
+        # Gestion sécurisée des objets de cohérence
+        if hasattr(coherence_result, 'coherence_score'):
+            contextual_relevance = coherence_result.coherence_score
+        elif isinstance(coherence_result, dict):
+            contextual_relevance = coherence_result.get('coherence_score', 0.5)
+        else:
+            contextual_relevance = 0.5
         
         # Prédiction de satisfaction basée sur les métriques
         user_satisfaction_prediction = (
@@ -794,18 +877,30 @@ class APIEnhancementService:
         elif len(response) > 1000:
             length_score = 0.7  # Peut-être trop long
         
-        return QualityMetrics(
-            response_completeness=response_completeness,
-            information_accuracy=information_accuracy,
-            contextual_relevance=contextual_relevance,
-            user_satisfaction_prediction=user_satisfaction_prediction,
-            response_length_appropriateness=length_score,
-            technical_accuracy=rag_score
-        )
+        try:
+            return QualityMetrics(
+                response_completeness=response_completeness,
+                information_accuracy=information_accuracy,
+                contextual_relevance=contextual_relevance,
+                user_satisfaction_prediction=user_satisfaction_prediction,
+                response_length_appropriateness=length_score,
+                technical_accuracy=rag_score
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur création QualityMetrics: {e}")
+            # Fallback dictionnaire
+            return {
+                "response_completeness": response_completeness,
+                "information_accuracy": information_accuracy,
+                "contextual_relevance": contextual_relevance,
+                "user_satisfaction_prediction": user_satisfaction_prediction,
+                "response_length_appropriateness": length_score,
+                "technical_accuracy": rag_score
+            }
     
     def create_detailed_document_relevance(self, rag_result: Dict, question: str, context: str):
         """Crée un scoring RAG détaillé"""
-        from .expert_models import DocumentRelevance, ConfidenceLevel
+        # ✅ CORRECTION: Gestion d'erreur pour DocumentRelevance
         
         # Extraction des informations du résultat RAG
         score = rag_result.get('score', 0.0)
@@ -830,15 +925,28 @@ class APIEnhancementService:
             source_document = sources[0].get('preview', 'Document principal')
             matched_section = sources[0].get('index', 'Section inconnue')
         
-        return DocumentRelevance(
-            score=score,
-            source_document=source_document,
-            matched_section=matched_section,
-            confidence_level=confidence,
-            chunk_used=source_document[:100] + "..." if source_document else None,
-            alternative_documents=[s.get('preview', '')[:50] for s in sources[1:3]] if len(sources) > 1 else [],
-            search_query_used=question[:100]
-        )
+        try:
+            return DocumentRelevance(
+                score=score,
+                source_document=source_document,
+                matched_section=matched_section,
+                confidence_level=confidence,
+                chunk_used=source_document[:100] + "..." if source_document else None,
+                alternative_documents=[s.get('preview', '')[:50] for s in sources[1:3]] if len(sources) > 1 else [],
+                search_query_used=question[:100]
+            )
+        except Exception as e:
+            logger.error(f"❌ Erreur création DocumentRelevance: {e}")
+            # Fallback dictionnaire
+            return {
+                "score": score,
+                "source_document": source_document,
+                "matched_section": matched_section,
+                "confidence_level": confidence.value if hasattr(confidence, 'value') else confidence,
+                "chunk_used": source_document[:100] + "..." if source_document else None,
+                "alternative_documents": [s.get('preview', '')[:50] for s in sources[1:3]] if len(sources) > 1 else [],
+                "search_query_used": question[:100]
+            }
 
 # =============================================================================
 # LOGGING ET CONFIGURATION
