@@ -56,7 +56,7 @@ const translations = {
     required: '*',
     close: 'Fermer',
     alreadyHaveAccount: 'Déjà un compte ?',
-    authSuccess: 'Connexion réussie ! Bienvenue.',
+    authSuccess: 'Connexion réussie !',
     authError: 'Erreur de connexion, veuillez réessayer.',
     authIncomplete: 'Connexion incomplète, veuillez réessayer.',
     sessionCleared: 'Session précédente effacée',
@@ -111,7 +111,7 @@ const translations = {
     required: '*',
     close: 'Close',
     alreadyHaveAccount: 'Already have an account?',
-    authSuccess: 'Successfully logged in! Welcome.',
+    authSuccess: 'Successfully logged in!',
     authError: 'Login error, please try again.',
     authIncomplete: 'Incomplete login, please try again.',
     sessionCleared: 'Previous session cleared',
@@ -166,7 +166,7 @@ const translations = {
     required: '*',
     close: 'Cerrar',
     alreadyHaveAccount: '¿Ya tienes cuenta?',
-    authSuccess: '¡Inicio de sesión exitoso! Bienvenido.',
+    authSuccess: '¡Inicio de sesión exitoso!',
     authError: 'Error de conexión, por favor intenta de nuevo.',
     authIncomplete: 'Inicio de sesión incompleto, por favor intenta de nuevo.',
     sessionCleared: 'Sesión anterior eliminada',
@@ -221,7 +221,7 @@ const translations = {
     required: '*',
     close: 'Schließen',
     alreadyHaveAccount: 'Bereits ein Konto?',
-    authSuccess: 'Erfolgreich angemeldet! Willkommen.',
+    authSuccess: 'Erfolgreich angemeldet!',
     authError: 'Anmeldefehler, bitte versuchen Sie es erneut.',
     authIncomplete: 'Unvollständige Anmeldung, bitte versuchen Sie es erneut.',
     sessionCleared: 'Vorherige Sitzung gelöscht',
@@ -378,6 +378,7 @@ export default function LoginPage() {
   // 🛡️ PROTECTION ANTI-BOUCLE + FORCE LOGOUT
   const [isInitialized, setIsInitialized] = useState(false)
   const [hasLoggedOut, setHasLoggedOut] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const [localError, setLocalError] = useState('')
@@ -612,16 +613,15 @@ export default function LoginPage() {
         localStorage.removeItem('intelia-last-email')
       }
       
-      console.log('✅ [Login] Connexion réussie - redirection immédiate')
-      setLocalSuccess(t.authSuccess)
+      console.log('✅ [Login] Connexion réussie - redirection en cours...')
       
-      // 🚀 REDIRECTION IMMÉDIATE après connexion réussie
-      setTimeout(() => {
-        window.location.href = '/chat'
-      }, 1000)
+      // 🚀 REDIRECTION IMMÉDIATE avec indicateur de chargement
+      setIsRedirecting(true)
+      window.location.href = '/chat'
       
     } catch (error: any) {
       console.error('❌ [Login] Erreur:', error)
+      setIsRedirecting(false) // ✅ Réinitialiser l'état de redirection en cas d'erreur
       
       // Messages d'erreur personnalisés
       if (error.message?.includes('Invalid login credentials')) {
@@ -767,6 +767,28 @@ export default function LoginPage() {
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Initialisation...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ ÉCRAN DE REDIRECTION
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-6 text-lg font-medium text-gray-900">Connexion réussie !</p>
+          <p className="mt-2 text-gray-600">Redirection vers votre chat...</p>
+          <div className="mt-4 bg-blue-50 rounded-lg p-4 max-w-sm mx-auto">
+            <div className="flex items-center justify-center">
+              <svg className="animate-pulse h-5 w-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-sm text-blue-700">Chargement en cours...</span>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1381,13 +1403,18 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleLogin}
-                  disabled={isLoading || !loginData.email || !loginData.password}
+                  disabled={isLoading || isRedirecting || !loginData.email || !loginData.password}
                   className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? (
                     <div className="flex items-center space-x-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>{t.connecting}</span>
+                    </div>
+                  ) : isRedirecting ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Redirection...</span>
                     </div>
                   ) : (
                     t.login
