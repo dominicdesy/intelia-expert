@@ -24,9 +24,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     '/auth/signup',        // Page d'inscription alternative
     '/auth/callback',      // Callback OAuth
     '/auth/reset',         // Reset password
+    '/auth/forgot-password', // Mot de passe oublié
     '/terms',              // Conditions d'utilisation
     '/privacy'             // Politique de confidentialité
   ].includes(pathname) || pathname.startsWith('/auth/')
+
+  // 🚨 PAGES PROTÉGÉES - Nécessitent authentification
+  const isProtectedPage = [
+    '/chat',
+    '/dashboard', 
+    '/profile',
+    '/settings'
+  ].includes(pathname) || (!isPublicPage && pathname !== '/')
 
   useEffect(() => {
     // 🛡️ EMPÊCHER LA BOUCLE INFINIE
@@ -41,21 +50,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return
     }
 
-    console.log('🔍 [AuthProvider] Vérification auth pour page protégée:', pathname)
-    
-    // Marquer comme vérifié
-    hasCheckedAuth.current = true
-    lastPathname.current = pathname
+    // 🚨 SEULEMENT pour les pages PROTÉGÉES
+    if (isProtectedPage) {
+      console.log('🔍 [AuthProvider] Vérification auth pour page protégée:', pathname)
+      
+      // Marquer comme vérifié
+      hasCheckedAuth.current = true
+      lastPathname.current = pathname
 
-    // Vérifier l'auth avec un délai pour éviter les conflits
-    const timeoutId = setTimeout(() => {
-      checkAuth()
-    }, 100)
+      // Vérifier l'auth avec un délai pour éviter les conflits
+      const timeoutId = setTimeout(() => {
+        checkAuth()
+      }, 100)
 
-    return () => {
-      clearTimeout(timeoutId)
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    } else {
+      console.log('ℹ️ [AuthProvider] Page ni publique ni protégée, skip:', pathname)
     }
-  }, [pathname, isPublicPage]) // 🛡️ RETIRER checkAuth des dépendances !
+  }, [pathname, isPublicPage, isProtectedPage]) // 🛡️ RETIRER checkAuth des dépendances !
 
   // 🛡️ Reset le flag quand on change de page
   useEffect(() => {
