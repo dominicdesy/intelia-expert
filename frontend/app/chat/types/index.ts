@@ -323,12 +323,17 @@ export interface UserFeedbackStats {
 
 // ==================== TYPES HOOKS AVEC CONVERSATIONS ====================
 
+// ✅ INTERFACE AuthStore CORRIGÉE AVEC TOUTES LES PROPRIÉTÉS
 export interface AuthStore {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  hasHydrated: boolean  // ✅ AJOUTÉ: Pour éviter l'erreur TypeScript
   logout: () => Promise<void>
+  login: (email: string, password: string) => Promise<void>  // ✅ AJOUTÉ
+  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>  // ✅ AJOUTÉ
   updateProfile: (data: ProfileUpdateData) => Promise<{ success: boolean; error?: string }>
+  initializeSession: () => Promise<boolean>  // ✅ AJOUTÉ
 }
 
 // ✅ MISE À JOUR: ChatStore pour gérer les conversations
@@ -894,3 +899,6 @@ export const CONVERSATION_UTILS = {
     })
   }
 } as const
+
+// ✅ TYPES POUR LANGUAGES (souvent utilisé)
+export type Language = 'fr' | 'en' | 'es' | 'de'
