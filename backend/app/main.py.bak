@@ -87,7 +87,7 @@ except ImportError as e:
     logging_router = None
     logger.warning(f"⚠️ Module logging non disponible: {e}")
 
-# Import expert router - CORRECTION UTF-8 + DEBUG AMÉLIORÉ
+# Import expert router - CORRECTION UTF-8
 try:
     from app.api.v1.expert import router as expert_router
     EXPERT_ROUTER_AVAILABLE = True
@@ -95,13 +95,7 @@ try:
 except ImportError as e:
     EXPERT_ROUTER_AVAILABLE = False
     expert_router = None
-    logger.error(f"❌ Module expert non disponible: {e}")
-    logger.error(f"❌ Traceback détaillé: {str(e)}")
-    
-    # Debug supplémentaire pour identifier le problème exact
-    import traceback
-    logger.error(f"❌ Traceback complet:")
-    logger.error(traceback.format_exc())
+    logger.warning(f"⚠️ Module expert non disponible: {e}")
 
 # Import autres routers
 try:
