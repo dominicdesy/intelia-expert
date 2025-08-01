@@ -111,17 +111,24 @@ export async function middleware(req: NextRequest) {
   }
 }
 
-// Fonction pour appliquer vos headers de sécurité existants (conservée intégralement)
+// Fonction pour appliquer vos headers de sécurité existants (VERSION COMPLÈTE RESTAURÉE)
 function applySecurityHeaders(response: NextResponse): NextResponse {
   const cspHeader = [
     "default-src 'self'",
+    // ✅ SCRIPT-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+    // ✅ STYLE-SRC CORRIGÉ pour autoriser Zoho SalesIQ  
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
     "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+    // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
+    // ✅ CONNECT-SRC CORRIGÉ - URL WEBSOCKET CONSERVÉE
     "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com",
+    // ✅ FRAME-SRC CONSERVÉ pour autoriser les iframes Zoho
     "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+    // ✅ CHILD-SRC CONSERVÉ pour autoriser les pop-ups Zoho
     "child-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
+    // ✅ WORKER-SRC CONSERVÉ pour les service workers
     "worker-src 'self' blob:",
     "media-src 'self' https://*.zoho.com",
     "object-src 'none'",
