@@ -3,6 +3,7 @@ app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM
 
 Logique métier principale pour le système expert
 VERSION FINALE : RAG-First + Toutes les améliorations API intégrées
+CORRECTION : Paramètre conversation_id supprimé des appels RAG
 """
 
 import os
@@ -383,6 +384,7 @@ class ExpertService:
     ) -> Dict[str, Any]:
         """
         VERSION FINALE - RAG obligatoire avec toutes les améliorations intégrées
+        ✅ CORRIGÉ: Paramètre conversation_id supprimé des appels RAG
         """
         
         # === 1. RÉCUPÉRER CONTEXTE CONVERSATIONNEL ===
@@ -450,7 +452,7 @@ class ExpertService:
                 }
             )
         
-        # === 4. APPEL RAG AVEC QUESTION AMÉLIORÉE ===
+        # === 4. APPEL RAG AVEC QUESTION AMÉLIORÉE (✅ CORRIGÉ) ===
         try:
             logger.info("🔍 Appel RAG avec question intelligemment améliorée...")
             
@@ -459,27 +461,28 @@ class ExpertService:
                 debug_info["enriched_question"] = enriched_question
                 debug_info["enhancement_info"] = enhancement_info
             
-            # Essayer d'abord avec le paramètre context
+            # ✅ CORRECTION: Essayer d'abord avec le paramètre context
             try:
                 result = await process_rag(
                     question=enriched_question,
                     user=current_user,
                     language=request_data.language,
                     speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id,
+                    # conversation_id=conversation_id,  # ← SUPPRIMÉ !
                     context=conversation_context_str
                 )
                 logger.info("✅ RAG appelé avec paramètre context")
             except TypeError as te:
                 logger.info(f"ℹ️ Paramètre context non supporté: {te}")
+                # ✅ CORRECTION: Fallback sans conversation_id ni context
                 result = await process_rag(
                     question=enriched_question,
                     user=current_user,
                     language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id
+                    speed_mode=request_data.speed_mode
+                    # conversation_id=conversation_id  # ← SUPPRIMÉ AUSSI !
                 )
-                logger.info("✅ RAG appelé sans paramètre context")
+                logger.info("✅ RAG appelé avec paramètres basiques")
             
             performance_breakdown["rag_complete"] = int(time.time() * 1000)
             
