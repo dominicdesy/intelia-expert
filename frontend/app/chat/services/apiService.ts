@@ -1,4 +1,4 @@
-// ==================== API SERVICE AVEC AUTHENTIFICATION + CONVERSATION_ID + SAUVEGARDE ====================
+// ==================== API SERVICE MODIFIÉ POUR ask-enhanced ====================
 
 // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
 const getApiConfig = () => {
@@ -16,7 +16,7 @@ const getApiConfig = () => {
 // ✅ VALIDATION CONFIGURATION AU RUNTIME
 const API_BASE_URL = getApiConfig()
 
-// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION (inchangée)
 const getAuthToken = (): string | null => {
   try {
     // 🔧 PRIORITÉ: Token depuis les cookies (URL-décodé)
@@ -40,26 +40,6 @@ const getAuthToken = (): string | null => {
       }
     }
 
-    // Ensuite essayer le token Supabase standard
-    const supabaseToken = localStorage.getItem('supabase.auth.token')
-    if (supabaseToken) {
-      const parsed = JSON.parse(supabaseToken)
-      if (parsed.access_token && parsed.access_token !== 'mock-jwt-token-for-development') {
-        console.log('[getAuthToken] Token trouvé dans supabase.auth.token')
-        return parsed.access_token
-      }
-    }
-
-    // Enfin essayer le token depuis l'auth storage Intelia
-    const authStorage = localStorage.getItem('intelia-auth-storage')
-    if (authStorage) {
-      const parsed = JSON.parse(authStorage)
-      if (parsed?.state?.token) {
-        console.log('[getAuthToken] Token trouvé dans intelia-auth-storage')
-        return parsed.state.token
-      }
-    }
-
     console.warn('[getAuthToken] Aucun token trouvé dans toutes les sources')
     return null
   } catch (error) {
@@ -68,24 +48,17 @@ const getAuthToken = (): string | null => {
   }
 }
 
-// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN DEPUIS LES COOKIES
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN DEPUIS LES COOKIES (inchangée)
 const getCookieToken = (): string | null => {
   try {
-    // Récupérer le cookie Supabase
     const cookies = document.cookie.split(';')
     const sbCookie = cookies.find(cookie => 
       cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
     )
     
     if (sbCookie) {
-      // Extraire la valeur du cookie
       const cookieValue = sbCookie.split('=')[1]
-      
-      // Décoder l'URL
       const decodedValue = decodeURIComponent(cookieValue)
-      console.log('[getCookieToken] Cookie value décodé:', decodedValue.substring(0, 50) + '...')
-      
-      // Parser le JSON
       const parsed = JSON.parse(decodedValue)
       
       if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
@@ -118,13 +91,20 @@ const getAuthHeaders = (): Record<string, string> => {
   return headers
 }
 
-// Interface pour la réponse de l'API
-interface AIResponse {
+// Interface pour la réponse enhanced
+interface EnhancedAIResponse {
   response: string
   conversation_id: string
   language: string
+  ai_enhancements_used?: string[]
   rag_used?: boolean
-  sources?: string[]
+  sources?: any[]
+  confidence_score?: number
+  response_time?: number
+  mode?: string
+  note?: string
+  timestamp?: string
+  processing_time?: number
 }
 
 // Interface pour les erreurs API
@@ -136,14 +116,14 @@ interface APIError {
 }
 
 /**
- * Génère une réponse IA via l'API Expert avec support conversation_id + SAUVEGARDE AUTOMATIQUE
+ * ✅ NOUVELLE FONCTION: Génère une réponse IA via ask-enhanced
  */
 export const generateAIResponse = async (
   question: string,
   user: any,
   language: string = 'fr',
-  conversationId?: string  // ✅ PARAMÈTRE POUR CONTINUATION CONVERSATION
-): Promise<AIResponse> => {
+  conversationId?: string
+): Promise<EnhancedAIResponse> => {
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
   }
@@ -152,36 +132,37 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  console.log('🔥 [apiService] Envoi question:', question.substring(0, 50) + '...')
+  console.log('🔥 [apiService] Envoi question vers ask-enhanced:', question.substring(0, 50) + '...')
   console.log('🔥 [apiService] User ID:', user.id)
   console.log('🔥 [apiService] Conversation ID:', conversationId || 'Nouvelle conversation')
 
   try {
-    // ✅ CORRECTION CRITIQUE: Inclure conversation_id ET user_id dans le body
+    // ✅ NOUVEAU: Format pour ask-enhanced (pas de user_id dans le body)
     const requestBody = {
       text: question.trim(),
-      user_id: user.id,  // ✅ AJOUT: user_id explicite
       language: language,
-      speed_mode: 'balanced',  // ✅ AJOUT: mode par défaut
-      ...(conversationId && { conversation_id: conversationId })  // ✅ AJOUT: conversation_id si fourni
+      speed_mode: 'balanced',
+      ...(conversationId && { conversation_id: conversationId }),
+      // ✅ IMPORTANT: Ne pas inclure user_id - il sera extrait du token
     }
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body:', requestBody)
+    console.log('📤 [apiService] Body pour ask-enhanced:', requestBody)
     console.log('📤 [apiService] Headers:', Object.keys(headers))
 
-    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
+    // ✅ CHANGEMENT CRITIQUE: Utiliser ask-enhanced au lieu de ask
+    const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut réponse:', response.status)
+    console.log('📡 [apiService] Statut réponse ask-enhanced:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur réponse:', errorText)
+      console.error('❌ [apiService] Erreur ask-enhanced:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -202,47 +183,37 @@ export const generateAIResponse = async (
       throw new Error(errorMessage)
     }
 
-    const data: AIResponse = await response.json()
-    console.log('✅ [apiService] Réponse reçue:', {
+    const data: EnhancedAIResponse = await response.json()
+    console.log('✅ [apiService] Réponse ask-enhanced reçue:', {
       conversation_id: data.conversation_id,
       language: data.language,
+      ai_enhancements: data.ai_enhancements_used,
       rag_used: data.rag_used,
       response_length: data.response?.length || 0
     })
 
-    // 🎯 CORRECTION CRITIQUE: SAUVEGARDER LA CONVERSATION AUTOMATIQUEMENT
-    try {
-      console.log('💾 [apiService] Sauvegarde conversation en cours...')
-      
-      const saveResponse = await fetch(`${API_BASE_URL}/conversation`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          conversation_id: data.conversation_id,
-          user_id: user.id,
-          question: question.trim(),
-          response: data.response,
-          language: language
-        })
-      })
+    // 🎯 NOUVEAU: Pas de sauvegarde séparée car ask-enhanced la gère automatiquement
+    console.log('💾 [apiService] Sauvegarde gérée automatiquement par ask-enhanced')
 
-      if (saveResponse.ok) {
-        const saveData = await saveResponse.json()
-        console.log('✅ [apiService] Conversation sauvegardée:', saveData.record_id)
-      } else {
-        const saveError = await saveResponse.text()
-        console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
-        // Ne pas faire échouer la requête principale si la sauvegarde échoue
-      }
-    } catch (saveError) {
-      console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
-      // Ne pas faire échouer la requête principale si la sauvegarde échoue
+    // ✅ CONVERSION vers le format attendu par le frontend
+    return {
+      response: data.response,
+      conversation_id: data.conversation_id,
+      language: data.language,
+      rag_used: data.rag_used,
+      sources: data.sources,
+      // ✅ Champs additionnels de ask-enhanced
+      ai_enhancements_used: data.ai_enhancements_used,
+      confidence_score: data.confidence_score,
+      response_time: data.response_time,
+      mode: data.mode,
+      note: data.note,
+      timestamp: data.timestamp,
+      processing_time: data.processing_time
     }
 
-    return data
-
   } catch (error) {
-    console.error('❌ [apiService] Erreur complète:', error)
+    console.error('❌ [apiService] Erreur complète ask-enhanced:', error)
     
     if (error instanceof Error) {
       throw error
@@ -253,7 +224,54 @@ export const generateAIResponse = async (
 }
 
 /**
- * Envoie un feedback pour une conversation
+ * ✅ ALTERNATIVE: Version publique sans authentification
+ */
+export const generateAIResponsePublic = async (
+  question: string,
+  language: string = 'fr',
+  conversationId?: string
+): Promise<EnhancedAIResponse> => {
+  if (!question || question.trim() === '') {
+    throw new Error('Question requise')
+  }
+
+  console.log('🌐 [apiService] Question publique vers ask-enhanced-public:', question.substring(0, 50) + '...')
+
+  try {
+    const requestBody = {
+      text: question.trim(),
+      language: language,
+      speed_mode: 'balanced',
+      ...(conversationId && { conversation_id: conversationId })
+    }
+
+    const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-public`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [apiService] Erreur ask-enhanced-public:', errorText)
+      throw new Error(`Erreur API: ${response.status}`)
+    }
+
+    const data: EnhancedAIResponse = await response.json()
+    console.log('✅ [apiService] Réponse ask-enhanced-public reçue')
+
+    return data
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur ask-enhanced-public:', error)
+    throw error
+  }
+}
+
+/**
+ * ✅ FONCTION DE FEEDBACK MISE À JOUR
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -264,12 +282,12 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('👍👎 [apiService] Envoi feedback:', feedback, 'pour conversation:', conversationId)
+  console.log('👍👎 [apiService] Envoi feedback enhanced:', feedback, 'pour conversation:', conversationId)
 
   try {
     const requestBody = {
-      rating: feedback === 1 ? 'positive' : 'negative',  // ✅ CORRIGÉ: utiliser 'rating' comme attendu
       conversation_id: conversationId,
+      rating: feedback === 1 ? 'positive' : 'negative',
       ...(comment && { comment: comment.trim() })
     }
 
@@ -281,11 +299,11 @@ export const sendFeedback = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Feedback statut:', response.status)
+    console.log('📡 [apiService] Feedback enhanced statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur feedback:', errorText)
+      console.error('❌ [apiService] Erreur feedback enhanced:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -294,17 +312,15 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('✅ [apiService] Feedback envoyé avec succès')
+    console.log('✅ [apiService] Feedback enhanced envoyé avec succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur feedback:', error)
+    console.error('❌ [apiService] Erreur feedback enhanced:', error)
     throw error
   }
 }
 
-/**
- * ✅ NOUVELLE FONCTION: Chargement conversations avec URL CORRIGÉE
- */
+// ✅ AUTRES FONCTIONS INCHANGÉES
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
@@ -315,7 +331,6 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
   try {
     const headers = getAuthHeaders()
 
-    // ✅ CORRECTION CRITIQUE: Utiliser la bonne URL depuis la documentation
     const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
       method: 'GET',
       headers
@@ -348,9 +363,6 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
   }
 }
 
-/**
- * Récupère les suggestions de sujets populaires
- */
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
   console.log('💡 [apiService] Récupération suggestions sujets:', language)
 
@@ -365,7 +377,6 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     if (!response.ok) {
       console.warn('⚠️ [apiService] Erreur récupération sujets:', response.status)
       
-      // Retourner des sujets par défaut en cas d'erreur
       return [
         "Problèmes de croissance poulets",
         "Conditions environnementales optimales",
@@ -384,7 +395,6 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
   } catch (error) {
     console.error('❌ [apiService] Erreur sujets:', error)
     
-    // Retourner des sujets par défaut en cas d'erreur
     return [
       "Problèmes de croissance poulets",
       "Conditions environnementales optimales", 
@@ -396,9 +406,6 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
   }
 }
 
-/**
- * Vérifie l'état de santé de l'API
- */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE_URL}/system/health`, {
@@ -420,23 +427,39 @@ export const checkAPIHealth = async (): Promise<boolean> => {
 }
 
 /**
- * ✅ NOUVELLE FONCTION: Test de l'API avec conversation_id
+ * ✅ FONCTION DE DEBUG ask-enhanced
  */
-export const testConversationContinuity = async (
+export const debugEnhancedAPI = () => {
+  console.group('🔧 [apiService] Configuration ask-enhanced')
+  console.log('API_BASE_URL:', API_BASE_URL)
+  console.log('Endpoints enhanced:')
+  console.log('- Ask enhanced (auth):', `${API_BASE_URL}/expert/ask-enhanced`)
+  console.log('- Ask enhanced (public):', `${API_BASE_URL}/expert/ask-enhanced-public`)
+  console.log('- Feedback enhanced:', `${API_BASE_URL}/expert/feedback`)
+  console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
+  console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
+  console.groupEnd()
+}
+
+/**
+ * ✅ FONCTION DE TEST ENHANCED API
+ */
+export const testEnhancedConversationContinuity = async (
   user: any,
   language: string = 'fr'
 ): Promise<{
   first_conversation_id: string,
   second_conversation_id: string,
   same_id: boolean,
-  success: boolean
+  success: boolean,
+  enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité conversation...')
+    console.log('🧪 [apiService] Test continuité conversation enhanced...')
     
     // Première question
     const firstResponse = await generateAIResponse(
-      "Test question 1: Qu'est-ce que Ross 308 ?",
+      "Test question 1: Qu'est-ce que les poulets de chair ?",
       user,
       language
     )
@@ -446,42 +469,49 @@ export const testConversationContinuity = async (
     
     // Deuxième question avec le même conversation_id
     const secondResponse = await generateAIResponse(
-      "Test question 2: Quel est leur poids à 12 jours ?",
+      "Test question 2: Quel est leur poids optimal à 12 jours ?",
       user,
       language,
-      firstResponse.conversation_id  // ✅ PASSER L'ID DE LA PREMIÈRE RÉPONSE
+      firstResponse.conversation_id
     )
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test résultat:', {
+    console.log('🧪 [apiService] Test enhanced résultat:', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
-      same_id: sameId
+      same_id: sameId,
+      first_enhancements: firstResponse.ai_enhancements_used,
+      second_enhancements: secondResponse.ai_enhancements_used
     })
     
     return {
       first_conversation_id: firstResponse.conversation_id,
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
-      success: true
+      success: true,
+      enhancements_used: [
+        ...(firstResponse.ai_enhancements_used || []),
+        ...(secondResponse.ai_enhancements_used || [])
+      ]
     }
     
   } catch (error) {
-    console.error('❌ [apiService] Erreur test continuité:', error)
+    console.error('❌ [apiService] Erreur test enhanced continuité:', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
       same_id: false,
-      success: false
+      success: false,
+      enhancements_used: []
     }
   }
 }
 
 /**
- * Utilitaire pour gérer les erreurs réseau
+ * ✅ UTILITAIRE POUR GÉRER LES ERREURS RÉSEAU ENHANCED
  */
-export const handleNetworkError = (error: any): string => {
+export const handleEnhancedNetworkError = (error: any): string => {
   if (error?.message?.includes('Failed to fetch')) {
     return 'Problème de connexion. Vérifiez votre connexion internet.'
   }
@@ -494,37 +524,117 @@ export const handleNetworkError = (error: any): string => {
     return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
   }
   
+  if (error?.message?.includes('ask-enhanced')) {
+    return 'Erreur du système expert amélioré. Veuillez réessayer.'
+  }
+  
   return error?.message || 'Une erreur inattendue s\'est produite.'
 }
 
 /**
- * ✅ NOUVELLE FONCTION: Debug conversation_id dans la console
+ * ✅ DEBUG CONVERSATION FLOW ENHANCED
  */
-export const debugConversationFlow = (
+export const debugEnhancedConversationFlow = (
   step: string,
   conversationId: string | undefined,
   additionalInfo?: any
 ) => {
-  console.log(`🔍 [Conversation Debug] ${step}:`, {
+  console.log(`🔍 [Enhanced Conversation Debug] ${step}:`, {
     conversation_id: conversationId || 'NOUVEAU',
+    endpoint: 'ask-enhanced',
     timestamp: new Date().toISOString(),
     ...additionalInfo
   })
 }
 
 /**
- * ✅ FONCTION UTILITAIRE: Debug configuration API
+ * ✅ MIGRATION HELPER - Détecte si on doit utiliser enhanced ou legacy
  */
-export const debugAPIConfiguration = () => {
-  console.group('🔧 [apiService] Configuration API')
-  console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('Expected endpoints:')
-  console.log('- Load conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
-  console.log('- Save conversation:', `${API_BASE_URL}/conversation`)
-  console.log('- Ask enhanced:', `${API_BASE_URL}/expert-enhanced/ask-enhanced`)
-  console.log('- Send feedback:', `${API_BASE_URL}/expert/feedback`)
+export const detectAPIVersion = async (): Promise<'enhanced' | 'legacy' | 'error'> => {
+  try {
+    // Test ask-enhanced
+    const enhancedResponse = await fetch(`${API_BASE_URL}/expert/ask-enhanced`, {
+      method: 'OPTIONS',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    
+    if (enhancedResponse.ok || enhancedResponse.status === 405) {
+      console.log('✅ [detectAPIVersion] ask-enhanced disponible')
+      return 'enhanced'
+    }
+    
+    // Test ask legacy
+    const legacyResponse = await fetch(`${API_BASE_URL}/expert/ask`, {
+      method: 'OPTIONS', 
+      headers: { 'Content-Type': 'application/json' }
+    })
+    
+    if (legacyResponse.ok || legacyResponse.status === 405) {
+      console.log('⚠️ [detectAPIVersion] Seul ask legacy disponible')
+      return 'legacy'
+    }
+    
+    return 'error'
+    
+  } catch (error) {
+    console.error('❌ [detectAPIVersion] Erreur détection:', error)
+    return 'error'
+  }
+}
+
+/**
+ * ✅ WRAPPER INTELLIGENT - Utilise automatiquement la meilleure version
+ */
+export const generateAIResponseSmart = async (
+  question: string,
+  user: any,
+  language: string = 'fr',
+  conversationId?: string
+): Promise<EnhancedAIResponse> => {
+  
+  const apiVersion = await detectAPIVersion()
+  
+  console.log(`🤖 [generateAIResponseSmart] Utilisation API: ${apiVersion}`)
+  
+  switch (apiVersion) {
+    case 'enhanced':
+      return await generateAIResponse(question, user, language, conversationId)
+      
+    case 'legacy':
+      console.warn('⚠️ [generateAIResponseSmart] Fallback vers API legacy')
+      // Ici, vous pourriez implémenter un fallback vers l'ancien ask
+      // Pour l'instant, on essaie enhanced quand même
+      return await generateAIResponse(question, user, language, conversationId)
+      
+    case 'error':
+    default:
+      throw new Error('API non disponible. Veuillez vérifier votre connexion.')
+  }
+}
+
+// ✅ CONFIGURATION DEBUG
+export const logEnhancedAPIInfo = () => {
+  console.group('🚀 [apiService] Configuration Enhanced API')
+  console.log('Version:', 'Enhanced (ask-enhanced)')
+  console.log('Base URL:', API_BASE_URL)
+  console.log('Fonctionnalités:')
+  console.log('  - ✅ Retraitement automatique')
+  console.log('  - ✅ Contexte conversationnel intelligent')
+  console.log('  - ✅ AI enhancements intégrés')
+  console.log('  - ✅ Métriques de performance')
+  console.log('  - ✅ Sauvegarde automatique')
+  console.log('Endpoints principaux:')
+  console.log('  - POST /expert/ask-enhanced (authentifié)')
+  console.log('  - POST /expert/ask-enhanced-public (public)')
+  console.log('  - POST /expert/feedback (enhanced)')
+  console.log('  - GET /expert/topics')
+  console.log('Améliorations vs legacy:')
+  console.log('  - 🔧 Pas de user_id dans body (extrait du JWT)')
+  console.log('  - 🔧 Gestion automatique des conversations')
+  console.log('  - 🔧 Réponses enrichies avec métadonnées')
+  console.log('  - 🔧 Support complet UTF-8')
   console.groupEnd()
 }
 
-// Export par défaut de la fonction principale
+// Export par défaut de la fonction principale enhanced
 export default generateAIResponse

@@ -171,7 +171,7 @@ export const generateAIResponse = async (
     console.log('📤 [apiService] Body:', requestBody)
     console.log('📤 [apiService] Headers:', Object.keys(headers))
 
-    const response = await fetch(`${API_BASE_URL}/expert-enhanced/ask-enhanced`, {
+    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody)
