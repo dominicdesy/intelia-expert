@@ -1,18 +1,16 @@
-// hooks/useAuthStore.ts - AVEC DÉCONNEXION COMPLÈTE CORRIGÉE
+// hooks/useAuthStore.ts - DÉCONNEXION CORRIGÉE SANS ERREUR CLIENT
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
 import { User, AuthStore, ProfileUpdateData } from '../types'
 
 const supabase = createClientComponentClient()
 
-// ==================== STORE D'AUTHENTIFICATION ÉTENDU ====================
+// ==================== STORE D'AUTHENTIFICATION CORRIGÉ ====================
 export const useAuthStore = (): AuthStore => {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
     const loadUser = async () => {
@@ -83,134 +81,104 @@ export const useAuthStore = (): AuthStore => {
     }
   }, [])
 
-  // ✅ DÉCONNEXION CORRIGÉE: Utilise Next.js Router au lieu de window.location
+  // ✅ DÉCONNEXION SIMPLIFIÉE SANS ROUTER - ÉVITE LES ERREURS CLIENT
   const logout = async (): Promise<void> => {
     try {
-      console.log('🚪 [Logout] Début déconnexion complète')
+      console.log('🚪 [Logout] Début déconnexion simplifiée')
       
       // ✅ ÉTAPE 1: Réinitialiser l'état local IMMÉDIATEMENT
-      console.log('🔄 [Logout] Réinitialisation état local immédiate')
       setUser(null)
       setIsAuthenticated(false)
       
-      // ✅ ÉTAPE 2: Déconnexion Supabase avec scope global
-      console.log('📤 [Logout] Déconnexion Supabase (scope: global)')
+      // ✅ ÉTAPE 2: Déconnexion Supabase
       try {
-        const { error } = await supabase.auth.signOut({ 
-          scope: 'global' // ✅ CRITIQUE: Déconnecte de TOUS les appareils/sessions
-        })
-        
+        const { error } = await supabase.auth.signOut({ scope: 'global' })
         if (error) {
-          console.error('❌ [Logout] Erreur déconnexion Supabase (non-bloquante):', error)
-          // Continuer le nettoyage même en cas d'erreur
+          console.warn('⚠️ [Logout] Avertissement Supabase:', error.message)
         } else {
           console.log('✅ [Logout] Déconnexion Supabase réussie')
         }
       } catch (supabaseError) {
-        console.error('❌ [Logout] Erreur critique Supabase (ignorée):', supabaseError)
-        // Continuer le processus même si Supabase échoue
+        console.warn('⚠️ [Logout] Erreur Supabase ignorée:', supabaseError)
       }
       
-      // ✅ ÉTAPE 3: Nettoyage COMPLET du stockage local
-      console.log('🧹 [Logout] Nettoyage stockage local complet')
-      
+      // ✅ ÉTAPE 3: Nettoyage stockage local SÉCURISÉ
       try {
-        // Nettoyer localStorage
-        const localStorageKeys = Object.keys(localStorage)
-        localStorageKeys.forEach(key => {
-          if (key.includes('supabase') || 
-              key.includes('sb-') || 
-              key.includes('auth') ||
-              key.includes('session') ||
-              key.includes('token') ||
-              key.includes('intelia') ||
-              key.startsWith('chakra-ui') ||
-              key.includes('user')) {
-            localStorage.removeItem(key)
-            console.log('🗑️ [Logout] Supprimé localStorage:', key)
-          }
-        })
+        // Nettoyer localStorage avec vérification
+        if (typeof localStorage !== 'undefined') {
+          const keysToRemove = Object.keys(localStorage).filter(key => 
+            key.includes('supabase') || 
+            key.includes('sb-') || 
+            key.includes('auth') ||
+            key.includes('session') ||
+            key.includes('token') ||
+            key.includes('intelia')
+          )
+          
+          keysToRemove.forEach(key => {
+            try {
+              localStorage.removeItem(key)
+              console.log('🗑️ [Logout] Supprimé localStorage:', key)
+            } catch (e) {
+              console.warn('⚠️ [Logout] Impossible de supprimer:', key)
+            }
+          })
+        }
         
-        // Nettoyer sessionStorage
-        const sessionStorageKeys = Object.keys(sessionStorage)
-        sessionStorageKeys.forEach(key => {
-          if (key.includes('supabase') || 
-              key.includes('sb-') || 
-              key.includes('auth') ||
-              key.includes('session') ||
-              key.includes('token') ||
-              key.includes('intelia') ||
-              key.includes('user')) {
-            sessionStorage.removeItem(key)
-            console.log('🗑️ [Logout] Supprimé sessionStorage:', key)
-          }
-        })
+        // Nettoyer sessionStorage avec vérification
+        if (typeof sessionStorage !== 'undefined') {
+          const sessionKeysToRemove = Object.keys(sessionStorage).filter(key => 
+            key.includes('supabase') || 
+            key.includes('sb-') || 
+            key.includes('auth') ||
+            key.includes('session') ||
+            key.includes('intelia')
+          )
+          
+          sessionKeysToRemove.forEach(key => {
+            try {
+              sessionStorage.removeItem(key)
+              console.log('🗑️ [Logout] Supprimé sessionStorage:', key)
+            } catch (e) {
+              console.warn('⚠️ [Logout] Impossible de supprimer session:', key)
+            }
+          })
+        }
       } catch (storageError) {
-        console.error('❌ [Logout] Erreur nettoyage stockage (ignorée):', storageError)
+        console.warn('⚠️ [Logout] Erreur nettoyage stockage:', storageError)
       }
       
-      // ✅ ÉTAPE 4: Nettoyer les cookies manuellement (backup)
-      try {
-        document.cookie.split(";").forEach(cookie => {
-          const eqPos = cookie.indexOf("=")
-          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
-          if (name.includes('supabase') || 
-              name.includes('sb-') || 
-              name.includes('auth') ||
-              name.includes('session')) {
-            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
-            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
-            console.log('🍪 [Logout] Cookie supprimé:', name)
-          }
-        })
-      } catch (cookieError) {
-        console.error('❌ [Logout] Erreur nettoyage cookies (ignorée):', cookieError)
-      }
+      // ✅ ÉTAPE 4: Attendre que les changements soient appliqués
+      await new Promise(resolve => setTimeout(resolve, 200))
       
-      // ✅ ÉTAPE 5: Attendre un peu pour s'assurer que tout est nettoyé
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // ✅ ÉTAPE 5: Redirection SIMPLE et SÛRE
+      console.log('🏠 [Logout] Redirection vers accueil')
       
-      // ✅ ÉTAPE 6: Redirection PROPRE avec Next.js Router
-      console.log('🏠 [Logout] Redirection vers page de connexion')
-      
-      try {
-        // Essayer d'abord avec le router Next.js
-        router.push('/')
-        router.refresh() // Force un refresh pour nettoyer le cache
-        
-        // Fallback avec window.location après un délai
-        setTimeout(() => {
-          if (window.location.pathname !== '/') {
-            console.log('🔄 [Logout] Fallback: redirection forcée')
-            window.location.href = '/'
-          }
-        }, 1000)
-        
-      } catch (routerError) {
-        console.error('❌ [Logout] Erreur router, utilisation fallback:', routerError)
-        // Fallback immédiat si le router échoue
+      // Méthode la plus fiable - rechargement complet de la page
+      if (typeof window !== 'undefined') {
         window.location.href = '/'
       }
       
     } catch (error) {
-      console.error('❌ [Logout] Erreur critique déconnexion:', error)
+      console.error('❌ [Logout] Erreur critique:', error)
       
-      // ✅ FALLBACK ULTIME: Même en cas d'erreur, forcer la déconnexion
+      // ✅ FALLBACK ULTIME - Nettoyage d'urgence
       setUser(null)
       setIsAuthenticated(false)
       
-      // Nettoyage d'urgence
       try {
-        localStorage.clear()
-        sessionStorage.clear()
+        if (typeof localStorage !== 'undefined') {
+          localStorage.clear()
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.clear()
+        }
       } catch (clearError) {
-        console.error('❌ [Logout] Erreur nettoyage d\'urgence:', clearError)
+        console.warn('⚠️ [Logout] Nettoyage d\'urgence échoué:', clearError)
       }
       
-      // Redirection forcée même en cas d'erreur totale
-      try {
-        router.push('/')
-      } catch (finalError) {
+      // Redirection forcée même en cas d'erreur
+      if (typeof window !== 'undefined') {
         window.location.href = '/'
       }
     }

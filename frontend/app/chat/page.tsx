@@ -19,13 +19,13 @@ import {
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
-import { FeedbackModal } from './components/modals/FeedbackModal'
+import { FeedbackModal } from './components/FeedbackModal'
 
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
   
-  // ✅ SÉLECTEURS ZUSTAND RÉACTIFS - UN PAR UN
+  // ✅ SÉLECTEURS ZUSTAND RÉACTIFS
   const currentConversation = useChatStore(state => state.currentConversation)
   const setCurrentConversation = useChatStore(state => state.setCurrentConversation)
   const addMessage = useChatStore(state => state.addMessage)
@@ -52,15 +52,39 @@ export default function ChatInterface() {
   })
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   
+  // ✅ REFS POUR CONTRÔLE DU COMPOSANT
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
+  const isMountedRef = useRef(true)
+  const hasRedirectedRef = useRef(false)
 
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  // ✅ DEBUG LOG POUR TRACER LES RE-RENDERS
   console.log('🔍 [Render] Messages actuels:', messages.length, 'Conversation ID:', currentConversation?.id)
+
+  // ✅ EFFET POUR MARQUER LE COMPOSANT COMME MONTÉ
+  useEffect(() => {
+    isMountedRef.current = true
+    
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // ✅ GESTION DE LA REDIRECTION SÉCURISÉE
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true
+      console.log('🔄 [ChatInterface] Redirection - utilisateur non authentifié')
+      
+      // Redirection immédiate et sécurisée
+      if (typeof window !== 'undefined') {
+        window.location.replace('/')
+      }
+    }
+  }, [isLoading, isAuthenticated])
 
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -77,7 +101,9 @@ export default function ChatInterface() {
     setIsMobileDevice(detectMobileDevice())
     
     const handleResize = () => {
-      setIsMobileDevice(detectMobileDevice())
+      if (isMountedRef.current) {
+        setIsMobileDevice(detectMobileDevice())
+      }
     }
     
     window.addEventListener('resize', handleResize)
@@ -85,9 +111,11 @@ export default function ChatInterface() {
   }, [])
 
   useEffect(() => {
-    if (messages.length > lastMessageCountRef.current && shouldAutoScroll && !isUserScrolling) {
+    if (isMountedRef.current && messages.length > lastMessageCountRef.current && shouldAutoScroll && !isUserScrolling) {
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        if (isMountedRef.current) {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        }
       }, 100)
     }
     
@@ -102,6 +130,8 @@ export default function ChatInterface() {
     let isScrolling = false
 
     const handleScroll = () => {
+      if (!isMountedRef.current) return
+
       const { scrollTop, scrollHeight, clientHeight } = chatContainer
       const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
@@ -121,8 +151,10 @@ export default function ChatInterface() {
 
       clearTimeout(scrollTimeout)
       scrollTimeout = setTimeout(() => {
-        setIsUserScrolling(false)
-        isScrolling = false
+        if (isMountedRef.current) {
+          setIsUserScrolling(false)
+          isScrolling = false
+        }
       }, 150)
     }
 
@@ -134,7 +166,7 @@ export default function ChatInterface() {
   }, [messages.length])
 
   useEffect(() => {
-    if (isAuthenticated && !currentConversation && !hasMessages) {
+    if (isAuthenticated && !currentConversation && !hasMessages && isMountedRef.current) {
       const welcomeMessage: Message = {
         id: 'welcome',
         content: t('chat.welcome'),
@@ -162,7 +194,8 @@ export default function ChatInterface() {
   useEffect(() => {
     if (currentConversation?.id === 'welcome' && 
         currentConversation.messages.length === 1 &&
-        currentConversation.messages[0].content !== t('chat.welcome')) {
+        currentConversation.messages[0].content !== t('chat.welcome') &&
+        isMountedRef.current) {
       
       const updatedMessage: Message = {
         ...currentConversation.messages[0],
@@ -179,22 +212,29 @@ export default function ChatInterface() {
   }, [currentLanguage, t])
 
   useEffect(() => {
-    console.log('Conversation changee, force re-render')
-  }, [currentConversation?.messages?.length, currentConversation?.id])
-
-  useEffect(() => {
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.id && isMountedRef.current) {
       const loadTimer = setTimeout(() => {
-        console.log('[ChatInterface] Chargement historique pour:', user.id)
-        loadConversations(user.id)
-          .then(() => console.log('Historique conversations charge'))
-          .catch(err => console.error('Erreur chargement historique:', err))
+        if (isMountedRef.current) {
+          console.log('[ChatInterface] Chargement historique pour:', user.id)
+          loadConversations(user.id)
+            .then(() => {
+              if (isMountedRef.current) {
+                console.log('Historique conversations chargé')
+              }
+            })
+            .catch(err => {
+              if (isMountedRef.current) {
+                console.error('Erreur chargement historique:', err)
+              }
+            })
+        }
       }, 800)
 
       return () => clearTimeout(loadTimer)
     }
   }, [isAuthenticated, user?.id, loadConversations])
 
+  // ✅ LOADING STATE SÉCURISÉ
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -206,11 +246,8 @@ export default function ChatInterface() {
     )
   }
 
+  // ✅ ÉTAT NON AUTHENTIFIÉ SIMPLIFIÉ
   if (!isAuthenticated) {
-    useEffect(() => {
-      window.location.href = '/'
-    }, [])
-    
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -222,7 +259,7 @@ export default function ChatInterface() {
   }
 
   const handleSendMessage = async (text: string = inputMessage) => {
-    if (!text.trim()) return
+    if (!text.trim() || !isMountedRef.current) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -231,10 +268,8 @@ export default function ChatInterface() {
       timestamp: new Date()
     }
 
-    // ✅ CORRECTION PRINCIPALE: Déterminer le conversation_id AVANT l'appel API
     let conversationIdToSend: string | undefined = undefined
     
-    // Si on a une conversation active ET que ce n'est pas la conversation welcome
     if (currentConversation && 
         currentConversation.id !== 'welcome' && 
         !currentConversation.id.startsWith('temp-')) {
@@ -258,8 +293,13 @@ export default function ChatInterface() {
         text.trim(), 
         user, 
         currentLanguage, 
-        conversationIdToSend  // ✅ CRITIQUE: Passer l'ID existant
+        conversationIdToSend
       )
+
+      if (!isMountedRef.current) {
+        console.log('⚠️ [handleSendMessage] Composant démonté, abandon')
+        return
+      }
 
       console.log('📥 [handleSendMessage] Réponse API reçue:', {
         conversation_id: response.conversation_id,
@@ -277,30 +317,34 @@ export default function ChatInterface() {
 
       addMessage(aiMessage)
 
-      // ✅ CORRECTION CRITIQUE: NE PAS utiliser setCurrentConversation après addMessage
-      // La méthode addMessage gère déjà la mise à jour de l'ID et du titre
       if (!conversationIdToSend && response.conversation_id) {
         console.log('🆕 [handleSendMessage] Nouvelle conversation créée:', response.conversation_id)
-        // addMessage a déjà mis à jour l'ID via message.conversation_id
       } else {
         console.log('✅ [handleSendMessage] Conversation existante mise à jour:', response.conversation_id)
       }
       
     } catch (error) {
       console.error('[handleSendMessage] Erreur:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: error instanceof Error ? error.message : t('chat.errorMessage'),
-        isUser: false,
-        timestamp: new Date()
+      
+      if (isMountedRef.current) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: error instanceof Error ? error.message : t('chat.errorMessage'),
+          isUser: false,
+          timestamp: new Date()
+        }
+        addMessage(errorMessage)
       }
-      addMessage(errorMessage)
     } finally {
-      setIsLoadingChat(false)
+      if (isMountedRef.current) {
+        setIsLoadingChat(false)
+      }
     }
   }
 
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
+    if (!isMountedRef.current) return
+    
     setFeedbackModal({
       isOpen: true,
       messageId,
@@ -310,11 +354,11 @@ export default function ChatInterface() {
 
   const handleFeedbackSubmit = async (feedback: 'positive' | 'negative', comment?: string) => {
     const { messageId } = feedbackModal
-    if (!messageId) return
+    if (!messageId || !isMountedRef.current) return
 
     const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
-      console.warn('Conversation ID non trouve pour le feedback', messageId)
+      console.warn('Conversation ID non trouvé pour le feedback', messageId)
       return
     }
 
@@ -334,27 +378,33 @@ export default function ChatInterface() {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
           } catch (commentError) {
-            console.warn('Commentaire non envoye (endpoint manquant):', commentError)
+            console.warn('Commentaire non envoyé (endpoint manquant):', commentError)
           }
         }
       } catch (feedbackError) {
         console.error('Erreur envoi feedback:', feedbackError)
-        updateMessage(messageId, { 
-          feedback: null,
-          feedbackComment: undefined 
-        })
+        if (isMountedRef.current) {
+          updateMessage(messageId, { 
+            feedback: null,
+            feedbackComment: undefined 
+          })
+        }
         throw feedbackError
       }
       
     } catch (error) {
-      console.error('Erreur generale feedback:', error)
+      console.error('Erreur générale feedback:', error)
       throw error
     } finally {
-      setIsSubmittingFeedback(false)
+      if (isMountedRef.current) {
+        setIsSubmittingFeedback(false)
+      }
     }
   }
 
   const handleFeedbackModalClose = () => {
+    if (!isMountedRef.current) return
+    
     setFeedbackModal({
       isOpen: false,
       messageId: null,
@@ -363,6 +413,8 @@ export default function ChatInterface() {
   }
 
   const handleNewConversation = () => {
+    if (!isMountedRef.current) return
+    
     createNewConversation()
     
     const welcomeMessage: Message = {
@@ -393,6 +445,8 @@ export default function ChatInterface() {
   }
 
   const scrollToBottom = () => {
+    if (!isMountedRef.current) return
+    
     setShouldAutoScroll(true)
     setIsUserScrolling(false)
     setShowScrollButton(false)
@@ -460,7 +514,7 @@ export default function ChatInterface() {
 
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <div className="text-sm">Aucun message a afficher</div>
+                  <div className="text-sm">Aucun message à afficher</div>
                 </div>
               ) : (
                 messages.map((message, index) => (

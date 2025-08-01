@@ -420,6 +420,7 @@ export default function ChatInterface() {
                 onClick={handleNewConversation}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                 title={t('nav.newConversation')}
+                aria-label={t('nav.newConversation')}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
@@ -486,6 +487,7 @@ export default function ChatInterface() {
                                 message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
                               }`}
                               title={t('chat.helpfulResponse')}
+                              aria-label={t('chat.helpfulResponse')}
                             >
                               <ThumbUpIcon />
                             </button>
@@ -495,6 +497,7 @@ export default function ChatInterface() {
                                 message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
                               }`}
                               title={t('chat.notHelpfulResponse')}
+                              aria-label={t('chat.notHelpfulResponse')}
                             >
                               <ThumbDownIcon />
                             </button>
@@ -550,6 +553,7 @@ export default function ChatInterface() {
                 onClick={scrollToBottom}
                 className="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
                 title="Revenir en bas"
+                aria-label="Revenir en bas de la conversation"
               >
                 <ArrowDownIcon />
               </button>
@@ -573,6 +577,7 @@ export default function ChatInterface() {
                     placeholder={t('chat.placeholder')}
                     className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
                     disabled={isLoadingChat}
+                    aria-label={t('chat.placeholder')}
                   />
                 </div>
 
@@ -580,6 +585,8 @@ export default function ChatInterface() {
                   onClick={() => handleSendMessage()}
                   disabled={isLoadingChat || !inputMessage.trim()}
                   className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                  title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
+                  aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                 >
                   <PaperAirplaneIcon />
                 </button>
