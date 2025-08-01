@@ -16,7 +16,7 @@ try:
     from .expert_models import VaguenessDetection, QuestionClarity, ContextCoherence, EnhancedFallbackDetails, QualityMetrics, DocumentRelevance, ConfidenceLevel
 except ImportError:
     # Fallback si les imports échouent
-    logger.warning("⚠️ Import expert_models échoué - utilisation des classes de fallback")
+    logger.warning(⚠️ Import expert_models échoué - utilisation des classes de fallback")
     
     class QuestionClarity:
         CLEAR = "clear"
@@ -720,7 +720,7 @@ class APIEnhancementService:
         # Si race ET sexe manquent → haute priorité de clarification
         if not has_breed and not has_sex:
             missing = ["race/souche", "sexe"]
-            score = 0.85
+            score = 0.95  # ← AUGMENTÉ de 0.85 à 0.95 pour garantir le déclenchement
             clarity = QuestionClarity.UNCLEAR
             
             suggestions = {
@@ -746,7 +746,7 @@ class APIEnhancementService:
             if not has_sex:
                 missing.append("sexe")
             
-            score = 0.65
+            score = 0.75  # ← AUGMENTÉ de 0.65 à 0.75 pour plus de sensibilité
             clarity = QuestionClarity.PARTIALLY_CLEAR
             
             missing_text = " et ".join(missing)

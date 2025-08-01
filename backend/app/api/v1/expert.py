@@ -60,6 +60,15 @@ async def ask_expert_enhanced_v2(
         logger.info(f"🐛 Mode debug: {request_data.debug_mode}")
         logger.info(f"🎪 Réponse clarification: {request_data.is_clarification_response}")
         
+        # ✅ CORRECTION CRITIQUE: FORCER l'activation des améliorations si pas déjà définies
+        if not hasattr(request_data, 'enable_vagueness_detection') or request_data.enable_vagueness_detection is None:
+            request_data.enable_vagueness_detection = True
+        if not hasattr(request_data, 'require_coherence_check') or request_data.require_coherence_check is None:
+            request_data.require_coherence_check = True
+            
+        logger.info(f"🎯 Vagueness detection FINAL: {request_data.enable_vagueness_detection}")
+        logger.info(f"🔍 Coherence check FINAL: {request_data.require_coherence_check}")
+        
         # Déléguer le traitement au service amélioré
         response = await expert_service.process_expert_question(
             request_data=request_data,
@@ -96,14 +105,22 @@ async def ask_expert_enhanced_v2_public(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """Endpoint public avec toutes les améliorations + clarification intelligente"""
+    """Endpoint public avec toutes les améliorations + clarification intelligente FORCÉE"""
     start_time = time.time()
     
     try:
         logger.info("=" * 80)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public - VERSION FINALE PUBLIQUE AVEC CLARIFICATION")
+        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public - VERSION FINALE PUBLIQUE AVEC CLARIFICATION FORCÉE")
         logger.info(f"📝 Question: {request_data.text[:100]}...")
         logger.info(f"🎪 Réponse clarification: {request_data.is_clarification_response}")
+        
+        # ✅ CORRECTION CRITIQUE: FORCER l'activation des améliorations
+        request_data.enable_vagueness_detection = True
+        request_data.require_coherence_check = True
+        
+        # ✅ NOUVEAU: Log pour vérifier les paramètres
+        logger.info(f"🎯 Vagueness detection FORCÉE: {request_data.enable_vagueness_detection}")
+        logger.info(f"🔍 Coherence check FORCÉ: {request_data.require_coherence_check}")
         
         # Déléguer le traitement au service (mode public)
         response = await expert_service.process_expert_question(
@@ -115,6 +132,8 @@ async def ask_expert_enhanced_v2_public(
         
         logger.info(f"✅ FIN ask_expert_enhanced_v2_public - conversation_id: {response.conversation_id}")
         logger.info(f"🤖 Améliorations publiques utilisées: {len(response.ai_enhancements_used or [])} features")
+        logger.info(f"🎭 Mode final: {response.mode}")
+        logger.info(f"🎪 Clarification déclenchée: {'clarification' in response.mode}")
         logger.info("=" * 80)
         
         return response
@@ -510,6 +529,235 @@ async def test_clarification_system(request: Request):
             "tests_performed": [],
             "errors": [f"Erreur critique: {str(e)}"]
         }
+
+@router.post("/debug/test-clarification")
+async def test_clarification_system(request: Request):
+    """✅ NOUVEAU: Test spécifique du système de clarification intelligent"""
+    try:
+        test_results = {
+            "test_successful": True,
+            "timestamp": datetime.now().isoformat(),
+            "tests_performed": [],
+            "errors": []
+        }
+        
+        # Test 1: Question nécessitant clarification race/sexe
+        logger.info("🎯 Test 1: Question poids sans race/sexe")
+        
+        clarification_question = EnhancedQuestionRequest(
+            text="Quel est le poids d'un poulet de 12 jours ?",
+            conversation_id=str(uuid.uuid4()),
+            language="fr",
+            enable_vagueness_detection=True,
+            is_clarification_response=False
+        )
+        
+        start_time = time.time()
+        result1 = await expert_service.process_expert_question(
+            request_data=clarification_question,
+            request=request,
+            current_user=None,
+            start_time=start_time
+        )
+        
+        test1_result = {
+            "test_name": "Détection question nécessitant clarification",
+            "question": clarification_question.text,
+            "clarification_requested": result1.clarification_result is not None,
+            "mode": result1.mode,
+            "enhancements_used": result1.ai_enhancements_used or [],
+            "success": "smart_performance_clarification" in result1.mode
+        }
+        
+        test_results["tests_performed"].append(test1_result)
+        
+        if not test1_result["success"]:
+            test_results["errors"].append("Clarification automatique non déclenchée")
+        
+        # Test 2: Traitement réponse de clarification
+        if test1_result["clarification_requested"]:
+            logger.info("🎪 Test 2: Traitement réponse clarification")
+            
+            clarification_response = EnhancedQuestionRequest(
+                text="Ross 308 mâles",
+                conversation_id=clarification_question.conversation_id,
+                language="fr",
+                is_clarification_response=True,
+                original_question="Quel est le poids d'un poulet de 12 jours ?",
+                clarification_context={
+                    "missing_information": ["breed", "sex"],
+                    "clarification_type": "performance_breed_sex"
+                }
+            )
+            
+            start_time2 = time.time()
+            result2 = await expert_service.process_expert_question(
+                request_data=clarification_response,
+                request=request,
+                current_user=None,
+                start_time=start_time2
+            )
+            
+            test2_result = {
+                "test_name": "Traitement réponse clarification",
+                "clarification_response": clarification_response.text,
+                "question_enriched": "Ross 308" in result2.question and "mâles" in result2.question,
+                "rag_used": result2.rag_used,
+                "mode": result2.mode,
+                "success": result2.rag_used and "Ross 308" in result2.question
+            }
+            
+            test_results["tests_performed"].append(test2_result)
+            
+            if not test2_result["success"]:
+                test_results["errors"].append("Traitement clarification échoué")
+        
+        # Test 3: Extraction race/sexe
+        logger.info("🔍 Test 3: Extraction entités")
+        
+        from .expert_utils import extract_breed_and_sex_from_clarification
+        
+        extraction_tests = [
+            ("Ross 308 mâles", {"breed": "Ross 308", "sex": "mâles"}),
+            ("Cobb 500 femelles", {"breed": "Cobb 500", "sex": "femelles"}),
+            ("Hubbard troupeau mixte", {"breed": "Hubbard", "sex": "mixte"})
+        ]
+        
+        extraction_results = []
+        for test_text, expected in extraction_tests:
+            extracted = extract_breed_and_sex_from_clarification(test_text, "fr")
+            success = extracted["breed"] == expected["breed"] and extracted["sex"] == expected["sex"]
+            
+            extraction_results.append({
+                "input": test_text,
+                "expected": expected,
+                "extracted": extracted,
+                "success": success
+            })
+            
+            if not success:
+                test_results["errors"].append(f"Extraction échouée pour: {test_text}")
+        
+        test_results["tests_performed"].append({
+            "test_name": "Extraction breed/sex",
+            "extraction_results": extraction_results,
+            "success": all(r["success"] for r in extraction_results)
+        })
+        
+        # Résultat final
+        test_results["test_successful"] = len(test_results["errors"]) == 0
+        
+        logger.info(f"✅ [Expert Enhanced] Test clarification: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        
+        return test_results
+        
+    except Exception as e:
+        logger.error(f"❌ [Expert Enhanced] Erreur test clarification: {e}")
+        return {
+            "test_successful": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+            "tests_performed": [],
+            "errors": [f"Erreur critique: {str(e)}"]
+        }
+
+@router.post("/ask-with-clarification", response_model=EnhancedExpertResponse)
+async def ask_with_forced_clarification(
+    request_data: EnhancedQuestionRequest,
+    request: Request
+):
+    """🎯 NOUVEAU: Endpoint avec clarification GARANTIE pour questions techniques"""
+    
+    start_time = time.time()
+    
+    try:
+        logger.info("🎯 DÉBUT ask_with_forced_clarification")
+        logger.info(f"📝 Question: {request_data.text}")
+        
+        # VÉRIFICATION DIRECTE si c'est une question poids+âge
+        question_lower = request_data.text.lower()
+        needs_clarification = False
+        
+        # Patterns simplifiés pour détecter poids+âge
+        weight_age_patterns = [
+            r'(?:poids|weight).*?(\d+)\s*(?:jour|day)',
+            r'(\d+)\s*(?:jour|day).*?(?:poids|weight)',
+            r'(?:quel|what).*?(?:poids|weight).*?(\d+)'
+        ]
+        
+        # Vérifier si question poids+âge
+        has_weight_age = any(re.search(pattern, question_lower) for pattern in weight_age_patterns)
+        logger.info(f"🔍 Détection poids+âge: {has_weight_age}")
+        
+        if has_weight_age:
+            # Vérifier si race/sexe manquent
+            breed_patterns = [r'(ross\s*308|cobb\s*500|hubbard)']
+            sex_patterns = [r'(mâle|male|femelle|female|mixte|mixed)']
+            
+            has_breed = any(re.search(p, question_lower) for p in breed_patterns)
+            has_sex = any(re.search(p, question_lower) for p in sex_patterns)
+            
+            logger.info(f"🏷️ Race détectée: {has_breed}")
+            logger.info(f"⚧ Sexe détecté: {has_sex}")
+            
+            if not has_breed and not has_sex:
+                needs_clarification = True
+                logger.info("🎯 CLARIFICATION NÉCESSAIRE!")
+        
+        if needs_clarification:
+            # DÉCLENCHER CLARIFICATION DIRECTE
+            age_match = re.search(r'(\d+)\s*(?:jour|day)', question_lower)
+            age = age_match.group(1) if age_match else "X"
+            
+            clarification_message = f"""Pour vous donner le poids de référence exact d'un poulet de {age} jours, j'ai besoin de :
+
+• **Race/souche** : Ross 308, Cobb 500, Hubbard, etc.
+• **Sexe** : Mâles, femelles, ou troupeau mixte
+
+Pouvez-vous préciser ces informations ?
+
+**Exemples de réponses :**
+• "Ross 308 mâles"
+• "Cobb 500 femelles"
+• "Hubbard troupeau mixte\""""
+            
+            logger.info("✅ CLARIFICATION DÉCLENCHÉE!")
+            
+            return EnhancedExpertResponse(
+                question=request_data.text,
+                response=clarification_message,
+                conversation_id=request_data.conversation_id or str(uuid.uuid4()),
+                rag_used=False,
+                rag_score=None,
+                timestamp=datetime.now().isoformat(),
+                language=request_data.language,
+                response_time_ms=int((time.time() - start_time) * 1000),
+                mode="forced_performance_clarification",
+                user=None,
+                logged=True,
+                validation_passed=True,
+                clarification_result={
+                    "clarification_requested": True,
+                    "clarification_type": "performance_breed_sex_forced",
+                    "missing_information": ["breed", "sex"],
+                    "age_detected": age,
+                    "confidence": 0.99
+                },
+                processing_steps=["forced_clarification_triggered"],
+                ai_enhancements_used=["forced_performance_clarification"]
+            )
+        
+        logger.info("📋 Pas de clarification nécessaire, traitement normal")
+        
+        # Si pas besoin de clarification, traitement normal avec améliorations forcées
+        request_data.enable_vagueness_detection = True
+        request_data.require_coherence_check = True
+        
+        return await ask_expert_enhanced_v2_public(request_data, request)
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur ask_with_forced_clarification: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 # =============================================================================
 # CONFIGURATION & LOGGING
