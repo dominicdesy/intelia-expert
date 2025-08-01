@@ -414,6 +414,32 @@ export default function LoginPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
+  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS
+  const rememberMeUtils = {
+    save: (email: string, remember = true) => {
+      if (remember && email) {
+        localStorage.setItem('intelia-remember-me', 'true')
+        localStorage.setItem('intelia-last-email', email.trim())
+        console.log('💾 [RememberMe] Email sauvegardé:', email)
+      } else {
+        localStorage.removeItem('intelia-remember-me')
+        localStorage.removeItem('intelia-last-email')
+        console.log('🗑️ [RememberMe] Préférences supprimées')
+      }
+    },
+    
+    load: () => {
+      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+      const lastEmail = localStorage.getItem('intelia-last-email') || ''
+      
+      return {
+        rememberMe,
+        lastEmail: rememberMe ? lastEmail : '',
+        hasRememberedEmail: rememberMe && lastEmail.length > 0
+      }
+    }
+  }
+
   // ✅ DEBUG LOGS RENFORCÉS POUR REMEMBER ME
   useEffect(() => {
     console.log('🔍 [Debug] LoginData complet:', {
@@ -446,7 +472,7 @@ export default function LoginPage() {
     }, 100)
   }, [isRedirecting])
 
-  // ✅ INITIALISATION UNE SEULE FOIS + REMEMBER ME AVEC DEBUG RENFORCÉ
+  // ✅ INITIALISATION CORRIGÉE AVEC REMEMBER ME
   useEffect(() => {
     if (hasInitialized.current) return
     
@@ -463,55 +489,22 @@ export default function LoginPage() {
       }
     }
 
-    // ✅ RESTAURER EMAIL si "remember me" était activé - AVEC DEBUG DÉTAILLÉ
-    console.log('🔍 [Init] Vérification localStorage remember me...')
+    // ✅ RESTAURER EMAIL avec fonction utilitaire
+    const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
     
-    const rememberMe = localStorage.getItem('intelia-remember-me')
-    const lastEmail = localStorage.getItem('intelia-last-email')
+    console.log('📦 [LocalStorage] Remember Me données:', { rememberMe, hasRememberedEmail, email: lastEmail ? lastEmail.substring(0, 10) + '...' : 'none' })
     
-    console.log('📦 [LocalStorage] intelia-remember-me:', rememberMe)
-    console.log('📦 [LocalStorage] intelia-last-email:', lastEmail)
-    console.log('📦 [LocalStorage] rememberMe === "true":', rememberMe === 'true')
-    console.log('📦 [LocalStorage] lastEmail truthy:', !!lastEmail)
-    
-    const shouldRemember = rememberMe === 'true'
-    const hasEmail = lastEmail && lastEmail.trim() !== ''
-    
-    console.log('🎯 [Decision] shouldRemember:', shouldRemember)
-    console.log('🎯 [Decision] hasEmail:', hasEmail)
-    console.log('🎯 [Decision] Condition finale:', shouldRemember && hasEmail)
-    
-    if (shouldRemember && hasEmail) {
-      console.log('💾 [Login] ✅ RESTAURATION EMAIL EN COURS...')
-      console.log('💾 [Login] Email à restaurer:', lastEmail)
+    if (hasRememberedEmail) {
+      console.log('💾 [Login] ✅ RESTAURATION EMAIL:', lastEmail)
       
-      const newLoginData = {
+      setLoginData({
         email: lastEmail,
-        rememberMe: true,
-        password: '' // ✅ Toujours vider le mot de passe
-      }
-      
-      console.log('💾 [Login] Nouvelles données à définir:', newLoginData)
-      
-      setLoginData(prev => {
-        console.log('💾 [Login] Données précédentes:', prev)
-        console.log('💾 [Login] Données après fusion:', newLoginData)
-        return newLoginData
+        password: '', // ✅ Toujours vider le mot de passe
+        rememberMe: true
       })
       
-      // ✅ Message informatif pour l'utilisateur
       setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
-      
-      // Masquer le message après 4 secondes
-      setTimeout(() => {
-        setLocalSuccess('')
-      }, 4000)
-      
-      console.log('💾 [Login] ✅ RESTAURATION TERMINÉE')
-    } else {
-      console.log('💾 [Login] ❌ PAS DE RESTAURATION')
-      if (!shouldRemember) console.log('   → Raison: rememberMe pas activé')
-      if (!hasEmail) console.log('   → Raison: pas d\'email sauvegardé')
+      setTimeout(() => setLocalSuccess(''), 4000)
     }
 
     hasInitialized.current = true
@@ -520,8 +513,7 @@ export default function LoginPage() {
 
   // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
   useEffect(() => {
-    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    const { rememberMe, lastEmail } = rememberMeUtils.load()
     
     if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
       console.log('🎯 [UX] Focus automatique sur mot de passe')
@@ -703,7 +695,7 @@ export default function LoginPage() {
     return null
   }
 
-  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" = EMAIL UNIQUEMENT
+  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÉE
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -733,20 +725,10 @@ export default function LoginPage() {
       
       await login(loginData.email.trim(), loginData.password)
       
-      // ✅ GESTION "Se souvenir de moi" = SEULEMENT EMAIL
-      if (loginData.rememberMe) {
-        console.log('💾 [Login] Sauvegarde EMAIL pour remember me')
-        localStorage.setItem('intelia-remember-me', 'true')
-        localStorage.setItem('intelia-last-email', loginData.email.trim())
-      } else {
-        console.log('🗑️ [Login] Suppression remember me')
-        localStorage.removeItem('intelia-remember-me')
-        localStorage.removeItem('intelia-last-email')
-      }
+      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire
+      rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
       console.log('✅ [Login] Connexion réussie - redirection en cours...')
-      
-      // Ne pas forcer la redirection ici, elle sera gérée automatiquement
       
     } catch (error: any) {
       console.error('❌ [Login] Erreur:', error)
@@ -818,20 +800,19 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ GESTION MODES AVEC REMEMBER EMAIL
+  // ✅ GESTION MODES AVEC REMEMBER EMAIL CORRIGÉE
   const handleCloseSignup = () => {
     setIsSignupMode(false)
     setLocalError('')
     setLocalSuccess('')
     
-    // ✅ Restaurer EMAIL si remember me était activé
-    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    // ✅ Restaurer EMAIL avec fonction utilitaire
+    const { rememberMe, lastEmail } = rememberMeUtils.load()
     
     console.log('🔄 [Signup] Fermeture signup - restore email:', lastEmail)
     
     setLoginData({ 
-      email: rememberMe ? lastEmail : '', 
+      email: lastEmail, 
       password: '', // ✅ Toujours vider mot de passe
       rememberMe 
     })
@@ -860,14 +841,13 @@ export default function LoginPage() {
       // Passage en mode signup - vider login
       setLoginData({ email: '', password: '', rememberMe: false })
     } else {
-      // Retour en mode login - restaurer EMAIL uniquement
-      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-      const lastEmail = localStorage.getItem('intelia-last-email') || ''
+      // Retour en mode login - restaurer EMAIL avec fonction utilitaire
+      const { rememberMe, lastEmail } = rememberMeUtils.load()
       
       console.log('🔄 [Toggle] Retour login - restore email:', lastEmail)
       
       setLoginData({ 
-        email: rememberMe ? lastEmail : '', 
+        email: lastEmail, 
         password: '', // ✅ Toujours vider mot de passe
         rememberMe 
       })
@@ -1045,11 +1025,6 @@ export default function LoginPage() {
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                     {t.rememberMe}
                   </label>
-                  
-                  {/* Debug visuel */}
-                  <div className="ml-4 text-xs text-gray-500">
-                    Debug: {loginData.rememberMe ? '✅ TRUE' : '❌ FALSE'}
-                  </div>
                 </div>
 
                 <div className="text-sm">

@@ -1,85 +1,9 @@
-# Fixed expert_utils.py - Add missing functions
+# Fixed expert_utils.py - Add missing import
 import os
 import logging
-import uuid
-from typing import Dict, Any, Optional
-from fastapi import Request
+from typing import Dict  # ← Add this import!
 
 logger = logging.getLogger(__name__)
-
-def get_user_id_from_request(request: Request) -> str:
-    """Extrait l'user_id depuis la requête"""
-    # Essayer d'extraire depuis les headers ou token
-    authorization = request.headers.get("authorization", "")
-    if authorization:
-        # Ici vous pouvez parser le JWT pour extraire l'user_id
-        # Pour l'instant, génération d'un ID temporaire
-        return f"user_{uuid.uuid4().hex[:8]}"
-    
-    # Fallback
-    return f"anonymous_{uuid.uuid4().hex[:8]}"
-
-def build_enriched_question_from_clarification(
-    original_question: str,
-    clarification_response: str, 
-    conversation_context: str = ""
-) -> str:
-    """Construit une question enrichie à partir d'une clarification"""
-    if conversation_context:
-        return f"{original_question}\n\nClarification: {clarification_response}\n\nContexte: {conversation_context}"
-    else:
-        return f"{original_question}\n\nClarification: {clarification_response}"
-
-def get_enhanced_topics_by_language() -> Dict[str, list]:
-    """Retourne les topics suggérés par langue"""
-    return {
-        "fr": [
-            "Problèmes de croissance poulets",
-            "Conditions environnementales optimales",
-            "Protocoles de vaccination",
-            "Diagnostic problèmes de santé",
-            "Nutrition et alimentation",
-            "Gestion de la mortalité",
-            "Température et humidité",
-            "Qualité de l'eau"
-        ],
-        "en": [
-            "Chicken growth problems",
-            "Optimal environmental conditions", 
-            "Vaccination protocols",
-            "Health problem diagnosis",
-            "Nutrition and feeding",
-            "Mortality management",
-            "Temperature and humidity",
-            "Water quality"
-        ],
-        "es": [
-            "Problemas de crecimiento de pollos",
-            "Condiciones ambientales óptimas",
-            "Protocolos de vacunación", 
-            "Diagnóstico de problemas de salud",
-            "Nutrición y alimentación",
-            "Gestión de mortalidad",
-            "Temperatura y humedad",
-            "Calidad del agua"
-        ]
-    }
-
-async def save_conversation_auto_enhanced(
-    conversation_id: str,
-    question: str,
-    response: str,
-    user_id: str,
-    language: str = "fr"
-) -> bool:
-    """Sauvegarde automatique de conversation"""
-    try:
-        # Ici vous pouvez intégrer avec votre système de logging
-        logger.info(f"💾 Sauvegarde conversation {conversation_id}: {question[:50]}...")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Erreur sauvegarde: {e}")
-        return False
 
 def get_fallback_response_enhanced(question: str, language: str = "fr") -> str:
     """Réponse de fallback améliorée"""
@@ -94,7 +18,7 @@ async def process_question_with_enhanced_prompt(
     question: str, 
     language: str = "fr", 
     speed_mode: str = "balanced",
-    extracted_entities: Optional[Dict] = None,
+    extracted_entities: Dict = None,  # ← Now Dict is properly imported
     conversation_context: str = ""
 ) -> str:
     """Traite une question avec prompt amélioré AVEC DONNÉES DE RÉFÉRENCE ROSS 308"""
