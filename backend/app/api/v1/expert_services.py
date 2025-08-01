@@ -2,8 +2,7 @@
 app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM
 
 Logique métier principale pour le système expert
-VERSION FINALE : RAG-First + Toutes les améliorations API intégrées
-CORRECTION : Paramètre conversation_id supprimé des appels RAG
+VERSION FINALE CORRIGÉE : RAG-First + Système de clarification intelligent
 """
 
 import os
@@ -24,7 +23,10 @@ from .expert_utils import (
     get_user_id_from_request, 
     build_enriched_question_from_clarification,
     get_enhanced_topics_by_language,
-    save_conversation_auto_enhanced
+    save_conversation_auto_enhanced,
+    extract_breed_and_sex_from_clarification,
+    build_enriched_question_with_breed_sex,
+    validate_clarification_completeness
 )
 from .expert_integrations import IntegrationsManager
 from .api_enhancement_service import APIEnhancementService
@@ -288,9 +290,9 @@ class ExpertService:
             ai_enhancements_used.append("vagueness_detection")
             performance_breakdown["vagueness_check"] = int(time.time() * 1000)
             
-            # Si question trop floue, retourner clarification immédiate
-            if vagueness_result.is_vague and vagueness_result.vagueness_score > 0.7:
-                logger.info(f"🎯 [Expert Service] Question trop floue (score: {vagueness_result.vagueness_score})")
+            # ✅ CORRECTION: Réduire le seuil de 0.7 à 0.6 pour déclencher plus facilement
+            if vagueness_result.is_vague and vagueness_result.vagueness_score > 0.6:  # ← était 0.7
+                logger.info(f"🎯 [Expert Service] Question floue détectée (score: {vagueness_result.vagueness_score})")
                 return self._create_vagueness_response(
                     vagueness_result, question_text, conversation_id, 
                     request_data.language, start_time, processing_steps, ai_enhancements_used
@@ -330,7 +332,7 @@ class ExpertService:
                 processing_steps, ai_enhancements_used, vagueness_result
             )
         
-        # === SYSTÈME DE CLARIFICATION ===
+        # === ✅ SYSTÈME DE CLARIFICATION INTELLIGENT ===
         clarification_result = await self._handle_clarification(
             request_data, question_text, user_id, conversation_id,
             processing_steps, ai_enhancements_used
@@ -375,6 +377,318 @@ class ExpertService:
             processing_steps, ai_enhancements_used, request_data,
             debug_info, performance_breakdown
         )
+    
+    # ===========================================================================================
+    # ✅ NOUVELLES FONCTIONS DE CLARIFICATION INTELLIGENTE
+    # ===========================================================================================
+    
+    async def _handle_clarification(
+        self, request_data, question_text, user_id, conversation_id, 
+        processing_steps, ai_enhancements_used
+    ):
+        """
+        ✅ SYSTÈME DE CLARIFICATION CORRIGÉ
+        Détecte les questions techniques nécessitant des précisions spécifiques
+        """
+        
+        # 1. Ignorer si c'est déjà une réponse de clarification
+        if request_data.is_clarification_response:
+            # ✅ NOUVEAU : Traitement des réponses de clarification
+            return await self._process_clarification_response(
+                request_data, question_text, conversation_id,
+                processing_steps, ai_enhancements_used
+            )
+        
+        # 2. ✅ NOUVELLE LOGIQUE : Détection questions poids/performance
+        clarification_needed = self._detect_performance_question_needing_clarification(
+            question_text, request_data.language
+        )
+        
+        if not clarification_needed:
+            return None
+        
+        logger.info(f"🎯 [Expert Service] Clarification nécessaire: {clarification_needed['type']}")
+        processing_steps.append("automatic_clarification_triggered")
+        ai_enhancements_used.append("smart_performance_clarification")
+        
+        # 3. Générer la demande de clarification
+        clarification_response = self._generate_performance_clarification_response(
+            question_text, clarification_needed, request_data.language, conversation_id
+        )
+        
+        return clarification_response
+    
+    async def _process_clarification_response(
+        self, request_data, question_text, conversation_id, 
+        processing_steps, ai_enhancements_used
+    ):
+        """
+        ✅ NOUVELLE FONCTION : Traite les réponses de clarification
+        """
+        
+        if not request_data.original_question or not request_data.clarification_context:
+            logger.warning("⚠️ [Expert Service] Réponse clarification sans contexte")
+            return None
+        
+        # Extraire les infos manquantes du contexte de clarification
+        missing_info = request_data.clarification_context.get("missing_information", [])
+        
+        # Valider que la clarification contient les infos demandées
+        validation = validate_clarification_completeness(
+            question_text, missing_info, request_data.language
+        )
+        
+        if not validation["is_complete"]:
+            logger.info(f"🔄 [Expert Service] Clarification incomplète: {validation['still_missing']}")
+            # Redemander les infos manquantes
+            return self._generate_follow_up_clarification(
+                question_text, validation, request_data.language, conversation_id
+            )
+        
+        # Enrichir la question originale avec les infos extraites
+        breed = validation["extracted_info"].get("breed")
+        sex = validation["extracted_info"].get("sex")
+        
+        enriched_original_question = build_enriched_question_with_breed_sex(
+            request_data.original_question, breed, sex, request_data.language
+        )
+        
+        logger.info(f"✅ [Expert Service] Question enrichie par clarification: {enriched_original_question}")
+        
+        # Remplacer la question actuelle par la version enrichie
+        request_data.text = enriched_original_question
+        request_data.is_clarification_response = False  # Traiter comme nouvelle question
+        
+        processing_steps.append("clarification_processed_successfully")
+        ai_enhancements_used.append("breed_sex_extraction")
+        ai_enhancements_used.append("question_enrichment_from_clarification")
+        
+        return None  # Continuer le traitement normal avec question enrichie
+    
+    def _detect_performance_question_needing_clarification(
+        self, question: str, language: str = "fr"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        ✅ NOUVELLE FONCTION : Détecte les questions techniques nécessitant race/sexe
+        """
+        
+        question_lower = question.lower()
+        
+        # Patterns de questions sur poids/performance avec âge mais sans race/sexe
+        weight_age_patterns = {
+            "fr": [
+                r'(?:poids|pèse)\s+.*?(\d+)\s*(?:jour|semaine)s?',
+                r'(\d+)\s*(?:jour|semaine)s?.*?(?:poids|pèse)',
+                r'(?:quel|combien)\s+.*?(?:poids|pèse).*?(\d+)',
+                r'(?:croissance|développement).*?(\d+)\s*(?:jour|semaine)',
+                r'(\d+)\s*(?:jour|semaine).*?(?:normal|référence|standard)'
+            ],
+            "en": [
+                r'(?:weight|weigh)\s+.*?(\d+)\s*(?:day|week)s?',
+                r'(\d+)\s*(?:day|week)s?.*?(?:weight|weigh)',
+                r'(?:what|how much)\s+.*?(?:weight|weigh).*?(\d+)',
+                r'(?:growth|development).*?(\d+)\s*(?:day|week)',
+                r'(\d+)\s*(?:day|week).*?(?:normal|reference|standard)'
+            ],
+            "es": [
+                r'(?:peso|pesa)\s+.*?(\d+)\s*(?:día|semana)s?',
+                r'(\d+)\s*(?:día|semana)s?.*?(?:peso|pesa)',
+                r'(?:cuál|cuánto)\s+.*?(?:peso|pesa).*?(\d+)',
+                r'(?:crecimiento|desarrollo).*?(\d+)\s*(?:día|semana)',
+                r'(\d+)\s*(?:día|semana).*?(?:normal|referencia|estándar)'
+            ]
+        }
+        
+        patterns = weight_age_patterns.get(language, weight_age_patterns["fr"])
+        
+        # Vérifier si c'est une question poids+âge
+        age_detected = None
+        for pattern in patterns:
+            match = re.search(pattern, question_lower)
+            if match:
+                age_detected = match.group(1)
+                break
+        
+        if not age_detected:
+            return None
+        
+        # Vérifier si race/sexe sont ABSENTS
+        breed_patterns = [
+            r'\b(ross\s*308|ross\s*708|cobb\s*500|cobb\s*700|hubbard|arbor\s*acres)\b',
+            r'\b(broiler|poulet|chicken|pollo)\s+(ross|cobb|hubbard)',
+            r'\brace\s*[:\-]?\s*(ross|cobb|hubbard)'
+        ]
+        
+        sex_patterns = [
+            r'\b(mâle|male|macho)s?\b',
+            r'\b(femelle|female|hembra)s?\b',
+            r'\b(coq|hen|poule|gallina)\b',
+            r'\b(mixte|mixed|misto)\b'
+        ]
+        
+        has_breed = any(re.search(pattern, question_lower, re.IGNORECASE) for pattern in breed_patterns)
+        has_sex = any(re.search(pattern, question_lower, re.IGNORECASE) for pattern in sex_patterns)
+        
+        # ✅ CLARIFICATION NÉCESSAIRE si poids+âge MAIS pas de race NI sexe
+        if not has_breed and not has_sex:
+            return {
+                "type": "performance_question_missing_breed_sex",
+                "age_detected": age_detected,
+                "question_type": "weight_performance",
+                "missing_info": ["breed", "sex"],
+                "confidence": 0.9
+            }
+        
+        # Clarification partielle si seulement un des deux manque
+        elif not has_breed or not has_sex:
+            missing = []
+            if not has_breed:
+                missing.append("breed")
+            if not has_sex:
+                missing.append("sex")
+            
+            return {
+                "type": "performance_question_partial_info",
+                "age_detected": age_detected,
+                "question_type": "weight_performance", 
+                "missing_info": missing,
+                "confidence": 0.7
+            }
+        
+        return None
+
+    def _generate_performance_clarification_response(
+        self, question: str, clarification_info: Dict, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """
+        ✅ NOUVELLE FONCTION : Génère la demande de clarification optimisée
+        """
+        
+        age = clarification_info.get("age_detected", "X")
+        missing_info = clarification_info.get("missing_info", [])
+        
+        # Messages de clarification par langue
+        clarification_messages = {
+            "fr": {
+                "both_missing": f"Pour vous donner le poids de référence exact d'un poulet de {age} jours, j'ai besoin de :\n\n• **Race/souche** : Ross 308, Cobb 500, Hubbard, etc.\n• **Sexe** : Mâles, femelles, ou troupeau mixte\n\nPouvez-vous préciser ces informations ?",
+                "breed_missing": f"Pour le poids exact à {age} jours, quelle est la **race/souche** (Ross 308, Cobb 500, Hubbard, etc.) ?",
+                "sex_missing": f"Pour le poids exact à {age} jours, s'agit-il de **mâles, femelles, ou d'un troupeau mixte** ?"
+            },
+            "en": {
+                "both_missing": f"To give you the exact reference weight for a {age}-day chicken, I need:\n\n• **Breed/strain**: Ross 308, Cobb 500, Hubbard, etc.\n• **Sex**: Males, females, or mixed flock\n\nCould you specify this information?",
+                "breed_missing": f"For the exact weight at {age} days, what is the **breed/strain** (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "sex_missing": f"For the exact weight at {age} days, are these **males, females, or a mixed flock**?"
+            },
+            "es": {
+                "both_missing": f"Para darle el peso de referencia exacto de un pollo de {age} días, necesito:\n\n• **Raza/cepa**: Ross 308, Cobb 500, Hubbard, etc.\n• **Sexo**: Machos, hembras, o lote mixto\n\n¿Podría especificar esta información?",
+                "breed_missing": f"Para el peso exacto a los {age} días, ¿cuál es la **raza/cepa** (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "sex_missing": f"Para el peso exacto a los {age} días, ¿son **machos, hembras, o un lote mixto**?"
+            }
+        }
+        
+        messages = clarification_messages.get(language, clarification_messages["fr"])
+        
+        # Sélectionner le message approprié
+        if len(missing_info) >= 2:
+            response_text = messages["both_missing"]
+        elif "breed" in missing_info:
+            response_text = messages["breed_missing"]
+        else:
+            response_text = messages["sex_missing"]
+        
+        # Ajouter exemples de réponse
+        examples = {
+            "fr": "\n\n**Exemples de réponses :**\n• \"Ross 308 mâles\"\n• \"Cobb 500 femelles\"\n• \"Hubbard troupeau mixte\"",
+            "en": "\n\n**Example responses:**\n• \"Ross 308 males\"\n• \"Cobb 500 females\"\n• \"Hubbard mixed flock\"",
+            "es": "\n\n**Ejemplos de respuestas:**\n• \"Ross 308 machos\"\n• \"Cobb 500 hembras\"\n• \"Hubbard lote mixto\""
+        }
+        
+        response_text += examples.get(language, examples["fr"])
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=response_text,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=50,  # Clarification rapide
+            mode="smart_performance_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "performance_breed_sex",
+                "missing_information": missing_info,
+                "age_detected": age,
+                "confidence": clarification_info.get("confidence", 0.9)
+            },
+            processing_steps=["smart_clarification_triggered"],
+            ai_enhancements_used=["performance_question_detection", "targeted_clarification"]
+        )
+    
+    def _generate_follow_up_clarification(
+        self, question: str, validation: Dict, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """
+        ✅ NOUVELLE FONCTION : Génère une clarification de suivi si première réponse incomplète
+        """
+        
+        still_missing = validation["still_missing"]
+        
+        messages = {
+            "fr": {
+                "breed": "Il me manque encore la **race/souche**. Ross 308, Cobb 500, ou autre ?",
+                "sex": "Il me manque encore le **sexe**. Mâles, femelles, ou troupeau mixte ?",  
+                "both": "Il me manque encore la **race et le sexe**. Exemple : \"Ross 308 mâles\""
+            },
+            "en": {
+                "breed": "I still need the **breed/strain**. Ross 308, Cobb 500, or other?",
+                "sex": "I still need the **sex**. Males, females, or mixed flock?",
+                "both": "I still need the **breed and sex**. Example: \"Ross 308 males\""
+            },
+            "es": {
+                "breed": "Aún necesito la **raza/cepa**. ¿Ross 308, Cobb 500, u otra?",
+                "sex": "Aún necesito el **sexo**. ¿Machos, hembras, o lote mixto?",
+                "both": "Aún necesito la **raza y sexo**. Ejemplo: \"Ross 308 machos\""
+            }
+        }
+        
+        lang_messages = messages.get(language, messages["fr"])
+        
+        if len(still_missing) >= 2:
+            message = lang_messages["both"]
+        elif "breed" in still_missing:
+            message = lang_messages["breed"]
+        else:
+            message = lang_messages["sex"]
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=message,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=30,
+            mode="follow_up_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "follow_up_incomplete",
+                "still_missing_information": still_missing,
+                "confidence": validation["confidence"]
+            },
+            processing_steps=["follow_up_clarification_triggered"],
+            ai_enhancements_used=["incomplete_clarification_handling"]
+        )
+    
+    # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS ===
     
     async def _process_expert_response_enhanced(
         self, question_text: str, request_data: EnhancedQuestionRequest,
@@ -591,6 +905,8 @@ class ExpertService:
             
             raise HTTPException(status_code=503, detail=error_details)
     
+    # === FONCTIONS DE SUPPORT ===
+    
     def _create_vagueness_response(
         self, vagueness_result, question_text: str, conversation_id: str,
         language: str, start_time: float, processing_steps: list, ai_enhancements_used: list
@@ -788,10 +1104,6 @@ class ExpertService:
             logger.error(f"❌ [Expert Service] Erreur validateur: {e}")
             return ValidationResult(is_valid=False, rejection_message="Erreur de validation")
     
-    async def _handle_clarification(self, request_data, question_text, user_id, conversation_id, processing_steps, ai_enhancements_used):
-        # Implémentation identique à la version précédente
-        return None  # Simplifié pour cet exemple
-    
     def _create_rejection_response(self, question_text, validation_result, conversation_id, user_email, language, start_time, processing_steps, ai_enhancements_used, vagueness_result=None):
         response_time_ms = int((time.time() - start_time) * 1000)
         
@@ -851,7 +1163,8 @@ class ExpertService:
                 "vagueness_detection_available": True,
                 "context_coherence_available": True,
                 "detailed_rag_scoring_available": True,
-                "quality_metrics_available": True
+                "quality_metrics_available": True,
+                "smart_clarification_available": True
             },
             "system_status": {
                 "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
@@ -865,7 +1178,7 @@ class ExpertService:
 # CONFIGURATION FINALE
 # =============================================================================
 
-logger.info("✅ [Expert Service] Services métier finalisés avec TOUTES les améliorations")
+logger.info("✅ [Expert Service] Services métier finalisés avec TOUTES les améliorations + CLARIFICATION INTELLIGENTE")
 logger.info("🚀 [Expert Service] Fonctionnalités disponibles:")
 logger.info("   - 🎯 Détection de questions floues avec clarification immédiate")
 logger.info("   - 🔍 Vérification de cohérence contextuelle avancée")
@@ -874,3 +1187,6 @@ logger.info("   - 🔧 Fallback enrichi avec diagnostics d'erreur")
 logger.info("   - 📈 Métriques de qualité prédictives")
 logger.info("   - 🐛 Mode debug complet pour développeurs")
 logger.info("   - ⚡ Breakdown de performance détaillé")
+logger.info("   - 🧠 Système de clarification intelligent race/sexe")
+logger.info("   - 🎪 Traitement des réponses de clarification")
+logger.info("   - 🔄 Suivi automatique des clarifications incomplètes")
