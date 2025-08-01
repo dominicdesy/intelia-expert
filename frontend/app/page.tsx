@@ -446,11 +446,11 @@ export default function LoginPage() {
     }, 100)
   }, [isRedirecting])
 
-  // ✅ INITIALISATION UNE SEULE FOIS + REMEMBER ME
+  // ✅ INITIALISATION UNE SEULE FOIS + REMEMBER ME AVEC DEBUG RENFORCÉ
   useEffect(() => {
     if (hasInitialized.current) return
     
-    console.log('🔧 [Init] Initialisation unique + restore remember me')
+    console.log('🔧 [Init] === DÉBUT INITIALISATION ===')
     
     // Charger les préférences utilisateur
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -463,18 +463,41 @@ export default function LoginPage() {
       }
     }
 
-    // ✅ RESTAURER EMAIL si "remember me" était activé
-    const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-    const lastEmail = localStorage.getItem('intelia-last-email') || ''
+    // ✅ RESTAURER EMAIL si "remember me" était activé - AVEC DEBUG DÉTAILLÉ
+    console.log('🔍 [Init] Vérification localStorage remember me...')
     
-    if (rememberMe && lastEmail) {
-      console.log('💾 [Login] Restauration email depuis remember me:', lastEmail)
-      setLoginData(prev => ({
-        ...prev,
+    const rememberMe = localStorage.getItem('intelia-remember-me')
+    const lastEmail = localStorage.getItem('intelia-last-email')
+    
+    console.log('📦 [LocalStorage] intelia-remember-me:', rememberMe)
+    console.log('📦 [LocalStorage] intelia-last-email:', lastEmail)
+    console.log('📦 [LocalStorage] rememberMe === "true":', rememberMe === 'true')
+    console.log('📦 [LocalStorage] lastEmail truthy:', !!lastEmail)
+    
+    const shouldRemember = rememberMe === 'true'
+    const hasEmail = lastEmail && lastEmail.trim() !== ''
+    
+    console.log('🎯 [Decision] shouldRemember:', shouldRemember)
+    console.log('🎯 [Decision] hasEmail:', hasEmail)
+    console.log('🎯 [Decision] Condition finale:', shouldRemember && hasEmail)
+    
+    if (shouldRemember && hasEmail) {
+      console.log('💾 [Login] ✅ RESTAURATION EMAIL EN COURS...')
+      console.log('💾 [Login] Email à restaurer:', lastEmail)
+      
+      const newLoginData = {
         email: lastEmail,
         rememberMe: true,
         password: '' // ✅ Toujours vider le mot de passe
-      }))
+      }
+      
+      console.log('💾 [Login] Nouvelles données à définir:', newLoginData)
+      
+      setLoginData(prev => {
+        console.log('💾 [Login] Données précédentes:', prev)
+        console.log('💾 [Login] Données après fusion:', newLoginData)
+        return newLoginData
+      })
       
       // ✅ Message informatif pour l'utilisateur
       setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
@@ -483,9 +506,16 @@ export default function LoginPage() {
       setTimeout(() => {
         setLocalSuccess('')
       }, 4000)
+      
+      console.log('💾 [Login] ✅ RESTAURATION TERMINÉE')
+    } else {
+      console.log('💾 [Login] ❌ PAS DE RESTAURATION')
+      if (!shouldRemember) console.log('   → Raison: rememberMe pas activé')
+      if (!hasEmail) console.log('   → Raison: pas d\'email sauvegardé')
     }
 
     hasInitialized.current = true
+    console.log('🔧 [Init] === FIN INITIALISATION ===')
   }, [])
 
   // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
