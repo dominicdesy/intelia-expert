@@ -16,7 +16,7 @@ try:
     from .expert_models import VaguenessDetection, QuestionClarity, ContextCoherence, EnhancedFallbackDetails, QualityMetrics, DocumentRelevance, ConfidenceLevel
 except ImportError:
     # Fallback si les imports échouent
-    logger.warning(⚠️ Import expert_models échoué - utilisation des classes de fallback")
+    logger.warning("⚠️ Import expert_models échoué - utilisation des classes de fallback")
     
     class QuestionClarity:
         CLEAR = "clear"
