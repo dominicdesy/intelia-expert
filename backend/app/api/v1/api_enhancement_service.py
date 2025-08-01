@@ -812,6 +812,211 @@ class EnhancedRAGContextEnhancer:
         return False
 
 # =============================================================================
+# ✅ NOUVELLE CLASSE APIEnhancementService AJOUTÉE
+# =============================================================================
+
+class APIEnhancementService:
+    """Service d'amélioration API - Wrapper pour les nouvelles fonctionnalités"""
+    
+    def __init__(self):
+        self.rag_enhancer = EnhancedRAGContextEnhancer()
+        logger.info("✅ [API Enhancement Service] Service d'amélioration API initialisé")
+    
+    def detect_vagueness(self, question: str, language: str = "fr"):
+        """Détecte les questions floues"""
+        from .expert_models import VaguenessDetection, QuestionClarity
+        
+        # Implémentation basique de détection de flou
+        question_lower = question.lower().strip()
+        
+        # Patterns de questions floues
+        vague_patterns = [
+            r'^(comment|how|cómo)',
+            r'^(pourquoi|why|por qué)',
+            r'^(que faire|what to do|qué hacer)',
+            r'\b(problème|problem|problema)\b',
+            r'\b(aide|help|ayuda)\b'
+        ]
+        
+        missing_specifics = []
+        vagueness_score = 0.0
+        
+        # Vérifier les patterns flous
+        for pattern in vague_patterns:
+            if re.search(pattern, question_lower):
+                vagueness_score += 0.2
+        
+        # Vérifier la longueur
+        if len(question_lower.split()) < 5:
+            vagueness_score += 0.3
+            missing_specifics.append("Question trop courte")
+        
+        # Vérifier les détails manquants
+        if not re.search(r'\d+', question_lower):
+            vagueness_score += 0.2
+            missing_specifics.append("Pas de données numériques")
+        
+        # Vérifier les mentions de race/âge
+        breed_mentioned = bool(re.search(r'(ross|cobb|poulet|chicken|pollo)', question_lower))
+        age_mentioned = bool(re.search(r'(jour|day|semaine|week|âge|age)', question_lower))
+        
+        if not breed_mentioned and not age_mentioned:
+            vagueness_score += 0.3
+            missing_specifics.append("Race ou âge non mentionnés")
+        
+        vagueness_score = min(vagueness_score, 1.0)
+        
+        # Déterminer la clarté
+        if vagueness_score > 0.7:
+            clarity = QuestionClarity.VERY_UNCLEAR
+        elif vagueness_score > 0.5:
+            clarity = QuestionClarity.UNCLEAR
+        elif vagueness_score > 0.3:
+            clarity = QuestionClarity.PARTIALLY_CLEAR
+        else:
+            clarity = QuestionClarity.CLEAR
+        
+        # Suggestion de clarification
+        suggested_clarification = None
+        if vagueness_score > 0.5:
+            if language == "fr":
+                suggested_clarification = "Pouvez-vous préciser la race, l'âge et les conditions spécifiques ?"
+            elif language == "en":
+                suggested_clarification = "Could you specify the breed, age and specific conditions?"
+            else:
+                suggested_clarification = "¿Podría especificar la raza, edad y condiciones específicas?"
+        
+        return VaguenessDetection(
+            is_vague=vagueness_score > 0.5,
+            vagueness_score=vagueness_score,
+            missing_specifics=missing_specifics,
+            question_clarity=clarity,
+            suggested_clarification=suggested_clarification,
+            actionable=vagueness_score < 0.8,
+            detected_patterns=[p for p in vague_patterns if re.search(p, question_lower)]
+        )
+    
+    def check_context_coherence(self, rag_response: str, extracted_entities: Dict, rag_context: Dict, original_question: str):
+        """Vérifie la cohérence entre contexte et RAG"""
+        from .expert_models import ContextCoherence
+        
+        # Implémentation basique de vérification de cohérence
+        entities_match = True
+        missing_critical_info = []
+        warnings = []
+        coherence_score = 1.0
+        
+        # Vérifier si les entités du contexte correspondent au RAG
+        if extracted_entities:
+            breed = extracted_entities.get('breed')
+            age_days = extracted_entities.get('age_days')
+            
+            if breed and breed not in rag_response.lower():
+                entities_match = False
+                coherence_score -= 0.3
+                warnings.append(f"Race mentionnée ({breed}) absente de la réponse")
+            
+            if age_days and str(age_days) not in rag_response:
+                coherence_score -= 0.2
+                warnings.append(f"Âge mentionné ({age_days} jours) non pris en compte")
+        
+        coherence_score = max(coherence_score, 0.0)
+        
+        return ContextCoherence(
+            entities_match=entities_match,
+            missing_critical_info=missing_critical_info,
+            rag_assumptions={},
+            coherence_score=coherence_score,
+            warnings=warnings,
+            recommended_clarification=None,
+            entities_used_in_rag=extracted_entities
+        )
+    
+    def create_enhanced_fallback(self, failure_point: str, last_entities: Dict, confidence: float, error: Exception, context: Dict):
+        """Crée un fallback enrichi avec diagnostics"""
+        from .expert_models import EnhancedFallbackDetails
+        
+        return EnhancedFallbackDetails(
+            failure_point=failure_point,
+            last_known_entities=last_entities,
+            confidence_at_failure=confidence,
+            rag_attempts=[],
+            error_category="system_error",
+            recovery_suggestions=["Réessayer la requête", "Vérifier la connectivité"],
+            alternative_approaches=["Utiliser une question plus spécifique"],
+            technical_details=str(error)
+        )
+    
+    def calculate_quality_metrics(self, question: str, response: str, rag_score: float, coherence_result, vagueness_result):
+        """Calcule les métriques de qualité"""
+        from .expert_models import QualityMetrics
+        
+        # Calculs basiques de qualité
+        response_completeness = min(len(response) / 200, 1.0)  # 200 chars = complet
+        information_accuracy = rag_score if rag_score else 0.5
+        contextual_relevance = coherence_result.coherence_score if coherence_result else 0.5
+        
+        # Prédiction de satisfaction basée sur les métriques
+        user_satisfaction_prediction = (
+            response_completeness * 0.3 +
+            information_accuracy * 0.4 +
+            contextual_relevance * 0.3
+        )
+        
+        # Pertinence de la longueur
+        length_score = 1.0
+        if len(response) < 50:
+            length_score = 0.3  # Trop court
+        elif len(response) > 1000:
+            length_score = 0.7  # Peut-être trop long
+        
+        return QualityMetrics(
+            response_completeness=response_completeness,
+            information_accuracy=information_accuracy,
+            contextual_relevance=contextual_relevance,
+            user_satisfaction_prediction=user_satisfaction_prediction,
+            response_length_appropriateness=length_score,
+            technical_accuracy=rag_score
+        )
+    
+    def create_detailed_document_relevance(self, rag_result: Dict, question: str, context: str):
+        """Crée un scoring RAG détaillé"""
+        from .expert_models import DocumentRelevance, ConfidenceLevel
+        
+        # Extraction des informations du résultat RAG
+        score = rag_result.get('score', 0.0)
+        sources = rag_result.get('sources', [])
+        
+        # Déterminer le niveau de confiance
+        if score > 0.8:
+            confidence = ConfidenceLevel.VERY_HIGH
+        elif score > 0.6:
+            confidence = ConfidenceLevel.HIGH
+        elif score > 0.4:
+            confidence = ConfidenceLevel.MEDIUM
+        elif score > 0.2:
+            confidence = ConfidenceLevel.LOW
+        else:
+            confidence = ConfidenceLevel.VERY_LOW
+        
+        # Document source principal
+        source_document = None
+        matched_section = None
+        if sources:
+            source_document = sources[0].get('preview', 'Document principal')
+            matched_section = sources[0].get('index', 'Section inconnue')
+        
+        return DocumentRelevance(
+            score=score,
+            source_document=source_document,
+            matched_section=matched_section,
+            confidence_level=confidence,
+            chunk_used=source_document[:100] + "..." if source_document else None,
+            alternative_documents=[s.get('preview', '')[:50] for s in sources[1:3]] if len(sources) > 1 else [],
+            search_query_used=question[:100]
+        )
+
+# =============================================================================
 # INTÉGRATION DANS EXPERT SERVICES
 # =============================================================================
 
@@ -823,12 +1028,12 @@ def update_expert_services_with_enhanced_context():
     # self.rag_enhancer = RAGContextEnhancer()
     
     # Par:
-    from .enhanced_rag_context_enhancer import EnhancedRAGContextEnhancer
+    from .api_enhancement_service import EnhancedRAGContextEnhancer, APIEnhancementService
     
     def __init__(self):
         self.integrations = IntegrationsManager()
         self.rag_enhancer = EnhancedRAGContextEnhancer()  # ← Version améliorée
-        self.enhancement_service = APIEnhancementService()
+        self.enhancement_service = APIEnhancementService()  # ← Nouveau service
     
     # Le reste du code reste identique - compatibilité totale
     '''
@@ -848,3 +1053,4 @@ logger.info("   - 📊 Scores de confiance par entité")
 logger.info("   - 🎯 Enrichissement contextuel avancé")
 logger.info("   - 🔍 Détection pronoms étendus")
 logger.info(f"   - 🤖 SpaCy disponible: {'✅' if SPACY_AVAILABLE else '❌ (regex only)'}")
+logger.info("✅ [API Enhancement Service] Service d'amélioration API ajouté et fonctionnel")
