@@ -420,11 +420,9 @@ export default function LoginPage() {
       if (remember && email) {
         localStorage.setItem('intelia-remember-me', 'true')
         localStorage.setItem('intelia-last-email', email.trim())
-        console.log('💾 [RememberMe] Email sauvegardé:', email)
       } else {
         localStorage.removeItem('intelia-remember-me')
         localStorage.removeItem('intelia-last-email')
-        console.log('🗑️ [RememberMe] Préférences supprimées')
       }
     },
     
@@ -440,29 +438,14 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ DEBUG LOGS RENFORCÉS POUR REMEMBER ME
-  useEffect(() => {
-    console.log('🔍 [Debug] LoginData complet:', {
-      loginData,
-      localStorage_rememberMe: localStorage.getItem('intelia-remember-me'),
-      localStorage_lastEmail: localStorage.getItem('intelia-last-email'),
-      timestamp: new Date().toISOString()
-    })
-  }, [loginData])
 
-  // 🔍 DEBUG : Surveiller spécifiquement rememberMe
-  useEffect(() => {
-    console.log('🎯 [RememberMe] Changement d\'état détecté:', loginData.rememberMe)
-  }, [loginData.rememberMe])
 
   // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE + REMEMBER ME
   const handleRedirectToChat = useCallback(() => {
     if (redirectInProgress.current || isRedirecting) {
-      console.log('⚠️ [Redirect] Redirection déjà en cours, ignorée')
       return
     }
 
-    console.log('🚀 [Redirect] Redirection sécurisée vers /chat')
     redirectInProgress.current = true
     setIsRedirecting(true)
     
@@ -475,8 +458,6 @@ export default function LoginPage() {
   // ✅ INITIALISATION CORRIGÉE AVEC REMEMBER ME
   useEffect(() => {
     if (hasInitialized.current) return
-    
-    console.log('🔧 [Init] === DÉBUT INITIALISATION ===')
     
     // Charger les préférences utilisateur
     const savedLanguage = localStorage.getItem('intelia-language') as Language
@@ -492,11 +473,7 @@ export default function LoginPage() {
     // ✅ RESTAURER EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
     
-    console.log('📦 [LocalStorage] Remember Me données:', { rememberMe, hasRememberedEmail, email: lastEmail ? lastEmail.substring(0, 10) + '...' : 'none' })
-    
     if (hasRememberedEmail) {
-      console.log('💾 [Login] ✅ RESTAURATION EMAIL:', lastEmail)
-      
       setLoginData({
         email: lastEmail,
         password: '', // ✅ Toujours vider le mot de passe
@@ -508,7 +485,6 @@ export default function LoginPage() {
     }
 
     hasInitialized.current = true
-    console.log('🔧 [Init] === FIN INITIALISATION ===')
   }, [])
 
   // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
@@ -516,7 +492,6 @@ export default function LoginPage() {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
     if (rememberMe && lastEmail && loginData.email && !loginData.password && passwordInputRef.current) {
-      console.log('🎯 [UX] Focus automatique sur mot de passe')
       setTimeout(() => {
         passwordInputRef.current?.focus()
       }, 500)
@@ -529,27 +504,21 @@ export default function LoginPage() {
       return
     }
 
-    console.log('🔍 [Auth] Vérification authentification unique')
     hasCheckedAuth.current = true
 
     // Si déjà connecté, rediriger immédiatement
     if (isAuthenticated) {
-      console.log('✅ [Auth] Utilisateur déjà connecté')
       handleRedirectToChat()
       return
     }
 
     // Sinon, initialiser la session une seule fois
     if (!sessionInitialized.current) {
-      console.log('🔄 [Session] Initialisation session')
       sessionInitialized.current = true
       
       initializeSession().then((sessionFound) => {
         if (sessionFound) {
-          console.log('✅ [Session] Session existante trouvée')
           // La redirection sera gérée par le changement d'état isAuthenticated
-        } else {
-          console.log('ℹ️ [Session] Aucune session existante')
         }
       }).catch(error => {
         console.error('❌ [Session] Erreur initialisation:', error)
@@ -564,7 +533,6 @@ export default function LoginPage() {
     }
 
     if (isAuthenticated && !isLoading && !redirectInProgress.current) {
-      console.log('🎯 [AuthChange] Changement détecté: utilisateur connecté')
       handleRedirectToChat()
     }
   }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
@@ -575,8 +543,6 @@ export default function LoginPage() {
 
     const authStatus = searchParams.get('auth')
     if (!authStatus) return
-    
-    console.log('🔗 [Callback] Traitement callback auth:', authStatus)
     
     if (authStatus === 'success') {
       setLocalSuccess(t.authSuccess)
@@ -640,18 +606,8 @@ export default function LoginPage() {
   }
 
   const handleLoginChange = (field: string, value: string | boolean) => {
-    console.log('🔄 [LoginChange] ENTRÉE - Field:', field, 'Value:', value, 'Type:', typeof value)
-    
-    // Test direct de la checkbox
-    if (field === 'rememberMe') {
-      console.log('📝 [RememberMe] Changement détecté!')
-      console.log('📝 [RememberMe] Ancienne valeur:', loginData.rememberMe)
-      console.log('📝 [RememberMe] Nouvelle valeur:', value)
-    }
-    
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
-      console.log('🔄 [LoginChange] APRÈS setState:', newData)
       return newData
     })
     
@@ -721,17 +677,12 @@ export default function LoginPage() {
     }
 
     try {
-      console.log('🔐 [Login] Connexion:', loginData.email, 'Remember email:', loginData.rememberMe)
-      
       await login(loginData.email.trim(), loginData.password)
       
       // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
-      console.log('✅ [Login] Connexion réussie - redirection en cours...')
-      
     } catch (error: any) {
-      console.error('❌ [Login] Erreur:', error)
       setIsRedirecting(false)
       redirectInProgress.current = false
       
