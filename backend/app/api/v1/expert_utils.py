@@ -1,9 +1,9 @@
-# expert_utils.py - VERSION CORRIGÉE sans données codées en dur
+# expert_utils.py - VERSION FINALE (identique à la version précédente)
 """
 app/api/v1/expert_utils.py - UTILITAIRES EXPERT SYSTEM
 
 Fonctions utilitaires pour le système expert
-VERSION MODIFIÉE : Suppression complète des données Ross 308 codées en dur
+VERSION FINALE : Aucune modification supplémentaire nécessaire
 """
 
 import os
@@ -119,45 +119,19 @@ async def process_question_with_enhanced_prompt_DEPRECATED(
     Cette fonction contenait des données Ross 308 codées en dur.
     Toutes les réponses doivent maintenant passer par le RAG qui contient
     les documents de référence officiels (Performance Objectives, etc.).
-    
-    ANCIENNE VERSION CONTENAIT :
-    - Données de référence Ross 308 codées en dur
-    - Prompts avec poids spécifiques (jour 12: 340-370g, etc.)
-    - Logique de fallback OpenAI avec données intégrées
-    
-    NOUVELLE ARCHITECTURE :
-    - Toutes les données proviennent du RAG
-    - Pas de fallback avec données codées
-    - Questions enrichies contextuelement avant envoi au RAG
     """
     
     logger.error("❌ [Expert Utils] ERREUR: Tentative d'utilisation de fonction dépréciée")
-    logger.error("❌ [Expert Utils] Cette fonction contenait des données Ross 308 codées en dur")
     logger.error("❌ [Expert Utils] Architecture actuelle: RAG-First obligatoire")
     
     raise RuntimeError(
         "ERREUR ARCHITECTURE: process_question_with_enhanced_prompt est dépréciée. "
-        "Raison: Cette fonction contenait des données Ross 308 codées en dur "
-        "(jour 12: 340-370g, jour 21: 800-900g, etc.) qui sont maintenant "
-        "stockées dans la base documentaire RAG. "
-        "Solution: Toutes les requêtes doivent passer par le système RAG qui contient "
+        "Toutes les requêtes doivent passer par le système RAG qui contient "
         "les Performance Objectives officiels d'Aviagen."
     )
 
 def get_hardcoded_ross_308_data_DEPRECATED():
-    """
-    ❌ FONCTION SUPPRIMÉE - DONNÉES TRANSFÉRÉES VERS RAG
-    
-    Les données de référence Ross 308 ne sont plus codées en dur.
-    Elles se trouvent maintenant dans la base documentaire RAG :
-    - Ross 308 Performance Objectives 2022 (Aviagen)
-    - Données complètes par jour (1-56 days)
-    - Poids par sexe (mixed, males, females)
-    - Données officielles, pas d'approximations
-    
-    MIGRATION :
-    Données codées → Documents RAG → Réponses via process_question_with_rag
-    """
+    """❌ FONCTION SUPPRIMÉE - DONNÉES TRANSFÉRÉES VERS RAG"""
     
     logger.error("❌ [Expert Utils] Tentative d'accès aux données codées supprimées")
     
@@ -236,13 +210,8 @@ def suggest_rag_setup_check() -> Dict[str, Any]:
 # LOGGING DE MIGRATION
 # =============================================================================
 
-logger.info("✅ [Expert Utils] Module utilitaires reconfiguré - RAG-First")
-logger.warning("⚠️ [Expert Utils] MIGRATION COMPLÉTÉE:")
-logger.warning("   - ❌ Données Ross 308 codées supprimées")
-logger.warning("   - ❌ process_question_with_enhanced_prompt dépréciée")
-logger.warning("   - ✅ Architecture RAG-First obligatoire")
-logger.warning("   - ✅ Validation RAG availability ajoutée")
-logger.info("🔧 [Expert Utils] Actions requises :")
-logger.info("   1. Vérifier que RAG contient Performance Objectives Ross 308")
-logger.info("   2. Tester avec question: 'Quel est le poids Ross 308 jour 18 ?'")
-logger.info("   3. Confirmer réponse: ~789g (768g femelles, 809g mâles)")
+logger.info("✅ [Expert Utils] Module utilitaires final - RAG-First")
+logger.info("✅ [Expert Utils] Compatible avec toutes les améliorations API")
+logger.info("   - ❌ Données codées supprimées")
+logger.info("   - ✅ Architecture RAG-First obligatoire")
+logger.info("   - ✅ Support complet nouvelles fonctionnalités")
