@@ -2,16 +2,14 @@
 app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM
 
 Logique métier principale pour le système expert
-VERSION MODIFIÉE : RAG-First obligatoire, suppression données codées
 """
 
 import os
 import logging
 import uuid
 import time
-import re
 from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 from fastapi import HTTPException, Request
 
@@ -22,6 +20,7 @@ from .expert_models import (
 from .expert_utils import (
     get_user_id_from_request, 
     build_enriched_question_from_clarification,
+    process_question_with_enhanced_prompt,
     get_enhanced_topics_by_language,
     save_conversation_auto_enhanced
 )
@@ -29,210 +28,11 @@ from .expert_integrations import IntegrationsManager
 
 logger = logging.getLogger(__name__)
 
-class RAGContextEnhancer:
-    """Améliore le contexte conversationnel pour optimiser les requêtes RAG"""
-    
-    def __init__(self):
-        # Patterns pour détecter les références contextuelles
-        self.pronoun_patterns = {
-            "fr": [
-                r'\b(son|sa|ses|leur|leurs)\s+(poids|âge|croissance|développement)',
-                r'\b(ils|elles)\s+(pèsent|grandissent|se développent)',
-                r'\b(qu\'?est-ce que|quel est)\s+(son|sa|ses|leur)',
-                r'\b(combien)\s+(pèsent-ils|font-ils|mesurent-ils)'
-            ],
-            "en": [
-                r'\b(their|its)\s+(weight|age|growth|development)',
-                r'\b(they)\s+(weigh|grow|develop)',
-                r'\b(what is|how much is)\s+(their|its)',
-                r'\b(how much do they)\s+(weigh|measure)'
-            ],
-            "es": [
-                r'\b(su|sus)\s+(peso|edad|crecimiento|desarrollo)',
-                r'\b(ellos|ellas)\s+(pesan|crecen|se desarrollan)',
-                r'\b(cuál es|cuánto es)\s+(su|sus)',
-                r'\b(cuánto)\s+(pesan|miden)'
-            ]
-        }
-    
-    def enhance_question_for_rag(
-        self, 
-        question: str, 
-        conversation_context: str, 
-        language: str = "fr"
-    ) -> Tuple[str, Dict[str, any]]:
-        """
-        Améliore une question pour le RAG en utilisant le contexte conversationnel
-        """
-        
-        enhancement_info = {
-            "pronoun_detected": False,
-            "context_entities_used": [],
-            "question_enriched": False,
-            "original_question": question
-        }
-        
-        # 1. Détecter les pronoms/références contextuelles
-        has_pronouns = self._detect_contextual_references(question, language)
-        if has_pronouns:
-            enhancement_info["pronoun_detected"] = True
-            logger.info(f"🔍 [RAG Context] Pronoms détectés dans: '{question}'")
-        
-        # 2. Extraire entités du contexte
-        context_entities = self._extract_context_entities(conversation_context)
-        if context_entities:
-            enhancement_info["context_entities_used"] = list(context_entities.keys())
-            logger.info(f"📊 [RAG Context] Entités contextuelles: {context_entities}")
-        
-        # 3. Enrichir la question si nécessaire
-        enriched_question = question
-        
-        if has_pronouns and context_entities:
-            enriched_question = self._build_enriched_question(
-                question, context_entities, language
-            )
-            enhancement_info["question_enriched"] = True
-            logger.info(f"✨ [RAG Context] Question enrichie: '{enriched_question}'")
-        
-        # 4. Ajouter contexte technique si pertinent
-        if context_entities or has_pronouns:
-            technical_context = self._build_technical_context(context_entities, language)
-            if technical_context:
-                enriched_question += f"\n\nContexte technique: {technical_context}"
-        
-        return enriched_question, enhancement_info
-    
-    def _detect_contextual_references(self, question: str, language: str) -> bool:
-        """Détecte si la question contient des pronoms/références contextuelles"""
-        
-        patterns = self.pronoun_patterns.get(language, self.pronoun_patterns["fr"])
-        question_lower = question.lower()
-        
-        for pattern in patterns:
-            if re.search(pattern, question_lower, re.IGNORECASE):
-                logger.debug(f"🎯 [RAG Context] Pattern trouvé: {pattern}")
-                return True
-        
-        return False
-    
-    def _extract_context_entities(self, context: str) -> Dict[str, str]:
-        """Extrait les entités importantes du contexte conversationnel"""
-        
-        if not context:
-            return {}
-        
-        entities = {}
-        context_lower = context.lower()
-        
-        # Extraire race
-        breed_patterns = [
-            r'race[:\s]+([a-zA-Z0-9\s]+?)(?:\n|,|\.|\s|$)',
-            r'breed[:\s]+([a-zA-Z0-9\s]+?)(?:\n|,|\.|\s|$)',
-            r'(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)',
-            r'poulets?\s+(ross\s*308|cobb\s*500)',
-            r'chickens?\s+(ross\s*308|cobb\s*500)'
-        ]
-        
-        for pattern in breed_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                entities["breed"] = match.group(1).strip()
-                break
-        
-        # Extraire âge
-        age_patterns = [
-            r'âge[:\s]+(\d+\s*(?:jour|semaine|day|week)s?)',
-            r'age[:\s]+(\d+\s*(?:jour|semaine|day|week)s?)',
-            r'(\d+)\s*(?:jour|day)s?',
-            r'(\d+)\s*(?:semaine|week)s?'
-        ]
-        
-        for pattern in age_patterns:
-            match = re.search(pattern, context_lower, re.IGNORECASE)
-            if match:
-                entities["age"] = match.group(1).strip()
-                break
-        
-        return entities
-    
-    def _build_enriched_question(
-        self, 
-        question: str, 
-        context_entities: Dict[str, str], 
-        language: str
-    ) -> str:
-        """Construit une question enrichie en remplaçant les pronoms par les entités contextuelles"""
-        
-        enriched = question
-        
-        # Templates par langue
-        templates = {
-            "fr": {
-                "breed_age": "Pour des {breed} de {age}",
-                "breed_only": "Pour des {breed}",
-                "age_only": "Pour des poulets de {age}"
-            },
-            "en": {
-                "breed_age": "For {breed} chickens at {age}",
-                "breed_only": "For {breed} chickens", 
-                "age_only": "For chickens at {age}"
-            },
-            "es": {
-                "breed_age": "Para pollos {breed} de {age}",
-                "breed_only": "Para pollos {breed}",
-                "age_only": "Para pollos de {age}"
-            }
-        }
-        
-        template_set = templates.get(language, templates["fr"])
-        
-        # Construire le préfixe contextuel
-        context_prefix = ""
-        if "breed" in context_entities and "age" in context_entities:
-            context_prefix = template_set["breed_age"].format(
-                breed=context_entities["breed"],
-                age=context_entities["age"]
-            )
-        elif "breed" in context_entities:
-            context_prefix = template_set["breed_only"].format(
-                breed=context_entities["breed"]
-            )
-        elif "age" in context_entities:
-            context_prefix = template_set["age_only"].format(
-                age=context_entities["age"]
-            )
-        
-        if context_prefix:
-            # Remplacer ou préfixer selon la structure de la question
-            if any(word in question.lower() for word in ["son", "sa", "ses", "leur", "leurs", "their", "its", "su", "sus"]):
-                enriched = f"{context_prefix}, {question.lower()}"
-            else:
-                enriched = f"{context_prefix}: {question}"
-        
-        return enriched
-    
-    def _build_technical_context(self, entities: Dict[str, str], language: str) -> str:
-        """Construit un contexte technique pour aider le RAG"""
-        
-        if not entities:
-            return ""
-        
-        context_parts = []
-        
-        if "breed" in entities:
-            context_parts.append(f"Race: {entities['breed']}")
-        
-        if "age" in entities:
-            context_parts.append(f"Âge: {entities['age']}")
-        
-        return " | ".join(context_parts)
-
 class ExpertService:
     """Service principal pour le système expert"""
     
     def __init__(self):
         self.integrations = IntegrationsManager()
-        self.rag_enhancer = RAGContextEnhancer()
         logger.info("✅ [Expert Service] Service expert initialisé")
     
     def get_current_user_dependency(self):
@@ -314,7 +114,7 @@ class ExpertService:
         if clarification_result:
             return clarification_result
         
-        # === TRAITEMENT EXPERT AVEC RAG-FIRST ===
+        # === TRAITEMENT EXPERT ===
         expert_result = await self._process_expert_response(
             question_text, request_data, request, current_user,
             conversation_id, processing_steps, ai_enhancements_used
@@ -583,182 +383,80 @@ class ExpertService:
         request: Request, current_user: Optional[Dict], conversation_id: str,
         processing_steps: list, ai_enhancements_used: list
     ) -> Dict[str, Any]:
-        """
-        VERSION CORRIGÉE - RAG OBLIGATOIRE avec amélioration contextuelle
-        """
+        """Traite la réponse expert avec RAG ou OpenAI"""
         
-        # === 1. RÉCUPÉRER CONTEXTE CONVERSATIONNEL ===
+        # Récupérer contexte pour traitement
         conversation_context_str = ""
         if self.integrations.intelligent_memory_available:
             try:
                 conversation_context_str = self.integrations.get_context_for_rag(conversation_id, max_chars=800)
-                if conversation_context_str:
-                    ai_enhancements_used.append("contextual_rag")
-                    logger.info(f"🧠 Contexte conversationnel récupéré: {conversation_context_str[:100]}...")
+                ai_enhancements_used.append("contextual_rag")
             except Exception as e:
-                logger.warning(f"⚠️ Erreur récupération contexte: {e}")
+                logger.warning(f"⚠️ [Expert Service] Erreur récupération contexte: {e}")
         
-        # === 2. AMÉLIORATION INTELLIGENTE DE LA QUESTION ===
-        enriched_question, enhancement_info = self.rag_enhancer.enhance_question_for_rag(
-            question=question_text,
-            conversation_context=conversation_context_str,
-            language=request_data.language
-        )
-        
-        if enhancement_info["question_enriched"]:
-            ai_enhancements_used.append("intelligent_question_enhancement")
-            logger.info(f"✨ Question améliorée: {enriched_question[:150]}...")
-        
-        if enhancement_info["pronoun_detected"]:
-            ai_enhancements_used.append("contextual_pronoun_resolution")
-            logger.info(f"🎯 Pronoms contextuels résolus: {enhancement_info['context_entities_used']}")
-        
-        processing_steps.append("intelligent_question_enhancement")
-        
-        # === 3. VÉRIFICATION RAG DISPONIBLE ===
+        # Essayer RAG d'abord
         app = request.app
         process_rag = getattr(app.state, 'process_question_with_rag', None)
         
-        if not process_rag:
-            logger.error("❌ Système RAG indisponible - Erreur critique")
-            raise HTTPException(
-                status_code=503, 
-                detail={
-                    "error": "Service RAG indisponible",
-                    "message": "Le système expert nécessite l'accès à la base documentaire pour répondre. Veuillez réessayer plus tard.",
-                    "technical_details": "process_question_with_rag not available in app.state",
-                    "suggestion": "Vérifiez que le système RAG est correctement initialisé"
-                }
-            )
-        
-        # === 4. APPEL RAG AVEC QUESTION AMÉLIORÉE ===
-        try:
-            logger.info("🔍 Appel RAG avec question intelligemment améliorée...")
-            logger.info(f"📝 Question originale: {question_text}")
-            logger.info(f"✨ Question enrichie: {enriched_question}")
-            
-            # Essayer d'abord avec le paramètre context
+        if process_rag:
             try:
-                result = await process_rag(
-                    question=enriched_question,
-                    user=current_user,
-                    language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id,
-                    context=conversation_context_str
-                )
-                logger.info("✅ RAG appelé avec paramètre context")
-            except TypeError as te:
-                logger.info(f"ℹ️ Paramètre context non supporté: {te}")
-                # Fallback sans paramètre context (question reste enrichie)
-                result = await process_rag(
-                    question=enriched_question,
-                    user=current_user,
-                    language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    conversation_id=conversation_id
-                )
-                logger.info("✅ RAG appelé sans paramètre context")
-            
-            # === 5. TRAITEMENT RÉSULTAT RAG ===
-            answer = str(result.get("response", ""))
-            rag_score = result.get("score")
-            original_mode = result.get("mode", "rag_processing")
-            
-            # Mode enrichi
-            mode = f"enhanced_contextual_{original_mode}"
-            
-            processing_steps.append("mandatory_rag_with_context")
-            
-            # === 6. VALIDATION QUALITÉ RÉPONSE ===
-            quality_check = self._validate_rag_response_quality(
-                answer, enriched_question, enhancement_info
-            )
-            
-            if not quality_check["valid"]:
-                logger.warning(f"⚠️ Qualité RAG insuffisante: {quality_check['reason']}")
-                ai_enhancements_used.append("quality_validation_failed")
+                logger.info("🔍 Utilisation du système RAG avec contexte intelligent...")
                 
-                # On peut ajouter ici une logique de retry avec question reformulée
-                # Mais JAMAIS de fallback vers données codées !
-            
-            logger.info(f"✅ RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
-            
-            return {
-                "answer": answer,
-                "rag_used": True,  # Toujours vrai maintenant
-                "rag_score": rag_score,
-                "mode": mode,
-                "context_used": bool(conversation_context_str),
-                "question_enriched": enhancement_info["question_enriched"],
-                "enhancement_info": enhancement_info,
-                "quality_check": quality_check
-            }
-            
-        except Exception as rag_error:
-            logger.error(f"❌ Erreur critique RAG: {rag_error}")
-            processing_steps.append("rag_error")
-            
-            # === 7. GESTION D'ERREUR - AUCUN FALLBACK DONNÉES CODÉES ===
-            error_details = {
-                "error": "Erreur RAG",
-                "message": "Impossible d'interroger la base documentaire pour cette question.",
-                "technical_details": str(rag_error),
-                "question_original": question_text,
-                "question_enriched": enriched_question,
-                "context_available": bool(conversation_context_str),
-                "suggestion": "Veuillez reformuler votre question ou réessayer plus tard."
-            }
-            
-            raise HTTPException(
-                status_code=503,
-                detail=error_details
-            )
-    
-    def _validate_rag_response_quality(
-        self, 
-        answer: str, 
-        enriched_question: str, 
-        enhancement_info: Dict
-    ) -> Dict[str, any]:
-        """Valide la qualité de la réponse RAG"""
-        
-        if not answer or len(answer.strip()) < 20:
-            return {
-                "valid": False,
-                "reason": "Réponse trop courte",
-                "answer_length": len(answer) if answer else 0
-            }
-        
-        # Vérifier si la réponse contient "je ne sais pas" ou équivalents
-        negative_responses = [
-            "je ne sais pas", "i don't know", "no sé",
-            "pas d'information", "no information", "sin información",
-            "données non disponibles", "data not available", "datos no disponibles"
-        ]
-        
-        answer_lower = answer.lower()
-        for negative in negative_responses:
-            if negative in answer_lower:
+                try:
+                    result = await process_rag(
+                        question=question_text,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id,
+                        context=conversation_context_str
+                    )
+                except TypeError:
+                    # Si process_rag ne supporte pas le paramètre context
+                    result = await process_rag(
+                        question=question_text,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode,
+                        conversation_id=conversation_id
+                    )
+                
+                answer = str(result.get("response", ""))
+                rag_used = result.get("mode", "").startswith("rag")
+                rag_score = result.get("score")
+                mode = f"enhanced_{result.get('mode', 'rag_processing')}"
+                
+                processing_steps.append("rag_processing")
+                
                 return {
-                    "valid": False,
-                    "reason": f"Réponse négative détectée: {negative}",
-                    "answer_length": len(answer)
+                    "answer": answer,
+                    "rag_used": rag_used,
+                    "rag_score": rag_score,
+                    "mode": mode
                 }
+                
+            except Exception as rag_error:
+                logger.error(f"❌ Erreur RAG: {rag_error}")
         
-        # Si question concernait des données spécifiques (poids, âge), vérifier présence de chiffres
-        if any(word in enriched_question.lower() for word in ["poids", "weight", "peso", "gramme", "gram", "kg"]):
-            if not re.search(r'\d+', answer):
-                return {
-                    "valid": False,
-                    "reason": "Question sur données numériques mais pas de chiffres dans la réponse",
-                    "answer_length": len(answer)
-                }
+        # Fallback vers OpenAI
+        logger.info("⚠️ RAG non disponible, utilisation OpenAI avec contexte intelligent")
+        answer = await process_question_with_enhanced_prompt(
+            question_text,
+            request_data.language,
+            request_data.speed_mode,
+            conversation_context=conversation_context_str
+        )
+        
+        if conversation_context_str:
+            ai_enhancements_used.append("enhanced_prompts")
+        
+        processing_steps.append("direct_openai" if process_rag else "fallback_openai")
         
         return {
-            "valid": True,
-            "reason": "Réponse valide",
-            "answer_length": len(answer)
+            "answer": answer,
+            "rag_used": False,
+            "rag_score": None,
+            "mode": "enhanced_direct_openai" if not process_rag else "enhanced_fallback_openai"
         }
     
     def _create_rejection_response(
@@ -833,4 +531,4 @@ class ExpertService:
 # CONFIGURATION
 # =============================================================================
 
-logger.info("✅ [Expert Service] Services métier initialisés avec RAG-First obligatoire")
+logger.info("✅ [Expert Service] Services métier initialisés")

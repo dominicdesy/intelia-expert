@@ -1,4 +1,11 @@
-# Fixed expert_utils.py - Add missing functions
+# expert_utils.py - VERSION CORRIGÉE sans données codées en dur
+"""
+app/api/v1/expert_utils.py - UTILITAIRES EXPERT SYSTEM
+
+Fonctions utilitaires pour le système expert
+VERSION MODIFIÉE : Suppression complète des données Ross 308 codées en dur
+"""
+
 import os
 import logging
 import uuid
@@ -82,148 +89,160 @@ async def save_conversation_auto_enhanced(
         return False
 
 def get_fallback_response_enhanced(question: str, language: str = "fr") -> str:
-    """Réponse de fallback améliorée"""
+    """
+    Réponse de fallback améliorée - REDIRECTION VERS RAG
+    
+    NOTE: Cette fonction ne doit plus être utilisée avec des données codées.
+    Elle redirige vers le système RAG.
+    """
     responses = {
-        "fr": "Je rencontre actuellement des difficultés techniques. Veuillez reformuler votre question ou réessayer dans quelques instants.",
-        "en": "I'm currently experiencing technical difficulties. Please rephrase your question or try again in a few moments.",
-        "es": "Actualmente estoy experimentando dificultades técnicas. Por favor reformule su pregunta o inténtelo de nuevo en unos momentos."
+        "fr": "Le système expert nécessite l'accès à la base documentaire pour répondre à votre question. Veuillez vous assurer que le service RAG est disponible.",
+        "en": "The expert system requires access to the document database to answer your question. Please ensure the RAG service is available.",
+        "es": "El sistema experto requiere acceso a la base de datos de documentos para responder a su pregunta. Asegúrese de que el servicio RAG esté disponible."
     }
     return responses.get(language.lower(), responses["fr"])
 
-async def process_question_with_enhanced_prompt(
+# =============================================================================
+# FONCTIONS DÉPRÉCIÉES - AVEC DONNÉES CODÉES SUPPRIMÉES
+# =============================================================================
+
+async def process_question_with_enhanced_prompt_DEPRECATED(
     question: str, 
     language: str = "fr", 
     speed_mode: str = "balanced",
     extracted_entities: Optional[Dict] = None,
     conversation_context: str = ""
 ) -> str:
-    """Traite une question avec prompt amélioré AVEC DONNÉES DE RÉFÉRENCE ROSS 308"""
+    """
+    ❌ FONCTION DÉPRÉCIÉE - SUPPRIMÉE
     
-    try:
-        import openai
-        
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            return get_fallback_response_enhanced(question, language)
-        
-        openai.api_key = api_key
-        
-        # ✅ DONNÉES DE RÉFÉRENCE ROSS 308 INTÉGRÉES
-        reference_data = """
-DONNÉES DE RÉFÉRENCE AVICULTURE (UTILISATION OBLIGATOIRE) :
+    Cette fonction contenait des données Ross 308 codées en dur.
+    Toutes les réponses doivent maintenant passer par le RAG qui contient
+    les documents de référence officiels (Performance Objectives, etc.).
+    
+    ANCIENNE VERSION CONTENAIT :
+    - Données de référence Ross 308 codées en dur
+    - Prompts avec poids spécifiques (jour 12: 340-370g, etc.)
+    - Logique de fallback OpenAI avec données intégrées
+    
+    NOUVELLE ARCHITECTURE :
+    - Toutes les données proviennent du RAG
+    - Pas de fallback avec données codées
+    - Questions enrichies contextuelement avant envoi au RAG
+    """
+    
+    logger.error("❌ [Expert Utils] ERREUR: Tentative d'utilisation de fonction dépréciée")
+    logger.error("❌ [Expert Utils] Cette fonction contenait des données Ross 308 codées en dur")
+    logger.error("❌ [Expert Utils] Architecture actuelle: RAG-First obligatoire")
+    
+    raise RuntimeError(
+        "ERREUR ARCHITECTURE: process_question_with_enhanced_prompt est dépréciée. "
+        "Raison: Cette fonction contenait des données Ross 308 codées en dur "
+        "(jour 12: 340-370g, jour 21: 800-900g, etc.) qui sont maintenant "
+        "stockées dans la base documentaire RAG. "
+        "Solution: Toutes les requêtes doivent passer par le système RAG qui contient "
+        "les Performance Objectives officiels d'Aviagen."
+    )
 
-🐔 Ross 308 - Poids Standards (À UTILISER EXACTEMENT) :
-- Jour 1: 42-45g
-- Jour 7: 160-180g  
-- Jour 12: 340-370g ← CRITIQUE ! (JAMAIS 700-900g)
-- Jour 14: 430-470g
-- Jour 21: 800-900g
-- Jour 28: 1400-1600g
-- Jour 35: 2000-2300g
-- Jour 42: 2500-2800g
+def get_hardcoded_ross_308_data_DEPRECATED():
+    """
+    ❌ FONCTION SUPPRIMÉE - DONNÉES TRANSFÉRÉES VERS RAG
+    
+    Les données de référence Ross 308 ne sont plus codées en dur.
+    Elles se trouvent maintenant dans la base documentaire RAG :
+    - Ross 308 Performance Objectives 2022 (Aviagen)
+    - Données complètes par jour (1-56 days)
+    - Poids par sexe (mixed, males, females)
+    - Données officielles, pas d'approximations
+    
+    MIGRATION :
+    Données codées → Documents RAG → Réponses via process_question_with_rag
+    """
+    
+    logger.error("❌ [Expert Utils] Tentative d'accès aux données codées supprimées")
+    
+    raise RuntimeError(
+        "DONNÉES SUPPRIMÉES: Les données Ross 308 ne sont plus codées en dur. "
+        "Elles se trouvent dans la base documentaire RAG. "
+        "Utilisez le système RAG pour accéder aux Performance Objectives officiels."
+    )
 
-🐔 Cobb 500 - Poids Standards :
-- Jour 12: 320-350g
-- Jour 21: 750-850g
-- Jour 42: 2400-2700g
+# =============================================================================
+# NOUVELLES FONCTIONS UTILITAIRES RAG-FIRST
+# =============================================================================
 
-RÈGLES CRITIQUES OBLIGATOIRES :
-- Ross 308 jour 12 = 340-370g (JAMAIS autre chose !)
-- Si contexte mentionne Ross 308 + âge = réponse PRÉCISE obligatoire
-- Utilise TOUJOURS ces données exactes, jamais d'approximations
-"""
+def validate_rag_availability(app_state) -> bool:
+    """Valide que le système RAG est disponible"""
+    process_rag = getattr(app_state, 'process_question_with_rag', None)
+    return process_rag is not None
 
-        # ✅ PROMPT AMÉLIORÉ avec détection contextuelle
-        enhanced_prompts = {
-            "fr": f"""{reference_data}
+def log_rag_dependency_error(function_name: str, question: str):
+    """Log les erreurs de dépendance RAG"""
+    logger.error(f"❌ [Expert Utils] {function_name}: RAG non disponible")
+    logger.error(f"❌ [Expert Utils] Question: {question[:100]}...")
+    logger.error(f"❌ [Expert Utils] Action requise: Vérifier initialisation RAG")
+    logger.error(f"❌ [Expert Utils] Documents requis: Ross 308 Performance Objectives")
 
-Tu es un expert en production avicole spécialisé en santé et nutrition animale. Tu assists tous les acteurs de la filière : fermiers, vétérinaires, nutritionnistes, consultants et techniciens.
-
-CONSIGNES CRITIQUES:
-1. UTILISE OBLIGATOIREMENT les données de référence ci-dessus
-2. Si le contexte mentionne "Ross 308" et un âge, donne la réponse EXACTE
-3. Ross 308 de 12 jours = 340-370g (JAMAIS 700-900g !)
-4. Si pronom "son/sa/ses" + âge mentionné = utilise la race du contexte
-5. Commence par répondre directement avec les chiffres exacts
-
-Contexte conversationnel disponible:
-{conversation_context}
-
-EXEMPLE CRITIQUE :
-Contexte précédent: "Ross 308"
-Question: "Quel est son poids idéal au jour 12 ?"
-Réponse CORRECTE: "Pour un Ross 308 de 12 jours, le poids idéal se situe entre 340-370 grammes selon les standards de performance. Si vos poulets pèsent moins de 320g à cet âge, cela peut indiquer un problème nutritionnel."
-
-IMPORTANT: 
-- Détecte les références contextuelles ("son", "sa", "ils", etc.)
-- Utilise le contexte fourni pour identifier la race
-- Donne TOUJOURS des réponses chiffrées précises
-- UTILISE les données de référence ci-dessus OBLIGATOIREMENT""",
-
-            "en": f"""{reference_data}
-
-You are an expert in poultry production specialized in animal health and nutrition. You assist all stakeholders in the industry: farmers, veterinarians, nutritionists, consultants and technicians.
-
-CRITICAL INSTRUCTIONS:
-1. USE the reference data above MANDATORILY
-2. If context mentions "Ross 308" and age, give EXACT answer
-3. Ross 308 at 12 days = 340-370g (NEVER 700-900g!)
-4. If pronoun "its/their" + age mentioned = use breed from context
-5. Start by directly answering with exact figures
-
-Available conversational context:
-{conversation_context}
-
-IMPORTANT: Always use the reference data above, never approximations!""",
-
-            "es": f"""{reference_data}
-
-Eres un experto en producción avícola especializado en salud y nutrición animal. Asistes a todos los actores de la industria: granjeros, veterinarios, nutricionistas, consultores y técnicos.
-
-INSTRUCCIONES CRÍTICAS:
-1. USA los datos de referencia arriba OBLIGATORIAMENTE
-2. Si el contexto menciona "Ross 308" y edad, da respuesta EXACTA
-3. Ross 308 a los 12 días = 340-370g (¡NUNCA 700-900g!)
-4. Si pronombre "su/sus" + edad mencionada = usa raza del contexto
-5. Comienza respondiendo directamente con cifras exactas
-
-Contexto conversacional disponible:
-{conversation_context}
-
-IMPORTANTE: Usa SIEMPRE los datos de referencia arriba, ¡nunca aproximaciones!"""
-        }
-        
-        system_prompt = enhanced_prompts.get(language.lower(), enhanced_prompts["fr"])
-        
-        # ✅ DEBUG LOG pour voir le contexte
-        logger.info(f"🔍 [Expert Utils] Question: {question}")
-        logger.info(f"🔍 [Expert Utils] Contexte: {conversation_context[:100]}...")
-        
-        # Configuration par mode
-        model_config = {
-            "fast": {"model": "gpt-3.5-turbo", "max_tokens": 400},
-            "balanced": {"model": "gpt-4o-mini", "max_tokens": 600},
-            "quality": {"model": "gpt-4o-mini", "max_tokens": 800}
-        }
-        
-        config = model_config.get(speed_mode, model_config["balanced"])
-        
-        response = openai.chat.completions.create(
-            model=config["model"],
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": str(question)}
-            ],
-            temperature=0.1,  # ← Réduire pour plus de précision
-            max_tokens=config["max_tokens"],
-            timeout=20
+def get_rag_error_response(language: str = "fr") -> str:
+    """Retourne un message d'erreur approprié quand RAG est indisponible"""
+    
+    messages = {
+        "fr": (
+            "Service temporairement indisponible. "
+            "Le système expert nécessite l'accès à la base documentaire "
+            "pour fournir des informations précises sur les performances "
+            "des races de poulets. Veuillez réessayer plus tard."
+        ),
+        "en": (
+            "Service temporarily unavailable. "
+            "The expert system requires access to the document database "
+            "to provide accurate information about chicken breed performance. "
+            "Please try again later."
+        ),
+        "es": (
+            "Servicio temporalmente no disponible. "
+            "El sistema experto requiere acceso a la base de datos de documentos "
+            "para proporcionar información precisa sobre el rendimiento de las razas de pollos. "
+            "Por favor, inténtelo de nuevo más tarde."
         )
-        
-        answer = response.choices[0].message.content
-        logger.info(f"🤖 [Expert Utils] Réponse GPT: {answer[:100]}...")
-        
-        return str(answer) if answer else get_fallback_response_enhanced(question, language)
-        
-    except Exception as e:
-        logger.error(f"❌ [Expert Utils] Erreur OpenAI: {e}")
-        return get_fallback_response_enhanced(question, language)
+    }
+    
+    return messages.get(language.lower(), messages["fr"])
+
+def suggest_rag_setup_check() -> Dict[str, Any]:
+    """Suggère les vérifications à effectuer pour le setup RAG"""
+    
+    return {
+        "checks_required": [
+            "Vérifier que process_question_with_rag est initialisé dans app.state",
+            "Confirmer que la base documentaire contient les Performance Objectives Ross 308",
+            "Tester la connectivité vers le système de vectorisation",
+            "Valider que les documents sont correctement indexés"
+        ],
+        "critical_documents": [
+            "Ross 308 Performance Objectives 2022 (Aviagen)",
+            "Cobb 500 Performance Standards", 
+            "Guides de nutrition avicole",
+            "Protocoles de vaccination"
+        ],
+        "test_questions": [
+            "Quel est le poids d'un Ross 308 au jour 18 ?",
+            "Quelles sont les conditions optimales pour l'élevage ?",
+            "Protocoles de vaccination recommandés ?"
+        ]
+    }
+
+# =============================================================================
+# LOGGING DE MIGRATION
+# =============================================================================
+
+logger.info("✅ [Expert Utils] Module utilitaires reconfiguré - RAG-First")
+logger.warning("⚠️ [Expert Utils] MIGRATION COMPLÉTÉE:")
+logger.warning("   - ❌ Données Ross 308 codées supprimées")
+logger.warning("   - ❌ process_question_with_enhanced_prompt dépréciée")
+logger.warning("   - ✅ Architecture RAG-First obligatoire")
+logger.warning("   - ✅ Validation RAG availability ajoutée")
+logger.info("🔧 [Expert Utils] Actions requises :")
+logger.info("   1. Vérifier que RAG contient Performance Objectives Ross 308")
+logger.info("   2. Tester avec question: 'Quel est le poids Ross 308 jour 18 ?'")
+logger.info("   3. Confirmer réponse: ~789g (768g femelles, 809g mâles)")
