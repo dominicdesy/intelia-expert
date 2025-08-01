@@ -3,10 +3,11 @@ app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM
 
 VERSION FINALE CORRIGÉE PARFAITE : RAG-First + Système de clarification RÉPARÉ
 CORRECTIONS CRITIQUES:
-1. Sauvegarde forcée question originale dans mémoire conversationnelle
-2. Récupération intelligente du contexte pour réponses clarification
-3. Détection améliorée des réponses courtes ("Ross 308")
-4. Contexte forcé pour RAG après clarification
+1. ✅ ORDRE DE PRIORITÉ CORRIGÉ : Clarification spécialisée AVANT vagueness générale
+2. Sauvegarde forcée question originale dans mémoire conversationnelle
+3. Récupération intelligente du contexte pour réponses clarification
+4. Détection améliorée des réponses courtes ("Ross 308")
+5. Contexte forcé pour RAG après clarification
 """
 
 import os
@@ -284,24 +285,6 @@ class ExpertService:
         
         processing_steps.append("question_validation")
         
-        # ✅ NOUVEAU: DÉTECTION DE QUESTIONS FLOUES (AVANT TOUT TRAITEMENT)
-        vagueness_result = None
-        if request_data.enable_vagueness_detection:
-            vagueness_result = self.enhancement_service.detect_vagueness(
-                question_text, request_data.language
-            )
-            
-            ai_enhancements_used.append("vagueness_detection")
-            performance_breakdown["vagueness_check"] = int(time.time() * 1000)
-            
-            # ✅ CORRECTION: Réduire le seuil de 0.7 à 0.6 pour déclencher plus facilement
-            if vagueness_result.is_vague and vagueness_result.vagueness_score > 0.6:
-                logger.info(f"🎯 [Expert Service] Question floue détectée (score: {vagueness_result.vagueness_score})")
-                return self._create_vagueness_response(
-                    vagueness_result, question_text, conversation_id, 
-                    request_data.language, start_time, processing_steps, ai_enhancements_used
-                )
-        
         # === ENREGISTREMENT DANS MÉMOIRE INTELLIGENTE ===
         conversation_context = None
         if self.integrations.intelligent_memory_available:
@@ -333,10 +316,10 @@ class ExpertService:
             return self._create_rejection_response(
                 question_text, validation_result, conversation_id, 
                 user_email, request_data.language, start_time,
-                processing_steps, ai_enhancements_used, vagueness_result
+                processing_steps, ai_enhancements_used, None
             )
         
-        # === ✅ SYSTÈME DE CLARIFICATION INTELLIGENT CORRIGÉ ===
+        # ✅ === SYSTÈME DE CLARIFICATION INTELLIGENT CORRIGÉ - ORDRE PRIORITÉ FIXÉ ===
         clarification_result = await self._handle_clarification_fixed(
             request_data, question_text, user_id, conversation_id,
             processing_steps, ai_enhancements_used
@@ -344,6 +327,24 @@ class ExpertService:
         
         if clarification_result:
             return clarification_result
+        
+        # ✅ NOUVEAU: DÉTECTION VAGUENESS APRÈS clarifications spécialisées
+        vagueness_result = None
+        if request_data.enable_vagueness_detection:
+            vagueness_result = self.enhancement_service.detect_vagueness(
+                question_text, request_data.language
+            )
+            
+            ai_enhancements_used.append("vagueness_detection")
+            performance_breakdown["vagueness_check"] = int(time.time() * 1000)
+            
+            # ✅ CORRECTION: Réduire le seuil de 0.7 à 0.6 pour déclencher plus facilement
+            if vagueness_result.is_vague and vagueness_result.vagueness_score > 0.6:
+                logger.info(f"🎯 [Expert Service] Question floue détectée (score: {vagueness_result.vagueness_score})")
+                return self._create_vagueness_response(
+                    vagueness_result, question_text, conversation_id, 
+                    request_data.language, start_time, processing_steps, ai_enhancements_used
+                )
         
         performance_breakdown["clarification_complete"] = int(time.time() * 1000)
         
@@ -1215,6 +1216,7 @@ class ExpertService:
 
 logger.info("✅ [Expert Service] Services métier PARFAITEMENT CORRIGÉS avec CLARIFICATION INTELLIGENTE")
 logger.info("🚀 [Expert Service] CORRECTIONS CRITIQUES APPLIQUÉES:")
+logger.info("   - ✅ ORDRE DE PRIORITÉ CORRIGÉ : Clarification spécialisée AVANT vagueness générale")
 logger.info("   - 💾 Sauvegarde forcée question originale dans mémoire conversationnelle")
 logger.info("   - 🔄 Récupération intelligente contexte pour réponses clarification")
 logger.info("   - 🎯 Détection améliorée réponses courtes (Ross 308)")
