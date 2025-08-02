@@ -499,13 +499,13 @@ class ExpertService:
         processing_steps, ai_enhancements_used
     ):
         """
-        ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION - VERSION CORRIGÉE
+        ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION - VERSION CORRIGÉE FINALE
         
-        CORRECTIONS APPLIQUÉES:
-        1. Utilisation find_original_question() depuis la mémoire intelligente
-        2. Extraction race/sexe avec utils corrigés
-        3. Enrichissement automatique pour RAG
-        4. Fallbacks multiples si récupération échoue
+        CORRECTION APPLIQUÉE:
+        1. Récupération question originale
+        2. Extraction âge depuis question originale (12 jours)
+        3. Extraction race/sexe depuis réponse clarification (Ross 308 male)
+        4. Enrichissement COMPLET avec race + sexe + âge
         """
         
         # ✅ RÉCUPÉRATION FORCÉE DE LA QUESTION ORIGINALE
@@ -557,25 +557,29 @@ class ExpertService:
                 question_text, validation, request_data.language, conversation_id
             )
         
-        # ✅ ENRICHISSEMENT AUTOMATIQUE DE LA QUESTION POUR RAG
+        # ✅ EXTRACTION RACE/SEXE DEPUIS CLARIFICATION
         breed = validation["extracted_info"].get("breed")
         sex = validation["extracted_info"].get("sex")
         
-        enriched_original_question = build_enriched_question_with_breed_sex(
-            original_question, breed, sex, request_data.language
+        # 🚨 NOUVELLE CORRECTION - EXTRACTION ÂGE DEPUIS QUESTION ORIGINALE
+        age_info = self._extract_age_from_original_question(original_question, request_data.language)
+        
+        # ✅ ENRICHISSEMENT AUTOMATIQUE COMPLET (race + sexe + âge)
+        enriched_original_question = self._build_complete_enriched_question(
+            original_question, breed, sex, age_info, request_data.language
         )
         
-        logger.info(f"✅ [Expert Service] Question enrichie par clarification: {enriched_original_question}")
+        logger.info(f"✅ [Expert Service] Question COMPLÈTEMENT enrichie: {enriched_original_question}")
         
         # ✅ FORCER LE REMPLACEMENT DE LA QUESTION POUR LE RAG
         request_data.text = enriched_original_question
         request_data.is_clarification_response = False  # Traiter comme nouvelle question
         request_data.original_question = original_question  # Garder référence
         
-        processing_steps.append("clarification_processed_successfully")
-        ai_enhancements_used.append("breed_sex_extraction_corrected")
-        ai_enhancements_used.append("question_enrichment_from_clarification")
-        ai_enhancements_used.append("forced_question_replacement")
+        processing_steps.append("clarification_processed_successfully_with_age")
+        ai_enhancements_used.append("breed_sex_age_extraction_complete")
+        ai_enhancements_used.append("complete_question_enrichment")
+        ai_enhancements_used.append("forced_question_replacement_with_age")
         
         return None  # Continuer le traitement normal avec question enrichie
     
@@ -795,6 +799,186 @@ class ExpertService:
             processing_steps=["follow_up_clarification_triggered"],
             ai_enhancements_used=["incomplete_clarification_handling"]
         )
+    
+    # === NOUVELLES MÉTHODES D'ENRICHISSEMENT COMPLET ===
+    
+    def _extract_age_from_original_question(self, original_question: str, language: str = "fr") -> Dict[str, Any]:
+        """
+        🚨 NOUVELLE FONCTION - Extrait l'âge depuis la question originale
+        
+        Exemple: "Quel est le poids d'un poulet de 12 jours ?" → {"days": 12, "text": "12 jours"}
+        """
+        
+        age_info = {"days": None, "weeks": None, "text": None, "detected": False}
+        
+        if not original_question:
+            return age_info
+        
+        question_lower = original_question.lower()
+        
+        # Patterns d'extraction d'âge multilingues
+        age_patterns = {
+            "fr": [
+                (r'(\d+)\s*jours?', "days"),
+                (r'(\d+)\s*semaines?', "weeks"),
+                (r'de\s+(\d+)\s*jours?', "days"),
+                (r'de\s+(\d+)\s*semaines?', "weeks"),
+                (r'à\s+(\d+)\s*jours?', "days"),
+                (r'à\s+(\d+)\s*semaines?', "weeks")
+            ],
+            "en": [
+                (r'(\d+)\s*days?', "days"),
+                (r'(\d+)\s*weeks?', "weeks"),
+                (r'of\s+(\d+)\s*days?', "days"),
+                (r'of\s+(\d+)\s*weeks?', "weeks"),
+                (r'at\s+(\d+)\s*days?', "days"),
+                (r'at\s+(\d+)\s*weeks?', "weeks")
+            ],
+            "es": [
+                (r'(\d+)\s*días?', "days"),
+                (r'(\d+)\s*semanas?', "weeks"),
+                (r'de\s+(\d+)\s*días?', "days"),
+                (r'de\s+(\d+)\s*semanas?', "weeks"),
+                (r'a\s+(\d+)\s*días?', "days"),
+                (r'a\s+(\d+)\s*semanas?', "weeks")
+            ]
+        }
+        
+        patterns = age_patterns.get(language, age_patterns["fr"])
+        
+        for pattern, unit in patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                value = int(match.group(1))
+                
+                if unit == "days":
+                    age_info["days"] = value
+                    age_info["weeks"] = round(value / 7, 1)
+                    age_info["text"] = f"{value} jour{'s' if value > 1 else ''}"
+                else:  # weeks
+                    age_info["weeks"] = value
+                    age_info["days"] = value * 7
+                    age_info["text"] = f"{value} semaine{'s' if value > 1 else ''}"
+                
+                age_info["detected"] = True
+                
+                logger.info(f"🕐 [Age Extraction] Âge détecté: {age_info['text']} ({age_info['days']} jours)")
+                break
+        
+        if not age_info["detected"]:
+            logger.warning(f"⚠️ [Age Extraction] Aucun âge détecté dans: {original_question}")
+        
+        return age_info
+
+    def _build_complete_enriched_question(
+        self, 
+        original_question: str, 
+        breed: Optional[str], 
+        sex: Optional[str], 
+        age_info: Dict[str, Any], 
+        language: str = "fr"
+    ) -> str:
+        """
+        🚨 NOUVELLE FONCTION - Construit une question complètement enrichie
+        
+        Combine race + sexe + âge dans une question naturelle pour le RAG
+        """
+        
+        # Templates d'enrichissement complet par langue
+        templates = {
+            "fr": {
+                "complete": "Pour des poulets {breed} {sex} de {age}",
+                "breed_age": "Pour des poulets {breed} de {age}",
+                "sex_age": "Pour des poulets {sex} de {age}",
+                "breed_sex": "Pour des poulets {breed} {sex}",
+                "age_only": "Pour des poulets de {age}",
+                "breed_only": "Pour des poulets {breed}",
+                "sex_only": "Pour des poulets {sex}"
+            },
+            "en": {
+                "complete": "For {breed} {sex} chickens at {age}",
+                "breed_age": "For {breed} chickens at {age}",
+                "sex_age": "For {sex} chickens at {age}",
+                "breed_sex": "For {breed} {sex} chickens",
+                "age_only": "For chickens at {age}",
+                "breed_only": "For {breed} chickens",
+                "sex_only": "For {sex} chickens"
+            },
+            "es": {
+                "complete": "Para pollos {breed} {sex} de {age}",
+                "breed_age": "Para pollos {breed} de {age}",
+                "sex_age": "Para pollos {sex} de {age}",
+                "breed_sex": "Para pollos {breed} {sex}",
+                "age_only": "Para pollos de {age}",
+                "breed_only": "Para pollos {breed}",
+                "sex_only": "Para pollos {sex}"
+            }
+        }
+        
+        template_set = templates.get(language, templates["fr"])
+        
+        # Construire le préfixe contextuel avec priorité à l'âge
+        context_prefix = ""
+        age_text = age_info.get("text") if age_info.get("detected") else None
+        
+        # 🎯 PRIORITÉ À L'ENRICHISSEMENT COMPLET
+        if breed and sex and age_text:
+            context_prefix = template_set["complete"].format(
+                breed=breed, sex=sex, age=age_text
+            )
+            logger.info(f"🌟 [Complete Enrichment] Contexte COMPLET: {context_prefix}")
+            
+        elif breed and age_text:
+            context_prefix = template_set["breed_age"].format(
+                breed=breed, age=age_text
+            )
+            logger.info(f"🏷️ [Breed+Age] Contexte: {context_prefix}")
+            
+        elif sex and age_text:
+            context_prefix = template_set["sex_age"].format(
+                sex=sex, age=age_text
+            )
+            logger.info(f"⚧ [Sex+Age] Contexte: {context_prefix}")
+            
+        elif breed and sex:
+            context_prefix = template_set["breed_sex"].format(
+                breed=breed, sex=sex
+            )
+            logger.info(f"🏷️⚧ [Breed+Sex] Contexte: {context_prefix}")
+            
+        elif age_text:
+            context_prefix = template_set["age_only"].format(age=age_text)
+            logger.info(f"🕐 [Age Only] Contexte: {context_prefix}")
+            
+        elif breed:
+            context_prefix = template_set["breed_only"].format(breed=breed)
+            logger.info(f"🏷️ [Breed Only] Contexte: {context_prefix}")
+            
+        elif sex:
+            context_prefix = template_set["sex_only"].format(sex=sex)
+            logger.info(f"⚧ [Sex Only] Contexte: {context_prefix}")
+        
+        # Construire la question finale enrichie
+        if context_prefix:
+            # Détecter le type de question originale pour intégration naturelle
+            original_lower = original_question.lower().strip()
+            
+            if "quel est" in original_lower or "what is" in original_lower or "cuál es" in original_lower:
+                # Questions directes → préfixer
+                enriched_question = f"{context_prefix}, {original_lower}"
+            elif "comment" in original_lower or "how" in original_lower or "cómo" in original_lower:
+                # Questions de méthode → deux points
+                enriched_question = f"{context_prefix}: {original_question}"
+            else:
+                # Autres questions → deux points
+                enriched_question = f"{context_prefix}: {original_question}"
+            
+            logger.info(f"✨ [Final Enrichment] Question finale: {enriched_question}")
+            return enriched_question
+        
+        else:
+            logger.warning("⚠️ [Enrichment] Pas d'enrichissement possible, question originale conservée")
+            return original_question
     
     # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS CORRIGÉ ===
     
