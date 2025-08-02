@@ -1,4 +1,4 @@
-// ==================== API SERVICE CORRIGÉ POUR ask-enhanced-v2 ====================
+// ==================== API SERVICE CORRIGÉ POUR ask-enhanced-v2 + CLARIFICATIONS ====================
 
 // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
 const getApiConfig = () => {
@@ -16,7 +16,7 @@ const getApiConfig = () => {
 // ✅ VALIDATION CONFIGURATION AU RUNTIME
 const API_BASE_URL = getApiConfig()
 
-// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION (inchangée)
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN D'AUTHENTIFICATION
 const getAuthToken = (): string | null => {
   try {
     // 🔧 PRIORITÉ: Token depuis les cookies (URL-décodé)
@@ -48,7 +48,7 @@ const getAuthToken = (): string | null => {
   }
 }
 
-// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN DEPUIS LES COOKIES (inchangée)
+// ✅ FONCTION POUR RÉCUPÉRER LE TOKEN DEPUIS LES COOKIES
 const getCookieToken = (): string | null => {
   try {
     const cookies = document.cookie.split(';')
@@ -91,7 +91,7 @@ const getAuthHeaders = (): Record<string, string> => {
   return headers
 }
 
-// Interface pour la réponse enhanced
+// Interface pour la réponse enhanced avec clarifications
 interface EnhancedAIResponse {
   response: string
   conversation_id: string
@@ -105,6 +105,11 @@ interface EnhancedAIResponse {
   note?: string
   timestamp?: string
   processing_time?: number
+  // ✅ NOUVEAUX CHAMPS CLARIFICATIONS
+  requires_clarification?: boolean
+  clarification_questions?: string[]
+  clarification_type?: string
+  vague_entities?: string[]
 }
 
 // Interface pour les erreurs API
@@ -116,13 +121,17 @@ interface APIError {
 }
 
 /**
- * ✅ FONCTION CORRIGÉE: Génère une réponse IA via ask-enhanced-v2 (sécurisé)
+ * ✅ FONCTION CORRIGÉE: Génère une réponse IA via ask-enhanced-v2 + CLARIFICATIONS
  */
 export const generateAIResponse = async (
   question: string,
   user: any,
   language: string = 'fr',
-  conversationId?: string
+  conversationId?: string,
+  // ✅ NOUVEAUX PARAMÈTRES POUR CLARIFICATIONS
+  isClarificationResponse = false,
+  originalQuestion?: string,
+  clarificationEntities?: Record<string, any>
 ): Promise<EnhancedAIResponse> => {
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
@@ -132,12 +141,15 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  console.log('🔥 [apiService] Envoi question vers ask-enhanced-v2:', question.substring(0, 50) + '...')
-  console.log('🔥 [apiService] User ID:', user.id)
-  console.log('🔥 [apiService] Conversation ID:', conversationId || 'Nouvelle conversation')
+  console.log('🔥 [apiService] Envoi question vers ask-enhanced-v2:', {
+    question: question.substring(0, 50) + '...',
+    isClarificationResponse,
+    originalQuestion: originalQuestion?.substring(0, 30) + '...',
+    entities: clarificationEntities
+  })
 
   try {
-    // ✅ CORRECTION: Format pour ask-enhanced-v2 avec améliorations
+    // ✅ CORRECTION: Format pour ask-enhanced-v2 avec support clarifications
     const requestBody = {
       text: question.trim(),
       language: language,
@@ -148,13 +160,18 @@ export const generateAIResponse = async (
       require_coherence_check: true,
       detailed_rag_scoring: false,
       enable_quality_metrics: false,
-      debug_mode: false
+      debug_mode: false,
+      // ✅ NOUVEAUX CHAMPS CLARIFICATIONS
+      ...(isClarificationResponse && {
+        is_clarification_response: true,
+        original_question: originalQuestion,
+        clarification_entities: clarificationEntities
+      })
     }
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body pour ask-enhanced-v2:', requestBody)
-    console.log('📤 [apiService] Headers:', Object.keys(headers))
+    console.log('📤 [apiService] Body complet pour ask-enhanced-v2:', requestBody)
 
     // ✅ CORRECTION CRITIQUE: Utiliser ask-enhanced-v2 au lieu de ask-enhanced
     const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2`, {
@@ -194,7 +211,9 @@ export const generateAIResponse = async (
       language: data.language,
       ai_enhancements: data.ai_enhancements_used,
       rag_used: data.rag_used,
-      response_length: data.response?.length || 0
+      response_length: data.response?.length || 0,
+      requires_clarification: data.requires_clarification,
+      clarification_questions: data.clarification_questions?.length || 0
     })
 
     // 🎯 CORRECTION: Pas de sauvegarde séparée car ask-enhanced-v2 la gère automatiquement
@@ -214,7 +233,12 @@ export const generateAIResponse = async (
       mode: data.mode,
       note: data.note,
       timestamp: data.timestamp,
-      processing_time: data.processing_time
+      processing_time: data.processing_time,
+      // ✅ CHAMPS CLARIFICATIONS
+      requires_clarification: data.requires_clarification,
+      clarification_questions: data.clarification_questions,
+      clarification_type: data.clarification_type,
+      vague_entities: data.vague_entities
     }
 
   } catch (error) {
@@ -328,7 +352,7 @@ export const sendFeedback = async (
   }
 }
 
-// ✅ AUTRES FONCTIONS INCHANGÉES
+// ✅ FONCTION POUR CHARGER LES CONVERSATIONS UTILISATEUR
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
@@ -434,6 +458,48 @@ export const checkAPIHealth = async (): Promise<boolean> => {
   }
 }
 
+// ✅ FONCTION UTILITAIRE POUR CONSTRUIRE LES ENTITÉS DE CLARIFICATION
+export const buildClarificationEntities = (
+  clarificationAnswers: Record<string, string>,
+  clarificationQuestions: string[]
+): Record<string, any> => {
+  const entities: Record<string, any> = {}
+  
+  Object.entries(clarificationAnswers).forEach(([index, answer]) => {
+    if (answer && answer.trim()) {
+      try {
+        const questionIndex = parseInt(index)
+        if (questionIndex >= 0 && questionIndex < clarificationQuestions.length) {
+          const question = clarificationQuestions[questionIndex].toLowerCase()
+          
+          // Détecter automatiquement le type d'entité basé sur la question
+          if (question.includes('race') || question.includes('breed') || question.includes('souche')) {
+            entities.breed = answer.trim()
+          } else if (question.includes('sexe') || question.includes('sex') || question.includes('mâle') || question.includes('femelle')) {
+            entities.sex = answer.trim()
+          } else if (question.includes('âge') || question.includes('age') || question.includes('jour') || question.includes('semaine')) {
+            entities.age = answer.trim()
+          } else if (question.includes('poids') || question.includes('weight')) {
+            entities.weight = answer.trim()
+          } else if (question.includes('température') || question.includes('temperature')) {
+            entities.temperature = answer.trim()
+          } else if (question.includes('nombre') || question.includes('quantité') || question.includes('effectif')) {
+            entities.quantity = answer.trim()
+          } else {
+            // Utiliser l'index comme clé par défaut
+            entities[`answer_${questionIndex}`] = answer.trim()
+          }
+        }
+      } catch {
+        // Ignorer les index invalides
+      }
+    }
+  })
+  
+  console.log('🔍 [apiService] Entités construites:', entities)
+  return entities
+}
+
 /**
  * ✅ FONCTION DE DEBUG CORRIGÉE
  */
@@ -450,6 +516,7 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ ask-enhanced → ask-enhanced-v2 (sécurisé)')
   console.log('  ✅ ask-enhanced-public → ask-enhanced-v2-public')
   console.log('  ✅ Fonctionnalités v2 activées par défaut')
+  console.log('  ✅ Support clarifications complet')
   console.log('  ✅ Authentification JWT maintenue')
   console.groupEnd()
 }
@@ -522,7 +589,7 @@ export const testEnhancedConversationContinuity = async (
 }
 
 /**
- * ✅ UTILITAIRE POUR GÉRER LES ERREURS RÉSEAU (inchangé)
+ * ✅ UTILITAIRE POUR GÉRER LES ERREURS RÉSEAU
  */
 export const handleEnhancedNetworkError = (error: any): string => {
   if (error?.message?.includes('Failed to fetch')) {
@@ -545,7 +612,7 @@ export const handleEnhancedNetworkError = (error: any): string => {
 }
 
 /**
- * ✅ DEBUG CONVERSATION FLOW (inchangé)
+ * ✅ DEBUG CONVERSATION FLOW
  */
 export const debugEnhancedConversationFlow = (
   step: string,
@@ -632,6 +699,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ ask-enhanced → ask-enhanced-v2 (endpoint sécurisé)')
   console.log('  - ✅ ask-enhanced-public → ask-enhanced-v2-public')
   console.log('  - ✅ Fonctionnalités v2 activées (vagueness detection, coherence check)')
+  console.log('  - ✅ Support clarifications complet')
   console.log('  - ✅ Authentification JWT maintenue')
   console.log('Fonctionnalités v2:')
   console.log('  - ✅ Détection de questions floues')
@@ -639,6 +707,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Améliorations IA intégrées')
   console.log('  - ✅ Métriques de performance')
   console.log('  - ✅ Sauvegarde automatique')
+  console.log('  - ✅ Support clarifications')
   console.log('Endpoints principaux:')
   console.log('  - POST /expert/ask-enhanced-v2 (authentifié)')
   console.log('  - POST /expert/ask-enhanced-v2-public (public)')
