@@ -61,7 +61,7 @@ class IntegrationsManager:
         
         # === INTÉGRATION MÉMOIRE INTELLIGENTE ===
         try:
-            from app.api.v1.conversation_memory import (
+            from app.api.v1.conversation_memory_enhanced import (
                 add_message_to_conversation,
                 get_conversation_context,
                 get_context_for_clarification,
