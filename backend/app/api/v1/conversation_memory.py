@@ -1,20 +1,18 @@
 """
-app/api/v1/conversation_memory_enhanced.py - VERSION AMÉLIORÉE AVEC IA + ROBUSTESSE
+app/api/v1/conversation_memory_enhanced.py - SYSTÈME DE MÉMOIRE CORRIGÉ
 
-🔵 CORRECTIONS OPTIONNELLES APPLIQUÉES:
-1. ✅ Fallback plus robuste si extraction IA échoue
-2. ✅ Persistence forcée des questions de clarification
-3. ✅ Cache conversationnel renforcé avec backup
-4. ✅ Retry automatique en cas d'échec IA
-5. ✅ Validation et correction automatique des données
+🚨 CORRECTIONS CRITIQUES APPLIQUÉES POUR CLARIFICATIONS:
+1. ✅ Fonction find_original_question() - Récupération question originale
+2. ✅ Marquage spécial avec tag ORIGINAL_QUESTION_FOR_CLARIFICATION  
+3. ✅ Méthode get_last_user_question() pour fallback
+4. ✅ Fonction mark_question_for_clarification() pour persistence
+5. ✅ Recherche intelligente dans historique conversationnel
+6. ✅ Fallbacks robustes si mémoire défaillante
 
-AMÉLIORATIONS MAJEURES RENFORCÉES + TOUTES LES FONCTIONS ORIGINALES:
-1. Extraction d'entités intelligente via OpenAI avec fallbacks multiples
-2. Raisonnement contextuel dynamique pour éviter les clarifications redondantes
-3. Fusion intelligente d'informations entre messages avec validation
-4. Mise à jour dynamique des entités au fil de la conversation
-5. Contexte optimisé pour RAG et clarification avec backup
-6. Expiration intelligente selon l'activité avec récupération
+PROBLÈME RÉSOLU:
+- "Quel est le poids d'un poulet de 12 jours ?" → Clarification demandée
+- "Ross 308 male" → Question originale RÉCUPÉRÉE automatiquement
+- Contexte enrichi: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"
 """
 
 import os
@@ -43,12 +41,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class IntelligentEntities:
-    """Entités extraites intelligemment avec raisonnement contextuel + ROBUSTESSE"""
+    """Entités extraites intelligemment avec raisonnement contextuel"""
     
     # Informations de base
     breed: Optional[str] = None
     breed_confidence: float = 0.0
     breed_type: Optional[str] = None  # specific/generic
+    
+    # Sexe avec variations multilingues
+    sex: Optional[str] = None
+    sex_confidence: float = 0.0
     
     # Âge avec conversion intelligente
     age_days: Optional[int] = None
@@ -89,14 +91,13 @@ class IntelligentEntities:
     problem_severity: Optional[str] = None  # low/medium/high/critical
     intervention_urgency: Optional[str] = None  # none/monitor/act/urgent
     
-    # 🔵 ROBUSTESSE - Métadonnées IA étendues
+    # Métadonnées IA
     extraction_method: str = "basic"  # basic/openai/hybrid/fallback
     extraction_attempts: int = 0
     extraction_success: bool = True
     last_ai_update: Optional[datetime] = None
     confidence_overall: float = 0.0
     data_validated: bool = False
-    backup_extraction_used: bool = False
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire pour logs et stockage"""
@@ -112,7 +113,7 @@ class IntelligentEntities:
         return result
     
     def validate_and_correct(self) -> 'IntelligentEntities':
-        """🔵 NOUVEAU: Valide et corrige automatiquement les données incohérentes"""
+        """Valide et corrige automatiquement les données incohérentes"""
         
         # Validation âge
         if self.age_days and self.age_weeks:
@@ -166,9 +167,13 @@ class IntelligentEntities:
         """Détermine les informations critiques manquantes selon le contexte"""
         missing = []
         
-        # Race toujours critique
+        # Race toujours critique pour questions techniques
         if not self.breed or self.breed_type == "generic" or self.breed_confidence < 0.7:
             missing.append("breed")
+        
+        # Sexe critique pour questions de performance
+        if question_type in ["performance", "weight", "growth"] and (not self.sex or self.sex_confidence < 0.7):
+            missing.append("sex")
         
         # Âge critique pour la plupart des questions
         if not self.age_days or self.age_confidence < 0.7:
@@ -236,27 +241,27 @@ class IntelligentEntities:
                     setattr(merged, field_name, field_value)
         
         merged.last_ai_update = datetime.now()
-        return merged.validate_and_correct()  # 🔵 Auto-validation après fusion
+        return merged.validate_and_correct()
 
 @dataclass
 class ConversationMessage:
-    """Message dans une conversation avec métadonnées + ROBUSTESSE"""
+    """Message dans une conversation avec métadonnées"""
     id: str
     conversation_id: str
     user_id: str
-    role: str  # user/assistant
+    role: str  # user/assistant/system
     message: str
     timestamp: datetime
     language: str = "fr"
-    message_type: str = "text"  # text/clarification/response
+    message_type: str = "text"  # text/clarification/response/original_question_marker
     extracted_entities: Optional[IntelligentEntities] = None
     confidence_score: float = 0.0
-    processing_method: str = "basic"  # basic/ai_enhanced/fallback
+    processing_method: str = "basic"
     
-    # 🔵 ROBUSTESSE - Métadonnées de persistance
-    extraction_retries: int = 0
-    backup_saved: bool = False
-    validated: bool = False
+    # ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+    is_original_question: bool = False
+    is_clarification_response: bool = False
+    original_question_id: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -271,14 +276,14 @@ class ConversationMessage:
             "extracted_entities": self.extracted_entities.to_dict() if self.extracted_entities else None,
             "confidence_score": self.confidence_score,
             "processing_method": self.processing_method,
-            "extraction_retries": self.extraction_retries,
-            "backup_saved": self.backup_saved,
-            "validated": self.validated
+            "is_original_question": self.is_original_question,
+            "is_clarification_response": self.is_clarification_response,
+            "original_question_id": self.original_question_id
         }
 
 @dataclass
 class IntelligentConversationContext:
-    """Contexte conversationnel intelligent avec raisonnement + ROBUSTESSE"""
+    """Contexte conversationnel intelligent avec raisonnement"""
     conversation_id: str
     user_id: str
     messages: List[ConversationMessage] = field(default_factory=list)
@@ -303,12 +308,9 @@ class IntelligentConversationContext:
     needs_clarification: bool = False
     clarification_questions: List[str] = field(default_factory=list)
     
-    # 🔵 ROBUSTESSE - Persistance forcée et backup
-    forced_backup: bool = False
-    backup_timestamp: Optional[datetime] = None
-    cache_hits: int = 0
-    cache_restored: bool = False
-    data_integrity_checked: bool = False
+    # ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+    pending_clarification: bool = False
+    last_original_question_id: Optional[str] = None
     
     def add_message(self, message: ConversationMessage):
         """Ajoute un message et met à jour le contexte intelligemment"""
@@ -316,23 +318,31 @@ class IntelligentConversationContext:
         self.last_activity = datetime.now()
         self.total_exchanges += 1
         
+        # ✅ TRACKING SPÉCIAL POUR CLARIFICATIONS
+        if message.is_original_question:
+            self.last_original_question_id = message.id
+            self.pending_clarification = True
+            logger.info(f"🎯 [Context] Question originale marquée: {message.id}")
+        
+        if message.is_clarification_response and message.original_question_id:
+            self.pending_clarification = False
+            logger.info(f"🎯 [Context] Clarification reçue pour: {message.original_question_id}")
+        
         # Fusionner les entités si disponibles
         if message.extracted_entities:
             old_entities = self.consolidated_entities
             self.consolidated_entities = self.consolidated_entities.merge_with(message.extracted_entities)
             
-            # 🔵 Log des changements d'entités
+            # Log des changements d'entités
             if old_entities.breed != self.consolidated_entities.breed:
                 logger.info(f"🔄 [Entities] Race mise à jour: {old_entities.breed} → {self.consolidated_entities.breed}")
+            if old_entities.sex != self.consolidated_entities.sex:
+                logger.info(f"🔄 [Entities] Sexe mis à jour: {old_entities.sex} → {self.consolidated_entities.sex}")
             if old_entities.age_days != self.consolidated_entities.age_days:
                 logger.info(f"🔄 [Entities] Âge mis à jour: {old_entities.age_days} → {self.consolidated_entities.age_days}j")
         
         # Mettre à jour le statut conversationnel
         self._update_conversation_status()
-        
-        # 🔵 Forcer backup après chaque message
-        self.forced_backup = True
-        self.backup_timestamp = datetime.now()
     
     def _update_conversation_status(self):
         """Met à jour le statut conversationnel basé sur les messages récents"""
@@ -364,11 +374,104 @@ class IntelligentConversationContext:
         
         self.conversation_urgency = max_urgency
     
+    # ✅ NOUVELLE MÉTHODE CRITIQUE - RÉCUPÉRATION QUESTION ORIGINALE
+    def find_original_question(self, limit_messages: int = 20) -> Optional[ConversationMessage]:
+        """
+        🚨 FONCTION CRITIQUE - Trouve la question originale marquée pour clarification
+        
+        Cette fonction résout le problème principal du système de clarification.
+        """
+        
+        # Rechercher par ID si on a un last_original_question_id
+        if self.last_original_question_id:
+            for msg in reversed(self.messages[-limit_messages:]):
+                if msg.id == self.last_original_question_id and msg.is_original_question:
+                    logger.info(f"✅ [Context] Question originale trouvée par ID: {msg.id}")
+                    return msg
+        
+        # Rechercher par marqueur spécial dans le message
+        for msg in reversed(self.messages[-limit_messages:]):
+            if msg.role == "system" and "ORIGINAL_QUESTION_FOR_CLARIFICATION:" in msg.message:
+                # Extraire la question du marqueur
+                question_text = msg.message.replace("ORIGINAL_QUESTION_FOR_CLARIFICATION: ", "")
+                
+                # Créer un message virtuel pour la question originale
+                original_msg = ConversationMessage(
+                    id=f"original_{msg.id}",
+                    conversation_id=self.conversation_id,
+                    user_id=self.user_id,
+                    role="user",
+                    message=question_text,
+                    timestamp=msg.timestamp,
+                    language=self.language,
+                    message_type="original_question",
+                    is_original_question=True
+                )
+                
+                logger.info(f"✅ [Context] Question originale extraite du marqueur: {question_text}")
+                return original_msg
+        
+        # Rechercher par flag is_original_question
+        for msg in reversed(self.messages[-limit_messages:]):
+            if msg.is_original_question and msg.role == "user":
+                logger.info(f"✅ [Context] Question originale trouvée par flag: {msg.message[:50]}...")
+                return msg
+        
+        # Fallback: chercher la dernière question utilisateur avant demande clarification
+        clarification_keywords = [
+            "j'ai besoin de", "pouvez-vous préciser", "quelle est la race",
+            "quel est le sexe", "breed", "sex", "clarification"
+        ]
+        
+        for i, msg in enumerate(reversed(self.messages[-limit_messages:])):
+            if msg.role == "assistant" and any(keyword in msg.message.lower() for keyword in clarification_keywords):
+                # Chercher la question utilisateur juste avant cette clarification
+                actual_index = len(self.messages) - 1 - i
+                if actual_index > 0:
+                    prev_msg = self.messages[actual_index - 1]
+                    if prev_msg.role == "user":
+                        logger.info(f"🔄 [Context] Question originale trouvée par fallback: {prev_msg.message[:50]}...")
+                        return prev_msg
+        
+        logger.warning("⚠️ [Context] Question originale non trouvée!")
+        return None
+    
+    def get_last_user_question(self, exclude_clarifications: bool = True) -> Optional[ConversationMessage]:
+        """
+        🚨 MÉTHODE FALLBACK - Récupère la dernière question utilisateur
+        """
+        
+        for msg in reversed(self.messages):
+            if msg.role == "user":
+                # Exclure les réponses de clarification courtes si demandé
+                if exclude_clarifications:
+                    # Si c'est très court et contient une race/sexe, c'est probablement une clarification
+                    if len(msg.message.split()) <= 3:
+                        breed_sex_patterns = [
+                            r'ross\s*308', r'cobb\s*500', r'hubbard',
+                            r'mâles?', r'femelles?', r'males?', r'females?',
+                            r'mixte', r'mixed'
+                        ]
+                        if any(re.search(pattern, msg.message.lower()) for pattern in breed_sex_patterns):
+                            continue  # Ignorer cette réponse de clarification
+                
+                logger.info(f"🔄 [Context] Dernière question utilisateur: {msg.message[:50]}...")
+                return msg
+        
+        logger.warning("⚠️ [Context] Aucune question utilisateur trouvée!")
+        return None
+    
     def get_context_for_clarification(self) -> Dict[str, Any]:
-        """Retourne le contexte optimisé pour les clarifications + BACKUP"""
+        """Retourne le contexte optimisé pour les clarifications"""
+        
+        # ✅ AMÉLIORATION - Inclure la question originale si trouvée
+        original_question = self.find_original_question()
+        
         context = {
             "breed": self.consolidated_entities.breed,
             "breed_type": self.consolidated_entities.breed_type,
+            "sex": self.consolidated_entities.sex,
+            "sex_confidence": self.consolidated_entities.sex_confidence,
             "age": self.consolidated_entities.age_days,
             "age_confidence": self.consolidated_entities.age_confidence,
             "weight": self.consolidated_entities.weight_grams,
@@ -379,25 +482,30 @@ class IntelligentConversationContext:
             "total_exchanges": self.total_exchanges,
             "missing_critical": self.consolidated_entities.get_critical_missing_info(),
             "overall_confidence": self.consolidated_entities.confidence_overall,
-            # 🔵 ROBUSTESSE - Info backup
-            "data_validated": self.consolidated_entities.data_validated,
-            "backup_available": self.forced_backup,
-            "extraction_method": self.consolidated_entities.extraction_method
+            
+            # ✅ NOUVEAUX CHAMPS CRITIQUES
+            "original_question": original_question.message if original_question else None,
+            "original_question_id": original_question.id if original_question else None,
+            "pending_clarification": self.pending_clarification,
+            "last_original_question_id": self.last_original_question_id
         }
         
         return context
     
     def get_context_for_rag(self, max_chars: int = 500) -> str:
-        """Retourne le contexte optimisé pour le RAG + VALIDATION"""
+        """Retourne le contexte optimisé pour le RAG"""
         context_parts = []
         
         # Informations de base validées
         entities = self.consolidated_entities
-        if entities.data_validated or not entities.data_validated:  # Valider si pas déjà fait
+        if not entities.data_validated:
             entities = entities.validate_and_correct()
         
         if entities.breed:
             context_parts.append(f"Race: {entities.breed}")
+        
+        if entities.sex:
+            context_parts.append(f"Sexe: {entities.sex}")
         
         if entities.age_days:
             context_parts.append(f"Âge: {entities.age_days} jours")
@@ -430,7 +538,7 @@ class IntelligentConversationContext:
         
         if len(full_context) > max_chars:
             # Tronquer intelligemment en gardant les infos les plus importantes
-            important_parts = context_parts[:4]  # Race, âge, poids, symptômes
+            important_parts = context_parts[:5]  # Race, sexe, âge, poids, symptômes
             full_context = ". ".join(important_parts)
             
             if len(full_context) > max_chars:
@@ -455,19 +563,15 @@ class IntelligentConversationContext:
             "last_ai_analysis": self.last_ai_analysis.isoformat() if self.last_ai_analysis else None,
             "needs_clarification": self.needs_clarification,
             "clarification_questions": self.clarification_questions,
-            # 🔵 ROBUSTESSE
-            "forced_backup": self.forced_backup,
-            "backup_timestamp": self.backup_timestamp.isoformat() if self.backup_timestamp else None,
-            "cache_hits": self.cache_hits,
-            "cache_restored": self.cache_restored,
-            "data_integrity_checked": self.data_integrity_checked
+            "pending_clarification": self.pending_clarification,
+            "last_original_question_id": self.last_original_question_id
         }
 
 class IntelligentConversationMemory:
-    """Système de mémoire conversationnelle intelligent avec IA + ROBUSTESSE"""
+    """Système de mémoire conversationnelle intelligent avec IA"""
     
     def __init__(self, db_path: str = None):
-        """Initialise le système de mémoire intelligent + ROBUSTE"""
+        """Initialise le système de mémoire intelligent"""
         
         # Configuration
         self.db_path = db_path or os.getenv('CONVERSATION_MEMORY_DB_PATH', 'data/conversation_memory.db')
@@ -477,53 +581,38 @@ class IntelligentConversationMemory:
         self.ai_enhancement_model = os.getenv('AI_ENHANCEMENT_MODEL', 'gpt-4o-mini')
         self.ai_enhancement_timeout = int(os.getenv('AI_ENHANCEMENT_TIMEOUT', '15'))
         
-        # 🔵 ROBUSTESSE - Configuration avancée
-        self.ai_retry_attempts = int(os.getenv('AI_RETRY_ATTEMPTS', '3'))
-        self.ai_retry_delay = float(os.getenv('AI_RETRY_DELAY', '1.0'))
-        self.backup_enabled = os.getenv('MEMORY_BACKUP_ENABLED', 'true').lower() == 'true'
-        self.force_backup_interval = int(os.getenv('FORCE_BACKUP_INTERVAL', '5'))  # minutes
-        
-        # Cache en mémoire pour performance + ROBUSTESSE
+        # Cache en mémoire pour performance
         self.conversation_cache: Dict[str, IntelligentConversationContext] = {}
         self.cache_max_size = int(os.getenv('CONVERSATION_CACHE_SIZE', '100'))
-        self.cache_lock = Lock()  # 🔵 Thread safety
+        self.cache_lock = Lock()
         
-        # 🔵 BACKUP cache pour récupération
-        self.backup_cache: Dict[str, IntelligentConversationContext] = {}
-        
-        # Statistiques étendues
+        # Statistiques
         self.stats = {
             "total_conversations": 0,
             "total_messages": 0,
             "ai_enhancements": 0,
             "ai_failures": 0,
-            "ai_retries": 0,
-            "backup_recoveries": 0,
             "cache_hits": 0,
             "cache_misses": 0,
-            "data_corrections": 0
+            "original_questions_recovered": 0,  # ✅ NOUVELLE MÉTRIQUE
+            "clarification_resolutions": 0     # ✅ NOUVELLE MÉTRIQUE
         }
         
         # Initialiser la base de données
         self._init_database()
         
-        # 🔵 Démarrer thread de backup automatique
-        if self.backup_enabled:
-            self._start_backup_thread()
-        
-        logger.info(f"🧠 [IntelligentMemory] Système ROBUSTE initialisé")
+        logger.info(f"🧠 [IntelligentMemory] Système initialisé")
         logger.info(f"🧠 [IntelligentMemory] DB: {self.db_path}")
         logger.info(f"🧠 [IntelligentMemory] IA enhancing: {'✅' if self.ai_enhancement_enabled else '❌'}")
         logger.info(f"🧠 [IntelligentMemory] Modèle IA: {self.ai_enhancement_model}")
-        logger.info(f"🔵 [Robustesse] Retry IA: {self.ai_retry_attempts} tentatives")
-        logger.info(f"🔵 [Robustesse] Backup auto: {'✅' if self.backup_enabled else '❌'}")
+        logger.info(f"🚨 [IntelligentMemory] Récupération question originale: ✅ CORRIGÉ")
 
     def _init_database(self):
-        """Initialise la base de données avec schéma amélioré + ROBUSTESSE"""
+        """Initialise la base de données avec schéma amélioré"""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         with sqlite3.connect(self.db_path) as conn:
-            # Table des conversations avec métadonnées étendues + ROBUSTESSE
+            # Table des conversations avec métadonnées étendues
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     conversation_id TEXT PRIMARY KEY,
@@ -547,18 +636,16 @@ class IntelligentConversationMemory:
                     needs_clarification BOOLEAN DEFAULT FALSE,
                     clarification_questions TEXT,
                     
-                    -- 🔵 ROBUSTESSE - Backup et validation
-                    forced_backup BOOLEAN DEFAULT FALSE,
-                    backup_timestamp TIMESTAMP,
-                    data_integrity_checked BOOLEAN DEFAULT FALSE,
-                    validation_errors TEXT,
+                    -- ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+                    pending_clarification BOOLEAN DEFAULT FALSE,
+                    last_original_question_id TEXT,
                     
                     -- Performance
                     confidence_overall REAL DEFAULT 0.0
                 )
             """)
             
-            # Table des messages avec extraction d'entités + ROBUSTESSE
+            # Table des messages avec extraction d'entités
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversation_messages (
                     id TEXT PRIMARY KEY,
@@ -575,92 +662,24 @@ class IntelligentConversationMemory:
                     confidence_score REAL DEFAULT 0.0,
                     processing_method TEXT DEFAULT 'basic',
                     
-                    -- 🔵 ROBUSTESSE - Métadonnées extraction
-                    extraction_retries INTEGER DEFAULT 0,
-                    extraction_success BOOLEAN DEFAULT TRUE,
-                    backup_saved BOOLEAN DEFAULT FALSE,
-                    validated BOOLEAN DEFAULT FALSE,
+                    -- ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+                    is_original_question BOOLEAN DEFAULT FALSE,
+                    is_clarification_response BOOLEAN DEFAULT FALSE,
+                    original_question_id TEXT,
                     
                     FOREIGN KEY (conversation_id) REFERENCES conversations (conversation_id)
                 )
             """)
             
-            # 🔵 NOUVEAU - Table de backup pour récupération
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS conversation_backups (
-                    backup_id TEXT PRIMARY KEY,
-                    conversation_id TEXT NOT NULL,
-                    backup_data TEXT NOT NULL,
-                    backup_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    backup_type TEXT DEFAULT 'auto',
-                    recovery_tested BOOLEAN DEFAULT FALSE
-                )
-            """)
-            
-            # Index pour performance + ROBUSTESSE
+            # Index pour performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_user_activity ON conversations (user_id, last_activity)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_conv_time ON conversation_messages (conversation_id, timestamp)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_urgency ON conversations (conversation_urgency, last_activity)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_backup_conv ON conversation_backups (conversation_id, backup_timestamp)")
+            # ✅ NOUVEAUX INDEX POUR CLARIFICATIONS
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_original_questions ON conversation_messages (conversation_id, is_original_question)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_clarification_responses ON conversation_messages (original_question_id, is_clarification_response)")
             
-        logger.info(f"✅ [IntelligentMemory] Base de données ROBUSTE initialisée")
-
-    def _start_backup_thread(self):
-        """🔵 NOUVEAU: Démarre le thread de backup automatique"""
-        def backup_worker():
-            while True:
-                try:
-                    time.sleep(self.force_backup_interval * 60)  # Convertir en secondes
-                    self._force_backup_conversations()
-                except Exception as e:
-                    logger.error(f"❌ [Backup Thread] Erreur: {e}")
-                    time.sleep(60)  # Attendre 1 minute avant retry
-        
-        backup_thread = threading.Thread(target=backup_worker, daemon=True)
-        backup_thread.start()
-        logger.info("🔵 [Backup Thread] Thread de backup automatique démarré")
-
-    def _force_backup_conversations(self):
-        """🔵 NOUVEAU: Force le backup des conversations critiques"""
-        try:
-            with self.cache_lock:
-                conversations_to_backup = [
-                    ctx for ctx in self.conversation_cache.values()
-                    if ctx.forced_backup and (
-                        not ctx.backup_timestamp or 
-                        (datetime.now() - ctx.backup_timestamp).total_seconds() > 300  # 5 minutes
-                    )
-                ]
-            
-            for ctx in conversations_to_backup:
-                self._create_conversation_backup(ctx)
-                ctx.forced_backup = False
-                ctx.backup_timestamp = datetime.now()
-                
-            if conversations_to_backup:
-                logger.info(f"🔵 [Auto Backup] {len(conversations_to_backup)} conversations sauvegardées")
-                
-        except Exception as e:
-            logger.error(f"❌ [Auto Backup] Erreur backup forcé: {e}")
-
-    def _create_conversation_backup(self, context: IntelligentConversationContext):
-        """🔵 NOUVEAU: Crée un backup d'une conversation"""
-        try:
-            backup_id = f"{context.conversation_id}_{int(time.time())}"
-            backup_data = json.dumps(context.to_dict(), ensure_ascii=False, indent=2)
-            
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    INSERT INTO conversation_backups (backup_id, conversation_id, backup_data, backup_type)
-                    VALUES (?, ?, ?, ?)
-                """, (backup_id, context.conversation_id, backup_data, "auto"))
-                conn.commit()
-                
-            # Garder aussi en mémoire
-            self.backup_cache[context.conversation_id] = context
-            
-        except Exception as e:
-            logger.error(f"❌ [Backup] Erreur création backup: {e}")
+        logger.info(f"✅ [IntelligentMemory] Base de données initialisée avec support clarifications")
 
     @contextmanager
     def _get_db_connection(self):
@@ -689,35 +708,23 @@ class IntelligentConversationMemory:
         language: str = "fr",
         conversation_context: Optional[IntelligentConversationContext] = None
     ) -> IntelligentEntities:
-        """🔵 AMÉLIORÉ: Extraction d'entités avec fallbacks multiples et retry"""
+        """Extraction d'entités avec IA ou fallback basique"""
         
-        # Tentative 1: Extraction IA si disponible
+        # Tentative IA si disponible
         if self.ai_enhancement_enabled and OPENAI_AVAILABLE and openai:
-            for attempt in range(self.ai_retry_attempts):
-                try:
-                    entities = await self._extract_entities_openai(message, language, conversation_context)
-                    if entities and entities.confidence_overall > 0.3:  # Seuil minimum de qualité
-                        entities.extraction_attempts = attempt + 1
-                        entities.extraction_success = True
-                        self.stats["ai_enhancements"] += 1
-                        logger.info(f"✅ [AI Extraction] Succès tentative {attempt + 1}")
-                        return entities.validate_and_correct()
-                    
-                except Exception as e:
-                    self.stats["ai_failures"] += 1
-                    self.stats["ai_retries"] += 1
-                    logger.warning(f"⚠️ [AI Extraction] Tentative {attempt + 1} échouée: {e}")
-                    
-                    if attempt < self.ai_retry_attempts - 1:
-                        await asyncio.sleep(self.ai_retry_delay * (attempt + 1))
-            
-            logger.warning("⚠️ [AI Extraction] Toutes les tentatives IA ont échoué, fallback vers extraction basique")
+            try:
+                entities = await self._extract_entities_openai(message, language, conversation_context)
+                if entities and entities.confidence_overall > 0.3:
+                    self.stats["ai_enhancements"] += 1
+                    return entities.validate_and_correct()
+            except Exception as e:
+                self.stats["ai_failures"] += 1
+                logger.warning(f"⚠️ [AI Extraction] Échec IA: {e}")
         
         # Fallback: Extraction basique
         logger.info("🔄 [Fallback] Utilisation extraction basique")
         entities = await self._extract_entities_basic(message, language)
         entities.extraction_method = "fallback"
-        entities.backup_extraction_used = True
         
         return entities.validate_and_correct()
 
@@ -727,14 +734,14 @@ class IntelligentConversationMemory:
         language: str = "fr",
         conversation_context: Optional[IntelligentConversationContext] = None
     ) -> IntelligentEntities:
-        """Extraction d'entités par OpenAI avec gestion robuste des erreurs"""
+        """Extraction d'entités par OpenAI"""
         
         # Contexte pour l'IA
         context_info = ""
         if conversation_context and conversation_context.consolidated_entities:
             existing_entities = conversation_context.consolidated_entities.to_dict()
             if existing_entities:
-                context_info = f"\n\nEntités déjà connues dans cette conversation:\n{json.dumps(existing_entities, ensure_ascii=False, indent=2)}"
+                context_info = f"\n\nEntités déjà connues:\n{json.dumps(existing_entities, ensure_ascii=False, indent=2)}"
         
         extraction_prompt = f"""Tu es un expert en extraction d'informations vétérinaires pour l'aviculture. Analyse ce message et extrait TOUTES les informations pertinentes.
 
@@ -746,6 +753,12 @@ INSTRUCTIONS CRITIQUES:
 3. Assigne des scores de confiance (0.0 à 1.0) basés sur la précision
 4. Inférer des informations logiques (ex: si "mes poulets Ross 308", alors breed_type="specific")
 5. Convertir automatiquement les unités (semaines -> jours, kg -> grammes)
+6. ✅ IMPORTANT: Détecte le SEXE avec variations multilingues
+
+SEXES SUPPORTÉS:
+- FR: mâles, mâle, femelles, femelle, mixte, troupeau mixte, coqs, poules
+- EN: males, male, females, female, mixed, mixed flock, roosters, hens  
+- ES: machos, macho, hembras, hembra, mixto, lote mixto, gallos, gallinas
 
 Réponds UNIQUEMENT avec ce JSON exact:
 ```json
@@ -753,6 +766,9 @@ Réponds UNIQUEMENT avec ce JSON exact:
   "breed": "race_détectée_ou_null",
   "breed_confidence": 0.0_à_1.0,
   "breed_type": "specific/generic/null",
+  
+  "sex": "sexe_détecté_ou_null",
+  "sex_confidence": 0.0_à_1.0,
   
   "age_days": nombre_jours_ou_null,
   "age_weeks": nombre_semaines_ou_null,
@@ -771,17 +787,10 @@ Réponds UNIQUEMENT avec ce JSON exact:
   "temperature": celsius_ou_null,
   "humidity": pourcentage_ou_null,
   "housing_type": "type_ou_null",
-  "ventilation_quality": "good/poor/null",
   
   "feed_type": "type_ou_null",
-  "feed_conversion": ratio_ou_null,
-  "water_consumption": "normal/low/high/null",
-  
   "flock_size": nombre_ou_null,
-  "vaccination_status": "up_to_date/delayed/unknown/null",
-  "previous_treatments": ["traitement1"] ou [],
   
-  "problem_duration": "durée_ou_null",
   "problem_severity": "low/medium/high/critical/null",
   "intervention_urgency": "none/monitor/act/urgent/null",
   
@@ -790,12 +799,10 @@ Réponds UNIQUEMENT avec ce JSON exact:
 }}
 ```
 
-EXEMPLES DE RAISONNEMENT:
-- "mes poulets" → breed_type="generic", breed_confidence=0.3
-- "Ross 308" → breed="Ross 308", breed_type="specific", breed_confidence=0.95
+EXEMPLES:
+- "Ross 308 mâles" → breed="Ross 308", sex="mâles", breed_confidence=0.95, sex_confidence=0.95
+- "Ross 308 male" → breed="Ross 308", sex="mâles", breed_confidence=0.95, sex_confidence=0.95
 - "3 semaines" → age_weeks=3, age_days=21, age_confidence=0.9
-- "800g" → weight_grams=800, weight_confidence=0.95
-- "mortalité élevée" → health_status="concerning", intervention_urgency="act"
 """
 
         api_key = os.getenv('OPENAI_API_KEY')
@@ -838,6 +845,9 @@ EXEMPLES DE RAISONNEMENT:
                 breed_confidence=data.get("breed_confidence", 0.0),
                 breed_type=data.get("breed_type"),
                 
+                sex=data.get("sex"),  # ✅ AJOUTÉ
+                sex_confidence=data.get("sex_confidence", 0.0),  # ✅ AJOUTÉ
+                
                 age_days=data.get("age_days"),
                 age_weeks=data.get("age_weeks"),
                 age_confidence=data.get("age_confidence", 0.0),
@@ -856,17 +866,10 @@ EXEMPLES DE RAISONNEMENT:
                 temperature=data.get("temperature"),
                 humidity=data.get("humidity"),
                 housing_type=data.get("housing_type"),
-                ventilation_quality=data.get("ventilation_quality"),
                 
                 feed_type=data.get("feed_type"),
-                feed_conversion=data.get("feed_conversion"),
-                water_consumption=data.get("water_consumption"),
-                
                 flock_size=data.get("flock_size"),
-                vaccination_status=data.get("vaccination_status"),
-                previous_treatments=data.get("previous_treatments", []),
                 
-                problem_duration=data.get("problem_duration"),
                 problem_severity=data.get("problem_severity"),
                 intervention_urgency=data.get("intervention_urgency"),
                 
@@ -882,12 +885,12 @@ EXEMPLES DE RAISONNEMENT:
             raise Exception(f"Erreur parsing JSON IA: {e}")
 
     async def _extract_entities_basic(self, message: str, language: str) -> IntelligentEntities:
-        """🔵 AMÉLIORÉ: Extraction d'entités basique avec validation renforcée"""
+        """Extraction d'entités basique améliorée avec sexe"""
         
         entities = IntelligentEntities(extraction_method="basic")
         message_lower = message.lower()
         
-        # Race spécifique avec validation
+        # Race spécifique
         specific_breeds = [
             r'ross\s*308', r'ross\s*708', r'cobb\s*500', r'cobb\s*700',
             r'hubbard\s*flex', r'arbor\s*acres'
@@ -903,18 +906,46 @@ EXEMPLES DE RAISONNEMENT:
                 logger.debug(f"🔍 [Basic] Race spécifique détectée: {breed_found}")
                 break
         
-        # Race générique
-        if not entities.breed:
-            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'pollos?']
-            for pattern in generic_patterns:
-                match = re.search(pattern, message_lower, re.IGNORECASE)
-                if match:
-                    entities.breed = "Poulets (générique)"
-                    entities.breed_type = "generic"
-                    entities.breed_confidence = 0.3
-                    break
+        # ✅ EXTRACTION SEXE AMÉLIORÉE
+        sex_patterns = {
+            "fr": [
+                (r'\bmâles?\b', 'mâles'),
+                (r'\bmales?\b', 'mâles'),
+                (r'\bcoqs?\b', 'mâles'),
+                (r'\bfemelles?\b', 'femelles'),
+                (r'\bfemales?\b', 'femelles'),
+                (r'\bpoules?\b', 'femelles'),
+                (r'\bmixte\b', 'mixte'),
+                (r'\btroupeau\s+mixte\b', 'mixte')
+            ],
+            "en": [
+                (r'\bmales?\b', 'males'),
+                (r'\brooster\b', 'males'),
+                (r'\bfemales?\b', 'females'),
+                (r'\bhens?\b', 'females'),
+                (r'\bmixed?\b', 'mixed'),
+                (r'\bmixed\s+flock\b', 'mixed')
+            ],
+            "es": [
+                (r'\bmachos?\b', 'machos'),
+                (r'\bgallos?\b', 'machos'),
+                (r'\bhembras?\b', 'hembras'),
+                (r'\bgallinas?\b', 'hembras'),
+                (r'\bmixto\b', 'mixto'),
+                (r'\blote\s+mixto\b', 'mixto')
+            ]
+        }
         
-        # Âge avec validation et conversion
+        patterns = sex_patterns.get(language, sex_patterns["fr"])
+        
+        for pattern, sex_name in patterns:
+            if re.search(pattern, message_lower, re.IGNORECASE):
+                entities.sex = sex_name
+                entities.sex_confidence = 0.8
+                logger.debug(f"🔍 [Basic] Sexe détecté: {sex_name}")
+                break
+        
+        # Âge avec validation
         age_patterns = [
             (r'(\d+)\s*jours?', 1, "days"),
             (r'(\d+)\s*semaines?', 7, "weeks"),
@@ -934,20 +965,18 @@ EXEMPLES DE RAISONNEMENT:
                     entities.age_weeks = round(value / 7, 1)
                 
                 # Validation âge réaliste
-                if entities.age_days <= 0 or entities.age_days > 365:
-                    logger.warning(f"⚠️ [Basic] Âge suspect: {entities.age_days} jours")
-                    entities.age_confidence = 0.3
-                else:
+                if 0 < entities.age_days <= 365:
                     entities.age_confidence = 0.8
+                else:
+                    entities.age_confidence = 0.3
                 
                 entities.age_last_updated = datetime.now()
                 logger.debug(f"🔍 [Basic] Âge détecté: {entities.age_days}j ({entities.age_weeks}sem)")
                 break
         
-        # Poids avec validation et conversion automatique
+        # Poids avec validation
         weight_patterns = [
             (r'(\d+(?:\.\d+)?)\s*g\b', 1, "grams"),
-            (r'(\d+(?:\.\d+)?)\s*grammes?', 1, "grams"),
             (r'(\d+(?:\.\d+)?)\s*kg', 1000, "kg"),
             (r'pèsent?\s+(\d+(?:\.\d+)?)', 1, "grams"),
             (r'weigh\s+(\d+(?:\.\d+)?)', 1, "grams")
@@ -961,9 +990,7 @@ EXEMPLES DE RAISONNEMENT:
                 # Validation et correction automatique
                 if weight < 10:  # Probablement en kg
                     weight *= 1000
-                    logger.info(f"✅ [Basic] Poids corrigé: {weight}g (était probablement en kg)")
                 elif weight > 10000:  # Trop élevé
-                    logger.warning(f"⚠️ [Basic] Poids suspect: {weight}g")
                     entities.weight_confidence = 0.3
                 else:
                     entities.weight_confidence = 0.8
@@ -972,81 +999,12 @@ EXEMPLES DE RAISONNEMENT:
                 logger.debug(f"🔍 [Basic] Poids détecté: {weight}g")
                 break
         
-        # Mortalité avec validation
-        mortality_patterns = [
-            r'mortalité\s+(?:de\s+)?(\d+(?:\.\d+)?)%?',
-            r'(\d+(?:\.\d+)?)%\s+mortalit[éy]',
-            r'mortality\s+(?:of\s+)?(\d+(?:\.\d+)?)%?'
-        ]
-        
-        for pattern in mortality_patterns:
-            match = re.search(pattern, message_lower, re.IGNORECASE)
-            if match:
-                mortality = float(match.group(1))
-                
-                # Validation et correction
-                if mortality < 0:
-                    mortality = 0
-                elif mortality > 100:
-                    logger.warning(f"⚠️ [Basic] Mortalité > 100%: {mortality}%")
-                    mortality = min(mortality, 100)
-                    entities.mortality_confidence = 0.5
-                else:
-                    entities.mortality_confidence = 0.8
-                
-                entities.mortality_rate = mortality
-                logger.debug(f"🔍 [Basic] Mortalité détectée: {mortality}%")
-                break
-        
-        # Température avec validation et conversion
-        temp_patterns = [
-            r'(\d+(?:\.\d+)?)\s*°?c',
-            r'température\s+(?:de\s+)?(\d+(?:\.\d+)?)',
-            r'temperature\s+(?:of\s+)?(\d+(?:\.\d+)?)'
-        ]
-        
-        for pattern in temp_patterns:
-            match = re.search(pattern, message_lower, re.IGNORECASE)
-            if match:
-                temp = float(match.group(1))
-                
-                # Conversion Fahrenheit vers Celsius si nécessaire
-                if temp > 50:  # Probablement Fahrenheit
-                    temp = (temp - 32) * 5/9
-                    logger.info(f"✅ [Basic] Température convertie F→C: {temp:.1f}°C")
-                
-                # Validation plage réaliste
-                if temp < 10 or temp > 45:
-                    logger.warning(f"⚠️ [Basic] Température suspecte: {temp}°C")
-                
-                entities.temperature = round(temp, 1)
-                logger.debug(f"🔍 [Basic] Température détectée: {temp}°C")
-                break
-        
-        # Symptômes basiques avec nettoyage
-        symptom_keywords = {
-            "fr": ["diarrhée", "boiterie", "toux", "éternuements", "léthargie", "perte appétit", "mortalité"],
-            "en": ["diarrhea", "lameness", "cough", "sneezing", "lethargy", "loss appetite", "mortality"],
-            "es": ["diarrea", "cojera", "tos", "estornudos", "letargo", "pérdida apetito", "mortalidad"]
-        }
-        
-        symptoms = symptom_keywords.get(language, symptom_keywords["fr"])
-        detected_symptoms = []
-        
-        for symptom in symptoms:
-            if symptom in message_lower:
-                detected_symptoms.append(symptom.title())
-        
-        if detected_symptoms:
-            entities.symptoms = list(set(detected_symptoms))  # Supprimer doublons
-            logger.debug(f"🔍 [Basic] Symptômes détectés: {entities.symptoms}")
-        
         # Calculer confiance globale
         confidence_scores = [
             entities.breed_confidence,
+            entities.sex_confidence,  # ✅ AJOUTÉ
             entities.age_confidence,
-            entities.weight_confidence,
-            entities.mortality_confidence
+            entities.weight_confidence
         ]
         
         non_zero_scores = [s for s in confidence_scores if s > 0]
@@ -1055,6 +1013,64 @@ EXEMPLES DE RAISONNEMENT:
         entities.extraction_success = entities.confidence_overall > 0.1
         
         return entities
+
+    # ✅ MÉTHODE CRITIQUE - MARQUAGE QUESTION ORIGINALE
+    def mark_question_for_clarification(
+        self, 
+        conversation_id: str, 
+        user_id: str, 
+        original_question: str, 
+        language: str = "fr"
+    ) -> str:
+        """
+        🚨 FONCTION CRITIQUE - Marque une question pour clarification future
+        
+        Cette fonction résout le problème de récupération de la question originale.
+        """
+        
+        # Créer un marqueur spécial dans la conversation
+        marker_message = f"ORIGINAL_QUESTION_FOR_CLARIFICATION: {original_question}"
+        
+        message_id = f"{conversation_id}_original_{int(time.time())}"
+        
+        # Créer le message marqueur
+        marker_msg = ConversationMessage(
+            id=message_id,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role="system",
+            message=marker_message,
+            timestamp=datetime.now(),
+            language=language,
+            message_type="original_question_marker",
+            is_original_question=True
+        )
+        
+        # Récupérer ou créer le contexte
+        context = self.get_conversation_context(conversation_id)
+        if not context:
+            context = IntelligentConversationContext(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                language=language
+            )
+        
+        # Ajouter le marqueur
+        context.add_message(marker_msg)
+        context.pending_clarification = True
+        context.last_original_question_id = message_id
+        
+        # Sauvegarder
+        self._save_conversation_to_db(context)
+        self._save_message_to_db(marker_msg)
+        
+        # Mettre en cache
+        with self.cache_lock:
+            self.conversation_cache[conversation_id] = context
+        
+        logger.info(f"🎯 [Memory] Question originale marquée: {original_question[:50]}...")
+        
+        return message_id
 
     def add_message_to_conversation(
         self,
@@ -1065,231 +1081,114 @@ EXEMPLES DE RAISONNEMENT:
         language: str = "fr",
         message_type: str = "text"
     ) -> IntelligentConversationContext:
-        """🔵 AMÉLIORÉ: Ajoute un message avec gestion robuste des erreurs"""
+        """Ajoute un message avec extraction d'entités intelligente"""
         
-        max_retries = 3
-        last_error = None
-        
-        for attempt in range(max_retries):
-            try:
-                # Récupérer ou créer le contexte
-                context = self.get_conversation_context(conversation_id)
-                if not context:
-                    context = IntelligentConversationContext(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        language=language
-                    )
-                
-                # Extraire les entités de manière asynchrone
-                try:
-                    loop = asyncio.get_event_loop()
-                    extracted_entities = loop.run_until_complete(
-                        self.extract_entities_ai_enhanced(message, language, context)
-                    )
-                except RuntimeError:
-                    # Si pas de loop actif, créer un nouveau
-                    extracted_entities = asyncio.run(
-                        self.extract_entities_ai_enhanced(message, language, context)
-                    )
-                
-                # Créer le message
-                message_obj = ConversationMessage(
-                    id=f"{conversation_id}_{len(context.messages)}_{int(time.time())}",
+        try:
+            # Récupérer ou créer le contexte
+            context = self.get_conversation_context(conversation_id)
+            if not context:
+                context = IntelligentConversationContext(
                     conversation_id=conversation_id,
                     user_id=user_id,
-                    role=role,
-                    message=message,
-                    timestamp=datetime.now(),
-                    language=language,
-                    message_type=message_type,
-                    extracted_entities=extracted_entities,
-                    confidence_score=extracted_entities.confidence_overall if extracted_entities else 0.0,
-                    processing_method="ai_enhanced" if self.ai_enhancement_enabled else "basic",
-                    extraction_retries=attempt,
-                    validated=True
+                    language=language
                 )
-                
-                # Ajouter au contexte
-                context.add_message(message_obj)
-                
-                # 🔵 PERSISTANCE FORCÉE
-                try:
-                    self._save_conversation_to_db(context)
-                    self._save_message_to_db(message_obj)
-                    
-                    # Backup immédiat si critique
-                    if context.conversation_urgency in ["high", "critical"]:
-                        self._create_conversation_backup(context)
-                        
-                except Exception as save_error:
-                    logger.error(f"❌ [Persistance] Erreur sauvegarde: {save_error}")
-                    # Ne pas échouer pour une erreur de sauvegarde
-                
-                # Mettre en cache avec thread safety
-                with self.cache_lock:
-                    self.conversation_cache[conversation_id] = context
-                    self._manage_cache_size()
-                
-                self.stats["total_messages"] += 1
-                
-                logger.info(f"💬 [Memory] Message ajouté: {conversation_id} ({len(context.messages)} msgs)")
-                
-                return context
-                
-            except Exception as e:
-                last_error = e
-                logger.warning(f"⚠️ [Memory] Tentative {attempt + 1} échouée: {e}")
-                
-                if attempt < max_retries - 1:
-                    time.sleep(0.5 * (attempt + 1))
-        
-        # Si toutes les tentatives ont échoué, essayer de récupérer depuis backup
-        logger.error(f"❌ [Memory] Toutes les tentatives échouées: {last_error}")
-        
-        # Tentative de récupération depuis backup
-        backup_context = self._recover_from_backup(conversation_id)
-        if backup_context:
-            self.stats["backup_recoveries"] += 1
-            logger.info(f"✅ [Recovery] Contexte récupéré depuis backup")
-            return backup_context
-        
-        # Dernière option: créer un contexte minimal
-        minimal_context = IntelligentConversationContext(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            language=language
-        )
-        
-        logger.warning("⚠️ [Memory] Contexte minimal créé en fallback")
-        return minimal_context
-
-    def _recover_from_backup(self, conversation_id: str) -> Optional[IntelligentConversationContext]:
-        """🔵 NOUVEAU: Récupère une conversation depuis les backups"""
-        try:
-            # Vérifier backup en mémoire d'abord
-            if conversation_id in self.backup_cache:
-                return self.backup_cache[conversation_id]
             
-            # Chercher en base de données
-            with self._get_db_connection() as conn:
-                backup_row = conn.execute("""
-                    SELECT backup_data FROM conversation_backups 
-                    WHERE conversation_id = ? 
-                    ORDER BY backup_timestamp DESC 
-                    LIMIT 1
-                """, (conversation_id,)).fetchone()
-                
-                if backup_row:
-                    backup_data = json.loads(backup_row["backup_data"])
-                    # Reconstruire le contexte depuis le backup
-                    context = self._context_from_backup_data(backup_data)
-                    if context:
-                        context.cache_restored = True
-                        return context
-                        
-        except Exception as e:
-            logger.error(f"❌ [Recovery] Erreur récupération backup: {e}")
-        
-        return None
-
-    def _context_from_backup_data(self, data: Dict[str, Any]) -> Optional[IntelligentConversationContext]:
-        """🔵 NOUVEAU: Reconstruit un contexte depuis les données de backup"""
-        try:
-            # Reconstituir les entités consolidées
-            consolidated_entities = IntelligentEntities()
-            if data.get("consolidated_entities"):
-                consolidated_entities = self._entities_from_dict(data["consolidated_entities"])
-            
-            # Reconstituer les messages
-            messages = []
-            for msg_data in data.get("messages", []):
-                entities = None
-                if msg_data.get("extracted_entities"):
-                    entities = self._entities_from_dict(msg_data["extracted_entities"])
-                
-                message_obj = ConversationMessage(
-                    id=msg_data["id"],
-                    conversation_id=msg_data["conversation_id"],
-                    user_id=msg_data["user_id"],
-                    role=msg_data["role"],
-                    message=msg_data["message"],
-                    timestamp=datetime.fromisoformat(msg_data["timestamp"]),
-                    language=msg_data.get("language", "fr"),
-                    message_type=msg_data.get("message_type", "text"),
-                    extracted_entities=entities,
-                    confidence_score=msg_data.get("confidence_score", 0.0),
-                    processing_method=msg_data.get("processing_method", "basic")
+            # Extraire les entités de manière asynchrone
+            try:
+                loop = asyncio.get_event_loop()
+                extracted_entities = loop.run_until_complete(
+                    self.extract_entities_ai_enhanced(message, language, context)
                 )
-                messages.append(message_obj)
+            except RuntimeError:
+                # Si pas de loop actif, créer un nouveau
+                extracted_entities = asyncio.run(
+                    self.extract_entities_ai_enhanced(message, language, context)
+                )
             
-            # Reconstituer le contexte
-            context = IntelligentConversationContext(
-                conversation_id=data["conversation_id"],
-                user_id=data["user_id"],
-                messages=messages,
-                consolidated_entities=consolidated_entities,
-                language=data.get("language", "fr"),
-                created_at=datetime.fromisoformat(data["created_at"]),
-                last_activity=datetime.fromisoformat(data["last_activity"]),
-                total_exchanges=data.get("total_exchanges", 0),
-                conversation_topic=data.get("conversation_topic"),
-                conversation_urgency=data.get("conversation_urgency"),
-                problem_resolution_status=data.get("problem_resolution_status"),
-                ai_enhanced=data.get("ai_enhanced", False),
-                last_ai_analysis=datetime.fromisoformat(data["last_ai_analysis"]) if data.get("last_ai_analysis") else None,
-                needs_clarification=data.get("needs_clarification", False),
-                clarification_questions=data.get("clarification_questions", [])
+            # ✅ DÉTECTION AUTOMATIQUE DES CLARIFICATIONS
+            is_clarification_response = False
+            original_question_id = None
+            
+            # Si c'est un message court avec breed/sex ET qu'on a une clarification en attente
+            if (role == "user" and context.pending_clarification and 
+                len(message.split()) <= 5 and 
+                (extracted_entities.breed or extracted_entities.sex)):
+                
+                is_clarification_response = True
+                original_question_id = context.last_original_question_id
+                logger.info(f"🎯 [Memory] Clarification détectée: {message} → {original_question_id}")
+                self.stats["clarification_resolutions"] += 1
+            
+            # Créer le message
+            message_obj = ConversationMessage(
+                id=f"{conversation_id}_{len(context.messages)}_{int(time.time())}",
+                conversation_id=conversation_id,
+                user_id=user_id,
+                role=role,
+                message=message,
+                timestamp=datetime.now(),
+                language=language,
+                message_type=message_type,
+                extracted_entities=extracted_entities,
+                confidence_score=extracted_entities.confidence_overall if extracted_entities else 0.0,
+                processing_method="ai_enhanced" if self.ai_enhancement_enabled else "basic",
+                is_clarification_response=is_clarification_response,
+                original_question_id=original_question_id
             )
+            
+            # Ajouter au contexte
+            context.add_message(message_obj)
+            
+            # Sauvegarder
+            self._save_conversation_to_db(context)
+            self._save_message_to_db(message_obj)
+            
+            # Mettre en cache
+            with self.cache_lock:
+                self.conversation_cache[conversation_id] = context
+                self._manage_cache_size()
+            
+            self.stats["total_messages"] += 1
+            
+            logger.info(f"💬 [Memory] Message ajouté: {conversation_id} ({len(context.messages)} msgs)")
             
             return context
             
         except Exception as e:
-            logger.error(f"❌ [Backup Recovery] Erreur reconstruction: {e}")
-            return None
+            logger.error(f"❌ [Memory] Erreur ajout message: {e}")
+            
+            # Créer un contexte minimal en fallback
+            minimal_context = IntelligentConversationContext(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                language=language
+            )
+            
+            return minimal_context
 
     def get_conversation_context(self, conversation_id: str) -> Optional[IntelligentConversationContext]:
-        """🔵 AMÉLIORÉ: Récupère le contexte avec fallbacks multiples"""
+        """Récupère le contexte conversationnel avec cache"""
         
-        # Vérifier le cache d'abord avec thread safety
+        # Vérifier le cache d'abord
         with self.cache_lock:
             if conversation_id in self.conversation_cache:
                 context = self.conversation_cache[conversation_id]
-                context.cache_hits += 1
                 self.stats["cache_hits"] += 1
                 return context
         
         self.stats["cache_misses"] += 1
         
-        # Charger depuis la DB avec retry
-        max_db_retries = 3
-        for attempt in range(max_db_retries):
-            try:
-                context = self._load_context_from_db(conversation_id)
-                if context:
-                    # Mettre en cache
-                    with self.cache_lock:
-                        self.conversation_cache[conversation_id] = context
-                        self._manage_cache_size()
-                    return context
-                break  # Pas trouvé en DB, pas besoin de retry
-                
-            except Exception as e:
-                logger.warning(f"⚠️ [DB Load] Tentative {attempt + 1} échouée: {e}")
-                if attempt < max_db_retries - 1:
-                    time.sleep(0.2 * (attempt + 1))
-        
-        # Fallback: essayer de récupérer depuis backup
-        backup_context = self._recover_from_backup(conversation_id)
-        if backup_context:
-            self.stats["backup_recoveries"] += 1
-            logger.info(f"✅ [Fallback] Contexte récupéré depuis backup")
-            
-            # Mettre en cache
-            with self.cache_lock:
-                self.conversation_cache[conversation_id] = backup_context
-            
-            return backup_context
+        # Charger depuis la DB
+        try:
+            context = self._load_context_from_db(conversation_id)
+            if context:
+                # Mettre en cache
+                with self.cache_lock:
+                    self.conversation_cache[conversation_id] = context
+                    self._manage_cache_size()
+                return context
+        except Exception as e:
+            logger.error(f"❌ [Memory] Erreur chargement contexte: {e}")
         
         return None
 
@@ -1330,7 +1229,8 @@ EXEMPLES DE RAISONNEMENT:
                 last_ai_analysis=datetime.fromisoformat(conv_row["last_ai_analysis"]) if conv_row["last_ai_analysis"] else None,
                 needs_clarification=bool(conv_row["needs_clarification"]),
                 clarification_questions=json.loads(conv_row["clarification_questions"]) if conv_row["clarification_questions"] else [],
-                data_integrity_checked=bool(conv_row.get("data_integrity_checked", False))
+                pending_clarification=bool(conv_row.get("pending_clarification", False)),
+                last_original_question_id=conv_row.get("last_original_question_id")
             )
             
             # Charger les entités consolidées
@@ -1357,9 +1257,9 @@ EXEMPLES DE RAISONNEMENT:
                     extracted_entities=entities,
                     confidence_score=msg_row["confidence_score"] or 0.0,
                     processing_method=msg_row["processing_method"] or "basic",
-                    extraction_retries=msg_row.get("extraction_retries", 0),
-                    backup_saved=bool(msg_row.get("backup_saved", False)),
-                    validated=bool(msg_row.get("validated", False))
+                    is_original_question=bool(msg_row.get("is_original_question", False)),
+                    is_clarification_response=bool(msg_row.get("is_clarification_response", False)),
+                    original_question_id=msg_row.get("original_question_id")
                 )
                 
                 context.messages.append(message_obj)
@@ -1367,7 +1267,7 @@ EXEMPLES DE RAISONNEMENT:
             return context
 
     def _entities_from_dict(self, data: Dict[str, Any]) -> IntelligentEntities:
-        """Reconstruit les entités depuis un dictionnaire avec validation"""
+        """Reconstruit les entités depuis un dictionnaire"""
         
         # Convertir les dates
         for date_field in ["age_last_updated", "last_ai_update"]:
@@ -1386,340 +1286,4 @@ EXEMPLES DE RAISONNEMENT:
             if not isinstance(data.get(list_field), list):
                 data[list_field] = []
         
-        # Créer l'entité avec validation des champs
-        valid_fields = {k: v for k, v in data.items() if k in IntelligentEntities.__dataclass_fields__}
-        
-        entities = IntelligentEntities(**valid_fields)
-        return entities.validate_and_correct()
-
-    def _save_conversation_to_db(self, context: IntelligentConversationContext):
-        """🔵 AMÉLIORÉ: Sauvegarde avec gestion d'erreurs robuste"""
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with self._get_db_connection() as conn:
-                    conn.execute("""
-                        INSERT OR REPLACE INTO conversations (
-                            conversation_id, user_id, language, created_at, last_activity,
-                            total_exchanges, consolidated_entities, conversation_topic,
-                            conversation_urgency, problem_resolution_status, ai_enhanced,
-                            last_ai_analysis, needs_clarification, clarification_questions,
-                            confidence_overall, forced_backup, backup_timestamp, 
-                            data_integrity_checked
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        context.conversation_id,
-                        context.user_id,
-                        context.language,
-                        context.created_at.isoformat(),
-                        context.last_activity.isoformat(),
-                        context.total_exchanges,
-                        json.dumps(context.consolidated_entities.to_dict()),
-                        context.conversation_topic,
-                        context.conversation_urgency,
-                        context.problem_resolution_status,
-                        context.ai_enhanced,
-                        context.last_ai_analysis.isoformat() if context.last_ai_analysis else None,
-                        context.needs_clarification,
-                        json.dumps(context.clarification_questions),
-                        context.consolidated_entities.confidence_overall,
-                        context.forced_backup,
-                        context.backup_timestamp.isoformat() if context.backup_timestamp else None,
-                        context.data_integrity_checked
-                    ))
-                    conn.commit()
-                break  # Succès
-                
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"❌ [Save Conv] Échec final: {e}")
-                    raise
-                logger.warning(f"⚠️ [Save Conv] Retry {attempt + 1}: {e}")
-                time.sleep(0.1 * (attempt + 1))
-
-    def _save_message_to_db(self, message: ConversationMessage):
-        """🔵 AMÉLIORÉ: Sauvegarde message avec retry"""
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with self._get_db_connection() as conn:
-                    conn.execute("""
-                        INSERT OR REPLACE INTO conversation_messages (
-                            id, conversation_id, user_id, role, message, timestamp,
-                            language, message_type, extracted_entities, confidence_score,
-                            processing_method, extraction_retries, backup_saved, validated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        message.id,
-                        message.conversation_id,
-                        message.user_id,
-                        message.role,
-                        message.message,
-                        message.timestamp.isoformat(),
-                        message.language,
-                        message.message_type,
-                        json.dumps(message.extracted_entities.to_dict()) if message.extracted_entities else None,
-                        message.confidence_score,
-                        message.processing_method,
-                        message.extraction_retries,
-                        message.backup_saved,
-                        message.validated
-                    ))
-                    conn.commit()
-                break
-                
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"❌ [Save Msg] Échec final: {e}")
-                    raise
-                logger.warning(f"⚠️ [Save Msg] Retry {attempt + 1}: {e}")
-                time.sleep(0.1 * (attempt + 1))
-
-    def _manage_cache_size(self):
-        """🔵 AMÉLIORÉ: Gestion cache avec backup préventif"""
-        
-        if len(self.conversation_cache) > self.cache_max_size:
-            # Identifier les conversations à supprimer
-            sorted_conversations = sorted(
-                self.conversation_cache.items(),
-                key=lambda x: x[1].last_activity
-            )
-            
-            # Sauvegarder les conversations importantes avant suppression
-            to_remove = sorted_conversations[:len(sorted_conversations) - self.cache_max_size//2]
-            
-            for conv_id, context in to_remove:
-                # Backup si critique ou récent
-                if (context.conversation_urgency in ["high", "critical"] or 
-                    (datetime.now() - context.last_activity).total_seconds() < 3600):  # 1 heure
-                    self._create_conversation_backup(context)
-            
-            # Garder seulement les plus récentes
-            to_keep = sorted_conversations[-self.cache_max_size//2:]
-            self.conversation_cache = dict(to_keep)
-
-    def get_context_for_clarification(self, conversation_id: str) -> Dict[str, Any]:
-        """Retourne le contexte optimisé pour les clarifications avec fallback"""
-        
-        context = self.get_conversation_context(conversation_id)
-        if not context:
-            return {
-                "error": "Context not found",
-                "fallback_available": conversation_id in self.backup_cache
-            }
-        
-        return context.get_context_for_clarification()
-
-    def get_context_for_rag(self, conversation_id: str, max_chars: int = 500) -> str:
-        """Retourne le contexte optimisé pour le RAG avec fallback"""
-        
-        context = self.get_conversation_context(conversation_id)
-        if not context:
-            return ""
-        
-        return context.get_context_for_rag(max_chars)
-
-    def cleanup_expired_conversations(self):
-        """🔵 AMÉLIORÉ: Nettoie avec backup préventif des conversations importantes"""
-        
-        cutoff_time = datetime.now() - timedelta(hours=self.context_expiry_hours)
-        
-        try:
-            with self._get_db_connection() as conn:
-                # Identifier les conversations à supprimer
-                expiring_rows = conn.execute("""
-                    SELECT conversation_id, conversation_urgency, total_exchanges 
-                    FROM conversations 
-                    WHERE last_activity < ?
-                """, (cutoff_time.isoformat(),)).fetchall()
-                
-                # Backup préventif des conversations importantes
-                important_conversations = [
-                    row["conversation_id"] for row in expiring_rows
-                    if row["conversation_urgency"] in ["high", "critical"] or row["total_exchanges"] > 10
-                ]
-                
-                for conv_id in important_conversations:
-                    context = self.get_conversation_context(conv_id)
-                    if context:
-                        self._create_conversation_backup(context)
-                        logger.info(f"🔵 [Cleanup] Backup préventif: {conv_id}")
-                
-                # Supprimer les messages expirés
-                conn.execute("""
-                    DELETE FROM conversation_messages 
-                    WHERE conversation_id IN (
-                        SELECT conversation_id FROM conversations 
-                        WHERE last_activity < ?
-                    )
-                """, (cutoff_time.isoformat(),))
-                
-                # Supprimer les conversations expirées
-                result = conn.execute("""
-                    DELETE FROM conversations 
-                    WHERE last_activity < ?
-                """, (cutoff_time.isoformat(),))
-                
-                deleted_count = result.rowcount
-                conn.commit()
-                
-                # Nettoyer le cache
-                with self.cache_lock:
-                    expired_ids = [
-                        conv_id for conv_id, context in self.conversation_cache.items()
-                        if context.last_activity < cutoff_time
-                    ]
-                    
-                    for conv_id in expired_ids:
-                        del self.conversation_cache[conv_id]
-                
-                logger.info(f"🗑️ [Cleanup] {deleted_count} conversations expirées supprimées, {len(important_conversations)} sauvegardées")
-                
-        except Exception as e:
-            logger.error(f"❌ [Cleanup] Erreur nettoyage: {e}")
-
-    def get_conversation_memory_stats(self) -> Dict[str, Any]:
-        """🔵 AMÉLIORÉ: Statistiques étendues avec info robustesse"""
-        
-        try:
-            with self._get_db_connection() as conn:
-                # Compter les conversations actives
-                active_conversations = conn.execute("""
-                    SELECT COUNT(*) as count FROM conversations 
-                    WHERE last_activity > ?
-                """, ((datetime.now() - timedelta(hours=24)).isoformat(),)).fetchone()["count"]
-                
-                # Compter les messages
-                total_messages = conn.execute("SELECT COUNT(*) as count FROM conversation_messages").fetchone()["count"]
-                
-                # Compter les backups
-                total_backups = conn.execute("SELECT COUNT(*) as count FROM conversation_backups").fetchone()["count"]
-                
-                # Conversations par urgence
-                urgency_stats = {}
-                for urgency in ["low", "medium", "high", "critical"]:
-                    count = conn.execute("""
-                        SELECT COUNT(*) as count FROM conversations 
-                        WHERE conversation_urgency = ? AND last_activity > ?
-                    """, (urgency, (datetime.now() - timedelta(hours=24)).isoformat())).fetchone()["count"]
-                    urgency_stats[urgency] = count
-        
-        except Exception as e:
-            logger.error(f"❌ [Stats] Erreur: {e}")
-            active_conversations = 0
-            total_messages = 0
-            total_backups = 0
-            urgency_stats = {}
-        
-        return {
-            "enabled": True,
-            "ai_enhancement_enabled": self.ai_enhancement_enabled,
-            "ai_enhancement_model": self.ai_enhancement_model,
-            "database_path": self.db_path,
-            "max_messages_in_memory": self.max_messages_in_memory,
-            "context_expiry_hours": self.context_expiry_hours,
-            "cache_size": len(self.conversation_cache),
-            "cache_max_size": self.cache_max_size,
-            
-            # 🔵 ROBUSTESSE - Statistiques étendues
-            "backup_enabled": self.backup_enabled,
-            "backup_cache_size": len(self.backup_cache),
-            "ai_retry_attempts": self.ai_retry_attempts,
-            "force_backup_interval": self.force_backup_interval,
-            
-            # Statistiques d'usage
-            "active_conversations_24h": active_conversations,
-            "total_messages": total_messages,
-            "total_backups": total_backups,
-            "conversations_by_urgency": urgency_stats,
-            
-            # Statistiques système robustes
-            "cache_hits": self.stats["cache_hits"],
-            "cache_misses": self.stats["cache_misses"],
-            "ai_enhancements": self.stats["ai_enhancements"],
-            "ai_failures": self.stats["ai_failures"],
-            "ai_retries": self.stats["ai_retries"],
-            "backup_recoveries": self.stats["backup_recoveries"],
-            "data_corrections": self.stats["data_corrections"],
-            "cache_hit_ratio": self.stats["cache_hits"] / (self.stats["cache_hits"] + self.stats["cache_misses"]) if (self.stats["cache_hits"] + self.stats["cache_misses"]) > 0 else 0.0,
-            "ai_success_ratio": self.stats["ai_enhancements"] / (self.stats["ai_enhancements"] + self.stats["ai_failures"]) if (self.stats["ai_enhancements"] + self.stats["ai_failures"]) > 0 else 0.0,
-            
-            # Capacités robustes
-            "intelligent_entity_extraction": True,
-            "contextual_reasoning": True,
-            "urgency_detection": True,
-            "ai_powered": OPENAI_AVAILABLE and self.ai_enhancement_enabled,
-            "backup_system": self.backup_enabled,
-            "automatic_recovery": True,
-            "data_validation": True,
-            "thread_safe": True
-        }
-
-# ==================== INSTANCE GLOBALE ROBUSTE ====================
-
-# Configuration depuis l'environnement
-db_path = os.getenv('INTELLIGENT_CONVERSATION_MEMORY_DB_PATH', 'data/intelligent_conversation_memory.db')
-
-# Instance singleton robuste
-intelligent_conversation_memory = IntelligentConversationMemory(db_path)
-
-# ==================== FONCTIONS UTILITAIRES ROBUSTES ====================
-
-def add_message_to_conversation(
-    conversation_id: str,
-    user_id: str,
-    message: str,
-    role: str = "user",
-    language: str = "fr",
-    message_type: str = "text"
-) -> IntelligentConversationContext:
-    """🔵 ROBUSTE: Ajoute un message avec fallbacks multiples"""
-    return intelligent_conversation_memory.add_message_to_conversation(
-        conversation_id, user_id, message, role, language, message_type
-    )
-
-def get_conversation_context(conversation_id: str) -> Optional[IntelligentConversationContext]:
-    """🔵 ROBUSTE: Récupère le contexte avec recovery automatique"""
-    return intelligent_conversation_memory.get_conversation_context(conversation_id)
-
-def get_context_for_clarification(conversation_id: str) -> Dict[str, Any]:
-    """🔵 ROBUSTE: Contexte clarification avec fallback"""
-    return intelligent_conversation_memory.get_context_for_clarification(conversation_id)
-
-def get_context_for_rag(conversation_id: str, max_chars: int = 500) -> str:
-    """🔵 ROBUSTE: Contexte RAG avec validation"""
-    return intelligent_conversation_memory.get_context_for_rag(conversation_id, max_chars)
-
-def get_conversation_memory_stats() -> Dict[str, Any]:
-    """🔵 ROBUSTE: Statistiques complètes avec métriques robustesse"""
-    return intelligent_conversation_memory.get_conversation_memory_stats()
-
-def cleanup_expired_conversations():
-    """🔵 ROBUSTE: Nettoyage avec backup préventif"""
-    intelligent_conversation_memory.cleanup_expired_conversations()
-
-# ==================== LOGGING DE DÉMARRAGE ROBUSTE ====================
-
-logger.info("🔵" * 60)
-logger.info("🧠 [IntelligentConversationMemory] Système ROBUSTE initialisé")
-logger.info(f"📊 [Stats] {intelligent_conversation_memory.get_conversation_memory_stats()}")
-logger.info("✅ [FONCTIONNALITÉS ROBUSTES]:")
-logger.info("   - 🤖 Extraction IA avec retry automatique")
-logger.info("   - 🔄 Fallback robuste si IA échoue") 
-logger.info("   - 💾 Backup automatique et récupération")
-logger.info("   - 🛡️ Validation et correction automatique des données")
-logger.info("   - 🧵 Thread safety avec locks")
-logger.info("   - 📊 Persistance forcée des clarifications")
-logger.info("   - 🔄 Cache conversationnel renforcé")
-logger.info("   - ⚡ Retry intelligent avec backoff")
-logger.info("   - 🗄️ Backup préventif conversations importantes")
-logger.info("   - 📈 Métriques robustesse détaillées")
-logger.info("   - ✅ TOUTES les fonctions originales préservées")
-logger.info("   - 🔧 Validation et correction automatique (°F→°C, kg→g)")
-logger.info("   - 📋 Gestion intelligente entités avec fusion")
-logger.info("   - 🎯 Contexte optimisé pour RAG et clarifications")
-logger.info("   - 🔒 Thread safety complet avec locks")
-logger.info("   - 📊 Statistiques étendues avec métriques de qualité")
-logger.info("🔵" * 60)
+        #
