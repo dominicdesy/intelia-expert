@@ -85,7 +85,7 @@ const getAuthHeaders = (): Record<string, string> => {
     headers['Authorization'] = `Bearer ${authToken}`
     console.log('🔑 [apiService] Token ajouté aux headers')
   } else {
-    console.warn(⚠️ [apiService] Aucun token trouvé - requête sans auth')
+    console.warn('⚠️ [apiService] Aucun token trouvé - requête sans auth')
   }
 
   return headers
