@@ -312,8 +312,8 @@ export const generateAIResponsePublic = async (
       ...(conversationId && { conversation_id: conversationId })
     }
 
-    // 🎯 UTILISER ask-with-clarification pour version publique aussi
-    const response = await fetch(`${API_BASE_URL}/expert/ask-with-clarification`, {
+    // 🎯 UTILISER ask-enhanced-v2 pour version publique aussi
+    const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2-public`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -564,8 +564,8 @@ export const debugEnhancedAPI = () => {
   console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
   console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
   console.log('CORRECTIONS APPLIQUÉES:')
-  console.log('  ✅ ask-enhanced-v2 → ask-with-clarification (QUI FONCTIONNE)')
-  console.log('  ✅ Détection clarification garantie par regex backend')
+  console.log('  ✅ ask-with-clarification → ask-enhanced-v2 (ENDPOINT PRINCIPAL)')
+  console.log('  ✅ Détection clarification via clarification_result')
   console.log('  ✅ Mapping clarification_result vers requires_clarification')
   console.log('  ✅ Support clarifications complet et testé')
   console.log('  ✅ Authentification JWT maintenue')
@@ -743,23 +743,24 @@ export const generateAIResponseSmart = async (
 
 // 🎯 CONFIGURATION DEBUG CORRIGÉE pour ask-with-clarification
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] Configuration Ask-With-Clarification CORRIGÉE')
-  console.log('Version:', 'Ask With Clarification (ask-with-clarification)')
+  console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 CORRIGÉE')
+  console.log('Version:', 'Enhanced v2 (ask-enhanced-v2)')
   console.log('Base URL:', API_BASE_URL)
   console.log('CORRECTIONS APPLIQUÉES:')
-  console.log('  - ✅ ask-enhanced-v2 → ask-with-clarification (ENDPOINT QUI FONCTIONNE)')
-  console.log('  - ✅ Détection clarification garantie par regex backend')
+  console.log('  - ✅ ask-with-clarification → ask-enhanced-v2 (ENDPOINT PRINCIPAL)')
+  console.log('  - ✅ Détection clarification via clarification_result')
   console.log('  - ✅ Mapping clarification_result vers anciens champs frontend')
   console.log('  - ✅ Support clarifications complet et testé')
   console.log('  - ✅ Authentification JWT maintenue')
-  console.log('Fonctionnalités ask-with-clarification:')
-  console.log('  - ✅ Détection automatique questions poids+âge')
-  console.log('  - ✅ Clarification forcée race/sexe manquants')
+  console.log('Fonctionnalités ask-enhanced-v2:')
+  console.log('  - ✅ Détection automatique questions vagues')
+  console.log('  - ✅ Clarification intelligente race/sexe')
   console.log('  - ✅ Enrichissement automatique questions')
-  console.log('  - ✅ Gestion entités incomplètes')
+  console.log('  - ✅ Gestion entités complètes')
   console.log('  - ✅ Traitement réponses clarification')
   console.log('Endpoints principaux:')
-  console.log('  - POST /expert/ask-with-clarification (authentifié et public)')
+  console.log('  - POST /expert/ask-enhanced-v2 (authentifié)')
+  console.log('  - POST /expert/ask-enhanced-v2-public (public)')
   console.log('  - POST /expert/feedback (enhanced)')
   console.log('  - GET /expert/topics')
   console.groupEnd()
