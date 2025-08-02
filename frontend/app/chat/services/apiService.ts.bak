@@ -85,7 +85,7 @@ const getAuthHeaders = (): Record<string, string> => {
     headers['Authorization'] = `Bearer ${authToken}`
     console.log('🔑 [apiService] Token ajouté aux headers')
   } else {
-    console.warn('⚠️ [apiService] Aucun token trouvé - requête sans auth')
+    console.warn(⚠️ [apiService] Aucun token trouvé - requête sans auth')
   }
 
   return headers
@@ -149,9 +149,9 @@ export const generateAIResponse = async (
   })
 
   try {
-    // ✅ CORRECTION: Format pour ask-enhanced-v2 avec support clarifications
+    // ✅ CORRECTION MAJEURE: Backend attend "question" pas "text"
     const requestBody = {
-      text: question.trim(),
+      question: question.trim(),  // ✅ CORRIGÉ: "text" → "question"
       language: language,
       speed_mode: 'balanced',
       ...(conversationId && { conversation_id: conversationId }),
@@ -171,7 +171,7 @@ export const generateAIResponse = async (
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body complet pour ask-enhanced-v2:', requestBody)
+    console.log('📤 [apiService] Body complet CORRIGÉ pour ask-enhanced-v2:', requestBody)
 
     // ✅ CORRECTION CRITIQUE: Utiliser ask-enhanced-v2 au lieu de ask-enhanced
     const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2`, {
@@ -268,7 +268,7 @@ export const generateAIResponsePublic = async (
 
   try {
     const requestBody = {
-      text: question.trim(),
+      question: question.trim(),  // ✅ CORRIGÉ: "text" → "question"
       language: language,
       speed_mode: 'balanced',
       ...(conversationId && { conversation_id: conversationId }),
@@ -518,6 +518,7 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Fonctionnalités v2 activées par défaut')
   console.log('  ✅ Support clarifications complet')
   console.log('  ✅ Authentification JWT maintenue')
+  console.log('  ✅ CORRECTION MAJEURE: "text" → "question" dans payload')
   console.groupEnd()
 }
 
@@ -698,6 +699,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('CORRECTIONS APPLIQUÉES:')
   console.log('  - ✅ ask-enhanced → ask-enhanced-v2 (endpoint sécurisé)')
   console.log('  - ✅ ask-enhanced-public → ask-enhanced-v2-public')
+  console.log('  - ✅ CORRECTION MAJEURE: "text" → "question" dans payload')
   console.log('  - ✅ Fonctionnalités v2 activées (vagueness detection, coherence check)')
   console.log('  - ✅ Support clarifications complet')
   console.log('  - ✅ Authentification JWT maintenue')
