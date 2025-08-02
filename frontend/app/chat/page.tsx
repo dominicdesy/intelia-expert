@@ -398,7 +398,7 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVELLE FONCTION: Traitement des réponses de clarification
+  // ✅ FONCTION CORRIGÉE: Traitement des réponses de clarification
   const handleClarificationSubmit = async (answers: Record<string, string>) => {
     if (!clarificationState || !isMountedRef.current) {
       console.warn('⚠️ [handleClarificationSubmit] Pas d\'état de clarification')
@@ -462,16 +462,15 @@ export default function ChatInterface() {
         conversationIdToSend = currentConversation.id
       }
 
-      // ✅ APPEL API AVEC PARAMÈTRES DE CLARIFICATION - CORRECTION
+      // ✅ CORRECTION MAJEURE: Appel avec paramètres positionnels
       const response = await generateAIResponse(
-        clarificationState.originalQuestion, 
-        user, 
-        currentLanguage, 
-        conversationIdToSend,
-        // ✅ PARAMÈTRES DE CLARIFICATION COMPLETS
-        true, // isClarificationResponse - ✅ OBLIGATOIRE
-        clarificationState.originalQuestion, // originalQuestion
-        clarificationEntities // clarificationEntities
+        clarificationState.originalQuestion,  // question: string
+        user,                                 // user: any
+        currentLanguage,                      // language?: string
+        conversationIdToSend,                // conversationId?: string
+        true,                                // ✅ isClarificationResponse: boolean
+        clarificationState.originalQuestion, // originalQuestion?: string
+        clarificationEntities               // clarificationEntities?: Record<string, any>
       )
 
       if (!isMountedRef.current) {

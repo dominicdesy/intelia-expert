@@ -462,14 +462,14 @@ export default function ChatInterface() {
         conversationIdToSend = currentConversation.id
       }
 
-      // ✅ APPEL API AVEC PARAMÈTRES DE CLARIFICATION
+      // ✅ APPEL API AVEC PARAMÈTRES DE CLARIFICATION - CORRECTION
       const response = await generateAIResponse(
         clarificationState.originalQuestion, 
         user, 
         currentLanguage, 
         conversationIdToSend,
-        // ✅ PARAMÈTRES DE CLARIFICATION
-        true, // isClarificationResponse
+        // ✅ PARAMÈTRES DE CLARIFICATION COMPLETS
+        true, // isClarificationResponse - ✅ OBLIGATOIRE
         clarificationState.originalQuestion, // originalQuestion
         clarificationEntities // clarificationEntities
       )
