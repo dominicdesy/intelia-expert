@@ -1,18 +1,18 @@
 """
-app/api/v1/conversation_memory_enhanced.py - SYSTÈME DE MÉMOIRE CORRIGÉ
+app/api/v1/conversation_memory_integrated.py - SYSTÈME DE MÉMOIRE COMPLET INTÉGRÉ
 
-🚨 CORRECTIONS CRITIQUES APPLIQUÉES POUR CLARIFICATIONS:
-1. ✅ Fonction find_original_question() - Récupération question originale
-2. ✅ Marquage spécial avec tag ORIGINAL_QUESTION_FOR_CLARIFICATION  
-3. ✅ Méthode get_last_user_question() pour fallback
-4. ✅ Fonction mark_question_for_clarification() pour persistence
-5. ✅ Recherche intelligente dans historique conversationnel
-6. ✅ Fallbacks robustes si mémoire défaillante
+🚨 VERSION FINALE INTÉGRÉE:
+✅ Toutes les fonctionnalités existantes conservées
+✅ Système de clarification enrichi ajouté
+✅ Fonction d'enrichissement de questions intégrée
+✅ Prêt pour intégration directe dans FastAPI
 
-PROBLÈME RÉSOLU:
-- "Quel est le poids d'un poulet de 12 jours ?" → Clarification demandée
-- "Ross 308 male" → Question originale RÉCUPÉRÉE automatiquement
-- Contexte enrichi: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"
+NOUVELLES FONCTIONNALITÉS AJOUTÉES:
+1. EnhancedClarificationSystem intégré dans IntelligentConversationMemory
+2. build_enriched_question_from_clarification()
+3. process_enhanced_question_with_clarification()
+4. detect_clarification_state()
+5. check_if_clarification_needed()
 """
 
 import os
@@ -258,7 +258,7 @@ class ConversationMessage:
     confidence_score: float = 0.0
     processing_method: str = "basic"
     
-    # ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+    # ✅ CHAMPS POUR CLARIFICATIONS
     is_original_question: bool = False
     is_clarification_response: bool = False
     original_question_id: Optional[str] = None
@@ -308,7 +308,7 @@ class IntelligentConversationContext:
     needs_clarification: bool = False
     clarification_questions: List[str] = field(default_factory=list)
     
-    # ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+    # ✅ CHAMPS POUR CLARIFICATIONS
     pending_clarification: bool = False
     last_original_question_id: Optional[str] = None
     
@@ -374,12 +374,10 @@ class IntelligentConversationContext:
         
         self.conversation_urgency = max_urgency
     
-    # ✅ NOUVELLE MÉTHODE CRITIQUE - RÉCUPÉRATION QUESTION ORIGINALE
+    # ✅ FONCTION CRITIQUE - RÉCUPÉRATION QUESTION ORIGINALE
     def find_original_question(self, limit_messages: int = 20) -> Optional[ConversationMessage]:
         """
         🚨 FONCTION CRITIQUE - Trouve la question originale marquée pour clarification
-        
-        Cette fonction résout le problème principal du système de clarification.
         """
         
         # Rechercher par ID si on a un last_original_question_id
@@ -568,7 +566,7 @@ class IntelligentConversationContext:
         }
 
 class IntelligentConversationMemory:
-    """Système de mémoire conversationnelle intelligent avec IA"""
+    """Système de mémoire conversationnelle intelligent avec IA et clarification intégrée"""
     
     def __init__(self, db_path: str = None):
         """Initialise le système de mémoire intelligent"""
@@ -605,7 +603,7 @@ class IntelligentConversationMemory:
         logger.info(f"🧠 [IntelligentMemory] DB: {self.db_path}")
         logger.info(f"🧠 [IntelligentMemory] IA enhancing: {'✅' if self.ai_enhancement_enabled else '❌'}")
         logger.info(f"🧠 [IntelligentMemory] Modèle IA: {self.ai_enhancement_model}")
-        logger.info(f"🚨 [IntelligentMemory] Récupération question originale: ✅ CORRIGÉ")
+        logger.info(f"🚨 [IntelligentMemory] Système de clarification intégré: ✅")
 
     def _init_database(self):
         """Initialise la base de données avec schéma amélioré"""
@@ -636,7 +634,7 @@ class IntelligentConversationMemory:
                     needs_clarification BOOLEAN DEFAULT FALSE,
                     clarification_questions TEXT,
                     
-                    -- ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+                    -- ✅ CHAMPS POUR CLARIFICATIONS
                     pending_clarification BOOLEAN DEFAULT FALSE,
                     last_original_question_id TEXT,
                     
@@ -662,7 +660,7 @@ class IntelligentConversationMemory:
                     confidence_score REAL DEFAULT 0.0,
                     processing_method TEXT DEFAULT 'basic',
                     
-                    -- ✅ NOUVEAUX CHAMPS POUR CLARIFICATIONS
+                    -- ✅ CHAMPS POUR CLARIFICATIONS
                     is_original_question BOOLEAN DEFAULT FALSE,
                     is_clarification_response BOOLEAN DEFAULT FALSE,
                     original_question_id TEXT,
@@ -675,7 +673,7 @@ class IntelligentConversationMemory:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_user_activity ON conversations (user_id, last_activity)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_conv_time ON conversation_messages (conversation_id, timestamp)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_urgency ON conversations (conversation_urgency, last_activity)")
-            # ✅ NOUVEAUX INDEX POUR CLARIFICATIONS
+            # ✅ INDEX POUR CLARIFICATIONS
             conn.execute("CREATE INDEX IF NOT EXISTS idx_original_questions ON conversation_messages (conversation_id, is_original_question)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_clarification_responses ON conversation_messages (original_question_id, is_clarification_response)")
             
@@ -845,8 +843,8 @@ EXEMPLES:
                 breed_confidence=data.get("breed_confidence", 0.0),
                 breed_type=data.get("breed_type"),
                 
-                sex=data.get("sex"),  # ✅ AJOUTÉ
-                sex_confidence=data.get("sex_confidence", 0.0),  # ✅ AJOUTÉ
+                sex=data.get("sex"),
+                sex_confidence=data.get("sex_confidence", 0.0),
                 
                 age_days=data.get("age_days"),
                 age_weeks=data.get("age_weeks"),
@@ -1002,7 +1000,7 @@ EXEMPLES:
         # Calculer confiance globale
         confidence_scores = [
             entities.breed_confidence,
-            entities.sex_confidence,  # ✅ AJOUTÉ
+            entities.sex_confidence,
             entities.age_confidence,
             entities.weight_confidence
         ]
@@ -1014,6 +1012,352 @@ EXEMPLES:
         
         return entities
 
+    # ✅ NOUVELLE SECTION - SYSTÈME DE CLARIFICATION INTÉGRÉ
+
+    def build_enriched_question_from_clarification(
+        self,
+        original_question: str,
+        clarification_response: str,
+        conversation_context: Optional[IntelligentConversationContext] = None
+    ) -> str:
+        """
+        🎯 FONCTION CRITIQUE - Enrichit la question originale avec la clarification
+        
+        Exemple:
+        - Original: "Quel est le poids d'un poulet de 12 jours ?"
+        - Clarification: "Ross 308 mâles"
+        - Enrichi: "Quel est le poids d'un poulet Ross 308 mâle de 12 jours ?"
+        """
+        
+        # Analyser la clarification pour extraire les entités
+        clarification_lower = clarification_response.lower().strip()
+        
+        # Détection race
+        breed_info = self._extract_breed_from_clarification(clarification_lower)
+        sex_info = self._extract_sex_from_clarification(clarification_lower)
+        
+        # Construire l'enrichissement
+        enrichments = []
+        
+        if breed_info:
+            enrichments.append(breed_info)
+        
+        if sex_info:
+            enrichments.append(sex_info)
+        
+        # Intégrer dans la question originale
+        if enrichments:
+            enriched_question = self._integrate_enrichments_into_question(
+                original_question, 
+                enrichments
+            )
+            
+            logger.info(f"✅ [Clarification] Question enrichie réussie")
+            logger.info(f"  📝 Original: {original_question}")
+            logger.info(f"  🔁 Enrichi: {enriched_question}")
+            
+            return enriched_question
+        else:
+            # Fallback: concaténation simple
+            fallback_question = f"{original_question} Contexte: {clarification_response}"
+            logger.warning(f"⚠️ [Clarification] Fallback utilisé: {fallback_question}")
+            return fallback_question
+    
+    def _extract_breed_from_clarification(self, clarification: str) -> Optional[str]:
+        """Extrait la race de la réponse de clarification"""
+        
+        breed_patterns = [
+            r'ross\s*308',
+            r'ross\s*708', 
+            r'cobb\s*500',
+            r'cobb\s*700',
+            r'hubbard\s*flex',
+            r'arbor\s*acres'
+        ]
+        
+        for pattern in breed_patterns:
+            match = re.search(pattern, clarification, re.IGNORECASE)
+            if match:
+                breed = match.group(0).strip().replace(' ', ' ').title()
+                logger.debug(f"🔍 [Clarification] Race détectée: {breed}")
+                return breed
+        
+        # Patterns génériques
+        generic_patterns = [
+            r'poulets?\s+de\s+chair',
+            r'broilers?',
+            r'poulets?'
+        ]
+        
+        for pattern in generic_patterns:
+            if re.search(pattern, clarification, re.IGNORECASE):
+                logger.debug(f"🔍 [Clarification] Race générique détectée")
+                return "poulets de chair"
+        
+        return None
+    
+    def _extract_sex_from_clarification(self, clarification: str) -> Optional[str]:
+        """Extrait le sexe de la réponse de clarification"""
+        
+        sex_patterns = [
+            (r'\bmâles?\b', 'mâles'),
+            (r'\bmales?\b', 'mâles'),
+            (r'\bcoqs?\b', 'mâles'),
+            (r'\bfemelles?\b', 'femelles'),
+            (r'\bfemales?\b', 'femelles'),
+            (r'\bpoules?\b', 'femelles'),
+            (r'\bmixte\b', 'mixte'),
+            (r'\btroupeau\s+mixte\b', 'mixte')
+        ]
+        
+        for pattern, sex_name in sex_patterns:
+            if re.search(pattern, clarification, re.IGNORECASE):
+                logger.debug(f"🔍 [Clarification] Sexe détecté: {sex_name}")
+                return sex_name
+        
+        return None
+    
+    def _integrate_enrichments_into_question(
+        self, 
+        original_question: str, 
+        enrichments: list
+    ) -> str:
+        """Intègre intelligemment les enrichissements dans la question"""
+        
+        # Patterns de questions communes où insérer les enrichissements
+        question_patterns = [
+            # "Quel est le poids d'un poulet de X jours ?"
+            (r'(quel\s+est\s+le\s+poids\s+d[\'']un\s+)poulet(\s+de\s+\d+\s+jours?)', 
+             r'\1{} \2'),
+            
+            # "Mes poulets de X jours pèsent Y"
+            (r'(mes\s+)poulets?(\s+de\s+\d+\s+jours?)',
+             r'\1{} \2'),
+            
+            # "Comment nourrir des poulets de X semaines ?"
+            (r'(comment\s+\w+\s+des\s+)poulets?(\s+de\s+\d+\s+semaines?)',
+             r'\1{} \2'),
+            
+            # Pattern générique "poulet" → "poulet [race] [sexe]"
+            (r'\bpoulets?\b',
+             '{}')
+        ]
+        
+        enrichment_text = ' '.join(enrichments)
+        
+        for pattern, replacement in question_patterns:
+            if re.search(pattern, original_question, re.IGNORECASE):
+                enriched = re.sub(
+                    pattern, 
+                    replacement.format(enrichment_text),
+                    original_question, 
+                    flags=re.IGNORECASE
+                )
+                
+                # Nettoyer les espaces multiples
+                enriched = re.sub(r'\s+', ' ', enriched).strip()
+                
+                return enriched
+        
+        # Fallback: ajout en contexte
+        return f"{original_question} (Contexte: {enrichment_text})"
+    
+    def detect_clarification_state(
+        self, 
+        conversation_context: IntelligentConversationContext
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        🔍 Détecte si on est en attente de clarification
+        
+        Returns:
+            (is_awaiting_clarification, original_question_text)
+        """
+        
+        # Vérifier l'état dans le contexte
+        if conversation_context.pending_clarification:
+            original_question_msg = conversation_context.find_original_question()
+            
+            if original_question_msg:
+                return True, original_question_msg.message
+        
+        # Fallback: analyser les derniers messages
+        if len(conversation_context.messages) >= 2:
+            last_assistant_msg = None
+            
+            # Chercher le dernier message assistant
+            for msg in reversed(conversation_context.messages):
+                if msg.role == "assistant":
+                    last_assistant_msg = msg
+                    break
+            
+            if last_assistant_msg:
+                # Mots-clés indiquant une demande de clarification
+                clarification_keywords = [
+                    "j'ai besoin de", "pouvez-vous préciser", "quelle est la race",
+                    "quel est le sexe", "de quelle race", "mâles ou femelles"
+                ]
+                
+                msg_lower = last_assistant_msg.message.lower()
+                
+                if any(keyword in msg_lower for keyword in clarification_keywords):
+                    # Chercher la question utilisateur précédente
+                    original_question = conversation_context.get_last_user_question()
+                    
+                    if original_question:
+                        return True, original_question.message
+        
+        return False, None
+
+    async def process_enhanced_question_with_clarification(
+        self,
+        request_text: str,
+        conversation_id: str,
+        user_id: str,
+        language: str = "fr"
+    ) -> Tuple[str, bool]:
+        """
+        🚀 FONCTION PRINCIPALE - Traite les questions avec gestion clarification
+        
+        Returns:
+            (processed_question, was_clarification_resolved)
+        """
+        
+        try:
+            # 1. Récupérer le contexte conversationnel
+            conversation_context = self.get_conversation_context(conversation_id)
+            
+            if not conversation_context:
+                # Nouvelle conversation
+                logger.info(f"🆕 [Clarification] Nouvelle conversation: {conversation_id}")
+                return request_text, False
+            
+            # 2. Détecter si on est en attente de clarification
+            is_awaiting, original_question = self.detect_clarification_state(
+                conversation_context
+            )
+            
+            if is_awaiting and original_question:
+                logger.info(f"🎯 [Clarification] État détecté - traitement clarification")
+                
+                # 3. Enrichir la question originale avec la clarification
+                enriched_question = self.build_enriched_question_from_clarification(
+                    original_question=original_question,
+                    clarification_response=request_text,
+                    conversation_context=conversation_context
+                )
+                
+                # 4. Reset l'état de clarification pour éviter les boucles
+                conversation_context.pending_clarification = False
+                conversation_context.last_original_question_id = None
+                
+                # 5. Marquer ce message comme réponse de clarification
+                self.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=request_text,
+                    role="user",
+                    language=language,
+                    message_type="clarification_response"
+                )
+                
+                # 6. Mettre à jour les statistiques
+                self.stats["clarification_resolutions"] += 1
+                
+                logger.info(f"✅ [Clarification] Question enrichie avec succès")
+                
+                return enriched_question, True
+            
+            else:
+                # 6. Question normale - pas de clarification en cours
+                logger.info(f"💬 [Clarification] Question normale - pas de clarification")
+                return request_text, False
+        
+        except Exception as e:
+            logger.error(f"❌ [Clarification] Erreur traitement: {e}")
+            # En cas d'erreur, retourner la question originale
+            return request_text, False
+
+    def check_if_clarification_needed(
+        self,
+        question: str,
+        rag_response: Any,
+        context: Optional[IntelligentConversationContext],
+        language: str = "fr"
+    ) -> Tuple[bool, List[str]]:
+        """Détermine si une clarification est nécessaire"""
+        
+        if not context:
+            return False, []
+        
+        entities = context.consolidated_entities
+        missing_info = entities.get_critical_missing_info()
+        
+        clarification_questions = []
+        
+        # Messages de clarification par langue
+        clarification_messages = {
+            "fr": {
+                "breed": "De quelle race de poulets s'agit-il ? (ex: Ross 308, Cobb 500)",
+                "sex": "S'agit-il de mâles, femelles, ou d'un troupeau mixte ?",
+                "age": "Quel est l'âge de vos poulets ?"
+            },
+            "en": {
+                "breed": "What breed of chickens are we talking about? (e.g., Ross 308, Cobb 500)",
+                "sex": "Are these males, females, or a mixed flock?",
+                "age": "How old are your chickens?"
+            },
+            "es": {
+                "breed": "¿De qué raza de pollos estamos hablando? (ej: Ross 308, Cobb 500)",
+                "sex": "¿Son machos, hembras, o un lote mixto?",
+                "age": "¿Qué edad tienen sus pollos?"
+            }
+        }
+        
+        messages = clarification_messages.get(language, clarification_messages["fr"])
+        
+        # Race manquante ou générique
+        if "breed" in missing_info:
+            clarification_questions.append(messages["breed"])
+        
+        # Sexe manquant
+        if "sex" in missing_info:
+            clarification_questions.append(messages["sex"])
+        
+        # Âge manquant
+        if "age" in missing_info:
+            clarification_questions.append(messages["age"])
+        
+        # Au maximum 2 questions de clarification
+        needs_clarification = len(clarification_questions) > 0 and len(clarification_questions) <= 2
+        
+        return needs_clarification, clarification_questions[:2]
+
+    def generate_clarification_request(
+        self, 
+        clarification_questions: List[str], 
+        language: str = "fr"
+    ) -> str:
+        """Génère une demande de clarification naturelle"""
+        
+        if not clarification_questions:
+            fallback_messages = {
+                "fr": "Pouvez-vous me donner plus de détails ?",
+                "en": "Can you give me more details?",
+                "es": "¿Puede darme más detalles?"
+            }
+            return fallback_messages.get(language, fallback_messages["fr"])
+        
+        intro_messages = {
+            "fr": "Pour vous donner une réponse plus précise, j'ai besoin de quelques informations supplémentaires :",
+            "en": "To give you a more accurate answer, I need some additional information:",
+            "es": "Para darle una respuesta más precisa, necesito información adicional:"
+        }
+        
+        intro = intro_messages.get(language, intro_messages["fr"])
+        questions_text = "\n".join([f"• {q}" for q in clarification_questions])
+        
+        return f"{intro}\n\n{questions_text}"
+
     # ✅ MÉTHODE CRITIQUE - MARQUAGE QUESTION ORIGINALE
     def mark_question_for_clarification(
         self, 
@@ -1024,8 +1368,6 @@ EXEMPLES:
     ) -> str:
         """
         🚨 FONCTION CRITIQUE - Marque une question pour clarification future
-        
-        Cette fonction résout le problème de récupération de la question originale.
         """
         
         # Créer un marqueur spécial dans la conversation
@@ -1286,4 +1628,246 @@ EXEMPLES:
             if not isinstance(data.get(list_field), list):
                 data[list_field] = []
         
-        #
+        return IntelligentEntities(**{k: v for k, v in data.items() if k in IntelligentEntities.__dataclass_fields__})
+
+    def _save_conversation_to_db(self, context: IntelligentConversationContext):
+        """Sauvegarde un contexte en base de données"""
+        
+        with self._get_db_connection() as conn:
+            # Préparer les données
+            consolidated_entities_json = json.dumps(context.consolidated_entities.to_dict(), ensure_ascii=False)
+            clarification_questions_json = json.dumps(context.clarification_questions, ensure_ascii=False)
+            
+            # Upsert de la conversation
+            conn.execute("""
+                INSERT OR REPLACE INTO conversations (
+                    conversation_id, user_id, language, created_at, last_activity,
+                    total_exchanges, consolidated_entities, conversation_topic,
+                    conversation_urgency, problem_resolution_status, ai_enhanced,
+                    last_ai_analysis, needs_clarification, clarification_questions,
+                    pending_clarification, last_original_question_id, confidence_overall
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                context.conversation_id,
+                context.user_id,
+                context.language,
+                context.created_at.isoformat(),
+                context.last_activity.isoformat(),
+                context.total_exchanges,
+                consolidated_entities_json,
+                context.conversation_topic,
+                context.conversation_urgency,
+                context.problem_resolution_status,
+                context.ai_enhanced,
+                context.last_ai_analysis.isoformat() if context.last_ai_analysis else None,
+                context.needs_clarification,
+                clarification_questions_json,
+                context.pending_clarification,
+                context.last_original_question_id,
+                context.consolidated_entities.confidence_overall
+            ))
+            
+            conn.commit()
+
+    def _save_message_to_db(self, message: ConversationMessage):
+        """Sauvegarde un message en base de données"""
+        
+        with self._get_db_connection() as conn:
+            # Préparer les données
+            entities_json = json.dumps(message.extracted_entities.to_dict(), ensure_ascii=False) if message.extracted_entities else None
+            
+            # Insert du message
+            conn.execute("""
+                INSERT OR REPLACE INTO conversation_messages (
+                    id, conversation_id, user_id, role, message, timestamp,
+                    language, message_type, extracted_entities, confidence_score,
+                    processing_method, is_original_question, is_clarification_response,
+                    original_question_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                message.id,
+                message.conversation_id,
+                message.user_id,
+                message.role,
+                message.message,
+                message.timestamp.isoformat(),
+                message.language,
+                message.message_type,
+                entities_json,
+                message.confidence_score,
+                message.processing_method,
+                message.is_original_question,
+                message.is_clarification_response,
+                message.original_question_id
+            ))
+            
+            conn.commit()
+
+    def _manage_cache_size(self):
+        """Gère la taille du cache en mémoire"""
+        
+        if len(self.conversation_cache) > self.cache_max_size:
+            # Supprimer les conversations les moins récemment utilisées
+            sorted_conversations = sorted(
+                self.conversation_cache.items(),
+                key=lambda x: x[1].last_activity
+            )
+            
+            # Garder seulement les plus récentes
+            conversations_to_keep = dict(sorted_conversations[-self.cache_max_size//2:])
+            self.conversation_cache = conversations_to_keep
+            
+            logger.info(f"🧹 [Memory] Cache nettoyé: {len(self.conversation_cache)} conversations gardées")
+
+    def get_conversation_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques du système"""
+        
+        return {
+            "system_stats": self.stats.copy(),
+            "cache_stats": {
+                "cache_size": len(self.conversation_cache),
+                "cache_max_size": self.cache_max_size,
+                "hit_rate": self.stats["cache_hits"] / (self.stats["cache_hits"] + self.stats["cache_misses"]) if (self.stats["cache_hits"] + self.stats["cache_misses"]) > 0 else 0
+            },
+            "clarification_stats": {
+                "questions_recovered": self.stats["original_questions_recovered"],
+                "clarifications_resolved": self.stats["clarification_resolutions"]
+            }
+        }
+
+    def cleanup_old_conversations(self, days_old: int = 30):
+        """Nettoie les conversations anciennes"""
+        
+        cutoff_date = datetime.now() - timedelta(days=days_old)
+        
+        with self._get_db_connection() as conn:
+            # Supprimer les messages anciens
+            result_messages = conn.execute(
+                "DELETE FROM conversation_messages WHERE timestamp < ?",
+                (cutoff_date.isoformat(),)
+            )
+            
+            # Supprimer les conversations anciennes
+            result_conversations = conn.execute(
+                "DELETE FROM conversations WHERE last_activity < ?",
+                (cutoff_date.isoformat(),)
+            )
+            
+            conn.commit()
+            
+            logger.info(f"🧹 [Cleanup] {result_messages.rowcount} messages et {result_conversations.rowcount} conversations supprimés")
+
+# ===============================
+# ✅ EXEMPLE D'UTILISATION DANS FASTAPI
+# ===============================
+
+"""
+Exemple d'intégration dans votre endpoint FastAPI:
+
+from app.core.conversation_memory_integrated import IntelligentConversationMemory
+
+# Initialiser le système de mémoire
+conversation_memory = IntelligentConversationMemory()
+
+@app.post("/api/v1/expert/ask")
+async def ask_expert_enhanced(request: QuestionRequest):
+    try:
+        logger.info(f"🚀 [ASK] Question reçue: {request.text[:100]}...")
+        
+        # ✅ ÉTAPE 1: Traitement clarification avec votre approche
+        processed_question, was_clarification = await conversation_memory.process_enhanced_question_with_clarification(
+            request_text=request.text,
+            conversation_id=request.conversation_id,
+            user_id=request.user_id,
+            language=request.language
+        )
+        
+        # Si c'était une clarification, utiliser la question enrichie
+        if was_clarification:
+            logger.info(f"🔁 [ASK] Reprocessing enriched question: {processed_question}")
+            request.text = processed_question
+        
+        # ✅ ÉTAPE 2: Ajouter le message à la conversation (si pas déjà fait)
+        if not was_clarification:
+            conversation_memory.add_message_to_conversation(
+                conversation_id=request.conversation_id,
+                user_id=request.user_id,
+                message=request.text,
+                role="user",
+                language=request.language
+            )
+        
+        # ✅ ÉTAPE 3: Récupérer le contexte enrichi
+        context = conversation_memory.get_conversation_context(request.conversation_id)
+        rag_context = context.get_context_for_rag() if context else ""
+        
+        # ✅ ÉTAPE 4: Appel au système RAG avec contexte enrichi
+        response = await rag_system.query(
+            question=processed_question,
+            context=rag_context,
+            language=request.language
+        )
+        
+        # ✅ ÉTAPE 5: Vérifier si nouvelle clarification nécessaire
+        needs_clarification, clarification_questions = conversation_memory.check_if_clarification_needed(
+            question=processed_question,
+            rag_response=response,
+            context=context,
+            language=request.language
+        )
+        
+        if needs_clarification and not was_clarification:
+            # Marquer pour clarification future
+            conversation_memory.mark_question_for_clarification(
+                conversation_id=request.conversation_id,
+                user_id=request.user_id,
+                original_question=request.text,
+                language=request.language
+            )
+            
+            # Générer la demande de clarification
+            clarification_response = conversation_memory.generate_clarification_request(
+                clarification_questions, 
+                request.language
+            )
+            
+            # Ajouter la réponse de clarification
+            conversation_memory.add_message_to_conversation(
+                conversation_id=request.conversation_id,
+                user_id=request.user_id,
+                message=clarification_response,
+                role="assistant",
+                language=request.language,
+                message_type="clarification_request"
+            )
+            
+            return QuestionResponse(
+                answer=clarification_response,
+                confidence=0.5,
+                context_used=rag_context,
+                needs_clarification=True,
+                conversation_id=request.conversation_id
+            )
+        
+        # ✅ ÉTAPE 6: Réponse normale
+        conversation_memory.add_message_to_conversation(
+            conversation_id=request.conversation_id,
+            user_id=request.user_id,
+            message=response.answer,
+            role="assistant",
+            language=request.language
+        )
+        
+        return QuestionResponse(
+            answer=response.answer,
+            confidence=response.confidence,
+            context_used=rag_context,
+            needs_clarification=False,
+            conversation_id=request.conversation_id,
+            sources=response.sources
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ [ASK] Erreur: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+"""
