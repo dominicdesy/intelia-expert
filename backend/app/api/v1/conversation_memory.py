@@ -1127,7 +1127,7 @@ EXEMPLES:
         # Patterns de questions communes où insérer les enrichissements
         question_patterns = [
             # "Quel est le poids d'un poulet de X jours ?"
-            (r'(quel\s+est\s+le\s+poids\s+d[\'""]un\s+)poulet(\s+de\s+\d+\s+jours?)', 
+            (r'(quel\s+est\s+le\s+poids\s+d.un\s+)poulet(\s+de\s+\d+\s+jours?)',
              r'\1{} \2'),
             
             # "Mes poulets de X jours pèsent Y"
