@@ -149,9 +149,9 @@ export const generateAIResponse = async (
   })
 
   try {
-    // ✅ CORRECTION MAJEURE: Backend attend "question" pas "text"
+    // ✅ CORRECTION MAJEURE: Backend attend "text" (validation Pydantic)
     const requestBody = {
-      question: question.trim(),  // ✅ CORRIGÉ: "text" → "question"
+      text: question.trim(),  // ✅ CORRIGÉ: Retour à "text" pour compatibilité backend
       language: language,
       speed_mode: 'balanced',
       ...(conversationId && { conversation_id: conversationId }),
@@ -268,7 +268,7 @@ export const generateAIResponsePublic = async (
 
   try {
     const requestBody = {
-      question: question.trim(),  // ✅ CORRIGÉ: "text" → "question"
+      text: question.trim(),  // ✅ CORRIGÉ: Retour à "text" pour compatibilité backend
       language: language,
       speed_mode: 'balanced',
       ...(conversationId && { conversation_id: conversationId }),
@@ -518,7 +518,7 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Fonctionnalités v2 activées par défaut')
   console.log('  ✅ Support clarifications complet')
   console.log('  ✅ Authentification JWT maintenue')
-  console.log('  ✅ CORRECTION MAJEURE: "text" → "question" dans payload')
+  console.log('  ✅ CORRECTION MAJEURE: Compatible avec backend "text" field')
   console.groupEnd()
 }
 
@@ -699,7 +699,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('CORRECTIONS APPLIQUÉES:')
   console.log('  - ✅ ask-enhanced → ask-enhanced-v2 (endpoint sécurisé)')
   console.log('  - ✅ ask-enhanced-public → ask-enhanced-v2-public')
-  console.log('  - ✅ CORRECTION MAJEURE: "text" → "question" dans payload')
+  console.log('  - ✅ CORRECTION MAJEURE: Compatible avec backend "text" field')
   console.log('  - ✅ Fonctionnalités v2 activées (vagueness detection, coherence check)')
   console.log('  - ✅ Support clarifications complet')
   console.log('  - ✅ Authentification JWT maintenue')
