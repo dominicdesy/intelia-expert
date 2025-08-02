@@ -269,13 +269,14 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ FONCTION CORRIGÉE: handleSendMessage avec support clarifications
+  // 🎯 FONCTION CORRIGÉE: handleSendMessage avec détection clarification_result
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
     console.log('📤 [ChatInterface] Envoi message:', {
       text: text.substring(0, 50) + '...',
-      hasClarificationState: !!clarificationState
+      hasClarificationState: !!clarificationState,
+      isAnsweringClarification: !!clarificationState
     })
 
     const userMessage: Message = {
@@ -306,14 +307,43 @@ export default function ChatInterface() {
     try {
       console.log('📤 [handleSendMessage] Envoi à API avec conversation_id:', conversationIdToSend || 'nouveau')
       
-      // ✅ APPEL API NORMAL: Pas de paramètres de clarification pour un message normal
-      const response = await generateAIResponse(
-        text.trim(), 
-        user, 
-        currentLanguage, 
-        conversationIdToSend
-        // ✅ Pas de paramètres de clarification pour un message normal
-      )
+      // 🎯 CORRECTION CRITIQUE: Vérifier si on répond à une clarification
+      let response;
+      
+      if (clarificationState) {
+        console.log('🎪 [handleSendMessage] Mode clarification - enrichissement question')
+        
+        // ✅ CONSTRUIRE LES ENTITÉS DEPUIS LA RÉPONSE
+        const answers: Record<string, string> = { '0': text.trim() } // Réponse simple
+        const clarificationEntities = buildClarificationEntities(
+          answers, 
+          clarificationState.clarificationQuestions
+        )
+
+        // ✅ APPEL AVEC PARAMÈTRES DE CLARIFICATION
+        response = await generateAIResponse(
+          clarificationState.originalQuestion,  // Question originale
+          user,
+          currentLanguage,
+          conversationIdToSend,
+          true,                                // ✅ isClarificationResponse = true
+          clarificationState.originalQuestion, // originalQuestion
+          clarificationEntities               // clarificationEntities
+        )
+        
+        // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
+        setClarificationState(null)
+        console.log('✅ [handleSendMessage] Clarification traitée et état réinitialisé')
+        
+      } else {
+        // ✅ APPEL NORMAL POUR NOUVELLE QUESTION
+        response = await generateAIResponse(
+          text.trim(), 
+          user, 
+          currentLanguage, 
+          conversationIdToSend
+        )
+      }
 
       if (!isMountedRef.current) {
         console.log('⚠️ [handleSendMessage] Composant démonté, abandon')
@@ -322,20 +352,21 @@ export default function ChatInterface() {
 
       console.log('📥 [handleSendMessage] Réponse API reçue:', {
         conversation_id: response.conversation_id,
-        is_new: !conversationIdToSend,
         response_length: response.response?.length || 0,
-        requires_clarification: response.requires_clarification,
-        clarification_questions: response.clarification_questions?.length || 0
+        // 🎯 CORRECTION: Vérifier clarification_result au lieu de requires_clarification
+        clarification_requested: response.clarification_result?.clarification_requested || false,
+        clarification_questions_count: response.clarification_questions?.length || 0
       })
 
-      // ✅ VÉRIFICATION: La réponse nécessite-t-elle des clarifications ?
-      if (response.requires_clarification && 
-          response.clarification_questions && 
-          response.clarification_questions.length > 0) {
+      // 🎯 CORRECTION MAJEURE: Détecter clarification via clarification_result
+      const needsClarification = response.clarification_result?.clarification_requested === true &&
+                                response.clarification_questions && 
+                                response.clarification_questions.length > 0
+
+      if (needsClarification) {
+        console.log('❓ [handleSendMessage] Clarifications détectées via clarification_result:', response.clarification_questions)
         
-        console.log('❓ [handleSendMessage] Clarifications détectées:', response.clarification_questions)
-        
-        // Créer le message avec les données de clarification
+        // ✅ MESSAGE IA AVEC DEMANDE DE CLARIFICATION DIRECTEMENT DANS LE CHAT
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
           content: response.response,
@@ -350,7 +381,7 @@ export default function ChatInterface() {
 
         addMessage(clarificationMessage)
 
-        // ✅ ACTIVER L'ÉTAT DE CLARIFICATION
+        // ✅ ACTIVER L'ÉTAT DE CLARIFICATION POUR AFFICHAGE INLINE
         setClarificationState({
           messageId: clarificationMessage.id,
           originalQuestion: text.trim(),
@@ -398,129 +429,37 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ FONCTION CORRIGÉE: Traitement des réponses de clarification
+  // ✅ FONCTION SIMPLIFIÉE: Traitement des réponses de clarification DIRECTEMENT dans le chat
   const handleClarificationSubmit = async (answers: Record<string, string>) => {
     if (!clarificationState || !isMountedRef.current) {
       console.warn('⚠️ [handleClarificationSubmit] Pas d\'état de clarification')
       return
     }
 
-    console.log('🔍 [handleClarificationSubmit] Soumission clarifications:', {
-      originalQuestion: clarificationState.originalQuestion,
+    console.log('🔍 [handleClarificationSubmit] Traitement simple dans le chat:', {
       answers,
-      messageId: clarificationState.messageId
+      originalQuestion: clarificationState.originalQuestion
     })
     
-    setIsProcessingClarification(true)
-
-    try {
-      // ✅ CONSTRUIRE LES ENTITÉS AUTOMATIQUEMENT
-      const clarificationEntities = buildClarificationEntities(
-        answers, 
-        clarificationState.clarificationQuestions
-      )
-
-      // ✅ CONSTRUIRE LA QUESTION ENRICHIE POUR L'AFFICHAGE
-      let enrichedQuestion = clarificationState.originalQuestion + "\n\nInformations supplémentaires :"
-      
-      Object.entries(answers).forEach(([index, answer]) => {
-        if (answer && answer.trim()) {
-          try {
-            const questionIndex = parseInt(index)
-            if (questionIndex >= 0 && questionIndex < clarificationState.clarificationQuestions.length) {
-              const question = clarificationState.clarificationQuestions[questionIndex]
-              enrichedQuestion += `\n- ${question}: ${answer.trim()}`
-            }
-          } catch {
-            // Ignorer les index invalides
-          }
-        }
-      })
-
-      // ✅ AJOUTER LE MESSAGE DE L'UTILISATEUR AVEC SES RÉPONSES
-      const userClarificationMessage: Message = {
-        id: Date.now().toString(),
-        content: enrichedQuestion,
-        isUser: true,
-        timestamp: new Date(),
-        is_clarification_response: true,
-        original_question: clarificationState.originalQuestion,
-        clarification_entities: clarificationEntities
+    // ✅ CONSTRUIRE UNE RÉPONSE TEXTUELLE SIMPLE
+    let clarificationText = ""
+    Object.entries(answers).forEach(([index, answer]) => {
+      if (answer && answer.trim()) {
+        clarificationText += answer.trim() + " "
       }
+    })
 
-      addMessage(userClarificationMessage)
-      setInputMessage('')
-
-      // ✅ OBTENIR L'ID DE CONVERSATION DU MESSAGE DE CLARIFICATION
-      let conversationIdToSend: string | undefined = undefined
-      const clarificationMessage = messages.find(m => m.id === clarificationState.messageId)
-      if (clarificationMessage?.conversation_id) {
-        conversationIdToSend = clarificationMessage.conversation_id
-      } else if (currentConversation && 
-                 currentConversation.id !== 'welcome' && 
-                 !currentConversation.id.startsWith('temp-')) {
-        conversationIdToSend = currentConversation.id
-      }
-
-      // ✅ CORRECTION MAJEURE: Appel avec paramètres positionnels
-      const response = await generateAIResponse(
-        clarificationState.originalQuestion,  // question: string
-        user,                                 // user: any
-        currentLanguage,                      // language?: string
-        conversationIdToSend,                // conversationId?: string
-        true,                                // ✅ isClarificationResponse: boolean
-        clarificationState.originalQuestion, // originalQuestion?: string
-        clarificationEntities               // clarificationEntities?: Record<string, any>
-      )
-
-      if (!isMountedRef.current) {
-        console.log('⚠️ [handleClarificationSubmit] Composant démonté, abandon')
-        return
-      }
-
-      console.log('📥 [handleClarificationSubmit] Réponse clarification reçue:', {
-        conversation_id: response.conversation_id,
-        response_length: response.response?.length || 0
-      })
-
-      // ✅ AJOUTER LA RÉPONSE FINALE
-      const finalResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response.response,
-        isUser: false,
-        timestamp: new Date(),
-        conversation_id: response.conversation_id
-      }
-
-      addMessage(finalResponse)
-
-      // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
-      setClarificationState(null)
-      console.log('✅ [handleClarificationSubmit] Clarification terminée avec succès')
-
-    } catch (error) {
-      console.error('❌ [handleClarificationSubmit] Erreur traitement clarifications:', error)
-      
-      if (isMountedRef.current) {
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: 'Erreur lors du traitement des clarifications. Veuillez réessayer.',
-          isUser: false,
-          timestamp: new Date()
-        }
-        addMessage(errorMessage)
-        
-        // Réinitialiser l'état même en cas d'erreur
-        setClarificationState(null)
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsProcessingClarification(false)
-      }
+    if (!clarificationText.trim()) {
+      console.warn('⚠️ [handleClarificationSubmit] Réponse vide')
+      return
     }
+
+    // ✅ ENVOYER LA RÉPONSE COMME MESSAGE NORMAL DANS LE CHAT
+    // L'état clarificationState va faire que handleSendMessage traite ça comme une clarification
+    await handleSendMessage(clarificationText.trim())
   }
 
-  // ✅ NOUVELLE FONCTION: Ignorer les clarifications
+  // ✅ FONCTION SIMPLIFIÉE: Ignorer les clarifications
   const handleClarificationSkip = async () => {
     if (!clarificationState || !isMountedRef.current) {
       console.warn('⚠️ [handleClarificationSkip] Pas d\'état de clarification')
@@ -529,80 +468,12 @@ export default function ChatInterface() {
 
     console.log('⏭️ [handleClarificationSkip] Clarifications ignorées')
     
-    setIsProcessingClarification(true)
-
-    try {
-      // ✅ RELANCER LA QUESTION ORIGINALE AVEC DEMANDE DE RÉPONSE GÉNÉRALE
-      const generalRequest = clarificationState.originalQuestion + "\n\nDonnez-moi une réponse générale sans clarifications supplémentaires."
-
-      // Ajouter le message utilisateur
-      const userSkipMessage: Message = {
-        id: Date.now().toString(),
-        content: generalRequest,
-        isUser: true,
-        timestamp: new Date()
-      }
-
-      addMessage(userSkipMessage)
-
-      // Obtenir l'ID de conversation
-      let conversationIdToSend: string | undefined = undefined
-      const clarificationMessage = messages.find(m => m.id === clarificationState.messageId)
-      if (clarificationMessage?.conversation_id) {
-        conversationIdToSend = clarificationMessage.conversation_id
-      } else if (currentConversation && 
-                 currentConversation.id !== 'welcome' && 
-                 !currentConversation.id.startsWith('temp-')) {
-        conversationIdToSend = currentConversation.id
-      }
-
-      // ✅ APPEL API NORMAL (pas de clarification)
-      const response = await generateAIResponse(
-        generalRequest, 
-        user, 
-        currentLanguage, 
-        conversationIdToSend
-      )
-
-      if (!isMountedRef.current) {
-        console.log('⚠️ [handleClarificationSkip] Composant démonté, abandon')
-        return
-      }
-
-      // Ajouter la réponse générale
-      const generalResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response.response,
-        isUser: false,
-        timestamp: new Date(),
-        conversation_id: response.conversation_id
-      }
-
-      addMessage(generalResponse)
-
-      // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
-      setClarificationState(null)
-      console.log('✅ [handleClarificationSkip] Clarification ignorée avec succès')
-
-    } catch (error) {
-      console.error('❌ [handleClarificationSkip] Erreur skip clarifications:', error)
-      
-      if (isMountedRef.current) {
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: 'Erreur lors du traitement. Veuillez réessayer.',
-          isUser: false,
-          timestamp: new Date()
-        }
-        addMessage(errorMessage)
-        
-        setClarificationState(null)
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsProcessingClarification(false)
-      }
-    }
+    // ✅ RÉINITIALISER L'ÉTAT ET RELANCER LA QUESTION ORIGINALE
+    const originalQuestion = clarificationState.originalQuestion
+    setClarificationState(null)
+    
+    // Envoyer une demande de réponse générale
+    await handleSendMessage(originalQuestion + " (donnez-moi une réponse générale)")
   }
 
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
@@ -679,6 +550,9 @@ export default function ChatInterface() {
     if (!isMountedRef.current) return
     
     createNewConversation()
+    
+    // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
+    setClarificationState(null)
     
     const welcomeMessage: Message = {
       id: 'welcome',
@@ -796,12 +670,18 @@ export default function ChatInterface() {
                           </p>
                         </div>
                         
-                        {/* ✅ AFFICHAGE DES CLARIFICATIONS INLINE */}
+                        {/* 🎯 AFFICHAGE DES CLARIFICATIONS INLINE DANS LE CHAT */}
                         {message.is_clarification_request && 
                          message.clarification_questions && 
                          message.clarification_questions.length > 0 && 
                          clarificationState?.messageId === message.id && (
-                          <div className="mt-4">
+                          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="mb-3">
+                              <p className="text-sm text-blue-800 font-medium">
+                                💡 Pour vous donner une réponse précise, j'ai besoin de quelques précisions :
+                              </p>
+                            </div>
+                            
                             <ClarificationInline
                               questions={message.clarification_questions}
                               originalQuestion={clarificationState.originalQuestion}
@@ -901,19 +781,19 @@ export default function ChatInterface() {
 
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
-              {/* ✅ AFFICHAGE INDICATEUR CLARIFICATION */}
+              {/* 🎯 AFFICHAGE INDICATEUR CLARIFICATION SIMPLE */}
               {clarificationState && (
-                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-amber-700 text-sm font-medium">
-                      ❓ Mode clarification actif
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 text-sm font-medium">
+                      💡 Répondez aux questions ci-dessus ou tapez votre réponse directement
                     </span>
                     <button
                       onClick={() => {
                         setClarificationState(null)
                         console.log('🔄 [ChatInterface] État clarification réinitialisé manuellement')
                       }}
-                      className="text-amber-600 hover:text-amber-800 text-sm underline"
+                      className="text-blue-600 hover:text-blue-800 text-sm underline"
                     >
                       Annuler
                     </button>
@@ -933,7 +813,7 @@ export default function ChatInterface() {
                         handleSendMessage()
                       }
                     }}
-                    placeholder={clarificationState ? "Tapez votre question de suivi..." : t('chat.placeholder')}
+                    placeholder={clarificationState ? "Répondez à la question ci-dessus ou tapez votre réponse..." : t('chat.placeholder')}
                     className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
                     disabled={isLoadingChat || isProcessingClarification}
                     aria-label={t('chat.placeholder')}
