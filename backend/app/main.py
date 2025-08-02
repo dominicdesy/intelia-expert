@@ -29,6 +29,21 @@ from fastapi.exceptions import RequestValidationError
 # Pydantic models
 from pydantic import BaseModel, Field, ValidationError
 
+from app.api.v1.conversation_memory import IntelligentConversationMemory
+
+# Initialiser au démarrage pour créer la DB
+def initialize_memory_system():
+    try:
+        memory = IntelligentConversationMemory()
+        logger.info("✅ [Startup] Système de mémoire initialisé")
+        return memory
+    except Exception as e:
+        logger.error(f"❌ [Startup] Erreur initialisation mémoire: {e}")
+        return None
+
+# Appeler au démarrage de l'app
+conversation_memory = initialize_memory_system()
+
 # Supabase
 try:
     from supabase import create_client, Client
