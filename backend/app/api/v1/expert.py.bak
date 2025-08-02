@@ -1,4 +1,5 @@
 """
+
 app/api/v1/expert.py - CORRECTIONS CRITIQUES DÉTECTION CLARIFICATION
 
 🧨 PROBLÈME RÉSOLU : Détection Mode Clarification
@@ -14,6 +15,7 @@ VERSION 3.6.0 - CORRECTIONS APPLIQUÉES:
 5. ✅ Logique clarifiée pour éviter faux positifs
 
 + TOUTES LES FONCTIONS ORIGINALES PRÉSERVÉES
+
 """
 
 import os
