@@ -9,14 +9,11 @@ export interface Message {
   feedback?: 'positive' | 'negative' | null
   conversation_id?: string
   feedbackComment?: string  // ✅ NOUVEAU: Commentaire associé au feedback
-  
-  // ✅ NOUVEAUX CHAMPS POUR CLARIFICATION
-  is_clarification_request?: boolean       // Pour les messages du bot qui demandent des clarifications
-  is_clarification_response?: boolean      // Pour les messages utilisateur qui répondent aux clarifications
-  clarification_questions?: string[]       // Questions de clarification du bot
-  clarification_answers?: Record<string, string>  // Réponses de clarification de l'utilisateur (optionnel)
-  original_question?: string               // Question originale avant clarification
-  clarification_entities?: Record<string, any>    // Entités extraites des réponses de clarification
+  // 🆕 NOUVEAUX CHAMPS POUR CLARIFICATION
+  is_clarification_request?: boolean
+  clarification_questions?: string[]
+  clarification_answers?: Record<string, string>
+  original_question?: string
 }
 
 export interface ExpertApiResponse {
