@@ -7,14 +7,12 @@ app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM CORRIGÉS
 3. ✅ Enrichissement automatique question avec race/sexe extraits  
 4. ✅ Fallbacks robustes si mémoire indisponible
 5. ✅ Système de clarification intelligent résolu
-6. 🧹 Nettoyage des références aux documents dans les réponses
 
 PROBLÈME RÉSOLU:
 - "Quel est le poids d'un poulet de 12 jours ?" → Question SAUVEGARDÉE
 - Clarification → Race/sexe demandés
 - "Ross 308 male" → Question originale RÉCUPÉRÉE + enrichie
 - RAG reçoit: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"
-- Réponse nettoyée: "Le poids cible..." au lieu de "Selon le document 2..."
 """
 
 import os
@@ -286,65 +284,6 @@ class ExpertService:
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
         return self.integrations.get_current_user_dependency()
-    
-    def _clean_document_references(self, response_text: str) -> str:
-        """
-        🧹 NOUVELLE FONCTION - Nettoie les références aux documents dans les réponses
-        
-        Transforme "Selon le document 2, le poids..." en "Le poids..."
-        """
-        if not response_text:
-            return response_text
-        
-        # Patterns de références à nettoyer
-        patterns_to_remove = [
-            # Français
-            r'selon le document \d+,?\s*',
-            r'd\'après le document \d+,?\s*',
-            r'le document \d+ indique que\s*',
-            r'comme mentionné dans le document \d+,?\s*',
-            r'tel que décrit dans le document \d+,?\s*',
-            
-            # Anglais
-            r'according to document \d+,?\s*',
-            r'as stated in document \d+,?\s*',
-            r'document \d+ indicates that\s*',
-            r'as mentioned in document \d+,?\s*',
-            
-            # Espagnol
-            r'según el documento \d+,?\s*',
-            r'como se indica en el documento \d+,?\s*',
-            r'el documento \d+ menciona que\s*',
-            
-            # Patterns génériques
-            r'\(document \d+\)',
-            r'\[document \d+\]',
-            r'source:\s*document \d+',
-            r'ref:\s*document \d+'
-        ]
-        
-        cleaned_response = response_text
-        
-        # Nettoyer chaque pattern
-        for pattern in patterns_to_remove:
-            cleaned_response = re.sub(
-                pattern, 
-                '', 
-                cleaned_response, 
-                flags=re.IGNORECASE
-            )
-        
-        # Nettoyer les doubles espaces et commencer par majuscule
-        cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
-        cleaned_response = cleaned_response.strip()
-        
-        # Capitaliser la première lettre si nécessaire
-        if cleaned_response and cleaned_response[0].islower():
-            cleaned_response = cleaned_response[0].upper() + cleaned_response[1:]
-        
-        logger.info(f"🧹 [Response Cleaning] Réponse nettoyée: {len(response_text)} → {len(cleaned_response)} chars")
-        
-        return cleaned_response
     
     async def process_expert_question(
         self,
@@ -1177,10 +1116,6 @@ class ExpertService:
             
             # === 5. TRAITEMENT RÉSULTAT RAG ===
             answer = str(result.get("response", ""))
-            
-            # 🧹 NOUVEAU: Nettoyer les références aux documents
-            answer = self._clean_document_references(answer)
-            
             rag_score = result.get("score", 0.0)
             original_mode = result.get("mode", "rag_processing")
             
@@ -1501,17 +1436,15 @@ class ExpertService:
 # CONFIGURATION FINALE
 # =============================================================================
 
-logger.info("✅ [Expert Service] Services métier PARFAITEMENT CORRIGÉS avec CLARIFICATION INTELLIGENTE + NETTOYAGE RÉPONSES")
+logger.info("✅ [Expert Service] Services métier PARFAITEMENT CORRIGÉS avec CLARIFICATION INTELLIGENTE")
 logger.info("🚀 [Expert Service] CORRECTIONS FINALES APPLIQUÉES:")
 logger.info("   - ✅ Utilisation mark_question_for_clarification() pour sauvegarde")
 logger.info("   - ✅ Récupération find_original_question() depuis mémoire intelligente")
 logger.info("   - ✅ Enrichissement automatique avec race/sexe extraits")
 logger.info("   - ✅ Fallbacks robustes si mémoire indisponible")
 logger.info("   - ✅ Système de clarification intelligent RÉSOLU")
-logger.info("   - 🧹 Nettoyage automatique des références aux documents")
 logger.info("🎯 [Expert Service] PROBLÈME RÉSOLU:")
 logger.info('   - "Quel est le poids d\'un poulet de 12 jours ?" → SAUVEGARDÉ')
 logger.info('   - "Ross 308 male" → Question originale RÉCUPÉRÉE + enrichie')
 logger.info('   - RAG reçoit: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"')
-logger.info('   - Réponse nettoyée: "Le poids cible..." au lieu de "Selon le document 2..."')
-logger.info("✅ [Expert Service] SYSTÈME DE CLARIFICATION + NETTOYAGE MAINTENANT PARFAIT!")
+logger.info("✅ [Expert Service] SYSTÈME DE CLARIFICATION MAINTENANT PARFAIT!")
