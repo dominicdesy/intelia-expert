@@ -1,14 +1,13 @@
 """
-app/api/v1/question_clarification_system.py - VERSION AMÉLIORÉE COMPLÈTE
+app/api/v1/question_clarification_system_enhanced.py - VERSION AMÉLIORÉE
 
 AMÉLIORATIONS MAJEURES:
-1. ✅ Extraction intelligente d'entités via OpenAI avec raisonnement dynamique (CONSERVÉ)
-2. ✅ Clarification multi-tour (interactive vs batch) (CONSERVÉ)
-3. ✅ Retraitement automatique après clarification (CONSERVÉ)
-4. ✅ Gestion avancée du contexte conversationnel (CONSERVÉ)
-5. ✅ Prompts plus intelligents pour données numériques (CONSERVÉ)
-6. ✅ Clarification partielle adaptative (1 question si 1 info manque) (CONSERVÉ)
-7. 🆕 NOUVEAU: Mode sémantique dynamique avec génération GPT de questions contextuelles
+1. Extraction intelligente d'entités via OpenAI avec raisonnement dynamique
+2. Clarification multi-tour (interactive vs batch)
+3. Retraitement automatique après clarification
+4. Gestion avancée du contexte conversationnel
+5. Prompts plus intelligents pour données numériques
+6. Clarification partielle adaptative (1 question si 1 info manque)
 """
 
 import os
@@ -44,7 +43,6 @@ class ClarificationMode(Enum):
     BATCH = "batch"          # Toutes les questions en une fois
     INTERACTIVE = "interactive"  # Une question à la fois
     ADAPTIVE = "adaptive"    # Mode adaptatif selon le contexte
-    SEMANTIC_DYNAMIC = "semantic_dynamic"  # 🆕 Nouveau mode dynamique via GPT
 
 class ClarificationState(Enum):
     """États de clarification"""
@@ -145,7 +143,6 @@ class EnhancedQuestionClarificationSystem:
     - Modes de clarification multiples
     - Retraitement automatique
     - Gestion avancée du contexte
-    - 🆕 Mode sémantique dynamique
     """
     
     def __init__(self):
@@ -167,10 +164,6 @@ class EnhancedQuestionClarificationSystem:
             self.auto_reprocess_after_clarification = getattr(settings, 'auto_reprocess_after_clarification', True)
             self.adaptive_question_count = getattr(settings, 'adaptive_question_count', True)
             self.intelligent_missing_detection = getattr(settings, 'intelligent_missing_detection', True)
-            
-            # 🆕 NOUVEAU: Configuration mode sémantique dynamique
-            self.enable_semantic_dynamic = getattr(settings, 'enable_semantic_dynamic_clarification', True)
-            self.semantic_dynamic_max_questions = getattr(settings, 'semantic_dynamic_max_questions', 4)
         else:
             # ✅ FALLBACK OPTIMISÉ depuis .env
             self.enabled = os.getenv('ENABLE_CLARIFICATION_SYSTEM', 'true').lower() == 'true'
@@ -187,16 +180,11 @@ class EnhancedQuestionClarificationSystem:
             self.auto_reprocess_after_clarification = os.getenv('AUTO_REPROCESS_AFTER_CLARIFICATION', 'true').lower() == 'true'
             self.adaptive_question_count = os.getenv('ADAPTIVE_QUESTION_COUNT', 'true').lower() == 'true'
             self.intelligent_missing_detection = os.getenv('INTELLIGENT_MISSING_DETECTION', 'true').lower() == 'true'
-            
-            # 🆕 NOUVEAU: Configuration mode sémantique dynamique
-            self.enable_semantic_dynamic = os.getenv('ENABLE_SEMANTIC_DYNAMIC_CLARIFICATION', 'true').lower() == 'true'
-            self.semantic_dynamic_max_questions = int(os.getenv('SEMANTIC_DYNAMIC_MAX_QUESTIONS', '4'))
         
         logger.info(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
         logger.info(f"🔧 [Enhanced Clarification] Extraction entités: {'✅' if self.smart_entity_extraction else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Auto-reprocess: {'✅' if self.auto_reprocess_after_clarification else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Questions adaptatives: {'✅' if self.adaptive_question_count else '❌'}")
-        logger.info(f"🆕 [Semantic Dynamic] Mode dynamique: {'✅' if self.enable_semantic_dynamic else '❌'}")
         
         self._init_patterns()
         self._init_enhanced_prompts()
@@ -238,152 +226,6 @@ class EnhancedQuestionClarificationSystem:
             "environment": [r'environnement', r'environment', r'ambiente', r'ventilation', r'humidity', r'humidité'],
             "performance": [r'performance', r'rendement', r'efficacité', r'efficiency', r'eficiencia', r'conversion']
         }
-
-    # 🆕 NOUVELLE MÉTHODE: Génération dynamique de questions
-    def generate_dynamic_clarification_questions(self, user_question: str, language: str = "fr") -> List[str]:
-        """
-        🆕 NOUVEAU: Génère jusqu'à 4 questions de clarification via GPT (mode libre).
-        
-        Args:
-            user_question: Question originale de l'utilisateur
-            language: Langue de réponse (fr/en/es)
-            
-        Returns:
-            Liste de 1-4 questions de clarification pertinentes
-        """
-        
-        try:
-            # Import dynamique du prompt template
-            try:
-                from .prompt_templates import build_contextualization_prompt
-            except ImportError:
-                logger.error("❌ [Semantic Dynamic] Impossible d'importer build_contextualization_prompt")
-                return self._fallback_dynamic_questions(user_question, language)
-
-            # Construire le prompt contextualisé
-            prompt = build_contextualization_prompt(user_question, language)
-            logger.info(f"🤖 [Clarification-Dynamique] Prompt généré pour: '{user_question[:50]}...'")
-            logger.debug(f"🤖 [Clarification-Dynamique] Prompt complet:\n{prompt}")
-
-            # Vérifier disponibilité OpenAI
-            if not OPENAI_AVAILABLE or not openai:
-                logger.warning("⚠️ [Semantic Dynamic] OpenAI non disponible pour clarification dynamique")
-                return self._fallback_dynamic_questions(user_question, language)
-
-            # Configuration OpenAI
-            api_key = os.getenv('OPENAI_API_KEY')
-            if not api_key:
-                logger.warning("⚠️ [Semantic Dynamic] Clé API OpenAI manquante")
-                return self._fallback_dynamic_questions(user_question, language)
-            
-            openai.api_key = api_key
-
-            # Appel GPT pour génération dynamique
-            response = openai.chat.completions.create(
-                model=self.model,  # Utilise le même modèle que la clarification normale
-                messages=[
-                    {"role": "system", "content": "Tu es un expert en aviculture spécialisé dans la génération de questions pertinentes."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,  # Légèrement créatif mais cohérent
-                max_tokens=300,   # Suffisant pour 4 questions
-                timeout=self.timeout
-            )
-            
-            content = response.choices[0].message.content.strip()
-            logger.info(f"🤖 [Clarification-Dynamique] Réponse brute reçue ({len(content)} chars)")
-            logger.debug(f"🤖 [Clarification-Dynamique] Contenu: {content}")
-            
-            # Parser la réponse JSON
-            try:
-                # Chercher le JSON dans la réponse
-                json_match = re.search(r'\{.*?\}', content, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                    data = json.loads(json_str)
-                    
-                    questions = data.get("clarification_questions", [])
-                    
-                    # Valider et nettoyer les questions
-                    validated_questions = []
-                    for q in questions[:self.semantic_dynamic_max_questions]:  # Max 4 questions par défaut
-                        if isinstance(q, str) and len(q.strip()) > 10:
-                            cleaned_q = q.strip()
-                            if not cleaned_q.endswith('?'):
-                                cleaned_q += ' ?'
-                            validated_questions.append(cleaned_q)
-                    
-                    if validated_questions:
-                        logger.info(f"✅ [Semantic Dynamic] {len(validated_questions)} questions générées avec succès")
-                        return validated_questions
-                    else:
-                        logger.warning("⚠️ [Semantic Dynamic] Aucune question valide dans la réponse JSON")
-                        
-                else:
-                    logger.warning("⚠️ [Semantic Dynamic] Pas de JSON trouvé dans la réponse")
-                    
-            except json.JSONDecodeError as e:
-                logger.error(f"❌ [Semantic Dynamic] Erreur parsing JSON: {e}")
-                logger.debug(f"Contenu problématique: {content}")
-            
-            # Fallback si parsing échoue
-            return self._extract_questions_from_text(content, language)
-            
-        except Exception as e:
-            logger.error(f"❌ [Semantic Dynamic] Erreur génération questions de clarification: {e}")
-            return self._fallback_dynamic_questions(user_question, language)
-
-    def _extract_questions_from_text(self, text: str, language: str) -> List[str]:
-        """Extrait les questions depuis un texte libre si JSON parsing échoue"""
-        
-        questions = []
-        lines = text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            # Chercher les lignes qui ressemblent à des questions
-            if ('?' in line or 
-                any(word in line.lower() for word in ['quel', 'quelle', 'comment', 'combien', 'what', 'how', 'which', 'cuál', 'cómo', 'cuánto'])):
-                
-                # Nettoyer la ligne
-                cleaned = re.sub(r'^[-•*\d]+\.?\s*', '', line)  # Supprimer puces/numéros
-                cleaned = cleaned.strip()
-                
-                if len(cleaned) > 15 and len(questions) < self.semantic_dynamic_max_questions:
-                    if not cleaned.endswith('?'):
-                        cleaned += ' ?'
-                    questions.append(cleaned)
-        
-        logger.info(f"📝 [Semantic Dynamic] Questions extraites du texte libre: {len(questions)}")
-        return questions
-
-    def _fallback_dynamic_questions(self, user_question: str, language: str) -> List[str]:
-        """Questions de fallback si génération dynamique échoue"""
-        
-        fallback_templates = {
-            "fr": [
-                "Pouvez-vous préciser la race ou souche de vos volailles ?",
-                "Quel âge ont actuellement vos animaux ?", 
-                "Dans quel contexte d'élevage vous trouvez-vous ?",
-                "Y a-t-il des symptômes ou problèmes spécifiques observés ?"
-            ],
-            "en": [
-                "Could you specify the breed or strain of your poultry?",
-                "What age are your animals currently?",
-                "What farming context are you in?",
-                "Are there any specific symptoms or problems observed?"
-            ],
-            "es": [
-                "¿Podría especificar la raza o cepa de sus aves?",
-                "¿Qué edad tienen actualmente sus animales?",
-                "¿En qué contexto de cría se encuentra?",
-                "¿Hay algún síntoma o problema específico observado?"
-            ]
-        }
-        
-        questions = fallback_templates.get(language, fallback_templates["fr"])
-        logger.info(f"🔄 [Semantic Dynamic] Utilisation questions fallback ({language}): {len(questions)}")
-        return questions
 
     async def extract_entities_intelligent(self, question: str, language: str, conversation_context: Dict = None) -> ExtractedEntities:
         """✅ NOUVEAU: Extraction intelligente d'entités via OpenAI"""
@@ -713,12 +555,10 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         user_id: str = "unknown",
         conversation_id: str = None,
         conversation_context: Dict = None,
-        original_question: str = None,
-        mode: str = None  # 🆕 NOUVEAU PARAMÈTRE pour mode sémantique dynamique
+        original_question: str = None
     ) -> ClarificationResult:
         """
         ✅ ANALYSE AMÉLIORÉE avec extraction intelligente et gestion du contexte
-        🆕 NOUVEAU: Support mode sémantique dynamique
         """
         
         start_time = time.time()
@@ -754,46 +594,6 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         
         logger.info(f"🔍 [Enhanced Clarification] Analyse: '{question[:80]}...'")
         logger.info(f"📊 [Enhanced Clarification] Entités extraites: {extracted_entities.to_dict()}")
-        
-        # 🆕 NOUVEAU: Gestion du mode sémantique dynamique
-        if (mode == "semantic_dynamic" or 
-            self.clarification_mode == ClarificationMode.SEMANTIC_DYNAMIC) and \
-           self.enable_semantic_dynamic:
-            
-            logger.info(f"🎯 [Semantic Dynamic] Mode activé pour: '{question[:50]}...'")
-            
-            # Générer questions dynamiques
-            dynamic_questions = self.generate_dynamic_clarification_questions(question, language)
-            
-            if dynamic_questions:
-                processing_time_ms = int((time.time() - start_time) * 1000)
-                
-                result = ClarificationResult(
-                    needs_clarification=True,
-                    questions=dynamic_questions,
-                    processing_time_ms=processing_time_ms,
-                    reason="semantic_dynamic_clarification_generated",
-                    model_used=f"{self.model}_semantic_dynamic",
-                    extracted_entities=extracted_entities,
-                    question_type=question_type,
-                    clarification_mode=ClarificationMode.SEMANTIC_DYNAMIC,
-                    clarification_state=ClarificationState.NEEDED,
-                    missing_critical_info=["context_understanding"],
-                    confidence_score=0.9,
-                    original_question=original_question or question
-                )
-                
-                logger.info(f"✅ [Semantic Dynamic] {len(dynamic_questions)} questions générées dynamiquement")
-                
-                if self.log_all_clarifications:
-                    await self._log_clarification_decision(
-                        question, language, user_id, conversation_id, result
-                    )
-                
-                return result
-            else:
-                logger.warning("⚠️ [Semantic Dynamic] Aucune question générée, fallback vers mode normal")
-                # Continuer avec la logique normale
         
         # ✅ NOUVEAU: Déterminer les informations critiques manquantes
         missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
@@ -1179,20 +979,17 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "fr": {
                 ClarificationMode.BATCH: "❓ Pour vous donner la réponse la plus précise possible, j'aurais besoin de quelques informations supplémentaires :",
                 ClarificationMode.INTERACTIVE: "❓ Pour vous aider au mieux, puis-je vous poser une question rapide :",
-                ClarificationMode.ADAPTIVE: "❓ J'ai besoin d'une précision pour vous donner une réponse adaptée :",
-                ClarificationMode.SEMANTIC_DYNAMIC: "❓ Pour mieux comprendre votre situation et vous aider efficacement :"
+                ClarificationMode.ADAPTIVE: "❓ J'ai besoin d'une précision pour vous donner une réponse adaptée :"
             },
             "en": {
                 ClarificationMode.BATCH: "❓ To give you the most accurate answer possible, I would need some additional information:",
                 ClarificationMode.INTERACTIVE: "❓ To help you best, may I ask you a quick question:",
-                ClarificationMode.ADAPTIVE: "❓ I need clarification to give you a tailored answer:",
-                ClarificationMode.SEMANTIC_DYNAMIC: "❓ To better understand your situation and help you effectively:"
+                ClarificationMode.ADAPTIVE: "❓ I need clarification to give you a tailored answer:"
             },
             "es": {
                 ClarificationMode.BATCH: "❓ Para darle la respuesta más precisa posible, necesitaría información adicional:",
                 ClarificationMode.INTERACTIVE: "❓ Para ayudarle mejor, ¿puedo hacerle una pregunta rápida:",
-                ClarificationMode.ADAPTIVE: "❓ Necesito una aclaración para darle una respuesta adaptada:",
-                ClarificationMode.SEMANTIC_DYNAMIC: "❓ Para entender mejor su situación y ayudarle efectivamente:"
+                ClarificationMode.ADAPTIVE: "❓ Necesito una aclaración para darle una respuesta adaptada:"
             }
         }
         
@@ -1200,20 +997,17 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "fr": {
                 ClarificationMode.BATCH: "\n\nCes précisions m'aideront à vous donner des conseils spécifiques et adaptés à votre situation ! 🐔",
                 ClarificationMode.INTERACTIVE: "\n\nMerci pour votre précision ! 🐔",
-                ClarificationMode.ADAPTIVE: "\n\nCela m'aidera à vous donner une réponse plus précise ! 🐔",
-                ClarificationMode.SEMANTIC_DYNAMIC: "\n\nCela me permettra de vous donner les conseils les plus pertinents ! 🐔"
+                ClarificationMode.ADAPTIVE: "\n\nCela m'aidera à vous donner une réponse plus précise ! 🐔"
             },
             "en": {
                 ClarificationMode.BATCH: "\n\nThese details will help me give you specific advice tailored to your situation! 🐔",
                 ClarificationMode.INTERACTIVE: "\n\nThank you for the clarification! 🐔",
-                ClarificationMode.ADAPTIVE: "\n\nThis will help me give you a more precise answer! 🐔",
-                ClarificationMode.SEMANTIC_DYNAMIC: "\n\nThis will allow me to give you the most relevant advice! 🐔"
+                ClarificationMode.ADAPTIVE: "\n\nThis will help me give you a more precise answer! 🐔"
             },
             "es": {
                 ClarificationMode.BATCH: "\n\n¡Estos detalles me ayudarán a darle consejos específicos adaptados a su situación! 🐔",
                 ClarificationMode.INTERACTIVE: "\n\n¡Gracias por la aclaración! 🐔",
-                ClarificationMode.ADAPTIVE: "\n\n¡Esto me ayudará a darle una respuesta más precisa! 🐔",
-                ClarificationMode.SEMANTIC_DYNAMIC: "\n\n¡Esto me permitirá darle los consejos más relevantes! 🐔"
+                ClarificationMode.ADAPTIVE: "\n\n¡Esto me ayudará a darle una respuesta más precisa! 🐔"
             }
         }
         
@@ -1256,9 +1050,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "clarification_mode": self.clarification_mode.value,
                 "smart_entity_extraction": self.smart_entity_extraction,
                 "auto_reprocess_after_clarification": self.auto_reprocess_after_clarification,
-                "adaptive_question_count": self.adaptive_question_count,
-                "enable_semantic_dynamic": self.enable_semantic_dynamic,
-                "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions
+                "adaptive_question_count": self.adaptive_question_count
             }
         }
         
@@ -1313,12 +1105,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "symptoms", "duration_problem", "previous_treatments"
             ],
             "clarification_modes_available": [mode.value for mode in ClarificationMode],
-            "clarification_states_available": [state.value for state in ClarificationState],
-            
-            # 🆕 NOUVELLES STATISTIQUES MODE SÉMANTIQUE DYNAMIQUE
-            "semantic_dynamic_enabled": self.enable_semantic_dynamic,
-            "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions,
-            "semantic_dynamic_available": OPENAI_AVAILABLE and bool(os.getenv('OPENAI_API_KEY'))
+            "clarification_states_available": [state.value for state in ClarificationState]
         }
 
 # ==================== INSTANCE GLOBALE AMÉLIORÉE ====================
@@ -1339,19 +1126,6 @@ async def analyze_question_for_clarification_enhanced(
     """Fonction utilitaire pour analyser les questions avec le système amélioré"""
     return await enhanced_clarification_system.analyze_question_enhanced(
         question, language, user_id, conversation_id, conversation_context, original_question
-    )
-
-# 🆕 NOUVELLE FONCTION: Mode sémantique dynamique
-async def analyze_question_for_clarification_semantic_dynamic(
-    question: str, 
-    language: str = "fr",
-    user_id: str = "unknown", 
-    conversation_id: str = None,
-    conversation_context: Dict = None
-) -> ClarificationResult:
-    """Fonction utilitaire pour utiliser le mode sémantique dynamique directement"""
-    return await enhanced_clarification_system.analyze_question_enhanced(
-        question, language, user_id, conversation_id, conversation_context, mode="semantic_dynamic"
     )
 
 def format_clarification_response_enhanced(result: ClarificationResult, language: str) -> str:
@@ -1396,16 +1170,11 @@ def build_enriched_question_enhanced(
     
     return enriched_question
 
-# 🆕 NOUVELLE FONCTION: Génération directe de questions dynamiques
-def generate_dynamic_clarification_questions(question: str, language: str = "fr") -> List[str]:
-    """Génère dynamiquement des questions de clarification"""
-    return enhanced_clarification_system.generate_dynamic_clarification_questions(question, language)
-
 # ==================== LOGGING DE DÉMARRAGE AMÉLIORÉ ====================
 
 logger.info("❓ [EnhancedQuestionClarificationSystem] Module AMÉLIORÉ initialisé")
 logger.info(f"📊 [EnhancedQuestionClarificationSystem] Statistiques: {enhanced_clarification_system.get_stats_enhanced()}")
-logger.info("✅ [EnhancedQuestionClarificationSystem] FONCTIONNALITÉS CONSERVÉES:")
+logger.info("✅ [EnhancedQuestionClarificationSystem] NOUVELLES FONCTIONNALITÉS:")
 logger.info("   - 🤖 Extraction intelligente d'entités via OpenAI")
 logger.info("   - 🔄 Retraitement automatique après clarification")
 logger.info("   - 🎯 Clarification adaptative (1 question si 1 info manque)")
@@ -1414,10 +1183,3 @@ logger.info("   - 📊 Classification automatique des types de questions")
 logger.info("   - 🎛️ Modes de clarification multiples (batch/interactive/adaptive)")
 logger.info("   - 📈 Prompts optimisés pour données numériques")
 logger.info("   - 🔍 Détection intelligente des informations critiques manquantes")
-logger.info("🆕 [EnhancedQuestionClarificationSystem] NOUVELLE FONCTIONNALITÉ:")
-logger.info("   - 🎭 MODE SÉMANTIQUE DYNAMIQUE: Génération GPT de 1-4 questions contextuelles")
-logger.info("   - 🤖 Prompt contextualisé pour questions métier intelligentes")
-logger.info("   - 🔄 Fallback automatique si génération échoue")
-logger.info("   - ⚙️ Configuration flexible (enable_semantic_dynamic, max_questions)")
-logger.info("   - 📊 Logging et métriques étendues pour mode dynamique")
-logger.info("✨ [EnhancedQuestionClarificationSystem] READY: Agent de clarification sémantique opérationnel!")
