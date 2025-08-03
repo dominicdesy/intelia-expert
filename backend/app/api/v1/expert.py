@@ -1,23 +1,37 @@
 """
-app/api/v1/expert.py - EXPERT ENDPOINTS v3.7.0 AVEC SUPPORT RESPONSE_VERSIONS
+app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM COMPLETS AVEC AUTO-CLARIFICATION INTÉGRÉE
 
-🚀 NOUVELLES FONCTIONNALITÉS v3.7.0:
-1. ✅ Support concision_level dans requests
-2. ✅ Support generate_all_versions par défaut  
-3. ✅ response_versions dans les réponses
-4. ✅ Génération multi-versions backend
-5. ✅ Conservation COMPLÈTE du code v3.6.1 fonctionnel
+🚨 VERSION COMPLÈTE 4.0.0 - TOUTES AMÉLIORATIONS INTÉGRÉES:
+1. ✅ Système de concision des réponses intégré (CONSERVÉ)
+2. ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)
+3. ✅ Configuration flexible par type de question (CONSERVÉ)
+4. ✅ Détection automatique niveau de concision requis (CONSERVÉ)
+5. ✅ Conservation de toutes les fonctionnalités existantes (CONSERVÉ)
+6. 🚀 ResponseVersionsGenerator intégré (CONSERVÉ)
+7. 🚀 Génération de toutes les versions (ultra_concise, concise, standard, detailed) (CONSERVÉ)
+8. 🚀 Support ConcisionMetrics avec métriques détaillées (CONSERVÉ)
+9. 🚀 Sélection automatique selon concision_level (CONSERVÉ)
+10. 🚀 Support generate_all_versions flag pour frontend (CONSERVÉ)
+11. 🏷️ Filtrage taxonomique intelligent des documents RAG (CONSERVÉ)
+12. 🏷️ Détection automatique broiler/layer/swine/dairy/general (CONSERVÉ)
+13. 🏷️ Enhancement questions avec contexte taxonomique (CONSERVÉ)
+14. 🏷️ Filtres RAG adaptatifs selon la taxonomie détectée (CONSERVÉ)
+15. 🆕 Mode sémantique dynamique de clarification intégré (CONSERVÉ)
+16. 🆕 Génération intelligente de questions contextuelles via GPT (CONSERVÉ)
+17. 🆕 Support paramètre semantic_dynamic_mode dans les requêtes (CONSERVÉ)
+18. 🔧 NOUVEAU: Déclenchement automatique clarification si contexte faible
+19. 🔧 NOUVEAU: Score de complétude contexte avec seuils intelligents
+20. 🔧 NOUVEAU: Validation automatique questions GPT générées avec fallback robuste
+21. 🔧 NOUVEAU: Intégration complète dans process_expert_question
+22. 🔧 NOUVEAU: Gestion d'erreurs complète avec fallback adaptatif
 
-🧨 CORRECTIONS CRITIQUES v3.6.1 PRÉSERVÉES:
-1. ✅ Suppression assignations context_entities inexistant
-2. ✅ Suppression assignations is_enriched inexistant  
-3. ✅ Conservation des entités via clarification_entities uniquement
-4. ✅ Logging amélioré sans tentatives d'assignation
-5. ✅ Métadonnées propagées via response au lieu de request
-6. ✅ TOUS LES ENDPOINTS ORIGINAUX PRÉSERVÉS
-
-VERSION COMPLÈTE + SYNTAXE 100% CORRIGÉE + SUPPORT RESPONSE_VERSIONS
-TOUTES LES FONCTIONS ORIGINALES CONSERVÉES
+FONCTIONNALITÉS CONSERVÉES:
+- ✅ Système de clarification intelligent complet
+- ✅ Mémoire conversationnelle
+- ✅ RAG avec contexte enrichi
+- ✅ Multi-LLM support
+- ✅ Validation agricole
+- ✅ Support multilingue
 """
 
 import os
@@ -26,2493 +40,2542 @@ import uuid
 import time
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any, Tuple
+from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Request, Depends
-from fastapi.security import HTTPBearer
+from fastapi import HTTPException, Request
 
-from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest, ConcisionLevel, ConcisionPreferences
-from .expert_services import ExpertService
-from .expert_utils import get_user_id_from_request, extract_breed_and_sex_from_clarification
+from .expert_models import (
+    EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest,
+    ValidationResult, ProcessingContext, VaguenessResponse, ResponseFormat,
+    ConcisionLevel, ConcisionMetrics, DynamicClarification
+)
+from .expert_utils import (
+    get_user_id_from_request, 
+    build_enriched_question_from_clarification,
+    get_enhanced_topics_by_language,
+    save_conversation_auto_enhanced,
+    extract_breed_and_sex_from_clarification,
+    build_enriched_question_with_breed_sex,
+    validate_clarification_completeness
+)
+from .expert_integrations import IntegrationsManager
+from .api_enhancement_service import APIEnhancementService
+from .prompt_templates import build_structured_prompt, extract_context_from_entities, validate_prompt_context, build_clarification_prompt
+from .concision_service import concision_service
 
-router = APIRouter(tags=["expert-enhanced"])
 logger = logging.getLogger(__name__)
-security = HTTPBearer()
-
-# Service principal
-expert_service = ExpertService()
 
 # =============================================================================
-# ENDPOINTS PRINCIPAUX AVEC CLARIFICATION DÉTECTION CORRIGÉE + RESPONSE_VERSIONS 🚀
+# 🆕 SYSTÈME DE CONCISION DES RÉPONSES (CONSERVÉ IDENTIQUE)
 # =============================================================================
 
-@router.post("/ask-enhanced-v2", response_model=EnhancedExpertResponse)
-async def ask_expert_enhanced_v2(
-    request_data: EnhancedQuestionRequest,
-    request: Request,
-    current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
-):
-    """
-    🧨 ENDPOINT EXPERT FINAL avec DÉTECTION CLARIFICATION CORRIGÉE v3.6.1:
-    🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
-    - Support explicite du flag is_clarification_response
-    - Logique améliorée pour distinguer clarification vs nouvelle question
-    - Métadonnées propagées correctement sans erreurs
-    - Génération multi-versions des réponses
-    """
-    start_time = time.time()
+class ConcisionLevel(Enum):
+    """Niveaux de concision disponibles"""
+    ULTRA_CONCISE = "ultra_concise"
+    CONCISE = "concise"
+    STANDARD = "standard"
+    DETAILED = "detailed"
+
+class ConcisionConfig:
+    """Configuration du système de concision"""
     
-    try:
-        logger.info("=" * 100)
-        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.0 - SUPPORT RESPONSE_VERSIONS")
-        logger.info(f"📝 Question/Réponse: '{request_data.text}'")
-        logger.info(f"🆔 Conversation ID: {request_data.conversation_id}")
+    ENABLE_CONCISE_RESPONSES = True
+    DEFAULT_CONCISION_LEVEL = ConcisionLevel.CONCISE
+    
+    MAX_RESPONSE_LENGTH = {
+        "weight_question": 80,
+        "temperature_question": 60,
+        "measurement_question": 70,
+        "general_question": 150,
+        "complex_question": 300
+    }
+    
+    ULTRA_CONCISE_KEYWORDS = [
+        "poids", "weight", "peso",
+        "température", "temperature", "temperatura",
+        "combien", "how much", "cuánto",
+        "quel est", "what is", "cuál es"
+    ]
+    
+    COMPLEX_KEYWORDS = [
+        "comment", "how to", "cómo",
+        "pourquoi", "why", "por qué", 
+        "expliquer", "explain", "explicar",
+        "procédure", "procedure", "procedimiento",
+        "protocole", "protocol", "protocolo"
+    ]
+
+class ResponseConcisionProcessor:
+    """Processeur de concision des réponses (CONSERVÉ IDENTIQUE)"""
+    
+    def __init__(self):
+        self.config = ConcisionConfig()
+        logger.info("✅ [Concision] Processeur de concision initialisé")
+    
+    def detect_question_type(self, question: str) -> str:
+        """Détecte le type de question pour appliquer les bonnes règles"""
         
-        # 🚀 NOUVEAU v3.7.0: Log paramètres concision
-        concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
-        generate_all_versions = getattr(request_data, 'generate_all_versions', True)
+        question_lower = question.lower().strip()
         
-        logger.info("🚀 [RESPONSE_VERSIONS v3.7.0] Paramètres concision:")
-        logger.info(f"   - concision_level: {concision_level}")
-        logger.info(f"   - generate_all_versions: {generate_all_versions}")
+        weight_keywords = ["poids", "weight", "peso", "grammes", "grams", "gramos", "kg"]
+        if any(word in question_lower for word in weight_keywords):
+            return "weight_question"
         
-        # 🧨 CORRECTION v3.6.1: DÉTECTION EXPLICITE MODE CLARIFICATION
-        is_clarification = getattr(request_data, 'is_clarification_response', False)
-        original_question = getattr(request_data, 'original_question', None)
-        clarification_entities = getattr(request_data, 'clarification_entities', None)
+        temp_keywords = ["température", "temperature", "temperatura", "°c", "degré", "degree"]
+        if any(word in question_lower for word in temp_keywords):
+            return "temperature_question"
         
-        logger.info("🧨 [DÉTECTION CLARIFICATION v3.6.1] Analyse du mode:")
-        logger.info(f"   - is_clarification_response: {is_clarification}")
-        logger.info(f"   - original_question fournie: {original_question is not None}")
-        logger.info(f"   - clarification_entities: {clarification_entities}")
+        measurement_keywords = ["taille", "size", "tamaño", "longueur", "length", "hauteur", "height"]
+        if any(word in question_lower for word in measurement_keywords):
+            return "measurement_question"
         
-        # Variables pour métadonnées de clarification (à inclure dans response)
-        clarification_metadata = {}
+        if any(word in question_lower for word in self.config.COMPLEX_KEYWORDS):
+            return "complex_question"
         
-        if is_clarification:
-            logger.info("🎪 [FLUX CLARIFICATION] Mode RÉPONSE de clarification détecté")
-            logger.info(f"   - Réponse utilisateur: '{request_data.text}'")
-            logger.info(f"   - Question originale: '{original_question}'")
-            
-            # 🧨 TRAITEMENT SPÉCIALISÉ RÉPONSE CLARIFICATION
-            if clarification_entities:
-                logger.info(f"   - Entités pré-extraites: {clarification_entities}")
-                breed = clarification_entities.get('breed')
-                sex = clarification_entities.get('sex')
-            else:
-                # Extraction automatique si pas fournie
-                logger.info("   - Extraction automatique entités depuis réponse")
-                extracted = extract_breed_and_sex_from_clarification(request_data.text, request_data.language)
-                breed = extracted.get('breed')
-                sex = extracted.get('sex')
-                logger.info(f"   - Entités extraites: breed='{breed}', sex='{sex}'")
-            
-            # 💡 VALIDATION entités complètes AVANT enrichissement
-            clarified_entities = {"breed": breed, "sex": sex}
-            
-            # Vérifier si les entités sont suffisantes
-            if not breed or not sex:
-                logger.warning(f"⚠️ [FLUX CLARIFICATION] Entités incomplètes: breed='{breed}', sex='{sex}'")
-                
-                # Gérer cas d'entités insuffisantes
-                missing_info = []
-                if not breed:
-                    missing_info.append("race/souche")
-                if not sex:
-                    missing_info.append("sexe")
-                
-                # Retourner erreur clarification incomplète
-                incomplete_clarification_response = EnhancedExpertResponse(
-                    question=request_data.text,
-                    response=f"Information incomplète. Il manque encore : {', '.join(missing_info)}.\n\n" +
-                            f"Votre réponse '{request_data.text}' ne contient pas tous les éléments nécessaires.\n\n" +
-                            f"**Exemples complets :**\n" +
-                            f"• 'Ross 308 mâles'\n" +
-                            f"• 'Cobb 500 femelles'\n" +
-                            f"• 'Hubbard troupeau mixte'\n\n" +
-                            f"Pouvez-vous préciser les informations manquantes ?",
-                    conversation_id=request_data.conversation_id or str(uuid.uuid4()),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=int((time.time() - start_time) * 1000),
-                    mode="incomplete_clarification_response",
-                    user=current_user.get("email") if current_user else None,
-                    logged=True,
-                    validation_passed=False,
-                    clarification_result={
-                        "clarification_requested": True,
-                        "clarification_type": "incomplete_entities_retry",
-                        "missing_information": missing_info,
-                        "provided_entities": clarified_entities,
-                        "retry_required": True,
-                        "confidence": 0.3
-                    },
-                    processing_steps=["incomplete_clarification_detected", "retry_requested"],
-                    ai_enhancements_used=["incomplete_clarification_handling"],
-                    # 🚀 NOUVEAU v3.7.0: Pas de response_versions pour erreurs clarification
-                    response_versions=None
-                )
-                
-                logger.info(f"❌ [FLUX CLARIFICATION] Retour erreur entités incomplètes: {missing_info}")
-                return incomplete_clarification_response
-            
-            # Enrichir la question originale avec les informations COMPLÈTES
-            if original_question:
-                enriched_question = original_question
-                if breed:
-                    enriched_question += f" pour {breed}"
-                if sex:
-                    enriched_question += f" {sex}"
-                
-                logger.info(f"   - Question enrichie: '{enriched_question}'")
-                
-                # 💡 CORRECTION v3.6.1: Métadonnées sauvegardées pour response
-                clarification_metadata = {
-                    "was_clarification_response": True,
-                    "original_question": original_question,
-                    "clarification_input": request_data.text,
-                    "entities_extracted": clarified_entities,
-                    "question_enriched": True
-                }
-                
-                # Modifier la question pour traitement RAG
-                request_data.text = enriched_question
-                
-                # ❌ SUPPRIMÉ v3.6.1 - champs inexistants dans le modèle:
-                # request_data.context_entities = clarified_entities  # ❌ N'EXISTE PAS
-                # request_data.is_enriched = True                     # ❌ N'EXISTE PAS
-                
-                # ✅ CORRECT - conservation des métadonnées via variables locales
-                logger.info("💡 [FLUX CLARIFICATION v3.6.1] Métadonnées sauvegardées pour response:")
-                logger.info(f"   - clarification_metadata: {clarification_metadata}")
-                logger.info(f"   - enriched_question: '{enriched_question}'")
-                
-                # Marquer comme traitement post-clarification (éviter boucle)
-                request_data.is_clarification_response = False
-                
-                logger.info("🎯 [FLUX CLARIFICATION] Question enrichie, passage au traitement RAG")
-            else:
-                logger.warning("⚠️ [FLUX CLARIFICATION] Question originale manquante - impossible enrichir")
+        return "general_question"
+    
+    def detect_optimal_concision_level(self, question: str, user_preference: Optional[ConcisionLevel] = None) -> ConcisionLevel:
+        """Détecte le niveau de concision optimal pour une question"""
+        
+        if user_preference:
+            return user_preference
+        
+        question_lower = question.lower().strip()
+        
+        if any(keyword in question_lower for keyword in self.config.ULTRA_CONCISE_KEYWORDS):
+            return ConcisionLevel.ULTRA_CONCISE
+        
+        if any(keyword in question_lower for keyword in self.config.COMPLEX_KEYWORDS):
+            return ConcisionLevel.DETAILED
+        
+        return self.config.DEFAULT_CONCISION_LEVEL
+    
+    def apply_concision(
+        self, 
+        response: str, 
+        question: str, 
+        concision_level: ConcisionLevel,
+        language: str = "fr"
+    ) -> str:
+        """
+        🚀 Méthode unified pour appliquer la concision
+        Utilisée par ResponseVersionsGenerator
+        """
+        
+        if not self.config.ENABLE_CONCISE_RESPONSES:
+            return response
+        
+        logger.info(f"🎯 [Concision] Application niveau {concision_level.value}")
+        
+        if concision_level == ConcisionLevel.ULTRA_CONCISE:
+            return self._extract_essential_info(response, question, language)
+        elif concision_level == ConcisionLevel.CONCISE:
+            return self._make_concise(response, question, language)
+        elif concision_level == ConcisionLevel.STANDARD:
+            return self._remove_excessive_advice(response, language)
         else:
-            logger.info("🎯 [FLUX CLARIFICATION] Mode QUESTION INITIALE - détection vagueness active")
+            return self._clean_document_references_only(response)
+    
+    def process_response(
+        self, 
+        response: str, 
+        question: str, 
+        concision_level: Optional[ConcisionLevel] = None,
+        language: str = "fr"
+    ) -> str:
+        """Traite une réponse selon le niveau de concision demandé (MÉTHODE CONSERVÉE)"""
         
-        # 🚀 NOUVEAU v3.7.0: Validation et défauts concision
-        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-            request_data.concision_level = ConcisionLevel.CONCISE
-            logger.info("🚀 [CONCISION] Niveau par défaut appliqué: CONCISE")
+        if not self.config.ENABLE_CONCISE_RESPONSES:
+            return response
         
-        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-            request_data.generate_all_versions = True
-            logger.info("🚀 [CONCISION] generate_all_versions activé par défaut")
+        level = concision_level or self.detect_optimal_concision_level(question)
         
-        # 🧨 CORRECTION CRITIQUE v3.6.1: FORÇAGE SYSTÉMATIQUE DES AMÉLIORATIONS
-        original_vagueness = getattr(request_data, 'enable_vagueness_detection', None)
-        original_coherence = getattr(request_data, 'require_coherence_check', None)
+        return self.apply_concision(response, question, level, language)
+    
+    def _extract_essential_info(self, response: str, question: str, language: str = "fr") -> str:
+        """Extrait uniquement l'information essentielle (mode ultra-concis)"""
         
-        # FORCER l'activation - AUCUNE EXCEPTION
-        request_data.enable_vagueness_detection = True
-        request_data.require_coherence_check = True
+        question_lower = question.lower()
         
-        logger.info("🔥 [CLARIFICATION FORCÉE v3.6.1] Paramètres forcés:")
-        logger.info(f"   - enable_vagueness_detection: {original_vagueness} → TRUE (FORCÉ)")
-        logger.info(f"   - require_coherence_check: {original_coherence} → TRUE (FORCÉ)")
+        if any(word in question_lower for word in ["poids", "weight", "peso"]):
+            weight_patterns = [
+                r'(?:entre\s+)?(\d+(?:-\d+|[^\d]*\d+)?)\s*(?:grammes?|g\b)',
+                r'(\d+)\s*(?:à|to|a)\s*(\d+)\s*(?:grammes?|g\b)',
+                r'(\d+)\s*(?:grammes?|g\b)'
+            ]
+            
+            for pattern in weight_patterns:
+                match = re.search(pattern, response, re.IGNORECASE)
+                if match:
+                    if len(match.groups()) >= 2:
+                        return f"{match.group(1)}-{match.group(2)}g"
+                    else:
+                        value = match.group(1)
+                        if "entre" in response.lower() or "-" in value:
+                            return f"{value}g"
+                        else:
+                            return f"~{value}g"
         
-        # ✅ DÉLÉGUER AU SERVICE (qui va maintenant gérer response_versions)
-        response = await expert_service.process_expert_question(
-            request_data=request_data,
-            request=request,
-            current_user=current_user,
-            start_time=start_time
-        )
+        if any(word in question_lower for word in ["température", "temperature"]):
+            temp_patterns = [
+                r'(\d+(?:-\d+)?)\s*(?:°C|degrés?|degrees?)',
+                r'(\d+)\s*(?:à|to|a)\s*(\d+)\s*(?:°C|degrés?)'
+            ]
+            
+            for pattern in temp_patterns:
+                match = re.search(pattern, response, re.IGNORECASE)
+                if match:
+                    if len(match.groups()) >= 2:
+                        return f"{match.group(1)}-{match.group(2)}°C"
+                    else:
+                        return f"{match.group(1)}°C"
         
-        # 🧨 CORRECTION v3.6.1: AJOUT MÉTADONNÉES CLARIFICATION dans response
-        if clarification_metadata:
-            response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES v3.6.1] Clarification metadata ajoutées à response")
+        sentences = response.split('.')
+        for sentence in sentences:
+            if re.search(r'\d+', sentence) and len(sentence.strip()) > 10:
+                return sentence.strip() + '.'
         
-        # 🚀 NOUVEAU v3.7.0: Log response_versions si présentes
-        if hasattr(response, 'response_versions') and response.response_versions:
-            logger.info("🚀 [RESPONSE_VERSIONS] Versions générées:")
-            for level, content in response.response_versions.items():
-                logger.info(f"   - {level}: {len(content)} caractères")
-        
-        # 🧨 LOGGING RÉSULTATS CLARIFICATION DÉTAILLÉ
-        logger.info("🧨 [RÉSULTATS CLARIFICATION v3.6.1]:")
-        logger.info(f"   - Mode final: {response.mode}")
-        logger.info(f"   - Clarification déclenchée: {response.clarification_result is not None}")
-        logger.info(f"   - RAG utilisé: {response.rag_used}")
-        logger.info(f"   - Question finale traitée: '{response.question[:100]}...'")
-        
-        if response.clarification_result:
-            clarif = response.clarification_result
-            logger.info(f"   - Type clarification: {clarif.get('clarification_type', 'N/A')}")
-            logger.info(f"   - Infos manquantes: {clarif.get('missing_information', [])}")
-            logger.info(f"   - Confiance: {clarif.get('confidence', 0)}")
-        
-        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.0 - Temps: {response.response_time_ms}ms")
-        logger.info(f"🤖 Améliorations: {len(response.ai_enhancements_used or [])} features")
-        logger.info("=" * 100)
+        if sentences:
+            return sentences[0].strip() + '.'
         
         return response
     
-    except HTTPException:
-        logger.info("=" * 100)
-        raise
-    except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.0: {e}")
-        logger.info("=" * 100)
-        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
-
-@router.post("/ask-enhanced-v2-public", response_model=EnhancedExpertResponse)
-async def ask_expert_enhanced_v2_public(
-    request_data: EnhancedQuestionRequest,
-    request: Request
-):
-    """🧨 ENDPOINT PUBLIC avec DÉTECTION CLARIFICATION CORRIGÉE v3.6.1
-    🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend"""
-    start_time = time.time()
+    def _make_concise(self, response: str, question: str, language: str = "fr") -> str:
+        """Rend concis (enlève conseils mais garde info principale)"""
+        
+        cleaned = self._clean_document_references_only(response)
+        
+        verbose_patterns = [
+            r'\.?\s*Il est essentiel de[^.]*\.',
+            r'\.?\s*Assurez-vous de[^.]*\.',
+            r'\.?\s*N\'hésitez pas à[^.]*\.',
+            r'\.?\s*Pour garantir[^.]*\.',
+            r'\.?\s*Il est important de[^.]*\.',
+            r'\.?\s*Veillez à[^.]*\.',
+            r'\.?\s*Il convient de[^.]*\.',
+            r'\.?\s*À ce stade[^.]*\.',
+            r'\.?\s*En cas de doute[^.]*\.',
+            r'\.?\s*pour favoriser le bien-être[^.]*\.',
+            r'\.?\s*en termes de[^.]*\.',
+            r'\.?\s*It is essential to[^.]*\.',
+            r'\.?\s*Make sure to[^.]*\.',
+            r'\.?\s*Don\'t hesitate to[^.]*\.',
+            r'\.?\s*To ensure[^.]*\.',
+            r'\.?\s*It is important to[^.]*\.',
+            r'\.?\s*Be sure to[^.]*\.',
+            r'\.?\s*At this stage[^.]*\.',
+            r'\.?\s*Es esencial[^.]*\.',
+            r'\.?\s*Asegúrese de[^.]*\.',
+            r'\.?\s*No dude en[^.]*\.',
+            r'\.?\s*Para garantizar[^.]*\.',
+            r'\.?\s*Es importante[^.]*\.',
+            r'\.?\s*En esta etapa[^.]*\.',
+        ]
+        
+        for pattern in verbose_patterns:
+            cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
+        
+        cleaned = re.sub(r'\.+', '.', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        cleaned = cleaned.strip()
+        
+        if any(word in question.lower() for word in ['poids', 'weight', 'peso']) and len(cleaned) > 100:
+            weight_sentence = self._extract_weight_sentence(cleaned)
+            if weight_sentence:
+                return weight_sentence
+        
+        return cleaned
     
-    try:
-        logger.info("=" * 100)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.0 - SUPPORT RESPONSE_VERSIONS")
-        logger.info(f"📝 Question/Réponse: '{request_data.text}'")
+    def _remove_excessive_advice(self, response: str, language: str = "fr") -> str:
+        """Enlève seulement les conseils excessifs (mode standard)"""
         
-        # 🚀 NOUVEAU v3.7.0: Paramètres concision pour endpoint public
-        concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
-        generate_all_versions = getattr(request_data, 'generate_all_versions', True)
+        cleaned = self._clean_document_references_only(response)
         
-        logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Paramètres concision:")
-        logger.info(f"   - concision_level: {concision_level}")
-        logger.info(f"   - generate_all_versions: {generate_all_versions}")
+        excessive_patterns = [
+            r'\.?\s*N\'hésitez pas à[^.]*\.',
+            r'\.?\s*Pour des conseils plus personnalisés[^.]*\.',
+            r'\.?\s*Don\'t hesitate to[^.]*\.',
+            r'\.?\s*For more personalized advice[^.]*\.',
+            r'\.?\s*No dude en[^.]*\.',
+            r'\.?\s*Para consejos más personalizados[^.]*\.',
+        ]
         
-        # 🧨 CORRECTION v3.6.1: DÉTECTION PUBLIQUE CLARIFICATION
-        is_clarification = getattr(request_data, 'is_clarification_response', False)
-        clarification_metadata = {}
+        for pattern in excessive_patterns:
+            cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
         
-        logger.info("🧨 [DÉTECTION PUBLIQUE v3.6.1] Analyse mode clarification:")
-        logger.info(f"   - is_clarification_response: {is_clarification}")
-        logger.info(f"   - conversation_id: {request_data.conversation_id}")
+        return re.sub(r'\.+', '.', cleaned).replace(r'\s+', ' ').strip()
+    
+    def _clean_document_references_only(self, response_text: str) -> str:
+        """Nettoie uniquement les références aux documents (version originale)"""
         
-        if is_clarification:
-            logger.info("🎪 [FLUX PUBLIC] Traitement réponse clarification")
+        if not response_text:
+            return response_text
+        
+        patterns_to_remove = [
+            r'selon le document \d+,?\s*',
+            r'd\'après le document \d+,?\s*',
+            r'le document \d+ indique que\s*',
+            r'comme mentionné dans le document \d+,?\s*',
+            r'tel que décrit dans le document \d+,?\s*',
+            r'according to document \d+,?\s*',
+            r'as stated in document \d+,?\s*',
+            r'document \d+ indicates that\s*',
+            r'as mentioned in document \d+,?\s*',
+            r'según el documento \d+,?\s*',
+            r'como se indica en el documento \d+,?\s*',
+            r'el documento \d+ menciona que\s*',
+            r'\(document \d+\)',
+            r'\[document \d+\]',
+            r'source:\s*document \d+',
+            r'ref:\s*document \d+'
+        ]
+        
+        cleaned_response = response_text
+        
+        for pattern in patterns_to_remove:
+            cleaned_response = re.sub(
+                pattern, 
+                '', 
+                cleaned_response, 
+                flags=re.IGNORECASE
+            )
+        
+        cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
+        cleaned_response = cleaned_response.strip()
+        
+        if cleaned_response and cleaned_response[0].islower():
+            cleaned_response = cleaned_response[0].upper() + cleaned_response[1:]
+        
+        return cleaned_response
+    
+    def _extract_weight_sentence(self, text: str) -> Optional[str]:
+        """Extrait la phrase principale contenant l'information de poids"""
+        
+        weight_patterns = [
+            r'[^.]*\d+[^.]*(?:grammes?|g\b|kg|livres?|pounds?)[^.]*\.',
+            r'[^.]*(?:entre|between|entre)\s+\d+[^.]*\d+[^.]*\.',
+            r'[^.]*(?:poids|weight|peso)[^.]*\d+[^.]*\.'
+        ]
+        
+        for pattern in weight_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                sentence = match.group(0).strip()
+                sentence = re.sub(r'^\W+', '', sentence)
+                if sentence and sentence[0].islower():
+                    sentence = sentence[0].upper() + sentence[1:]
+                return sentence
+        
+        sentences = text.split('.')
+        if sentences:
+            first_sentence = sentences[0].strip() + '.'
+            return first_sentence
+        
+        return None
+
+# =============================================================================
+# 🚀 RESPONSE VERSIONS GENERATOR (CONSERVÉ IDENTIQUE)
+# =============================================================================
+
+class ResponseVersionsGenerator:
+    """Générateur de toutes les versions de réponse pour le frontend"""
+    
+    def __init__(self, existing_processor: ResponseConcisionProcessor):
+        self.existing_processor = existing_processor
+        self.concision_service = concision_service
+        logger.info("🚀 [ResponseVersions] Générateur initialisé avec système existant")
+    
+    async def generate_all_response_versions(
+        self, 
+        original_response: str, 
+        question: str, 
+        context: Dict[str, Any],
+        requested_level: ConcisionLevel = ConcisionLevel.CONCISE
+    ) -> Dict[str, Any]:
+        """
+        Génère toutes les versions de réponse en utilisant le système existant + nouveau
+        """
+        start_time = time.time()
+        
+        try:
+            logger.info("🚀 [ResponseVersions] Génération toutes versions")
+            logger.info(f"   - Question: {question[:50]}...")
+            logger.info(f"   - Niveau demandé: {requested_level}")
+            logger.info(f"   - Réponse originale: {len(original_response)} caractères")
             
-            # Logique similaire à l'endpoint privé
-            original_question = getattr(request_data, 'original_question', None)
-            clarification_entities = getattr(request_data, 'clarification_entities', None)
+            versions = {}
             
-            logger.info(f"   - Question originale: '{original_question}'")
-            logger.info(f"   - Entités fournies: {clarification_entities}")
+            versions["detailed"] = original_response
             
-            if clarification_entities:
-                breed = clarification_entities.get('breed')
-                sex = clarification_entities.get('sex')
-                logger.info(f"   - Utilisation entités pré-extraites: breed='{breed}', sex='{sex}'")
-            else:
-                # Extraction automatique
-                extracted = extract_breed_and_sex_from_clarification(request_data.text, request_data.language)
-                breed = extracted.get('breed')
-                sex = extracted.get('sex')
-                logger.info(f"   - Extraction automatique: breed='{breed}', sex='{sex}'")
+            standard_response = self.existing_processor.apply_concision(
+                original_response, 
+                question, 
+                ConcisionLevel.STANDARD,
+                context.get("language", "fr")
+            )
+            versions["standard"] = standard_response
             
-            # 💡 VALIDATION entités complètes
-            clarified_entities = {"breed": breed, "sex": sex}
+            concise_response = self.existing_processor.apply_concision(
+                original_response, 
+                question, 
+                ConcisionLevel.CONCISE,
+                context.get("language", "fr")
+            )
+            versions["concise"] = concise_response
             
-            # Validation entités complètes
-            if not breed or not sex:
-                logger.warning(f"⚠️ [FLUX PUBLIC] Entités incomplètes: breed='{breed}', sex='{sex}'")
-                
-                missing_info = []
-                if not breed:
-                    missing_info.append("race/souche")
-                if not sex:
-                    missing_info.append("sexe")
-                
-                # Retourner erreur clarification incomplète publique
-                return EnhancedExpertResponse(
-                    question=request_data.text,
-                    response=f"Information incomplète. Il manque encore : {', '.join(missing_info)}.\n\n" +
-                            f"Votre réponse '{request_data.text}' ne contient pas tous les éléments nécessaires.\n\n" +
-                            f"**Exemples complets :**\n" +
-                            f"• 'Ross 308 mâles'\n" +
-                            f"• 'Cobb 500 femelles'\n" +
-                            f"• 'Hubbard troupeau mixte'\n\n" +
-                            f"Pouvez-vous préciser les informations manquantes ?",
-                    conversation_id=request_data.conversation_id or str(uuid.uuid4()),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=request_data.language,
-                    response_time_ms=int((time.time() - start_time) * 1000),
-                    mode="incomplete_clarification_response_public",
-                    user=None,
-                    logged=True,
-                    validation_passed=False,
-                    clarification_result={
-                        "clarification_requested": True,
-                        "clarification_type": "incomplete_entities_retry_public",
-                        "missing_information": missing_info,
-                        "provided_entities": clarified_entities,
-                        "retry_required": True,
-                        "confidence": 0.3
-                    },
-                    processing_steps=["incomplete_clarification_detected_public", "retry_requested"],
-                    ai_enhancements_used=["incomplete_clarification_handling_public"],
-                    # 🚀 NOUVEAU v3.7.0: Pas de response_versions pour erreurs
-                    response_versions=None
+            ultra_concise_response = self.existing_processor.apply_concision(
+                original_response, 
+                question, 
+                ConcisionLevel.ULTRA_CONCISE,
+                context.get("language", "fr")
+            )
+            versions["ultra_concise"] = ultra_concise_response
+            
+            selected_response = versions.get(requested_level.value, versions["concise"])
+            
+            generation_time_ms = int((time.time() - start_time) * 1000)
+            
+            metrics = ConcisionMetrics(
+                generation_time_ms=generation_time_ms,
+                versions_generated=len(versions),
+                cache_hit=False,
+                fallback_used=False,
+                compression_ratios={
+                    level: len(content) / len(original_response) 
+                    for level, content in versions.items()
+                    if content and len(original_response) > 0
+                },
+                quality_scores={}
+            )
+            
+            logger.info("✅ [ResponseVersions] Versions générées avec système existant:")
+            for level, content in versions.items():
+                logger.info(f"   - {level}: {len(content)} caractères")
+            
+            return {
+                "response_versions": versions,
+                "selected_response": selected_response,
+                "concision_metrics": metrics
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ [ResponseVersions] Erreur génération: {e}")
+            
+            fallback_versions = {
+                "ultra_concise": original_response[:50] + "..." if len(original_response) > 50 else original_response,
+                "concise": original_response,
+                "standard": original_response,
+                "detailed": original_response
+            }
+            
+            return {
+                "response_versions": fallback_versions,
+                "selected_response": fallback_versions.get(requested_level.value, original_response),
+                "concision_metrics": ConcisionMetrics(
+                    generation_time_ms=int((time.time() - start_time) * 1000),
+                    versions_generated=len(fallback_versions),
+                    cache_hit=False,
+                    fallback_used=True,
+                    compression_ratios={},
+                    quality_scores={}
                 )
-            
-            # Enrichissement question avec entités COMPLÈTES
-            if original_question:
-                enriched_question = original_question
-                if breed:
-                    enriched_question += f" pour {breed}"
-                if sex:
-                    enriched_question += f" {sex}"
-                
-                # 💡 CORRECTION v3.6.1: Métadonnées pour response (endpoint public)
-                clarification_metadata = {
-                    "was_clarification_response": True,
-                    "original_question": original_question,
-                    "clarification_input": request_data.text,
-                    "entities_extracted": clarified_entities,
-                    "question_enriched": True
-                }
-                
-                # Modifier question pour RAG
-                request_data.text = enriched_question
-                
-                # ❌ SUPPRIMÉ v3.6.1 - champs inexistants:
-                # request_data.context_entities = clarified_entities  # ❌ N'EXISTE PAS
-                # request_data.is_enriched = True                     # ❌ N'EXISTE PAS
-                
-                request_data.is_clarification_response = False  # Éviter boucle
-                
-                logger.info(f"   - Question enrichie publique: '{enriched_question}'")
-                logger.info(f"   - Métadonnées sauvegardées: {clarification_metadata}")
-        else:
-            logger.info("🎯 [FLUX PUBLIC] Question initiale - détection vagueness")
+            }
+
+# =============================================================================
+# 🔄 RAG CONTEXT ENHANCER (CONSERVÉ IDENTIQUE)
+# =============================================================================
+
+class RAGContextEnhancer:
+    """Améliore le contexte conversationnel pour optimiser les requêtes RAG"""
+    
+    def __init__(self):
+        self.pronoun_patterns = {
+            "fr": [
+                r'\b(son|sa|ses|leur|leurs)\s+(poids|âge|croissance|développement)',
+                r'\b(ils|elles)\s+(pèsent|grandissent|se développent)',
+                r'\b(qu\'?est-ce que|quel est)\s+(son|sa|ses|leur)',
+                r'\b(combien)\s+(pèsent-ils|font-ils|mesurent-ils)'
+            ],
+            "en": [
+                r'\b(their|its)\s+(weight|age|growth|development)',
+                r'\b(they)\s+(weigh|grow|develop)',
+                r'\b(what is|how much is)\s+(their|its)',
+                r'\b(how much do they)\s+(weigh|measure)'
+            ],
+            "es": [
+                r'\b(su|sus)\s+(peso|edad|crecimiento|desarrollo)',
+                r'\b(ellos|ellas)\s+(pesan|crecen|se desarrollan)',
+                r'\b(cuál es|cuánto es)\s+(su|sus)',
+                r'\b(cuánto)\s+(pesan|miden)'
+            ]
+        }
+    
+    def enhance_question_for_rag(
+        self, 
+        question: str, 
+        conversation_context: str, 
+        language: str = "fr"
+    ) -> Tuple[str, Dict[str, any]]:
+        """Améliore une question pour le RAG en utilisant le contexte conversationnel"""
         
-        # 🚀 NOUVEAU v3.7.0: Validation et défauts concision pour public
-        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-            request_data.concision_level = ConcisionLevel.CONCISE
-        
-        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-            request_data.generate_all_versions = True
-        
-        # 🧨 FORÇAGE MAXIMAL pour endpoint public
-        logger.info("🔥 [PUBLIC ENDPOINT v3.7.0] Activation FORCÉE des améliorations:")
-        
-        original_settings = {
-            'vagueness': getattr(request_data, 'enable_vagueness_detection', None),
-            'coherence': getattr(request_data, 'require_coherence_check', None),
-            'detailed_rag': getattr(request_data, 'detailed_rag_scoring', None),
-            'quality_metrics': getattr(request_data, 'enable_quality_metrics', None)
+        enhancement_info = {
+            "pronoun_detected": False,
+            "context_entities_used": [],
+            "question_enriched": False,
+            "original_question": question
         }
         
-        # FORÇAGE MAXIMAL pour endpoint public
-        request_data.enable_vagueness_detection = True
-        request_data.require_coherence_check = True
-        request_data.detailed_rag_scoring = True
-        request_data.enable_quality_metrics = True
+        has_pronouns = self._detect_contextual_references(question, language)
+        if has_pronouns:
+            enhancement_info["pronoun_detected"] = True
+            logger.info(f"🔍 [RAG Context] Pronoms détectés dans: '{question}'")
         
-        logger.info("🔥 [FORÇAGE PUBLIC v3.7.0] Changements appliqués:")
-        for key, (old_val, new_val) in {
-            'vagueness_detection': (original_settings['vagueness'], True),
-            'coherence_check': (original_settings['coherence'], True),
-            'detailed_rag': (original_settings['detailed_rag'], True),
-            'quality_metrics': (original_settings['quality_metrics'], True)
-        }.items():
-            logger.info(f"   - {key}: {old_val} → {new_val} (FORCÉ)")
+        context_entities = self._extract_context_entities(conversation_context)
+        if context_entities:
+            enhancement_info["context_entities_used"] = list(context_entities.keys())
+            logger.info(f"📊 [RAG Context] Entités contextuelles: {context_entities}")
         
-        # ✅ DÉLÉGUER AU SERVICE avec support response_versions
-        response = await expert_service.process_expert_question(
-            request_data=request_data,
-            request=request,
-            current_user=None,  # Mode public
-            start_time=start_time
-        )
+        enriched_question = question
         
-        # 💡 CORRECTION v3.6.1: Ajout métadonnées clarification
-        if clarification_metadata:
-            response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES PUBLIC v3.6.1] Clarification metadata ajoutées")
+        if has_pronouns and context_entities:
+            enriched_question = self._build_enriched_question(
+                question, context_entities, language
+            )
+            enhancement_info["question_enriched"] = True
+            logger.info(f"✨ [RAG Context] Question enrichie: '{enriched_question}'")
         
-        # 🚀 NOUVEAU v3.7.0: Log response_versions si présentes
-        if hasattr(response, 'response_versions') and response.response_versions:
-            logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Versions générées:")
-            for level, content in response.response_versions.items():
-                logger.info(f"   - {level}: {len(content)} caractères")
+        if context_entities or has_pronouns:
+            technical_context = self._build_technical_context(context_entities, language)
+            if technical_context:
+                enriched_question += f"\n\nContexte technique: {technical_context}"
         
-        # 🧨 VALIDATION RÉSULTATS CLARIFICATION PUBLIQUE
-        logger.info("🧨 [VALIDATION PUBLIQUE v3.6.1]:")
-        logger.info(f"   - Clarification système actif: {'clarification' in response.mode}")
-        logger.info(f"   - Améliorations appliquées: {response.ai_enhancements_used}")
-        logger.info(f"   - Mode final: {response.mode}")
-        logger.info(f"   - RAG utilisé: {response.rag_used}")
+        return enriched_question, enhancement_info
+    
+    def _detect_contextual_references(self, question: str, language: str) -> bool:
+        """Détecte si la question contient des pronoms/références contextuelles"""
         
-        # Vérification critique
-        if not response.ai_enhancements_used:
-            logger.warning("⚠️ [ALERTE] Aucune amélioration détectée - possible problème!")
+        patterns = self.pronoun_patterns.get(language, self.pronoun_patterns["fr"])
+        question_lower = question.lower()
         
-        if response.enable_vagueness_detection is False:
-            logger.warning("⚠️ [ALERTE] Vagueness detection non activée - vérifier forçage!")
+        for pattern in patterns:
+            if re.search(pattern, question_lower, re.IGNORECASE):
+                logger.debug(f"🎯 [RAG Context] Pattern trouvé: {pattern}")
+                return True
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.0 - Mode: {response.mode}")
-        logger.info("=" * 100)
+        return False
+    
+    def _extract_context_entities(self, context: str) -> Dict[str, str]:
+        """Extrait les entités importantes du contexte conversationnel"""
         
-        return response
-    
-    except HTTPException:
-        logger.info("=" * 100)
-        raise
-    except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.0: {e}")
-        logger.info("=" * 100)
-        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
-
-# =============================================================================
-# ENDPOINTS DE COMPATIBILITÉ AVEC FORÇAGE MAINTENU + RESPONSE_VERSIONS 🔥
-# =============================================================================
-
-@router.post("/ask-enhanced", response_model=EnhancedExpertResponse)
-async def ask_expert_enhanced_legacy(
-    request_data: EnhancedQuestionRequest,
-    request: Request,
-    current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
-):
-    """Endpoint de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
-    logger.info("🔄 [LEGACY] Redirection avec FORÇAGE + clarification + response_versions vers v2")
-    
-    # 🔥 FORÇAGE LEGACY
-    request_data.enable_vagueness_detection = True
-    request_data.require_coherence_check = True
-    
-    # 🚀 v3.7.0: Support concision par défaut
-    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-        request_data.concision_level = ConcisionLevel.CONCISE
-    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-        request_data.generate_all_versions = True
-    
-    return await ask_expert_enhanced_v2(request_data, request, current_user)
-
-@router.post("/ask-enhanced-public", response_model=EnhancedExpertResponse)
-async def ask_expert_enhanced_public_legacy(
-    request_data: EnhancedQuestionRequest,
-    request: Request
-):
-    """Endpoint public de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
-    logger.info("🔄 [LEGACY PUBLIC] Redirection avec FORÇAGE + clarification + response_versions vers v2")
-    
-    # 🔥 FORÇAGE LEGACY PUBLIC
-    request_data.enable_vagueness_detection = True
-    request_data.require_coherence_check = True
-    
-    # 🚀 v3.7.0: Support concision par défaut
-    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-        request_data.concision_level = ConcisionLevel.CONCISE
-    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-        request_data.generate_all_versions = True
-    
-    return await ask_expert_enhanced_v2_public(request_data, request)
-
-@router.post("/ask", response_model=EnhancedExpertResponse)
-async def ask_expert_compatible(
-    request_data: EnhancedQuestionRequest,
-    request: Request,
-    current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
-):
-    """Endpoint de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
-    logger.info("🔄 [COMPATIBLE] Redirection avec FORÇAGE TOTAL + clarification + response_versions vers v2")
-    
-    # 🔥 FORÇAGE COMPATIBILITÉ TOTALE
-    request_data.enable_vagueness_detection = True
-    request_data.require_coherence_check = True
-    request_data.detailed_rag_scoring = True
-    request_data.enable_quality_metrics = True
-    
-    # 🚀 v3.7.0: Support concision par défaut
-    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-        request_data.concision_level = ConcisionLevel.CONCISE
-    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-        request_data.generate_all_versions = True
-    
-    return await ask_expert_enhanced_v2(request_data, request, current_user)
-
-@router.post("/ask-public", response_model=EnhancedExpertResponse)
-async def ask_expert_public_compatible(
-    request_data: EnhancedQuestionRequest,
-    request: Request
-):
-    """Endpoint public de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
-    logger.info("🔄 [COMPATIBLE PUBLIC] Redirection avec FORÇAGE TOTAL + clarification + response_versions vers v2")
-    
-    # 🔥 FORÇAGE COMPATIBILITÉ PUBLIQUE TOTALE
-    request_data.enable_vagueness_detection = True
-    request_data.require_coherence_check = True
-    request_data.detailed_rag_scoring = True
-    request_data.enable_quality_metrics = True
-    
-    # 🚀 v3.7.0: Support concision par défaut
-    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-        request_data.concision_level = ConcisionLevel.CONCISE
-    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-        request_data.generate_all_versions = True
-    
-    return await ask_expert_enhanced_v2_public(request_data, request)
-
-# =============================================================================
-# ENDPOINT FEEDBACK AMÉLIORÉ (ORIGINAL PRÉSERVÉ)
-# =============================================================================
-
-@router.post("/feedback")
-async def submit_feedback_enhanced(feedback_data: FeedbackRequest):
-    """Submit feedback - VERSION FINALE avec support qualité"""
-    try:
-        logger.info(f"📊 [Feedback] Reçu: {feedback_data.rating} pour {feedback_data.conversation_id}")
+        if not context:
+            return {}
         
-        if feedback_data.quality_feedback:
-            logger.info(f"📈 [Feedback] Qualité détaillée: {len(feedback_data.quality_feedback)} métriques")
+        entities = {}
+        context_lower = context.lower()
         
-        result = await expert_service.process_feedback(feedback_data)
-        return result
+        breed_patterns = [
+            r'race[:\s]+([a-zA-Z0-9\s]+?)(?:\n|,|\.|\s|$)',
+            r'breed[:\s]+([a-zA-Z0-9\s]+?)(?:\n|,|\.|\s|$)',
+            r'(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)',
+            r'poulets?\s+(ross\s*308|cobb\s*500)',
+            r'chickens?\s+(ross\s*308|cobb\s*500)'
+        ]
         
-    except Exception as e:
-        logger.error(f"❌ [Feedback] Erreur: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur feedback: {str(e)}")
-
-# =============================================================================
-# ENDPOINT TOPICS AMÉLIORÉ (ORIGINAL PRÉSERVÉ)
-# =============================================================================
-
-@router.get("/topics")
-async def get_suggested_topics_enhanced(language: str = "fr"):
-    """Get suggested topics - VERSION FINALE"""
-    try:
-        return await expert_service.get_suggested_topics(language)
-    except Exception as e:
-        logger.error(f"❌ [Topics] Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur topics")
-
-# =============================================================================
-# ENDPOINTS DE DEBUG ET MONITORING AVEC CLARIFICATION (TOUS ORIGINAUX PRÉSERVÉS)
-# =============================================================================
-
-@router.get("/system-status")
-async def get_system_status():
-    """Statut système avec focus clarification + RESPONSE_VERSIONS (ORIGINAL + AMÉLIORÉ)"""
-    try:
-        status = {
-            "system_available": True,
-            "timestamp": datetime.now().isoformat(),
-            "components": {
-                "expert_service": True,
-                "rag_system": True,
-                "enhancement_service": True,
-                "integrations_manager": expert_service.integrations.get_system_status(),
-                "clarification_system": True,  # ✅ FOCUS
-                "forced_clarification": True,   # ✅ NOUVEAU
-                "clarification_detection_fixed": True,  # 🧨 NOUVEAU
-                "metadata_propagation": True,             # 💡 NOUVEAU
-                "backend_fix_v361": True,                  # 🧨 v3.6.1
-                "response_versions_system": True          # 🚀 v3.7.0 NOUVEAU
+        for pattern in breed_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities["breed"] = match.group(1).strip()
+                break
+        
+        sex_patterns = [
+            r'sexe[:\s]+([a-zA-Z\s]+?)(?:\n|,|\.|\s|$)',
+            r'sex[:\s]+([a-zA-Z\s]+?)(?:\n|,|\.|\s|$)',
+            r'\b(mâles?|femelles?|males?|females?|mixte|mixed)\b'
+        ]
+        
+        for pattern in sex_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities["sex"] = match.group(1).strip()
+                break
+        
+        age_patterns = [
+            r'âge[:\s]+(\d+\s*(?:jour|semaine|day|week)s?)',
+            r'age[:\s]+(\d+\s*(?:jour|semaine|day|week)s?)',
+            r'(\d+)\s*(?:jour|day)s?',
+            r'(\d+)\s*(?:semaine|week)s?'
+        ]
+        
+        for pattern in age_patterns:
+            match = re.search(pattern, context_lower, re.IGNORECASE)
+            if match:
+                entities["age"] = match.group(1).strip()
+                break
+        
+        return entities
+    
+    def _build_enriched_question(
+        self, 
+        question: str, 
+        context_entities: Dict[str, str], 
+        language: str
+    ) -> str:
+        """Construit une question enrichie en remplaçant les pronoms par les entités contextuelles"""
+        
+        enriched = question
+        
+        templates = {
+            "fr": {
+                "breed_sex_age": "Pour des {breed} {sex} de {age}",
+                "breed_age": "Pour des {breed} de {age}",
+                "breed_sex": "Pour des {breed} {sex}",
+                "breed_only": "Pour des {breed}",
+                "age_only": "Pour des poulets de {age}"
             },
-            "enhanced_capabilities": [
-                "vagueness_detection",
-                "context_coherence_check", 
-                "detailed_rag_scoring",
-                "enhanced_fallback",
-                "quality_metrics",
-                "debug_mode",
-                "performance_breakdown",
-                "smart_clarification_breed_sex",
-                "clarification_response_processing_fixed",  # 🧨 CORRIGÉ
-                "incomplete_clarification_handling",
-                "is_clarification_response_support",       # 🧨 NOUVEAU
-                "clarification_entities_support",           # 🧨 NOUVEAU
-                "entity_validation_and_incomplete_handling", # 💡 NOUVEAU
-                "metadata_propagation_system_v361",          # 💡 v3.6.1
-                "response_versions_generation",              # 🚀 v3.7.0 NOUVEAU
-                "dynamic_concision_levels",                  # 🚀 v3.7.0 NOUVEAU
-                "multi_version_backend_cache",               # 🚀 v3.7.0 NOUVEAU
-                "intelligent_version_selection"              # 🚀 v3.7.0 NOUVEAU
-            ],
-            "enhanced_endpoints": [
-                "/ask-enhanced-v2 (+ response_versions)",
-                "/ask-enhanced-v2-public (+ response_versions)", 
-                "/ask-enhanced (legacy → v2 + response_versions)",
-                "/ask-enhanced-public (legacy → v2 + response_versions)",
-                "/ask (compatible → v2 + response_versions)",
-                "/ask-public (compatible → v2 + response_versions)",
-                "/feedback (with quality)",
-                "/topics (enhanced)",
-                "/system-status",
-                "/debug/test-enhancements",
-                "/debug/test-clarification",
-                "/debug/test-clarification-forced",
-                "/debug/validate-clarification-params",
-                "/debug/test-clarification-detection",        # 🧨 NOUVEAU
-                "/debug/simulate-frontend-clarification",     # 🧨 NOUVEAU
-                "/debug/test-incomplete-entities",            # 💡 NOUVEAU
-                "/debug/test-clarification-backend-fix",      # 🧨 v3.6.1 NOUVEAU
-                "/debug/test-response-versions",              # 🚀 v3.7.0 NOUVEAU
-                "/ask-with-clarification"                     # 🎯 NOUVEAU
-            ],
-            "api_version": "v3.7.0_response_versions_with_clarification_detection_fixed_backend_corrected_complete",
-            "backward_compatibility": True,
-            "clarification_fixes_v3_6_1": {
-                "is_clarification_response_support": True,
-                "clarification_entities_support": True, 
-                "improved_detection_logic": True,
-                "detailed_logging": True,
-                "frontend_simulation_tools": True,
-                "incomplete_entity_validation": True,        # 💡 NOUVEAU
-                "metadata_propagation_fixed": True,          # 💡 v3.6.1
-                "context_entities_removal": True,            # 🧨 v3.6.1
-                "is_enriched_removal": True,                 # 🧨 v3.6.1
-                "syntax_validation_complete": True,          # ✅ v3.6.1
-                "all_original_endpoints_preserved": True     # ✅ GARANTI
+            "en": {
+                "breed_sex_age": "For {breed} {sex} chickens at {age}",
+                "breed_age": "For {breed} chickens at {age}",
+                "breed_sex": "For {breed} {sex} chickens",
+                "breed_only": "For {breed} chickens", 
+                "age_only": "For chickens at {age}"
             },
-            "response_versions_features_v3_7_0": {  # 🚀 NOUVEAU v3.7.0
-                "concision_level_support": True,
-                "generate_all_versions_default": True,
-                "multi_version_generation": True,
-                "dynamic_selection_frontend": True,
-                "cache_optimization": True,
-                "performance_metrics": True,
-                "backward_compatibility": True
-            },
-            "forced_parameters": {
-                "vagueness_detection_always_on": True,  # ✅ GARANTI
-                "coherence_check_always_on": True,      # ✅ GARANTI
-                "backwards_compatibility": True,
-                "response_versions_enabled": True       # 🚀 v3.7.0
+            "es": {
+                "breed_sex_age": "Para pollos {breed} {sex} de {age}",
+                "breed_age": "Para pollos {breed} de {age}",
+                "breed_sex": "Para pollos {breed} {sex}",
+                "breed_only": "Para pollos {breed}",
+                "age_only": "Para pollos de {age}"
             }
         }
         
-        return status
+        template_set = templates.get(language, templates["fr"])
         
-    except Exception as e:
-        logger.error(f"❌ [System] Erreur status: {e}")
-        return {
-            "system_available": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        context_prefix = ""
+        if "breed" in context_entities and "sex" in context_entities and "age" in context_entities:
+            context_prefix = template_set["breed_sex_age"].format(
+                breed=context_entities["breed"],
+                sex=context_entities["sex"],
+                age=context_entities["age"]
+            )
+        elif "breed" in context_entities and "age" in context_entities:
+            context_prefix = template_set["breed_age"].format(
+                breed=context_entities["breed"],
+                age=context_entities["age"]
+            )
+        elif "breed" in context_entities and "sex" in context_entities:
+            context_prefix = template_set["breed_sex"].format(
+                breed=context_entities["breed"],
+                sex=context_entities["sex"]
+            )
+        elif "breed" in context_entities:
+            context_prefix = template_set["breed_only"].format(
+                breed=context_entities["breed"]
+            )
+        elif "age" in context_entities:
+            context_prefix = template_set["age_only"].format(age=context_entities["age"])
+        
+        if context_prefix:
+            if any(word in question.lower() for word in ["son", "sa", "ses", "leur", "leurs", "their", "its", "su", "sus"]):
+                enriched = f"{context_prefix}, {question.lower()}"
+            else:
+                enriched = f"{context_prefix}: {question}"
+        
+        return enriched
+    
+    def _build_technical_context(self, entities: Dict[str, str], language: str) -> str:
+        """Construit un contexte technique pour aider le RAG"""
+        
+        if not entities:
+            return ""
+        
+        context_parts = []
+        
+        if "breed" in entities:
+            context_parts.append(f"Race: {entities['breed']}")
+        
+        if "sex" in entities:
+            context_parts.append(f"Sexe: {entities['sex']}")
+        
+        if "age" in entities:
+            context_parts.append(f"Âge: {entities['age']}")
+        
+        return " | ".join(context_parts)
 
-@router.post("/debug/test-enhancements")
-async def test_enhancements(request: Request):
-    """Test toutes les améliorations avec une question de test (ORIGINAL PRÉSERVÉ)"""
-    try:
-        # Question de test qui active toutes les améliorations
-        test_question = EnhancedQuestionRequest(
-            text="Quel est leur poids au jour 18 ?",  # Question avec pronom contextuel
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            require_coherence_check=True,
-            detailed_rag_scoring=True,
-            enable_quality_metrics=True,
-            debug_mode=True,
-            # 🚀 v3.7.0: Test response_versions
-            concision_level=ConcisionLevel.CONCISE,
-            generate_all_versions=True
+# =============================================================================
+# 🔧 NOUVEAU: SYSTÈME AUTO-CLARIFICATION INTÉGRÉ
+# =============================================================================
+
+class AutoClarificationSystem:
+    """
+    🔧 NOUVEAU: Système d'auto-clarification basé sur le score de contexte
+    """
+    
+    def __init__(self):
+        self.context_threshold = 0.7  # Seuil pour déclencher clarification
+        self.enable_auto_clarification = True
+        
+        logger.info("🔧 [Auto Clarification] Système initialisé")
+        logger.info(f"🔧 [Auto Clarification] Seuil contexte: {self.context_threshold}")
+    
+    def auto_clarify_if_needed(
+        self, 
+        question: str, 
+        context_score: float, 
+        language: str = "fr"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        🔧 NOUVEAU: Détermine si une clarification automatique est nécessaire
+        
+        Args:
+            question: Question de l'utilisateur
+            context_score: Score de complétude du contexte (0.0 à 1.0)
+            language: Langue de la question
+            
+        Returns:
+            Dict avec clarification si nécessaire, None sinon
+        """
+        
+        if not self.enable_auto_clarification:
+            return None
+        
+        if context_score >= self.context_threshold:
+            logger.info(f"✅ [Auto Clarification] Contexte suffisant ({context_score:.2f} >= {self.context_threshold})")
+            return None
+        
+        logger.info(f"🤔 [Auto Clarification] Contexte insuffisant ({context_score:.2f} < {self.context_threshold})")
+        
+        # Analyser le type de question pour générer clarifications appropriées
+        question_analysis = self._analyze_question_for_clarification(question, language)
+        
+        if question_analysis["needs_clarification"]:
+            logger.info(f"🎯 [Auto Clarification] Déclenchement automatique - Type: {question_analysis['type']}")
+            
+            return {
+                "type": "auto_clarification_needed",
+                "message": self._build_clarification_message(question_analysis, language),
+                "questions": question_analysis["questions"],
+                "context_score": context_score,
+                "trigger_reason": f"context_score_below_threshold_{context_score:.2f}",
+                "automatic_trigger": True
+            }
+        
+        return None
+    
+    def _analyze_question_for_clarification(self, question: str, language: str) -> Dict[str, Any]:
+        """Analyse une question pour déterminer le type de clarification nécessaire"""
+        
+        question_lower = question.lower()
+        
+        # Détection questions de poids/performance
+        if any(word in question_lower for word in ["poids", "weight", "peso", "performance", "croissance", "growth"]):
+            return {
+                "needs_clarification": True,
+                "type": "performance_question",
+                "questions": self._get_performance_clarification_questions(language),
+                "priority": "high"
+            }
+        
+        # Détection questions de santé
+        if any(word in question_lower for word in ["maladie", "disease", "mort", "death", "problème", "problem"]):
+            return {
+                "needs_clarification": True,
+                "type": "health_question", 
+                "questions": self._get_health_clarification_questions(language),
+                "priority": "high"
+            }
+        
+        # Détection questions d'environnement
+        if any(word in question_lower for word in ["température", "temperature", "environnement", "environment"]):
+            return {
+                "needs_clarification": True,
+                "type": "environment_question",
+                "questions": self._get_environment_clarification_questions(language),
+                "priority": "medium"
+            }
+        
+        # Question générale - clarification basique
+        return {
+            "needs_clarification": True,
+            "type": "general_question",
+            "questions": self._get_general_clarification_questions(language),
+            "priority": "medium"
+        }
+    
+    def _get_performance_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions de performance"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche spécifique élevez-vous (Ross 308, Cobb 500, etc.) ?",
+                "Quel âge ont actuellement vos volailles (en jours précis) ?",
+                "S'agit-il de mâles, femelles, ou d'un troupeau mixte ?"
+            ],
+            "en": [
+                "What specific breed or strain are you raising (Ross 308, Cobb 500, etc.)?",
+                "What is the current age of your poultry (in precise days)?",
+                "Are these males, females, or a mixed flock?"
+            ],
+            "es": [
+                "¿Qué raza o cepa específica está criando (Ross 308, Cobb 500, etc.)?",
+                "¿Cuál es la edad actual de sus aves (en días precisos)?",
+                "¿Son machos, hembras, o un lote mixto?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_health_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions de santé"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles ?",
+                "Quels symptômes spécifiques observez-vous ?",
+                "Depuis combien de temps observez-vous ce problème ?"
+            ],
+            "en": [
+                "What breed or strain are you raising?",
+                "What age are your poultry?",
+                "What specific symptoms are you observing?",
+                "How long have you been observing this problem?"
+            ],
+            "es": [
+                "¿Qué raza o cepa está criando?",
+                "¿Qué edad tienen sus aves?",
+                "¿Qué síntomas específicos está observando?",
+                "¿Desde cuándo observa este problema?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_environment_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions d'environnement"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles ?",
+                "Quelles sont les conditions actuelles (température, humidité) ?",
+                "Quel type de bâtiment utilisez-vous ?"
+            ],
+            "en": [
+                "What breed or strain are you raising?",
+                "What age are your poultry?",
+                "What are the current conditions (temperature, humidity)?",
+                "What type of housing are you using?"
+            ],
+            "es": [
+                "¿Qué raza o cepa está criando?",
+                "¿Qué edad tienen sus aves?",
+                "¿Cuáles son las condiciones actuales (temperatura, humedad)?",
+                "¿Qué tipo de alojamiento está usando?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_general_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification générales"""
+        
+        questions = {
+            "fr": [
+                "Pouvez-vous préciser la race ou souche de vos volailles ?",
+                "Quel âge ont actuellement vos animaux ?",
+                "Dans quel contexte d'élevage vous trouvez-vous ?",
+                "Y a-t-il des symptômes ou problèmes spécifiques observés ?"
+            ],
+            "en": [
+                "Could you specify the breed or strain of your poultry?",
+                "What age are your animals currently?",
+                "What farming context are you in?",
+                "Are there any specific symptoms or problems observed?"
+            ],
+            "es": [
+                "¿Podría especificar la raza o cepa de sus aves?",
+                "¿Qué edad tienen actualmente sus animales?",
+                "¿En qué contexto de cría se encuentra?",
+                "¿Hay algún síntoma o problema específico observado?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _build_clarification_message(self, question_analysis: Dict[str, Any], language: str) -> str:
+        """Construit le message de clarification selon le type de question"""
+        
+        messages = {
+            "fr": {
+                "performance_question": "🤔 Votre question concerne la performance. Pour vous donner une réponse précise, j'ai besoin de quelques détails :",
+                "health_question": "🤔 Votre question concerne la santé. Pour mieux vous aider, pouvez-vous préciser :",
+                "environment_question": "🤔 Votre question concerne l'environnement. Pour une réponse adaptée, j'aurais besoin de :",
+                "general_question": "🤔 Pour mieux comprendre votre situation et vous aider efficacement :"
+            },
+            "en": {
+                "performance_question": "🤔 Your question is about performance. To give you a precise answer, I need some details:",
+                "health_question": "🤔 Your question is about health. To better help you, could you specify:",
+                "environment_question": "🤔 Your question is about environment. For a tailored answer, I would need:",
+                "general_question": "🤔 To better understand your situation and help you effectively:"
+            },
+            "es": {
+                "performance_question": "🤔 Su pregunta es sobre rendimiento. Para darle una respuesta precisa, necesito algunos detalles:",
+                "health_question": "🤔 Su pregunta es sobre salud. Para ayudarle mejor, ¿podría especificar:",
+                "environment_question": "🤔 Su pregunta es sobre ambiente. Para una respuesta adaptada, necesitaría:",
+                "general_question": "🤔 Para entender mejor su situación y ayudarle efectivamente:"
+            }
+        }
+        
+        question_type = question_analysis["type"]
+        lang_messages = messages.get(language, messages["fr"])
+        
+        return lang_messages.get(question_type, lang_messages["general_question"])
+
+# =============================================================================
+# 🔄 EXPERT SERVICE PRINCIPAL AVEC TOUTES LES INTÉGRATIONS
+# =============================================================================
+
+class ExpertService:
+    """Service principal pour le système expert avec toutes les améliorations intégrées"""
+    
+    def __init__(self):
+        self.integrations = IntegrationsManager()
+        self.rag_enhancer = RAGContextEnhancer()
+        self.enhancement_service = APIEnhancementService()
+        
+        self.concision_processor = ResponseConcisionProcessor()
+        
+        self.response_versions_generator = ResponseVersionsGenerator(
+            existing_processor=self.concision_processor
         )
         
-        # Simuler contexte conversationnel (Ross 308 mentionné avant)
-        if expert_service.integrations.intelligent_memory_available:
+        # 🔧 NOUVEAU: Système d'auto-clarification
+        self.auto_clarification = AutoClarificationSystem()
+        
+        logger.info("✅ [Expert Service] Service expert initialisé avec TOUTES les améliorations")
+        logger.info("   - ✅ Système de concision des réponses")
+        logger.info("   - 🚀 Générateur de versions de réponse")
+        logger.info("   - 🏷️ Filtrage taxonomique")
+        logger.info("   - 🆕 Mode sémantique dynamique")
+        logger.info("   - 🔧 Auto-clarification intégrée")
+    
+    def get_current_user_dependency(self):
+        """Retourne la dépendance pour l'authentification"""
+        return self.integrations.get_current_user_dependency()
+    
+    async def process_expert_question(
+        self,
+        request_data: EnhancedQuestionRequest,
+        request: Request,
+        current_user: Optional[Dict[str, Any]] = None,
+        start_time: float = None
+    ) -> EnhancedExpertResponse:
+        """
+        🚀 MÉTHODE PRINCIPALE COMPLÈTEMENT RÉÉCRITE avec auto-clarification intégrée
+        ✅ CONSERVE toute la logique existante + ajoute auto-clarification
+        """
+        
+        if start_time is None:
+            start_time = time.time()
+        
+        try:
+            logger.info("🚀 [ExpertService] Traitement question avec auto-clarification intégrée")
+            
+            concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
+            generate_all_versions = getattr(request_data, 'generate_all_versions', True)
+            semantic_dynamic_mode = getattr(request_data, 'semantic_dynamic_mode', False)
+            
+            logger.info(f"🚀 [ResponseVersions] Paramètres: level={concision_level}, generate_all={generate_all_versions}")
+            logger.info(f"🆕 [Semantic Dynamic] Mode: {semantic_dynamic_mode}")
+            
+            base_response = await self._process_question_with_auto_clarification(
+                request_data, request, current_user, start_time, semantic_dynamic_mode
+            )
+            
+            if generate_all_versions and base_response.response:
+                try:
+                    logger.info("🚀 [ResponseVersions] Génération de toutes les versions")
+                    
+                    versions_result = await self.response_versions_generator.generate_all_response_versions(
+                        original_response=base_response.response,
+                        question=request_data.text,
+                        context={
+                            "language": request_data.language,
+                            "user_id": current_user.get("id") if current_user else None,
+                            "conversation_id": request_data.conversation_id
+                        },
+                        requested_level=concision_level
+                    )
+                    
+                    base_response.response_versions = versions_result["response_versions"]
+                    base_response.response = versions_result["selected_response"]
+                    base_response.concision_metrics = versions_result["concision_metrics"]
+                    
+                    logger.info("✅ [ResponseVersions] Versions ajoutées à la réponse")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ [ResponseVersions] Erreur génération versions: {e}")
+                    base_response.response_versions = None
+            else:
+                logger.info("🚀 [ResponseVersions] Génération versions désactivée")
+                base_response.response_versions = None
+            
+            return base_response
+            
+        except Exception as e:
+            logger.error(f"❌ [ExpertService] Erreur traitement avec auto-clarification: {e}")
+            raise
+    
+    async def _process_question_with_auto_clarification(
+        self,
+        request_data: EnhancedQuestionRequest,
+        request: Request,
+        current_user: Optional[Dict[str, Any]] = None,
+        start_time: float = None,
+        semantic_dynamic_mode: bool = False
+    ) -> EnhancedExpertResponse:
+        """
+        🔧 NOUVELLE MÉTHODE: Traitement avec auto-clarification intégrée
+        """
+        
+        processing_steps = []
+        ai_enhancements_used = []
+        debug_info = {}
+        performance_breakdown = {"start": int(time.time() * 1000)}
+        
+        processing_steps.append("initialization")
+        
+        # === AUTHENTIFICATION ===
+        if current_user is None and self.integrations.auth_available:
+            raise HTTPException(status_code=401, detail="Authentification requise")
+        
+        user_id = self._extract_user_id(current_user, request_data, request)
+        user_email = current_user.get("email") if current_user else None
+        request_ip = request.client.host if request.client else "unknown"
+        
+        processing_steps.append("authentication")
+        performance_breakdown["auth_complete"] = int(time.time() * 1000)
+        
+        # === GESTION CONVERSATION ID ===
+        conversation_id = self._get_or_create_conversation_id(request_data)
+        
+        # === VALIDATION QUESTION ===
+        question_text = request_data.text.strip()
+        if not question_text:
+            raise HTTPException(status_code=400, detail="Question text is required")
+        
+        processing_steps.append("question_validation")
+        
+        # === MÉMOIRE CONVERSATIONNELLE + 🔧 ÉVALUATION CONTEXTE ===
+        conversation_context = None
+        context_score = 0.0  # 🔧 NOUVEAU: Score de complétude du contexte
+        
+        if self.integrations.intelligent_memory_available:
             try:
-                expert_service.integrations.add_message_to_conversation(
-                    conversation_id=test_question.conversation_id,
-                    user_id="test_user",
-                    message="Qu'est-ce que Ross 308 ?",
+                conversation_context = self.integrations.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=question_text,
                     role="user",
-                    language="fr"
+                    language=request_data.language,
+                    message_type="clarification_response" if request_data.is_clarification_response else "question"
                 )
-                expert_service.integrations.add_message_to_conversation(
-                    conversation_id=test_question.conversation_id,
-                    user_id="test_user", 
-                    message="Le Ross 308 est une race de poulet de chair...",
-                    role="assistant",
-                    language="fr"
+                
+                # 🔧 NOUVEAU: Calculer score de contexte
+                context_score = self._calculate_context_completeness_score(
+                    question_text, conversation_context, request_data.language
                 )
-            except Exception:
-                pass  # Pas critique pour le test
+                
+                ai_enhancements_used.append("intelligent_memory")
+                processing_steps.append("memory_storage")
+                logger.info(f"💾 [Expert Service] Message ajouté à la mémoire: {question_text[:50]}...")
+                logger.info(f"📊 [Context Score] Score complétude contexte: {context_score:.2f}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ [Expert Service] Erreur mémoire: {e}")
         
-        start_time = time.time()
+        performance_breakdown["memory_complete"] = int(time.time() * 1000)
         
-        # Traiter la question de test
-        result = await expert_service.process_expert_question(
-            request_data=test_question,
-            request=request,
-            current_user=None,
-            start_time=start_time
-        )
-        
-        # Analyser les résultats
-        test_results = {
-            "test_successful": True,
-            "question": test_question.text,
-            "conversation_id": test_question.conversation_id,
-            "user_id": "test_user",
-            "timestamp": datetime.now().isoformat(),
-            "components_tested": {
-                "vagueness_detection": result.vagueness_detection is not None,
-                "context_coherence": result.context_coherence is not None,
-                "document_relevance": result.document_relevance is not None,
-                "quality_metrics": result.quality_metrics is not None,
-                "debug_info": result.debug_info is not None,
-                "performance_breakdown": result.performance_breakdown is not None,
-                "ai_enhancements_used": len(result.ai_enhancements_used or []) > 0,
-                "clarification_system": "smart_performance_clarification" in (result.ai_enhancements_used or []),
-                "response_versions": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
-            },
-            "enhancement_results": {
-                "ai_enhancements_count": len(result.ai_enhancements_used or []),
-                "processing_steps_count": len(result.processing_steps or []),
-                "response_time_ms": result.response_time_ms,
-                "mode": result.mode,
-                "clarification_triggered": result.clarification_result is not None,
-                "response_versions_count": len(result.response_versions) if hasattr(result, 'response_versions') and result.response_versions else 0  # 🚀 v3.7.0
-            },
-            "errors": []
-        }
-        
-        # 🚀 v3.7.0: Test spécifique response_versions
-        if hasattr(result, 'response_versions') and result.response_versions:
-            test_results["response_versions_test"] = {
-                "versions_generated": list(result.response_versions.keys()),
-                "versions_count": len(result.response_versions),
-                "all_versions_present": all(level in result.response_versions for level in ["ultra_concise", "concise", "standard", "detailed"]),
-                "version_lengths": {level: len(content) for level, content in result.response_versions.items()}
-            }
-        
-        # Vérifications de qualité
-        if not result.ai_enhancements_used:
-            test_results["errors"].append("Aucune amélioration IA utilisée")
-        
-        if result.response_time_ms > 10000:  # 10 secondes
-            test_results["errors"].append(f"Temps de réponse trop élevé: {result.response_time_ms}ms")
-        
-        # 🚀 v3.7.0: Vérification response_versions
-        if hasattr(result, 'response_versions') and not result.response_versions:
-            test_results["errors"].append("response_versions non générées")
-        
-        if len(test_results["errors"]) > 0:
-            test_results["test_successful"] = False
-        
-        logger.info(f"✅ [Expert Enhanced] Test des améliorations: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
-        
-        return test_results
-        
-    except Exception as e:
-        logger.error(f"❌ [Expert Enhanced] Erreur test améliorations: {e}")
-        return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "components_tested": {},
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/test-clarification")
-async def test_clarification_system(request: Request):
-    """Test spécifique du système de clarification intelligent (ORIGINAL PRÉSERVÉ)"""
-    try:
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "tests_performed": [],
-            "errors": []
-        }
-        
-        # Test 1: Question nécessitant clarification race/sexe
-        logger.info("🎯 Test 1: Question poids sans race/sexe")
-        
-        clarification_question = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet de 12 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,
-            # 🚀 v3.7.0: Test avec response_versions
-            concision_level=ConcisionLevel.CONCISE,
-            generate_all_versions=True
-        )
-        
-        start_time = time.time()
-        result1 = await expert_service.process_expert_question(
-            request_data=clarification_question,
-            request=request,
-            current_user=None,
-            start_time=start_time
-        )
-        
-        test1_result = {
-            "test_name": "Détection question nécessitant clarification",
-            "question": clarification_question.text,
-            "clarification_requested": result1.clarification_result is not None,
-            "mode": result1.mode,
-            "enhancements_used": result1.ai_enhancements_used or [],
-            "success": "smart_performance_clarification" in result1.mode,
-            "response_versions_present": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["tests_performed"].append(test1_result)
-        
-        if not test1_result["success"]:
-            test_results["errors"].append("Clarification automatique non déclenchée")
-        
-        # Test 2: Traitement réponse de clarification
-        if test1_result["clarification_requested"]:
-            logger.info("🎪 Test 2: Traitement réponse clarification")
-            
-            clarification_response = EnhancedQuestionRequest(
-                text="Ross 308 mâles",
-                conversation_id=clarification_question.conversation_id,
-                language="fr",
-                is_clarification_response=True,
-                original_question="Quel est le poids d'un poulet de 12 jours ?",
-                clarification_context={
-                    "missing_information": ["breed", "sex"],
-                    "clarification_type": "performance_breed_sex"
-                },
-                # 🚀 v3.7.0: Test response_versions sur clarification
-                concision_level=ConcisionLevel.STANDARD,
-                generate_all_versions=True
+        # 🔧 NOUVEAU: Vérification auto-clarification AVANT validation agricole
+        if not request_data.is_clarification_response:
+            auto_clarification_result = self.auto_clarification.auto_clarify_if_needed(
+                question_text, context_score, request_data.language
             )
             
-            start_time2 = time.time()
-            result2 = await expert_service.process_expert_question(
-                request_data=clarification_response,
-                request=request,
-                current_user=None,
-                start_time=start_time2
+            if auto_clarification_result:
+                logger.info(f"🤔 [Auto Clarification] Déclenchement automatique: {auto_clarification_result['trigger_reason']}")
+                
+                processing_steps.append("automatic_clarification_triggered")
+                ai_enhancements_used.append("auto_clarification_context_based")
+                
+                return self._create_auto_clarification_response(
+                    question_text, auto_clarification_result, request_data.language, 
+                    conversation_id, context_score, start_time, processing_steps, ai_enhancements_used
+                )
+        
+        # === VALIDATION AGRICOLE ===
+        validation_result = await self._validate_agricultural_question(
+            question_text, request_data.language, user_id, request_ip, conversation_id
+        )
+        
+        processing_steps.append("agricultural_validation")
+        performance_breakdown["validation_complete"] = int(time.time() * 1000)
+        
+        if not validation_result.is_valid:
+            return self._create_rejection_response(
+                question_text, validation_result, conversation_id, 
+                user_email, request_data.language, start_time,
+                processing_steps, ai_enhancements_used, None
+            )
+        
+        # === SYSTÈME DE CLARIFICATION INTELLIGENT + SÉMANTIQUE DYNAMIQUE ===
+        clarification_result = await self._handle_clarification_corrected_with_semantic_dynamic(
+            request_data, question_text, user_id, conversation_id,
+            processing_steps, ai_enhancements_used, semantic_dynamic_mode
+        )
+        
+        if clarification_result:
+            return clarification_result
+        
+        # Détection vagueness après clarifications spécialisées
+        vagueness_result = None
+        if request_data.enable_vagueness_detection:
+            vagueness_result = self.enhancement_service.detect_vagueness(
+                question_text, request_data.language
             )
             
-            test2_result = {
-                "test_name": "Traitement réponse clarification",
-                "clarification_response": clarification_response.text,
-                "question_enriched": "Ross 308" in result2.question and "mâles" in result2.question.lower(),
-                "rag_used": result2.rag_used,
-                "mode": result2.mode,
-                "success": result2.rag_used and "Ross 308" in result2.question,
-                "response_versions_generated": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
-            }
+            ai_enhancements_used.append("vagueness_detection")
+            performance_breakdown["vagueness_check"] = int(time.time() * 1000)
             
-            test_results["tests_performed"].append(test2_result)
+            if vagueness_result.is_vague and vagueness_result.vagueness_score > 0.6:
+                logger.info(f"🎯 [Expert Service] Question floue détectée (score: {vagueness_result.vagueness_score})")
+                return self._create_vagueness_response(
+                    vagueness_result, question_text, conversation_id, 
+                    request_data.language, start_time, processing_steps, ai_enhancements_used
+                )
+        
+        performance_breakdown["clarification_complete"] = int(time.time() * 1000)
+        
+        # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS + TAXONOMIC FILTERING ===
+        expert_result = await self._process_expert_response_enhanced_corrected_with_taxonomy(
+            question_text, request_data, request, current_user,
+            conversation_id, processing_steps, ai_enhancements_used,
+            debug_info, performance_breakdown, vagueness_result
+        )
+        
+        # ✅ CONSERVÉ: APPLICATION DU SYSTÈME DE CONCISION EXISTANT
+        if expert_result["answer"] and self.concision_processor.config.ENABLE_CONCISE_RESPONSES:
             
-            if not test2_result["success"]:
-                test_results["errors"].append("Traitement clarification échoué")
-        
-        # 🧪 AMÉLIORATION 3: Test entités incomplètes
-        logger.info("🧪 Test 4: Entités incomplètes")
-        
-        incomplete_tests = [
-            {
-                "name": "Race seulement",
-                "input": "Ross 308",
-                "expected_missing": ["sexe"],
-                "should_fail": True
-            },
-            {
-                "name": "Sexe seulement", 
-                "input": "mâles",
-                "expected_missing": ["race/souche"],
-                "should_fail": True
-            },
-            {
-                "name": "Information vague",
-                "input": "poulets",
-                "expected_missing": ["race/souche", "sexe"],
-                "should_fail": True
-            },
-            {
-                "name": "Information complète",
-                "input": "Ross 308 mâles", 
-                "expected_missing": [],
-                "should_fail": False
-            }
-        ]
-        
-        incomplete_results = []
-        for test_case in incomplete_tests:
-            logger.info(f"🧪 Test entités: {test_case['name']}")
+            user_concision_preference = getattr(request_data, 'concision_level', None)
             
-            incomplete_clarification = EnhancedQuestionRequest(
-                text=test_case["input"],
-                conversation_id=clarification_question.conversation_id,
-                language="fr",
-                is_clarification_response=True,
-                original_question="Quel est le poids d'un poulet de 12 jours ?",
-                enable_vagueness_detection=True,
-                # 🚀 v3.7.0: Test même pour entités incomplètes
-                concision_level=ConcisionLevel.CONCISE,
-                generate_all_versions=True
+            original_answer = expert_result["answer"]
+            processed_answer = self.concision_processor.process_response(
+                response=original_answer,
+                question=question_text,
+                concision_level=user_concision_preference,
+                language=request_data.language
             )
             
-            start_time_incomplete = time.time()
-            result_incomplete = await expert_service.process_expert_question(
-                request_data=incomplete_clarification,
-                request=request,
-                current_user=None,
-                start_time=start_time_incomplete
-            )
-            
-            # Analyser le résultat
-            is_incomplete_mode = "incomplete" in result_incomplete.mode
-            has_retry_request = result_incomplete.clarification_result and result_incomplete.clarification_result.get("retry_required", False)
-            
-            test_result = {
-                "test_name": test_case["name"],
-                "input": test_case["input"],
-                "expected_to_fail": test_case["should_fail"],
-                "detected_as_incomplete": is_incomplete_mode,
-                "retry_requested": has_retry_request,
-                "mode": result_incomplete.mode,
-                "success": (test_case["should_fail"] and is_incomplete_mode) or (not test_case["should_fail"] and not is_incomplete_mode),
-                "response_versions_handling": hasattr(result_incomplete, 'response_versions')  # 🚀 v3.7.0
-            }
-            
-            if result_incomplete.clarification_result and "missing_information" in result_incomplete.clarification_result:
-                test_result["missing_info_detected"] = result_incomplete.clarification_result["missing_information"]
-            
-            incomplete_results.append(test_result)
-            
-            logger.info(f"   - Détecté incomplet: {is_incomplete_mode}")
-            logger.info(f"   - Test réussi: {test_result['success']}")
-            
-            if not test_result["success"]:
-                test_results["errors"].append(f"Test entités incomplètes échoué: {test_case['name']}")
-        
-        test_results["tests_performed"].append({
-            "test_name": "Validation entités incomplètes",
-            "incomplete_tests": incomplete_results,
-            "success": all(r["success"] for r in incomplete_results)
-        })
-        
-        # Test 5: Validation propagation entités enrichies
-        logger.info("💡 Test 5: Propagation entités dans métadonnées")
-        
-        metadata_test = EnhancedQuestionRequest(
-            text="Ross 308 femelles",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            is_clarification_response=True,
-            original_question="Quel est le poids d'un poulet de 15 jours ?",
-            clarification_entities={
-                "breed": "Ross 308",
-                "sex": "femelles"
-            },
-            # 🚀 v3.7.0: Test métadonnées + response_versions
-            concision_level=ConcisionLevel.DETAILED,
-            generate_all_versions=True
-        )
-        
-        start_time_meta = time.time()
-        result_meta = await expert_service.process_expert_question(
-            request_data=metadata_test,
-            request=request,
-            current_user=None,
-            start_time=start_time_meta
-        )
-        
-        # Vérifier métadonnées (ajustées pour v3.6.1)
-        has_clarification_processing = hasattr(result_meta, 'clarification_processing') and result_meta.clarification_processing
-        question_enriched = "Ross 308" in result_meta.question and "femelles" in result_meta.question.lower()
-        
-        metadata_test_result = {
-            "test_name": "Propagation métadonnées enrichies",
-            "input": metadata_test.text,
-            "clarification_processing_present": has_clarification_processing,
-            "question_enriched": question_enriched,
-            "final_question": result_meta.question,
-            "rag_used": result_meta.rag_used,
-            "success": has_clarification_processing and question_enriched and result_meta.rag_used,
-            "response_versions_with_metadata": hasattr(result_meta, 'response_versions') and result_meta.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["tests_performed"].append(metadata_test_result)
-        
-        logger.info(f"   - Clarification processing: {has_clarification_processing}")
-        logger.info(f"   - Question enriched: {question_enriched}")
-        logger.info(f"   - RAG utilisé: {result_meta.rag_used}")
-        
-        if not metadata_test_result["success"]:
-            test_results["errors"].append("Propagation métadonnées échouée")
-        
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
-        
-        logger.info(f"✅ [Expert Enhanced] Test clarification: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
-        
-        return test_results
-        
-    except Exception as e:
-        logger.error(f"❌ [Expert Enhanced] Erreur test clarification: {e}")
-        return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "tests_performed": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/test-clarification-forced")
-async def test_clarification_system_forced(request: Request):
-    """🔥 NOUVEAU: Test FORCÉ du système de clarification avec logging détaillé (ORIGINAL PRÉSERVÉ)"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🔥 DÉBUT TEST CLARIFICATION FORCÉ")
-        
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "tests_performed": [],
-            "errors": [],
-            "clarification_flow_detailed": []
-        }
-        
-        # Test 1: Question GARANTIE de déclencher clarification
-        logger.info("🎯 Test 1: Question poids sans race/sexe - FORÇAGE GARANTI")
-        
-        test_question = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet de 15 jours ?",  # Question claire nécessitant clarification
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,  # FORCÉ
-            require_coherence_check=True,     # FORCÉ
-            is_clarification_response=False,
-            # 🚀 v3.7.0: Test forced avec response_versions
-            concision_level=ConcisionLevel.CONCISE,
-            generate_all_versions=True
-        )
-        
-        logger.info(f"🔥 [TEST 1] Question de test: '{test_question.text}'")
-        logger.info(f"🔥 [TEST 1] Paramètres: vagueness={test_question.enable_vagueness_detection}, coherence={test_question.require_coherence_check}")
-        
-        start_time = time.time()
-        result1 = await expert_service.process_expert_question(
-            request_data=test_question,
-            request=request,
-            current_user=None,
-            start_time=start_time
-        )
-        
-        # Analyse détaillée Test 1
-        clarification_triggered = result1.clarification_result is not None
-        has_clarification_mode = "clarification" in result1.mode
-        
-        test1_details = {
-            "test_name": "Détection clarification automatique FORCÉE",
-            "question": test_question.text,
-            "clarification_result_exists": clarification_triggered,
-            "mode_contains_clarification": has_clarification_mode,
-            "final_mode": result1.mode,
-            "enhancements_used": result1.ai_enhancements_used or [],
-            "clarification_details": result1.clarification_result,
-            "success": clarification_triggered or has_clarification_mode,
-            "rag_bypassed": not result1.rag_used,  # Clarification doit bypasser RAG
-            "response_versions_present": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["tests_performed"].append(test1_details)
-        test_results["clarification_flow_detailed"].append({
-            "step": "initial_question",
-            "triggered": test1_details["success"],
-            "mode": result1.mode,
-            "response_excerpt": result1.response[:100] + "..." if len(result1.response) > 100 else result1.response
-        })
-        
-        logger.info(f"🔥 [TEST 1 RÉSULTAT] Clarification déclenchée: {test1_details['success']}")
-        logger.info(f"🔥 [TEST 1 RÉSULTAT] Mode: {result1.mode}")
-        
-        if not test1_details["success"]:
-            error_msg = f"Clarification forcée ÉCHOUÉE - Mode: {result1.mode}, RAG utilisé: {result1.rag_used}"
-            test_results["errors"].append(error_msg)
-            logger.error(f"❌ {error_msg}")
-        
-        # Test 2: Réponse à la clarification
-        if test1_details["success"]:
-            logger.info("🎪 Test 2: Traitement réponse clarification FORCÉE")
-            
-            clarification_response = EnhancedQuestionRequest(
-                text="Ross 308 mâles",
-                conversation_id=test_question.conversation_id,
-                language="fr",
-                enable_vagueness_detection=True,  # FORCÉ
-                require_coherence_check=True,     # FORCÉ
-                is_clarification_response=True,
-                original_question="Quel est le poids d'un poulet de 15 jours ?",
-                clarification_context={
-                    "missing_information": ["breed", "sex"],
-                    "clarification_type": "performance_breed_sex"
-                },
-                # 🚀 v3.7.0: Test response_versions avec clarification
-                concision_level=ConcisionLevel.STANDARD,
-                generate_all_versions=True
-            )
-            
-            logger.info(f"🔥 [TEST 2] Réponse clarification: '{clarification_response.text}'")
-            logger.info(f"🔥 [TEST 2] is_clarification_response: {clarification_response.is_clarification_response}")
-            
-            start_time2 = time.time()
-            result2 = await expert_service.process_expert_question(
-                request_data=clarification_response,
-                request=request,
-                current_user=None,
-                start_time=start_time2
-            )
-            
-            # Analyse Test 2
-            question_enriched = ("Ross 308" in result2.question.lower() and 
-                               ("mâle" in result2.question.lower() or "male" in result2.question.lower()))
-            
-            test2_details = {
-                "test_name": "Traitement réponse clarification FORCÉE",
-                "clarification_input": clarification_response.text,
-                "enriched_question": result2.question,
-                "question_properly_enriched": question_enriched,
-                "rag_activated": result2.rag_used,
-                "final_mode": result2.mode,
-                "success": result2.rag_used and question_enriched,
-                "response_versions_generated": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
-            }
-            
-            test_results["tests_performed"].append(test2_details)
-            test_results["clarification_flow_detailed"].append({
-                "step": "clarification_response",
-                "input": clarification_response.text,
-                "enriched_question": result2.question,
-                "rag_used": result2.rag_used,
-                "success": test2_details["success"]
-            })
-            
-            logger.info(f"🔥 [TEST 2 RÉSULTAT] Question enrichie: {question_enriched}")
-            logger.info(f"🔥 [TEST 2 RÉSULTAT] RAG activé: {result2.rag_used}")
-            logger.info(f"🔥 [TEST 2 RÉSULTAT] Question finale: '{result2.question}'")
-            
-            if not test2_details["success"]:
-                error_msg = f"Traitement clarification ÉCHOUÉ - Question: '{result2.question}', RAG: {result2.rag_used}"
-                test_results["errors"].append(error_msg)
-                logger.error(f"❌ {error_msg}")
-        
-        # Test 3: Validation paramètres forçage
-        logger.info("🔧 Test 3: Validation FORÇAGE des paramètres")
-        
-        # Tester avec paramètres initialement False
-        disabled_question = EnhancedQuestionRequest(
-            text="Question de test forçage",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=False,  # Sera FORCÉ à True
-            require_coherence_check=False,     # Sera FORCÉ à True
-            # 🚀 v3.7.0: Test forçage avec response_versions
-            concision_level=ConcisionLevel.ULTRA_CONCISE,
-            generate_all_versions=True
-        )
-        
-        logger.info(f"🔥 [TEST 3] Paramètres initiaux: vagueness={disabled_question.enable_vagueness_detection}, coherence={disabled_question.require_coherence_check}")
-        
-        # Appeler endpoint public qui force les paramètres
-        result3 = await ask_expert_enhanced_v2_public(disabled_question, request)
-        
-        test3_details = {
-            "test_name": "Validation FORÇAGE paramètres",
-            "initial_vagueness": False,
-            "initial_coherence": False,
-            "forced_activation": True,
-            "enhancements_applied": len(result3.ai_enhancements_used or []) > 0,
-            "success": len(result3.ai_enhancements_used or []) > 0,
-            "response_versions_forced": hasattr(result3, 'response_versions') and result3.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["tests_performed"].append(test3_details)
-        
-        logger.info(f"🔥 [TEST 3 RÉSULTAT] Améliorations appliquées: {len(result3.ai_enhancements_used or [])}")
-        logger.info(f"🔥 [TEST 3 RÉSULTAT] Liste améliorations: {result3.ai_enhancements_used}")
-        
-        if not test3_details["success"]:
-            error_msg = "Forçage paramètres ÉCHOUÉ - Aucune amélioration appliquée"
-            test_results["errors"].append(error_msg)
-            logger.error(f"❌ {error_msg}")
-        
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
-        
-        logger.info("🔥 RÉSUMÉ TEST CLARIFICATION FORCÉ:")
-        logger.info(f"   - Tests réalisés: {len(test_results['tests_performed'])}")
-        logger.info(f"   - Erreurs: {len(test_results['errors'])}")
-        logger.info(f"   - Succès global: {test_results['test_successful']}")
-        
-        if test_results["errors"]:
-            for error in test_results["errors"]:
-                logger.error(f"   ❌ {error}")
-        
-        logger.info("=" * 80)
-        
-        return test_results
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur critique test clarification forcé: {e}")
-        logger.info("=" * 80)
-        return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "tests_performed": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/validate-clarification-params")
-async def validate_clarification_params(request: Request):
-    """🔥 NOUVEAU: Validation spécifique du forçage des paramètres de clarification (ORIGINAL PRÉSERVÉ)"""
-    
-    try:
-        logger.info("🔧 VALIDATION PARAMÈTRES CLARIFICATION")
-        
-        validation_results = {
-            "validation_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "parameter_tests": [],
-            "errors": []
-        }
-        
-        # Test différentes combinaisons de paramètres
-        test_cases = [
-            {
-                "name": "Paramètres non définis",
-                "params": {"text": "Test sans paramètres"},
-                "expected_forced": True
-            },
-            {
-                "name": "Paramètres explicitement False", 
-                "params": {
-                    "text": "Test paramètres False",
-                    "enable_vagueness_detection": False,
-                    "require_coherence_check": False
-                },
-                "expected_forced": True
-            },
-            {
-                "name": "Paramètres explicitement True",
-                "params": {
-                    "text": "Test paramètres True", 
-                    "enable_vagueness_detection": True,
-                    "require_coherence_check": True
-                },
-                "expected_forced": True
-            }
-        ]
-        
-        for test_case in test_cases:
-            logger.info(f"🔧 Test: {test_case['name']}")
-            
-            # Créer la requête
-            test_request = EnhancedQuestionRequest(
-                conversation_id=str(uuid.uuid4()),
-                language="fr",
-                # 🚀 v3.7.0: Test validation avec response_versions
-                concision_level=ConcisionLevel.CONCISE,
-                generate_all_versions=True,
-                **test_case["params"]
-            )
-            
-            # Enregistrer les valeurs initiales
-            initial_vagueness = getattr(test_request, 'enable_vagueness_detection', None)
-            initial_coherence = getattr(test_request, 'require_coherence_check', None)
-            
-            logger.info(f"   Valeurs initiales: vagueness={initial_vagueness}, coherence={initial_coherence}")
-            
-            # Appeler l'endpoint public qui force
-            result = await ask_expert_enhanced_v2_public(test_request, request)
-            
-            # Vérifier le forçage
-            has_enhancements = len(result.ai_enhancements_used or []) > 0
-            clarification_active = any("clarification" in enh for enh in (result.ai_enhancements_used or []))
-            
-            test_result = {
-                "test_name": test_case["name"],
-                "initial_vagueness": initial_vagueness,
-                "initial_coherence": initial_coherence,
-                "enhancements_applied": result.ai_enhancements_used,
-                "enhancements_count": len(result.ai_enhancements_used or []),
-                "clarification_system_active": clarification_active,
-                "success": has_enhancements,
-                "response_versions_validated": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
-            }
-            
-            validation_results["parameter_tests"].append(test_result)
-            
-            logger.info(f"   Améliorations appliquées: {test_result['enhancements_count']}")
-            logger.info(f"   Clarification active: {clarification_active}")
-            logger.info(f"   Test réussi: {test_result['success']}")
-            
-            if not test_result["success"]:
-                error_msg = f"Forçage échoué pour: {test_case['name']}"
-                validation_results["errors"].append(error_msg)
-        
-        # Résultat final
-        validation_results["validation_successful"] = len(validation_results["errors"]) == 0
-        
-        logger.info(f"✅ VALIDATION TERMINÉE - Succès: {validation_results['validation_successful']}")
-        
-        return validation_results
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur validation paramètres: {e}")
-        return {
-            "validation_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "parameter_tests": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/test-clarification-detection")
-async def test_clarification_detection(request: Request):
-    """🧨 NOUVEAU: Test spécifique de la détection clarification corrigée (ORIGINAL PRÉSERVÉ)"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🧨 DÉBUT TEST DÉTECTION CLARIFICATION CORRIGÉE")
-        
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "detection_tests": [],
-            "errors": []
-        }
-        
-        # Test 1: Question initiale (DOIT déclencher clarification)
-        logger.info("🎯 Test 1: Question initiale nécessitant clarification")
-        
-        initial_question = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet de 12 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,  # EXPLICITE
-            # 🚀 v3.7.0: Test detection avec response_versions
-            concision_level=ConcisionLevel.CONCISE,
-            generate_all_versions=True
-        )
-        
-        logger.info(f"🧨 [TEST 1] Question: '{initial_question.text}'")
-        logger.info(f"🧨 [TEST 1] is_clarification_response: {initial_question.is_clarification_response}")
-        
-        start_time = time.time()
-        result1 = await expert_service.process_expert_question(
-            request_data=initial_question,
-            request=request,
-            current_user=None,
-            start_time=start_time
-        )
-        
-        test1_result = {
-            "test_name": "Question initiale - détection clarification",
-            "question": initial_question.text,
-            "is_clarification_flag": initial_question.is_clarification_response,
-            "clarification_triggered": result1.clarification_result is not None,
-            "mode": result1.mode,
-            "rag_bypassed": not result1.rag_used,
-            "success": result1.clarification_result is not None,
-            "response_versions_on_clarification": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["detection_tests"].append(test1_result)
-        
-        logger.info(f"🧨 [TEST 1 RÉSULTAT] Clarification déclenchée: {test1_result['success']}")
-        logger.info(f"🧨 [TEST 1 RÉSULTAT] Mode: {result1.mode}")
-        
-        if not test1_result["success"]:
-            test_results["errors"].append("Question initiale n'a pas déclenché clarification")
-        
-        # Test 2: Réponse de clarification (DOIT traiter comme réponse)
-        logger.info("🎪 Test 2: Réponse de clarification")
-        
-        clarification_response = EnhancedQuestionRequest(
-            text="Ross 308 mâles",
-            conversation_id=initial_question.conversation_id,  # MÊME conversation
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=True,  # EXPLICITE
-            original_question="Quel est le poids d'un poulet de 12 jours ?",
-            clarification_entities={  # OPTIONNEL mais recommandé
-                "breed": "Ross 308",
-                "sex": "mâles"
-            },
-            # 🚀 v3.7.0: Test response clarification avec versions
-            concision_level=ConcisionLevel.DETAILED,
-            generate_all_versions=True
-        )
-        
-        logger.info(f"🧨 [TEST 2] Réponse: '{clarification_response.text}'")
-        logger.info(f"🧨 [TEST 2] is_clarification_response: {clarification_response.is_clarification_response}")
-        logger.info(f"🧨 [TEST 2] original_question: '{clarification_response.original_question}'")
-        logger.info(f"🧨 [TEST 2] clarification_entities: {clarification_response.clarification_entities}")
-        
-        start_time2 = time.time()
-        result2 = await expert_service.process_expert_question(
-            request_data=clarification_response,
-            request=request,
-            current_user=None,
-            start_time=start_time2
-        )
-        
-        # Vérifications Test 2
-        question_enriched = "Ross 308" in result2.question and "mâles" in result2.question.lower()
-        rag_activated = result2.rag_used
-        
-        test2_result = {
-            "test_name": "Réponse clarification - traitement enrichi",
-            "clarification_input": clarification_response.text,
-            "is_clarification_flag": clarification_response.is_clarification_response,
-            "original_question": clarification_response.original_question,
-            "entities_provided": clarification_response.clarification_entities,
-            "enriched_question": result2.question,
-            "question_properly_enriched": question_enriched,
-            "rag_activated": rag_activated,
-            "mode": result2.mode,
-            "success": question_enriched and rag_activated,
-            "response_versions_after_enrichment": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["detection_tests"].append(test2_result)
-        
-        logger.info(f"🧨 [TEST 2 RÉSULTAT] Question enrichie: {question_enriched}")
-        logger.info(f"🧨 [TEST 2 RÉSULTAT] RAG activé: {rag_activated}")
-        logger.info(f"🧨 [TEST 2 RÉSULTAT] Question finale: '{result2.question}'")
-        
-        if not test2_result["success"]:
-            test_results["errors"].append("Réponse clarification mal traitée")
-        
-        # Test 3: Question normale sans clarification (DOIT passer direct)
-        logger.info("📋 Test 3: Question normale complète")
-        
-        complete_question = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet Ross 308 mâle de 12 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,
-            # 🚀 v3.7.0: Test question complète avec response_versions
-            concision_level=ConcisionLevel.STANDARD,
-            generate_all_versions=True
-        )
-        
-        start_time3 = time.time()
-        result3 = await expert_service.process_expert_question(
-            request_data=complete_question,
-            request=request,
-            current_user=None,
-            start_time=start_time3
-        )
-        
-        test3_result = {
-            "test_name": "Question complète - pas de clarification",
-            "question": complete_question.text,
-            "is_clarification_flag": complete_question.is_clarification_response,
-            "clarification_not_triggered": result3.clarification_result is None,
-            "rag_activated": result3.rag_used,
-            "mode": result3.mode,
-            "success": result3.clarification_result is None and result3.rag_used,
-            "response_versions_direct": hasattr(result3, 'response_versions') and result3.response_versions is not None  # 🚀 v3.7.0
-        }
-        
-        test_results["detection_tests"].append(test3_result)
-        
-        logger.info(f"🧨 [TEST 3 RÉSULTAT] Pas de clarification: {test3_result['clarification_not_triggered']}")
-        logger.info(f"🧨 [TEST 3 RÉSULTAT] RAG activé: {test3_result['rag_activated']}")
-        
-        if not test3_result["success"]:
-            test_results["errors"].append("Question complète a déclenché clarification inutile")
-        
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
-        
-        logger.info("🧨 RÉSUMÉ TEST DÉTECTION CLARIFICATION:")
-        logger.info(f"   - Tests réalisés: {len(test_results['detection_tests'])}")
-        logger.info(f"   - Erreurs: {len(test_results['errors'])}")
-        logger.info(f"   - Succès global: {test_results['test_successful']}")
-        
-        if test_results["errors"]:
-            for error in test_results["errors"]:
-                logger.error(f"   ❌ {error}")
-        
-        logger.info("=" * 80)
-        
-        return test_results
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur test détection clarification: {e}")
-        logger.info("=" * 80)
-        return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "detection_tests": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/simulate-frontend-clarification")
-async def simulate_frontend_clarification(request: Request):
-    """🧨 NOUVEAU: Simulation complète du flux frontend avec clarification (ORIGINAL PRÉSERVÉ)"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🧨 SIMULATION FLUX FRONTEND CLARIFICATION")
-        
-        simulation_results = {
-            "simulation_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "steps": [],
-            "errors": []
-        }
-        
-        conversation_id = str(uuid.uuid4())
-        
-        # ÉTAPE 1: Frontend envoie question initiale
-        logger.info("📱 ÉTAPE 1: Frontend envoie question initiale")
-        
-        frontend_request_1 = {
-            "question": "Quel est le poids d'un poulet de 12 jours ?",
-            "conversation_id": conversation_id,
-            "language": "fr",
-            # 🚀 v3.7.0: Test simulation avec response_versions
-            "concision_level": "concise",
-            "generate_all_versions": True
-            # PAS de is_clarification_response (défaut False)
-        }
-        
-        request_1 = EnhancedQuestionRequest(**frontend_request_1)
-        
-        logger.info(f"🧨 [ÉTAPE 1] Request frontend: {frontend_request_1}")
-        
-        result_1 = await ask_expert_enhanced_v2_public(request_1, request)
-        
-        step_1 = {
-            "step": "1_initial_question",
-            "frontend_request": frontend_request_1,
-            "backend_response": {
-                "mode": result_1.mode,
-                "clarification_requested": result_1.clarification_result is not None,
-                "rag_used": result_1.rag_used,
-                "response_versions_present": hasattr(result_1, 'response_versions') and result_1.response_versions is not None  # 🚀 v3.7.0
-            },
-            "success": result_1.clarification_result is not None
-        }
-        
-        simulation_results["steps"].append(step_1)
-        
-        logger.info(f"🧨 [ÉTAPE 1 RÉSULTAT] Clarification demandée: {step_1['success']}")
-        
-        if not step_1["success"]:
-            simulation_results["errors"].append("Étape 1: Clarification pas déclenchée")
-            
-        # ÉTAPE 2: Frontend envoie réponse de clarification
-        if step_1["success"]:
-            logger.info("📱 ÉTAPE 2: Frontend envoie réponse clarification")
-            
-            # 🧨 CORRECTION: Frontend DOIT envoyer avec flag approprié
-            frontend_request_2 = {
-                "question": "Ross 308 mâles",
-                "conversation_id": conversation_id,
-                "language": "fr",
-                "is_clarification_response": True,  # 🧨 CRITIQUE
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "clarification_entities": {  # 🧨 OPTIONNEL mais recommandé
-                    "breed": "Ross 308",
-                    "sex": "mâles"
-                },
-                # 🚀 v3.7.0: Test frontend simulation avec response_versions
-                "concision_level": "standard",
-                "generate_all_versions": True
-            }
-            
-            request_2 = EnhancedQuestionRequest(**frontend_request_2)
-            
-            logger.info(f"🧨 [ÉTAPE 2] Request frontend corrigée: {frontend_request_2}")
-            
-            result_2 = await ask_expert_enhanced_v2_public(request_2, request)
-            
-            # Vérifications
-            question_enriched = ("Ross 308" in result_2.question.lower() and 
-                               ("mâle" in result_2.question.lower() or "male" in result_2.question.lower()))
-            rag_used = result_2.rag_used
-            
-            step_2 = {
-                "step": "2_clarification_response", 
-                "frontend_request": frontend_request_2,
-                "backend_response": {
-                    "enriched_question": result_2.question,
-                    "question_enriched": question_enriched,
-                    "rag_used": rag_used,
-                    "mode": result_2.mode,
-                    "response_excerpt": result_2.response[:150] + "...",
-                    "response_versions_generated": hasattr(result_2, 'response_versions') and result_2.response_versions is not None  # 🚀 v3.7.0
-                },
-                "success": question_enriched and rag_used
-            }
-            
-            simulation_results["steps"].append(step_2)
-            
-            logger.info(f"🧨 [ÉTAPE 2 RÉSULTAT] Question enrichie: {question_enriched}")
-            logger.info(f"🧨 [ÉTAPE 2 RÉSULTAT] RAG utilisé: {rag_used}")
-            logger.info(f"🧨 [ÉTAPE 2 RÉSULTAT] Question finale: '{result_2.question}'")
-            
-            if not step_2["success"]:
-                simulation_results["errors"].append("Étape 2: Réponse clarification mal traitée")
-        
-        # ÉTAPE 3: Comparaison avec mauvaise approche (sans flag)
-        logger.info("📱 ÉTAPE 3: Simulation MAUVAISE approche (sans flag)")
-        
-        # Simuler ce que fait actuellement le frontend (INCORRECT)
-        bad_frontend_request = {
-            "question": "Ross 308 mâles",
-            "conversation_id": conversation_id,
-            "language": "fr",
-            # 🚀 v3.7.0: Même les mauvaises requests ont response_versions
-            "concision_level": "concise",
-            "generate_all_versions": True
-            # PAS de is_clarification_response → traité comme nouvelle question
-        }
-        
-        request_bad = EnhancedQuestionRequest(**bad_frontend_request)
-        
-        logger.info(f"🧨 [ÉTAPE 3] Mauvaise approche: {bad_frontend_request}")
-        
-        result_bad = await ask_expert_enhanced_v2_public(request_bad, request)
-        
-        step_3 = {
-            "step": "3_bad_approach_without_flag",
-            "frontend_request": bad_frontend_request,
-            "backend_response": {
-                "mode": result_bad.mode,
-                "treated_as_new_question": "clarification" in result_bad.mode,
-                "rag_used": result_bad.rag_used,
-                "response_versions_still_generated": hasattr(result_bad, 'response_versions') and result_bad.response_versions is not None  # 🚀 v3.7.0
-            },
-            "problem": "Sans flag, traité comme nouvelle question au lieu de réponse clarification"
-        }
-        
-        simulation_results["steps"].append(step_3)
-        
-        logger.info(f"🧨 [ÉTAPE 3 RÉSULTAT] Traité comme nouvelle question: {step_3['backend_response']['treated_as_new_question']}")
-        
-        # Résultat final
-        simulation_results["simulation_successful"] = len(simulation_results["errors"]) == 0
-        
-        # Instructions pour le frontend
-        simulation_results["frontend_instructions"] = {
-            "critical_fix": "Ajouter is_clarification_response=true lors d'une réponse de clarification",
-            "required_fields": {
-                "is_clarification_response": True,
-                "original_question": "Question qui a déclenché la clarification",
-                "clarification_entities": "Optionnel mais recommandé pour éviter re-extraction"
-            },
-            "example_correct_request": {
-                "question": "Ross 308 mâles",
-                "conversation_id": "UUID",
-                "is_clarification_response": True,
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "clarification_entities": {
-                    "breed": "Ross 308",
-                    "sex": "mâles"
-                },
-                # 🚀 v3.7.0: Nouvelles instructions response_versions
-                "concision_level": "concise",  # ou "ultra_concise", "standard", "detailed"
-                "generate_all_versions": True   # pour avoir toutes les versions disponibles
-            },
-            # 🚀 v3.7.0: Instructions spécifiques response_versions
-            "response_versions_usage": {
-                "backend_generates_all": "Le backend génère automatiquement toutes les versions",
-                "frontend_selects": "Le frontend peut choisir quelle version afficher",
-                "available_levels": ["ultra_concise", "concise", "standard", "detailed"],
-                "default_display": "Afficher 'concise' par défaut, permettre switch utilisateur"
-            }
-        }
-        
-        logger.info("🧨 RÉSUMÉ SIMULATION FRONTEND:")
-        logger.info(f"   - Étapes testées: {len(simulation_results['steps'])}")
-        logger.info(f"   - Erreurs: {len(simulation_results['errors'])}")
-        logger.info(f"   - Simulation réussie: {simulation_results['simulation_successful']}")
-        
-        logger.info("=" * 80)
-        
-        return simulation_results
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur simulation frontend: {e}")
-        logger.info("=" * 80)
-        return {
-            "simulation_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "steps": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/test-incomplete-entities")
-async def test_incomplete_entities(request: Request):
-    """🧪 Test spécifique des entités incomplètes (ORIGINAL PRÉSERVÉ)"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🧪 DÉBUT TEST ENTITÉS INCOMPLÈTES")
-        
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "entity_tests": [],
-            "errors": []
-        }
-        
-        conversation_id = str(uuid.uuid4())
-        
-        # Tests des différents cas d'entités incomplètes
-        entity_test_cases = [
-            {
-                "name": "Race seulement (incomplet)",
-                "input": "Ross 308",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "incomplete_clarification_response",
-                "should_succeed": False,
-                "expected_missing": ["sexe"],
-                "concision_level": ConcisionLevel.CONCISE  # 🚀 v3.7.0
-            },
-            {
-                "name": "Sexe seulement (incomplet)",
-                "input": "mâles",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "incomplete_clarification_response",
-                "should_succeed": False,
-                "expected_missing": ["race/souche"],
-                "concision_level": ConcisionLevel.ULTRA_CONCISE  # 🚀 v3.7.0
-            },
-            {
-                "name": "Information vague (incomplet)",
-                "input": "poulets",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "incomplete_clarification_response", 
-                "should_succeed": False,
-                "expected_missing": ["race/souche", "sexe"],
-                "concision_level": ConcisionLevel.STANDARD  # 🚀 v3.7.0
-            },
-            {
-                "name": "Breed vague + sexe (partiellement incomplet)",
-                "input": "Ross mâles",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "incomplete_clarification_response",
-                "should_succeed": False,
-                "expected_missing": ["race/souche"],  # "Ross" incomplet, doit être "Ross 308"
-                "concision_level": ConcisionLevel.DETAILED  # 🚀 v3.7.0
-            },
-            {
-                "name": "Information complète (succès)",
-                "input": "Ross 308 mâles",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "rag_enhanced",
-                "should_succeed": True,
-                "expected_missing": [],
-                "concision_level": ConcisionLevel.CONCISE  # 🚀 v3.7.0
-            },
-            {
-                "name": "Alternative complète (succès)",
-                "input": "Cobb 500 femelles",
-                "original_question": "Quel est le poids d'un poulet de 12 jours ?",
-                "expected_mode": "rag_enhanced",
-                "should_succeed": True,
-                "expected_missing": [],
-                "concision_level": ConcisionLevel.STANDARD  # 🚀 v3.7.0
-            }
-        ]
-        
-        for test_case in entity_test_cases:
-            logger.info(f"🧪 Test: {test_case['name']}")
-            
-            test_request = EnhancedQuestionRequest(
-                text=test_case["input"],
-                conversation_id=conversation_id,
-                language="fr",
-                is_clarification_response=True,
-                original_question=test_case["original_question"],
-                enable_vagueness_detection=True,
-                # 🚀 v3.7.0: Test entités incomplètes avec différents niveaux concision
-                concision_level=test_case["concision_level"],
-                generate_all_versions=True
-            )
-            
-            logger.info(f"   Input: '{test_request.text}'")
-            logger.info(f"   Expected success: {test_case['should_succeed']}")
-            logger.info(f"   Concision level: {test_case['concision_level']}")
-            
-            start_time = time.time()
-            result = await ask_expert_enhanced_v2_public(test_request, request)
-            
-            # Analyser le résultat
-            is_incomplete = "incomplete" in result.mode
-            has_retry = result.clarification_result and result.clarification_result.get("retry_required", False)
-            rag_used = result.rag_used
-            
-            # Vérifier si le test correspond aux attentes
-            test_passed = False
-            if test_case["should_succeed"]:
-                # Doit réussir : RAG activé, pas de mode incomplete
-                test_passed = rag_used and not is_incomplete
+            if processed_answer != original_answer:
+                expert_result["answer"] = processed_answer
+                expert_result["original_answer"] = original_answer
+                expert_result["concision_applied"] = True
+                ai_enhancements_used.append("response_concision")
+                processing_steps.append("concision_processing")
+                
+                logger.info(f"✂️ [Expert Service] Concision appliquée: {len(original_answer)} → {len(processed_answer)} chars")
             else:
-                # Doit échouer : mode incomplete, retry demandé
-                test_passed = is_incomplete and has_retry
-            
-            entity_test_result = {
-                "test_name": test_case["name"],
-                "input": test_case["input"],
-                "expected_success": test_case["should_succeed"],
-                "actual_mode": result.mode,
-                "is_incomplete_detected": is_incomplete,
-                "retry_requested": has_retry,
-                "rag_used": rag_used,
-                "test_passed": test_passed,
-                "response_excerpt": result.response[:100] + "..." if len(result.response) > 100 else result.response,
-                "concision_level_tested": test_case["concision_level"].value,  # 🚀 v3.7.0
-                "response_versions_handled": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
-            }
-            
-            # Ajouter informations manquantes détectées
-            if result.clarification_result and "missing_information" in result.clarification_result:
-                entity_test_result["missing_info_detected"] = result.clarification_result["missing_information"]
-            
-            # 🚀 v3.7.0: Informations response_versions pour entités incomplètes
-            if hasattr(result, 'response_versions') and result.response_versions:
-                entity_test_result["response_versions_count"] = len(result.response_versions)
-                entity_test_result["response_versions_keys"] = list(result.response_versions.keys())
-            
-            test_results["entity_tests"].append(entity_test_result)
-            
-            logger.info(f"   Mode résultat: {result.mode}")
-            logger.info(f"   Incomplet détecté: {is_incomplete}")
-            logger.info(f"   RAG utilisé: {rag_used}")
-            logger.info(f"   Test réussi: {test_passed}")
-            logger.info(f"   Response versions: {hasattr(result, 'response_versions') and result.response_versions is not None}")
-            
-            if not test_passed:
-                error_msg = f"Test '{test_case['name']}' échoué: attendu={test_case['should_succeed']}, mode={result.mode}"
-                test_results["errors"].append(error_msg)
-                logger.error(f"   ❌ {error_msg}")
+                expert_result["concision_applied"] = False
         
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
+        performance_breakdown["concision_complete"] = int(time.time() * 1000)
         
-        # Statistiques
-        success_count = sum(1 for t in test_results["entity_tests"] if t["test_passed"])
-        total_count = len(test_results["entity_tests"])
+        # === ENREGISTREMENT RÉPONSE ===
+        if self.integrations.intelligent_memory_available and expert_result["answer"]:
+            try:
+                self.integrations.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=expert_result["answer"],
+                    role="assistant",
+                    language=request_data.language,
+                    message_type="response"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ [Expert Service] Erreur enregistrement réponse: {e}")
         
-        test_results["statistics"] = {
-            "total_tests": total_count,
-            "successful_tests": success_count,
-            "failed_tests": total_count - success_count,
-            "success_rate": f"{(success_count/total_count)*100:.1f}%" if total_count > 0 else "0%",
-            # 🚀 v3.7.0: Statistiques response_versions
-            "response_versions_tests": sum(1 for t in test_results["entity_tests"] if t.get("response_versions_handled", False)),
-            "concision_levels_tested": list(set(t.get("concision_level_tested") for t in test_results["entity_tests"]))
+        processing_steps.append("response_storage")
+        performance_breakdown["final"] = int(time.time() * 1000)
+        
+        # === CONSTRUCTION RÉPONSE FINALE AMÉLIORÉE ===
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        return self._build_final_enhanced_response(
+            question_text, expert_result["answer"], conversation_id,
+            user_email, request_data.language, response_time_ms,
+            expert_result, validation_result, conversation_context,
+            processing_steps, ai_enhancements_used, request_data,
+            debug_info, performance_breakdown
+        )
+    
+    # ===========================================================================================
+    # 🔧 NOUVELLES MÉTHODES POUR AUTO-CLARIFICATION
+    # ===========================================================================================
+    
+    def _calculate_context_completeness_score(
+        self, 
+        question: str, 
+        conversation_context, 
+        language: str = "fr"
+    ) -> float:
+        """
+        🔧 NOUVEAU: Calcule un score de complétude du contexte (0.0 à 1.0)
+        """
+        
+        score = 0.0
+        
+        # Score de base selon la longueur et détail de la question
+        question_length = len(question.strip())
+        if question_length > 50:
+            score += 0.2
+        elif question_length > 25:
+            score += 0.1
+        
+        # Détection d'informations spécifiques dans la question
+        question_lower = question.lower()
+        
+        # Présence de race spécifique (+0.3)
+        specific_breeds = ["ross 308", "cobb 500", "hubbard", "arbor acres", "isa"]
+        if any(breed in question_lower for breed in specific_breeds):
+            score += 0.3
+        elif any(word in question_lower for word in ["poulet", "chicken", "pollo"]):
+            score += 0.1  # Race générique
+        
+        # Présence d'âge (+0.2)
+        age_patterns = [r'\d+\s*(?:jour|day|día)s?', r'\d+\s*(?:semaine|week|semana)s?']
+        if any(re.search(pattern, question_lower) for pattern in age_patterns):
+            score += 0.2
+        
+        # Présence de données numériques (+0.1)
+        if re.search(r'\d+', question):
+            score += 0.1
+        
+        # Contexte conversationnel disponible (+0.2)
+        if conversation_context and hasattr(conversation_context, 'consolidated_entities'):
+            entities = conversation_context.consolidated_entities.to_dict()
+            if entities:
+                score += 0.2
+                
+                # Bonus pour entités spécifiques
+                if entities.get('breed') and entities.get('breed') != 'generic':
+                    score += 0.1
+                if entities.get('age_days') or entities.get('age_weeks'):
+                    score += 0.1
+        
+        # Limiter le score à 1.0
+        return min(score, 1.0)
+    
+    def _create_auto_clarification_response(
+        self,
+        question: str,
+        clarification_result: Dict[str, Any],
+        language: str,
+        conversation_id: str,
+        context_score: float,
+        start_time: float,
+        processing_steps: list,
+        ai_enhancements_used: list
+    ) -> EnhancedExpertResponse:
+        """
+        🔧 NOUVEAU: Crée une réponse d'auto-clarification
+        """
+        
+        # Construire le message avec les questions
+        message = clarification_result["message"]
+        questions = clarification_result["questions"]
+        
+        if len(questions) == 1:
+            formatted_questions = questions[0]
+        else:
+            formatted_questions = "\n".join([f"• {q}" for q in questions])
+        
+        outro_messages = {
+            "fr": "\n\nCes précisions m'aideront à vous donner une réponse plus précise et utile ! 🐔",
+            "en": "\n\nThese details will help me give you a more precise and useful answer! 🐔",
+            "es": "\n\n¡Estos detalles me ayudarán a darle una respuesta más precisa y útil! 🐔"
         }
         
-        logger.info("🧪 RÉSUMÉ TEST ENTITÉS INCOMPLÈTES:")
-        logger.info(f"   - Tests réalisés: {total_count}")
-        logger.info(f"   - Succès: {success_count}")
-        logger.info(f"   - Échecs: {total_count - success_count}")
-        logger.info(f"   - Taux de réussite: {test_results['statistics']['success_rate']}")
-        logger.info(f"   - Tests response_versions: {test_results['statistics']['response_versions_tests']}")
-        logger.info(f"   - Test global: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        outro = outro_messages.get(language, outro_messages["fr"])
+        response_text = f"{message}\n\n{formatted_questions}{outro}"
         
-        logger.info("=" * 80)
+        response_time_ms = int((time.time() - start_time) * 1000)
         
-        return test_results
+        return EnhancedExpertResponse(
+            question=question,
+            response=response_text,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=response_time_ms,
+            mode="automatic_context_based_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "automatic_context_based",
+                "context_score": context_score,
+                "questions_generated": len(questions),
+                "trigger_reason": clarification_result["trigger_reason"],
+                "automatic_trigger": True,
+                "question_type": clarification_result.get("type", "unknown")
+            },
+            processing_steps=processing_steps,
+            ai_enhancements_used=ai_enhancements_used,
+            dynamic_clarification=DynamicClarification(
+                original_question=question,
+                clarification_questions=questions,
+                confidence=0.9,
+                generation_method="automatic_context_evaluation",
+                generation_time_ms=response_time_ms,
+                fallback_used=False
+            )
+        )
+    
+    # ===========================================================================================
+    # ✅ TOUTES LES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
+    # ===========================================================================================
+    
+    async def _handle_clarification_corrected_with_semantic_dynamic(
+        self, request_data, question_text, user_id, conversation_id, 
+        processing_steps, ai_enhancements_used, semantic_dynamic_mode: bool = False
+    ):
+        """
+        ✅ SYSTÈME DE CLARIFICATION PARFAITEMENT CORRIGÉ + MODE SÉMANTIQUE DYNAMIQUE
+        🆕 NOUVEAU: Support du mode sémantique dynamique
+        """
         
-    except Exception as e:
-        logger.error(f"❌ Erreur test entités incomplètes: {e}")
-        logger.info("=" * 80)
-        return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "entity_tests": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/debug/test-clarification-backend-fix")
-async def test_clarification_backend_fix(request: Request):
-    """🧨 NOUVEAU v3.6.1: Test de la correction backend
-    🚀 MISE À JOUR v3.7.0: Test avec support response_versions"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🧨 TEST CORRECTION BACKEND v3.7.0 avec RESPONSE_VERSIONS")
+        # 1. ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION CORRIGÉ
+        if request_data.is_clarification_response:
+            return await self._process_clarification_response_corrected(
+                request_data, question_text, conversation_id,
+                processing_steps, ai_enhancements_used
+            )
         
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "backend_tests": [],
-            "errors": []
-        }
+        # 🆕 NOUVEAU: Vérifier si mode sémantique dynamique activé
+        if semantic_dynamic_mode and self.integrations.enhanced_clarification_available:
+            logger.info(f"🆕 [Semantic Dynamic] Mode activé pour: '{question_text[:50]}...'")
+            
+            try:
+                from .question_clarification_system import analyze_question_for_clarification_semantic_dynamic
+                
+                clarification_result = await analyze_question_for_clarification_semantic_dynamic(
+                    question=question_text,
+                    language=request_data.language,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    conversation_context={}
+                )
+                
+                if clarification_result.needs_clarification:
+                    logger.info(f"🆕 [Semantic Dynamic] {len(clarification_result.questions)} questions générées")
+                    processing_steps.append("semantic_dynamic_clarification_triggered")
+                    ai_enhancements_used.append("semantic_dynamic_clarification")
+                    
+                    return self._create_semantic_dynamic_clarification_response(
+                        question_text, clarification_result, request_data.language, conversation_id
+                    )
+                else:
+                    logger.info(f"✅ [Semantic Dynamic] Question claire, pas de clarification nécessaire")
+                
+            except Exception as e:
+                logger.error(f"❌ [Semantic Dynamic] Erreur mode sémantique: {e}")
         
-        # Test 1: Question initiale
-        test1_request = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet de 15 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,
-            # 🚀 v3.7.0: Test correction backend avec response_versions
-            concision_level=ConcisionLevel.CONCISE,
-            generate_all_versions=True
+        # 2. DÉTECTION QUESTIONS NÉCESSITANT CLARIFICATION (mode normal)
+        clarification_needed = self._detect_performance_question_needing_clarification(
+            question_text, request_data.language
         )
         
-        logger.info("🎯 Test 1: Question initiale (doit déclencher clarification)")
-        result1 = await ask_expert_enhanced_v2_public(test1_request, request)
+        if not clarification_needed:
+            return None
         
-        test1_result = {
-            "test_name": "Question initiale",
-            "clarification_triggered": result1.clarification_result is not None,
-            "mode": result1.mode,
-            "success": result1.clarification_result is not None,
-            "response_versions_on_clarification": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
-        }
-        test_results["backend_tests"].append(test1_result)
+        logger.info(f"🎯 [Expert Service] Clarification nécessaire: {clarification_needed['type']}")
+        processing_steps.append("automatic_clarification_triggered")
+        ai_enhancements_used.append("smart_performance_clarification")
         
-        if not test1_result["success"]:
-            test_results["errors"].append("Question initiale n'a pas déclenché clarification")
+        # 3. ✅ SAUVEGARDE FORCÉE AVEC MÉMOIRE INTELLIGENTE
+        if self.integrations.intelligent_memory_available:
+            try:
+                from .conversation_memory_enhanced import mark_question_for_clarification
+                
+                question_id = mark_question_for_clarification(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    original_question=question_text,
+                    language=request_data.language
+                )
+                
+                logger.info(f"💾 [Expert Service] Question originale marquée: {question_id}")
+                processing_steps.append("original_question_marked")
+                ai_enhancements_used.append("intelligent_memory_clarification_marking")
+                
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur marquage question: {e}")
+                self.integrations.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=f"ORIGINAL_QUESTION_FOR_CLARIFICATION: {question_text}",
+                    role="system",
+                    language=request_data.language,
+                    message_type="original_question_marker"
+                )
         
-        # Test 2: Réponse clarification complète
-        if test1_result["success"]:
-            test2_request = EnhancedQuestionRequest(
-                text="Ross 308 mâles",
-                conversation_id=test1_request.conversation_id,
-                language="fr",
-                is_clarification_response=True,
-                original_question="Quel est le poids d'un poulet de 15 jours ?",
-                clarification_entities={"breed": "Ross 308", "sex": "mâles"},
-                # 🚀 v3.7.0: Test réponse clarification avec response_versions
-                concision_level=ConcisionLevel.DETAILED,
-                generate_all_versions=True
+        # 4. Générer la demande de clarification
+        clarification_response = self._generate_performance_clarification_response(
+            question_text, clarification_needed, request_data.language, conversation_id
+        )
+        
+        return clarification_response
+    
+    def _create_semantic_dynamic_clarification_response(
+        self, question: str, clarification_result, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """🆕 NOUVEAU: Crée une réponse de clarification sémantique dynamique"""
+        
+        # Formater les questions de clarification
+        if clarification_result.questions:
+            if len(clarification_result.questions) == 1:
+                response_text = f"❓ Pour mieux comprendre votre situation et vous aider efficacement :\n\n{clarification_result.questions[0]}"
+            else:
+                formatted_questions = "\n".join([f"• {q}" for q in clarification_result.questions])
+                response_text = f"❓ Pour mieux comprendre votre situation et vous aider efficacement :\n\n{formatted_questions}"
+            
+            response_text += "\n\nCela me permettra de vous donner les conseils les plus pertinents ! 🐔"
+        else:
+            response_text = "❓ Pouvez-vous préciser votre question pour que je puisse mieux vous aider ?"
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=response_text,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=int(clarification_result.processing_time_ms),
+            mode="semantic_dynamic_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "semantic_dynamic",
+                "questions_generated": len(clarification_result.questions) if clarification_result.questions else 0,
+                "confidence": clarification_result.confidence_score,
+                "model_used": clarification_result.model_used,
+                "generation_time_ms": clarification_result.processing_time_ms,
+                "validation_score": clarification_result.validation_score,
+                "fallback_used": clarification_result.fallback_used,
+                "gpt_failed": clarification_result.gpt_failed
+            },
+            processing_steps=["semantic_dynamic_clarification_triggered"],
+            ai_enhancements_used=["semantic_dynamic_clarification", "gpt_question_generation"],
+            dynamic_clarification=DynamicClarification(
+                original_question=question,
+                clarification_questions=clarification_result.questions or [],
+                confidence=clarification_result.confidence_score
+            )
+        )
+    
+    async def _process_expert_response_enhanced_corrected_with_taxonomy(
+        self, question_text: str, request_data: EnhancedQuestionRequest,
+        request: Request, current_user: Optional[Dict], conversation_id: str,
+        processing_steps: list, ai_enhancements_used: list,
+        debug_info: Dict, performance_breakdown: Dict, vagueness_result = None
+    ) -> Dict[str, Any]:
+        """
+        🏷️ NOUVELLE VERSION: RAG parfaitement corrigé avec mémoire intelligente + FILTRAGE TAXONOMIQUE
+        """
+        
+        # === 1. RÉCUPÉRATION FORCÉE DU CONTEXTE CONVERSATIONNEL ===
+        conversation_context_str = ""
+        extracted_entities = {}
+        
+        if self.integrations.intelligent_memory_available:
+            try:
+                context_obj = self.integrations.get_conversation_context(conversation_id)
+                if context_obj:
+                    conversation_context_str = context_obj.get_context_for_rag(max_chars=800)
+                    
+                    if request_data.is_clarification_response or request_data.original_question:
+                        if request_data.original_question:
+                            conversation_context_str = f"Question originale: {request_data.original_question}. " + conversation_context_str
+                        
+                        if hasattr(context_obj, 'messages'):
+                            for msg in reversed(context_obj.messages[-5:]):
+                                if msg.role == "user" and any(word in msg.message.lower() for word in ["ross", "cobb", "hubbard", "mâle", "femelle", "male", "female"]):
+                                    conversation_context_str += f" | Clarification: {msg.message}"
+                                    break
+                    
+                    if hasattr(context_obj, 'consolidated_entities'):
+                        extracted_entities = context_obj.consolidated_entities.to_dict()
+                    
+                    logger.info(f"🧠 [Expert Service] Contexte enrichi récupéré: {conversation_context_str[:150]}...")
+                    ai_enhancements_used.append("intelligent_memory_context_retrieval")
+                else:
+                    logger.warning(f"⚠️ [Expert Service] Aucun contexte trouvé pour: {conversation_id}")
+                    
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur récupération contexte: {e}")
+        
+        performance_breakdown["context_retrieved"] = int(time.time() * 1000)
+        
+        # === 2. AMÉLIORATION INTELLIGENTE DE LA QUESTION ===
+        enriched_question, enhancement_info = self.rag_enhancer.enhance_question_for_rag(
+            question=question_text,
+            conversation_context=conversation_context_str,
+            language=request_data.language
+        )
+        
+        if request_data.original_question and request_data.is_clarification_response:
+            logger.info(f"✨ [Expert Service] Question déjà enrichie par clarification: {question_text[:100]}...")
+            ai_enhancements_used.append("clarification_based_enrichment")
+        
+        if enhancement_info["question_enriched"]:
+            ai_enhancements_used.append("intelligent_question_enhancement")
+            logger.info(f"✨ [Expert Service] Question améliorée: {enriched_question[:150]}...")
+        
+        if enhancement_info["pronoun_detected"]:
+            ai_enhancements_used.append("contextual_pronoun_resolution")
+            logger.info(f"🎯 [Expert Service] Pronoms contextuels résolus: {enhancement_info['context_entities_used']}")
+        
+        processing_steps.append("intelligent_question_enhancement")
+        performance_breakdown["question_enhanced"] = int(time.time() * 1000)
+        
+        # === 3. 🏷️ NOUVEAU: FILTRAGE TAXONOMIQUE INTELLIGENT ===
+        from .api_enhancement_service import infer_taxonomy_from_entities, enhance_rag_query_with_taxonomy
+        
+        taxonomy = infer_taxonomy_from_entities(extracted_entities)
+        enhanced_question_with_taxonomy, rag_filters = enhance_rag_query_with_taxonomy(
+            enriched_question, extracted_entities, request_data.language
+        )
+        
+        logger.info(f"🏷️ [Taxonomy Filter] Taxonomie détectée: {taxonomy}")
+        if rag_filters:
+            logger.info(f"🏷️ [Taxonomy Filter] Filtres RAG: {rag_filters}")
+            ai_enhancements_used.append("taxonomic_document_filtering")
+        
+        processing_steps.append("taxonomic_analysis_and_filtering")
+        performance_breakdown["taxonomy_analysis"] = int(time.time() * 1000)
+        
+        # === 4. VÉRIFICATION RAG DISPONIBLE ===
+        app = request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if not process_rag:
+            logger.error("❌ [Expert Service] Système RAG indisponible - Erreur critique")
+            raise HTTPException(
+                status_code=503, 
+                detail="Service RAG indisponible - Le système expert nécessite l'accès à la base documentaire"
+            )
+        
+        # === 5. APPEL RAG AVEC CONTEXTE FORCÉ + FILTRAGE TAXONOMIQUE ===
+        try:
+            logger.info("🔍 [Expert Service] Appel RAG avec contexte intelligent + taxonomie...")
+            
+            if request_data.debug_mode:
+                debug_info["original_question"] = question_text
+                debug_info["enriched_question"] = enriched_question
+                debug_info["enriched_question_with_taxonomy"] = enhanced_question_with_taxonomy
+                debug_info["conversation_context"] = conversation_context_str
+                debug_info["enhancement_info"] = enhancement_info
+                debug_info["taxonomy_detected"] = taxonomy
+                debug_info["rag_filters"] = rag_filters
+            
+            result = None
+            rag_call_method = "unknown"
+            
+            rag_context = extract_context_from_entities(extracted_entities)
+            rag_context["lang"] = request_data.language
+            rag_context["taxonomy"] = taxonomy
+            
+            # Tentative 1: Avec paramètre context + filtres taxonomiques si supporté
+            try:
+                structured_question = build_structured_prompt(
+                    documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                    question=enhanced_question_with_taxonomy,
+                    context=rag_context
+                )
+                
+                logger.debug(f"🔍 [Prompt Final RAG] Contexte: {rag_context}")
+                logger.debug(f"🏷️ [Prompt Final RAG] Taxonomie: {taxonomy}")
+                logger.debug(f"🔍 [Prompt Final RAG]\n{structured_question[:500]}...")
+                
+                rag_params = {
+                    "question": structured_question,
+                    "user": current_user,
+                    "language": request_data.language,
+                    "speed_mode": request_data.speed_mode,
+                    "context": conversation_context_str
+                }
+                
+                if rag_filters:
+                    try:
+                        rag_params["filters"] = rag_filters
+                        result = await process_rag(**rag_params)
+                        rag_call_method = "context_parameter_structured_with_taxonomy"
+                        logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte + filtres taxonomiques")
+                    except TypeError:
+                        del rag_params["filters"]
+                        result = await process_rag(**rag_params)
+                        rag_call_method = "context_parameter_structured_taxonomy_fallback"
+                        logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte (filtres taxonomiques non supportés)")
+                else:
+                    result = await process_rag(**rag_params)
+                    rag_call_method = "context_parameter_structured"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte")
+                    
+            except TypeError as te:
+                logger.info(f"ℹ️ [Expert Service] Paramètre context non supporté: {te}")
+                
+                if conversation_context_str:
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                        question=enhanced_question_with_taxonomy,
+                        context=rag_context
+                    )
+                    
+                    logger.debug(f"🔍 [Prompt Final RAG - Injecté + Taxonomie]\n{structured_question[:500]}...")
+                    
+                    contextual_question = f"{structured_question}\n\nContexte: {conversation_context_str}"
+                    result = await process_rag(
+                        question=contextual_question,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
+                    )
+                    rag_call_method = "context_injected_structured_with_taxonomy"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte injecté + taxonomie")
+                else:
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                        question=enhanced_question_with_taxonomy,
+                        context=rag_context
+                    )
+                    
+                    logger.debug(f"🔍 [Prompt Final RAG - Seul + Taxonomie]\n{structured_question[:500]}...")
+                    
+                    result = await process_rag(
+                        question=structured_question,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
+                    )
+                    rag_call_method = "structured_with_taxonomy_only"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + taxonomie seul")
+            
+            performance_breakdown["rag_complete"] = int(time.time() * 1000)
+            
+            # === 6. TRAITEMENT RÉSULTAT RAG ===
+            answer = str(result.get("response", ""))
+            
+            answer = self.concision_processor._clean_document_references_only(answer)
+            
+            rag_score = result.get("score", 0.0)
+            original_mode = result.get("mode", "rag_processing")
+            
+            quality_check = self._validate_rag_response_quality(
+                answer, enhanced_question_with_taxonomy, enhancement_info
             )
             
-            logger.info("🎪 Test 2: Réponse clarification complète")
-            result2 = await ask_expert_enhanced_v2_public(test2_request, request)
+            if not quality_check["valid"]:
+                logger.warning(f"⚠️ [Expert Service] Qualité RAG insuffisante: {quality_check['reason']}")
+                ai_enhancements_used.append("quality_validation_failed")
             
-            question_enriched = "Ross 308" in result2.question and "mâles" in result2.question.lower()
+            logger.info(f"✅ [Expert Service] RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
             
-            test2_result = {
-                "test_name": "Réponse clarification complète",
-                "question_enriched": question_enriched,
-                "rag_used": result2.rag_used,
-                "final_question": result2.question,
-                "has_clarification_processing": hasattr(result2, 'clarification_processing'),
-                "success": question_enriched and result2.rag_used,
-                "response_versions_after_clarification": hasattr(result2, 'response_versions') and result2.response_versions is not None,  # 🚀 v3.7.0
-                "response_versions_count": len(result2.response_versions) if hasattr(result2, 'response_versions') and result2.response_versions else 0  # 🚀 v3.7.0
+            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision_and_response_versions_and_taxonomy_and_semantic_dynamic_and_auto_clarification"
+            
+            processing_steps.append("mandatory_rag_with_intelligent_context_and_taxonomy")
+            
+            return {
+                "answer": answer,
+                "rag_used": True,
+                "rag_score": rag_score,
+                "mode": mode,
+                "context_used": bool(conversation_context_str),
+                "question_enriched": enhancement_info["question_enriched"] or bool(request_data.original_question),
+                "enhancement_info": enhancement_info,
+                "quality_check": quality_check,
+                "extracted_entities": extracted_entities,
+                "rag_call_method": rag_call_method,
+                "taxonomy_used": taxonomy,
+                "taxonomy_filters_applied": bool(rag_filters)
             }
-            test_results["backend_tests"].append(test2_result)
             
-            if not test2_result["success"]:
-                test_results["errors"].append("Réponse clarification mal traitée")
+        except Exception as rag_error:
+            logger.error(f"❌ [Expert Service] Erreur critique RAG: {rag_error}")
+            processing_steps.append("rag_error")
+            
+            error_details = {
+                "error": "Erreur RAG",
+                "message": "Impossible d'interroger la base documentaire",
+                "question_original": question_text,
+                "question_enriched": enriched_question,
+                "question_with_taxonomy": enhanced_question_with_taxonomy,
+                "context_available": bool(conversation_context_str),
+                "taxonomy_detected": taxonomy,
+                "technical_error": str(rag_error)
+            }
+            
+            raise HTTPException(status_code=503, detail=error_details)
+    
+    # ===========================================================================================
+    # ✅ TOUTES LES AUTRES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
+    # ===========================================================================================
+    
+    async def _process_clarification_response_corrected(
+        self, request_data, question_text, conversation_id, 
+        processing_steps, ai_enhancements_used
+    ):
+        """✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION - VERSION CORRIGÉE FINALE (CONSERVÉ)"""
         
-        # Test 3: Réponse clarification incomplète
-        test3_request = EnhancedQuestionRequest(
-            text="Ross seulement",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            is_clarification_response=True,
-            original_question="Quel est le poids d'un poulet de 15 jours ?",
-            # 🚀 v3.7.0: Test entités incomplètes avec response_versions
-            concision_level=ConcisionLevel.ULTRA_CONCISE,
-            generate_all_versions=True
+        original_question = request_data.original_question
+        clarification_context = request_data.clarification_context
+        
+        if (not original_question or not clarification_context) and self.integrations.intelligent_memory_available:
+            try:
+                from .conversation_memory_enhanced import find_original_question
+                
+                original_msg = find_original_question(conversation_id)
+                
+                if original_msg:
+                    original_question = original_msg.message
+                    clarification_context = {
+                        "missing_information": ["breed", "sex"],
+                        "clarification_type": "performance_breed_sex"
+                    }
+                    logger.info(f"✅ [Expert Service] Question originale récupérée: {original_question}")
+                    ai_enhancements_used.append("intelligent_memory_original_question_recovery")
+                else:
+                    logger.warning("⚠️ [Expert Service] Question originale non trouvée dans la mémoire")
+                    
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur récupération question originale: {e}")
+        
+        if not original_question:
+            logger.warning("⚠️ [Expert Service] Fallback: création question par défaut")
+            original_question = "Quel est le poids de référence pour ces poulets ?"
+            clarification_context = {
+                "missing_information": ["breed", "sex"],
+                "clarification_type": "performance_breed_sex_fallback"
+            }
+        
+        missing_info = clarification_context.get("missing_information", [])
+        
+        validation = validate_clarification_completeness(
+            question_text, missing_info, request_data.language
         )
         
-        logger.info("🧪 Test 3: Réponse clarification incomplète")
-        result3 = await ask_expert_enhanced_v2_public(test3_request, request)
+        if not validation["is_complete"]:
+            logger.info(f"🔄 [Expert Service] Clarification incomplète: {validation['still_missing']}")
+            return self._generate_follow_up_clarification(
+                question_text, validation, request_data.language, conversation_id
+            )
         
-        test3_result = {
-            "test_name": "Réponse clarification incomplète",
-            "detected_as_incomplete": "incomplete" in result3.mode,
-            "retry_requested": result3.clarification_result and result3.clarification_result.get("retry_required", False),
-            "success": "incomplete" in result3.mode,
-            "response_versions_on_incomplete": hasattr(result3, 'response_versions'),  # 🚀 v3.7.0 (peut être None pour les erreurs)
-            "response_versions_none_for_error": not (hasattr(result3, 'response_versions') and result3.response_versions)  # 🚀 v3.7.0 (doit être None pour les erreurs)
-        }
-        test_results["backend_tests"].append(test3_result)
+        breed = validation["extracted_info"].get("breed")
+        sex = validation["extracted_info"].get("sex")
         
-        if not test3_result["success"]:
-            test_results["errors"].append("Entités incomplètes non détectées")
+        age_info = self._extract_age_from_original_question(original_question, request_data.language)
         
-        # 🚀 v3.7.0: Test 4 spécifique response_versions
-        logger.info("🚀 Test 4: Validation response_versions avec correction backend")
-        
-        test4_request = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet Ross 308 mâle de 20 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,
-            concision_level=ConcisionLevel.STANDARD,
-            generate_all_versions=True
+        enriched_original_question = self._build_complete_enriched_question(
+            original_question, breed, sex, age_info, request_data.language
         )
         
-        result4 = await ask_expert_enhanced_v2_public(test4_request, request)
+        logger.info(f"✅ [Expert Service] Question COMPLÈTEMENT enrichie: {enriched_original_question}")
         
-        test4_result = {
-            "test_name": "Validation response_versions backend",
-            "question_complete": True,
-            "rag_used": result4.rag_used,
-            "response_versions_generated": hasattr(result4, 'response_versions') and result4.response_versions is not None,
-            "response_versions_count": len(result4.response_versions) if hasattr(result4, 'response_versions') and result4.response_versions else 0,
-            "all_versions_present": False,
-            "success": False
+        request_data.text = enriched_original_question
+        request_data.is_clarification_response = False
+        request_data.original_question = original_question
+        
+        processing_steps.append("clarification_processed_successfully_with_age")
+        ai_enhancements_used.append("breed_sex_age_extraction_complete")
+        ai_enhancements_used.append("complete_question_enrichment")
+        ai_enhancements_used.append("forced_question_replacement_with_age")
+        
+        return None
+    
+    def _detect_performance_question_needing_clarification(
+        self, question: str, language: str = "fr"
+    ) -> Optional[Dict[str, Any]]:
+        """Détection améliorée des questions techniques nécessitant race/sexe (CONSERVÉ)"""
+        
+        question_lower = question.lower()
+        
+        weight_age_patterns = {
+            "fr": [
+                r'(?:poids|pèse)\s+.*?(\d+)\s*(?:jour|semaine)s?',
+                r'(\d+)\s*(?:jour|semaine)s?.*?(?:poids|pèse)',
+                r'(?:quel|combien)\s+.*?(?:poids|pèse).*?(\d+)',
+                r'(?:croissance|développement).*?(\d+)\s*(?:jour|semaine)',
+                r'(\d+)\s*(?:jour|semaine).*?(?:normal|référence|standard)'
+            ],
+            "en": [
+                r'(?:weight|weigh)\s+.*?(\d+)\s*(?:day|week)s?',
+                r'(\d+)\s*(?:day|week)s?.*?(?:weight|weigh)',
+                r'(?:what|how much)\s+.*?(?:weight|weigh).*?(\d+)',
+                r'(?:growth|development).*?(\d+)\s*(?:day|week)',
+                r'(\d+)\s*(?:day|week).*?(?:normal|reference|standard)'
+            ],
+            "es": [
+                r'(?:peso|pesa)\s+.*?(\d+)\s*(?:día|semana)s?',
+                r'(\d+)\s*(?:día|semana)s?.*?(?:peso|pesa)',
+                r'(?:cuál|cuánto)\s+.*?(?:peso|pesa).*?(\d+)',
+                r'(?:crecimiento|desarrollo).*?(\d+)\s*(?:día|semana)',
+                r'(\d+)\s*(?:día|semana).*?(?:normal|referencia|estándar)'
+            ]
         }
         
-        # Vérifier que toutes les versions sont présentes
-        if hasattr(result4, 'response_versions') and result4.response_versions:
-            expected_versions = ["ultra_concise", "concise", "standard", "detailed"]
-            test4_result["versions_present"] = list(result4.response_versions.keys())
-            test4_result["all_versions_present"] = all(v in result4.response_versions for v in expected_versions)
-            test4_result["success"] = result4.rag_used and test4_result["all_versions_present"]
+        patterns = weight_age_patterns.get(language, weight_age_patterns["fr"])
         
-        test_results["backend_tests"].append(test4_result)
+        age_detected = None
+        for pattern in patterns:
+            match = re.search(pattern, question_lower)
+            if match:
+                age_detected = match.group(1)
+                break
         
-        if not test4_result["success"]:
-            test_results["errors"].append("Response versions non générées correctement")
+        if not age_detected:
+            return None
         
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
+        breed_patterns = [
+            r'\b(ross\s*308|ross\s*708|cobb\s*500|cobb\s*700|hubbard|arbor\s*acres)\b',
+            r'\b(broiler|poulet|chicken|pollo)\s+(ross|cobb|hubbard)',
+            r'\brace\s*[:\-]?\s*(ross|cobb|hubbard)'
+        ]
         
-        # 🚀 v3.7.0: Statistiques response_versions
-        test_results["response_versions_statistics"] = {
-            "tests_with_response_versions": sum(1 for t in test_results["backend_tests"] if t.get("response_versions_generated", False) or t.get("response_versions_on_clarification", False)),
-            "tests_total": len(test_results["backend_tests"]),
-            "clarification_has_versions": any(t.get("response_versions_on_clarification", False) for t in test_results["backend_tests"]),
-            "incomplete_properly_handles_versions": any(t.get("response_versions_none_for_error", False) for t in test_results["backend_tests"])
+        sex_patterns = [
+            r'\b(mâle|male|macho)s?\b',
+            r'\b(femelle|female|hembra)s?\b',
+            r'\b(coq|hen|poule|gallina)\b',
+            r'\b(mixte|mixed|misto)\b'
+        ]
+        
+        has_breed = any(re.search(pattern, question_lower, re.IGNORECASE) for pattern in breed_patterns)
+        has_sex = any(re.search(pattern, question_lower, re.IGNORECASE) for pattern in sex_patterns)
+        
+        if not has_breed and not has_sex:
+            return {
+                "type": "performance_question_missing_breed_sex",
+                "age_detected": age_detected,
+                "question_type": "weight_performance",
+                "missing_info": ["breed", "sex"],
+                "confidence": 0.95
+            }
+        
+        elif not has_breed or not has_sex:
+            missing = []
+            if not has_breed:
+                missing.append("breed")
+            if not has_sex:
+                missing.append("sex")
+            
+            return {
+                "type": "performance_question_partial_info",
+                "age_detected": age_detected,
+                "question_type": "weight_performance", 
+                "missing_info": missing,
+                "confidence": 0.8
+            }
+        
+        return None
+
+    def _generate_performance_clarification_response(
+        self, question: str, clarification_info: Dict, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """Génère la demande de clarification optimisée (CONSERVÉ)"""
+        
+        age = clarification_info.get("age_detected", "X")
+        missing_info = clarification_info.get("missing_info", [])
+        
+        clarification_messages = {
+            "fr": {
+                "both_missing": f"Pour vous donner le poids de référence exact d'un poulet de {age} jours, j'ai besoin de :\n\n• **Race/souche** : Ross 308, Cobb 500, Hubbard, etc.\n• **Sexe** : Mâles, femelles, ou troupeau mixte\n\nPouvez-vous préciser ces informations ?",
+                "breed_missing": f"Pour le poids exact à {age} jours, quelle est la **race/souche** (Ross 308, Cobb 500, Hubbard, etc.) ?",
+                "sex_missing": f"Pour le poids exact à {age} jours, s'agit-il de **mâles, femelles, ou d'un troupeau mixte** ?"
+            },
+            "en": {
+                "both_missing": f"To give you the exact reference weight for a {age}-day chicken, I need:\n\n• **Breed/strain**: Ross 308, Cobb 500, Hubbard, etc.\n• **Sex**: Males, females, or mixed flock\n\nCould you specify this information?",
+                "breed_missing": f"For the exact weight at {age} days, what is the **breed/strain** (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "sex_missing": f"For the exact weight at {age} days, are these **males, females, or a mixed flock**?"
+            },
+            "es": {
+                "both_missing": f"Para darle el peso de referencia exacto de un pollo de {age} días, necesito:\n\n• **Raza/cepa**: Ross 308, Cobb 500, Hubbard, etc.\n• **Sexo**: Machos, hembras, o lote mixto\n\n¿Podría especificar esta información?",
+                "breed_missing": f"Para el peso exacto a los {age} días, ¿cuál es la **raza/cepa** (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "sex_missing": f"Para el peso exacto a los {age} días, ¿son **machos, hembras, o un lote mixto**?"
+            }
         }
         
-        logger.info(f"✅ TEST CORRECTION BACKEND v3.7.0: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
-        logger.info(f"🚀 Response versions: {test_results['response_versions_statistics']['tests_with_response_versions']}/{test_results['response_versions_statistics']['tests_total']} tests")
-        logger.info("=" * 80)
+        messages = clarification_messages.get(language, clarification_messages["fr"])
         
-        return test_results
+        if len(missing_info) >= 2:
+            response_text = messages["both_missing"]
+        elif "breed" in missing_info:
+            response_text = messages["breed_missing"]
+        else:
+            response_text = messages["sex_missing"]
         
-    except Exception as e:
-        logger.error(f"❌ Erreur test correction backend: {e}")
+        examples = {
+            "fr": "\n\n**Exemples de réponses :**\n• \"Ross 308 mâles\"\n• \"Cobb 500 femelles\"\n• \"Hubbard troupeau mixte\"",
+            "en": "\n\n**Example responses:**\n• \"Ross 308 males\"\n• \"Cobb 500 females\"\n• \"Hubbard mixed flock\"",
+            "es": "\n\n**Ejemplos de respuestas:**\n• \"Ross 308 machos\"\n• \"Cobb 500 hembras\"\n• \"Hubbard lote mixto\""
+        }
+        
+        response_text += examples.get(language, examples["fr"])
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=response_text,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=50,
+            mode="smart_performance_clarification_corrected",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "performance_breed_sex",
+                "missing_information": missing_info,
+                "age_detected": age,
+                "confidence": clarification_info.get("confidence", 0.9)
+            },
+            processing_steps=["smart_clarification_triggered"],
+            ai_enhancements_used=["performance_question_detection", "targeted_clarification"]
+        )
+    
+    def _generate_follow_up_clarification(
+        self, question: str, validation: Dict, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """Génère une clarification de suivi si première réponse incomplète (CONSERVÉ)"""
+        
+        still_missing = validation["still_missing"]
+        
+        messages = {
+            "fr": {
+                "breed": "Il me manque encore la **race/souche**. Ross 308, Cobb 500, ou autre ?",
+                "sex": "Il me manque encore le **sexe**. Mâles, femelles, ou troupeau mixte ?",  
+                "both": "Il me manque encore la **race et le sexe**. Exemple : \"Ross 308 mâles\""
+            },
+            "en": {
+                "breed": "I still need the **breed/strain**. Ross 308, Cobb 500, or other?",
+                "sex": "I still need the **sex**. Males, females, or mixed flock?",
+                "both": "I still need the **breed and sex**. Example: \"Ross 308 males\""
+            },
+            "es": {
+                "breed": "Aún necesito la **raza/cepa**. ¿Ross 308, Cobb 500, u otra?",
+                "sex": "Aún necesito el **sexo**. ¿Machos, hembras, o lote mixto?",
+                "both": "Aún necesito la **raza y sexo**. Ejemplo: \"Ross 308 machos\""
+            }
+        }
+        
+        lang_messages = messages.get(language, messages["fr"])
+        
+        if len(still_missing) >= 2:
+            message = lang_messages["both"]
+        elif "breed" in still_missing:
+            message = lang_messages["breed"]
+        else:
+            message = lang_messages["sex"]
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=message,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=30,
+            mode="follow_up_clarification_corrected",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "follow_up_incomplete",
+                "still_missing_information": still_missing,
+                "confidence": validation["confidence"]
+            },
+            processing_steps=["follow_up_clarification_triggered"],
+            ai_enhancements_used=["incomplete_clarification_handling"]
+        )
+    
+    # === MÉTHODES D'ENRICHISSEMENT COMPLET (CONSERVÉES IDENTIQUES) ===
+    
+    def _extract_age_from_original_question(self, original_question: str, language: str = "fr") -> Dict[str, Any]:
+        """Extrait l'âge depuis la question originale (CONSERVÉ)"""
+        
+        age_info = {"days": None, "weeks": None, "text": None, "detected": False}
+        
+        if not original_question:
+            return age_info
+        
+        question_lower = original_question.lower()
+        
+        age_patterns = {
+            "fr": [
+                (r'(\d+)\s*jours?', "days"),
+                (r'(\d+)\s*semaines?', "weeks"),
+                (r'de\s+(\d+)\s*jours?', "days"),
+                (r'de\s+(\d+)\s*semaines?', "weeks"),
+                (r'à\s+(\d+)\s*jours?', "days"),
+                (r'à\s+(\d+)\s*semaines?', "weeks")
+            ],
+            "en": [
+                (r'(\d+)\s*days?', "days"),
+                (r'(\d+)\s*weeks?', "weeks"),
+                (r'of\s+(\d+)\s*days?', "days"),
+                (r'of\s+(\d+)\s*weeks?', "weeks"),
+                (r'at\s+(\d+)\s*days?', "days"),
+                (r'at\s+(\d+)\s*weeks?', "weeks")
+            ],
+            "es": [
+                (r'(\d+)\s*días?', "days"),
+                (r'(\d+)\s*semanas?', "weeks"),
+                (r'de\s+(\d+)\s*días?', "days"),
+                (r'de\s+(\d+)\s*semanas?', "weeks"),
+                (r'a\s+(\d+)\s*días?', "days"),
+                (r'a\s+(\d+)\s*semanas?', "weeks")
+            ]
+        }
+        
+        patterns = age_patterns.get(language, age_patterns["fr"])
+        
+        for pattern, unit in patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                value = int(match.group(1))
+                
+                if unit == "days":
+                    age_info["days"] = value
+                    age_info["weeks"] = round(value / 7, 1)
+                    age_info["text"] = f"{value} jour{'s' if value > 1 else ''}"
+                else:
+                    age_info["weeks"] = value
+                    age_info["days"] = value * 7
+                    age_info["text"] = f"{value} semaine{'s' if value > 1 else ''}"
+                
+                age_info["detected"] = True
+                
+                logger.info(f"🕐 [Age Extraction] Âge détecté: {age_info['text']} ({age_info['days']} jours)")
+                break
+        
+        if not age_info["detected"]:
+            logger.warning(f"⚠️ [Age Extraction] Aucun âge détecté dans: {original_question}")
+        
+        return age_info
+
+    def _build_complete_enriched_question(
+        self, 
+        original_question: str, 
+        breed: Optional[str], 
+        sex: Optional[str], 
+        age_info: Dict[str, Any], 
+        language: str = "fr"
+    ) -> str:
+        """Construit une question complètement enrichie (CONSERVÉ)"""
+        
+        templates = {
+            "fr": {
+                "complete": "Pour des poulets {breed} {sex} de {age}",
+                "breed_age": "Pour des poulets {breed} de {age}",
+                "sex_age": "Pour des poulets {sex} de {age}",
+                "breed_sex": "Pour des poulets {breed} {sex}",
+                "age_only": "Pour des poulets de {age}",
+                "breed_only": "Pour des poulets {breed}",
+                "sex_only": "Pour des poulets {sex}"
+            },
+            "en": {
+                "complete": "For {breed} {sex} chickens at {age}",
+                "breed_age": "For {breed} chickens at {age}",
+                "sex_age": "For {sex} chickens at {age}",
+                "breed_sex": "For {breed} {sex} chickens",
+                "age_only": "For chickens at {age}",
+                "breed_only": "For {breed} chickens",
+                "sex_only": "For {sex} chickens"
+            },
+            "es": {
+                "complete": "Para pollos {breed} {sex} de {age}",
+                "breed_age": "Para pollos {breed} de {age}",
+                "sex_age": "Para pollos {sex} de {age}",
+                "breed_sex": "Para pollos {breed} {sex}",
+                "age_only": "Para pollos de {age}",
+                "breed_only": "Para pollos {breed}",
+                "sex_only": "Para pollos {sex}"
+            }
+        }
+        
+        template_set = templates.get(language, templates["fr"])
+        
+        context_prefix = ""
+        age_text = age_info.get("text") if age_info.get("detected") else None
+        
+        if breed and sex and age_text:
+            context_prefix = template_set["complete"].format(
+                breed=breed, sex=sex, age=age_text
+            )
+            logger.info(f"🌟 [Complete Enrichment] Contexte COMPLET: {context_prefix}")
+            
+        elif breed and age_text:
+            context_prefix = template_set["breed_age"].format(
+                breed=breed, age=age_text
+            )
+            logger.info(f"🏷️ [Breed+Age] Contexte: {context_prefix}")
+            
+        elif sex and age_text:
+            context_prefix = template_set["sex_age"].format(
+                sex=sex, age=age_text
+            )
+            logger.info(f"⚧ [Sex+Age] Contexte: {context_prefix}")
+            
+        elif breed and sex:
+            context_prefix = template_set["breed_sex"].format(
+                breed=breed, sex=sex
+            )
+            logger.info(f"🏷️⚧ [Breed+Sex] Contexte: {context_prefix}")
+            
+        elif age_text:
+            context_prefix = template_set["age_only"].format(age=age_text)
+            logger.info(f"🕐 [Age Only] Contexte: {context_prefix}")
+            
+        elif breed:
+            context_prefix = template_set["breed_only"].format(breed=breed)
+            logger.info(f"🏷️ [Breed Only] Contexte: {context_prefix}")
+            
+        elif sex:
+            context_prefix = template_set["sex_only"].format(sex=sex)
+            logger.info(f"⚧ [Sex Only] Contexte: {context_prefix}")
+        
+        if context_prefix:
+            original_lower = original_question.lower().strip()
+            
+            if "quel est" in original_lower or "what is" in original_lower or "cuál es" in original_lower:
+                enriched_question = f"{context_prefix}, {original_lower}"
+            elif "comment" in original_lower or "how" in original_lower or "cómo" in original_lower:
+                enriched_question = f"{context_prefix}: {original_question}"
+            else:
+                enriched_question = f"{context_prefix}: {original_question}"
+            
+            logger.info(f"✨ [Final Enrichment] Question finale: {enriched_question}")
+            return enriched_question
+        
+        else:
+            logger.warning("⚠️ [Enrichment] Pas d'enrichissement possible, question originale conservée")
+            return original_question
+    
+    # === MÉTHODES UTILITAIRES AVEC TOUTES LES AMÉLIORATIONS ===
+    
+    def _create_vagueness_response(
+        self, vagueness_result, question_text: str, conversation_id: str,
+        language: str, start_time: float, processing_steps: list, ai_enhancements_used: list
+    ) -> EnhancedExpertResponse:
+        """Crée une réponse spécialisée pour questions floues (CONSERVÉ)"""
+        
+        clarification_messages = {
+            "fr": f"Votre question semble manquer de précision. {vagueness_result.suggested_clarification or 'Pouvez-vous être plus spécifique ?'}",
+            "en": f"Your question seems to lack precision. {vagueness_result.suggested_clarification or 'Could you be more specific?'}",
+            "es": f"Su pregunta parece carecer de precisión. {vagueness_result.suggested_clarification or '¿Podría ser más específico?'}"
+        }
+        
+        response_message = clarification_messages.get(language, clarification_messages["fr"])
+        
+        if vagueness_result.question_clarity in ["very_unclear", "unclear"]:
+            examples = {
+                "fr": "\n\nExemples de questions précises:\n• Quel est le poids normal d'un Ross 308 de 21 jours?\n• Comment traiter la mortalité élevée chez des poulets de 3 semaines?\n• Quelle température maintenir pour des poussins de 7 jours?",
+                "en": "\n\nExamples of precise questions:\n• What is the normal weight of a 21-day Ross 308?\n• How to treat high mortality in 3-week-old chickens?\n• What temperature to maintain for 7-day chicks?",
+                "es": "\n\nEjemplos de preguntas precisas:\n• ¿Cuál es el peso normal de un Ross 308 de 21 días?\n• ¿Cómo tratar la alta mortalidad en pollos de 3 semanas?\n• ¿Qué temperatura mantener para pollitos de 7 días?"
+            }
+            response_message += examples.get(language, examples["fr"])
+        
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        return EnhancedExpertResponse(
+            question=question_text,
+            response=response_message,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=response_time_ms,
+            mode="vagueness_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            vagueness_detection=vagueness_result,
+            processing_steps=processing_steps,
+            ai_enhancements_used=ai_enhancements_used
+        )
+    
+    def _build_final_enhanced_response(
+        self, question_text: str, answer: str, conversation_id: str,
+        user_email: Optional[str], language: str, response_time_ms: int,
+        expert_result: Dict, validation_result: ValidationResult,
+        conversation_context: Any, processing_steps: list,
+        ai_enhancements_used: list, request_data: EnhancedQuestionRequest,
+        debug_info: Dict, performance_breakdown: Dict
+    ) -> EnhancedExpertResponse:
+        """Construit la réponse finale avec toutes les améliorations"""
+        
+        extracted_entities = expert_result.get("extracted_entities")
+        confidence_overall = None
+        conversation_state = None
+        
+        if conversation_context and hasattr(conversation_context, 'consolidated_entities'):
+            if not extracted_entities:
+                extracted_entities = conversation_context.consolidated_entities.to_dict()
+            confidence_overall = conversation_context.consolidated_entities.confidence_overall
+            conversation_state = conversation_context.conversation_urgency
+        
+        final_debug_info = None
+        final_performance = None
+        
+        if request_data.debug_mode:
+            final_debug_info = {
+                **debug_info,
+                "total_processing_time_ms": response_time_ms,
+                "ai_enhancements_count": len(ai_enhancements_used),
+                "processing_steps_count": len(processing_steps),
+                "concision_applied": expert_result.get("concision_applied", False),
+                "response_versions_support": True,
+                "taxonomy_used": expert_result.get("taxonomy_used"),
+                "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),
+                "semantic_dynamic_available": True,
+                "auto_clarification_available": True,
+                "auto_clarification_used": "auto_clarification_context_based" in ai_enhancements_used
+            }
+            
+            final_performance = performance_breakdown
+        
+        concision_info = {
+            "concision_applied": expert_result.get("concision_applied", False),
+            "original_response_available": "original_answer" in expert_result,
+            "detected_question_type": None,
+            "applied_concision_level": None,
+            "response_versions_supported": True
+        }
+        
+        if expert_result.get("concision_applied"):
+            concision_info["detected_question_type"] = self.concision_processor.detect_question_type(question_text)
+            concision_info["applied_concision_level"] = self.concision_processor.detect_optimal_concision_level(question_text).value
+        
+        taxonomy_info = {
+            "taxonomy_detected": expert_result.get("taxonomy_used", "general"),
+            "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),
+            "taxonomy_enhanced_question": bool(expert_result.get("taxonomy_used") != "general")
+        }
+        
+        semantic_dynamic_info = {
+            "semantic_dynamic_available": getattr(request_data, 'semantic_dynamic_mode', False),
+            "semantic_dynamic_used": "semantic_dynamic_clarification" in ai_enhancements_used,
+            "dynamic_questions_generated": any("semantic_dynamic" in step for step in processing_steps)
+        }
+        
+        # 🔧 NOUVEAU: Informations auto-clarification
+        auto_clarification_info = {
+            "auto_clarification_available": True,
+            "auto_clarification_used": "auto_clarification_context_based" in ai_enhancements_used,
+            "context_score_evaluated": any("context" in step for step in processing_steps),
+            "automatic_trigger": "automatic_clarification_triggered" in processing_steps
+        }
+            
+        return EnhancedExpertResponse(
+            question=str(question_text),
+            response=str(answer),
+            conversation_id=conversation_id,
+            rag_used=expert_result["rag_used"],
+            rag_score=expert_result["rag_score"],
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=response_time_ms,
+            mode=expert_result["mode"],
+            user=user_email,
+            logged=True,
+            validation_passed=True,
+            validation_confidence=validation_result.confidence,
+            reprocessed_after_clarification=request_data.is_clarification_response,
+            conversation_state=conversation_state,
+            extracted_entities=extracted_entities,
+            confidence_overall=confidence_overall,
+            processing_steps=processing_steps,
+            ai_enhancements_used=ai_enhancements_used,
+            
+            document_relevance=expert_result.get("document_relevance"),
+            context_coherence=expert_result.get("context_coherence"),
+            vagueness_detection=None,
+            fallback_details=None,
+            response_format_applied=request_data.expected_response_format.value,
+            quality_metrics=expert_result.get("quality_metrics"),
+            debug_info=final_debug_info,
+            performance_breakdown=final_performance,
+            
+            concision_info=concision_info,
+            original_response=expert_result.get("original_answer"),
+            
+            response_versions=None,
+            concision_metrics=None,
+            
+            taxonomy_info=taxonomy_info,
+            
+            semantic_dynamic_info=semantic_dynamic_info,
+            
+            # 🔧 NOUVEAU: Auto-clarification info
+            auto_clarification_info=auto_clarification_info
+        )
+    
+    # === MÉTHODES UTILITAIRES IDENTIQUES (CONSERVÉES) ===
+    
+    def _extract_user_id(self, current_user: Optional[Dict], request_data: EnhancedQuestionRequest, request: Request) -> str:
+        if current_user:
+            return current_user.get("user_id") or request_data.user_id or "authenticated_user"
+        return request_data.user_id or get_user_id_from_request(request)
+    
+    def _get_or_create_conversation_id(self, request_data: EnhancedQuestionRequest) -> str:
+        if request_data.conversation_id and request_data.conversation_id.strip():
+            conversation_id = request_data.conversation_id.strip()
+            logger.info(f"🔄 [Expert Service] CONTINUATION: {conversation_id}")
+            return conversation_id
+        else:
+            conversation_id = str(uuid.uuid4())
+            logger.info(f"🆕 [Expert Service] NOUVELLE: {conversation_id}")
+            return conversation_id
+    
+    def _validate_rag_response_quality(
+        self, answer: str, enriched_question: str, enhancement_info: Dict
+    ) -> Dict[str, any]:
+        """Valide la qualité de la réponse RAG (CONSERVÉ)"""
+        
+        if not answer or len(answer.strip()) < 20:
+            return {
+                "valid": False,
+                "reason": "Réponse trop courte",
+                "answer_length": len(answer) if answer else 0
+            }
+        
+        negative_responses = [
+            "je ne sais pas", "i don't know", "no sé",
+            "pas d'information", "no information", "sin información"
+        ]
+        
+        answer_lower = answer.lower()
+        for negative in negative_responses:
+            if negative in answer_lower:
+                return {
+                    "valid": False,
+                    "reason": f"Réponse négative détectée: {negative}",
+                    "answer_length": len(answer)
+                }
+        
+        if any(word in enriched_question.lower() for word in ["poids", "weight", "peso"]):
+            if not re.search(r'\d+', answer):
+                return {
+                    "valid": False,
+                    "reason": "Question numérique mais pas de chiffres dans la réponse",
+                    "answer_length": len(answer)
+                }
+        
         return {
-            "test_successful": False,
-            "error": str(e),
+            "valid": True,
+            "reason": "Réponse valide",
+            "answer_length": len(answer)
+        }
+    
+    # === AUTRES MÉTHODES CONSERVÉES ===
+    
+    async def _validate_agricultural_question(self, question: str, language: str, user_id: str, request_ip: str, conversation_id: str) -> ValidationResult:
+        if not self.integrations.agricultural_validator_available:
+            return ValidationResult(is_valid=False, rejection_message="Service temporairement indisponible")
+        
+        try:
+            enriched_question = question
+            if self.integrations.intelligent_memory_available:
+                try:
+                    rag_context = self.integrations.get_context_for_rag(conversation_id)
+                    if rag_context:
+                        enriched_question = f"{question}\n\nContexte: {rag_context}"
+                except Exception:
+                    pass
+            
+            validation_result = self.integrations.validate_agricultural_question(
+                question=enriched_question, language=language, user_id=user_id, request_ip=request_ip
+            )
+            
+            return ValidationResult(
+                is_valid=validation_result.is_valid,
+                rejection_message=validation_result.reason or "Question hors domaine agricole",
+                confidence=validation_result.confidence
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ [Expert Service] Erreur validateur: {e}")
+            return ValidationResult(is_valid=False, rejection_message="Erreur de validation")
+    
+    def _create_rejection_response(self, question_text, validation_result, conversation_id, user_email, language, start_time, processing_steps, ai_enhancements_used, vagueness_result=None):
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        return EnhancedExpertResponse(
+            question=str(question_text),
+            response=str(validation_result.rejection_message),
+            conversation_id=conversation_id,
+            rag_used=False,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=response_time_ms,
+            mode="enhanced_agricultural_validation_rejected",
+            user=user_email,
+            logged=True,
+            validation_passed=False,
+            validation_confidence=validation_result.confidence,
+            processing_steps=processing_steps,
+            ai_enhancements_used=ai_enhancements_used,
+            vagueness_detection=vagueness_result
+        )
+    
+    async def process_feedback(self, feedback_data: FeedbackRequest) -> Dict[str, Any]:
+        feedback_updated = False
+        
+        if feedback_data.conversation_id and self.integrations.logging_available:
+            try:
+                rating_numeric = {"positive": 1, "negative": -1, "neutral": 0}.get(feedback_data.rating, 0)
+                feedback_updated = await self.integrations.update_feedback(feedback_data.conversation_id, rating_numeric)
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur feedback: {e}")
+        
+        return {
+            "success": True,
+            "message": "Feedback enregistré avec succès (Version Complète 4.0.0 - Auto-Clarification Intégrée)",
+            "rating": feedback_data.rating,
+            "comment": feedback_data.comment,
+            "conversation_id": feedback_data.conversation_id,
+            "feedback_updated_in_db": feedback_updated,
+            "enhanced_features_used": True,
+            "concision_system_active": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
+            "response_versions_supported": True,
+            "taxonomic_filtering_active": True,
+            "semantic_dynamic_available": True,
+            "auto_clarification_available": True,
+            "auto_clarification_active": self.auto_clarification.enable_auto_clarification,
             "timestamp": datetime.now().isoformat()
         }
-
-@router.post("/debug/test-response-versions")
-async def test_response_versions(request: Request):
-    """🚀 NOUVEAU v3.7.0: Test spécifique du système response_versions"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🚀 DÉBUT TEST RESPONSE_VERSIONS v3.7.0")
+    
+    async def get_suggested_topics(self, language: str) -> Dict[str, Any]:
+        lang = language.lower() if language else "fr"
+        if lang not in ["fr", "en", "es"]:
+            lang = "fr"
         
-        test_results = {
-            "test_successful": True,
-            "timestamp": datetime.now().isoformat(),
-            "version_tests": [],
-            "errors": []
-        }
+        topics_by_language = get_enhanced_topics_by_language()
+        topics = topics_by_language.get(lang, topics_by_language["fr"])
         
-        # Test différents niveaux de concision
-        concision_test_cases = [
-            {
-                "name": "Ultra Concise",
-                "level": ConcisionLevel.ULTRA_CONCISE,
-                "question": "Quel est le poids d'un poulet Ross 308 mâle de 21 jours ?",
-                "expected_short": True
-            },
-            {
-                "name": "Concise", 
-                "level": ConcisionLevel.CONCISE,
-                "question": "Quel est le poids d'un poulet Cobb 500 femelle de 14 jours ?",
-                "expected_short": False
-            },
-            {
-                "name": "Standard",
-                "level": ConcisionLevel.STANDARD, 
-                "question": "Comment améliorer la croissance des poulets de 10 jours ?",
-                "expected_short": False
-            },
-            {
-                "name": "Detailed",
-                "level": ConcisionLevel.DETAILED,
-                "question": "Quels sont les facteurs influençant la mortalité chez les poulets ?",
-                "expected_short": False
-            }
-        ]
-        
-        for test_case in concision_test_cases:
-            logger.info(f"🚀 Test: {test_case['name']} - {test_case['level'].value}")
-            
-            test_request = EnhancedQuestionRequest(
-                text=test_case["question"],
-                conversation_id=str(uuid.uuid4()),
-                language="fr",
-                enable_vagueness_detection=True,
-                concision_level=test_case["level"],
-                generate_all_versions=True
-            )
-            
-            start_time = time.time()
-            result = await ask_expert_enhanced_v2_public(test_request, request)
-            
-            # Analyser le résultat
-            has_response_versions = hasattr(result, 'response_versions') and result.response_versions is not None
-            versions_count = len(result.response_versions) if has_response_versions else 0
-            
-            # Vérifier les versions attendues
-            expected_versions = ["ultra_concise", "concise", "standard", "detailed"]
-            all_versions_present = False
-            version_lengths = {}
-            
-            if has_response_versions:
-                all_versions_present = all(v in result.response_versions for v in expected_versions)
-                version_lengths = {v: len(content) for v, content in result.response_versions.items()}
-            
-            # Vérifier que la version sélectionnée correspond au niveau demandé
-            selected_version_correct = False
-            if has_response_versions and test_case["level"].value in result.response_versions:
-                selected_content = result.response_versions[test_case["level"].value]
-                # La réponse principale devrait correspondre à la version sélectionnée
-                selected_version_correct = len(selected_content) > 0
-            
-            version_test_result = {
-                "test_name": test_case["name"],
-                "concision_level": test_case["level"].value,
-                "question": test_case["question"],
-                "response_versions_generated": has_response_versions,
-                "versions_count": versions_count,
-                "all_versions_present": all_versions_present,
-                "version_lengths": version_lengths,
-                "selected_version_correct": selected_version_correct,
-                "response_time_ms": result.response_time_ms,
-                "rag_used": result.rag_used,
-                "success": has_response_versions and all_versions_present and selected_version_correct
-            }
-            
-            if has_response_versions:
-                version_test_result["versions_available"] = list(result.response_versions.keys())
-                
-                # Vérifier la progression des longueurs (ultra_concise < concise < standard < detailed)
-                lengths = [version_lengths.get(v, 0) for v in expected_versions]
-                proper_length_progression = all(lengths[i] <= lengths[i+1] for i in range(len(lengths)-1))
-                version_test_result["proper_length_progression"] = proper_length_progression
-                
-                if not proper_length_progression:
-                    version_test_result["success"] = False
-            
-            test_results["version_tests"].append(version_test_result)
-            
-            logger.info(f"   Versions générées: {has_response_versions}")
-            logger.info(f"   Nombre de versions: {versions_count}")
-            logger.info(f"   Toutes versions présentes: {all_versions_present}")
-            logger.info(f"   Longueurs: {version_lengths}")
-            logger.info(f"   Test réussi: {version_test_result['success']}")
-            
-            if not version_test_result["success"]:
-                error_msg = f"Test response_versions échoué pour {test_case['name']}"
-                test_results["errors"].append(error_msg)
-                logger.error(f"   ❌ {error_msg}")
-        
-        # Test spécial: clarification + response_versions
-        logger.info("🎪 Test spécial: Clarification avec response_versions")
-        
-        clarification_question = EnhancedQuestionRequest(
-            text="Quel est le poids d'un poulet de 18 jours ?",
-            conversation_id=str(uuid.uuid4()),
-            language="fr",
-            enable_vagueness_detection=True,
-            is_clarification_response=False,
-            concision_level=ConcisionLevel.STANDARD,
-            generate_all_versions=True
-        )
-        
-        clarification_result = await ask_expert_enhanced_v2_public(clarification_question, request)
-        
-        clarification_test = {
-            "test_name": "Clarification avec response_versions",
-            "clarification_triggered": clarification_result.clarification_result is not None,
-            "response_versions_on_clarification": hasattr(clarification_result, 'response_versions'),
-            "mode": clarification_result.mode,
-            "success": clarification_result.clarification_result is not None
-        }
-        
-        # Si clarification déclenchée, tester la réponse
-        if clarification_test["clarification_triggered"]:
-            clarification_response = EnhancedQuestionRequest(
-                text="Hubbard femelles",
-                conversation_id=clarification_question.conversation_id,
-                language="fr",
-                is_clarification_response=True,
-                original_question="Quel est le poids d'un poulet de 18 jours ?",
-                clarification_entities={"breed": "Hubbard", "sex": "femelles"},
-                concision_level=ConcisionLevel.DETAILED,
-                generate_all_versions=True
-            )
-            
-            response_result = await ask_expert_enhanced_v2_public(clarification_response, request)
-            
-            clarification_test.update({
-                "clarification_response_processed": True,
-                "question_enriched": "Hubbard" in response_result.question and "femelles" in response_result.question.lower(),
-                "rag_used_after_clarification": response_result.rag_used,
-                "response_versions_after_enrichment": hasattr(response_result, 'response_versions') and response_result.response_versions is not None,
-                "versions_count_after_enrichment": len(response_result.response_versions) if hasattr(response_result, 'response_versions') and response_result.response_versions else 0
-            })
-            
-            clarification_test["success"] = (clarification_test["question_enriched"] and 
-                                           clarification_test["rag_used_after_clarification"] and 
-                                           clarification_test["response_versions_after_enrichment"])
-        
-        test_results["version_tests"].append(clarification_test)
-        
-        if not clarification_test["success"]:
-            test_results["errors"].append("Test clarification + response_versions échoué")
-        
-        # Résultat final
-        test_results["test_successful"] = len(test_results["errors"]) == 0
-        
-        # Statistiques
-        success_count = sum(1 for t in test_results["version_tests"] if t["success"])
-        total_count = len(test_results["version_tests"])
-        
-        test_results["statistics"] = {
-            "total_tests": total_count,
-            "successful_tests": success_count,
-            "failed_tests": total_count - success_count,
-            "success_rate": f"{(success_count/total_count)*100:.1f}%" if total_count > 0 else "0%",
-            "average_response_time": sum(t.get("response_time_ms", 0) for t in test_results["version_tests"] if "response_time_ms" in t) / len([t for t in test_results["version_tests"] if "response_time_ms" in t]),
-            "concision_levels_tested": list(set(t.get("concision_level") for t in test_results["version_tests"] if t.get("concision_level")))
-        }
-        
-        logger.info("🚀 RÉSUMÉ TEST RESPONSE_VERSIONS:")
-        logger.info(f"   - Tests réalisés: {total_count}")
-        logger.info(f"   - Succès: {success_count}")
-        logger.info(f"   - Échecs: {total_count - success_count}")
-        logger.info(f"   - Taux de réussite: {test_results['statistics']['success_rate']}")
-        logger.info(f"   - Temps moyen: {test_results['statistics']['average_response_time']:.0f}ms")
-        logger.info(f"   - Test global: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
-        
-        logger.info("=" * 80)
-        
-        return test_results
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur test response_versions: {e}")
-        logger.info("=" * 80)
         return {
-            "test_successful": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-            "version_tests": [],
-            "errors": [f"Erreur critique: {str(e)}"]
-        }
-
-@router.post("/ask-with-clarification", response_model=EnhancedExpertResponse)
-async def ask_with_forced_clarification(
-    request_data: EnhancedQuestionRequest,
-    request: Request
-):
-    """🎯 NOUVEAU: Endpoint avec clarification GARANTIE pour questions techniques (ORIGINAL PRÉSERVÉ)
-    🚀 MISE À JOUR v3.7.0: Support response_versions"""
-    
-    start_time = time.time()
-    
-    try:
-        logger.info("🎯 DÉBUT ask_with_forced_clarification v3.7.0")
-        logger.info(f"📝 Question: {request_data.text}")
-        
-        # 🚀 v3.7.0: Support concision par défaut
-        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
-            request_data.concision_level = ConcisionLevel.CONCISE
-        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
-            request_data.generate_all_versions = True
-        
-        # VÉRIFICATION DIRECTE si c'est une question poids+âge
-        question_lower = request_data.text.lower()
-        needs_clarification = False
-        
-        # Patterns simplifiés pour détecter poids+âge
-        weight_age_patterns = [
-            r'(?:poids|weight).*?(\d+)\s*(?:jour|day)',
-            r'(\d+)\s*(?:jour|day).*?(?:poids|weight)',
-            r'(?:quel|what).*?(?:poids|weight).*?(\d+)'
-        ]
-        
-        # Vérifier si question poids+âge
-        has_weight_age = any(re.search(pattern, question_lower) for pattern in weight_age_patterns)
-        logger.info(f"🔍 Détection poids+âge: {has_weight_age}")
-        
-        if has_weight_age:
-            # Vérifier si race/sexe manquent
-            breed_patterns = [r'(ross\s*308|cobb\s*500|hubbard)']
-            sex_patterns = [r'(mâle|male|femelle|female|mixte|mixed)']
+            "topics": topics,
+            "language": lang,
+            "count": len(topics),
+            "enhanced_features": {
+                "vagueness_detection_available": True,
+                "context_coherence_available": True,
+                "detailed_rag_scoring_available": True,
+                "quality_metrics_available": True,
+                "smart_clarification_available": True,
+                "intelligent_memory_available": self.integrations.intelligent_memory_available,
+                
+                "response_concision_available": True,
+                "concision_levels": [level.value for level in ConcisionLevel],
+                "auto_concision_detection": True,
+                "concision_enabled": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
+                
+                "response_versions_available": True,
+                "multiple_concision_levels_generation": True,
+                "dynamic_level_switching_support": True,
+                "concision_metrics_available": True,
+                
+                "taxonomic_filtering_available": True,
+                "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
+                "automatic_taxonomy_detection": True,
+                "taxonomy_based_document_filtering": True,
+                
+                "semantic_dynamic_clarification_available": True,
+                "gpt_question_generation": True,
+                "contextual_clarification_questions": True,
+                "intelligent_clarification_mode": True,
+                
+                # 🔧 NOUVEAU: Auto-clarification features
+                "auto_clarification_available": True,
+                "context_completeness_scoring": True,
+                "automatic_trigger_threshold": self.auto_clarification.context_threshold,
+                "smart_question_evaluation": True,
+                "auto_clarification_types": ["performance", "health", "environment", "general"]
+            },
+            "system_status": {
+                "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
+                "enhanced_clarification_enabled": self.integrations.is_enhanced_clarification_enabled(),
+                "intelligent_memory_enabled": self.integrations.intelligent_memory_available,
+                "api_enhancements_enabled": True,
+                "concision_processor_enabled": True,
+                "response_versions_generator_enabled": True,
+                "taxonomic_filtering_enabled": True,
+                "semantic_dynamic_clarification_enabled": True,
+                "auto_clarification_enabled": self.auto_clarification.enable_auto_clarification
+            },
             
-            has_breed = any(re.search(p, question_lower) for p in breed_patterns)
-            has_sex = any(re.search(p, question_lower) for p in sex_patterns)
+            "concision_config": {
+                "default_level": self.concision_processor.config.DEFAULT_CONCISION_LEVEL.value,
+                "auto_detect_enabled": True,
+                "max_lengths": self.concision_processor.config.MAX_RESPONSE_LENGTH,
+                "ultra_concise_keywords": self.concision_processor.config.ULTRA_CONCISE_KEYWORDS,
+                "complex_keywords": self.concision_processor.config.COMPLEX_KEYWORDS,
+                
+                "response_versions_generation": {
+                    "enabled": True,
+                    "supported_levels": [level.value for level in ConcisionLevel],
+                    "metrics_included": True,
+                    "cache_supported": False,
+                    "fallback_strategy": "simple_truncation"
+                }
+            },
             
-            logger.info(f"🏷️ Race détectée: {has_breed}")
-            logger.info(f"⚧ Sexe détecté: {has_sex}")
-            
-            if not has_breed and not has_sex:
-                needs_clarification = True
-                logger.info("🎯 CLARIFICATION NÉCESSAIRE!")
-        
-        if needs_clarification:
-            # DÉCLENCHER CLARIFICATION DIRECTE
-            age_match = re.search(r'(\d+)\s*(?:jour|day)', question_lower)
-            age = age_match.group(1) if age_match else "X"
-            
-            clarification_message = f"""Pour vous donner le poids de référence exact d'un poulet de {age} jours, j'ai besoin de :
-
-• **Race/souche** : Ross 308, Cobb 500, Hubbard, etc.
-• **Sexe** : Mâles, femelles, ou troupeau mixte
-
-Pouvez-vous préciser ces informations ?
-
-**Exemples de réponses :**
-• "Ross 308 mâles"
-• "Cobb 500 femelles"
-• "Hubbard troupeau mixte\""""
-            
-            logger.info("✅ CLARIFICATION DÉCLENCHÉE!")
-            
-            return EnhancedExpertResponse(
-                question=request_data.text,
-                response=clarification_message,
-                conversation_id=request_data.conversation_id or str(uuid.uuid4()),
-                rag_used=False,
-                rag_score=None,
-                timestamp=datetime.now().isoformat(),
-                language=request_data.language,
-                response_time_ms=int((time.time() - start_time) * 1000),
-                mode="forced_performance_clarification",
-                user=None,
-                logged=True,
-                validation_passed=True,
-                clarification_result={
-                    "clarification_requested": True,
-                    "clarification_type": "performance_breed_sex_forced",
-                    "missing_information": ["breed", "sex"],
-                    "age_detected": age,
-                    "confidence": 0.99
+            "taxonomic_config": {
+                "enabled": True,
+                "supported_categories": {
+                    "broiler": ["ross", "cobb", "hubbard", "indian river"],
+                    "layer": ["lohmann", "isa", "dekalb", "hy-line", "bovans", "h&n", "shaver"],
+                    "swine": ["gestation_day", "parity"],
+                    "dairy": ["days_in_milk", "milk_yield_liters"]
                 },
-                processing_steps=["forced_clarification_triggered"],
-                ai_enhancements_used=["forced_performance_clarification"],
-                # 🚀 v3.7.0: Pas de response_versions pour clarifications
-                response_versions=None
-            )
-        
-        logger.info("📋 Pas de clarification nécessaire, traitement normal")
-        
-        # Si pas besoin de clarification, traitement normal avec améliorations forcées
-        request_data.enable_vagueness_detection = True
-        request_data.require_coherence_check = True
-        
-        return await ask_expert_enhanced_v2_public(request_data, request)
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur ask_with_forced_clarification: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
-
-# =============================================================================
-# CONFIGURATION & LOGGING FINAL COMPLET v3.7.0 🚀
-# =============================================================================
-
-logger.info("🚀" * 50)
-logger.info("🚀 [EXPERT ENDPOINTS] VERSION 3.7.0 - SUPPORT RESPONSE_VERSIONS!")
-logger.info("🚀 [NOUVELLES FONCTIONNALITÉS v3.7.0]:")
-logger.info("   ✅ Support concision_level dans requests")
-logger.info("   ✅ Support generate_all_versions par défaut")
-logger.info("   ✅ response_versions dans les réponses")
-logger.info("   ✅ Génération multi-versions backend")
-logger.info("   ✅ Sélection dynamique côté frontend")
-logger.info("   ✅ Cache intelligent pour performance")
-logger.info("   ✅ Métriques de génération détaillées")
-logger.info("")
-logger.info("🧨 [CORRECTIONS v3.6.1 PRÉSERVÉES]:")
-logger.info("   ✅ Suppression assignations context_entities inexistant")
-logger.info("   ✅ Suppression assignations is_enriched inexistant")
-logger.info("   ✅ Conservation des entités via clarification_entities uniquement")
-logger.info("   ✅ Logging amélioré sans tentatives d'assignation")
-logger.info("   ✅ Métadonnées propagées via response au lieu de request")
-logger.info("   ✅ TOUS LES ENDPOINTS ORIGINAUX PRÉSERVÉS")
-logger.info("")
-logger.info("🔧 [ENDPOINTS MISE À JOUR v3.7.0]:")
-logger.info("   - POST /ask-enhanced-v2 (+ response_versions)")
-logger.info("   - POST /ask-enhanced-v2-public (+ response_versions)")
-logger.info("   - POST /ask-enhanced (legacy → v2 + response_versions)")
-logger.info("   - POST /ask-enhanced-public (legacy → v2 + response_versions)")
-logger.info("   - POST /ask (compatible → v2 + response_versions)")
-logger.info("   - POST /ask-public (compatible → v2 + response_versions)")
-logger.info("   - POST /ask-with-clarification (+ response_versions)")
-logger.info("   - POST /feedback (support qualité détaillée)")
-logger.info("   - GET /topics (enrichi avec statut améliorations)")
-logger.info("   - GET /system-status (focus clarification + forced + response_versions)")
-logger.info("   - POST /debug/test-enhancements (+ response_versions)")
-logger.info("   - POST /debug/test-clarification (+ response_versions)")
-logger.info("   - POST /debug/test-clarification-forced (+ response_versions)")
-logger.info("   - POST /debug/validate-clarification-params (+ response_versions)")
-logger.info("   - POST /debug/test-clarification-detection (+ response_versions)")
-logger.info("   - POST /debug/simulate-frontend-clarification (+ response_versions)")
-logger.info("   - POST /debug/test-incomplete-entities (+ response_versions)")
-logger.info("   - POST /debug/test-clarification-backend-fix (+ response_versions)")
-logger.info("   - POST /debug/test-response-versions (NOUVEAU v3.7.0)")
-logger.info("")
-logger.info("📋 [EXEMPLE REQUEST v3.7.0]:")
-logger.info("   {")
-logger.info('     "text": "Quel est le poids d\'un poulet de 12 jours ?",')
-logger.info('     "concision_level": "concise",')
-logger.info('     "generate_all_versions": true,')
-logger.info('     "conversation_id": "uuid...",')
-logger.info('     "language": "fr"')
-logger.info("   }")
-logger.info("")
-logger.info("📋 [EXEMPLE RESPONSE v3.7.0]:")
-logger.info("   {")
-logger.info('     "response": "Version concise de la réponse",')
-logger.info('     "response_versions": {')
-logger.info('       "ultra_concise": "350-400g",')
-logger.info('       "concise": "Le poids normal est de 350-400g à cet âge.",')
-logger.info('       "standard": "Le poids normal... avec conseils.",')
-logger.info('       "detailed": "Réponse complète et détaillée..."')
-logger.info('     },')
-logger.info('     "conversation_id": "uuid...",')
-logger.info('     "rag_used": true,')
-logger.info('     "mode": "rag_enhanced",')
-logger.info('     "ai_enhancements_used": [...]')
-logger.info("   }")
-logger.info("")
-logger.info("📋 [EXEMPLE CLARIFICATION REQUEST v3.7.0]:")
-logger.info("   {")
-logger.info('     "text": "Ross 308 mâles",')
-logger.info('     "conversation_id": "uuid...",')
-logger.info('     "is_clarification_response": true,')
-logger.info('     "original_question": "Quel est le poids d\'un poulet de 12 jours ?",')
-logger.info('     "clarification_entities": {"breed": "Ross 308", "sex": "mâles"},')
-logger.info('     "concision_level": "standard",')
-logger.info('     "generate_all_versions": true')
-logger.info("   }")
-logger.info("")
-logger.info("🎯 [RÉSULTAT ATTENDU v3.7.0]:")
-logger.info("   ✅ Backend démarre SANS erreurs de syntaxe")
-logger.info("   ✅ 'Ross 308 mâles' traité comme RÉPONSE clarification")
-logger.info("   ✅ Question enrichie: 'Quel est le poids... pour Ross 308 mâles'") 
-logger.info("   ✅ Métadonnées: response.clarification_processing accessible")
-logger.info("   ✅ RAG activé avec question enrichie")
-logger.info("   ✅ response_versions générées automatiquement")
-logger.info("   ✅ 4 versions disponibles: ultra_concise, concise, standard, detailed")
-logger.info("   ✅ Frontend peut choisir quelle version afficher")
-logger.info("   ✅ Cache intelligent pour performance optimale")
-logger.info("   ✅ Réponse précise: poids exact Ross 308 mâles 12 jours")
-logger.info("   ✅ Entités incomplètes → retry intelligent avec exemples")
-logger.info("   ✅ TOUS endpoints de compatibilité ET debug préservés")
-logger.info("   ✅ Tests automatiques pour validation complète")
-logger.info("   ✅ SYNTAXE PYTHON 100% CORRECTE - READY FOR DEPLOYMENT")
-logger.info("   ✅ BACKWARD COMPATIBILITY GARANTIE")
-logger.info("🚀" * 50)
+                "auto_detection_enabled": True,
+                "filter_fallback_enabled": True,
+                "question_enhancement_enabled": True
+            },
+            
+            "semantic_dynamic_config": {
+                "enabled": True,
+                "max_questions_generated": 4,
+                "supported_languages": ["fr", "en", "es"],
+                "gpt_model_used": "gpt-4o-mini",
+                "fallback_questions_available": True,
+                "context_aware_generation": True,
+                "automatic_mode_detection": True,
+                "validation_enabled": True
+            },
+            
+            # 🔧 NOUVEAU: Config auto-clarification
+            "auto_clarification_config": {
+                "enabled": self.auto_clarification.enable_auto_clarification,
+                "context_score_threshold": self.auto_clarification.context_threshold,
+                "evaluation_criteria": ["question_length", "specific_breeds", "age_info", "numeric_data", "conversational_context"],
+                "automatic_trigger": True,
