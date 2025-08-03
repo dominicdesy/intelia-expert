@@ -7,10 +7,6 @@ import { useTranslation } from './hooks/useTranslation'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-
-// 🆕 NOUVEAU: Import du hook de concision
-import { useResponseConcision, ConcisionLevel } from './hooks/useResponseConcision'
-
 import { 
   PaperAirplaneIcon, 
   UserIcon, 
@@ -18,16 +14,12 @@ import {
   InteliaLogo, 
   ArrowDownIcon,
   ThumbUpIcon,
-  ThumbDownIcon,
-  CogIcon  // 🆕 NOUVEAU: Icône pour les paramètres
+  ThumbDownIcon
 } from './utils/icons'
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
-import { FeedbackModal } from './components/FeedbackModal'
-
-// 🆕 NOUVEAU: Composant de contrôle de concision
-import { ConcisionControl } from './components/ConcisionControl'
+import { FeedbackModal } from './components/modals/FeedbackModal'
 
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
@@ -40,17 +32,11 @@ export default function ChatInterface() {
   const createNewConversation = useChatStore(state => state.createNewConversation)
   const loadConversations = useChatStore(state => state.loadConversations)
   
-  // 🆕 NOUVEAU: Hook de concision
-  const { config, processResponse, updateConcisionLevel, detectOptimalLevel } = useResponseConcision()
-  
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   
-  // 🆕 NOUVEAU: État pour les paramètres de concision
-  const [showConcisionSettings, setShowConcisionSettings] = useState(false)
-  
-  // États existants
+  // ✅ ÉTAT CLARIFICATION ULTRA-SIMPLE
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
     originalQuestion: string
@@ -81,41 +67,8 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  console.log('🔍 [Render] Messages actuels:', messages.length, 'Clarification active:', !!clarificationState, 'Concision level:', config.level)
+  console.log('🔍 [Render] Messages actuels:', messages.length, 'Clarification active:', !!clarificationState)
 
-  // 🆕 NOUVEAU: Fonction pour reprocesser tous les messages avec nouveau niveau
-  const reprocessAllMessages = () => {
-    if (!currentConversation?.messages) return
-
-    const updatedMessages = currentConversation.messages.map(message => {
-      // Ne traiter que les réponses IA qui ne sont pas des clarifications
-      if (!message.isUser && 
-          message.id !== 'welcome' && 
-          !message.content.includes('Mode clarification') &&
-          !message.content.includes('💡 Répondez simplement')) {
-        
-        // Utiliser la réponse originale si disponible, sinon la réponse actuelle
-        const originalResponse = (message as any).originalResponse || message.content
-        const processedResponse = processResponse(originalResponse, message.content)
-        
-        return {
-          ...message,
-          content: processedResponse,
-          originalResponse: originalResponse // Sauvegarder l'original
-        }
-      }
-      return message
-    })
-
-    const updatedConversation = {
-      ...currentConversation,
-      messages: updatedMessages
-    }
-
-    setCurrentConversation(updatedConversation)
-  }
-
-  // Tous vos useEffect existants restent identiques
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -304,14 +257,13 @@ export default function ChatInterface() {
     )
   }
 
-  // 🆕 FONCTION MODIFIÉE: handleSendMessage avec traitement de concision
+  // 🎯 FONCTION ULTRA-SIMPLIFIÉE: handleSendMessage - PAS DE MODAL
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
     console.log('📤 [ChatInterface] Envoi message:', {
       text: text.substring(0, 50) + '...',
-      hasClarificationState: !!clarificationState,
-      concisionLevel: config.level
+      hasClarificationState: !!clarificationState
     })
 
     const userMessage: Message = {
@@ -337,25 +289,29 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
 
     try {
+      // 🎯 CORRECTION: Vérifier si on répond à une clarification
       let response;
       
       if (clarificationState) {
         console.log('🎪 [handleSendMessage] Mode clarification - traitement simple')
         
+        // ✅ APPEL AVEC PARAMÈTRES DE CLARIFICATION SIMPLES
         response = await generateAIResponse(
-          clarificationState.originalQuestion + " " + text.trim(),
+          clarificationState.originalQuestion + " " + text.trim(), // Combiner question + réponse
           user,
           currentLanguage,
           conversationIdToSend,
-          true,
-          clarificationState.originalQuestion,
-          { answer: text.trim() }
+          true,                                // ✅ isClarificationResponse = true
+          clarificationState.originalQuestion, // originalQuestion
+          { answer: text.trim() }             // clarificationEntities simple
         )
         
+        // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
         setClarificationState(null)
         console.log('✅ [handleSendMessage] Clarification traitée')
         
       } else {
+        // ✅ APPEL NORMAL
         response = await generateAIResponse(
           text.trim(), 
           user, 
@@ -372,11 +328,13 @@ export default function ChatInterface() {
         clarification_requested: response.clarification_result?.clarification_requested || false
       })
 
+      // 🎯 CORRECTION: Détecter clarification via clarification_result
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
         console.log('❓ [handleSendMessage] Clarification demandée - affichage SIMPLE dans le chat')
         
+        // ✅ MESSAGE DE CLARIFICATION SIMPLE DANS LE CHAT
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
           content: response.response + "\n\n💡 Répondez simplement dans le chat avec les informations demandées.",
@@ -387,6 +345,7 @@ export default function ChatInterface() {
 
         addMessage(clarificationMessage)
 
+        // ✅ ACTIVER L'ÉTAT DE CLARIFICATION SIMPLE
         setClarificationState({
           messageId: clarificationMessage.id,
           originalQuestion: text.trim(),
@@ -396,32 +355,17 @@ export default function ChatInterface() {
         console.log('🔄 [handleSendMessage] État clarification activé - répondez dans le chat')
 
       } else {
-        // 🆕 NOUVEAU: Traitement de concision pour réponses normales
-        const originalResponse = response.response
-        let processedResponse = originalResponse
-
-        // Appliquer la concision si activée
-        if (config.level !== ConcisionLevel.DETAILED) {
-          processedResponse = processResponse(originalResponse, text.trim())
-          console.log('✂️ [handleSendMessage] Concision appliquée:', {
-            original_length: originalResponse.length,
-            processed_length: processedResponse.length,
-            level: config.level
-          })
-        }
-
+        // ✅ RÉPONSE NORMALE
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: processedResponse,
+          content: response.response,
           isUser: false,
           timestamp: new Date(),
-          conversation_id: response.conversation_id,
-          // 🆕 NOUVEAU: Sauvegarder la réponse originale
-          originalResponse: originalResponse
+          conversation_id: response.conversation_id
         }
 
         addMessage(aiMessage)
-        console.log('✅ [handleSendMessage] Réponse normale ajoutée avec concision')
+        console.log('✅ [handleSendMessage] Réponse normale ajoutée')
       }
       
     } catch (error) {
@@ -443,7 +387,6 @@ export default function ChatInterface() {
     }
   }
 
-  // Toutes vos autres fonctions restent identiques
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
     
@@ -518,6 +461,8 @@ export default function ChatInterface() {
     if (!isMountedRef.current) return
     
     createNewConversation()
+    
+    // ✅ RÉINITIALISER L'ÉTAT DE CLARIFICATION
     setClarificationState(null)
     
     const welcomeMessage: Message = {
@@ -595,48 +540,10 @@ export default function ChatInterface() {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              {/* 🆕 NOUVEAU: Bouton paramètres de concision */}
-              <button
-                onClick={() => setShowConcisionSettings(!showConcisionSettings)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Paramètres de réponse"
-                aria-label="Paramètres de réponse"
-              >
-                <CogIcon className="w-5 h-5" />
-              </button>
-              
+            <div className="flex items-center">
               <UserMenuButton />
             </div>
           </div>
-
-          {/* 🆕 NOUVEAU: Panel de paramètres de concision */}
-          {showConcisionSettings && (
-            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-sm font-medium text-gray-900">
-                  Niveau de détail des réponses
-                </h3>
-                <button
-                  onClick={() => setShowConcisionSettings(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <ConcisionControl />
-              
-              {hasMessages && (
-                <button
-                  onClick={reprocessAllMessages}
-                  className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm transition-colors"
-                >
-                  🔄 Appliquer à toutes les réponses
-                </button>
-              )}
-            </div>
-          )}
         </header>
 
         <div className="flex-1 overflow-hidden flex flex-col">
@@ -674,23 +581,7 @@ export default function ChatInterface() {
                           </p>
                         </div>
                         
-                        {/* 🆕 NOUVEAU: Bouton voir réponse complète si concision appliquée */}
-                        {!message.isUser && 
-                         (message as any).originalResponse && 
-                         (message as any).originalResponse !== message.content && (
-                          <div className="mt-2 ml-2">
-                            <details className="text-xs">
-                              <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
-                                📄 Voir la réponse complète
-                              </summary>
-                              <div className="mt-2 p-3 bg-gray-50 rounded-lg text-gray-700 text-sm">
-                                {(message as any).originalResponse}
-                              </div>
-                            </details>
-                          </div>
-                        )}
-                        
-                        {/* Feedback buttons existants */}
+                        {/* ✅ FEEDBACK BUTTONS - Pas pour les clarifications */}
                         {!message.isUser && 
                          index > 0 && 
                          message.conversation_id && (
@@ -776,7 +667,7 @@ export default function ChatInterface() {
 
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
-              {/* Indicateur clarification existant */}
+              {/* 🎯 INDICATEUR CLARIFICATION ULTRA-SIMPLE */}
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">

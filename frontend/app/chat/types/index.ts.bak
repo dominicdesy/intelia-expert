@@ -1,7 +1,6 @@
-// types/index.ts - Mise à jour COMPLÈTE avec support de concision
+// ==================== TYPES PRINCIPAUX ====================
 
-// ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ====================
-
+// ✅ INTERFACE MESSAGE ÉTENDUE AVEC COMMENTAIRES FEEDBACK ET CLARIFICATIONS
 export interface Message {
   id: string
   content: string
@@ -9,50 +8,16 @@ export interface Message {
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
   conversation_id?: string
-  feedbackComment?: string  // ✅ CONSERVÉ: Commentaire associé au feedback
+  feedbackComment?: string  // ✅ NOUVEAU: Commentaire associé au feedback
   
-  // ✅ CONSERVÉS: CHAMPS POUR CLARIFICATION
+  // ✅ NOUVEAUX CHAMPS POUR CLARIFICATION
   is_clarification_request?: boolean       // Pour les messages du bot qui demandent des clarifications
   is_clarification_response?: boolean      // Pour les messages utilisateur qui répondent aux clarifications
   clarification_questions?: string[]       // Questions de clarification du bot
   clarification_answers?: Record<string, string>  // Réponses de clarification de l'utilisateur (optionnel)
   original_question?: string               // Question originale avant clarification
   clarification_entities?: Record<string, any>    // Entités extraites des réponses de clarification
-  
-  // 🆕 NOUVEAU: Champs pour le système de concision
-  originalResponse?: string  // Réponse originale avant concision
-  processedResponse?: string // Réponse après traitement de concision
-  concisionLevel?: ConcisionLevel // Niveau de concision appliqué
 }
-
-// ==================== NOUVEAUX TYPES POUR CONCISION ====================
-
-export enum ConcisionLevel {
-  ULTRA_CONCISE = 'ultra_concise',  // Réponse minimale
-  CONCISE = 'concise',              // Réponse courte  
-  STANDARD = 'standard',            // Réponse normale
-  DETAILED = 'detailed'             // Réponse complète
-}
-
-export interface ConcisionConfig {
-  level: ConcisionLevel;
-  autoDetect: boolean;  // Détection automatique selon le type de question
-  userPreference: boolean; // Sauvegarder préférence utilisateur
-}
-
-export interface ConcisionControlProps {
-  className?: string;
-  compact?: boolean;
-}
-
-export interface ResponseProcessingResult {
-  processedContent: string;
-  originalContent: string;
-  levelUsed: ConcisionLevel;
-  wasProcessed: boolean;
-}
-
-// ==================== TYPES EXISTANTS CONSERVÉS ====================
 
 export interface ExpertApiResponse {
   question: string
@@ -68,12 +33,12 @@ export interface ExpertApiResponse {
   logged: boolean
   validation_passed?: boolean
   validation_confidence?: number
-  // 🆕 CONSERVÉS: NOUVEAUX CHAMPS POUR CLARIFICATION
+  // 🆕 NOUVEAUX CHAMPS POUR CLARIFICATION
   is_clarification_request?: boolean
   clarification_questions?: string[]
 }
 
-// ✅ CONSERVÉ: INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
+// ✅ INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
 export interface ConversationData {
   user_id: string
   question: string
@@ -83,21 +48,8 @@ export interface ConversationData {
   response_time_ms?: number
   language?: string
   rag_used?: boolean
-  feedback?: 1 | -1 | null          // ✅ CONSERVÉ: Feedback numérique pour le backend
-  feedback_comment?: string          // ✅ CONSERVÉ: Commentaire feedback
-}
-
-export interface ConversationData {
-  user_id: string
-  question: string
-  response: string
-  conversation_id: string
-  confidence_score?: number
-  response_time_ms?: number
-  language?: string
-  rag_used?: boolean
-  feedback?: 1 | -1 | null
-  feedback_comment?: string
+  feedback?: 1 | -1 | null          // ✅ NOUVEAU: Feedback numérique pour le backend
+  feedback_comment?: string          // ✅ NOUVEAU: Commentaire feedback
 }
 
 export interface ConversationItem {
@@ -111,12 +63,12 @@ export interface ConversationItem {
   updated_at: string
   created_at: string
   feedback?: number | null
-  feedback_comment?: string  // ✅ CONSERVÉ: Commentaire dans l'historique
+  feedback_comment?: string  // ✅ NOUVEAU: Commentaire dans l'historique
 }
 
-// ==================== CONSERVÉS: TYPES POUR CONVERSATIONS STYLE CLAUDE.AI ====================
+// ==================== NOUVEAUX TYPES POUR CONVERSATIONS STYLE CLAUDE.AI ====================
 
-// ✅ CONSERVÉ: Structure complète d'une conversation
+// ✅ NOUVEAU: Structure complète d'une conversation
 export interface Conversation {
   id: string
   title: string
@@ -130,18 +82,18 @@ export interface Conversation {
   status?: 'active' | 'archived'
 }
 
-// ✅ CONSERVÉ: Conversation complète avec tous ses messages
+// ✅ NOUVEAU: Conversation complète avec tous ses messages
 export interface ConversationWithMessages extends Conversation {
   messages: Message[]
 }
 
-// ✅ CONSERVÉ: Structure pour l'historique groupé
+// ✅ NOUVEAU: Structure pour l'historique groupé
 export interface ConversationGroup {
   title: string  // "Aujourd'hui", "Hier", "Cette semaine", etc.
   conversations: Conversation[]
 }
 
-// ✅ CONSERVÉ: Réponse API pour l'historique
+// ✅ NOUVEAU: Réponse API pour l'historique
 export interface ConversationHistoryResponse {
   success: boolean
   conversations: Conversation[]
@@ -151,14 +103,14 @@ export interface ConversationHistoryResponse {
   timestamp: string
 }
 
-// ✅ CONSERVÉ: Réponse API pour une conversation complète
+// ✅ NOUVEAU: Réponse API pour une conversation complète
 export interface ConversationDetailResponse {
   success: boolean
   conversation: ConversationWithMessages
   timestamp: string
 }
 
-// ✅ CONSERVÉ: Options pour le groupement des conversations
+// ✅ NOUVEAU: Options pour le groupement des conversations
 export interface ConversationGroupingOptions {
   groupBy: 'date' | 'topic' | 'none'
   sortBy: 'updated_at' | 'created_at' | 'message_count'
@@ -167,7 +119,7 @@ export interface ConversationGroupingOptions {
   offset?: number
 }
 
-// ✅ CONSERVÉ: Statistiques de conversation
+// ✅ NOUVEAU: Statistiques de conversation
 export interface ConversationStats {
   total_conversations: number
   total_messages: number
@@ -177,9 +129,9 @@ export interface ConversationStats {
   satisfaction_rate: number
 }
 
-// ==================== CONSERVÉS: TYPES POUR CLARIFICATIONS INLINE ====================
+// ==================== TYPES POUR CLARIFICATIONS INLINE ====================
 
-// ✅ CONSERVÉ: Interface simplifiée pour clarifications inline (REMPLACE ClarificationModalProps)
+// ✅ Interface simplifiée pour clarifications inline (REMPLACE ClarificationModalProps)
 export interface ClarificationInlineProps {
   questions: string[]
   originalQuestion: string
@@ -190,7 +142,7 @@ export interface ClarificationInlineProps {
   conversationId?: string
 }
 
-// ✅ CONSERVÉ: Interface pour les réponses de clarification
+// ✅ Interface pour les réponses de clarification
 export interface ClarificationResponse {
   needs_clarification: boolean
   questions?: string[]
@@ -199,7 +151,7 @@ export interface ClarificationResponse {
   model_used?: string
 }
 
-// ✅ CONSERVÉ: Interface pour l'état des clarifications
+// ✅ Interface pour l'état des clarifications
 export interface ClarificationState {
   pendingClarification: ExpertApiResponse | null
   isProcessingClarification: boolean
@@ -212,7 +164,7 @@ export interface ClarificationState {
   }>
 }
 
-// ==================== CONSERVÉS: TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
+// ==================== TYPES UTILISATEUR AVEC CHAMPS TÉLÉPHONE ====================
 
 export interface User {
   id: string
@@ -220,7 +172,7 @@ export interface User {
   name: string
   firstName: string
   lastName: string
-  phone: string  // ⚠️ CONSERVÉ: Champ existant - gardé pour compatibilité
+  phone: string  // ⚠️ Champ existant - gardé pour compatibilité
   country: string
   linkedinProfile: string
   companyName: string
@@ -231,7 +183,7 @@ export interface User {
   created_at: string
   plan: string
   
-  // ✅ CONSERVÉS: NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
+  // ✅ NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS POUR SUPABASE
   country_code?: string    // Code pays (ex: +1, +33, +32)
   area_code?: string       // Code régional (ex: 514, 04, 2)
   phone_number?: string    // Numéro principal (ex: 1234567, 12345678)
@@ -241,7 +193,7 @@ export interface ProfileUpdateData {
   firstName: string
   lastName: string
   email: string
-  phone?: string  // ✅ CONSERVÉ: Maintenant optionnel pour éviter les conflits
+  phone?: string  // ✅ CORRIGÉ : Maintenant optionnel pour éviter les conflits
   country: string
   linkedinProfile: string
   companyName: string
@@ -249,13 +201,13 @@ export interface ProfileUpdateData {
   linkedinCorporate: string
   language?: string
   
-  // ✅ CONSERVÉS: NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
+  // ✅ NOUVEAUX CHAMPS TÉLÉPHONE SÉPARÉS
   country_code?: string
   area_code?: string
   phone_number?: string
 }
 
-// ==================== CONSERVÉS: TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
+// ==================== TYPES SPÉCIFIQUES AU COMPOSANT PHONE ====================
 
 export interface PhoneData {
   country_code: string
@@ -271,9 +223,9 @@ export interface PhoneValidationResult {
   isValidNumber: boolean
 }
 
-// ==================== CONSERVÉS: NOUVEAUX TYPES FEEDBACK ET COMMENTAIRES ====================
+// ==================== NOUVEAUX TYPES FEEDBACK ET COMMENTAIRES ====================
 
-// ✅ CONSERVÉ: Interface pour les données feedback enrichies
+// ✅ NOUVEAU: Interface pour les données feedback enrichies
 export interface FeedbackData {
   conversation_id: string
   feedback: 'positive' | 'negative'
@@ -282,7 +234,7 @@ export interface FeedbackData {
   user_id?: string
 }
 
-// ✅ CONSERVÉ: Props pour la modal feedback
+// ✅ NOUVEAU: Props pour la modal feedback
 export interface FeedbackModalProps {
   isOpen: boolean
   onClose: () => void
@@ -291,7 +243,7 @@ export interface FeedbackModalProps {
   isSubmitting?: boolean
 }
 
-// ✅ CONSERVÉ: Interface pour les analytics feedback
+// ✅ NOUVEAU: Interface pour les analytics feedback
 export interface FeedbackAnalytics {
   period_days: number
   total_conversations: number
@@ -313,7 +265,7 @@ export interface FeedbackAnalytics {
   }>
 }
 
-// ✅ CONSERVÉ: Interface pour le rapport admin feedback
+// ✅ NOUVEAU: Interface pour le rapport admin feedback
 export interface AdminFeedbackReport {
   period_days: number
   generated_at: string
@@ -359,7 +311,7 @@ export interface AdminFeedbackReport {
   }>
 }
 
-// ✅ CONSERVÉ: Interface pour les statistiques utilisateur
+// ✅ NOUVEAU: Interface pour les statistiques utilisateur
 export interface UserFeedbackStats {
   user_id: string
   total_conversations: number
@@ -372,24 +324,24 @@ export interface UserFeedbackStats {
   last_feedback_date?: string
 }
 
-// ==================== CONSERVÉS: TYPES HOOKS AVEC CONVERSATIONS ====================
+// ==================== TYPES HOOKS AVEC CONVERSATIONS ====================
 
-// ✅ CONSERVÉ: INTERFACE AuthStore COMPLÈTE AVEC TOUTES LES PROPRIÉTÉS
+// ✅ INTERFACE AuthStore CORRIGÉE AVEC TOUTES LES PROPRIÉTÉS
 export interface AuthStore {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  hasHydrated: boolean  // ✅ CONSERVÉ: Pour éviter l'erreur TypeScript
+  hasHydrated: boolean  // ✅ AJOUTÉ: Pour éviter l'erreur TypeScript
   logout: () => Promise<void>
-  login: (email: string, password: string) => Promise<void>  // ✅ CONSERVÉ
-  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>  // ✅ CONSERVÉ
+  login: (email: string, password: string) => Promise<void>  // ✅ AJOUTÉ
+  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>  // ✅ AJOUTÉ
   updateProfile: (data: ProfileUpdateData) => Promise<{ success: boolean; error?: string }>
-  initializeSession: () => Promise<boolean>  // ✅ CONSERVÉ
+  initializeSession: () => Promise<boolean>  // ✅ AJOUTÉ
 }
 
-// ✅ CONSERVÉ: ChatStore pour gérer les conversations
+// ✅ MISE À JOUR: ChatStore pour gérer les conversations
 export interface ChatStore {
-  // ✅ CONSERVÉES: PROPRIÉTÉS EXISTANTES 
+  // ✅ PROPRIÉTÉS EXISTANTES CONSERVÉES
   conversations: ConversationItem[]
   isLoading: boolean
   loadConversations: (userId: string) => Promise<void>
@@ -398,7 +350,7 @@ export interface ChatStore {
   refreshConversations: (userId: string) => Promise<void>
   addConversation: (conversationId: string, question: string, response: string) => void
 
-  // ✅ CONSERVÉES: PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
+  // ✅ NOUVELLES PROPRIÉTÉS POUR CONVERSATIONS STYLE CLAUDE.AI
   conversationGroups: ConversationGroup[]
   currentConversation: ConversationWithMessages | null
   isLoadingHistory: boolean
@@ -416,7 +368,7 @@ export interface Translation {
   currentLanguage: string
 }
 
-// ==================== CONSERVÉS: TYPES COMPOSANTS ====================
+// ==================== TYPES COMPOSANTS ====================
 
 export interface ModalProps {
   isOpen: boolean
@@ -434,7 +386,7 @@ export interface IconProps {
   className?: string
 }
 
-// ==================== CONSERVÉS: TYPES API ====================
+// ==================== TYPES API ====================
 
 export interface ApiError extends Error {
   status?: number
@@ -454,9 +406,9 @@ export class TimeoutError extends Error {
   }
 }
 
-// ==================== CONSERVÉES: CONSTANTES API SÉCURISÉES ====================
+// ==================== CONSTANTES API SÉCURISÉES ====================
 
-// ✅ CONSERVÉ: Configuration API dynamique depuis environnement
+// ✅ SÉCURISÉ: Configuration API dynamique depuis environnement
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
@@ -479,7 +431,7 @@ const getApiConfig = () => {
 
 export const API_CONFIG = getApiConfig()
 
-// ✅ CONSERVÉS: ENDPOINTS FEEDBACK
+// ✅ NOUVEAUX ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {
   SAVE_CONVERSATION: '/logging/conversation',
   UPDATE_FEEDBACK: '/logging/conversation/{id}/feedback',
@@ -523,7 +475,7 @@ export const PLAN_CONFIGS = {
   }
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION FEEDBACK
+// ✅ NOUVELLE CONFIGURATION FEEDBACK
 export const FEEDBACK_CONFIG = {
   TYPES: {
     POSITIVE: {
@@ -556,7 +508,7 @@ export const FEEDBACK_CONFIG = {
   PRIVACY_POLICY_URL: 'https://intelia.com/privacy-policy/'
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION DES CLARIFICATIONS
+// ✅ CONFIGURATION DES CLARIFICATIONS
 export const CLARIFICATION_TEXTS = {
   fr: {
     title: "Informations supplémentaires requises",
@@ -602,7 +554,7 @@ export const CLARIFICATION_CONFIG = {
   VALIDATION_DEBOUNCE: 500
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES ANALYTICS
+// ✅ UTILITAIRES ANALYTICS
 export const ANALYTICS_UTILS = {
   calculateSatisfactionRate: (positive: number, negative: number): number => {
     const total = positive + negative
@@ -640,7 +592,7 @@ export const ANALYTICS_UTILS = {
   }
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES POUR CLARIFICATIONS
+// ✅ UTILITAIRES POUR CLARIFICATIONS
 export const ClarificationUtils = {
   isClarificationResponse: (response: ExpertApiResponse): boolean => {
     return (
@@ -713,7 +665,7 @@ export const ClarificationUtils = {
   }
 } as const
 
-// ✅ CONSERVÉES: CONSTANTES DE VALIDATION
+// ✅ CONSTANTES DE VALIDATION
 export const VALIDATION_RULES = {
   FEEDBACK: {
     COMMENT_MIN_LENGTH: 0,
@@ -726,7 +678,7 @@ export const VALIDATION_RULES = {
     AREA_CODE_PATTERN: /^\d{1,4}$/,
     PHONE_NUMBER_PATTERN: /^\d{4,12}$/
   },
-  // ✅ CONSERVÉES: RÈGLES POUR CONVERSATIONS
+  // ✅ NOUVELLES RÈGLES POUR CONVERSATIONS
   CONVERSATION: {
     TITLE_MAX_LENGTH: 60,
     PREVIEW_MAX_LENGTH: 150,
@@ -734,7 +686,7 @@ export const VALIDATION_RULES = {
     MAX_CONVERSATIONS_PER_USER: 1000,
     AUTO_DELETE_DAYS: 30
   },
-  // ✅ CONSERVÉES: RÈGLES POUR CLARIFICATIONS
+  // ✅ NOUVELLES RÈGLES POUR CLARIFICATIONS
   CLARIFICATION: {
     MIN_ANSWER_LENGTH: 0,
     MAX_ANSWER_LENGTH: 200,
@@ -743,7 +695,7 @@ export const VALIDATION_RULES = {
   }
 } as const
 
-// ✅ CONSERVÉS: MESSAGES D'ERREUR LOCALISÉS
+// ✅ MESSAGES D'ERREUR LOCALISÉS
 export const ERROR_MESSAGES = {
   FEEDBACK: {
     SUBMISSION_FAILED: 'Erreur lors de l\'envoi du feedback. Veuillez réessayer.',
@@ -753,7 +705,7 @@ export const ERROR_MESSAGES = {
     SERVER_ERROR: 'Erreur serveur. Veuillez réessayer plus tard.',
     TIMEOUT_ERROR: 'Timeout - le serveur met trop de temps à répondre'
   },
-  // ✅ CONSERVÉS: MESSAGES POUR CONVERSATIONS
+  // ✅ NOUVEAUX MESSAGES POUR CONVERSATIONS
   CONVERSATION: {
     LOAD_FAILED: 'Erreur lors du chargement de la conversation',
     DELETE_FAILED: 'Erreur lors de la suppression de la conversation',
@@ -762,7 +714,7 @@ export const ERROR_MESSAGES = {
     MESSAGE_TOO_LONG: `Le message ne peut pas dépasser ${VALIDATION_RULES.CONVERSATION.MESSAGE_MAX_LENGTH} caractères`,
     CREATION_FAILED: 'Erreur lors de la création de la conversation'
   },
-  // ✅ CONSERVÉS: MESSAGES POUR CLARIFICATIONS
+  // ✅ NOUVEAUX MESSAGES POUR CLARIFICATIONS
   CLARIFICATION: {
     PROCESSING_FAILED: 'Erreur lors du traitement des clarifications',
     INVALID_ANSWERS: 'Réponses invalides. Veuillez vérifier vos réponses.',
@@ -777,7 +729,7 @@ export const ERROR_MESSAGES = {
   }
 } as const
 
-// ✅ CONSERVÉS: TYPES POUR LES RÉPONSES D'API FEEDBACK
+// ✅ TYPES POUR LES RÉPONSES D'API FEEDBACK
 export interface FeedbackApiResponse {
   status: 'success' | 'error'
   message: string
@@ -801,7 +753,7 @@ export interface AnalyticsApiResponse {
   message: string
 }
 
-// ✅ CONSERVÉS: TYPE GUARDS POUR LA VALIDATION
+// ✅ TYPE GUARDS POUR LA VALIDATION
 export const TypeGuards = {
   isFeedbackType: (value: any): value is 'positive' | 'negative' => {
     return typeof value === 'string' && ['positive', 'negative'].includes(value)
@@ -827,7 +779,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: TYPE GUARD POUR CONVERSATION DE BASE
+  // ✅ TYPE GUARD POUR CONVERSATION DE BASE
   isValidConversation: (value: any): value is Conversation => {
     return (
       typeof value === 'object' &&
@@ -839,7 +791,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: Type guard pour ConversationWithMessages
+  // ✅ Type guard pour ConversationWithMessages
   isValidConversationWithMessages: (value: any): value is ConversationWithMessages => {
     return (
       typeof value === 'object' &&
@@ -863,7 +815,7 @@ export const TypeGuards = {
     )
   },
 
-  // ✅ CONSERVÉ: Type guard pour clarifications
+  // ✅ NOUVEAU: Type guard pour clarifications
   isValidClarificationResponse: (value: any): value is ClarificationResponse => {
     return (
       typeof value === 'object' &&
@@ -873,7 +825,7 @@ export const TypeGuards = {
   }
 } as const
 
-// ✅ CONSERVÉE: CONFIGURATION DES CONVERSATIONS
+// ✅ CONFIGURATION DES CONVERSATIONS
 export const CONVERSATION_CONFIG = {
   GROUPING: {
     DEFAULT_OPTIONS: {
@@ -904,7 +856,7 @@ export const CONVERSATION_CONFIG = {
   }
 } as const
 
-// ✅ CONSERVÉS: UTILITAIRES POUR CONVERSATIONS
+// ✅ UTILITAIRES POUR CONVERSATIONS
 export const CONVERSATION_UTILS = {
   generateTitle: (firstMessage: string): string => {
     const maxLength = CONVERSATION_CONFIG.UI.MAX_TITLE_LENGTH
@@ -950,3 +902,6 @@ export const CONVERSATION_UTILS = {
     })
   }
 } as const
+
+// ✅ TYPES POUR LANGUAGES (souvent utilisé)
+export type Language = 'fr' | 'en' | 'es' | 'de'
