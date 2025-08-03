@@ -1,5 +1,5 @@
 """
-app/api/v1/question_clarification_system.py - VERSION AMÉLIORÉE COMPLÈTE
+app/api/v1/question_clarification_system.py - VERSION AMÉLIORÉE COMPLÈTE AVEC VALIDATION GPT
 
 AMÉLIORATIONS MAJEURES:
 1. ✅ Extraction intelligente d'entités via OpenAI avec raisonnement dynamique (CONSERVÉ)
@@ -8,7 +8,10 @@ AMÉLIORATIONS MAJEURES:
 4. ✅ Gestion avancée du contexte conversationnel (CONSERVÉ)
 5. ✅ Prompts plus intelligents pour données numériques (CONSERVÉ)
 6. ✅ Clarification partielle adaptative (1 question si 1 info manque) (CONSERVÉ)
-7. 🆕 NOUVEAU: Mode sémantique dynamique avec génération GPT de questions contextuelles
+7. 🆕 Mode sémantique dynamique avec génération GPT de questions contextuelles (CONSERVÉ)
+8. 🔧 NOUVEAU: Validation automatique des questions générées par GPT
+9. 🔧 NOUVEAU: Filtrage des questions non pertinentes
+10. 🔧 NOUVEAU: Fallback intelligent si validation échoue
 """
 
 import os
@@ -41,10 +44,10 @@ logger = logging.getLogger(__name__)
 
 class ClarificationMode(Enum):
     """Modes de clarification disponibles"""
-    BATCH = "batch"          # Toutes les questions en une fois
-    INTERACTIVE = "interactive"  # Une question à la fois
-    ADAPTIVE = "adaptive"    # Mode adaptatif selon le contexte
-    SEMANTIC_DYNAMIC = "semantic_dynamic"  # 🆕 Nouveau mode dynamique via GPT
+    BATCH = "batch"
+    INTERACTIVE = "interactive"
+    ADAPTIVE = "adaptive"
+    SEMANTIC_DYNAMIC = "semantic_dynamic"
 
 class ClarificationState(Enum):
     """États de clarification"""
@@ -58,7 +61,7 @@ class ClarificationState(Enum):
 class ExtractedEntities:
     """Entités extraites intelligemment du contexte"""
     breed: Optional[str] = None
-    breed_type: Optional[str] = None  # specific/generic
+    breed_type: Optional[str] = None
     age_days: Optional[int] = None
     age_weeks: Optional[float] = None
     weight_grams: Optional[float] = None
@@ -80,11 +83,9 @@ class ExtractedEntities:
         """Détermine les informations critiques manquantes selon le type de question"""
         missing = []
         
-        # Informations de base toujours critiques
         if not self.breed or self.breed_type == "generic":
             missing.append("breed")
         
-        # Informations spécifiques selon le type de question
         if question_type in ["growth", "weight", "performance"]:
             if not self.age_days and not self.age_weeks:
                 missing.append("age")
@@ -118,6 +119,7 @@ class ClarificationResult:
     missing_critical_info: Optional[List[str]] = None
     should_reprocess: bool = False
     original_question: Optional[str] = None
+    validation_score: Optional[float] = None  # 🔧 NOUVEAU: Score de validation des questions
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire pour les logs"""
@@ -135,23 +137,18 @@ class ClarificationResult:
             "clarification_state": self.clarification_state.value if self.clarification_state else None,
             "missing_critical_info": self.missing_critical_info,
             "should_reprocess": self.should_reprocess,
-            "original_question": self.original_question
+            "original_question": self.original_question,
+            "validation_score": self.validation_score
         }
 
 class EnhancedQuestionClarificationSystem:
     """
-    Système de clarification intelligent AMÉLIORÉ avec:
-    - Extraction d'entités via OpenAI
-    - Modes de clarification multiples
-    - Retraitement automatique
-    - Gestion avancée du contexte
-    - 🆕 Mode sémantique dynamique
+    Système de clarification intelligent AMÉLIORÉ avec validation GPT intégrée
     """
     
     def __init__(self):
         """Initialise le système avec configuration améliorée"""
         
-        # ✅ CONFIGURATION ÉTENDUE
         if SETTINGS_AVAILABLE and settings:
             self.enabled = getattr(settings, 'clarification_system_enabled', True)
             self.model = getattr(settings, 'clarification_model', 'gpt-4o-mini')
@@ -161,18 +158,19 @@ class EnhancedQuestionClarificationSystem:
             self.log_all_clarifications = getattr(settings, 'clarification_log_all', True)
             self.confidence_threshold = getattr(settings, 'clarification_confidence_threshold', 0.7)
             
-            # ✅ NOUVELLES CONFIGURATIONS
             self.clarification_mode = ClarificationMode(getattr(settings, 'clarification_mode', 'adaptive'))
             self.smart_entity_extraction = getattr(settings, 'smart_entity_extraction', True)
             self.auto_reprocess_after_clarification = getattr(settings, 'auto_reprocess_after_clarification', True)
             self.adaptive_question_count = getattr(settings, 'adaptive_question_count', True)
             self.intelligent_missing_detection = getattr(settings, 'intelligent_missing_detection', True)
             
-            # 🆕 NOUVEAU: Configuration mode sémantique dynamique
             self.enable_semantic_dynamic = getattr(settings, 'enable_semantic_dynamic_clarification', True)
             self.semantic_dynamic_max_questions = getattr(settings, 'semantic_dynamic_max_questions', 4)
+            
+            # 🔧 NOUVEAU: Configuration validation GPT
+            self.enable_question_validation = getattr(settings, 'enable_question_validation', True)
+            self.validation_threshold = getattr(settings, 'validation_threshold', 0.5)
         else:
-            # ✅ FALLBACK OPTIMISÉ depuis .env
             self.enabled = os.getenv('ENABLE_CLARIFICATION_SYSTEM', 'true').lower() == 'true'
             self.model = os.getenv('CLARIFICATION_MODEL', 'gpt-4o-mini')
             self.timeout = int(os.getenv('CLARIFICATION_TIMEOUT', '25'))
@@ -181,21 +179,24 @@ class EnhancedQuestionClarificationSystem:
             self.log_all_clarifications = os.getenv('LOG_ALL_CLARIFICATIONS', 'true').lower() == 'true'
             self.confidence_threshold = float(os.getenv('CLARIFICATION_CONFIDENCE_THRESHOLD', '0.7'))
             
-            # ✅ NOUVELLES CONFIGURATIONS
             self.clarification_mode = ClarificationMode(os.getenv('CLARIFICATION_MODE', 'adaptive'))
             self.smart_entity_extraction = os.getenv('SMART_ENTITY_EXTRACTION', 'true').lower() == 'true'
             self.auto_reprocess_after_clarification = os.getenv('AUTO_REPROCESS_AFTER_CLARIFICATION', 'true').lower() == 'true'
             self.adaptive_question_count = os.getenv('ADAPTIVE_QUESTION_COUNT', 'true').lower() == 'true'
             self.intelligent_missing_detection = os.getenv('INTELLIGENT_MISSING_DETECTION', 'true').lower() == 'true'
             
-            # 🆕 NOUVEAU: Configuration mode sémantique dynamique
             self.enable_semantic_dynamic = os.getenv('ENABLE_SEMANTIC_DYNAMIC_CLARIFICATION', 'true').lower() == 'true'
             self.semantic_dynamic_max_questions = int(os.getenv('SEMANTIC_DYNAMIC_MAX_QUESTIONS', '4'))
+            
+            # 🔧 NOUVEAU: Configuration validation GPT
+            self.enable_question_validation = os.getenv('ENABLE_QUESTION_VALIDATION', 'true').lower() == 'true'
+            self.validation_threshold = float(os.getenv('VALIDATION_THRESHOLD', '0.5'))
         
         logger.info(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
         logger.info(f"🔧 [Enhanced Clarification] Extraction entités: {'✅' if self.smart_entity_extraction else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Auto-reprocess: {'✅' if self.auto_reprocess_after_clarification else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Questions adaptatives: {'✅' if self.adaptive_question_count else '❌'}")
+        logger.info(f"🔧 [Enhanced Clarification] Validation GPT: {'✅' if self.enable_question_validation else '❌'}")
         logger.info(f"🆕 [Semantic Dynamic] Mode dynamique: {'✅' if self.enable_semantic_dynamic else '❌'}")
         
         self._init_patterns()
@@ -239,23 +240,17 @@ class EnhancedQuestionClarificationSystem:
             "performance": [r'performance', r'rendement', r'efficacité', r'efficiency', r'eficiencia', r'conversion']
         }
 
-    # 🆕 NOUVELLE MÉTHODE: Génération dynamique de questions
+    # 🔧 MÉTHODE MODIFIÉE: Génération dynamique avec validation intégrée
     def generate_dynamic_clarification_questions(self, user_question: str, language: str = "fr") -> List[str]:
         """
-        🆕 NOUVEAU: Génère jusqu'à 4 questions de clarification via GPT (mode libre).
-        
-        Args:
-            user_question: Question originale de l'utilisateur
-            language: Langue de réponse (fr/en/es)
-            
-        Returns:
-            Liste de 1-4 questions de clarification pertinentes
+        🆕 Génère jusqu'à 4 questions de clarification via GPT avec validation automatique
+        🔧 AMÉLIORÉ: Validation des questions générées intégrée
         """
         
         try:
             # Import dynamique du prompt template
             try:
-                from .prompt_templates import build_contextualization_prompt
+                from .prompt_templates import build_contextualization_prompt, validate_dynamic_questions
             except ImportError:
                 logger.error("❌ [Semantic Dynamic] Impossible d'importer build_contextualization_prompt")
                 return self._fallback_dynamic_questions(user_question, language)
@@ -280,13 +275,13 @@ class EnhancedQuestionClarificationSystem:
 
             # Appel GPT pour génération dynamique
             response = openai.chat.completions.create(
-                model=self.model,  # Utilise le même modèle que la clarification normale
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "Tu es un expert en aviculture spécialisé dans la génération de questions pertinentes."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,  # Légèrement créatif mais cohérent
-                max_tokens=300,   # Suffisant pour 4 questions
+                temperature=0.3,
+                max_tokens=300,
                 timeout=self.timeout
             )
             
@@ -296,7 +291,6 @@ class EnhancedQuestionClarificationSystem:
             
             # Parser la réponse JSON
             try:
-                # Chercher le JSON dans la réponse
                 json_match = re.search(r'\{.*?\}', content, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
@@ -304,9 +298,27 @@ class EnhancedQuestionClarificationSystem:
                     
                     questions = data.get("clarification_questions", [])
                     
+                    # 🔧 NOUVEAU: Validation des questions générées
+                    if self.enable_question_validation and questions:
+                        validation_result = validate_dynamic_questions(questions, language)
+                        validation_score = validation_result.get("quality_score", 0.0)
+                        
+                        logger.info(f"🔧 [Question Validation] Score qualité: {validation_score:.2f}")
+                        
+                        if validation_score < self.validation_threshold:
+                            logger.warning(f"⚠️ [Question Validation] Questions générées jugées peu pertinentes (score: {validation_score:.2f})")
+                            # Utiliser les questions valides ou fallback
+                            valid_questions = validation_result.get("valid_questions", [])
+                            if valid_questions:
+                                logger.info(f"🔧 [Question Validation] Utilisation des {len(valid_questions)} questions valides")
+                                return valid_questions[:self.semantic_dynamic_max_questions]
+                            else:
+                                logger.warning("⚠️ [Question Validation] Aucune question valide, utilisation fallback")
+                                return self._fallback_dynamic_questions(user_question, language)
+                    
                     # Valider et nettoyer les questions
                     validated_questions = []
-                    for q in questions[:self.semantic_dynamic_max_questions]:  # Max 4 questions par défaut
+                    for q in questions[:self.semantic_dynamic_max_questions]:
                         if isinstance(q, str) and len(q.strip()) > 10:
                             cleaned_q = q.strip()
                             if not cleaned_q.endswith('?'):
@@ -714,7 +726,7 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         conversation_id: str = None,
         conversation_context: Dict = None,
         original_question: str = None,
-        mode: str = None  # 🆕 NOUVEAU PARAMÈTRE pour mode sémantique dynamique
+        mode: str = None
     ) -> ClarificationResult:
         """
         ✅ ANALYSE AMÉLIORÉE avec extraction intelligente et gestion du contexte
@@ -780,7 +792,8 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
                     clarification_state=ClarificationState.NEEDED,
                     missing_critical_info=["context_understanding"],
                     confidence_score=0.9,
-                    original_question=original_question or question
+                    original_question=original_question or question,
+                    validation_score=0.8  # 🔧 Score par défaut pour mode dynamique
                 )
                 
                 logger.info(f"✅ [Semantic Dynamic] {len(dynamic_questions)} questions générées dynamiquement")
@@ -793,14 +806,12 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
                 return result
             else:
                 logger.warning("⚠️ [Semantic Dynamic] Aucune question générée, fallback vers mode normal")
-                # Continuer avec la logique normale
         
         # ✅ NOUVEAU: Déterminer les informations critiques manquantes
         missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
         logger.info(f"❌ [Enhanced Clarification] Informations critiques manquantes: {missing_critical_info}")
         
         # ✅ NOUVEAU: Logique de clarification intelligente
-        # Si race générique detectée = clarification obligatoire (comme avant)
         if extracted_entities.breed_type == "generic":
             logger.info(f"🚨 [Enhanced Clarification] Race générique détectée - clarification obligatoire")
             
@@ -820,10 +831,11 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
                 clarification_state=ClarificationState.NEEDED,
                 missing_critical_info=missing_critical_info,
                 confidence_score=95.0,
-                original_question=original_question or question
+                original_question=original_question or question,
+                validation_score=0.9
             )
         
-        # ✅ NOUVEAU: Si race spécifique + âge présents = OK (comme avant)
+        # ✅ NOUVEAU: Si race spécifique + âge présents = OK
         if extracted_entities.breed_type == "specific" and (extracted_entities.age_days or extracted_entities.age_weeks):
             logger.info(f"✅ [Enhanced Clarification] Race spécifique + âge - question complète")
             return ClarificationResult(
@@ -832,10 +844,11 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
                 reason="specific_breed_and_age_detected",
                 extracted_entities=extracted_entities,
                 question_type=question_type,
-                clarification_state=ClarificationState.NONE
+                clarification_state=ClarificationState.NONE,
+                validation_score=1.0
             )
         
-        # ✅ NOUVEAU: Si pas d'informations critiques manquantes (selon le contexte)
+        # ✅ NOUVEAU: Si pas d'informations critiques manquantes
         if not missing_critical_info:
             logger.info(f"✅ [Enhanced Clarification] Toutes les informations critiques présentes")
             return ClarificationResult(
@@ -844,7 +857,8 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
                 reason="all_critical_info_present",
                 extracted_entities=extracted_entities,
                 question_type=question_type,
-                clarification_state=ClarificationState.NONE
+                clarification_state=ClarificationState.NONE,
+                validation_score=1.0
             )
         
         # ✅ ANALYSE VIA OpenAI pour les cas complexes
@@ -925,7 +939,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     model_used=self.model,
                     extracted_entities=extracted_entities,
                     question_type=question_type,
-                    clarification_state=ClarificationState.NONE
+                    clarification_state=ClarificationState.NONE,
+                    validation_score=1.0
                 )
                 
                 logger.info(f"✅ [Enhanced Clarification] Question claire selon GPT-4o-mini enrichi")
@@ -952,7 +967,6 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 # ✅ NOUVEAU: Mode de clarification
                 clarification_mode = self.clarification_mode
                 if clarification_mode == ClarificationMode.ADAPTIVE:
-                    # Mode adaptatif: si 1 info manque = interactive, sinon batch
                     clarification_mode = ClarificationMode.INTERACTIVE if len(limited_questions) == 1 else ClarificationMode.BATCH
                 
                 result = ClarificationResult(
@@ -967,7 +981,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     clarification_mode=clarification_mode,
                     clarification_state=ClarificationState.NEEDED,
                     missing_critical_info=missing_critical_info,
-                    original_question=original_question or question
+                    original_question=original_question or question,
+                    validation_score=0.8  # Score par défaut pour questions GPT
                 )
                 
                 logger.info(f"❓ [Enhanced Clarification] {len(limited_questions)} questions générées (mode: {clarification_mode.value})")
@@ -987,7 +1002,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     model_used=self.model,
                     extracted_entities=extracted_entities,
                     question_type=question_type,
-                    clarification_state=ClarificationState.NONE
+                    clarification_state=ClarificationState.NONE,
+                    validation_score=1.0
                 )
         
         except Exception as e:
@@ -1258,7 +1274,9 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "auto_reprocess_after_clarification": self.auto_reprocess_after_clarification,
                 "adaptive_question_count": self.adaptive_question_count,
                 "enable_semantic_dynamic": self.enable_semantic_dynamic,
-                "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions
+                "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions,
+                "enable_question_validation": self.enable_question_validation,
+                "validation_threshold": self.validation_threshold
             }
         }
         
@@ -1274,6 +1292,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 f"Missing: {result.missing_critical_info} | "
                 f"Modèle: {result.model_used} | "
                 f"Confiance: {result.confidence_score:.1f}% | "
+                f"Validation: {result.validation_score:.1f} | "
                 f"Temps: {result.processing_time_ms}ms"
             )
         else:
@@ -1283,6 +1302,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 f"Raison: {result.reason} | "
                 f"Entités: {len(result.extracted_entities.to_dict()) if result.extracted_entities else 0} | "
                 f"Modèle: {result.model_used} | "
+                f"Validation: {result.validation_score:.1f} | "
                 f"Temps: {result.processing_time_ms}ms"
             )
 
@@ -1318,7 +1338,12 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             # 🆕 NOUVELLES STATISTIQUES MODE SÉMANTIQUE DYNAMIQUE
             "semantic_dynamic_enabled": self.enable_semantic_dynamic,
             "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions,
-            "semantic_dynamic_available": OPENAI_AVAILABLE and bool(os.getenv('OPENAI_API_KEY'))
+            "semantic_dynamic_available": OPENAI_AVAILABLE and bool(os.getenv('OPENAI_API_KEY')),
+            
+            # 🔧 NOUVELLES STATISTIQUES VALIDATION GPT
+            "question_validation_enabled": self.enable_question_validation,
+            "validation_threshold": self.validation_threshold,
+            "validation_available": OPENAI_AVAILABLE and bool(os.getenv('OPENAI_API_KEY'))
         }
 
 # ==================== INSTANCE GLOBALE AMÉLIORÉE ====================
@@ -1403,7 +1428,7 @@ def generate_dynamic_clarification_questions(question: str, language: str = "fr"
 
 # ==================== LOGGING DE DÉMARRAGE AMÉLIORÉ ====================
 
-logger.info("❓ [EnhancedQuestionClarificationSystem] Module AMÉLIORÉ initialisé")
+logger.info("❓ [EnhancedQuestionClarificationSystem] Module AMÉLIORÉ avec VALIDATION GPT initialisé")
 logger.info(f"📊 [EnhancedQuestionClarificationSystem] Statistiques: {enhanced_clarification_system.get_stats_enhanced()}")
 logger.info("✅ [EnhancedQuestionClarificationSystem] FONCTIONNALITÉS CONSERVÉES:")
 logger.info("   - 🤖 Extraction intelligente d'entités via OpenAI")
@@ -1414,10 +1439,25 @@ logger.info("   - 📊 Classification automatique des types de questions")
 logger.info("   - 🎛️ Modes de clarification multiples (batch/interactive/adaptive)")
 logger.info("   - 📈 Prompts optimisés pour données numériques")
 logger.info("   - 🔍 Détection intelligente des informations critiques manquantes")
-logger.info("🆕 [EnhancedQuestionClarificationSystem] NOUVELLE FONCTIONNALITÉ:")
+logger.info("🆕 [EnhancedQuestionClarificationSystem] FONCTIONNALITÉ MODE SÉMANTIQUE DYNAMIQUE:")
 logger.info("   - 🎭 MODE SÉMANTIQUE DYNAMIQUE: Génération GPT de 1-4 questions contextuelles")
 logger.info("   - 🤖 Prompt contextualisé pour questions métier intelligentes")
 logger.info("   - 🔄 Fallback automatique si génération échoue")
 logger.info("   - ⚙️ Configuration flexible (enable_semantic_dynamic, max_questions)")
 logger.info("   - 📊 Logging et métriques étendues pour mode dynamique")
-logger.info("✨ [EnhancedQuestionClarificationSystem] READY: Agent de clarification sémantique opérationnel!")
+logger.info("🔧 [EnhancedQuestionClarificationSystem] NOUVELLE FONCTIONNALITÉ VALIDATION GPT:")
+logger.info("   - ✅ Validation automatique des questions générées par GPT")
+logger.info("   - 📊 Score de qualité des questions (0.0 à 1.0)")
+logger.info("   - 🎯 Filtrage des questions non pertinentes")
+logger.info("   - 🔄 Fallback intelligent si validation échoue")
+logger.info("   - ⚙️ Seuil de validation configurable (validation_threshold)")
+logger.info("   - 📈 Métriques de validation dans les logs")
+logger.info("   - 🔧 Support enable_question_validation pour activer/désactiver")
+logger.info("✨ [EnhancedQuestionClarificationSystem] RÉSULTAT:")
+logger.info('   - Question floue: "J\'ai un problème avec mes poulets"')
+logger.info('   - Mode sémantique dynamique: 4 questions GPT générées')
+logger.info('   - Validation automatique: score qualité > 0.5')
+logger.info('   - Questions validées: filtrées et nettoyées')
+logger.info('   - Fallback si échec: questions prédéfinies')
+logger.info('   - Logs détaillés: validation_score inclus')
+logger.info("✅ [EnhancedQuestionClarificationSystem] READY: Agent de clarification avec VALIDATION GPT opérationnel!")
