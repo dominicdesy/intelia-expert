@@ -1,4 +1,4 @@
-// ==================== API SERVICE CORRIGÉ AVEC ask-with-clarification QUI FONCTIONNE ====================
+// ==================== API SERVICE CORRIGÉ AVEC ask-enhanced-v2 QUI FONCTIONNE ====================
 
 // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
 const getApiConfig = () => {
@@ -105,7 +105,7 @@ interface EnhancedAIResponse {
   note?: string
   timestamp?: string
   processing_time?: number
-  // 🎯 CHAMP CLARIFICATION QUI FONCTIONNE (ask-with-clarification)
+  // 🎯 CHAMP CLARIFICATION QUI FONCTIONNE (ask-enhanced-v2)
   clarification_result?: {
     clarification_requested: boolean
     clarification_type: string
@@ -129,7 +129,7 @@ interface APIError {
 }
 
 /**
- * 🎯 FONCTION PRINCIPALE CORRIGÉE: Utilise ask-with-clarification QUI FONCTIONNE
+ * 🎯 FONCTION PRINCIPALE CORRIGÉE: Utilise ask-enhanced-v2 QUI FONCTIONNE
  */
 export const generateAIResponse = async (
   question: string,
@@ -149,7 +149,7 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-      console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
+  console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
     question: question.substring(0, 50) + '...',
     isClarificationResponse,
     originalQuestion: originalQuestion?.substring(0, 30) + '...',
@@ -292,7 +292,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🎯 VERSION PUBLIQUE CORRIGÉE: Utilise ask-with-clarification
+ * 🎯 VERSION PUBLIQUE CORRIGÉE: Utilise ask-enhanced-v2
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -552,14 +552,14 @@ export const buildClarificationEntities = (
 }
 
 /**
- * 🎯 FONCTION DE DEBUG CORRIGÉE pour ask-with-clarification
+ * 🎯 FONCTION DE DEBUG CORRIGÉE pour ask-enhanced-v2
  */
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration ask-with-clarification CORRIGÉE')
+  console.group('🔧 [apiService] Configuration ask-enhanced-v2 CORRIGÉE')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Endpoints corrigés:')
-  console.log('- Ask with clarification (auth):', `${API_BASE_URL}/expert/ask-with-clarification`)
-  console.log('- Ask with clarification (public):', `${API_BASE_URL}/expert/ask-with-clarification`)
+  console.log('- Ask enhanced v2 (auth):', `${API_BASE_URL}/expert/ask-enhanced-v2`)
+  console.log('- Ask enhanced v2 (public):', `${API_BASE_URL}/expert/ask-enhanced-v2-public`)
   console.log('- Feedback enhanced:', `${API_BASE_URL}/expert/feedback`)
   console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
   console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
@@ -573,7 +573,7 @@ export const debugEnhancedAPI = () => {
 }
 
 /**
- * 🎯 FONCTION DE TEST CORRIGÉE avec ask-with-clarification
+ * 🎯 FONCTION DE TEST CORRIGÉE avec ask-enhanced-v2
  */
 export const testEnhancedConversationContinuity = async (
   user: any,
@@ -663,7 +663,7 @@ export const handleEnhancedNetworkError = (error: any): string => {
 }
 
 /**
- * 🎯 DEBUG CONVERSATION FLOW avec ask-with-clarification
+ * 🎯 DEBUG CONVERSATION FLOW avec ask-enhanced-v2
  */
 export const debugEnhancedConversationFlow = (
   step: string,
@@ -679,18 +679,18 @@ export const debugEnhancedConversationFlow = (
 }
 
 /**
- * 🎯 MIGRATION HELPER CORRIGÉ pour ask-with-clarification
+ * 🎯 CORRECTION TYPE: Fonction detectAPIVersion avec types cohérents
  */
 export const detectAPIVersion = async (): Promise<'clarification' | 'legacy' | 'error'> => {
   try {
-    // Test ask-with-clarification
-    const clarificationResponse = await fetch(`${API_BASE_URL}/expert/ask-with-clarification`, {
+    // Test ask-enhanced-v2
+    const enhancedResponse = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2`, {
       method: 'OPTIONS',
       headers: { 'Content-Type': 'application/json' }
     })
     
-    if (clarificationResponse.ok || clarificationResponse.status === 405) {
-      console.log('✅ [detectAPIVersion] ask-with-clarification disponible')
+    if (enhancedResponse.ok || enhancedResponse.status === 405) {
+      console.log('✅ [detectAPIVersion] ask-enhanced-v2 disponible')
       return 'clarification'
     }
     
@@ -714,7 +714,7 @@ export const detectAPIVersion = async (): Promise<'clarification' | 'legacy' | '
 }
 
 /**
- * 🎯 WRAPPER INTELLIGENT CORRIGÉ avec ask-with-clarification
+ * 🎯 CORRECTION TYPE: Wrapper intelligent avec types cohérents
  */
 export const generateAIResponseSmart = async (
   question: string,
@@ -728,7 +728,7 @@ export const generateAIResponseSmart = async (
   console.log(`🤖 [generateAIResponseSmart] Utilisation API: ${apiVersion}`)
   
   switch (apiVersion) {
-    case 'enhanced':
+    case 'clarification': // ✅ CORRIGÉ: 'enhanced' → 'clarification'
       return await generateAIResponse(question, user, language, conversationId)
       
     case 'legacy':
@@ -741,7 +741,7 @@ export const generateAIResponseSmart = async (
   }
 }
 
-// 🎯 CONFIGURATION DEBUG CORRIGÉE pour ask-with-clarification
+// 🎯 CONFIGURATION DEBUG CORRIGÉE pour ask-enhanced-v2
 export const logEnhancedAPIInfo = () => {
   console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 CORRIGÉE')
   console.log('Version:', 'Enhanced v2 (ask-enhanced-v2)')
@@ -752,6 +752,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Mapping clarification_result vers anciens champs frontend')
   console.log('  - ✅ Support clarifications complet et testé')
   console.log('  - ✅ Authentification JWT maintenue')
+  console.log('  - ✅ Types TypeScript corrigés')
   console.log('Fonctionnalités ask-enhanced-v2:')
   console.log('  - ✅ Détection automatique questions vagues')
   console.log('  - ✅ Clarification intelligente race/sexe')
