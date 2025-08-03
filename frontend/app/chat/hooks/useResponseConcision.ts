@@ -170,11 +170,26 @@ function extractEssentialInfo(response: string, question: string): string {
   return sentences[0]?.trim() + '.' || response;
 }
 
-// Rendre concis (enlever conseils mais garder info principale)
+// Rendre concis (enlever conseils mais garder info principale) - VERSION AMÉLIORÉE
 function makeConcise(response: string, question: string): string {
-  // Patterns de phrases à supprimer (conseils non demandés)
+  const questionLower = question.toLowerCase();
+  
+  // ✅ NOUVEAU: Traitement spécialisé par type de question
+  if (['poids', 'weight', 'peso'].some(word => questionLower.includes(word))) {
+    return makeConciseForWeight(response, question);
+  }
+  
+  if (['température', 'temperature', 'temperatura'].some(word => questionLower.includes(word))) {
+    return makeConciseForTemperature(response, question);
+  }
+  
+  if (['diagnostic', 'diagnosis', 'problème', 'problem'].some(word => questionLower.includes(word))) {
+    return makeConciseForDiagnosis(response, question);
+  }
+  
+  // Traitement général pour autres questions
   const verbosePatterns = [
-    // Français
+    // Français - conseils non demandés
     /\.?\s*Il est essentiel de[^.]*\./gi,
     /\.?\s*Assurez-vous de[^.]*\./gi,
     /\.?\s*N'hésitez pas à[^.]*\./gi,
@@ -204,7 +219,7 @@ function makeConcise(response: string, question: string): string {
     /\.?\s*Para optimizar[^.]*\./gi,
     /\.?\s*Idealmente[^.]*\./gi,
     
-    // Phrases génériques
+    // Phrases génériques à supprimer
     /\.?\s*Pour plus d'informations[^.]*\./gi,
     /\.?\s*For more information[^.]*\./gi,
     /\.?\s*Para más información[^.]*\./gi,
@@ -237,44 +252,105 @@ function makeConcise(response: string, question: string): string {
   // Nettoyer les doubles points et espaces
   cleaned = cleaned.replace(/\.+/g, '.').replace(/\s+/g, ' ').trim();
   
-  // Si c'est une question spécifique et que c'est encore long, extraire l'essentiel
-  if (cleaned.length > 150) {
-    const questionLower = question.toLowerCase();
+  return cleaned;
+}
+
+// ✅ NOUVELLE FONCTION: Concision spécialisée pour questions de poids
+function makeConciseForWeight(response: string, question: string): string {
+  const sentences = response.split('.').map(s => s.trim()).filter(s => s.length > 0);
+  
+  // Chercher les phrases contenant des informations de poids importantes
+  const weightSentences = sentences.filter(sentence => {
+    const hasWeight = /\d+\s*(?:grammes?|g\b)/i.test(sentence);
+    const isRelevant = [
+      'poids', 'weight', 'varie', 'entre', 'normal', 'age', 'âge', 'jours', 'days',
+      'ross', 'souche', 'strain', 'considéré', 'considered', 'standard'
+    ].some(word => sentence.toLowerCase().includes(word));
+    const isNotAdvice = ![
+      'recommandé', 'essentiel', 'important', 'devrait', 'doit',
+      'recommended', 'essential', 'important', 'should', 'must'
+    ].some(word => sentence.toLowerCase().includes(word));
     
-    // Questions de poids
-    if (['poids', 'weight'].some(word => questionLower.includes(word))) {
-      const weightSentence = cleaned.split('.').find(sentence => 
-        /\d+/.test(sentence) && ['gram', 'poids', 'weight', 'g'].some(word => 
-          sentence.toLowerCase().includes(word)
-        )
-      );
-      if (weightSentence && weightSentence.trim().length < 100) {
-        return weightSentence.trim() + '.';
-      }
+    return (hasWeight || isRelevant) && isNotAdvice;
+  });
+  
+  // Si on trouve des phrases pertinentes, les combiner intelligemment
+  if (weightSentences.length > 0) {
+    // Prendre les 2 premières phrases les plus informatives
+    let result = weightSentences.slice(0, 2).join('. ');
+    
+    // S'assurer qu'on a une phrase complète
+    if (!result.endsWith('.')) {
+      result += '.';
     }
     
-    // Questions de température
-    if (['température', 'temperature'].some(word => questionLower.includes(word))) {
-      const tempSentence = cleaned.split('.').find(sentence => 
-        /\d+.*°?C/i.test(sentence)
-      );
-      if (tempSentence && tempSentence.trim().length < 100) {
-        return tempSentence.trim() + '.';
-      }
-    }
-    
-    // Questions de diagnostic
-    if (['diagnostic', 'diagnosis', 'problème', 'problem'].some(word => questionLower.includes(word))) {
-      const diagnosticSentence = cleaned.split('.').find(sentence => 
-        sentence.length > 20 && sentence.length < 80
-      );
-      if (diagnosticSentence) {
-        return diagnosticSentence.trim() + '.';
-      }
-    }
+    return result;
   }
   
-  return cleaned;
+  // Fallback: première phrase avec poids + contexte
+  const firstWeightSentence = sentences.find(s => /\d+\s*(?:grammes?|g\b)/i.test(s));
+  if (firstWeightSentence) {
+    // Essayer d'ajouter une phrase de contexte si disponible
+    const contextSentence = sentences.find(s => 
+      s !== firstWeightSentence && 
+      ['normal', 'age', 'âge', 'souche', 'strain'].some(word => s.toLowerCase().includes(word))
+    );
+    
+    if (contextSentence) {
+      return firstWeightSentence + '. ' + contextSentence + '.';
+    }
+    
+    return firstWeightSentence + '.';
+  }
+  
+  // Ultime fallback: traitement général
+  return sentences.slice(0, 2).join('. ') + '.';
+}
+
+// ✅ NOUVELLE FONCTION: Concision spécialisée pour questions de température
+function makeConciseForTemperature(response: string, question: string): string {
+  const sentences = response.split('.').map(s => s.trim()).filter(s => s.length > 0);
+  
+  // Chercher les phrases contenant des informations de température
+  const tempSentences = sentences.filter(sentence => {
+    const hasTemp = /\d+\s*°?C/i.test(sentence);
+    const isRelevant = [
+      'température', 'temperature', 'optimale', 'optimal', 'chaud', 'froid', 
+      'hot', 'cold', 'maintenir', 'maintain', 'idéale', 'ideal'
+    ].some(word => sentence.toLowerCase().includes(word));
+    const isNotAdvice = ![
+      'recommandé', 'essentiel', 'surveiller', 'vérifier'
+    ].some(word => sentence.toLowerCase().includes(word));
+    
+    return (hasTemp || isRelevant) && isNotAdvice;
+  });
+  
+  if (tempSentences.length > 0) {
+    return tempSentences.slice(0, 2).join('. ') + '.';
+  }
+  
+  return sentences.slice(0, 2).join('. ') + '.';
+}
+
+// ✅ NOUVELLE FONCTION: Concision spécialisée pour questions de diagnostic
+function makeConciseForDiagnosis(response: string, question: string): string {
+  const sentences = response.split('.').map(s => s.trim()).filter(s => s.length > 0);
+  
+  // Garder les phrases qui contiennent le diagnostic principal
+  const diagnosticSentences = sentences.filter((sentence, index) => {
+    const isDiagnostic = [
+      'symptôme', 'cause', 'indicateur', 'signe', 'symptom', 'cause', 'sign',
+      'problème', 'problem', 'maladie', 'disease', 'infection'
+    ].some(word => sentence.toLowerCase().includes(word));
+    const isEarly = index < 3; // Premières phrases seulement
+    const isNotAdvice = ![
+      'recommandé', 'consulter', 'contacter', 'surveillance'
+    ].some(word => sentence.toLowerCase().includes(word));
+    
+    return (isDiagnostic || isEarly) && isNotAdvice;
+  });
+  
+  return diagnosticSentences.slice(0, 2).join('. ') + '.';
 }
 
 // Enlever seulement les conseils excessifs (mode standard)
