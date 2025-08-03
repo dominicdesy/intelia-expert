@@ -42,6 +42,7 @@ from .expert_utils import (
 )
 from .expert_integrations import IntegrationsManager
 from .api_enhancement_service import APIEnhancementService
+from .prompt_templates import build_structured_prompt, extract_context_from_entities
 
 logger = logging.getLogger(__name__)
 
@@ -1137,41 +1138,62 @@ class ExpertService:
             result = None
             rag_call_method = "unknown"
             
+            # 🎯 NOUVEAU: Construire prompt structuré avec contexte
+            rag_context = extract_context_from_entities(extracted_entities)
+            rag_context["lang"] = request_data.language
+            
             # Tentative 1: Avec paramètre context si supporté
             try:
-                result = await process_rag(
+                # 🎯 Appliquer prompt structuré
+                structured_question = build_structured_prompt(
+                    documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
                     question=enriched_question,
+                    context=rag_context
+                )
+                
+                result = await process_rag(
+                    question=structured_question,
                     user=current_user,
                     language=request_data.language,
                     speed_mode=request_data.speed_mode,
                     context=conversation_context_str
                 )
-                rag_call_method = "context_parameter"
-                logger.info("✅ [Expert Service] RAG appelé avec paramètre context")
+                rag_call_method = "context_parameter_structured"
+                logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte")
             except TypeError as te:
                 logger.info(f"ℹ️ [Expert Service] Paramètre context non supporté: {te}")
                 
                 # Tentative 2: Injection du contexte dans la question
                 if conversation_context_str:
-                    contextual_question = f"{enriched_question}\n\nContexte: {conversation_context_str}"
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                        question=enriched_question,
+                        context=rag_context
+                    )
+                    contextual_question = f"{structured_question}\n\nContexte: {conversation_context_str}"
                     result = await process_rag(
                         question=contextual_question,
                         user=current_user,
                         language=request_data.language,
                         speed_mode=request_data.speed_mode
                     )
-                    rag_call_method = "context_injected"
-                    logger.info("✅ [Expert Service] RAG appelé avec contexte injecté")
+                    rag_call_method = "context_injected_structured"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte injecté")
                 else:
-                    # Tentative 3: Question enrichie seule
-                    result = await process_rag(
+                    # Tentative 3: Question enrichie avec prompt structuré
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
                         question=enriched_question,
+                        context=rag_context
+                    )
+                    result = await process_rag(
+                        question=structured_question,
                         user=current_user,
                         language=request_data.language,
                         speed_mode=request_data.speed_mode
                     )
-                    rag_call_method = "enriched_only"
-                    logger.info("✅ [Expert Service] RAG appelé avec question enrichie seule")
+                    rag_call_method = "structured_only"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré seul")
             
             performance_breakdown["rag_complete"] = int(time.time() * 1000)
             
