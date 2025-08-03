@@ -5,10 +5,11 @@ app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS
 🔧 AMÉLIORATION: Éliminer les références aux documents dans les réponses
 ✨ QUALITÉ: Réponses plus naturelles et professionnelles
 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
+🐛 FIX: Ajout import List manquant
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List  # 🐛 FIX: Ajout de List à l'import
 
 logger = logging.getLogger(__name__)
 
@@ -526,3 +527,4 @@ logger.info("   - ✅ Validation qualité questions générées")
 logger.info("   - 📝 Exemples de questions par langue")
 logger.info("🧹 [Prompt Templates] OBJECTIF: Éliminer références aux documents")
 logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles")
+logger.info("🐛 [Prompt Templates] FIX: Import List ajouté - erreur corrigée!")
