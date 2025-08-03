@@ -1,4 +1,12 @@
-// ==================== API SERVICE CORRIGÉ AVEC ask-enhanced-v2 QUI FONCTIONNE ====================
+console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
+    question: question.substring(0, 50) + '...',
+    isClarificationResponse,
+    originalQuestion: originalQuestion?.substring(0, 30) + '...',
+    clarification_entities: clarificationEntities  // ✅ SUPPORTÉ par backend
+  })  console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
+    question: question.substring(0, 50) + '...',
+    isClarificationResponse,
+    originalQuestion: originalQuestion?.substring(0, 30) + '...',// ==================== API SERVICE CORRIGÉ AVEC ask-enhanced-v2 QUI FONCTIONNE ====================
 
 // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
 const getApiConfig = () => {
@@ -129,14 +137,14 @@ interface APIError {
 }
 
 /**
- * 🎯 FONCTION PRINCIPALE CORRIGÉE: Utilise ask-enhanced-v2 avec context_entities
+ * 🎯 FONCTION PRINCIPALE CORRIGÉE: Utilise ask-enhanced-v2 avec champs backend supportés
  */
 export const generateAIResponse = async (
   question: string,
   user: any,
   language: string = 'fr',
   conversationId?: string,
-  // ✅ PARAMÈTRES POUR CLARIFICATIONS - context_entities attendu par backend
+  // ✅ PARAMÈTRES POUR CLARIFICATIONS - utilise champs supportés backend
   isClarificationResponse = false,
   originalQuestion?: string,
   clarificationEntities?: Record<string, any>
@@ -186,11 +194,11 @@ export const generateAIResponse = async (
       text: finalQuestion,
       language: language,
       ...(conversationId && { conversation_id: conversationId }),
-      // Paramètres optionnels pour clarification - CORRIGÉ: context_entities
+      // ✅ CORRECTION FINALE: Utiliser les champs supportés par le backend
       ...(isClarificationResponse && {
         is_clarification_response: true,
         original_question: originalQuestion,
-        context_entities: clarificationEntities  // ✅ CORRIGÉ: clarification_entities → context_entities
+        clarification_entities: clarificationEntities  // ✅ SUPPORTÉ selon expert.py
       })
     }
 
