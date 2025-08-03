@@ -1,7 +1,7 @@
 """
-app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING
+app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC
 
-🚨 NOUVELLES FONCTIONNALITÉS VERSION 3.8.0:
+🚨 NOUVELLES FONCTIONNALITÉS VERSION 3.9.0:
 1. ✅ Système de concision des réponses intégré (CONSERVÉ)
 2. ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)
 3. ✅ Configuration flexible par type de question (CONSERVÉ)
@@ -12,10 +12,13 @@ app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + 
 8. 🚀 Support ConcisionMetrics avec métriques détaillées (CONSERVÉ)
 9. 🚀 Sélection automatique selon concision_level (CONSERVÉ)
 10. 🚀 Support generate_all_versions flag pour frontend (CONSERVÉ)
-11. 🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents RAG
-12. 🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy/general
-13. 🏷️ NOUVEAU: Enhancement questions avec contexte taxonomique
-14. 🏷️ NOUVEAU: Filtres RAG adaptatifs selon la taxonomie détectée
+11. 🏷️ Filtrage taxonomique intelligent des documents RAG (CONSERVÉ)
+12. 🏷️ Détection automatique broiler/layer/swine/dairy/general (CONSERVÉ)
+13. 🏷️ Enhancement questions avec contexte taxonomique (CONSERVÉ)
+14. 🏷️ Filtres RAG adaptatifs selon la taxonomie détectée (CONSERVÉ)
+15. 🆕 NOUVEAU: Mode sémantique dynamique de clarification intégré
+16. 🆕 NOUVEAU: Génération intelligente de questions contextuelles via GPT
+17. 🆕 NOUVEAU: Support paramètre semantic_dynamic_mode dans les requêtes
 
 FONCTIONNALITÉS CONSERVÉES:
 - ✅ Système de clarification intelligent complet
@@ -40,7 +43,7 @@ from fastapi import HTTPException, Request
 from .expert_models import (
     EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest,
     ValidationResult, ProcessingContext, VaguenessResponse, ResponseFormat,
-    ConcisionLevel, ConcisionMetrics  # 🚀 Import ConcisionLevel et ConcisionMetrics
+    ConcisionLevel, ConcisionMetrics, DynamicClarification  # 🆕 Nouveau modèle
 )
 from .expert_utils import (
     get_user_id_from_request, 
@@ -769,11 +772,11 @@ class RAGContextEnhancer:
         return " | ".join(context_parts)
 
 # =============================================================================
-# 🔄 EXPERT SERVICE PRINCIPAL AVEC RESPONSE VERSIONS + TAXONOMIC FILTERING
+# 🔄 EXPERT SERVICE PRINCIPAL AVEC RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC
 # =============================================================================
 
 class ExpertService:
-    """Service principal pour le système expert avec concision + response_versions + taxonomic filtering intégré"""
+    """Service principal pour le système expert avec concision + response_versions + taxonomic filtering + semantic dynamic intégré"""
     
     def __init__(self):
         # ✅ CONSERVER tous les attributs existants
@@ -789,7 +792,7 @@ class ExpertService:
             existing_processor=self.concision_processor  # Utiliser le système existant
         )
         
-        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision + response_versions + taxonomic_filtering")
+        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision + response_versions + taxonomic_filtering + semantic_dynamic")
     
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
@@ -803,25 +806,29 @@ class ExpertService:
         start_time: float = None
     ) -> EnhancedExpertResponse:
         """
-        🚀 MODIFIÉ: Méthode principale avec support response_versions + taxonomic_filtering
-        ✅ CONSERVE toute la logique existante + ajoute génération versions + filtrage taxonomique
+        🚀 MODIFIÉ: Méthode principale avec support response_versions + taxonomic_filtering + semantic_dynamic
+        ✅ CONSERVE toute la logique existante + ajoute génération versions + filtrage taxonomique + mode sémantique dynamique
         """
         
         if start_time is None:
             start_time = time.time()
         
         try:
-            logger.info("🚀 [ExpertService] Traitement question avec support response_versions + taxonomic_filtering")
+            logger.info("🚀 [ExpertService] Traitement question avec support response_versions + taxonomic_filtering + semantic_dynamic")
             
             # 🚀 Extraire paramètres concision
             concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
             generate_all_versions = getattr(request_data, 'generate_all_versions', True)
             
+            # 🆕 NOUVEAU: Extraire paramètre mode sémantique dynamique
+            semantic_dynamic_mode = getattr(request_data, 'semantic_dynamic_mode', False)
+            
             logger.info(f"🚀 [ResponseVersions] Paramètres: level={concision_level}, generate_all={generate_all_versions}")
+            logger.info(f"🆕 [Semantic Dynamic] Mode: {semantic_dynamic_mode}")
             
             # ✅ APPELER LA LOGIQUE EXISTANTE pour obtenir la réponse de base
             base_response = await self._process_question_existing_logic(
-                request_data, request, current_user, start_time
+                request_data, request, current_user, start_time, semantic_dynamic_mode
             )
             
             # 🚀 Générer toutes les versions si demandé
@@ -858,7 +865,7 @@ class ExpertService:
             return base_response
             
         except Exception as e:
-            logger.error(f"❌ [ExpertService] Erreur traitement avec response_versions + taxonomic_filtering: {e}")
+            logger.error(f"❌ [ExpertService] Erreur traitement avec response_versions + taxonomic_filtering + semantic_dynamic: {e}")
             raise
     
     async def _process_question_existing_logic(
@@ -866,11 +873,13 @@ class ExpertService:
         request_data: EnhancedQuestionRequest,
         request: Request,
         current_user: Optional[Dict[str, Any]] = None,
-        start_time: float = None
+        start_time: float = None,
+        semantic_dynamic_mode: bool = False  # 🆕 NOUVEAU PARAMÈTRE
     ) -> EnhancedExpertResponse:
         """
         ✅ TOUTE LA LOGIQUE EXISTANTE DE process_expert_question (CONSERVÉE IDENTIQUE)
         + 🏷️ NOUVELLE INTÉGRATION: Filtrage taxonomique intelligent
+        + 🆕 NOUVELLE INTÉGRATION: Mode sémantique dynamique
         """
         
         processing_steps = []
@@ -937,10 +946,10 @@ class ExpertService:
                 processing_steps, ai_enhancements_used, None
             )
         
-        # === SYSTÈME DE CLARIFICATION INTELLIGENT ===
-        clarification_result = await self._handle_clarification_corrected(
+        # === SYSTÈME DE CLARIFICATION INTELLIGENT + SÉMANTIQUE DYNAMIQUE ===
+        clarification_result = await self._handle_clarification_corrected_with_semantic_dynamic(
             request_data, question_text, user_id, conversation_id,
-            processing_steps, ai_enhancements_used
+            processing_steps, ai_enhancements_used, semantic_dynamic_mode
         )
         
         if clarification_result:
@@ -1025,6 +1034,155 @@ class ExpertService:
             expert_result, validation_result, conversation_context,
             processing_steps, ai_enhancements_used, request_data,
             debug_info, performance_breakdown
+        )
+    
+    # ===========================================================================================
+    # 🆕 NOUVELLE MÉTHODE: Gestion clarification avec mode sémantique dynamique
+    # ===========================================================================================
+    
+    async def _handle_clarification_corrected_with_semantic_dynamic(
+        self, request_data, question_text, user_id, conversation_id, 
+        processing_steps, ai_enhancements_used, semantic_dynamic_mode: bool = False
+    ):
+        """
+        ✅ SYSTÈME DE CLARIFICATION PARFAITEMENT CORRIGÉ + MODE SÉMANTIQUE DYNAMIQUE
+        🆕 NOUVEAU: Support du mode sémantique dynamique
+        """
+        
+        # 1. ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION CORRIGÉ
+        if request_data.is_clarification_response:
+            return await self._process_clarification_response_corrected(
+                request_data, question_text, conversation_id,
+                processing_steps, ai_enhancements_used
+            )
+        
+        # 🆕 NOUVEAU: Vérifier si mode sémantique dynamique activé
+        if semantic_dynamic_mode and self.integrations.enhanced_clarification_available:
+            logger.info(f"🆕 [Semantic Dynamic] Mode activé pour: '{question_text[:50]}...'")
+            
+            try:
+                # Utiliser le mode sémantique dynamique
+                from .question_clarification_system import analyze_question_for_clarification_semantic_dynamic
+                
+                clarification_result = await analyze_question_for_clarification_semantic_dynamic(
+                    question=question_text,
+                    language=request_data.language,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    conversation_context={}
+                )
+                
+                if clarification_result.needs_clarification:
+                    logger.info(f"🆕 [Semantic Dynamic] {len(clarification_result.questions)} questions générées")
+                    processing_steps.append("semantic_dynamic_clarification_triggered")
+                    ai_enhancements_used.append("semantic_dynamic_clarification")
+                    
+                    return self._create_semantic_dynamic_clarification_response(
+                        question_text, clarification_result, request_data.language, conversation_id
+                    )
+                else:
+                    logger.info(f"✅ [Semantic Dynamic] Question claire, pas de clarification nécessaire")
+                
+            except Exception as e:
+                logger.error(f"❌ [Semantic Dynamic] Erreur mode sémantique: {e}")
+                # Fallback vers mode normal
+        
+        # 2. DÉTECTION QUESTIONS NÉCESSITANT CLARIFICATION (mode normal)
+        clarification_needed = self._detect_performance_question_needing_clarification(
+            question_text, request_data.language
+        )
+        
+        if not clarification_needed:
+            return None
+        
+        logger.info(f"🎯 [Expert Service] Clarification nécessaire: {clarification_needed['type']}")
+        processing_steps.append("automatic_clarification_triggered")
+        ai_enhancements_used.append("smart_performance_clarification")
+        
+        # 3. ✅ SAUVEGARDE FORCÉE AVEC MÉMOIRE INTELLIGENTE
+        if self.integrations.intelligent_memory_available:
+            try:
+                # Utiliser la fonction dédiée du système de mémoire
+                from .conversation_memory_enhanced import mark_question_for_clarification
+                
+                question_id = mark_question_for_clarification(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    original_question=question_text,
+                    language=request_data.language
+                )
+                
+                logger.info(f"💾 [Expert Service] Question originale marquée: {question_id}")
+                processing_steps.append("original_question_marked")
+                ai_enhancements_used.append("intelligent_memory_clarification_marking")
+                
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur marquage question: {e}")
+                # Fallback: marquer manuellement
+                self.integrations.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=f"ORIGINAL_QUESTION_FOR_CLARIFICATION: {question_text}",
+                    role="system",
+                    language=request_data.language,
+                    message_type="original_question_marker"
+                )
+        
+        # 4. Générer la demande de clarification
+        clarification_response = self._generate_performance_clarification_response(
+            question_text, clarification_needed, request_data.language, conversation_id
+        )
+        
+        return clarification_response
+    
+    def _create_semantic_dynamic_clarification_response(
+        self, question: str, clarification_result, language: str, conversation_id: str
+    ) -> EnhancedExpertResponse:
+        """🆕 NOUVEAU: Crée une réponse de clarification sémantique dynamique"""
+        
+        # Formater les questions de clarification
+        if clarification_result.questions:
+            if len(clarification_result.questions) == 1:
+                # Une seule question - mode interactif
+                response_text = f"❓ Pour mieux comprendre votre situation et vous aider efficacement :\n\n{clarification_result.questions[0]}"
+            else:
+                # Plusieurs questions - mode batch
+                formatted_questions = "\n".join([f"• {q}" for q in clarification_result.questions])
+                response_text = f"❓ Pour mieux comprendre votre situation et vous aider efficacement :\n\n{formatted_questions}"
+            
+            response_text += "\n\nCela me permettra de vous donner les conseils les plus pertinents ! 🐔"
+        else:
+            response_text = "❓ Pouvez-vous préciser votre question pour que je puisse mieux vous aider ?"
+        
+        return EnhancedExpertResponse(
+            question=question,
+            response=response_text,
+            conversation_id=conversation_id,
+            rag_used=False,
+            rag_score=None,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=int(clarification_result.processing_time_ms),
+            mode="semantic_dynamic_clarification",
+            user=None,
+            logged=True,
+            validation_passed=True,
+            clarification_result={
+                "clarification_requested": True,
+                "clarification_type": "semantic_dynamic",
+                "questions_generated": len(clarification_result.questions) if clarification_result.questions else 0,
+                "confidence": clarification_result.confidence_score,
+                "model_used": clarification_result.model_used,
+                "generation_time_ms": clarification_result.processing_time_ms
+            },
+            processing_steps=["semantic_dynamic_clarification_triggered"],
+            ai_enhancements_used=["semantic_dynamic_clarification", "gpt_question_generation"],
+            # 🆕 NOUVEAU: Informations spécifiques mode sémantique dynamique
+            dynamic_clarification=DynamicClarification(
+                original_question=question,
+                clarification_questions=clarification_result.questions or [],
+                confidence=clarification_result.confidence_score
+            )
         )
     
     # ===========================================================================================
@@ -1259,7 +1417,7 @@ class ExpertService:
             logger.info(f"✅ [Expert Service] RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
             
             # Mode enrichi avec méthode d'appel + taxonomie
-            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision_and_response_versions_and_taxonomy"
+            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision_and_response_versions_and_taxonomy_and_semantic_dynamic"
             
             processing_steps.append("mandatory_rag_with_intelligent_context_and_taxonomy")
             
@@ -1298,67 +1456,6 @@ class ExpertService:
     # ===========================================================================================
     # ✅ TOUTES LES AUTRES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
     # ===========================================================================================
-    
-    async def _handle_clarification_corrected(
-        self, request_data, question_text, user_id, conversation_id, 
-        processing_steps, ai_enhancements_used
-    ):
-        """✅ SYSTÈME DE CLARIFICATION PARFAITEMENT CORRIGÉ (CONSERVÉ IDENTIQUE)"""
-        
-        # 1. ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION CORRIGÉ
-        if request_data.is_clarification_response:
-            return await self._process_clarification_response_corrected(
-                request_data, question_text, conversation_id,
-                processing_steps, ai_enhancements_used
-            )
-        
-        # 2. DÉTECTION QUESTIONS NÉCESSITANT CLARIFICATION
-        clarification_needed = self._detect_performance_question_needing_clarification(
-            question_text, request_data.language
-        )
-        
-        if not clarification_needed:
-            return None
-        
-        logger.info(f"🎯 [Expert Service] Clarification nécessaire: {clarification_needed['type']}")
-        processing_steps.append("automatic_clarification_triggered")
-        ai_enhancements_used.append("smart_performance_clarification")
-        
-        # 3. ✅ SAUVEGARDE FORCÉE AVEC MÉMOIRE INTELLIGENTE
-        if self.integrations.intelligent_memory_available:
-            try:
-                # Utiliser la fonction dédiée du système de mémoire
-                from .conversation_memory_enhanced import mark_question_for_clarification
-                
-                question_id = mark_question_for_clarification(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    original_question=question_text,
-                    language=request_data.language
-                )
-                
-                logger.info(f"💾 [Expert Service] Question originale marquée: {question_id}")
-                processing_steps.append("original_question_marked")
-                ai_enhancements_used.append("intelligent_memory_clarification_marking")
-                
-            except Exception as e:
-                logger.error(f"❌ [Expert Service] Erreur marquage question: {e}")
-                # Fallback: marquer manuellement
-                self.integrations.add_message_to_conversation(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    message=f"ORIGINAL_QUESTION_FOR_CLARIFICATION: {question_text}",
-                    role="system",
-                    language=request_data.language,
-                    message_type="original_question_marker"
-                )
-        
-        # 4. Générer la demande de clarification
-        clarification_response = self._generate_performance_clarification_response(
-            question_text, clarification_needed, request_data.language, conversation_id
-        )
-        
-        return clarification_response
     
     async def _process_clarification_response_corrected(
         self, request_data, question_text, conversation_id, 
@@ -1830,7 +1927,7 @@ class ExpertService:
             logger.warning("⚠️ [Enrichment] Pas d'enrichissement possible, question originale conservée")
             return original_question
     
-    # === MÉTHODES UTILITAIRES AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING ===
+    # === MÉTHODES UTILITAIRES AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC ===
     
     def _create_vagueness_response(
         self, vagueness_result, question_text: str, conversation_id: str,
@@ -1883,7 +1980,7 @@ class ExpertService:
         ai_enhancements_used: list, request_data: EnhancedQuestionRequest,
         debug_info: Dict, performance_breakdown: Dict
     ) -> EnhancedExpertResponse:
-        """Construit la réponse finale avec toutes les améliorations + concision + response_versions + taxonomic_filtering"""
+        """Construit la réponse finale avec toutes les améliorations + concision + response_versions + taxonomic_filtering + semantic_dynamic"""
         
         # Métriques finales
         extracted_entities = expert_result.get("extracted_entities")
@@ -1908,8 +2005,9 @@ class ExpertService:
                 "processing_steps_count": len(processing_steps),
                 "concision_applied": expert_result.get("concision_applied", False),
                 "response_versions_support": True,  # 🚀 Support response_versions
-                "taxonomy_used": expert_result.get("taxonomy_used"),  # 🏷️ NOUVEAU
-                "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False)  # 🏷️ NOUVEAU
+                "taxonomy_used": expert_result.get("taxonomy_used"),  # 🏷️ Taxonomie
+                "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),  # 🏷️ Taxonomie
+                "semantic_dynamic_available": True  # 🆕 Support mode sémantique dynamique
             }
             
             final_performance = performance_breakdown
@@ -1932,6 +2030,13 @@ class ExpertService:
             "taxonomy_detected": expert_result.get("taxonomy_used", "general"),
             "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),
             "taxonomy_enhanced_question": bool(expert_result.get("taxonomy_used") != "general")
+        }
+        
+        # 🆕 NOUVEAU: Informations mode sémantique dynamique
+        semantic_dynamic_info = {
+            "semantic_dynamic_available": getattr(request_data, 'semantic_dynamic_mode', False),
+            "semantic_dynamic_used": "semantic_dynamic_clarification" in ai_enhancements_used,
+            "dynamic_questions_generated": any("semantic_dynamic" in step for step in processing_steps)
         }
             
         return EnhancedExpertResponse(
@@ -1974,8 +2079,11 @@ class ExpertService:
             response_versions=None,  # Sera rempli par process_expert_question si generate_all_versions=True
             concision_metrics=None,   # Sera rempli par process_expert_question si generate_all_versions=True
             
-            # 🏷️ NOUVEAU: Informations taxonomiques
-            taxonomy_info=taxonomy_info
+            # 🏷️ Informations taxonomiques
+            taxonomy_info=taxonomy_info,
+            
+            # 🆕 NOUVEAU: Informations mode sémantique dynamique
+            semantic_dynamic_info=semantic_dynamic_info
         )
     
     # === MÉTHODES UTILITAIRES IDENTIQUES (CONSERVÉES) ===
@@ -2098,7 +2206,7 @@ class ExpertService:
         
         return {
             "success": True,
-            "message": "Feedback enregistré avec succès (Enhanced + Concision + Response Versions + Taxonomic Filtering)",
+            "message": "Feedback enregistré avec succès (Enhanced + Concision + Response Versions + Taxonomic Filtering + Semantic Dynamic)",
             "rating": feedback_data.rating,
             "comment": feedback_data.comment,
             "conversation_id": feedback_data.conversation_id,
@@ -2106,7 +2214,8 @@ class ExpertService:
             "enhanced_features_used": True,
             "concision_system_active": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
             "response_versions_supported": True,  # 🚀 Support response_versions
-            "taxonomic_filtering_active": True,  # 🏷️ NOUVEAU
+            "taxonomic_filtering_active": True,  # 🏷️ Filtrage taxonomique
+            "semantic_dynamic_available": True,  # 🆕 Mode sémantique dynamique
             "timestamp": datetime.now().isoformat()
         }
     
@@ -2142,11 +2251,17 @@ class ExpertService:
                 "dynamic_level_switching_support": True,
                 "concision_metrics_available": True,
                 
-                # 🏷️ NOUVEAU: Informations filtrage taxonomique
+                # 🏷️ Informations filtrage taxonomique
                 "taxonomic_filtering_available": True,
                 "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
                 "automatic_taxonomy_detection": True,
-                "taxonomy_based_document_filtering": True
+                "taxonomy_based_document_filtering": True,
+                
+                # 🆕 NOUVEAU: Informations mode sémantique dynamique
+                "semantic_dynamic_clarification_available": True,
+                "gpt_question_generation": True,
+                "contextual_clarification_questions": True,
+                "intelligent_clarification_mode": True
             },
             "system_status": {
                 "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
@@ -2155,7 +2270,8 @@ class ExpertService:
                 "api_enhancements_enabled": True,
                 "concision_processor_enabled": True,
                 "response_versions_generator_enabled": True,  # 🚀 Support response_versions
-                "taxonomic_filtering_enabled": True  # 🏷️ NOUVEAU
+                "taxonomic_filtering_enabled": True,  # 🏷️ Filtrage taxonomique
+                "semantic_dynamic_clarification_enabled": True  # 🆕 Mode sémantique dynamique
             },
             
             # ✅ CONSERVÉ: Configuration concision par défaut
@@ -2176,7 +2292,7 @@ class ExpertService:
                 }
             },
             
-            # 🏷️ NOUVEAU: Configuration filtrage taxonomique
+            # 🏷️ Configuration filtrage taxonomique
             "taxonomic_config": {
                 "enabled": True,
                 "supported_categories": {
@@ -2188,17 +2304,28 @@ class ExpertService:
                 "auto_detection_enabled": True,
                 "filter_fallback_enabled": True,
                 "question_enhancement_enabled": True
+            },
+            
+            # 🆕 NOUVEAU: Configuration mode sémantique dynamique
+            "semantic_dynamic_config": {
+                "enabled": True,
+                "max_questions_generated": 4,
+                "supported_languages": ["fr", "en", "es"],
+                "gpt_model_used": "gpt-4o-mini",
+                "fallback_questions_available": True,
+                "context_aware_generation": True,
+                "automatic_mode_detection": True
             }
         }
 
 # =============================================================================
-# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING (OPTIONNEL)
+# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC (OPTIONNEL)
 # =============================================================================
 
 def create_concision_control_endpoint():
     """
     Endpoint optionnel pour contrôler la concision côté backend
-    🚀 MODIFIÉ: Ajout support response_versions + taxonomic_filtering
+    🚀 MODIFIÉ: Ajout support response_versions + taxonomic_filtering + semantic_dynamic
     """
     
     from fastapi import APIRouter
@@ -2211,7 +2338,8 @@ def create_concision_control_endpoint():
         default_level: ConcisionLevel = ConcisionLevel.CONCISE
         max_lengths: Optional[Dict[str, int]] = None
         enable_response_versions: bool = True  # 🚀 Support response_versions
-        enable_taxonomic_filtering: bool = True  # 🏷️ NOUVEAU
+        enable_taxonomic_filtering: bool = True  # 🏷️ Filtrage taxonomique
+        enable_semantic_dynamic: bool = True  # 🆕 Mode sémantique dynamique
     
     class ConcisionSettingsResponse(BaseModel):
         success: bool
@@ -2220,7 +2348,7 @@ def create_concision_control_endpoint():
     
     @router.post("/concision/settings", response_model=ConcisionSettingsResponse)
     async def update_concision_settings(request: ConcisionSettingsRequest):
-        """Mettre à jour les paramètres de concision + response_versions + taxonomic_filtering du système"""
+        """Mettre à jour les paramètres de concision + response_versions + taxonomic_filtering + semantic_dynamic du système"""
         
         try:
             # Mettre à jour la configuration globale
@@ -2237,9 +2365,10 @@ def create_concision_control_endpoint():
                     "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
                     "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH,
                     "response_versions_enabled": request.enable_response_versions,  # 🚀 Support response_versions
-                    "taxonomic_filtering_enabled": request.enable_taxonomic_filtering  # 🏷️ NOUVEAU
+                    "taxonomic_filtering_enabled": request.enable_taxonomic_filtering,  # 🏷️ Filtrage taxonomique
+                    "semantic_dynamic_enabled": request.enable_semantic_dynamic  # 🆕 Mode sémantique dynamique
                 },
-                message="Paramètres de concision + response_versions + taxonomic_filtering mis à jour avec succès"
+                message="Paramètres de concision + response_versions + taxonomic_filtering + semantic_dynamic mis à jour avec succès"
             )
         except Exception as e:
             return ConcisionSettingsResponse(
@@ -2250,7 +2379,7 @@ def create_concision_control_endpoint():
     
     @router.get("/concision/settings", response_model=Dict[str, Any])
     async def get_concision_settings():
-        """Récupérer les paramètres actuels de concision + response_versions + taxonomic_filtering"""
+        """Récupérer les paramètres actuels de concision + response_versions + taxonomic_filtering + semantic_dynamic"""
         
         return {
             "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
@@ -2269,25 +2398,35 @@ def create_concision_control_endpoint():
                 "metrics_included": True
             },
             
-            # 🏷️ NOUVEAU: Configuration taxonomic_filtering
+            # 🏷️ Configuration taxonomic_filtering
             "taxonomic_filtering": {
                 "supported": True,
                 "auto_detection_enabled": True,
                 "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
                 "question_enhancement_enabled": True,
                 "filter_fallback_enabled": True
+            },
+            
+            # 🆕 NOUVEAU: Configuration semantic_dynamic
+            "semantic_dynamic": {
+                "supported": True,
+                "max_questions": 4,
+                "supported_languages": ["fr", "en", "es"],
+                "gpt_generation_enabled": True,
+                "fallback_questions_available": True,
+                "contextual_mode_available": True
             }
         }
     
     return router
 
 # =============================================================================
-# CONFIGURATION FINALE AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING
+# CONFIGURATION FINALE AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC
 # =============================================================================
 
 logger.info("🚀" * 30)
-logger.info("🚀 [EXPERT SERVICES] VERSION 3.8.0 - TAXONOMIC FILTERING INTÉGRÉ!")
-logger.info("🚀 [INTÉGRATION] Système concision + response_versions + taxonomie:")
+logger.info("🚀 [EXPERT SERVICES] VERSION 3.9.0 - SEMANTIC DYNAMIC INTÉGRÉ!")
+logger.info("🚀 [INTÉGRATION] Système concision + response_versions + taxonomie + semantic_dynamic:")
 logger.info("   ✅ ResponseVersionsGenerator utilise ResponseConcisionProcessor existant")
 logger.info("   ✅ Génération 4 versions: ultra_concise, concise, standard, detailed")
 logger.info("   ✅ Sélection automatique selon concision_level")
@@ -2295,19 +2434,25 @@ logger.info("   ✅ Métriques détaillées avec ConcisionMetrics")
 logger.info("   ✅ Compatible avec toute la logique existante")
 logger.info("   ✅ Fallback automatique si erreur")
 logger.info("   ✅ Support generate_all_versions flag")
-logger.info("   🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents")
-logger.info("   🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy")
-logger.info("   🏷️ NOUVEAU: Questions enrichies avec contexte taxonomique")
+logger.info("   🏷️ Filtrage taxonomique intelligent des documents")
+logger.info("   🏷️ Détection automatique broiler/layer/swine/dairy")
+logger.info("   🏷️ Questions enrichies avec contexte taxonomique")
+logger.info("   🆕 NOUVEAU: Mode sémantique dynamique de clarification")
+logger.info("   🆕 NOUVEAU: Génération GPT de 1-4 questions contextuelles")
+logger.info("   🆕 NOUVEAU: Support paramètre semantic_dynamic_mode")
+logger.info("   🆕 NOUVEAU: Fallback automatique vers mode normal")
 logger.info("🚀 [BACKEND READY] Frontend peut maintenant:")
 logger.info("   - Demander concision_level spécifique")
 logger.info("   - Recevoir response_versions complètes") 
 logger.info("   - Changer niveau dynamiquement côté frontend")
 logger.info("   - Profiter du cache et performance optimisée")
 logger.info("   - Bénéficier du filtrage taxonomique automatique")
+logger.info("   - Activer le mode sémantique dynamique (semantic_dynamic_mode=true)")
+logger.info("   - Recevoir questions de clarification intelligentes")
 logger.info("🚀" * 30)
 
-logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING intégré")
-logger.info("🚀 [Expert Service] NOUVELLES FONCTIONNALITÉS V3.8.0:")
+logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC intégré")
+logger.info("🚀 [Expert Service] FONCTIONNALITÉS VERSION 3.9.0:")
 logger.info("   - ✅ Système de concision intelligent multi-niveaux (CONSERVÉ)")
 logger.info("   - ✅ Détection automatique type de question (CONSERVÉ)")
 logger.info("   - ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)")
@@ -2318,10 +2463,15 @@ logger.info("   - 🚀 Génération toutes versions (ultra_concise, concise, sta
 logger.info("   - 🚀 ConcisionMetrics avec compression ratios et métriques")
 logger.info("   - 🚀 Support generate_all_versions flag pour contrôle frontend")
 logger.info("   - 🚀 Sélection intelligente version selon concision_level")
-logger.info("   - 🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents RAG")
-logger.info("   - 🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy/general")
-logger.info("   - 🏷️ NOUVEAU: Enhancement questions avec contexte taxonomique")
-logger.info("   - 🏷️ NOUVEAU: Filtres RAG adaptatifs selon la taxonomie détectée")
+logger.info("   - 🏷️ Filtrage taxonomique intelligent des documents RAG (CONSERVÉ)")
+logger.info("   - 🏷️ Détection automatique broiler/layer/swine/dairy/general (CONSERVÉ)")
+logger.info("   - 🏷️ Enhancement questions avec contexte taxonomique (CONSERVÉ)")
+logger.info("   - 🏷️ Filtres RAG adaptatifs selon la taxonomie détectée (CONSERVÉ)")
+logger.info("   - 🆕 NOUVEAU: Mode sémantique dynamique de clarification")
+logger.info("   - 🆕 NOUVEAU: Génération intelligente 1-4 questions via GPT")
+logger.info("   - 🆕 NOUVEAU: Support paramètre semantic_dynamic_mode")
+logger.info("   - 🆕 NOUVEAU: Fallback automatique si génération échoue")
+logger.info("   - 🆕 NOUVEAU: DynamicClarification dans les réponses")
 logger.info("🔧 [Expert Service] FONCTIONNALITÉS CONSERVÉES:")
 logger.info("   - ✅ Système de clarification intelligent complet")
 logger.info("   - ✅ Mémoire conversationnelle enrichie")
@@ -2329,15 +2479,10 @@ logger.info("   - ✅ RAG avec contexte et prompt structuré")
 logger.info("   - ✅ Multi-LLM support et validation agricole")
 logger.info("   - ✅ Support multilingue FR/EN/ES")
 logger.info("🎯 [Expert Service] RÉSULTATS ATTENDUS:")
-logger.info('   - Question: "Quel est le poids d\'un poulet Ross 308 mâle de 18 jours ?"')
-logger.info('   - Taxonomie détectée: "broiler" (à partir de Ross 308)')
-logger.info('   - Filtres RAG: {"taxonomy": "broiler", "category": "broiler"}')
-logger.info('   - Question enrichie: "[CONTEXTE: poulets de chair] Quel est le poids..."')
-logger.info('   - Documents filtrés: Seulement les docs broiler pertinents')
-logger.info('   - response_versions["ultra_concise"]: "410-450g"')
-logger.info('   - response_versions["concise"]: "Le poids se situe entre 410g et 450g."')
-logger.info('   - response_versions["standard"]: Réponse normale sans conseils excessifs')
-logger.info('   - response_versions["detailed"]: Version complète originale')
-logger.info('   - response (sélection): Selon concision_level demandé')
-logger.info('   - concision_metrics: Métriques génération et compression')
-logger.info("✅ [Expert Service] SYSTÈME COMPLET TAXONOMIC FILTERING PARFAITEMENT INTÉGRÉ!")
+logger.info('   - Question floue: "J\'ai un problème avec mes poulets"')
+logger.info('   - semantic_dynamic_mode=true activé')
+logger.info('   - Génération GPT: ["Quelle race élevez-vous ?", "Quel âge ont-ils ?", ...]')
+logger.info('   - Response avec DynamicClarification + questions contextuelles')
+logger.info('   - Fallback automatique si GPT indisponible')
+logger.info('   - Mode normal si semantic_dynamic_mode=false')
+logger.info("✅ [Expert Service] SYSTÈME COMPLET SEMANTIC DYNAMIC PARFAITEMENT INTÉGRÉ!")

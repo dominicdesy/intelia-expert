@@ -1,7 +1,7 @@
 """
 RAGContextEnhancer AMÉLIORÉ - Extraction d'entités complète
 Version enrichie avec extraction NLP hybride et entités étendues
-VERSION FINALE AVEC DÉTECTION INTELLIGENTE QUESTIONS TECHNIQUES + TAXONOMIC FILTERING
+VERSION FINALE AVEC DÉTECTION INTELLIGENTE QUESTIONS TECHNIQUES
 """
 
 import re
@@ -16,7 +16,6 @@ try:
     from .expert_models import VaguenessDetection, QuestionClarity, ContextCoherence, EnhancedFallbackDetails, QualityMetrics, DocumentRelevance, ConfidenceLevel
 except ImportError:
     # Fallback si les imports échouent
-    logger = logging.getLogger(__name__)
     logger.warning("⚠️ Import expert_models échoué - utilisation des classes de fallback")
     
     class QuestionClarity:
@@ -950,126 +949,10 @@ class APIEnhancementService:
             }
 
 # =============================================================================
-# 🏷️ FONCTIONS UTILITAIRES TAXONOMIE (NOUVELLES AJOUTÉES)
+# LOGGING ET CONFIGURATION
 # =============================================================================
 
-def infer_taxonomy_from_entities(entities: Dict[str, Any]) -> str:
-    """
-    Déduit la taxonomie principale (broiler, layer, swine, dairy, etc.) 
-    à partir des entités extraites.
-    """
-    breed = (entities.get("breed") or "").lower()
-    
-    # Détection poulets de chair (broiler)
-    if any(x in breed for x in ["ross", "cobb", "hubbard", "indian river"]):
-        return "broiler"
-    
-    # Détection poules pondeuses (layer)
-    if any(x in breed for x in ["lohmann", "isa", "dekalb", "hy-line", "bovans", "h&n", "shaver"]):
-        return "layer"
-    
-    # Détection porcine (swine)
-    if entities.get("gestation_day") or entities.get("parity"):
-        return "swine"
-    
-    # Détection bovins laitiers (dairy)
-    if entities.get("days_in_milk") or entities.get("milk_yield_liters"):
-        return "dairy"
-    
-    # Taxonomie générale par défaut
-    return "general"
-
-def create_taxonomy_filter(taxonomy: str, filter_type: str = "path") -> Optional[Dict[str, Any]]:
-    """
-    Crée un filtre pour le moteur RAG basé sur la taxonomie détectée.
-    
-    Args:
-        taxonomy: La taxonomie détectée (broiler, layer, swine, dairy, general)
-        filter_type: Type de filtre ("path", "metadata", "category")
-    
-    Returns:
-        Dictionnaire de filtres pour le moteur RAG ou None si général
-    """
-    if taxonomy == "general":
-        return None
-    
-    # Filtres selon le type de moteur RAG
-    filters = {
-        "path": {
-            "field": "path",
-            "operator": "contains",
-            "value": f"/{taxonomy}/"
-        },
-        "metadata": {
-            "taxonomy": taxonomy,
-            "category": taxonomy
-        },
-        "category": {
-            "categories": [taxonomy],
-            "include_subcategories": True
-        }
-    }
-    
-    return filters.get(filter_type, filters["metadata"])
-
-def enhance_rag_query_with_taxonomy(
-    question: str, 
-    entities: Dict[str, Any], 
-    language: str = "fr"
-) -> Tuple[str, Optional[Dict[str, Any]]]:
-    """
-    Améliore la requête RAG avec filtrage taxonomique intelligent.
-    
-    Returns:
-        Tuple[enhanced_question, rag_filters]
-    """
-    # Inférer taxonomie
-    taxonomy = infer_taxonomy_from_entities(entities)
-    
-    # Créer filtres RAG
-    rag_filters = create_taxonomy_filter(taxonomy, "metadata")
-    
-    # Améliorer la question avec contexte taxonomique
-    if taxonomy != "general":
-        taxonomy_context = {
-            "broiler": {
-                "fr": "poulets de chair",
-                "en": "broiler chickens", 
-                "es": "pollos de engorde"
-            },
-            "layer": {
-                "fr": "poules pondeuses",
-                "en": "layer hens",
-                "es": "gallinas ponedoras"
-            },
-            "swine": {
-                "fr": "porcs",
-                "en": "swine",
-                "es": "cerdos"
-            },
-            "dairy": {
-                "fr": "bovins laitiers",
-                "en": "dairy cattle",
-                "es": "ganado lechero"
-            }
-        }
-        
-        context_text = taxonomy_context.get(taxonomy, {}).get(language, taxonomy)
-        enhanced_question = f"[CONTEXTE: {context_text}] {question}"
-        
-        logger.info(f"🏷️ [Taxonomy] Question enrichie pour {taxonomy}: {enhanced_question[:100]}...")
-        
-    else:
-        enhanced_question = question
-        logger.info("🏷️ [Taxonomy] Taxonomie générale - pas de filtrage spécifique")
-    
-    return enhanced_question, rag_filters
-
-# =============================================================================
-# LOGGING ET CONFIGURATION FINALE
-# =============================================================================
-
-logger.info("✅ [Enhanced RAG Context Enhancer] Extracteur d'entités avancé initialisé avec détection intelligente + taxonomie")
+logger.info("✅ [Enhanced RAG Context Enhancer] Extracteur d'entités avancé initialisé avec détection intelligente")
 logger.info("🚀 [Enhanced RAG Context Enhancer] NOUVELLES CAPACITÉS:")
 logger.info("   - 🏷️ 15+ types d'entités extraites (vs 3 avant)")
 logger.info("   - 🧠 Extraction hybride regex + NLP SpaCy")
@@ -1080,8 +963,4 @@ logger.info("   - 🔍 Détection pronoms étendus")
 logger.info(f"   - 🤖 SpaCy disponible: {'✅' if SPACY_AVAILABLE else '❌ (regex only)'}")
 logger.info("   - 🎪 Détection intelligente questions techniques race/sexe")
 logger.info("   - ⚡ Clarification automatique poids/performance")
-logger.info("   - 📋 Inférence taxonomie automatique (NOUVEAU)")
-logger.info("   - 🏷️ Filtrage taxonomique RAG intelligent (NOUVEAU)")
-logger.info("   - 🎯 Enhancement questions avec contexte taxonomique (NOUVEAU)")
-logger.info("   - 🔄 Support tous moteurs RAG (path/metadata/category)")
-logger.info("✅ [API Enhancement Service] Service d'amélioration API complet et fonctionnel avec taxonomie")
+logger.info("✅ [API Enhancement Service] Service d'amélioration API complet et fonctionnel")

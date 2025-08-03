@@ -4,7 +4,6 @@ app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS
 🎯 OBJECTIF: Centraliser et standardiser les prompts pour le système RAG
 🔧 AMÉLIORATION: Éliminer les références aux documents dans les réponses
 ✨ QUALITÉ: Réponses plus naturelles et professionnelles
-🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
 """
 
 import logging
@@ -113,112 +112,6 @@ INSTRUCCIONES CRÍTICAS:
 7. Proporcione rangos de valores cuando sea apropiado (ej: 410-450g)
 
 RESPUESTA EXPERTA:"""
-
-# 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
-def build_contextualization_prompt(user_question: str, language: str = "fr") -> str:
-    """
-    🆕 NOUVEAU: Construit un prompt pour générer des questions de clarification dynamiques.
-    
-    Args:
-        user_question: Question originale de l'utilisateur
-        language: Langue de réponse (fr/en/es)
-        
-    Returns:
-        Prompt structuré pour GPT
-    """
-    
-    if language.lower() == "en":
-        return f"""You are a poultry farming expert specialized in providing practical advice.
-
-The user asks: "{user_question}"
-
-TASK: Generate 2-4 clarification questions to better understand their specific situation and provide the most relevant advice.
-
-FOCUS ON:
-- Missing technical details (breed, age, housing conditions)
-- Context of the problem (symptoms, timeline, environment)
-- Scale of operation (flock size, production type)
-- Specific objectives (what outcome they want)
-
-INSTRUCTIONS:
-- Ask practical, specific questions
-- Prioritize the most critical missing information
-- Make questions easy to answer
-- Focus on actionable context
-
-Respond in JSON format:
-{{
-  "clarification_questions": [
-    "What specific breed or strain are you raising?",
-    "What age are your birds currently?",
-    "What symptoms or issues are you observing?",
-    "What is your housing setup (closed barn, free-range, etc.)?"
-  ]
-}}
-
-Generate 2-4 questions maximum. Make them specific and practical."""
-
-    elif language.lower() == "es":
-        return f"""Eres un experto en avicultura especializado en brindar asesoría práctica.
-
-El usuario pregunta: "{user_question}"
-
-TAREA: Genera 2-4 preguntas de aclaración para entender mejor su situación específica y brindar el consejo más relevante.
-
-ENFÓCATE EN:
-- Detalles técnicos faltantes (raza, edad, condiciones de alojamiento)
-- Contexto del problema (síntomas, cronología, ambiente)
-- Escala de operación (tamaño del lote, tipo de producción)
-- Objetivos específicos (qué resultado buscan)
-
-INSTRUCCIONES:
-- Haz preguntas prácticas y específicas
-- Prioriza la información más crítica faltante
-- Haz que las preguntas sean fáciles de responder
-- Enfócate en contexto accionable
-
-Responde en formato JSON:
-{{
-  "clarification_questions": [
-    "¿Qué raza o cepa específica está criando?",
-    "¿Qué edad tienen actualmente sus aves?",
-    "¿Qué síntomas o problemas está observando?",
-    "¿Cuál es su configuración de alojamiento (galpón cerrado, campo libre, etc.)?"
-  ]
-}}
-
-Genera máximo 2-4 preguntas. Hazlas específicas y prácticas."""
-
-    else:  # français
-        return f"""Tu es un expert en aviculture spécialisé dans les conseils pratiques.
-
-L'utilisateur pose la question suivante : "{user_question}"
-
-TÂCHE : Génère 2-4 questions de clarification pour mieux comprendre sa situation spécifique et fournir les conseils les plus pertinents.
-
-CONCENTRE-TOI SUR :
-- Détails techniques manquants (race, âge, conditions d'élevage)
-- Contexte du problème (symptômes, chronologie, environnement)
-- Échelle d'opération (taille du troupeau, type de production)
-- Objectifs spécifiques (quel résultat ils recherchent)
-
-INSTRUCTIONS :
-- Pose des questions pratiques et spécifiques
-- Priorise les informations critiques manquantes
-- Rends les questions faciles à répondre
-- Concentre-toi sur un contexte actionnable
-
-Réponds en format JSON :
-{{
-  "clarification_questions": [
-    "Quelle race ou souche spécifique élevez-vous ?",
-    "Quel âge ont actuellement vos volailles ?",
-    "Quels symptômes ou problèmes observez-vous ?",
-    "Quelle est votre configuration d'élevage (bâtiment fermé, plein air, etc.) ?"
-  ]
-}}
-
-Génère 2-4 questions maximum. Rends-les spécifiques et pratiques."""
 
 def build_clarification_prompt(missing_info: list, detected_age: str, language: str = "fr") -> str:
     """
@@ -420,92 +313,6 @@ def validate_prompt_context(context: Dict[str, str]) -> Dict[str, Any]:
     return validation_result
 
 # =============================================================================
-# 🆕 NOUVELLES FONCTIONS POUR MODE SÉMANTIQUE DYNAMIQUE
-# =============================================================================
-
-def get_dynamic_clarification_examples(language: str = "fr") -> List[str]:
-    """
-    🆕 NOUVEAU: Retourne des exemples de questions dynamiques par langue
-    """
-    
-    examples = {
-        "fr": [
-            "Quelle race ou souche spécifique élevez-vous ?",
-            "Quel âge ont actuellement vos volailles ?",
-            "Quels symptômes ou problèmes observez-vous ?",
-            "Quelle est votre configuration d'élevage ?",
-            "Quel type d'alimentation utilisez-vous ?",
-            "Combien d'animaux avez-vous dans votre troupeau ?",
-            "Depuis combien de temps observez-vous ce problème ?",
-            "Quelles sont les conditions environnementales actuelles ?"
-        ],
-        "en": [
-            "What specific breed or strain are you raising?",
-            "What age are your birds currently?",
-            "What symptoms or issues are you observing?",
-            "What is your housing setup?",
-            "What type of feed are you using?",
-            "How many animals do you have in your flock?",
-            "How long have you been observing this problem?",
-            "What are the current environmental conditions?"
-        ],
-        "es": [
-            "¿Qué raza o cepa específica está criando?",
-            "¿Qué edad tienen actualmente sus aves?",
-            "¿Qué síntomas o problemas está observando?",
-            "¿Cuál es su configuración de alojamiento?",
-            "¿Qué tipo de alimentación está usando?",
-            "¿Cuántos animales tiene en su lote?",
-            "¿Desde cuándo está observando este problema?",
-            "¿Cuáles son las condiciones ambientales actuales?"
-        ]
-    }
-    
-    return examples.get(language, examples["fr"])
-
-def validate_dynamic_questions(questions: List[str], language: str = "fr") -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Valide la qualité des questions générées dynamiquement
-    """
-    
-    validation = {
-        "valid_questions": [],
-        "invalid_questions": [],
-        "quality_score": 0.0,
-        "issues": []
-    }
-    
-    question_words = {
-        "fr": ["quel", "quelle", "combien", "comment", "où", "quand", "pourquoi"],
-        "en": ["what", "which", "how", "where", "when", "why", "who"],
-        "es": ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "quién"]
-    }
-    
-    words = question_words.get(language, question_words["fr"])
-    
-    for question in questions:
-        if not question or len(question.strip()) < 10:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question trop courte: '{question}'")
-            continue
-        
-        question_lower = question.lower()
-        
-        # Vérifier si c'est une vraie question
-        if not any(word in question_lower for word in words) and not question.endswith('?'):
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Pas une question valide: '{question}'")
-            continue
-        
-        validation["valid_questions"].append(question)
-    
-    # Calculer score de qualité
-    if questions:
-        validation["quality_score"] = len(validation["valid_questions"]) / len(questions)
-    
-    return validation
-
-# =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
 
@@ -518,11 +325,5 @@ logger.info("   - 🎪 Prompts de clarification spécialisés")
 logger.info("   - 🎯 Prompts pour questions floues")
 logger.info("   - 🔍 Extraction contexte depuis entités")
 logger.info("   - ✅ Validation qualité contexte")
-logger.info("🆕 [Prompt Templates] NOUVELLE FONCTIONNALITÉ:")
-logger.info("   - 🎭 Prompt de contextualisation pour mode sémantique dynamique")
-logger.info("   - 🤖 Génération intelligente de questions via GPT")
-logger.info("   - 🌐 Support multilingue pour questions dynamiques")
-logger.info("   - ✅ Validation qualité questions générées")
-logger.info("   - 📝 Exemples de questions par langue")
 logger.info("🧹 [Prompt Templates] OBJECTIF: Éliminer références aux documents")
 logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles")
