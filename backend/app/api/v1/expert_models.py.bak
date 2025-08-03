@@ -3,7 +3,6 @@ app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
 VERSION AMÉLIORÉE : Ajout des nouvelles fonctionnalités API
-🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 """
 
 from typing import Optional, List, Dict, Any, Literal
@@ -130,10 +129,6 @@ class EnhancedQuestionRequest(BaseModel):
     is_clarification_response: Optional[bool] = Field(False, description="Is this a response to clarification?")
     original_question: Optional[str] = Field(None, description="Original question if this is clarification response")
     clarification_context: Optional[Dict[str, Any]] = Field(None, description="Clarification context")
-    
-    # 🧨 AJOUT v3.6.1: Support clarification_entities
-    clarification_entities: Optional[Dict[str, str]] = Field(None, description="Entités extraites (race, sexe)")
-    
     force_reprocess: Optional[bool] = Field(False, description="Force reprocessing even if no clarification needed")
 
     # ✅ NOUVELLES FONCTIONNALITÉS
@@ -197,9 +192,6 @@ class EnhancedExpertResponse(BaseModel):
     confidence_overall: Optional[float] = None
     processing_steps: Optional[List[str]] = None
     ai_enhancements_used: Optional[List[str]] = None
-    
-    # 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
-    clarification_processing: Optional[Dict[str, Any]] = Field(None, description="Métadonnées traitement clarification")
     
     # ✅ NOUVELLES FONCTIONNALITÉS
     document_relevance: Optional[DocumentRelevance] = Field(None, description="Score de pertinence détaillé")
@@ -313,4 +305,3 @@ logger.info("   - 🎯 VaguenessDetection: Détection de questions floues")
 logger.info("   - 🔧 EnhancedFallbackDetails: Fallback enrichi")
 logger.info("   - 📈 QualityMetrics: Métriques de qualité")
 logger.info("   - 🐛 Debug mode: Support pour développeurs")
-logger.info("   - 🧨 clarification_processing: Support métadonnées clarification v3.6.1")
