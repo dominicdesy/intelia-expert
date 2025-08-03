@@ -2,10 +2,9 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION AMÉLIORÉE : Ajout des nouvelles fonctionnalités API + RESPONSE_VERSIONS + SEMANTIC_DYNAMIC
+VERSION AMÉLIORÉE : Ajout des nouvelles fonctionnalités API + RESPONSE_VERSIONS
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
-🆕 NOUVEAU v3.9.0: Support mode sémantique dynamique avec DynamicClarification
 """
 
 from typing import Optional, List, Dict, Any, Literal
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 # =============================================================================
-# NOUVEAUX ENUMS POUR LES AMÉLIORATIONS + CONCISION + SEMANTIC DYNAMIC
+# NOUVEAUX ENUMS POUR LES AMÉLIORATIONS + CONCISION
 # =============================================================================
 
 class ResponseFormat(str, Enum):
@@ -40,7 +39,7 @@ class QuestionClarity(str, Enum):
     UNCLEAR = "unclear"
     VERY_UNCLEAR = "very_unclear"
 
-# 🚀 Enum pour les niveaux de concision
+# 🚀 NOUVEAU: Enum pour les niveaux de concision
 class ConcisionLevel(str, Enum):
     """Niveaux de concision pour les réponses"""
     ULTRA_CONCISE = "ultra_concise"  # Réponse minimale (ex: "350-400g")
@@ -62,23 +61,13 @@ class ResponsePreferences(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-# 🚀 Configuration pour la concision
+# 🚀 NOUVEAU: Configuration pour la concision
 class ConcisionPreferences(BaseModel):
     """Préférences de concision pour les réponses"""
     level: ConcisionLevel = Field(ConcisionLevel.CONCISE, description="Niveau de concision souhaité")
     generate_all_versions: bool = Field(True, description="Générer toutes les versions de concision")
     auto_detect_optimal: bool = Field(True, description="Détecter automatiquement le niveau optimal")
     cache_versions: bool = Field(True, description="Mettre en cache les versions générées")
-
-    model_config = ConfigDict(extra="ignore")
-
-# 🆕 NOUVEAU: Configuration pour le mode sémantique dynamique
-class SemanticDynamicPreferences(BaseModel):
-    """Préférences pour le mode sémantique dynamique"""
-    enabled: bool = Field(False, description="Activer le mode sémantique dynamique")
-    max_questions: int = Field(4, description="Nombre maximum de questions à générer")
-    fallback_enabled: bool = Field(True, description="Utiliser questions de fallback si génération échoue")
-    context_aware: bool = Field(True, description="Génération contextuelle intelligente")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -142,7 +131,7 @@ class QualityMetrics(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-# 🚀 Métriques spécifiques à la concision
+# 🚀 NOUVEAU: Métriques spécifiques à la concision
 class ConcisionMetrics(BaseModel):
     """Métriques pour évaluer la qualité des versions de concision"""
     generation_time_ms: int = Field(..., description="Temps de génération des versions en ms")
@@ -154,24 +143,12 @@ class ConcisionMetrics(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-# 🆕 NOUVEAU: Modèle pour clarification sémantique dynamique
-class DynamicClarification(BaseModel):
-    """Clarification générée dynamiquement via mode sémantique"""
-    original_question: str = Field(..., description="Question originale de l'utilisateur")
-    clarification_questions: List[str] = Field(..., description="Questions de clarification générées")
-    confidence: float = Field(0.9, ge=0.0, le=1.0, description="Confiance dans la génération")
-    generation_method: str = Field("gpt_semantic", description="Méthode de génération utilisée")
-    generation_time_ms: Optional[int] = Field(None, description="Temps de génération en ms")
-    fallback_used: bool = Field(False, description="Questions de fallback utilisées")
-
-    model_config = ConfigDict(extra="ignore")
-
 # =============================================================================
-# MODÈLES DE REQUÊTE AMÉLIORÉS AVEC CONCISION + SEMANTIC DYNAMIC
+# MODÈLES DE REQUÊTE AMÉLIORÉS AVEC CONCISION
 # =============================================================================
 
 class EnhancedQuestionRequest(BaseModel):
-    """Request model amélioré avec nouvelles fonctionnalités + concision + semantic dynamic"""
+    """Request model amélioré avec nouvelles fonctionnalités + concision"""
     text: str = Field(..., min_length=1, max_length=5000)
     language: Optional[str] = Field("fr", description="Response language")
     speed_mode: Optional[str] = Field("balanced", description="Speed mode")
@@ -187,7 +164,7 @@ class EnhancedQuestionRequest(BaseModel):
     clarification_entities: Optional[Dict[str, str]] = Field(None, description="Entités extraites (race, sexe)")
     force_reprocess: Optional[bool] = Field(False, description="Force reprocessing even if no clarification needed")
 
-    # 🚀 Champs concision (conservés)
+    # 🚀 NOUVEAUX CHAMPS CONCISION
     concision_level: Optional[ConcisionLevel] = Field(
         ConcisionLevel.CONCISE, 
         description="Niveau de concision souhaité pour la réponse principale"
@@ -199,16 +176,6 @@ class EnhancedQuestionRequest(BaseModel):
     concision_preferences: Optional[ConcisionPreferences] = Field(
         default_factory=ConcisionPreferences,
         description="Préférences avancées de concision"
-    )
-
-    # 🆕 NOUVEAU: Champs mode sémantique dynamique
-    semantic_dynamic_mode: Optional[bool] = Field(
-        False,
-        description="Activer le mode sémantique dynamique pour la clarification"
-    )
-    semantic_dynamic_preferences: Optional[SemanticDynamicPreferences] = Field(
-        default_factory=SemanticDynamicPreferences,
-        description="Préférences du mode sémantique dynamique"
     )
 
     # Fonctionnalités existantes (conservées)
@@ -243,11 +210,11 @@ class FeedbackRequest(BaseModel):
             self.rating = 'neutral'
 
 # =============================================================================
-# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC RESPONSE_VERSIONS + SEMANTIC DYNAMIC
+# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC RESPONSE_VERSIONS
 # =============================================================================
 
 class EnhancedExpertResponse(BaseModel):
-    """Response model amélioré avec toutes les nouvelles fonctionnalités + response_versions + semantic_dynamic"""
+    """Response model amélioré avec toutes les nouvelles fonctionnalités + response_versions"""
     
     # ✅ CHAMPS EXISTANTS (CONSERVÉS)
     question: str
@@ -264,7 +231,7 @@ class EnhancedExpertResponse(BaseModel):
     validation_passed: Optional[bool] = None
     validation_confidence: Optional[float] = None
     
-    # 🚀 Champ principal: Toutes les versions de concision (conservé)
+    # 🚀 NOUVEAU CHAMP PRINCIPAL: Toutes les versions de concision
     response_versions: Optional[Dict[str, str]] = Field(
         None,
         description="Toutes les versions de concision de la réponse",
@@ -276,16 +243,10 @@ class EnhancedExpertResponse(BaseModel):
         }
     )
     
-    # 🚀 Métriques de concision (conservé)
+    # 🚀 NOUVEAU: Métriques de concision
     concision_metrics: Optional[ConcisionMetrics] = Field(
         None,
         description="Métriques détaillées sur la génération des versions de concision"
-    )
-    
-    # 🆕 NOUVEAU: Informations clarification sémantique dynamique
-    dynamic_clarification: Optional[DynamicClarification] = Field(
-        None,
-        description="Informations sur la clarification sémantique dynamique générée"
     )
     
     # ✅ CHAMPS EXISTANTS AMÉLIORÉS (CONSERVÉS)
@@ -310,12 +271,6 @@ class EnhancedExpertResponse(BaseModel):
     debug_info: Optional[Dict[str, Any]] = Field(None, description="Informations de debug")
     rag_debug: Optional[Dict[str, Any]] = Field(None, description="Debug détaillé du RAG")
     performance_breakdown: Optional[Dict[str, int]] = Field(None, description="Breakdown des temps de traitement")
-
-    # 🆕 NOUVEAU: Informations spécifiques nouvelles fonctionnalités
-    concision_info: Optional[Dict[str, Any]] = Field(None, description="Informations système de concision")
-    original_response: Optional[str] = Field(None, description="Réponse originale avant concision")
-    taxonomy_info: Optional[Dict[str, Any]] = Field(None, description="Informations taxonomiques")
-    semantic_dynamic_info: Optional[Dict[str, Any]] = Field(None, description="Informations mode sémantique dynamique")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -345,7 +300,7 @@ class ProcessingContext(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
-# MODÈLES DE STATS AMÉLIORÉS (CONSERVÉS + SEMANTIC DYNAMIC)
+# MODÈLES DE STATS AMÉLIORÉS (CONSERVÉS)
 # =============================================================================
 
 class SystemStats(BaseModel):
@@ -357,10 +312,8 @@ class SystemStats(BaseModel):
     enhanced_endpoints: List[str]
     quality_metrics_enabled: bool = False
     debug_mode_available: bool = False
-    # 🚀 Existant
+    # 🚀 NOUVEAU
     concision_system_enabled: bool = Field(True, description="Système de concision activé")
-    # 🆕 NOUVEAU
-    semantic_dynamic_enabled: bool = Field(True, description="Mode sémantique dynamique activé")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -374,15 +327,13 @@ class TestResult(BaseModel):
     test_successful: bool
     errors: List[str]
     enhancement_results: Optional[Dict[str, Any]] = None
-    # 🚀 Existant
+    # 🚀 NOUVEAU
     concision_test_results: Optional[Dict[str, Any]] = Field(None, description="Résultats test concision")
-    # 🆕 NOUVEAU
-    semantic_dynamic_test_results: Optional[Dict[str, Any]] = Field(None, description="Résultats test mode sémantique dynamique")
 
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
-# MODÈLES POUR RÉPONSES SPÉCIALISÉES (CONSERVÉS + SEMANTIC DYNAMIC)
+# MODÈLES POUR RÉPONSES SPÉCIALISÉES (CONSERVÉS)
 # =============================================================================
 
 class VaguenessResponse(BaseModel):
@@ -409,7 +360,7 @@ class CoherenceWarningResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-# 🚀 Modèle spécialisé pour les réponses avec versions multiples (conservé)
+# 🚀 NOUVEAU: Modèle spécialisé pour les réponses avec versions multiples
 class ConcisionResponse(BaseModel):
     """Réponse spécialisée avec focus sur les versions de concision"""
     question: str
@@ -424,57 +375,6 @@ class ConcisionResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-# 🆕 NOUVEAU: Modèle spécialisé pour les réponses de clarification sémantique dynamique
-class SemanticDynamicResponse(BaseModel):
-    """Réponse spécialisée pour clarification sémantique dynamique"""
-    question: str
-    clarification_questions: List[str]
-    conversation_id: str
-    dynamic_clarification: DynamicClarification
-    generation_method: str
-    confidence_score: float
-    timestamp: str
-    language: str
-    response_time_ms: int
-
-    model_config = ConfigDict(extra="ignore")
-
-# =============================================================================
-# 🆕 NOUVEAUX MODÈLES POUR CONFIGURATION SYSTÈME
-# =============================================================================
-
-class SemanticDynamicConfig(BaseModel):
-    """Configuration du système sémantique dynamique"""
-    enabled: bool = True
-    max_questions: int = 4
-    supported_languages: List[str] = ["fr", "en", "es"]
-    gpt_model: str = "gpt-4o-mini"
-    fallback_enabled: bool = True
-    context_aware: bool = True
-    timeout_seconds: int = 25
-
-    model_config = ConfigDict(extra="ignore")
-
-class TaxonomicFilteringConfig(BaseModel):
-    """Configuration du filtrage taxonomique"""
-    enabled: bool = True
-    supported_taxonomies: List[str] = ["broiler", "layer", "swine", "dairy", "general"]
-    auto_detection: bool = True
-    filter_fallback: bool = True
-    question_enhancement: bool = True
-
-    model_config = ConfigDict(extra="ignore")
-
-class EnhancedSystemConfig(BaseModel):
-    """Configuration système complète"""
-    concision_config: Optional[Dict[str, Any]] = None
-    semantic_dynamic_config: Optional[SemanticDynamicConfig] = Field(default_factory=SemanticDynamicConfig)
-    taxonomic_filtering_config: Optional[TaxonomicFilteringConfig] = Field(default_factory=TaxonomicFilteringConfig)
-    response_versions_enabled: bool = True
-    advanced_clarification_enabled: bool = True
-
-    model_config = ConfigDict(extra="ignore")
-
 # =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
@@ -482,7 +382,7 @@ class EnhancedSystemConfig(BaseModel):
 import logging
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec améliorations API + Response Versions + Semantic Dynamic")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec améliorations API + Response Versions")
 logger.info("🆕 [Expert Models] Nouvelles fonctionnalités disponibles:")
 logger.info("   - 📊 DocumentRelevance: Scoring RAG détaillé")
 logger.info("   - 🔍 ContextCoherence: Vérification de cohérence")
@@ -491,18 +391,9 @@ logger.info("   - 🔧 EnhancedFallbackDetails: Fallback enrichi")
 logger.info("   - 📈 QualityMetrics: Métriques de qualité")
 logger.info("   - 🐛 Debug mode: Support pour développeurs")
 logger.info("   - 🧨 clarification_processing: Support métadonnées clarification v3.6.1")
-logger.info("🚀 [Expert Models] FONCTIONNALITÉS v3.7.0 - RESPONSE VERSIONS:")
+logger.info("🚀 [Expert Models] NOUVEAU v3.7.0 - RESPONSE VERSIONS:")
 logger.info("   - 📝 ConcisionLevel: 4 niveaux (ultra_concise, concise, standard, detailed)")
 logger.info("   - 🎛️ response_versions: Toutes les versions dans la réponse")
 logger.info("   - 📊 ConcisionMetrics: Métriques génération versions")
 logger.info("   - ⚙️ ConcisionPreferences: Configuration avancée")
 logger.info("   - 🔄 generate_all_versions: Génération automatique par défaut")
-logger.info("🆕 [Expert Models] NOUVELLES FONCTIONNALITÉS v3.9.0 - SEMANTIC DYNAMIC:")
-logger.info("   - 🎭 DynamicClarification: Modèle pour clarification sémantique dynamique")
-logger.info("   - 🤖 semantic_dynamic_mode: Paramètre d'activation dans les requêtes")
-logger.info("   - ⚙️ SemanticDynamicPreferences: Configuration avancée mode sémantique")
-logger.info("   - 📊 SemanticDynamicResponse: Réponse spécialisée clarification dynamique")
-logger.info("   - 🔧 SemanticDynamicConfig: Configuration système")
-logger.info("   - 📈 semantic_dynamic_info: Informations dans les réponses")
-logger.info("   - 🎯 EnhancedSystemConfig: Configuration système complète")
-logger.info("✨ [Expert Models] RÉSULTAT: Support complet mode sémantique dynamique dans les modèles Pydantic!")
