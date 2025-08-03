@@ -149,7 +149,7 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  console.log('🎯 [apiService] Envoi question vers ask-with-clarification (QUI FONCTIONNE):', {
+      console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
     question: question.substring(0, 50) + '...',
     isClarificationResponse,
     originalQuestion: originalQuestion?.substring(0, 30) + '...',
@@ -157,8 +157,8 @@ export const generateAIResponse = async (
   })
 
   try {
-    // 🎯 CORRECTION CRITIQUE: Utiliser l'endpoint QUI FONCTIONNE
-    let endpoint = `${API_BASE_URL}/expert/ask-with-clarification`
+    // 🎯 CORRECTION CRITIQUE: Utiliser l'endpoint PRINCIPAL
+    let endpoint = `${API_BASE_URL}/expert/ask-enhanced-v2`
     
     // Si c'est une réponse de clarification, enrichir la question
     let finalQuestion = question.trim()
@@ -196,7 +196,7 @@ export const generateAIResponse = async (
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body pour ask-with-clarification:', requestBody)
+    console.log('📤 [apiService] Body pour ask-enhanced-v2:', requestBody)
 
     // 🎯 UTILISER L'ENDPOINT QUI FONCTIONNE
     const response = await fetch(endpoint, {
@@ -205,11 +205,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut réponse ask-with-clarification:', response.status)
+    console.log('📡 [apiService] Statut réponse ask-enhanced-v2:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur ask-with-clarification:', errorText)
+      console.error('❌ [apiService] Erreur ask-enhanced-v2:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -231,7 +231,7 @@ export const generateAIResponse = async (
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-with-clarification reçue:', {
+    console.log('✅ [apiService] Réponse ask-enhanced-v2 reçue:', {
       conversation_id: data.conversation_id,
       language: data.language,
       mode: data.mode,
@@ -281,7 +281,7 @@ export const generateAIResponse = async (
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur complète ask-with-clarification:', error)
+    console.error('❌ [apiService] Erreur complète ask-enhanced-v2:', error)
     
     if (error instanceof Error) {
       throw error
@@ -303,7 +303,7 @@ export const generateAIResponsePublic = async (
     throw new Error('Question requise')
   }
 
-  console.log('🌐 [apiService] Question publique vers ask-with-clarification:', question.substring(0, 50) + '...')
+  console.log('🌐 [apiService] Question publique vers ask-enhanced-v2-public:', question.substring(0, 50) + '...')
 
   try {
     const requestBody = {
@@ -323,12 +323,12 @@ export const generateAIResponsePublic = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur ask-with-clarification public:', errorText)
+      console.error('❌ [apiService] Erreur ask-enhanced-v2-public:', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-with-clarification publique reçue')
+    console.log('✅ [apiService] Réponse ask-enhanced-v2-public reçue')
 
     // 🎯 MÊME MAPPING que la version authentifiée
     return {
@@ -348,7 +348,7 @@ export const generateAIResponsePublic = async (
     }
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur ask-with-clarification public:', error)
+    console.error('❌ [apiService] Erreur ask-enhanced-v2-public:', error)
     throw error
   }
 }
@@ -586,7 +586,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité conversation ask-with-clarification...')
+    console.log('🧪 [apiService] Test continuité conversation ask-enhanced-v2...')
     
     // Première question
     const firstResponse = await generateAIResponse(
@@ -608,7 +608,7 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test ask-with-clarification résultat:', {
+    console.log('🧪 [apiService] Test ask-enhanced-v2 résultat:', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
@@ -628,7 +628,7 @@ export const testEnhancedConversationContinuity = async (
     }
     
   } catch (error) {
-    console.error('❌ [apiService] Erreur test ask-with-clarification continuité:', error)
+    console.error('❌ [apiService] Erreur test ask-enhanced-v2 continuité:', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
@@ -655,7 +655,7 @@ export const handleEnhancedNetworkError = (error: any): string => {
     return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
   }
   
-  if (error?.message?.includes('ask-with-clarification')) {
+  if (error?.message?.includes('ask-enhanced-v2')) {
     return 'Erreur du système expert amélioré. Veuillez réessayer.'
   }
   
@@ -672,7 +672,7 @@ export const debugEnhancedConversationFlow = (
 ) => {
   console.log(`🔍 [Enhanced Conversation Debug] ${step}:`, {
     conversation_id: conversationId || 'NOUVEAU',
-    endpoint: 'ask-with-clarification',
+    endpoint: 'ask-enhanced-v2',
     timestamp: new Date().toISOString(),
     ...additionalInfo
   })
@@ -728,7 +728,7 @@ export const generateAIResponseSmart = async (
   console.log(`🤖 [generateAIResponseSmart] Utilisation API: ${apiVersion}`)
   
   switch (apiVersion) {
-    case 'clarification':
+    case 'enhanced':
       return await generateAIResponse(question, user, language, conversationId)
       
     case 'legacy':
