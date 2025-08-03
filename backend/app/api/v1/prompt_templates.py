@@ -1,16 +1,18 @@
 """
-app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS AVEC VALIDATION
+app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS AVEC VALIDATION ROBUSTE
 
 🎯 OBJECTIF: Centraliser et standardiser les prompts pour le système RAG
 🔧 AMÉLIORATION: Éliminer les références aux documents dans les réponses
 ✨ QUALITÉ: Réponses plus naturelles et professionnelles
 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
-🔧 NOUVEAU: Validation des questions générées dynamiquement
-🐛 FIX: Ajout import List manquant (CORRIGÉ)
+🔧 NOUVEAU: Validation robuste des questions générées dynamiquement
+🔧 NOUVEAU: Fallback intelligent si GPT échoue
+🎯 NOUVEAU: Filtrage avancé des questions non pertinentes
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+import re
+from typing import Dict, Any, Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +118,11 @@ INSTRUCCIONES CRÍTICAS:
 
 RESPUESTA EXPERTA:"""
 
-# 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique (MODIFIÉ)
+# 🆕 NOUVEAU: Prompt de contextualisation optimisé pour mode sémantique dynamique
 def build_contextualization_prompt(user_question: str, language: str = "fr") -> str:
     """
     🆕 NOUVEAU: Construit un prompt pour générer des questions de clarification dynamiques.
-    🔧 MODIFIÉ: Prompt optimisé pour éviter les exemples génériques non pertinents
+    🔧 AMÉLIORÉ: Prompt optimisé pour éviter les exemples génériques non pertinents
     
     Args:
         user_question: Question originale de l'utilisateur
@@ -137,10 +139,19 @@ Your task is to help another AI agent better understand the following question: 
 
 Analyze the question and deduce its main theme (e.g., laying drop, mortality, temperature, feeding, etc.). Then generate between 2 and 4 **targeted and concrete** clarification questions to better understand the problem.
 
-Do not propose generic examples.
-Do not reformulate the question.
-Do not answer the question.
-Do not mention breeds or species that are not already cited by the user.
+CRITICAL RULES:
+- Do NOT propose generic examples or hypothetical scenarios
+- Do NOT reformulate the question
+- Do NOT answer the question
+- Do NOT mention breeds or species that are not already cited by the user
+- Focus on MISSING INFORMATION that would help provide a precise answer
+- Ask for SPECIFIC details (exact age, specific breed, current conditions)
+
+GOOD examples of targeted questions:
+- "What exact breed/strain are you raising?" (if not specified)
+- "What is their current age in days?" (if age missing)
+- "What specific symptoms are you observing?" (for health issues)
+- "What are the current housing conditions?" (for environment issues)
 
 Respond in this JSON format:
 {{
@@ -158,10 +169,19 @@ Tu tarea es ayudar a otro agente de IA a entender mejor la siguiente pregunta: "
 
 Analiza la pregunta y deduce su tema principal (ej. caída de postura, mortalidad, temperatura, alimentación, etc.). Luego genera entre 2 y 4 preguntas de aclaración **dirigidas y concretas** para entender mejor el problema.
 
-No propongas ejemplos genéricos.
-No reformules la pregunta.
-No respondas la pregunta.
-No menciones razas o especies que no hayan sido ya citadas por el usuario.
+REGLAS CRÍTICAS:
+- NO propongas ejemplos genéricos o escenarios hipotéticos
+- NO reformules la pregunta
+- NO respondas la pregunta
+- NO menciones razas o especies que no hayan sido ya citadas por el usuario
+- Enfócate en INFORMACIÓN FALTANTE que ayudaría a proporcionar una respuesta precisa
+- Pregunta por detalles ESPECÍFICOS (edad exacta, raza específica, condiciones actuales)
+
+Ejemplos BUENOS de preguntas dirigidas:
+- "¿Qué raza/cepa exacta está criando?" (si no especificado)
+- "¿Cuál es su edad actual en días?" (si falta la edad)
+- "¿Qué síntomas específicos está observando?" (para problemas de salud)
+- "¿Cuáles son las condiciones actuales de alojamiento?" (para problemas ambientales)
 
 Responde en este formato JSON:
 {{
@@ -179,10 +199,19 @@ Ta tâche est d'aider un autre agent IA à mieux comprendre la question suivante
 
 Analyse la question et déduis son thème principal (ex. baisse de ponte, mortalité, température, alimentation, etc.). Puis génère entre 2 et 4 questions de clarification **ciblées et concrètes** pour mieux comprendre le problème.
 
-Ne propose pas d'exemples génériques.
-Ne reformule pas la question.
-Ne réponds pas à la question.
-Ne mentionne pas de races ou d'espèces qui ne sont pas déjà citées par l'utilisateur.
+RÈGLES CRITIQUES :
+- Ne propose PAS d'exemples génériques ou de scénarios hypothétiques
+- Ne reformule PAS la question
+- Ne réponds PAS à la question
+- Ne mentionne PAS de races ou d'espèces qui ne sont pas déjà citées par l'utilisateur
+- Concentre-toi sur l'INFORMATION MANQUANTE qui aiderait à fournir une réponse précise
+- Demande des détails SPÉCIFIQUES (âge exact, race spécifique, conditions actuelles)
+
+Exemples BONS de questions ciblées :
+- "Quelle race/souche exacte élevez-vous ?" (si non spécifié)
+- "Quel est leur âge actuel en jours ?" (si âge manquant)
+- "Quels symptômes spécifiques observez-vous ?" (pour problèmes de santé)
+- "Quelles sont les conditions actuelles de logement ?" (pour problèmes environnementaux)
 
 Réponds dans ce format JSON :
 {{
@@ -298,7 +327,314 @@ def build_vagueness_prompt(vague_question: str, suggestions: list, language: str
     return templates.get(language.lower(), templates["fr"])
 
 # =============================================================================
-# UTILITAIRES POUR EXTRACTION CONTEXTE
+# 🔧 NOUVELLE FONCTION: VALIDATION ROBUSTE DES QUESTIONS DYNAMIQUES
+# =============================================================================
+
+def validate_dynamic_questions(questions: List[str], user_question: str = "", language: str = "fr") -> Dict[str, Any]:
+    """
+    🔧 NOUVEAU: Validation robuste des questions générées dynamiquement
+    
+    Args:
+        questions: Liste des questions à valider
+        user_question: Question originale de l'utilisateur (pour contexte)
+        language: Langue des questions (fr/en/es)
+        
+    Returns:
+        Dict avec résultats de validation incluant quality_score
+    """
+    
+    validation = {
+        "valid_questions": [],
+        "invalid_questions": [],
+        "quality_score": 0.0,
+        "issues": [],
+        "filtered_count": 0,
+        "validation_details": {}
+    }
+    
+    if not questions or not isinstance(questions, list):
+        validation["quality_score"] = 0.0
+        validation["issues"].append("Aucune question fournie ou format incorrect")
+        return validation
+    
+    # Mots-clés de questions par langue
+    question_words = {
+        "fr": ["quel", "quelle", "combien", "comment", "où", "quand", "pourquoi", "dans quel", "depuis quand", "à quel"],
+        "en": ["what", "which", "how", "where", "when", "why", "who", "how long", "what type", "at what"],
+        "es": ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "quién", "cuánto tiempo", "qué tipo", "a qué"]
+    }
+    
+    # Mots-clés génériques à éviter (indiquent des questions trop vagues)
+    generic_keywords = {
+        "fr": ["exemple", "par exemple", "etc", "quelque chose", "peut-être", "généralement", "souvent", "parfois", "habituellement"],
+        "en": ["example", "for example", "etc", "something", "maybe", "generally", "often", "sometimes", "usually"],
+        "es": ["ejemplo", "por ejemplo", "etc", "algo", "tal vez", "generalmente", "a menudo", "a veces", "usualmente"]
+    }
+    
+    # Phrases interdites qui indiquent des questions non pertinentes
+    forbidden_phrases = {
+        "fr": [
+            "reformul", "reformulation", "pouvez-vous reformuler", "pourriez-vous reformuler",
+            "expliquer différemment", "dire autrement", "autre façon", "manière différente"
+        ],
+        "en": [
+            "rephras", "rephrase", "could you rephrase", "can you rephrase",
+            "explain differently", "say differently", "another way", "different way"
+        ],
+        "es": [
+            "reformul", "reformular", "puede reformular", "podría reformular",
+            "explicar diferente", "decir diferente", "otra manera", "forma diferente"
+        ]
+    }
+    
+    words = question_words.get(language, question_words["fr"])
+    generic_words = generic_keywords.get(language, generic_keywords["fr"])
+    forbidden = forbidden_phrases.get(language, forbidden_phrases["fr"])
+    
+    validation_details = {
+        "total_questions": len(questions),
+        "length_failures": 0,
+        "question_word_failures": 0,
+        "generic_failures": 0,
+        "forbidden_phrase_failures": 0,
+        "length_limit_failures": 0,
+        "duplicate_failures": 0
+    }
+    
+    processed_questions = []
+    
+    for i, question in enumerate(questions):
+        if not isinstance(question, str):
+            validation["invalid_questions"].append(f"Question {i+1}: Not a string")
+            validation["issues"].append(f"Question {i+1} n'est pas une chaîne de caractères")
+            continue
+        
+        question = question.strip()
+        
+        # Test 1: Longueur minimale
+        if len(question) < 15:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop courte: '{question}'")
+            validation_details["length_failures"] += 1
+            continue
+        
+        question_lower = question.lower()
+        
+        # Test 2: Vérifier si c'est une vraie question
+        has_question_word = any(word in question_lower for word in words)
+        has_question_mark = question.strip().endswith('?')
+        
+        if not has_question_word and not has_question_mark:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Pas une question valide: '{question}'")
+            validation_details["question_word_failures"] += 1
+            continue
+        
+        # Test 3: Vérifier les phrases interdites (reformulation, etc.)
+        has_forbidden = any(phrase in question_lower for phrase in forbidden)
+        if has_forbidden:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question interdite (reformulation): '{question}'")
+            validation_details["forbidden_phrase_failures"] += 1
+            continue
+        
+        # Test 4: Vérifier si la question n'est pas trop générique
+        generic_count = sum(1 for generic_word in generic_words if generic_word in question_lower)
+        if generic_count >= 2:  # Plus souple: 2+ mots génériques = rejet
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop générique: '{question}'")
+            validation_details["generic_failures"] += 1
+            continue
+        
+        # Test 5: Vérifier la longueur (pas trop longue)
+        if len(question) > 200:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop longue: '{question[:50]}...'")
+            validation_details["length_limit_failures"] += 1
+            continue
+        
+        # Test 6: Éviter les doublons
+        if question in processed_questions:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question en doublon: '{question}'")
+            validation_details["duplicate_failures"] += 1
+            continue
+        
+        # Nettoyer et formater la question valide
+        if not question.endswith('?'):
+            question += ' ?'
+        
+        validation["valid_questions"].append(question)
+        processed_questions.append(question)
+    
+    validation["validation_details"] = validation_details
+    validation["filtered_count"] = len(validation["valid_questions"])
+    
+    # Calculer score de qualité amélioré
+    if questions:
+        # Score de base
+        base_score = len(validation["valid_questions"]) / len(questions)
+        
+        # Bonus pour diversité des questions
+        if len(validation["valid_questions"]) > 1:
+            # Vérifier que les questions ne commencent pas toutes de la même façon
+            unique_starts = set()
+            for q in validation["valid_questions"]:
+                first_words = " ".join(q.split()[:2]).lower()
+                unique_starts.add(first_words)
+            
+            diversity_bonus = len(unique_starts) / len(validation["valid_questions"]) * 0.2
+            base_score += diversity_bonus
+        
+        # Malus pour questions invalides
+        invalid_penalty = len(validation["invalid_questions"]) / len(questions) * 0.3
+        base_score -= invalid_penalty
+        
+        # Bonus pour questions spécifiques vs génériques
+        if validation["valid_questions"]:
+            specificity_bonus = 0
+            for q in validation["valid_questions"]:
+                q_lower = q.lower()
+                # Bonus si mention d'éléments spécifiques
+                if any(word in q_lower for word in ["race", "breed", "âge", "age", "jours", "days", "symptômes", "symptoms"]):
+                    specificity_bonus += 0.1
+            
+            specificity_bonus = min(specificity_bonus, 0.2)  # Max 20% bonus
+            base_score += specificity_bonus
+        
+        validation["quality_score"] = max(0.0, min(1.0, base_score))
+    
+    logger.info(f"🔧 [Question Validation] Score calculé: {validation['quality_score']:.2f}")
+    logger.info(f"🔧 [Question Validation] Questions valides: {len(validation['valid_questions'])}/{len(questions)}")
+    
+    if validation["issues"]:
+        logger.info(f"🔧 [Question Validation] Problèmes détectés: {validation['issues'][:3]}...")  # Log premier 3 problèmes
+    
+    return validation
+
+def get_dynamic_clarification_fallback_questions(user_question: str, language: str = "fr") -> List[str]:
+    """
+    🆕 NOUVEAU: Retourne des questions de fallback intelligentes basées sur l'analyse de la question utilisateur
+    """
+    
+    user_question_lower = user_question.lower() if user_question else ""
+    
+    # Analyse basique du type de question pour fallback ciblé
+    is_weight_question = any(word in user_question_lower for word in ["poids", "weight", "peso", "grammes", "grams"])
+    is_health_question = any(word in user_question_lower for word in ["maladie", "disease", "enfermedad", "mort", "death", "muerte"])
+    is_growth_question = any(word in user_question_lower for word in ["croissance", "growth", "crecimiento", "développement", "development"])
+    is_feed_question = any(word in user_question_lower for word in ["alimentation", "feeding", "alimentación", "nourriture", "food"])
+    
+    fallback_questions = {
+        "fr": {
+            "weight": [
+                "Quelle race ou souche spécifique élevez-vous (Ross 308, Cobb 500, etc.) ?",
+                "Quel âge ont actuellement vos poulets (en jours précis) ?",
+                "S'agit-il de mâles, femelles, ou d'un troupeau mixte ?"
+            ],
+            "health": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles actuellement ?",
+                "Quels symptômes spécifiques observez-vous ?",
+                "Depuis combien de temps observez-vous ce problème ?"
+            ],
+            "growth": [
+                "Quelle race ou souche spécifique élevez-vous ?",
+                "Quel âge ont-ils actuellement en jours ?",
+                "Quelles sont les conditions d'élevage actuelles ?"
+            ],
+            "feed": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles ?",
+                "Quel type d'alimentation utilisez-vous actuellement ?"
+            ],
+            "general": [
+                "Pouvez-vous préciser la race ou souche de vos volailles ?",
+                "Quel âge ont actuellement vos animaux ?",
+                "Dans quel contexte d'élevage vous trouvez-vous ?",
+                "Y a-t-il des symptômes ou problèmes spécifiques observés ?"
+            ]
+        },
+        "en": {
+            "weight": [
+                "What specific breed or strain are you raising (Ross 308, Cobb 500, etc.)?",
+                "What is the current age of your chickens (in precise days)?",
+                "Are these males, females, or a mixed flock?"
+            ],
+            "health": [
+                "What breed or strain are you raising?",
+                "What is the current age of your poultry?",
+                "What specific symptoms are you observing?",
+                "How long have you been observing this problem?"
+            ],
+            "growth": [
+                "What specific breed or strain are you raising?",
+                "What is their current age in days?",
+                "What are the current housing conditions?"
+            ],
+            "feed": [
+                "What breed or strain are you raising?",
+                "What age are your poultry?",
+                "What type of feed are you currently using?"
+            ],
+            "general": [
+                "Could you specify the breed or strain of your poultry?",
+                "What age are your animals currently?",
+                "What farming context are you in?",
+                "Are there any specific symptoms or problems observed?"
+            ]
+        },
+        "es": {
+            "weight": [
+                "¿Qué raza o cepa específica está criando (Ross 308, Cobb 500, etc.)?",
+                "¿Cuál es la edad actual de sus pollos (en días precisos)?",
+                "¿Son machos, hembras, o un lote mixto?"
+            ],
+            "health": [
+                "¿Qué raza o cepa está criando?",
+                "¿Cuál es la edad actual de sus aves?",
+                "¿Qué síntomas específicos está observando?",
+                "¿Desde cuándo observa este problema?"
+            ],
+            "growth": [
+                "¿Qué raza o cepa específica está criando?",
+                "¿Cuál es su edad actual en días?",
+                "¿Cuáles son las condiciones actuales de alojamiento?"
+            ],
+            "feed": [
+                "¿Qué raza o cepa está criando?",
+                "¿Qué edad tienen sus aves?",
+                "¿Qué tipo de alimentación está usando actualmente?"
+            ],
+            "general": [
+                "¿Podría especificar la raza o cepa de sus aves?",
+                "¿Qué edad tienen actualmente sus animales?",
+                "¿En qué contexto de cría se encuentra?",
+                "¿Hay algún síntoma o problema específico observado?"
+            ]
+        }
+    }
+    
+    lang_questions = fallback_questions.get(language, fallback_questions["fr"])
+    
+    # Sélectionner le type de questions le plus approprié
+    if is_weight_question:
+        selected_questions = lang_questions["weight"]
+    elif is_health_question:
+        selected_questions = lang_questions["health"]
+    elif is_growth_question:
+        selected_questions = lang_questions["growth"]
+    elif is_feed_question:
+        selected_questions = lang_questions["feed"]
+    else:
+        selected_questions = lang_questions["general"]
+    
+    logger.info(f"🔄 [Fallback Questions] Type détecté pour '{user_question[:30]}...': {selected_questions[0][:30]}...")
+    
+    return selected_questions[:4]  # Max 4 questions
+
+# =============================================================================
+# UTILITAIRES POUR EXTRACTION CONTEXTE (CONSERVÉS)
 # =============================================================================
 
 def extract_context_from_entities(extracted_entities: Dict[str, Any]) -> Dict[str, str]:
@@ -393,159 +729,10 @@ def validate_prompt_context(context: Dict[str, str]) -> Dict[str, Any]:
     return validation_result
 
 # =============================================================================
-# 🔧 NOUVELLES FONCTIONS POUR VALIDATION QUESTIONS DYNAMIQUES
-# =============================================================================
-
-def validate_dynamic_questions(questions: List[str], language: str = "fr") -> Dict[str, Any]:
-    """
-    🔧 NOUVEAU: Valide la qualité des questions générées dynamiquement
-    
-    Args:
-        questions: Liste des questions à valider
-        language: Langue des questions (fr/en/es)
-        
-    Returns:
-        Dict avec résultats de validation incluant quality_score
-    """
-    
-    validation = {
-        "valid_questions": [],
-        "invalid_questions": [],
-        "quality_score": 0.0,
-        "issues": []
-    }
-    
-    if not questions:
-        validation["quality_score"] = 0.0
-        validation["issues"].append("Aucune question fournie")
-        return validation
-    
-    # Mots-clés de questions par langue
-    question_words = {
-        "fr": ["quel", "quelle", "combien", "comment", "où", "quand", "pourquoi", "dans quel", "depuis quand"],
-        "en": ["what", "which", "how", "where", "when", "why", "who", "how long", "what type"],
-        "es": ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "quién", "cuánto tiempo", "qué tipo"]
-    }
-    
-    # Mots-clés génériques à éviter (indiquent des questions trop vagues)
-    generic_keywords = {
-        "fr": ["exemple", "par exemple", "etc", "quelque chose", "peut-être", "généralement"],
-        "en": ["example", "for example", "etc", "something", "maybe", "generally"],
-        "es": ["ejemplo", "por ejemplo", "etc", "algo", "tal vez", "generalmente"]
-    }
-    
-    words = question_words.get(language, question_words["fr"])
-    generic_words = generic_keywords.get(language, generic_keywords["fr"])
-    
-    for question in questions:
-        if not question or len(question.strip()) < 10:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question trop courte: '{question}'")
-            continue
-        
-        question_lower = question.lower().strip()
-        
-        # Vérifier si c'est une vraie question
-        has_question_word = any(word in question_lower for word in words)
-        has_question_mark = question.strip().endswith('?')
-        
-        if not has_question_word and not has_question_mark:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Pas une question valide: '{question}'")
-            continue
-        
-        # Vérifier si la question n'est pas trop générique
-        is_generic = any(generic_word in question_lower for generic_word in generic_words)
-        if is_generic:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question trop générique: '{question}'")
-            continue
-        
-        # Vérifier la longueur (pas trop courte, pas trop longue)
-        if len(question) < 20:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question manque de contexte: '{question}'")
-            continue
-        
-        if len(question) > 150:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question trop longue: '{question[:50]}...'")
-            continue
-        
-        # Si toutes les validations passent
-        validation["valid_questions"].append(question)
-    
-    # Calculer score de qualité
-    if questions:
-        base_score = len(validation["valid_questions"]) / len(questions)
-        
-        # Bonus pour diversité des questions
-        if len(validation["valid_questions"]) > 1:
-            # Vérifier que les questions ne sont pas trop similaires
-            unique_starts = set()
-            for q in validation["valid_questions"]:
-                first_words = " ".join(q.split()[:3]).lower()
-                unique_starts.add(first_words)
-            
-            diversity_bonus = len(unique_starts) / len(validation["valid_questions"]) * 0.2
-            base_score += diversity_bonus
-        
-        # Malus pour questions invalides
-        invalid_penalty = len(validation["invalid_questions"]) / len(questions) * 0.3
-        base_score -= invalid_penalty
-        
-        validation["quality_score"] = max(0.0, min(1.0, base_score))
-    
-    logger.info(f"🔧 [Question Validation] Score calculé: {validation['quality_score']:.2f}")
-    logger.info(f"🔧 [Question Validation] Questions valides: {len(validation['valid_questions'])}/{len(questions)}")
-    
-    return validation
-
-def get_dynamic_clarification_examples(language: str = "fr") -> List[str]:
-    """
-    🆕 NOUVEAU: Retourne des exemples de questions dynamiques par langue
-    """
-    
-    examples = {
-        "fr": [
-            "Quelle race ou souche spécifique élevez-vous ?",
-            "Quel âge ont actuellement vos volailles ?",
-            "Quels symptômes ou problèmes observez-vous ?",
-            "Quelle est votre configuration d'élevage ?",
-            "Quel type d'alimentation utilisez-vous ?",
-            "Combien d'animaux avez-vous dans votre troupeau ?",
-            "Depuis combien de temps observez-vous ce problème ?",
-            "Quelles sont les conditions environnementales actuelles ?"
-        ],
-        "en": [
-            "What specific breed or strain are you raising?",
-            "What age are your birds currently?",
-            "What symptoms or issues are you observing?",
-            "What is your housing setup?",
-            "What type of feed are you using?",
-            "How many animals do you have in your flock?",
-            "How long have you been observing this problem?",
-            "What are the current environmental conditions?"
-        ],
-        "es": [
-            "¿Qué raza o cepa específica está criando?",
-            "¿Qué edad tienen actualmente sus aves?",
-            "¿Qué síntomas o problemas está observando?",
-            "¿Cuál es su configuración de alojamiento?",
-            "¿Qué tipo de alimentación está usando?",
-            "¿Cuántos animales tiene en su lote?",
-            "¿Desde cuándo está observando este problema?",
-            "¿Cuáles son las condiciones ambientales actuales?"
-        ]
-    }
-    
-    return examples.get(language, examples["fr"])
-
-# =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
 
-logger.info("✅ [Prompt Templates] Templates de prompts structurés chargés avec validation")
+logger.info("✅ [Prompt Templates] Templates de prompts structurés chargés avec validation robuste")
 logger.info("🎯 [Prompt Templates] Fonctionnalités disponibles:")
 logger.info("   - 🇫🇷 Prompts français optimisés")
 logger.info("   - 🇬🇧 Prompts anglais optimisés") 
@@ -558,15 +745,15 @@ logger.info("🆕 [Prompt Templates] FONCTIONNALITÉ MODE SÉMANTIQUE:")
 logger.info("   - 🎭 Prompt de contextualisation pour mode sémantique dynamique")
 logger.info("   - 🤖 Génération intelligente de questions via GPT")
 logger.info("   - 🌐 Support multilingue pour questions dynamiques")
-logger.info("   - 📝 Exemples de questions par langue")
-logger.info("🔧 [Prompt Templates] NOUVELLE FONCTIONNALITÉ VALIDATION:")
-logger.info("   - ✅ Validation qualité questions générées (validate_dynamic_questions)")
-logger.info("   - 📊 Score de qualité (0.0 à 1.0)")
-logger.info("   - 🎯 Filtrage questions génériques/trop courtes/trop longues")
-logger.info("   - 🔍 Vérification mots-clés question par langue")
-logger.info("   - 📈 Bonus diversité + malus répétition")
-logger.info("   - 📝 Logs détaillés résultats validation")
+logger.info("   - 📝 Questions de fallback intelligentes par type")
+logger.info("🔧 [Prompt Templates] NOUVELLE FONCTIONNALITÉ VALIDATION ROBUSTE:")
+logger.info("   - ✅ Validation complète des questions générées (validate_dynamic_questions)")
+logger.info("   - 🎯 Filtrage avancé: longueur, mots-clés, phrases interdites")
+logger.info("   - 📊 Score de qualité détaillé (0.0 à 1.0)")
+logger.info("   - 🚫 Détection reformulations et questions génériques")
+logger.info("   - 🔍 Bonus diversité et spécificité")
+logger.info("   - 📋 Logs détaillés des échecs de validation")
+logger.info("   - 🔄 Fallback intelligent par type de question (poids/santé/croissance/alimentation)")
 logger.info("🧹 [Prompt Templates] OBJECTIF: Éliminer références aux documents")
-logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles + questions validées")
-logger.info("🐛 [Prompt Templates] FIX: Import List ajouté - erreur corrigée!")
-logger.info("🔧 [Prompt Templates] AMÉLIORATION: Prompt contextualisation optimisé pour éviter exemples génériques")
+logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles + questions validées robustement")
+logger.info("🔧 [Prompt Templates] AMÉLIORATION: Validation complète avec fallback intelligent")
