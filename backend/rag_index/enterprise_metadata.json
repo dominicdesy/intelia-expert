@@ -1,16 +1,16 @@
 {
   "build_info": {
     "builder_version": "Enterprise RAG Builder v1.0 (Modified for C:/intelia_gpt/rag_index)",
-    "build_date": "2025-07-25T17:09:05.249595",
-    "build_duration_seconds": 152.12579679489136,
+    "build_date": "2025-08-03T17:14:22.123964",
+    "build_duration_seconds": 166.0148468017578,
     "python_version": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
     "output_directory": "C:\\intelia_gpt\\rag_index"
   },
   "index_specifications": {
-    "total_vectors": 594,
+    "total_vectors": 1481,
     "vector_dimension": 384,
-    "index_type": "FlatIP",
-    "estimated_size_mb": 1.044140625
+    "index_type": "IVFFlat_nlist38",
+    "estimated_size_mb": 2.6033203124999997
   },
   "parser_ecosystem": {
     "total_parsers_loaded": 10,
@@ -98,63 +98,42 @@
       ],
       "failed_loads": [],
       "parser_count": 10,
-      "loading_time": 80.44475102424622
+      "loading_time": 8.345574617385864
     }
   },
   "processing_statistics": {
-    "total_files": 8,
-    "successful_parsings": 8,
+    "total_files": 56,
+    "successful_parsings": 56,
     "failed_parsings": 0,
-    "total_chunks": 594,
-    "total_processing_time": 39.06692671775818,
+    "total_chunks": 1481,
+    "total_processing_time": 77.66253566741943,
     "parser_usage": {
-      "text": {
-        "total_attempts": 1,
-        "successful_attempts": 1,
-        "total_time": 0.015523910522460938,
-        "total_chunks": 1,
-        "success_rate": 1.0
-      },
       "pdf": {
-        "total_attempts": 4,
-        "successful_attempts": 4,
-        "total_time": 36.989933252334595,
-        "total_chunks": 582,
-        "success_rate": 1.0
-      },
-      "broiler_performance": {
-        "total_attempts": 2,
-        "successful_attempts": 2,
-        "total_time": 2.0487334728240967,
-        "total_chunks": 4,
-        "success_rate": 1.0
-      },
-      "markdown": {
-        "total_attempts": 1,
-        "successful_attempts": 1,
-        "total_time": 0.012736082077026367,
-        "total_chunks": 7,
+        "total_attempts": 56,
+        "successful_attempts": 56,
+        "total_time": 77.66253566741943,
+        "total_chunks": 1481,
         "success_rate": 1.0
       }
     },
     "overall_success_rate": 100.0,
-    "avg_processing_time": 4.883365839719772,
-    "avg_chunks_per_document": 74.25,
+    "avg_processing_time": 1.3868309940610613,
+    "avg_chunks_per_document": 26.446428571428573,
     "performance_benchmarks": {
-      "documents_per_second": 0.20477679387980977,
-      "chunks_per_second": 15.204676945575876,
-      "top_performing_parser": "text"
+      "documents_per_second": 0.7210683957038608,
+      "chunks_per_second": 19.069683822096746,
+      "top_performing_parser": "pdf"
     }
   },
   "content_analysis": {
-    "total_documents_discovered": 8,
-    "successful_processings": 8,
+    "total_documents_discovered": 56,
+    "successful_processings": 56,
     "failed_processings": 0,
     "overall_success_rate": 100.0,
-    "total_chunks_generated": 594
+    "total_chunks_generated": 1481
   },
   "source_information": {
     "documents_source_path": "C:\\intelia_gpt\\documents",
-    "total_source_files": 8
+    "total_source_files": 56
   }
 }

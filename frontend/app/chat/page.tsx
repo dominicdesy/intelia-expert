@@ -8,7 +8,7 @@ import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 
-// 🆕 NOUVEAU: Import du hook de concision
+// 🚀 IMPORT MODIFIÉ : Hook simplifié avec sélection de versions
 import { useResponseConcision, ConcisionLevel } from './hooks/useResponseConcision'
 
 import { 
@@ -19,14 +19,12 @@ import {
   ArrowDownIcon,
   ThumbUpIcon,
   ThumbDownIcon,
-  CogIcon  // 🆕 NOUVEAU: Icône pour les paramètres
+  CogIcon
 } from './utils/icons'
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
-
-// 🆕 NOUVEAU: Composant de contrôle de concision
 import { ConcisionControl } from './components/ConcisionControl'
 
 export default function ChatInterface() {
@@ -40,17 +38,15 @@ export default function ChatInterface() {
   const createNewConversation = useChatStore(state => state.createNewConversation)
   const loadConversations = useChatStore(state => state.loadConversations)
   
-  // 🆕 NOUVEAU: Hook de concision
-  const { config, processResponse, updateConcisionLevel, detectOptimalLevel } = useResponseConcision()
+  // 🚀 HOOK MODIFIÉ : Hook simplifié avec sélection de versions
+  const { config, updateConcisionLevel, detectOptimalLevel, selectVersionFromResponse } = useResponseConcision()
   
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
-  
-  // 🆕 NOUVEAU: État pour les paramètres de concision
   const [showConcisionSettings, setShowConcisionSettings] = useState(false)
   
-  // États existants
+  // États existants inchangés
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
     originalQuestion: string
@@ -81,27 +77,32 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  console.log('🔍 [Render] Messages actuels:', messages.length, 'Clarification active:', !!clarificationState, 'Concision level:', config.level)
+  console.log('🔍 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // 🆕 NOUVEAU: Fonction pour reprocesser tous les messages avec nouveau niveau
+  // 🚀 FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
   const reprocessAllMessages = () => {
     if (!currentConversation?.messages) return
 
     const updatedMessages = currentConversation.messages.map(message => {
-      // Ne traiter que les réponses IA qui ne sont pas des clarifications
+      // Ne traiter que les réponses IA qui ont response_versions
       if (!message.isUser && 
           message.id !== 'welcome' && 
+          message.response_versions &&
           !message.content.includes('Mode clarification') &&
           !message.content.includes('💡 Répondez simplement')) {
         
-        // Utiliser la réponse originale si disponible, sinon la réponse actuelle
-        const originalResponse = (message as any).originalResponse || message.content
-        const processedResponse = processResponse(originalResponse, message.content)
+        // 🚀 SÉLECTION DE VERSION : Utiliser selectVersionFromResponse
+        const selectedContent = selectVersionFromResponse(message.response_versions, config.level)
+        
+        console.log(`📋 [reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
+          original_length: message.content.length,
+          new_length: selectedContent.length,
+          versions_available: Object.keys(message.response_versions)
+        })
         
         return {
           ...message,
-          content: processedResponse,
-          originalResponse: originalResponse // Sauvegarder l'original
+          content: selectedContent
         }
       }
       return message
@@ -113,9 +114,10 @@ export default function ChatInterface() {
     }
 
     setCurrentConversation(updatedConversation)
+    console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
-  // Tous vos useEffect existants restent identiques
+  // Tous les useEffect existants restent identiques
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -304,7 +306,7 @@ export default function ChatInterface() {
     )
   }
 
-  // 🆕 FONCTION MODIFIÉE: handleSendMessage avec traitement de concision
+  // 🚀 FONCTION MODIFIÉE : handleSendMessage avec niveau détecté automatiquement
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
@@ -339,14 +341,19 @@ export default function ChatInterface() {
     try {
       let response;
       
+      // 🚀 DÉTECTION AUTOMATIQUE : Niveau optimal pour la question
+      const optimalLevel = detectOptimalLevel(text.trim())
+      console.log('🎯 [handleSendMessage] Niveau optimal détecté:', optimalLevel)
+      
       if (clarificationState) {
-        console.log('🎪 [handleSendMessage] Mode clarification - traitement simple')
+        console.log('🎪 [handleSendMessage] Mode clarification')
         
         response = await generateAIResponse(
           clarificationState.originalQuestion + " " + text.trim(),
           user,
           currentLanguage,
           conversationIdToSend,
+          optimalLevel, // 🚀 NOUVEAU : Passer niveau optimal
           true,
           clarificationState.originalQuestion,
           { answer: text.trim() }
@@ -356,26 +363,29 @@ export default function ChatInterface() {
         console.log('✅ [handleSendMessage] Clarification traitée')
         
       } else {
+        // 🚀 APPEL MODIFIÉ : Passer niveau optimal au backend
         response = await generateAIResponse(
           text.trim(), 
           user, 
           currentLanguage, 
-          conversationIdToSend
+          conversationIdToSend,
+          optimalLevel // 🚀 NOUVEAU : Niveau optimal détecté automatiquement
         )
       }
 
       if (!isMountedRef.current) return
 
-      console.log('📥 [handleSendMessage] Réponse API reçue:', {
+      console.log('📥 [handleSendMessage] Réponse reçue:', {
         conversation_id: response.conversation_id,
         response_length: response.response?.length || 0,
+        versions_received: Object.keys(response.response_versions || {}),
         clarification_requested: response.clarification_result?.clarification_requested || false
       })
 
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
-        console.log('❓ [handleSendMessage] Clarification demandée - affichage SIMPLE dans le chat')
+        console.log('❓ [handleSendMessage] Clarification demandée')
         
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -386,42 +396,42 @@ export default function ChatInterface() {
         }
 
         addMessage(clarificationMessage)
-
         setClarificationState({
           messageId: clarificationMessage.id,
           originalQuestion: text.trim(),
           clarificationQuestions: response.clarification_questions || []
         })
 
-        console.log('🔄 [handleSendMessage] État clarification activé - répondez dans le chat')
+        console.log('🔄 [handleSendMessage] État clarification activé')
 
       } else {
-        // 🆕 NOUVEAU: Traitement de concision pour réponses normales
-        const originalResponse = response.response
-        let processedResponse = originalResponse
-
-        // Appliquer la concision si activée
-        if (config.level !== ConcisionLevel.DETAILED) {
-          processedResponse = processResponse(originalResponse, text.trim())
-          console.log('✂️ [handleSendMessage] Concision appliquée:', {
-            original_length: originalResponse.length,
-            processed_length: processedResponse.length,
-            level: config.level
+        // 🚀 NOUVEAU : Stocker toutes les versions + afficher la réponse du niveau demandé
+        let displayContent = response.response
+        
+        // Si on a des versions, utiliser la version appropriée au niveau actuel
+        if (response.response_versions) {
+          displayContent = selectVersionFromResponse(response.response_versions, config.level)
+          console.log('📋 [handleSendMessage] Version sélectionnée:', {
+            level: config.level,
+            content_length: displayContent.length,
+            versions_available: Object.keys(response.response_versions)
           })
         }
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: processedResponse,
+          content: displayContent,
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
-          // 🆕 NOUVEAU: Sauvegarder la réponse originale
-          originalResponse: originalResponse
+          // 🚀 NOUVEAU : Stocker toutes les versions reçues du backend
+          response_versions: response.response_versions,
+          // Garder pour compatibilité (peut être supprimé plus tard)
+          originalResponse: response.response
         }
 
         addMessage(aiMessage)
-        console.log('✅ [handleSendMessage] Réponse normale ajoutée avec concision')
+        console.log('✅ [handleSendMessage] Message ajouté avec versions:', Object.keys(response.response_versions || {}))
       }
       
     } catch (error) {
@@ -443,7 +453,7 @@ export default function ChatInterface() {
     }
   }
 
-  // Toutes vos autres fonctions restent identiques
+  // Toutes les autres fonctions restent identiques
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
     
@@ -596,7 +606,6 @@ export default function ChatInterface() {
             </div>
             
             <div className="flex items-center space-x-2">
-              {/* 🆕 NOUVEAU: Bouton paramètres de concision */}
               <button
                 onClick={() => setShowConcisionSettings(!showConcisionSettings)}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -610,7 +619,6 @@ export default function ChatInterface() {
             </div>
           </div>
 
-          {/* 🆕 NOUVEAU: Panel de paramètres de concision */}
           {showConcisionSettings && (
             <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
               <div className="flex justify-between items-start mb-4">
@@ -674,23 +682,41 @@ export default function ChatInterface() {
                           </p>
                         </div>
                         
-                        {/* 🆕 NOUVEAU: Bouton voir réponse complète si concision appliquée */}
+                        {/* 🚀 NOUVEAU : Indicateur versions disponibles + sélecteur rapide */}
                         {!message.isUser && 
-                         (message as any).originalResponse && 
-                         (message as any).originalResponse !== message.content && (
+                         message.response_versions && 
+                         Object.keys(message.response_versions).length > 0 && (
                           <div className="mt-2 ml-2">
                             <details className="text-xs">
                               <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
-                                📄 Voir la réponse complète
+                                📋 Voir autres versions ({Object.keys(message.response_versions).length} disponibles)
                               </summary>
-                              <div className="mt-2 p-3 bg-gray-50 rounded-lg text-gray-700 text-sm">
-                                {(message as any).originalResponse}
+                              <div className="mt-2 space-y-2">
+                                {Object.entries(message.response_versions).map(([level, content]) => {
+                                  if (content && content !== message.content) {
+                                    const levelLabels = {
+                                      ultra_concise: '⚡ Minimal',
+                                      concise: '🎯 Concis', 
+                                      standard: '📝 Standard',
+                                      detailed: '📚 Détaillé'
+                                    }
+                                    return (
+                                      <div key={level} className="p-2 bg-gray-50 rounded border-l-2 border-gray-300">
+                                        <div className="text-xs font-medium text-gray-600 mb-1">
+                                          {levelLabels[level as keyof typeof levelLabels] || level}
+                                        </div>
+                                        <div className="text-gray-700 text-sm">{content}</div>
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })}
                               </div>
                             </details>
                           </div>
                         )}
                         
-                        {/* Feedback buttons existants */}
+                        {/* Feedback buttons existants inchangés */}
                         {!message.isUser && 
                          index > 0 && 
                          message.conversation_id && (
@@ -776,7 +802,6 @@ export default function ChatInterface() {
 
           <div className="px-4 py-4 bg-white border-t border-gray-100">
             <div className="max-w-4xl mx-auto">
-              {/* Indicateur clarification existant */}
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">

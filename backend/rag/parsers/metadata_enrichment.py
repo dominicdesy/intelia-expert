@@ -1,0 +1,485 @@
+"""
+Metadata Enrichment System
+Automatic extraction of thematic tags and entities from document content
+"""
+
+import re
+from typing import Dict, List, Set, Optional, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class MetadataEnricher:
+    """
+    Automatic metadata enrichment for poultry and livestock documents
+    
+    Extracts and standardizes:
+    - Breed information
+    - Disease entities  
+    - Production phases
+    - Topics and themes
+    - Technical metrics
+    """
+    
+    # Breed detection patterns (standardized naming)
+    BREED_PATTERNS = {
+        # Layer breeds
+        'hy_line_brown': [
+            'hy-line brown', 'hyline brown', 'hy line brown',
+            'hy-line brown commercial', 'hyline brown commercial'
+        ],
+        'hy_line_w36': [
+            'hy-line w-36', 'hyline w36', 'hy line w36',
+            'hy-line w 36', 'hyline w-36'
+        ],
+        'lohmann_brown': [
+            'lohmann brown', 'lohmann lsl', 'lohmann classic'
+        ],
+        'isa_brown': [
+            'isa brown', 'isa warren', 'isa babcock'
+        ],
+        
+        # Broiler breeds  
+        'ross_308': [
+            'ross 308', 'ross308', 'ross-308', 'ross 308 broiler'
+        ],
+        'ross_708': [
+            'ross 708', 'ross708', 'ross-708', 'ross 708 broiler'
+        ],
+        'cobb_500': [
+            'cobb 500', 'cobb500', 'cobb-500', 'cobb 500 broiler'
+        ],
+        'cobb_700': [
+            'cobb 700', 'cobb700', 'cobb-700', 'cobb 700 broiler'
+        ],
+        'aviagen_plus': [
+            'aviagen plus', 'aviagen+', 'aviagen-plus', 'aviagen plus broiler'
+        ],
+        'hubbard_flex': [
+            'hubbard flex', 'hubbard-flex', 'hubbard classic'
+        ]
+    }
+    
+    # Disease and health condition patterns
+    DISEASE_PATTERNS = {
+        'newcastle_disease': [
+            'newcastle disease', 'nd', 'newcastle', 'paramyxovirus',
+            'newcastle disease virus', 'ndv'
+        ],
+        'avian_influenza': [
+            'avian influenza', 'bird flu', 'ai', 'h5n1', 'h7n9',
+            'highly pathogenic avian influenza', 'hpai',
+            'low pathogenic avian influenza', 'lpai'
+        ],
+        'infectious_bronchitis': [
+            'infectious bronchitis', 'ib', 'bronchitis virus',
+            'coronavirus', 'respiratory syndrome'
+        ],
+        'gumboro_disease': [
+            'gumboro', 'infectious bursal disease', 'ibd',
+            'bursal disease', 'immunosuppression'
+        ],
+        'coccidiosis': [
+            'coccidiosis', 'coccidia', 'eimeria', 'intestinal parasite',
+            'bloody diarrhea', 'anticoccidial'
+        ],
+        'salmonella': [
+            'salmonella', 'salmonellosis', 'typhimurium', 'enteritidis',
+            'paratyphoid', 'food safety'
+        ],
+        'e_coli': [
+            'e. coli', 'e coli', 'escherichia coli', 'colibacillosis',
+            'coliform bacteria'
+        ],
+        'marek_disease': [
+            'marek disease', "marek's disease", 'md', 'lymphoma',
+            'paralysis', 'herpesvirus'
+        ],
+        'fowl_pox': [
+            'fowl pox', 'pox virus', 'avian pox', 'cutaneous pox',
+            'diphtheritic pox'
+        ],
+        'mycoplasma': [
+            'mycoplasma', 'mg', 'ms', 'mycoplasma gallisepticum',
+            'mycoplasma synoviae', 'chronic respiratory disease'
+        ]
+    }
+    
+    # Production phase patterns
+    PHASE_PATTERNS = {
+        'brooding': [
+            'brooding', 'brooder', 'chick', 'day-old', 'starter',
+            'first week', 'hatching', 'incubation'
+        ],
+        'rearing': [
+            'rearing', 'growing', 'pullet', 'grower', 'developer',
+            'juvenile', 'point of lay', 'sexual maturity'
+        ],
+        'laying': [
+            'laying', 'production', 'egg production', 'peak production',
+            'laying period', 'hen-day', 'persistency'
+        ],
+        'finishing': [
+            'finishing', 'finisher', 'processing', 'slaughter',
+            'market weight', 'harvest', 'grow-out'
+        ]
+    }
+    
+    # Topic classification patterns
+    TOPIC_PATTERNS = {
+        'nutrition': [
+            'nutrition', 'feed', 'diet', 'protein', 'energy',
+            'amino acid', 'vitamin', 'mineral', 'supplement',
+            'feeding', 'fcr', 'feed conversion'
+        ],
+        'health': [
+            'health', 'disease', 'vaccination', 'medicine', 'treatment',
+            'prevention', 'biosecurity', 'mortality', 'morbidity',
+            'veterinary', 'therapeutic'
+        ],
+        'management': [
+            'management', 'housing', 'environment', 'temperature',
+            'ventilation', 'lighting', 'density', 'welfare',
+            'handling', 'husbandry'
+        ],
+        'performance': [
+            'performance', 'growth', 'weight gain', 'production',
+            'efficiency', 'yield', 'liveability', 'uniformity',
+            'body weight', 'daily gain'
+        ],
+        'reproduction': [
+            'reproduction', 'breeding', 'fertility', 'hatchability',
+            'egg quality', 'shell quality', 'incubation',
+            'genetic', 'heredity'
+        ],
+        'processing': [
+            'processing', 'slaughter', 'meat quality', 'carcass',
+            'yield', 'grading', 'packaging', 'food safety',
+            'haccp', 'quality control'
+        ]
+    }
+    
+    # Metric and measurement patterns
+    METRIC_PATTERNS = {
+        'weight_metrics': [
+            'body weight', 'live weight', 'weight gain', 'daily gain',
+            'average weight', 'target weight', 'kg', 'gram', 'g'
+        ],
+        'production_metrics': [
+            'egg production', 'hen-day', 'peak production', 'persistency',
+            'laying rate', 'eggs per hen', 'production %'
+        ],
+        'feed_metrics': [
+            'feed intake', 'feed consumption', 'fcr', 'feed conversion',
+            'feed efficiency', 'daily feed', 'cumulative feed'
+        ],
+        'mortality_metrics': [
+            'mortality', 'livability', 'survival', 'death rate',
+            'cumulative mortality', 'weekly mortality'
+        ],
+        'quality_metrics': [
+            'egg weight', 'shell strength', 'haugh unit', 'albumen height',
+            'shell color', 'yolk color', 'internal quality'
+        ]
+    }
+    
+    @staticmethod
+    def enrich_metadata(text: str, existing_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Main enrichment function - extracts thematic tags from text
+        
+        Args:
+            text: Document text content
+            existing_metadata: Existing metadata to enhance
+            
+        Returns:
+            Enhanced metadata dictionary with extracted tags
+        """
+        if existing_metadata is None:
+            existing_metadata = {}
+        
+        enricher = MetadataEnricher()
+        
+        # Extract all entity types
+        breeds = enricher.extract_breeds(text)
+        diseases = enricher.extract_diseases(text)
+        phases = enricher.extract_phases(text)  
+        topics = enricher.extract_topics(text)
+        metrics = enricher.extract_metrics(text)
+        
+        # Create enriched metadata
+        enriched = existing_metadata.copy()
+        
+        # Add detected entities (only if found)
+        if breeds:
+            enriched['breeds_detected'] = breeds
+            enriched['primary_breed'] = breeds[0]  # Most confident match
+            
+        if diseases:
+            enriched['diseases_mentioned'] = diseases
+            enriched['health_topics'] = len(diseases)
+            
+        if phases:
+            enriched['production_phases'] = phases
+            enriched['primary_phase'] = phases[0]
+            
+        if topics:
+            enriched['topic_categories'] = topics
+            enriched['primary_topic'] = topics[0]
+            
+        if metrics:
+            enriched['metrics_types'] = metrics
+            
+        # Add derived classifications
+        enriched['content_complexity'] = enricher._assess_complexity(text)
+        enriched['technical_level'] = enricher._assess_technical_level(text, topics, metrics)
+        enriched['species_type'] = enricher._infer_species(breeds, text)
+        
+        return enriched
+    
+    def extract_breeds(self, text: str) -> List[str]:
+        """Extract breed information from text"""
+        text_lower = text.lower()
+        detected_breeds = []
+        
+        for breed_key, patterns in self.BREED_PATTERNS.items():
+            for pattern in patterns:
+                if pattern in text_lower:
+                    # Convert key to readable format
+                    readable_breed = breed_key.replace('_', ' ').title()
+                    if readable_breed not in detected_breeds:
+                        detected_breeds.append(readable_breed)
+                    break  # Found this breed, move to next
+        
+        return detected_breeds
+    
+    def extract_diseases(self, text: str) -> List[str]:
+        """Extract disease and health condition mentions"""
+        text_lower = text.lower()
+        detected_diseases = []
+        
+        for disease_key, patterns in self.DISEASE_PATTERNS.items():
+            for pattern in patterns:
+                if pattern in text_lower:
+                    readable_disease = disease_key.replace('_', ' ').title()
+                    if readable_disease not in detected_diseases:
+                        detected_diseases.append(readable_disease)
+                    break
+        
+        return detected_diseases
+    
+    def extract_phases(self, text: str) -> List[str]:
+        """Extract production phase mentions"""
+        text_lower = text.lower()
+        detected_phases = []
+        
+        for phase_key, patterns in self.PHASE_PATTERNS.items():
+            for pattern in patterns:
+                if pattern in text_lower:
+                    if phase_key not in detected_phases:
+                        detected_phases.append(phase_key)
+                    break
+        
+        return detected_phases
+    
+    def extract_topics(self, text: str) -> List[str]:
+        """Extract topic categories from text"""
+        text_lower = text.lower()
+        detected_topics = []
+        
+        # Score each topic category
+        topic_scores = {}
+        for topic_key, patterns in self.TOPIC_PATTERNS.items():
+            score = sum(1 for pattern in patterns if pattern in text_lower)
+            if score > 0:
+                topic_scores[topic_key] = score
+        
+        # Sort by score and return top topics
+        sorted_topics = sorted(topic_scores.items(), key=lambda x: x[1], reverse=True)
+        detected_topics = [topic for topic, score in sorted_topics if score >= 2]
+        
+        return detected_topics
+    
+    def extract_metrics(self, text: str) -> List[str]:
+        """Extract metric and measurement types"""
+        text_lower = text.lower()
+        detected_metrics = []
+        
+        for metric_key, patterns in self.METRIC_PATTERNS.items():
+            for pattern in patterns:
+                if pattern in text_lower:
+                    if metric_key not in detected_metrics:
+                        detected_metrics.append(metric_key)
+                    break
+        
+        return detected_metrics
+    
+    def _assess_complexity(self, text: str) -> str:
+        """Assess content complexity level"""
+        # Simple heuristics for complexity
+        word_count = len(text.split())
+        technical_terms = self._count_technical_terms(text)
+        
+        if word_count < 200:
+            return 'simple'
+        elif word_count < 1000 and technical_terms < 10:
+            return 'moderate'
+        elif technical_terms > 20 or word_count > 2000:
+            return 'complex'
+        else:
+            return 'moderate'
+    
+    def _assess_technical_level(self, text: str, topics: List[str], metrics: List[str]) -> str:
+        """Assess technical sophistication level"""
+        technical_score = 0
+        
+        # Score based on topic diversity
+        technical_score += len(topics) * 2
+        
+        # Score based on metric types
+        technical_score += len(metrics) * 3
+        
+        # Score based on technical vocabulary
+        technical_score += self._count_technical_terms(text)
+        
+        if technical_score < 10:
+            return 'basic'
+        elif technical_score < 25:
+            return 'intermediate'
+        else:
+            return 'advanced'
+    
+    def _count_technical_terms(self, text: str) -> int:
+        """Count technical and scientific terms"""
+        text_lower = text.lower()
+        
+        technical_terms = [
+            'amino acid', 'metabolizable energy', 'digestibility',
+            'bioavailability', 'immunoglobulin', 'pathogen',
+            'microorganism', 'enzyme', 'probiotic', 'prebiotic',
+            'vaccination', 'serotype', 'antibody', 'antigen',
+            'genetic', 'heritability', 'selection', 'breeding value'
+        ]
+        
+        return sum(1 for term in technical_terms if term in text_lower)
+    
+    def _infer_species(self, breeds: List[str], text: str) -> str:
+        """Infer primary species type"""
+        text_lower = text.lower()
+        
+        # Check for explicit species mentions
+        if 'layer' in text_lower or 'laying' in text_lower or 'egg' in text_lower:
+            return 'layer'
+        elif 'broiler' in text_lower or 'meat' in text_lower or 'processing' in text_lower:
+            return 'broiler'
+        
+        # Infer from breeds
+        layer_breeds = ['hy_line', 'lohmann', 'isa_brown']
+        broiler_breeds = ['ross', 'cobb', 'aviagen', 'hubbard']
+        
+        breed_text = ' '.join(breeds).lower()
+        
+        if any(breed in breed_text for breed in layer_breeds):
+            return 'layer'
+        elif any(breed in breed_text for breed in broiler_breeds):
+            return 'broiler'
+        
+        return 'unknown'
+
+
+def extract_hierarchical_metadata(file_path: str) -> Dict[str, str]:
+    """
+    Extract hierarchical metadata from file path structure
+    
+    Expected structure: root/access_level/species/category/sub_category/file
+    Example: public/layer/breeds/hy_line_brown/management_guide.pdf
+    
+    Args:
+        file_path: Full path to the file
+        
+    Returns:
+        Dictionary with hierarchical metadata
+    """
+    from pathlib import Path
+    
+    path = Path(file_path)
+    parts = path.parts
+    
+    # Initialize metadata with defaults
+    metadata = {
+        'access_level': 'unknown',
+        'species': 'unknown', 
+        'category': 'unknown',
+        'sub_category': 'unknown',
+        'file_name': path.name,
+        'file_stem': path.stem,
+        'file_extension': path.suffix
+    }
+    
+    # Extract based on expected structure depth
+    if len(parts) >= 2:
+        # Look for access level indicators
+        for part in parts:
+            if part.lower() in ['public', 'private', 'confidential', 'restricted']:
+                metadata['access_level'] = part.lower()
+                break
+    
+    if len(parts) >= 3:
+        # Look for species indicators  
+        for part in parts:
+            if part.lower() in ['broiler', 'layer', 'breeder', 'turkey', 'duck']:
+                metadata['species'] = part.lower()
+                break
+    
+    if len(parts) >= 4:
+        # Look for category indicators
+        categories = [
+            'breeds', 'nutrition', 'health', 'management', 'housing',
+            'value_chain', 'performance', 'welfare', 'biosecurity'
+        ]
+        for part in parts:
+            if part.lower() in categories:
+                metadata['category'] = part.lower()
+                break
+    
+    if len(parts) >= 5:
+        # Look for sub-category
+        sub_categories = [
+            'ross_308', 'cobb_500', 'hy_line_brown', 'breeding', 'hatcheries',
+            'feed_milling', 'processing', 'vaccination', 'disease_control'
+        ]
+        for part in parts:
+            if part.lower() in sub_categories:
+                metadata['sub_category'] = part.lower().replace('_', ' ')
+                break
+    
+    return metadata
+
+
+def infer_tags_from_text(text: str) -> Dict[str, str]:
+    """
+    Convenience function for basic tag inference
+    Wrapper around MetadataEnricher for backward compatibility
+    """
+    enriched = MetadataEnricher.enrich_metadata(text)
+    
+    # Convert to simple tag format
+    tags = {}
+    
+    if 'primary_breed' in enriched:
+        tags['breed'] = enriched['primary_breed']
+        
+    if 'primary_topic' in enriched:
+        tags['topic'] = enriched['primary_topic']
+        
+    if 'primary_phase' in enriched:
+        tags['phase'] = enriched['primary_phase']
+        
+    if 'species_type' in enriched:
+        tags['species'] = enriched['species_type']
+        
+    if 'diseases_mentioned' in enriched and enriched['diseases_mentioned']:
+        tags['disease'] = enriched['diseases_mentioned'][0]
+    
+    return tags
