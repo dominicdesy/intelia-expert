@@ -42,7 +42,7 @@ from .expert_utils import (
 )
 from .expert_integrations import IntegrationsManager
 from .api_enhancement_service import APIEnhancementService
-from .prompt_templates import build_structured_prompt, extract_context_from_entities
+from .prompt_templates import build_structured_prompt, extract_context_from_entities, validate_prompt_context, build_clarification_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -1151,6 +1151,10 @@ class ExpertService:
                     context=rag_context
                 )
                 
+                # 📊 LOGGING: Debug du prompt final
+                logger.debug(f"🔍 [Prompt Final RAG] Contexte: {rag_context}")
+                logger.debug(f"🔍 [Prompt Final RAG]\n{structured_question[:500]}...")
+                
                 result = await process_rag(
                     question=structured_question,
                     user=current_user,
@@ -1170,6 +1174,10 @@ class ExpertService:
                         question=enriched_question,
                         context=rag_context
                     )
+                    
+                    # 📊 LOGGING: Debug du prompt injecté
+                    logger.debug(f"🔍 [Prompt Final RAG - Injecté]\n{structured_question[:500]}...")
+                    
                     contextual_question = f"{structured_question}\n\nContexte: {conversation_context_str}"
                     result = await process_rag(
                         question=contextual_question,
@@ -1186,6 +1194,10 @@ class ExpertService:
                         question=enriched_question,
                         context=rag_context
                     )
+                    
+                    # 📊 LOGGING: Debug du prompt seul
+                    logger.debug(f"🔍 [Prompt Final RAG - Seul]\n{structured_question[:500]}...")
+                    
                     result = await process_rag(
                         question=structured_question,
                         user=current_user,
