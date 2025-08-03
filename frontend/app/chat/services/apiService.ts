@@ -152,8 +152,7 @@ export const generateAIResponse = async (
   console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
     question: question.substring(0, 50) + '...',
     isClarificationResponse,
-    originalQuestion: originalQuestion?.substring(0, 30) + '...',
-    clarification_entities: clarificationEntities  // ✅ SUPPORTÉ par backend
+    originalQuestion: originalQuestion?.substring(0, 30) + '...'
   })
 
   try {
@@ -186,11 +185,11 @@ export const generateAIResponse = async (
       text: finalQuestion,
       language: language,
       ...(conversationId && { conversation_id: conversationId }),
-      // ✅ CORRECTION FINALE: Utiliser les champs supportés par le backend
+      // ✅ CORRECTION FINALE: Laisser le backend extraire automatiquement
       ...(isClarificationResponse && {
         is_clarification_response: true,
-        original_question: originalQuestion,
-        clarification_entities: clarificationEntities  // ✅ SUPPORTÉ selon expert.py
+        original_question: originalQuestion
+        // clarification_entities: SUPPRIMÉ - le backend extrait automatiquement
       })
     }
 
@@ -552,7 +551,7 @@ export const buildClarificationEntities = (
 }
 
 /**
- * 🎯 FONCTION DE DEBUG CORRIGÉE pour ask-enhanced-v2 avec clarification_entities
+ * 🎯 FONCTION DE DEBUG CORRIGÉE pour ask-enhanced-v2 sans clarification_entities
  */
 export const debugEnhancedAPI = () => {
   console.group('🔧 [apiService] Configuration ask-enhanced-v2 CORRIGÉE')
@@ -564,7 +563,7 @@ export const debugEnhancedAPI = () => {
   console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
   console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
   console.log('CORRECTIONS APPLIQUÉES:')
-  console.log('  ✅ clarification_entities (CHAMP BACKEND SUPPORTÉ)')
+  console.log('  ✅ clarification_entities SUPPRIMÉ - backend extrait automatiquement')
   console.log('  ✅ ask-enhanced-v2 endpoint principal')
   console.log('  ✅ Détection clarification via clarification_result')
   console.log('  ✅ Mapping clarification_result vers requires_clarification')
@@ -742,13 +741,13 @@ export const generateAIResponseSmart = async (
   }
 }
 
-// 🎯 CONFIGURATION DEBUG CORRIGÉE pour ask-enhanced-v2 avec clarification_entities
+// 🎯 CONFIGURATION DEBUG CORRIGÉE pour ask-enhanced-v2 sans clarification_entities
 export const logEnhancedAPIInfo = () => {
   console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 CORRIGÉE FINALE')
   console.log('Version:', 'Enhanced v2 (ask-enhanced-v2)')
   console.log('Base URL:', API_BASE_URL)
   console.log('CORRECTIONS FINALES APPLIQUÉES:')
-  console.log('  - ✅ clarification_entities (CHAMP SUPPORTÉ PAR BACKEND)')
+  console.log('  - ✅ clarification_entities SUPPRIMÉ - backend extrait automatiquement')
   console.log('  - ✅ ask-enhanced-v2 endpoint principal')
   console.log('  - ✅ Détection clarification via clarification_result')
   console.log('  - ✅ Mapping clarification_result vers anciens champs frontend')
@@ -760,7 +759,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Détection automatique questions vagues')
   console.log('  - ✅ Clarification intelligente race/sexe')
   console.log('  - ✅ Enrichissement automatique questions')
-  console.log('  - ✅ Gestion entités complètes via clarification_entities')
+  console.log('  - ✅ Backend extrait breed/sex automatiquement depuis text')
   console.log('  - ✅ Traitement réponses clarification')
   console.log('Endpoints principaux:')
   console.log('  - POST /expert/ask-enhanced-v2 (authentifié)')
