@@ -1,20 +1,20 @@
 """
-app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM CORRIGÉS
+app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION
 
-🚨 CORRECTIONS FINALES APPLIQUÉES POUR CLARIFICATIONS:
-1. ✅ Utilisation correcte mark_question_for_clarification()
-2. ✅ Récupération question originale avec find_original_question()
-3. ✅ Enrichissement automatique question avec race/sexe extraits  
-4. ✅ Fallbacks robustes si mémoire indisponible
-5. ✅ Système de clarification intelligent résolu
-6. 🧹 Nettoyage des références aux documents dans les réponses
+🚨 NOUVELLES FONCTIONNALITÉS AJOUTÉES:
+1. ✅ Système de concision des réponses intégré
+2. ✅ Nettoyage avancé verbosité + références documents
+3. ✅ Configuration flexible par type de question
+4. ✅ Détection automatique niveau de concision requis
+5. ✅ Conservation de toutes les fonctionnalités existantes
 
-PROBLÈME RÉSOLU:
-- "Quel est le poids d'un poulet de 12 jours ?" → Question SAUVEGARDÉE
-- Clarification → Race/sexe demandés
-- "Ross 308 male" → Question originale RÉCUPÉRÉE + enrichie
-- RAG reçoit: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"
-- Réponse nettoyée: "Le poids cible..." au lieu de "Selon le document 2..."
+FONCTIONNALITÉS CONSERVÉES:
+- ✅ Système de clarification intelligent complet
+- ✅ Mémoire conversationnelle
+- ✅ RAG avec contexte enrichi
+- ✅ Multi-LLM support
+- ✅ Validation agricole
+- ✅ Support multilingue
 """
 
 import os
@@ -24,6 +24,7 @@ import time
 import re
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
+from enum import Enum
 
 from fastapi import HTTPException, Request
 
@@ -45,6 +46,349 @@ from .api_enhancement_service import APIEnhancementService
 from .prompt_templates import build_structured_prompt, extract_context_from_entities, validate_prompt_context, build_clarification_prompt
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# 🆕 SYSTÈME DE CONCISION DES RÉPONSES
+# =============================================================================
+
+class ConcisionLevel(Enum):
+    """Niveaux de concision disponibles"""
+    ULTRA_CONCISE = "ultra_concise"    # Réponse minimale (ex: "410-450g")
+    CONCISE = "concise"                # Réponse courte mais complète
+    STANDARD = "standard"              # Réponse normale sans conseils excessifs
+    DETAILED = "detailed"              # Réponse complète (mode actuel)
+
+class ConcisionConfig:
+    """Configuration du système de concision"""
+    
+    # Activer/désactiver le système
+    ENABLE_CONCISE_RESPONSES = True
+    
+    # Niveau par défaut
+    DEFAULT_CONCISION_LEVEL = ConcisionLevel.CONCISE
+    
+    # Seuils de longueur par type de question
+    MAX_RESPONSE_LENGTH = {
+        "weight_question": 80,      # Questions de poids: max 80 caractères
+        "temperature_question": 60, # Questions température: max 60 caractères
+        "measurement_question": 70, # Questions de mesure: max 70 caractères
+        "general_question": 150,    # Questions générales: max 150 caractères
+        "complex_question": 300     # Questions complexes: max 300 caractères
+    }
+    
+    # Mots-clés qui déclenchent le mode ultra-concis
+    ULTRA_CONCISE_KEYWORDS = [
+        "poids", "weight", "peso",
+        "température", "temperature", "temperatura",
+        "combien", "how much", "cuánto",
+        "quel est", "what is", "cuál es"
+    ]
+    
+    # Mots-clés pour questions complexes (mode détaillé)
+    COMPLEX_KEYWORDS = [
+        "comment", "how to", "cómo",
+        "pourquoi", "why", "por qué", 
+        "expliquer", "explain", "explicar",
+        "procédure", "procedure", "procedimiento",
+        "protocole", "protocol", "protocolo"
+    ]
+
+class ResponseConcisionProcessor:
+    """Processeur de concision des réponses"""
+    
+    def __init__(self):
+        self.config = ConcisionConfig()
+        logger.info("✅ [Concision] Processeur de concision initialisé")
+    
+    def detect_question_type(self, question: str) -> str:
+        """Détecte le type de question pour appliquer les bonnes règles"""
+        
+        question_lower = question.lower().strip()
+        
+        # Questions de poids/mesures = réponses très courtes
+        weight_keywords = ["poids", "weight", "peso", "grammes", "grams", "gramos", "kg"]
+        if any(word in question_lower for word in weight_keywords):
+            return "weight_question"
+        
+        # Questions de température
+        temp_keywords = ["température", "temperature", "temperatura", "°c", "degré", "degree"]
+        if any(word in question_lower for word in temp_keywords):
+            return "temperature_question"
+        
+        # Questions de mesure générale
+        measurement_keywords = ["taille", "size", "tamaño", "longueur", "length", "hauteur", "height"]
+        if any(word in question_lower for word in measurement_keywords):
+            return "measurement_question"
+        
+        # Questions complexes avec "comment", "pourquoi", etc.
+        if any(word in question_lower for word in self.config.COMPLEX_KEYWORDS):
+            return "complex_question"
+        
+        # Par défaut: question générale
+        return "general_question"
+    
+    def detect_optimal_concision_level(self, question: str, user_preference: Optional[ConcisionLevel] = None) -> ConcisionLevel:
+        """Détecte le niveau de concision optimal pour une question"""
+        
+        # Si l'utilisateur a une préférence explicite, l'utiliser
+        if user_preference:
+            return user_preference
+        
+        question_lower = question.lower().strip()
+        
+        # Questions ultra-concises (poids, température, mesures simples)
+        if any(keyword in question_lower for keyword in self.config.ULTRA_CONCISE_KEYWORDS):
+            return ConcisionLevel.ULTRA_CONCISE
+        
+        # Questions complexes = réponses détaillées
+        if any(keyword in question_lower for keyword in self.config.COMPLEX_KEYWORDS):
+            return ConcisionLevel.DETAILED
+        
+        # Par défaut: concis
+        return self.config.DEFAULT_CONCISION_LEVEL
+    
+    def process_response(
+        self, 
+        response: str, 
+        question: str, 
+        concision_level: Optional[ConcisionLevel] = None,
+        language: str = "fr"
+    ) -> str:
+        """Traite une réponse selon le niveau de concision demandé"""
+        
+        if not self.config.ENABLE_CONCISE_RESPONSES:
+            return response
+        
+        # Déterminer le niveau de concision
+        level = concision_level or self.detect_optimal_concision_level(question)
+        
+        logger.info(f"🎯 [Concision] Traitement réponse niveau {level.value}")
+        
+        # Appliquer le traitement selon le niveau
+        if level == ConcisionLevel.ULTRA_CONCISE:
+            return self._extract_essential_info(response, question, language)
+        elif level == ConcisionLevel.CONCISE:
+            return self._make_concise(response, question, language)
+        elif level == ConcisionLevel.STANDARD:
+            return self._remove_excessive_advice(response, language)
+        else:  # DETAILED
+            return self._clean_document_references_only(response)
+    
+    def _extract_essential_info(self, response: str, question: str, language: str = "fr") -> str:
+        """Extrait uniquement l'information essentielle (mode ultra-concis)"""
+        
+        question_lower = question.lower()
+        
+        # Questions de poids → extraire juste les chiffres + unité
+        if any(word in question_lower for word in ["poids", "weight", "peso"]):
+            # Chercher pattern "X grammes" ou "entre X et Y grammes"
+            weight_patterns = [
+                r'(?:entre\s+)?(\d+(?:-\d+|[^\d]*\d+)?)\s*(?:grammes?|g\b)',
+                r'(\d+)\s*(?:à|to|a)\s*(\d+)\s*(?:grammes?|g\b)',
+                r'(\d+)\s*(?:grammes?|g\b)'
+            ]
+            
+            for pattern in weight_patterns:
+                match = re.search(pattern, response, re.IGNORECASE)
+                if match:
+                    if len(match.groups()) >= 2:  # Range
+                        return f"{match.group(1)}-{match.group(2)}g"
+                    else:  # Single value
+                        value = match.group(1)
+                        if "entre" in response.lower() or "-" in value:
+                            return f"{value}g"
+                        else:
+                            return f"~{value}g"
+        
+        # Questions de température → extraire juste les degrés
+        if any(word in question_lower for word in ["température", "temperature"]):
+            temp_patterns = [
+                r'(\d+(?:-\d+)?)\s*(?:°C|degrés?|degrees?)',
+                r'(\d+)\s*(?:à|to|a)\s*(\d+)\s*(?:°C|degrés?)'
+            ]
+            
+            for pattern in temp_patterns:
+                match = re.search(pattern, response, re.IGNORECASE)
+                if match:
+                    if len(match.groups()) >= 2:
+                        return f"{match.group(1)}-{match.group(2)}°C"
+                    else:
+                        return f"{match.group(1)}°C"
+        
+        # Fallback: première phrase avec chiffres
+        sentences = response.split('.')
+        for sentence in sentences:
+            if re.search(r'\d+', sentence) and len(sentence.strip()) > 10:
+                return sentence.strip() + '.'
+        
+        # Ultime fallback: première phrase tout court
+        if sentences:
+            return sentences[0].strip() + '.'
+        
+        return response
+    
+    def _make_concise(self, response: str, question: str, language: str = "fr") -> str:
+        """Rend concis (enlève conseils mais garde info principale)"""
+        
+        # D'abord nettoyer les références aux documents
+        cleaned = self._clean_document_references_only(response)
+        
+        # Ensuite supprimer la verbosité excessive
+        verbose_patterns = [
+            # Français - Conseils généraux non demandés
+            r'\.?\s*Il est essentiel de[^.]*\.',
+            r'\.?\s*Assurez-vous de[^.]*\.',
+            r'\.?\s*N\'hésitez pas à[^.]*\.',
+            r'\.?\s*Pour garantir[^.]*\.',
+            r'\.?\s*Il est important de[^.]*\.',
+            r'\.?\s*Veillez à[^.]*\.',
+            r'\.?\s*Il convient de[^.]*\.',
+            r'\.?\s*À ce stade[^.]*\.',
+            r'\.?\s*En cas de doute[^.]*\.',
+            r'\.?\s*pour favoriser le bien-être[^.]*\.',
+            r'\.?\s*en termes de[^.]*\.',
+            
+            # Anglais - Conseils généraux non demandés
+            r'\.?\s*It is essential to[^.]*\.',
+            r'\.?\s*Make sure to[^.]*\.',
+            r'\.?\s*Don\'t hesitate to[^.]*\.',
+            r'\.?\s*To ensure[^.]*\.',
+            r'\.?\s*It is important to[^.]*\.',
+            r'\.?\s*Be sure to[^.]*\.',
+            r'\.?\s*At this stage[^.]*\.',
+            
+            # Espagnol - Consejos generales no solicitados
+            r'\.?\s*Es esencial[^.]*\.',
+            r'\.?\s*Asegúrese de[^.]*\.',
+            r'\.?\s*No dude en[^.]*\.',
+            r'\.?\s*Para garantizar[^.]*\.',
+            r'\.?\s*Es importante[^.]*\.',
+            r'\.?\s*En esta etapa[^.]*\.',
+        ]
+        
+        # Supprimer les patterns verbeux
+        for pattern in verbose_patterns:
+            cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
+        
+        # Nettoyer les doubles points et espaces
+        cleaned = re.sub(r'\.+', '.', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        cleaned = cleaned.strip()
+        
+        # Si c'est une question de poids et que c'est encore long, extraire la phrase principale
+        if any(word in question.lower() for word in ['poids', 'weight', 'peso']) and len(cleaned) > 100:
+            weight_sentence = self._extract_weight_sentence(cleaned)
+            if weight_sentence:
+                return weight_sentence
+        
+        return cleaned
+    
+    def _remove_excessive_advice(self, response: str, language: str = "fr") -> str:
+        """Enlève seulement les conseils excessifs (mode standard)"""
+        
+        # D'abord nettoyer les références aux documents
+        cleaned = self._clean_document_references_only(response)
+        
+        # Patterns de conseils excessifs seulement
+        excessive_patterns = [
+            r'\.?\s*N\'hésitez pas à[^.]*\.',
+            r'\.?\s*Pour des conseils plus personnalisés[^.]*\.',
+            r'\.?\s*Don\'t hesitate to[^.]*\.',
+            r'\.?\s*For more personalized advice[^.]*\.',
+            r'\.?\s*No dude en[^.]*\.',
+            r'\.?\s*Para consejos más personalizados[^.]*\.',
+        ]
+        
+        for pattern in excessive_patterns:
+            cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
+        
+        return re.sub(r'\.+', '.', cleaned).replace(r'\s+', ' ').strip()
+    
+    def _clean_document_references_only(self, response_text: str) -> str:
+        """Nettoie uniquement les références aux documents (version originale)"""
+        
+        if not response_text:
+            return response_text
+        
+        # Patterns de références aux documents à nettoyer
+        patterns_to_remove = [
+            # Français
+            r'selon le document \d+,?\s*',
+            r'd\'après le document \d+,?\s*',
+            r'le document \d+ indique que\s*',
+            r'comme mentionné dans le document \d+,?\s*',
+            r'tel que décrit dans le document \d+,?\s*',
+            
+            # Anglais
+            r'according to document \d+,?\s*',
+            r'as stated in document \d+,?\s*',
+            r'document \d+ indicates that\s*',
+            r'as mentioned in document \d+,?\s*',
+            
+            # Espagnol
+            r'según el documento \d+,?\s*',
+            r'como se indica en el documento \d+,?\s*',
+            r'el documento \d+ menciona que\s*',
+            
+            # Patterns génériques
+            r'\(document \d+\)',
+            r'\[document \d+\]',
+            r'source:\s*document \d+',
+            r'ref:\s*document \d+'
+        ]
+        
+        cleaned_response = response_text
+        
+        # Nettoyer chaque pattern de document
+        for pattern in patterns_to_remove:
+            cleaned_response = re.sub(
+                pattern, 
+                '', 
+                cleaned_response, 
+                flags=re.IGNORECASE
+            )
+        
+        # Nettoyer les doubles espaces et capitaliser
+        cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
+        cleaned_response = cleaned_response.strip()
+        
+        # Capitaliser la première lettre si nécessaire
+        if cleaned_response and cleaned_response[0].islower():
+            cleaned_response = cleaned_response[0].upper() + cleaned_response[1:]
+        
+        return cleaned_response
+    
+    def _extract_weight_sentence(self, text: str) -> Optional[str]:
+        """Extrait la phrase principale contenant l'information de poids"""
+        
+        # Chercher la première phrase avec des chiffres + unités de poids
+        weight_patterns = [
+            r'[^.]*\d+[^.]*(?:grammes?|g\b|kg|livres?|pounds?)[^.]*\.',
+            r'[^.]*(?:entre|between|entre)\s+\d+[^.]*\d+[^.]*\.',
+            r'[^.]*(?:poids|weight|peso)[^.]*\d+[^.]*\.'
+        ]
+        
+        for pattern in weight_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                sentence = match.group(0).strip()
+                # Nettoyer la phrase trouvée
+                sentence = re.sub(r'^\W+', '', sentence)  # Supprimer ponctuation début
+                if sentence and sentence[0].islower():
+                    sentence = sentence[0].upper() + sentence[1:]
+                return sentence
+        
+        # Si aucun pattern trouvé, prendre la première phrase
+        sentences = text.split('.')
+        if sentences:
+            first_sentence = sentences[0].strip() + '.'
+            return first_sentence
+        
+        return None
+
+# =============================================================================
+# 🔄 CLASSES EXISTANTES AVEC CONCISION INTÉGRÉE
+# =============================================================================
 
 class RAGContextEnhancer:
     """Améliore le contexte conversationnel pour optimiser les requêtes RAG"""
@@ -243,9 +587,7 @@ class RAGContextEnhancer:
                 breed=context_entities["breed"]
             )
         elif "age" in context_entities:
-            context_prefix = template_set["age_only"].format(
-                age=context_entities["age"]
-            )
+            context_prefix = template_set["age_only"].format(age=context_entities["age"])
         
         if context_prefix:
             # Remplacer ou préfixer selon la structure de la question
@@ -276,76 +618,21 @@ class RAGContextEnhancer:
         return " | ".join(context_parts)
 
 class ExpertService:
-    """Service principal pour le système expert avec toutes les améliorations"""
+    """Service principal pour le système expert avec concision intégrée"""
     
     def __init__(self):
         self.integrations = IntegrationsManager()
         self.rag_enhancer = RAGContextEnhancer()
         self.enhancement_service = APIEnhancementService()
-        logger.info("✅ [Expert Service] Service expert initialisé avec corrections clarifications")
+        
+        # 🆕 NOUVEAU: Processeur de concision
+        self.concision_processor = ResponseConcisionProcessor()
+        
+        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision")
     
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
         return self.integrations.get_current_user_dependency()
-    
-    def _clean_document_references(self, response_text: str) -> str:
-        """
-        🧹 NOUVELLE FONCTION - Nettoie les références aux documents dans les réponses
-        
-        Transforme "Selon le document 2, le poids..." en "Le poids..."
-        """
-        if not response_text:
-            return response_text
-        
-        # Patterns de références à nettoyer
-        patterns_to_remove = [
-            # Français
-            r'selon le document \d+,?\s*',
-            r'd\'après le document \d+,?\s*',
-            r'le document \d+ indique que\s*',
-            r'comme mentionné dans le document \d+,?\s*',
-            r'tel que décrit dans le document \d+,?\s*',
-            
-            # Anglais
-            r'according to document \d+,?\s*',
-            r'as stated in document \d+,?\s*',
-            r'document \d+ indicates that\s*',
-            r'as mentioned in document \d+,?\s*',
-            
-            # Espagnol
-            r'según el documento \d+,?\s*',
-            r'como se indica en el documento \d+,?\s*',
-            r'el documento \d+ menciona que\s*',
-            
-            # Patterns génériques
-            r'\(document \d+\)',
-            r'\[document \d+\]',
-            r'source:\s*document \d+',
-            r'ref:\s*document \d+'
-        ]
-        
-        cleaned_response = response_text
-        
-        # Nettoyer chaque pattern
-        for pattern in patterns_to_remove:
-            cleaned_response = re.sub(
-                pattern, 
-                '', 
-                cleaned_response, 
-                flags=re.IGNORECASE
-            )
-        
-        # Nettoyer les doubles espaces et commencer par majuscule
-        cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
-        cleaned_response = cleaned_response.strip()
-        
-        # Capitaliser la première lettre si nécessaire
-        if cleaned_response and cleaned_response[0].islower():
-            cleaned_response = cleaned_response[0].upper() + cleaned_response[1:]
-        
-        logger.info(f"🧹 [Response Cleaning] Réponse nettoyée: {len(response_text)} → {len(cleaned_response)} chars")
-        
-        return cleaned_response
     
     async def process_expert_question(
         self,
@@ -354,7 +641,7 @@ class ExpertService:
         current_user: Optional[Dict[str, Any]],
         start_time: float
     ) -> EnhancedExpertResponse:
-        """Traite une question expert avec système de clarification CORRIGÉ"""
+        """Traite une question expert avec système de clarification ET concision"""
         
         processing_steps = []
         ai_enhancements_used = []
@@ -385,7 +672,7 @@ class ExpertService:
         
         processing_steps.append("question_validation")
         
-        # ✅ === MÉMOIRE CONVERSATIONNELLE CORRIGÉE ===
+        # === MÉMOIRE CONVERSATIONNELLE ===
         conversation_context = None
         if self.integrations.intelligent_memory_available:
             try:
@@ -420,7 +707,7 @@ class ExpertService:
                 processing_steps, ai_enhancements_used, None
             )
         
-        # ✅ === SYSTÈME DE CLARIFICATION INTELLIGENT CORRIGÉ ===
+        # === SYSTÈME DE CLARIFICATION INTELLIGENT ===
         clarification_result = await self._handle_clarification_corrected(
             request_data, question_text, user_id, conversation_id,
             processing_steps, ai_enhancements_used
@@ -455,6 +742,33 @@ class ExpertService:
             debug_info, performance_breakdown, vagueness_result
         )
         
+        # 🆕 === NOUVEAU: APPLICATION DU SYSTÈME DE CONCISION ===
+        if expert_result["answer"] and self.concision_processor.config.ENABLE_CONCISE_RESPONSES:
+            
+            # Détecter le niveau de concision optimal (peut être overridé par préférence utilisateur)
+            user_concision_preference = getattr(request_data, 'concision_level', None)
+            
+            original_answer = expert_result["answer"]
+            processed_answer = self.concision_processor.process_response(
+                response=original_answer,
+                question=question_text,
+                concision_level=user_concision_preference,
+                language=request_data.language
+            )
+            
+            if processed_answer != original_answer:
+                expert_result["answer"] = processed_answer
+                expert_result["original_answer"] = original_answer  # Garder l'original
+                expert_result["concision_applied"] = True
+                ai_enhancements_used.append("response_concision")
+                processing_steps.append("concision_processing")
+                
+                logger.info(f"✂️ [Expert Service] Concision appliquée: {len(original_answer)} → {len(processed_answer)} chars")
+            else:
+                expert_result["concision_applied"] = False
+        
+        performance_breakdown["concision_complete"] = int(time.time() * 1000)
+        
         # === ENREGISTREMENT RÉPONSE ===
         if self.integrations.intelligent_memory_available and expert_result["answer"]:
             try:
@@ -484,22 +798,14 @@ class ExpertService:
         )
     
     # ===========================================================================================
-    # ✅ SYSTÈME DE CLARIFICATION CORRIGÉ - VERSION FINALE
+    # ✅ SYSTÈME DE CLARIFICATION CORRIGÉ - VERSION FINALE (INCHANGÉ)
     # ===========================================================================================
     
     async def _handle_clarification_corrected(
         self, request_data, question_text, user_id, conversation_id, 
         processing_steps, ai_enhancements_used
     ):
-        """
-        ✅ SYSTÈME DE CLARIFICATION PARFAITEMENT CORRIGÉ
-        
-        CORRECTIONS APPLIQUÉES:
-        1. Utilisation mark_question_for_clarification() pour sauvegarder
-        2. Récupération avec find_original_question() depuis la mémoire
-        3. Enrichissement automatique avec race/sexe extraits
-        4. Fallbacks robustes si mémoire indisponible
-        """
+        """✅ SYSTÈME DE CLARIFICATION PARFAITEMENT CORRIGÉ"""
         
         # 1. ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION CORRIGÉ
         if request_data.is_clarification_response:
@@ -560,15 +866,7 @@ class ExpertService:
         self, request_data, question_text, conversation_id, 
         processing_steps, ai_enhancements_used
     ):
-        """
-        ✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION - VERSION CORRIGÉE FINALE
-        
-        CORRECTION APPLIQUÉE:
-        1. Récupération question originale
-        2. Extraction âge depuis question originale (12 jours)
-        3. Extraction race/sexe depuis réponse clarification (Ross 308 male)
-        4. Enrichissement COMPLET avec race + sexe + âge
-        """
+        """✅ TRAITEMENT DES RÉPONSES DE CLARIFICATION - VERSION CORRIGÉE FINALE"""
         
         # ✅ RÉCUPÉRATION FORCÉE DE LA QUESTION ORIGINALE
         original_question = request_data.original_question
@@ -623,7 +921,7 @@ class ExpertService:
         breed = validation["extracted_info"].get("breed")
         sex = validation["extracted_info"].get("sex")
         
-        # 🚨 NOUVELLE CORRECTION - EXTRACTION ÂGE DEPUIS QUESTION ORIGINALE
+        # 🚨 EXTRACTION ÂGE DEPUIS QUESTION ORIGINALE
         age_info = self._extract_age_from_original_question(original_question, request_data.language)
         
         # ✅ ENRICHISSEMENT AUTOMATIQUE COMPLET (race + sexe + âge)
@@ -862,14 +1160,10 @@ class ExpertService:
             ai_enhancements_used=["incomplete_clarification_handling"]
         )
     
-    # === NOUVELLES MÉTHODES D'ENRICHISSEMENT COMPLET ===
+    # === MÉTHODES D'ENRICHISSEMENT COMPLET (INCHANGÉES) ===
     
     def _extract_age_from_original_question(self, original_question: str, language: str = "fr") -> Dict[str, Any]:
-        """
-        🚨 NOUVELLE FONCTION - Extrait l'âge depuis la question originale
-        
-        Exemple: "Quel est le poids d'un poulet de 12 jours ?" → {"days": 12, "text": "12 jours"}
-        """
+        """Extrait l'âge depuis la question originale"""
         
         age_info = {"days": None, "weeks": None, "text": None, "detected": False}
         
@@ -940,11 +1234,7 @@ class ExpertService:
         age_info: Dict[str, Any], 
         language: str = "fr"
     ) -> str:
-        """
-        🚨 NOUVELLE FONCTION - Construit une question complètement enrichie
-        
-        Combine race + sexe + âge dans une question naturelle pour le RAG
-        """
+        """Construit une question complètement enrichie"""
         
         # Templates d'enrichissement complet par langue
         templates = {
@@ -983,7 +1273,7 @@ class ExpertService:
         context_prefix = ""
         age_text = age_info.get("text") if age_info.get("detected") else None
         
-        # 🎯 PRIORITÉ À L'ENRICHISSEMENT COMPLET
+        # PRIORITÉ À L'ENRICHISSEMENT COMPLET
         if breed and sex and age_text:
             context_prefix = template_set["complete"].format(
                 breed=breed, sex=sex, age=age_text
@@ -1212,8 +1502,9 @@ class ExpertService:
             # === 5. TRAITEMENT RÉSULTAT RAG ===
             answer = str(result.get("response", ""))
             
-            # 🧹 NOUVEAU: Nettoyer les références aux documents
-            answer = self._clean_document_references(answer)
+            # 🧹 IMPORTANT: Ici on ne nettoie que les références documents
+            # La concision sera appliquée plus tard dans le processus principal
+            answer = self.concision_processor._clean_document_references_only(answer)
             
             rag_score = result.get("score", 0.0)
             original_mode = result.get("mode", "rag_processing")
@@ -1230,7 +1521,7 @@ class ExpertService:
             logger.info(f"✅ [Expert Service] RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
             
             # Mode enrichi avec méthode d'appel
-            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected"
+            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision"
             
             processing_steps.append("mandatory_rag_with_intelligent_context")
             
@@ -1262,7 +1553,7 @@ class ExpertService:
             
             raise HTTPException(status_code=503, detail=error_details)
     
-    # === MÉTHODES UTILITAIRES IDENTIQUES ===
+    # === MÉTHODES UTILITAIRES AVEC CONCISION ===
     
     def _create_vagueness_response(
         self, vagueness_result, question_text: str, conversation_id: str,
@@ -1315,7 +1606,7 @@ class ExpertService:
         ai_enhancements_used: list, request_data: EnhancedQuestionRequest,
         debug_info: Dict, performance_breakdown: Dict
     ) -> EnhancedExpertResponse:
-        """Construit la réponse finale avec toutes les améliorations"""
+        """Construit la réponse finale avec toutes les améliorations + concision"""
         
         # Métriques finales
         extracted_entities = expert_result.get("extracted_entities")
@@ -1337,10 +1628,23 @@ class ExpertService:
                 **debug_info,
                 "total_processing_time_ms": response_time_ms,
                 "ai_enhancements_count": len(ai_enhancements_used),
-                "processing_steps_count": len(processing_steps)
+                "processing_steps_count": len(processing_steps),
+                "concision_applied": expert_result.get("concision_applied", False)
             }
             
             final_performance = performance_breakdown
+        
+        # 🆕 Informations de concision dans la réponse
+        concision_info = {
+            "concision_applied": expert_result.get("concision_applied", False),
+            "original_response_available": "original_answer" in expert_result,
+            "detected_question_type": None,
+            "applied_concision_level": None
+        }
+        
+        if expert_result.get("concision_applied"):
+            concision_info["detected_question_type"] = self.concision_processor.detect_question_type(question_text)
+            concision_info["applied_concision_level"] = self.concision_processor.detect_optimal_concision_level(question_text).value
             
         return EnhancedExpertResponse(
             # Champs existants
@@ -1372,10 +1676,14 @@ class ExpertService:
             response_format_applied=request_data.expected_response_format.value,
             quality_metrics=expert_result.get("quality_metrics"),
             debug_info=final_debug_info,
-            performance_breakdown=final_performance
+            performance_breakdown=final_performance,
+            
+            # 🆕 NOUVEAU: Informations de concision
+            concision_info=concision_info,
+            original_response=expert_result.get("original_answer")  # Réponse originale si concision appliquée
         )
     
-    # === MÉTHODES UTILITAIRES ===
+    # === MÉTHODES UTILITAIRES IDENTIQUES ===
     
     def _extract_user_id(self, current_user: Optional[Dict], request_data: EnhancedQuestionRequest, request: Request) -> str:
         if current_user:
@@ -1494,12 +1802,13 @@ class ExpertService:
         
         return {
             "success": True,
-            "message": "Feedback enregistré avec succès (Enhanced)",
+            "message": "Feedback enregistré avec succès (Enhanced + Concision)",
             "rating": feedback_data.rating,
             "comment": feedback_data.comment,
             "conversation_id": feedback_data.conversation_id,
             "feedback_updated_in_db": feedback_updated,
             "enhanced_features_used": True,
+            "concision_system_active": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
             "timestamp": datetime.now().isoformat()
         }
     
@@ -1521,31 +1830,124 @@ class ExpertService:
                 "detailed_rag_scoring_available": True,
                 "quality_metrics_available": True,
                 "smart_clarification_available": True,
-                "intelligent_memory_available": self.integrations.intelligent_memory_available
+                "intelligent_memory_available": self.integrations.intelligent_memory_available,
+                
+                # 🆕 NOUVEAU: Informations système de concision
+                "response_concision_available": True,
+                "concision_levels": [level.value for level in ConcisionLevel],
+                "auto_concision_detection": True,
+                "concision_enabled": self.concision_processor.config.ENABLE_CONCISE_RESPONSES
             },
             "system_status": {
                 "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
                 "enhanced_clarification_enabled": self.integrations.is_enhanced_clarification_enabled(),
                 "intelligent_memory_enabled": self.integrations.intelligent_memory_available,
-                "api_enhancements_enabled": True
+                "api_enhancements_enabled": True,
+                "concision_processor_enabled": True
+            },
+            
+            # 🆕 NOUVEAU: Configuration concision par défaut
+            "concision_config": {
+                "default_level": self.concision_processor.config.DEFAULT_CONCISION_LEVEL.value,
+                "auto_detect_enabled": True,
+                "max_lengths": self.concision_processor.config.MAX_RESPONSE_LENGTH,
+                "ultra_concise_keywords": self.concision_processor.config.ULTRA_CONCISE_KEYWORDS,
+                "complex_keywords": self.concision_processor.config.COMPLEX_KEYWORDS
             }
         }
 
 # =============================================================================
-# CONFIGURATION FINALE
+# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION (OPTIONNEL)
 # =============================================================================
 
-logger.info("✅ [Expert Service] Services métier PARFAITEMENT CORRIGÉS avec CLARIFICATION INTELLIGENTE + NETTOYAGE RÉPONSES")
-logger.info("🚀 [Expert Service] CORRECTIONS FINALES APPLIQUÉES:")
-logger.info("   - ✅ Utilisation mark_question_for_clarification() pour sauvegarde")
-logger.info("   - ✅ Récupération find_original_question() depuis mémoire intelligente")
-logger.info("   - ✅ Enrichissement automatique avec race/sexe extraits")
-logger.info("   - ✅ Fallbacks robustes si mémoire indisponible")
-logger.info("   - ✅ Système de clarification intelligent RÉSOLU")
-logger.info("   - 🧹 Nettoyage automatique des références aux documents")
-logger.info("🎯 [Expert Service] PROBLÈME RÉSOLU:")
-logger.info('   - "Quel est le poids d\'un poulet de 12 jours ?" → SAUVEGARDÉ')
-logger.info('   - "Ross 308 male" → Question originale RÉCUPÉRÉE + enrichie')
-logger.info('   - RAG reçoit: "Pour des poulets Ross 308 mâles de 12 jours, quel est le poids ?"')
-logger.info('   - Réponse nettoyée: "Le poids cible..." au lieu de "Selon le document 2..."')
-logger.info("✅ [Expert Service] SYSTÈME DE CLARIFICATION + NETTOYAGE MAINTENANT PARFAIT!")
+# Cette fonction peut être ajoutée à votre router expert pour permettre 
+# le contrôle dynamique de la concision
+
+def create_concision_control_endpoint():
+    """
+    Endpoint optionnel pour contrôler la concision côté backend
+    (à ajouter dans votre router expert si souhaité)
+    """
+    
+    from fastapi import APIRouter
+    from pydantic import BaseModel
+    
+    router = APIRouter()
+    
+    class ConcisionSettingsRequest(BaseModel):
+        enabled: bool = True
+        default_level: ConcisionLevel = ConcisionLevel.CONCISE
+        max_lengths: Optional[Dict[str, int]] = None
+    
+    class ConcisionSettingsResponse(BaseModel):
+        success: bool
+        current_settings: Dict[str, Any]
+        message: str
+    
+    @router.post("/concision/settings", response_model=ConcisionSettingsResponse)
+    async def update_concision_settings(request: ConcisionSettingsRequest):
+        """Mettre à jour les paramètres de concision du système"""
+        
+        try:
+            # Mettre à jour la configuration globale
+            ConcisionConfig.ENABLE_CONCISE_RESPONSES = request.enabled
+            ConcisionConfig.DEFAULT_CONCISION_LEVEL = request.default_level
+            
+            if request.max_lengths:
+                ConcisionConfig.MAX_RESPONSE_LENGTH.update(request.max_lengths)
+            
+            return ConcisionSettingsResponse(
+                success=True,
+                current_settings={
+                    "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
+                    "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
+                    "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH
+                },
+                message="Paramètres de concision mis à jour avec succès"
+            )
+        except Exception as e:
+            return ConcisionSettingsResponse(
+                success=False,
+                current_settings={},
+                message=f"Erreur lors de la mise à jour: {str(e)}"
+            )
+    
+    @router.get("/concision/settings", response_model=Dict[str, Any])
+    async def get_concision_settings():
+        """Récupérer les paramètres actuels de concision"""
+        
+        return {
+            "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
+            "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
+            "available_levels": [level.value for level in ConcisionLevel],
+            "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH,
+            "ultra_concise_keywords": ConcisionConfig.ULTRA_CONCISE_KEYWORDS,
+            "complex_keywords": ConcisionConfig.COMPLEX_KEYWORDS
+        }
+    
+    return router
+
+# =============================================================================
+# CONFIGURATION FINALE AVEC CONCISION
+# =============================================================================
+
+logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION intégré")
+logger.info("🚀 [Expert Service] NOUVELLES FONCTIONNALITÉS:")
+logger.info("   - ✅ Système de concision intelligent multi-niveaux")
+logger.info("   - ✅ Détection automatique type de question")
+logger.info("   - ✅ Nettoyage avancé verbosité + références documents")
+logger.info("   - ✅ Configuration flexible par type de question")
+logger.info("   - ✅ Conservation réponse originale si concision appliquée")
+logger.info("🔧 [Expert Service] FONCTIONNALITÉS CONSERVÉES:")
+logger.info("   - ✅ Système de clarification intelligent complet")
+logger.info("   - ✅ Mémoire conversationnelle enrichie")
+logger.info("   - ✅ RAG avec contexte et prompt structuré")
+logger.info("   - ✅ Multi-LLM support et validation agricole")
+logger.info("   - ✅ Support multilingue FR/EN/ES")
+logger.info("🎯 [Expert Service] RÉSULTAT ATTENDU:")
+logger.info('   - Question: "Quel est le poids d\'un poulet Ross 308 mâle de 18 jours ?"')
+logger.info('   - Réponse ultra-concise: "410-450g"')
+logger.info('   - Réponse concise: "Le poids se situe entre 410g et 450g."')
+logger.info('   - Réponse standard: Normale sans conseils excessifs')
+logger.info('   - Réponse détaillée: Version complète actuelle')
+logger.info("✅ [Expert Service] SYSTÈME DE CONCISION PARFAITEMENT INTÉGRÉ!")
