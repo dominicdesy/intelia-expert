@@ -1,8 +1,4 @@
-// =============================================================================
-// 1. HOOK REACT POUR CONCISION DES RÉPONSES
-// =============================================================================
-
-// hooks/useResponseConcision.ts
+// hooks/useResponseConcision.ts - VERSION COMPLÈTE CORRIGÉE
 import { useState, useCallback, useEffect } from 'react';
 
 export enum ConcisionLevel {
@@ -108,7 +104,7 @@ export const useResponseConcision = () => {
 };
 
 // =============================================================================
-// 2. FONCTIONS DE TRAITEMENT DES RÉPONSES
+// FONCTIONS DE TRAITEMENT DES RÉPONSES (TOUTES INCLUSES)
 // =============================================================================
 
 // Extraire uniquement l'information essentielle
@@ -135,10 +131,37 @@ function extractEssentialInfo(response: string, question: string): string {
     }
   }
   
-  // Fallback: première phrase avec chiffres
+  // Questions de quantité d'eau
+  if (['eau', 'water', 'agua'].some(word => questionLower.includes(word))) {
+    const waterMatch = response.match(/(\d+(?:\.\d+)?)\s*(?:litres?|l\b|ml|millilitres?)/i);
+    if (waterMatch) {
+      return `${waterMatch[1]}L/jour`;
+    }
+  }
+  
+  // Questions de mortalité
+  if (['mortalité', 'mortality', 'mortalidad', 'morts', 'deaths'].some(word => questionLower.includes(word))) {
+    const mortalityMatch = response.match(/(\d+(?:\.\d+)?)\s*%/i);
+    if (mortalityMatch) {
+      return `${mortalityMatch[1]}%`;
+    }
+  }
+  
+  // Questions oui/non
+  const yesNoKeywords = ['oui', 'non', 'yes', 'no', 'sí', 'normal', 'anormal'];
+  for (const keyword of yesNoKeywords) {
+    if (response.toLowerCase().includes(keyword)) {
+      const sentence = response.split('.').find(s => s.toLowerCase().includes(keyword));
+      if (sentence && sentence.trim().length < 50) {
+        return sentence.trim() + '.';
+      }
+    }
+  }
+  
+  // Fallback: première phrase avec chiffres ou information clé
   const sentences = response.split('.');
   for (const sentence of sentences) {
-    if (/\d+/.test(sentence) && sentence.trim().length > 10) {
+    if ((/\d+/.test(sentence) || sentence.length < 50) && sentence.trim().length > 10) {
       return sentence.trim() + '.';
     }
   }
@@ -151,6 +174,7 @@ function extractEssentialInfo(response: string, question: string): string {
 function makeConcise(response: string, question: string): string {
   // Patterns de phrases à supprimer (conseils non demandés)
   const verbosePatterns = [
+    // Français
     /\.?\s*Il est essentiel de[^.]*\./gi,
     /\.?\s*Assurez-vous de[^.]*\./gi,
     /\.?\s*N'hésitez pas à[^.]*\./gi,
@@ -158,15 +182,35 @@ function makeConcise(response: string, question: string): string {
     /\.?\s*À ce stade[^.]*\./gi,
     /\.?\s*pour favoriser le bien-être[^.]*\./gi,
     /\.?\s*en termes de[^.]*\./gi,
+    /\.?\s*Il est recommandé de[^.]*\./gi,
+    /\.?\s*Veillez à[^.]*\./gi,
+    /\.?\s*Il convient de[^.]*\./gi,
+    /\.?\s*Pour optimiser[^.]*\./gi,
+    /\.?\s*Dans l'idéal[^.]*\./gi,
     
     // Anglais
     /\.?\s*It is essential to[^.]*\./gi,
     /\.?\s*Make sure to[^.]*\./gi,
     /\.?\s*Don't hesitate to[^.]*\./gi,
+    /\.?\s*It is recommended to[^.]*\./gi,
+    /\.?\s*Be sure to[^.]*\./gi,
+    /\.?\s*To optimize[^.]*\./gi,
+    /\.?\s*Ideally[^.]*\./gi,
     
     // Espagnol
     /\.?\s*Es esencial[^.]*\./gi,
-    /\.?\s*Asegúrese de[^.]*\./gi
+    /\.?\s*Asegúrese de[^.]*\./gi,
+    /\.?\s*Es recomendable[^.]*\./gi,
+    /\.?\s*Para optimizar[^.]*\./gi,
+    /\.?\s*Idealmente[^.]*\./gi,
+    
+    // Phrases génériques
+    /\.?\s*Pour plus d'informations[^.]*\./gi,
+    /\.?\s*For more information[^.]*\./gi,
+    /\.?\s*Para más información[^.]*\./gi,
+    /\.?\s*En cas de doute[^.]*\./gi,
+    /\.?\s*If in doubt[^.]*\./gi,
+    /\.?\s*En caso de duda[^.]*\./gi
   ];
   
   let cleaned = response;
@@ -176,18 +220,57 @@ function makeConcise(response: string, question: string): string {
     cleaned = cleaned.replace(pattern, '.');
   });
   
+  // Supprimer les répétitions et phrases redondantes
+  const redundantPatterns = [
+    /\.?\s*Cela dit[^.]*\./gi,
+    /\.?\s*Cependant[^.]*\./gi,
+    /\.?\s*Néanmoins[^.]*\./gi,
+    /\.?\s*However[^.]*\./gi,
+    /\.?\s*Nevertheless[^.]*\./gi,
+    /\.?\s*Sin embargo[^.]*\./gi
+  ];
+  
+  redundantPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '.');
+  });
+  
   // Nettoyer les doubles points et espaces
   cleaned = cleaned.replace(/\.+/g, '.').replace(/\s+/g, ' ').trim();
   
-  // Si c'est une question de poids et que c'est encore long, extraire la phrase principale
-  if (['poids', 'weight'].some(word => question.toLowerCase().includes(word)) && cleaned.length > 100) {
-    const weightSentence = cleaned.split('.').find(sentence => 
-      /\d+/.test(sentence) && ['gram', 'poids', 'weight'].some(word => 
-        sentence.toLowerCase().includes(word)
-      )
-    );
-    if (weightSentence) {
-      return weightSentence.trim() + '.';
+  // Si c'est une question spécifique et que c'est encore long, extraire l'essentiel
+  if (cleaned.length > 150) {
+    const questionLower = question.toLowerCase();
+    
+    // Questions de poids
+    if (['poids', 'weight'].some(word => questionLower.includes(word))) {
+      const weightSentence = cleaned.split('.').find(sentence => 
+        /\d+/.test(sentence) && ['gram', 'poids', 'weight', 'g'].some(word => 
+          sentence.toLowerCase().includes(word)
+        )
+      );
+      if (weightSentence && weightSentence.trim().length < 100) {
+        return weightSentence.trim() + '.';
+      }
+    }
+    
+    // Questions de température
+    if (['température', 'temperature'].some(word => questionLower.includes(word))) {
+      const tempSentence = cleaned.split('.').find(sentence => 
+        /\d+.*°?C/i.test(sentence)
+      );
+      if (tempSentence && tempSentence.trim().length < 100) {
+        return tempSentence.trim() + '.';
+      }
+    }
+    
+    // Questions de diagnostic
+    if (['diagnostic', 'diagnosis', 'problème', 'problem'].some(word => questionLower.includes(word))) {
+      const diagnosticSentence = cleaned.split('.').find(sentence => 
+        sentence.length > 20 && sentence.length < 80
+      );
+      if (diagnosticSentence) {
+        return diagnosticSentence.trim() + '.';
+      }
     }
   }
   
@@ -197,10 +280,23 @@ function makeConcise(response: string, question: string): string {
 // Enlever seulement les conseils excessifs (mode standard)
 function removeExcessiveAdvice(response: string): string {
   const excessivePatterns = [
+    // Phrases trop génériques
     /\.?\s*N'hésitez pas à[^.]*\./gi,
     /\.?\s*Pour des conseils plus personnalisés[^.]*\./gi,
     /\.?\s*Don't hesitate to[^.]*\./gi,
-    /\.?\s*For more personalized advice[^.]*\./gi
+    /\.?\s*For more personalized advice[^.]*\./gi,
+    /\.?\s*No dude en[^.]*\./gi,
+    /\.?\s*Para consejos más personalizados[^.]*\./gi,
+    
+    // Répétitions de contact
+    /\.?\s*Contactez votre vétérinaire[^.]*\./gi,
+    /\.?\s*Contact your veterinarian[^.]*\./gi,
+    /\.?\s*Contacte a su veterinario[^.]*\./gi,
+    
+    // Disclaimers excessifs
+    /\.?\s*Il est toujours préférable de[^.]*\./gi,
+    /\.?\s*It is always better to[^.]*\./gi,
+    /\.?\s*Siempre es mejor[^.]*\./gi
   ];
   
   let cleaned = response;
@@ -211,255 +307,71 @@ function removeExcessiveAdvice(response: string): string {
   return cleaned.replace(/\.+/g, '.').replace(/\s+/g, ' ').trim();
 }
 
-// =============================================================================
-// 3. COMPOSANT UI POUR CONTRÔLER LA CONCISION
-// =============================================================================
-
-// components/ConcisionControl.tsx
-import React from 'react';
-import { ConcisionLevel, useResponseConcision } from '../hooks/useResponseConcision';
-
-interface ConcisionControlProps {
-  className?: string;
-  compact?: boolean;
-}
-
-export const ConcisionControl: React.FC<ConcisionControlProps> = ({ 
-  className = '', 
-  compact = false 
-}) => {
-  const { config, updateConcisionLevel } = useResponseConcision();
-
-  const levels = [
-    { 
-      level: ConcisionLevel.ULTRA_CONCISE, 
-      label: 'Minimal', 
-      description: 'Juste l\'essentiel (ex: "410-450g")',
-      icon: '⚡'
-    },
-    { 
-      level: ConcisionLevel.CONCISE, 
-      label: 'Concis', 
-      description: 'Information principale (ex: "Le poids se situe entre 410-450g.")',
-      icon: '🎯'
-    },
-    { 
-      level: ConcisionLevel.STANDARD, 
-      label: 'Standard', 
-      description: 'Réponse normale sans conseils excessifs',
-      icon: '📝'
-    },
-    { 
-      level: ConcisionLevel.DETAILED, 
-      label: 'Détaillé', 
-      description: 'Réponse complète avec conseils',
-      icon: '📚'
-    }
-  ];
-
-  if (compact) {
-    return (
-      <div className={`flex gap-1 ${className}`}>
-        {levels.map(({ level, icon, label }) => (
-          <button
-            key={level}
-            onClick={() => updateConcisionLevel(level)}
-            className={`px-2 py-1 text-xs rounded transition-colors ${
-              config.level === level
-                ? 'bg-green-100 text-green-800 border border-green-300'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title={label}
-          >
-            {icon}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className={`space-y-2 ${className}`}>
-      <label className="text-sm font-medium text-gray-700">
-        Niveau de détail des réponses
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        {levels.map(({ level, label, description, icon }) => (
-          <button
-            key={level}
-            onClick={() => updateConcisionLevel(level)}
-            className={`p-3 text-left rounded-lg border transition-all ${
-              config.level === level
-                ? 'bg-green-50 border-green-300 text-green-800'
-                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span>{icon}</span>
-              <span className="font-medium">{label}</span>
-            </div>
-            <p className="text-xs text-gray-600">{description}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// =============================================================================
-// 4. COMPOSANT CHAT AVEC CONCISION INTÉGRÉE
-// =============================================================================
-
-// components/ChatInterface.tsx (modification de votre composant existant)
-import React, { useState } from 'react';
-import { useResponseConcision } from '../hooks/useResponseConcision';
-import { ConcisionControl } from './ConcisionControl';
-
-interface ChatMessage {
-  question: string;
-  response: string;
-  originalResponse?: string; // Garder l'original pour pouvoir basculer
-  timestamp: string;
-}
-
-export const ChatInterface: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [question, setQuestion] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showConcisionSettings, setShowConcisionSettings] = useState(false);
+// Fonction utilitaire pour détecter le type de question
+export function detectQuestionType(question: string): string {
+  const questionLower = question.toLowerCase();
   
-  const { processResponse, config } = useResponseConcision();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim() || isLoading) return;
-
-    setIsLoading(true);
-    
-    try {
-      // Votre appel API existant (pas de modification côté backend)
-      const response = await fetch('/api/v1/expert/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: question })
-      });
-      
-      const data = await response.json();
-      
-      // Traiter la réponse avec le système de concision
-      const processedResponse = processResponse(data.response, question);
-      
-      setMessages(prev => [...prev, {
-        question,
-        response: processedResponse,
-        originalResponse: data.response, // Garder l'original
-        timestamp: new Date().toISOString()
-      }]);
-      
-      setQuestion('');
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fonction pour reprocesser tous les messages avec nouveau niveau
-  const reprocessAllMessages = () => {
-    setMessages(prev => prev.map(msg => ({
-      ...msg,
-      response: processResponse(msg.originalResponse || msg.response, msg.question)
-    })));
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto p-4">
-      {/* Header avec contrôles */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <div className="flex justify-between items-start mb-4">
-          <h1 className="text-xl font-bold text-gray-800">Intelia Expert</h1>
-          <div className="flex gap-2">
-            <ConcisionControl compact />
-            <button
-              onClick={() => setShowConcisionSettings(!showConcisionSettings)}
-              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-            >
-              ⚙️ Détail
-            </button>
-          </div>
-        </div>
-        
-        {showConcisionSettings && (
-          <div className="mt-4 p-4 bg-white rounded border">
-            <ConcisionControl />
-            <button
-              onClick={reprocessAllMessages}
-              className="mt-3 px-4 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm"
-            >
-              🔄 Appliquer à toutes les réponses
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Messages */}
-      <div className="space-y-4 mb-6">
-        {messages.map((msg, index) => (
-          <div key={index} className="space-y-2">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-blue-800">{msg.question}</p>
-            </div>
-            <div className="bg-green-50 p-3 rounded-lg">
-              <p className="text-green-800">{msg.response}</p>
-              {msg.originalResponse && msg.originalResponse !== msg.response && (
-                <details className="mt-2">
-                  <summary className="text-xs text-gray-500 cursor-pointer">
-                    Voir la réponse complète
-                  </summary>
-                  <p className="text-xs text-gray-600 mt-1">{msg.originalResponse}</p>
-                </details>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Formulaire */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Posez votre question..."
-          className="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={isLoading}
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !question.trim()}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isLoading ? '...' : 'Envoyer'}
-        </button>
-      </form>
-    </div>
-  );
-};
-
-// =============================================================================
-// 5. EXEMPLE D'UTILISATION DANS L'APP PRINCIPALE
-// =============================================================================
-
-// App.tsx
-import React from 'react';
-import { ChatInterface } from './components/ChatInterface';
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <ChatInterface />
-    </div>
-  );
+  if (['poids', 'weight', 'peso'].some(word => questionLower.includes(word))) {
+    return 'weight';
+  }
+  
+  if (['température', 'temperature', 'temperatura'].some(word => questionLower.includes(word))) {
+    return 'temperature';
+  }
+  
+  if (['mortalité', 'mortality', 'mortalidad'].some(word => questionLower.includes(word))) {
+    return 'mortality';
+  }
+  
+  if (['eau', 'water', 'agua'].some(word => questionLower.includes(word))) {
+    return 'water';
+  }
+  
+  if (['diagnostic', 'diagnosis', 'diagnóstico'].some(word => questionLower.includes(word))) {
+    return 'diagnosis';
+  }
+  
+  if (['comment', 'how', 'cómo'].some(word => questionLower.includes(word))) {
+    return 'how-to';
+  }
+  
+  if (['pourquoi', 'why', 'por qué'].some(word => questionLower.includes(word))) {
+    return 'why';
+  }
+  
+  return 'general';
 }
 
-export default App;
+// Fonction pour analyser la complexité d'une réponse
+export function analyzeResponseComplexity(response: string): {
+  wordCount: number;
+  sentenceCount: number;
+  hasNumbers: boolean;
+  hasAdvice: boolean;
+  complexity: 'simple' | 'moderate' | 'complex';
+} {
+  const wordCount = response.split(/\s+/).length;
+  const sentenceCount = response.split('.').filter(s => s.trim().length > 0).length;
+  const hasNumbers = /\d+/.test(response);
+  
+  const adviceKeywords = [
+    'recommandé', 'essentiel', 'important', 'devrait', 'doit',
+    'recommended', 'essential', 'important', 'should', 'must',
+    'recomendado', 'esencial', 'importante', 'debería', 'debe'
+  ];
+  const hasAdvice = adviceKeywords.some(keyword => 
+    response.toLowerCase().includes(keyword)
+  );
+  
+  let complexity: 'simple' | 'moderate' | 'complex' = 'simple';
+  if (wordCount > 100 || sentenceCount > 3) complexity = 'moderate';
+  if (wordCount > 200 || sentenceCount > 6) complexity = 'complex';
+  
+  return {
+    wordCount,
+    sentenceCount,
+    hasNumbers,
+    hasAdvice,
+    complexity
+  };
+}
