@@ -1,17 +1,21 @@
 """
-app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + RESPONSE VERSIONS
+app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING
 
-🚨 NOUVELLES FONCTIONNALITÉS VERSION 3.7.0:
+🚨 NOUVELLES FONCTIONNALITÉS VERSION 3.8.0:
 1. ✅ Système de concision des réponses intégré (CONSERVÉ)
 2. ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)
 3. ✅ Configuration flexible par type de question (CONSERVÉ)
 4. ✅ Détection automatique niveau de concision requis (CONSERVÉ)
 5. ✅ Conservation de toutes les fonctionnalités existantes (CONSERVÉ)
-6. 🚀 NOUVEAU: ResponseVersionsGenerator intégré
-7. 🚀 NOUVEAU: Génération de toutes les versions (ultra_concise, concise, standard, detailed)
-8. 🚀 NOUVEAU: Support ConcisionMetrics avec métriques détaillées
-9. 🚀 NOUVEAU: Sélection automatique selon concision_level
-10. 🚀 NOUVEAU: Support generate_all_versions flag pour frontend
+6. 🚀 ResponseVersionsGenerator intégré (CONSERVÉ)
+7. 🚀 Génération de toutes les versions (ultra_concise, concise, standard, detailed) (CONSERVÉ)
+8. 🚀 Support ConcisionMetrics avec métriques détaillées (CONSERVÉ)
+9. 🚀 Sélection automatique selon concision_level (CONSERVÉ)
+10. 🚀 Support generate_all_versions flag pour frontend (CONSERVÉ)
+11. 🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents RAG
+12. 🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy/general
+13. 🏷️ NOUVEAU: Enhancement questions avec contexte taxonomique
+14. 🏷️ NOUVEAU: Filtres RAG adaptatifs selon la taxonomie détectée
 
 FONCTIONNALITÉS CONSERVÉES:
 - ✅ Système de clarification intelligent complet
@@ -36,7 +40,7 @@ from fastapi import HTTPException, Request
 from .expert_models import (
     EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest,
     ValidationResult, ProcessingContext, VaguenessResponse, ResponseFormat,
-    ConcisionLevel, ConcisionMetrics  # 🚀 NOUVEAU: Import ConcisionLevel et ConcisionMetrics
+    ConcisionLevel, ConcisionMetrics  # 🚀 Import ConcisionLevel et ConcisionMetrics
 )
 from .expert_utils import (
     get_user_id_from_request, 
@@ -50,7 +54,7 @@ from .expert_utils import (
 from .expert_integrations import IntegrationsManager
 from .api_enhancement_service import APIEnhancementService
 from .prompt_templates import build_structured_prompt, extract_context_from_entities, validate_prompt_context, build_clarification_prompt
-from .concision_service import concision_service  # 🚀 NOUVEAU: Import concision service
+from .concision_service import concision_service  # 🚀 Import concision service
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +166,7 @@ class ResponseConcisionProcessor:
         language: str = "fr"
     ) -> str:
         """
-        🚀 NOUVEAU: Méthode unified pour appliquer la concision
+        🚀 Méthode unified pour appliquer la concision
         Utilisée par ResponseVersionsGenerator
         """
         
@@ -411,7 +415,7 @@ class ResponseConcisionProcessor:
         return None
 
 # =============================================================================
-# 🚀 NOUVEAU: RESPONSE VERSIONS GENERATOR
+# 🚀 RESPONSE VERSIONS GENERATOR (CONSERVÉ IDENTIQUE)
 # =============================================================================
 
 class ResponseVersionsGenerator:
@@ -765,11 +769,11 @@ class RAGContextEnhancer:
         return " | ".join(context_parts)
 
 # =============================================================================
-# 🔄 EXPERT SERVICE PRINCIPAL AVEC RESPONSE VERSIONS
+# 🔄 EXPERT SERVICE PRINCIPAL AVEC RESPONSE VERSIONS + TAXONOMIC FILTERING
 # =============================================================================
 
 class ExpertService:
-    """Service principal pour le système expert avec concision + response_versions intégré"""
+    """Service principal pour le système expert avec concision + response_versions + taxonomic filtering intégré"""
     
     def __init__(self):
         # ✅ CONSERVER tous les attributs existants
@@ -780,12 +784,12 @@ class ExpertService:
         # ✅ CONSERVÉ: Processeur de concision existant
         self.concision_processor = ResponseConcisionProcessor()
         
-        # 🚀 NOUVEAU : Ajouter générateur de versions
+        # 🚀 Ajouter générateur de versions
         self.response_versions_generator = ResponseVersionsGenerator(
             existing_processor=self.concision_processor  # Utiliser le système existant
         )
         
-        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision + response_versions")
+        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision + response_versions + taxonomic_filtering")
     
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
@@ -799,17 +803,17 @@ class ExpertService:
         start_time: float = None
     ) -> EnhancedExpertResponse:
         """
-        🚀 MODIFIÉ: Méthode principale avec support response_versions
-        ✅ CONSERVE toute la logique existante + ajoute génération versions
+        🚀 MODIFIÉ: Méthode principale avec support response_versions + taxonomic_filtering
+        ✅ CONSERVE toute la logique existante + ajoute génération versions + filtrage taxonomique
         """
         
         if start_time is None:
             start_time = time.time()
         
         try:
-            logger.info("🚀 [ExpertService] Traitement question avec support response_versions")
+            logger.info("🚀 [ExpertService] Traitement question avec support response_versions + taxonomic_filtering")
             
-            # 🚀 NOUVEAU : Extraire paramètres concision
+            # 🚀 Extraire paramètres concision
             concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
             generate_all_versions = getattr(request_data, 'generate_all_versions', True)
             
@@ -820,7 +824,7 @@ class ExpertService:
                 request_data, request, current_user, start_time
             )
             
-            # 🚀 NOUVEAU : Générer toutes les versions si demandé
+            # 🚀 Générer toutes les versions si demandé
             if generate_all_versions and base_response.response:
                 try:
                     logger.info("🚀 [ResponseVersions] Génération de toutes les versions")
@@ -854,7 +858,7 @@ class ExpertService:
             return base_response
             
         except Exception as e:
-            logger.error(f"❌ [ExpertService] Erreur traitement avec response_versions: {e}")
+            logger.error(f"❌ [ExpertService] Erreur traitement avec response_versions + taxonomic_filtering: {e}")
             raise
     
     async def _process_question_existing_logic(
@@ -866,6 +870,7 @@ class ExpertService:
     ) -> EnhancedExpertResponse:
         """
         ✅ TOUTE LA LOGIQUE EXISTANTE DE process_expert_question (CONSERVÉE IDENTIQUE)
+        + 🏷️ NOUVELLE INTÉGRATION: Filtrage taxonomique intelligent
         """
         
         processing_steps = []
@@ -960,8 +965,8 @@ class ExpertService:
         
         performance_breakdown["clarification_complete"] = int(time.time() * 1000)
         
-        # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS ===
-        expert_result = await self._process_expert_response_enhanced_corrected(
+        # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS + TAXONOMIC FILTERING ===
+        expert_result = await self._process_expert_response_enhanced_corrected_with_taxonomy(
             question_text, request_data, request, current_user,
             conversation_id, processing_steps, ai_enhancements_used,
             debug_info, performance_breakdown, vagueness_result
@@ -1023,7 +1028,275 @@ class ExpertService:
         )
     
     # ===========================================================================================
-    # ✅ TOUTES LES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
+    # ✅ TOUTES LES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES + 🏷️ NOUVELLE MÉTHODE TAXONOMIQUE
+    # ===========================================================================================
+    
+    async def _process_expert_response_enhanced_corrected_with_taxonomy(
+        self, question_text: str, request_data: EnhancedQuestionRequest,
+        request: Request, current_user: Optional[Dict], conversation_id: str,
+        processing_steps: list, ai_enhancements_used: list,
+        debug_info: Dict, performance_breakdown: Dict, vagueness_result = None
+    ) -> Dict[str, Any]:
+        """
+        🏷️ NOUVELLE VERSION: RAG parfaitement corrigé avec mémoire intelligente + FILTRAGE TAXONOMIQUE
+        """
+        
+        # === 1. RÉCUPÉRATION FORCÉE DU CONTEXTE CONVERSATIONNEL ===
+        conversation_context_str = ""
+        extracted_entities = {}
+        
+        if self.integrations.intelligent_memory_available:
+            try:
+                # Récupération forcée du contexte depuis la mémoire intelligente
+                context_obj = self.integrations.get_conversation_context(conversation_id)
+                if context_obj:
+                    conversation_context_str = context_obj.get_context_for_rag(max_chars=800)
+                    
+                    # Enrichissement spécial si clarification
+                    if request_data.is_clarification_response or request_data.original_question:
+                        # Ajouter explicitement le contexte de clarification
+                        if request_data.original_question:
+                            conversation_context_str = f"Question originale: {request_data.original_question}. " + conversation_context_str
+                        
+                        # Rechercher les infos breed/sex dans les messages récents
+                        if hasattr(context_obj, 'messages'):
+                            for msg in reversed(context_obj.messages[-5:]):
+                                if msg.role == "user" and any(word in msg.message.lower() for word in ["ross", "cobb", "hubbard", "mâle", "femelle", "male", "female"]):
+                                    conversation_context_str += f" | Clarification: {msg.message}"
+                                    break
+                    
+                    # Entités consolidées
+                    if hasattr(context_obj, 'consolidated_entities'):
+                        extracted_entities = context_obj.consolidated_entities.to_dict()
+                    
+                    logger.info(f"🧠 [Expert Service] Contexte enrichi récupéré: {conversation_context_str[:150]}...")
+                    ai_enhancements_used.append("intelligent_memory_context_retrieval")
+                else:
+                    logger.warning(f"⚠️ [Expert Service] Aucun contexte trouvé pour: {conversation_id}")
+                    
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur récupération contexte: {e}")
+        
+        performance_breakdown["context_retrieved"] = int(time.time() * 1000)
+        
+        # === 2. AMÉLIORATION INTELLIGENTE DE LA QUESTION ===
+        enriched_question, enhancement_info = self.rag_enhancer.enhance_question_for_rag(
+            question=question_text,
+            conversation_context=conversation_context_str,
+            language=request_data.language
+        )
+        
+        # Enrichissement supplémentaire si vient d'une clarification
+        if request_data.original_question and request_data.is_clarification_response:
+            logger.info(f"✨ [Expert Service] Question déjà enrichie par clarification: {question_text[:100]}...")
+            ai_enhancements_used.append("clarification_based_enrichment")
+        
+        if enhancement_info["question_enriched"]:
+            ai_enhancements_used.append("intelligent_question_enhancement")
+            logger.info(f"✨ [Expert Service] Question améliorée: {enriched_question[:150]}...")
+        
+        if enhancement_info["pronoun_detected"]:
+            ai_enhancements_used.append("contextual_pronoun_resolution")
+            logger.info(f"🎯 [Expert Service] Pronoms contextuels résolus: {enhancement_info['context_entities_used']}")
+        
+        processing_steps.append("intelligent_question_enhancement")
+        performance_breakdown["question_enhanced"] = int(time.time() * 1000)
+        
+        # === 3. 🏷️ NOUVEAU: FILTRAGE TAXONOMIQUE INTELLIGENT ===
+        from .api_enhancement_service import infer_taxonomy_from_entities, enhance_rag_query_with_taxonomy
+        
+        taxonomy = infer_taxonomy_from_entities(extracted_entities)
+        enhanced_question_with_taxonomy, rag_filters = enhance_rag_query_with_taxonomy(
+            enriched_question, extracted_entities, request_data.language
+        )
+        
+        logger.info(f"🏷️ [Taxonomy Filter] Taxonomie détectée: {taxonomy}")
+        if rag_filters:
+            logger.info(f"🏷️ [Taxonomy Filter] Filtres RAG: {rag_filters}")
+            ai_enhancements_used.append("taxonomic_document_filtering")
+        
+        processing_steps.append("taxonomic_analysis_and_filtering")
+        performance_breakdown["taxonomy_analysis"] = int(time.time() * 1000)
+        
+        # === 4. VÉRIFICATION RAG DISPONIBLE ===
+        app = request.app
+        process_rag = getattr(app.state, 'process_question_with_rag', None)
+        
+        if not process_rag:
+            logger.error("❌ [Expert Service] Système RAG indisponible - Erreur critique")
+            raise HTTPException(
+                status_code=503, 
+                detail="Service RAG indisponible - Le système expert nécessite l'accès à la base documentaire"
+            )
+        
+        # === 5. APPEL RAG AVEC CONTEXTE FORCÉ + FILTRAGE TAXONOMIQUE ===
+        try:
+            logger.info("🔍 [Expert Service] Appel RAG avec contexte intelligent + taxonomie...")
+            
+            if request_data.debug_mode:
+                debug_info["original_question"] = question_text
+                debug_info["enriched_question"] = enriched_question
+                debug_info["enriched_question_with_taxonomy"] = enhanced_question_with_taxonomy
+                debug_info["conversation_context"] = conversation_context_str
+                debug_info["enhancement_info"] = enhancement_info
+                debug_info["taxonomy_detected"] = taxonomy
+                debug_info["rag_filters"] = rag_filters
+            
+            # Stratégie multi-tentative pour RAG avec contexte + taxonomie
+            result = None
+            rag_call_method = "unknown"
+            
+            # 🎯 Construire prompt structuré avec contexte
+            rag_context = extract_context_from_entities(extracted_entities)
+            rag_context["lang"] = request_data.language
+            rag_context["taxonomy"] = taxonomy  # 🏷️ Ajouter taxonomie au contexte
+            
+            # Tentative 1: Avec paramètre context + filtres taxonomiques si supporté
+            try:
+                # 🎯 Appliquer prompt structuré avec taxonomie
+                structured_question = build_structured_prompt(
+                    documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                    question=enhanced_question_with_taxonomy,
+                    context=rag_context
+                )
+                
+                # 📊 LOGGING: Debug du prompt final avec taxonomie
+                logger.debug(f"🔍 [Prompt Final RAG] Contexte: {rag_context}")
+                logger.debug(f"🏷️ [Prompt Final RAG] Taxonomie: {taxonomy}")
+                logger.debug(f"🔍 [Prompt Final RAG]\n{structured_question[:500]}...")
+                
+                # Appel RAG avec filtres taxonomiques
+                rag_params = {
+                    "question": structured_question,
+                    "user": current_user,
+                    "language": request_data.language,
+                    "speed_mode": request_data.speed_mode,
+                    "context": conversation_context_str
+                }
+                
+                # 🏷️ Ajouter filtres si supportés par le moteur RAG
+                if rag_filters:
+                    try:
+                        rag_params["filters"] = rag_filters
+                        result = await process_rag(**rag_params)
+                        rag_call_method = "context_parameter_structured_with_taxonomy"
+                        logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte + filtres taxonomiques")
+                    except TypeError:
+                        # Fallback sans filtres si non supportés
+                        del rag_params["filters"]
+                        result = await process_rag(**rag_params)
+                        rag_call_method = "context_parameter_structured_taxonomy_fallback"
+                        logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte (filtres taxonomiques non supportés)")
+                else:
+                    result = await process_rag(**rag_params)
+                    rag_call_method = "context_parameter_structured"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte")
+                    
+            except TypeError as te:
+                logger.info(f"ℹ️ [Expert Service] Paramètre context non supporté: {te}")
+                
+                # Tentative 2: Injection du contexte dans la question avec taxonomie
+                if conversation_context_str:
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                        question=enhanced_question_with_taxonomy,
+                        context=rag_context
+                    )
+                    
+                    # 📊 LOGGING: Debug du prompt injecté avec taxonomie
+                    logger.debug(f"🔍 [Prompt Final RAG - Injecté + Taxonomie]\n{structured_question[:500]}...")
+                    
+                    contextual_question = f"{structured_question}\n\nContexte: {conversation_context_str}"
+                    result = await process_rag(
+                        question=contextual_question,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
+                    )
+                    rag_call_method = "context_injected_structured_with_taxonomy"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte injecté + taxonomie")
+                else:
+                    # Tentative 3: Question enrichie avec prompt structuré + taxonomie
+                    structured_question = build_structured_prompt(
+                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
+                        question=enhanced_question_with_taxonomy,
+                        context=rag_context
+                    )
+                    
+                    # 📊 LOGGING: Debug du prompt seul avec taxonomie
+                    logger.debug(f"🔍 [Prompt Final RAG - Seul + Taxonomie]\n{structured_question[:500]}...")
+                    
+                    result = await process_rag(
+                        question=structured_question,
+                        user=current_user,
+                        language=request_data.language,
+                        speed_mode=request_data.speed_mode
+                    )
+                    rag_call_method = "structured_with_taxonomy_only"
+                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + taxonomie seul")
+            
+            performance_breakdown["rag_complete"] = int(time.time() * 1000)
+            
+            # === 6. TRAITEMENT RÉSULTAT RAG ===
+            answer = str(result.get("response", ""))
+            
+            # 🧹 IMPORTANT: Ici on ne nettoie que les références documents
+            # La concision sera appliquée plus tard dans le processus principal
+            answer = self.concision_processor._clean_document_references_only(answer)
+            
+            rag_score = result.get("score", 0.0)
+            original_mode = result.get("mode", "rag_processing")
+            
+            # Validation qualité
+            quality_check = self._validate_rag_response_quality(
+                answer, enhanced_question_with_taxonomy, enhancement_info
+            )
+            
+            if not quality_check["valid"]:
+                logger.warning(f"⚠️ [Expert Service] Qualité RAG insuffisante: {quality_check['reason']}")
+                ai_enhancements_used.append("quality_validation_failed")
+            
+            logger.info(f"✅ [Expert Service] RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
+            
+            # Mode enrichi avec méthode d'appel + taxonomie
+            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision_and_response_versions_and_taxonomy"
+            
+            processing_steps.append("mandatory_rag_with_intelligent_context_and_taxonomy")
+            
+            return {
+                "answer": answer,
+                "rag_used": True,
+                "rag_score": rag_score,
+                "mode": mode,
+                "context_used": bool(conversation_context_str),
+                "question_enriched": enhancement_info["question_enriched"] or bool(request_data.original_question),
+                "enhancement_info": enhancement_info,
+                "quality_check": quality_check,
+                "extracted_entities": extracted_entities,
+                "rag_call_method": rag_call_method,
+                "taxonomy_used": taxonomy,  # 🏷️ NOUVEAU
+                "taxonomy_filters_applied": bool(rag_filters)  # 🏷️ NOUVEAU
+            }
+            
+        except Exception as rag_error:
+            logger.error(f"❌ [Expert Service] Erreur critique RAG: {rag_error}")
+            processing_steps.append("rag_error")
+            
+            error_details = {
+                "error": "Erreur RAG",
+                "message": "Impossible d'interroger la base documentaire",
+                "question_original": question_text,
+                "question_enriched": enriched_question,
+                "question_with_taxonomy": enhanced_question_with_taxonomy,
+                "context_available": bool(conversation_context_str),
+                "taxonomy_detected": taxonomy,
+                "technical_error": str(rag_error)
+            }
+            
+            raise HTTPException(status_code=503, detail=error_details)
+    
+    # ===========================================================================================
+    # ✅ TOUTES LES AUTRES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
     # ===========================================================================================
     
     async def _handle_clarification_corrected(
@@ -1557,228 +1830,7 @@ class ExpertService:
             logger.warning("⚠️ [Enrichment] Pas d'enrichissement possible, question originale conservée")
             return original_question
     
-    # === TRAITEMENT EXPERT AVEC RAG-FIRST + AMÉLIORATIONS CORRIGÉ (CONSERVÉ) ===
-    
-    async def _process_expert_response_enhanced_corrected(
-        self, question_text: str, request_data: EnhancedQuestionRequest,
-        request: Request, current_user: Optional[Dict], conversation_id: str,
-        processing_steps: list, ai_enhancements_used: list,
-        debug_info: Dict, performance_breakdown: Dict, vagueness_result = None
-    ) -> Dict[str, Any]:
-        """Version RAG parfaitement corrigée avec mémoire intelligente (CONSERVÉ)"""
-        
-        # === 1. RÉCUPÉRATION FORCÉE DU CONTEXTE CONVERSATIONNEL ===
-        conversation_context_str = ""
-        extracted_entities = {}
-        
-        if self.integrations.intelligent_memory_available:
-            try:
-                # Récupération forcée du contexte depuis la mémoire intelligente
-                context_obj = self.integrations.get_conversation_context(conversation_id)
-                if context_obj:
-                    conversation_context_str = context_obj.get_context_for_rag(max_chars=800)
-                    
-                    # Enrichissement spécial si clarification
-                    if request_data.is_clarification_response or request_data.original_question:
-                        # Ajouter explicitement le contexte de clarification
-                        if request_data.original_question:
-                            conversation_context_str = f"Question originale: {request_data.original_question}. " + conversation_context_str
-                        
-                        # Rechercher les infos breed/sex dans les messages récents
-                        if hasattr(context_obj, 'messages'):
-                            for msg in reversed(context_obj.messages[-5:]):
-                                if msg.role == "user" and any(word in msg.message.lower() for word in ["ross", "cobb", "hubbard", "mâle", "femelle", "male", "female"]):
-                                    conversation_context_str += f" | Clarification: {msg.message}"
-                                    break
-                    
-                    # Entités consolidées
-                    if hasattr(context_obj, 'consolidated_entities'):
-                        extracted_entities = context_obj.consolidated_entities.to_dict()
-                    
-                    logger.info(f"🧠 [Expert Service] Contexte enrichi récupéré: {conversation_context_str[:150]}...")
-                    ai_enhancements_used.append("intelligent_memory_context_retrieval")
-                else:
-                    logger.warning(f"⚠️ [Expert Service] Aucun contexte trouvé pour: {conversation_id}")
-                    
-            except Exception as e:
-                logger.error(f"❌ [Expert Service] Erreur récupération contexte: {e}")
-        
-        performance_breakdown["context_retrieved"] = int(time.time() * 1000)
-        
-        # === 2. AMÉLIORATION INTELLIGENTE DE LA QUESTION ===
-        enriched_question, enhancement_info = self.rag_enhancer.enhance_question_for_rag(
-            question=question_text,
-            conversation_context=conversation_context_str,
-            language=request_data.language
-        )
-        
-        # Enrichissement supplémentaire si vient d'une clarification
-        if request_data.original_question and request_data.is_clarification_response:
-            logger.info(f"✨ [Expert Service] Question déjà enrichie par clarification: {question_text[:100]}...")
-            ai_enhancements_used.append("clarification_based_enrichment")
-        
-        if enhancement_info["question_enriched"]:
-            ai_enhancements_used.append("intelligent_question_enhancement")
-            logger.info(f"✨ [Expert Service] Question améliorée: {enriched_question[:150]}...")
-        
-        if enhancement_info["pronoun_detected"]:
-            ai_enhancements_used.append("contextual_pronoun_resolution")
-            logger.info(f"🎯 [Expert Service] Pronoms contextuels résolus: {enhancement_info['context_entities_used']}")
-        
-        processing_steps.append("intelligent_question_enhancement")
-        performance_breakdown["question_enhanced"] = int(time.time() * 1000)
-        
-        # === 3. VÉRIFICATION RAG DISPONIBLE ===
-        app = request.app
-        process_rag = getattr(app.state, 'process_question_with_rag', None)
-        
-        if not process_rag:
-            logger.error("❌ [Expert Service] Système RAG indisponible - Erreur critique")
-            raise HTTPException(
-                status_code=503, 
-                detail="Service RAG indisponible - Le système expert nécessite l'accès à la base documentaire"
-            )
-        
-        # === 4. APPEL RAG AVEC CONTEXTE FORCÉ ===
-        try:
-            logger.info("🔍 [Expert Service] Appel RAG avec contexte intelligent...")
-            
-            if request_data.debug_mode:
-                debug_info["original_question"] = question_text
-                debug_info["enriched_question"] = enriched_question
-                debug_info["conversation_context"] = conversation_context_str
-                debug_info["enhancement_info"] = enhancement_info
-            
-            # Stratégie multi-tentative pour RAG avec contexte
-            result = None
-            rag_call_method = "unknown"
-            
-            # 🎯 NOUVEAU: Construire prompt structuré avec contexte
-            rag_context = extract_context_from_entities(extracted_entities)
-            rag_context["lang"] = request_data.language
-            
-            # Tentative 1: Avec paramètre context si supporté
-            try:
-                # 🎯 Appliquer prompt structuré
-                structured_question = build_structured_prompt(
-                    documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
-                    question=enriched_question,
-                    context=rag_context
-                )
-                
-                # 📊 LOGGING: Debug du prompt final
-                logger.debug(f"🔍 [Prompt Final RAG] Contexte: {rag_context}")
-                logger.debug(f"🔍 [Prompt Final RAG]\n{structured_question[:500]}...")
-                
-                result = await process_rag(
-                    question=structured_question,
-                    user=current_user,
-                    language=request_data.language,
-                    speed_mode=request_data.speed_mode,
-                    context=conversation_context_str
-                )
-                rag_call_method = "context_parameter_structured"
-                logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte")
-            except TypeError as te:
-                logger.info(f"ℹ️ [Expert Service] Paramètre context non supporté: {te}")
-                
-                # Tentative 2: Injection du contexte dans la question
-                if conversation_context_str:
-                    structured_question = build_structured_prompt(
-                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
-                        question=enriched_question,
-                        context=rag_context
-                    )
-                    
-                    # 📊 LOGGING: Debug du prompt injecté
-                    logger.debug(f"🔍 [Prompt Final RAG - Injecté]\n{structured_question[:500]}...")
-                    
-                    contextual_question = f"{structured_question}\n\nContexte: {conversation_context_str}"
-                    result = await process_rag(
-                        question=contextual_question,
-                        user=current_user,
-                        language=request_data.language,
-                        speed_mode=request_data.speed_mode
-                    )
-                    rag_call_method = "context_injected_structured"
-                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré + contexte injecté")
-                else:
-                    # Tentative 3: Question enrichie avec prompt structuré
-                    structured_question = build_structured_prompt(
-                        documents="[DOCUMENTS_WILL_BE_INSERTED_BY_RAG]",
-                        question=enriched_question,
-                        context=rag_context
-                    )
-                    
-                    # 📊 LOGGING: Debug du prompt seul
-                    logger.debug(f"🔍 [Prompt Final RAG - Seul]\n{structured_question[:500]}...")
-                    
-                    result = await process_rag(
-                        question=structured_question,
-                        user=current_user,
-                        language=request_data.language,
-                        speed_mode=request_data.speed_mode
-                    )
-                    rag_call_method = "structured_only"
-                    logger.info("✅ [Expert Service] RAG appelé avec prompt structuré seul")
-            
-            performance_breakdown["rag_complete"] = int(time.time() * 1000)
-            
-            # === 5. TRAITEMENT RÉSULTAT RAG ===
-            answer = str(result.get("response", ""))
-            
-            # 🧹 IMPORTANT: Ici on ne nettoie que les références documents
-            # La concision sera appliquée plus tard dans le processus principal
-            answer = self.concision_processor._clean_document_references_only(answer)
-            
-            rag_score = result.get("score", 0.0)
-            original_mode = result.get("mode", "rag_processing")
-            
-            # Validation qualité
-            quality_check = self._validate_rag_response_quality(
-                answer, enriched_question, enhancement_info
-            )
-            
-            if not quality_check["valid"]:
-                logger.warning(f"⚠️ [Expert Service] Qualité RAG insuffisante: {quality_check['reason']}")
-                ai_enhancements_used.append("quality_validation_failed")
-            
-            logger.info(f"✅ [Expert Service] RAG réponse reçue: {len(answer)} caractères, score: {rag_score}")
-            
-            # Mode enrichi avec méthode d'appel
-            mode = f"enhanced_contextual_{original_mode}_{rag_call_method}_corrected_with_concision_and_response_versions"
-            
-            processing_steps.append("mandatory_rag_with_intelligent_context")
-            
-            return {
-                "answer": answer,
-                "rag_used": True,
-                "rag_score": rag_score,
-                "mode": mode,
-                "context_used": bool(conversation_context_str),
-                "question_enriched": enhancement_info["question_enriched"] or bool(request_data.original_question),
-                "enhancement_info": enhancement_info,
-                "quality_check": quality_check,
-                "extracted_entities": extracted_entities,
-                "rag_call_method": rag_call_method
-            }
-            
-        except Exception as rag_error:
-            logger.error(f"❌ [Expert Service] Erreur critique RAG: {rag_error}")
-            processing_steps.append("rag_error")
-            
-            error_details = {
-                "error": "Erreur RAG",
-                "message": "Impossible d'interroger la base documentaire",
-                "question_original": question_text,
-                "question_enriched": enriched_question,
-                "context_available": bool(conversation_context_str),
-                "technical_error": str(rag_error)
-            }
-            
-            raise HTTPException(status_code=503, detail=error_details)
-    
-    # === MÉTHODES UTILITAIRES AVEC CONCISION + RESPONSE VERSIONS ===
+    # === MÉTHODES UTILITAIRES AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING ===
     
     def _create_vagueness_response(
         self, vagueness_result, question_text: str, conversation_id: str,
@@ -1831,7 +1883,7 @@ class ExpertService:
         ai_enhancements_used: list, request_data: EnhancedQuestionRequest,
         debug_info: Dict, performance_breakdown: Dict
     ) -> EnhancedExpertResponse:
-        """Construit la réponse finale avec toutes les améliorations + concision + response_versions"""
+        """Construit la réponse finale avec toutes les améliorations + concision + response_versions + taxonomic_filtering"""
         
         # Métriques finales
         extracted_entities = expert_result.get("extracted_entities")
@@ -1855,7 +1907,9 @@ class ExpertService:
                 "ai_enhancements_count": len(ai_enhancements_used),
                 "processing_steps_count": len(processing_steps),
                 "concision_applied": expert_result.get("concision_applied", False),
-                "response_versions_support": True  # 🚀 NOUVEAU
+                "response_versions_support": True,  # 🚀 Support response_versions
+                "taxonomy_used": expert_result.get("taxonomy_used"),  # 🏷️ NOUVEAU
+                "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False)  # 🏷️ NOUVEAU
             }
             
             final_performance = performance_breakdown
@@ -1866,12 +1920,19 @@ class ExpertService:
             "original_response_available": "original_answer" in expert_result,
             "detected_question_type": None,
             "applied_concision_level": None,
-            "response_versions_supported": True  # 🚀 NOUVEAU
+            "response_versions_supported": True  # 🚀 Support response_versions
         }
         
         if expert_result.get("concision_applied"):
             concision_info["detected_question_type"] = self.concision_processor.detect_question_type(question_text)
             concision_info["applied_concision_level"] = self.concision_processor.detect_optimal_concision_level(question_text).value
+        
+        # 🏷️ NOUVEAU: Informations taxonomiques
+        taxonomy_info = {
+            "taxonomy_detected": expert_result.get("taxonomy_used", "general"),
+            "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),
+            "taxonomy_enhanced_question": bool(expert_result.get("taxonomy_used") != "general")
+        }
             
         return EnhancedExpertResponse(
             # Champs existants conservés
@@ -1909,9 +1970,12 @@ class ExpertService:
             concision_info=concision_info,
             original_response=expert_result.get("original_answer"),  # Réponse originale si concision appliquée
             
-            # 🚀 NOUVEAU: Support response_versions (sera ajouté par la méthode principale)
+            # 🚀 Support response_versions (sera ajouté par la méthode principale)
             response_versions=None,  # Sera rempli par process_expert_question si generate_all_versions=True
-            concision_metrics=None   # Sera rempli par process_expert_question si generate_all_versions=True
+            concision_metrics=None,   # Sera rempli par process_expert_question si generate_all_versions=True
+            
+            # 🏷️ NOUVEAU: Informations taxonomiques
+            taxonomy_info=taxonomy_info
         )
     
     # === MÉTHODES UTILITAIRES IDENTIQUES (CONSERVÉES) ===
@@ -2034,14 +2098,15 @@ class ExpertService:
         
         return {
             "success": True,
-            "message": "Feedback enregistré avec succès (Enhanced + Concision + Response Versions)",
+            "message": "Feedback enregistré avec succès (Enhanced + Concision + Response Versions + Taxonomic Filtering)",
             "rating": feedback_data.rating,
             "comment": feedback_data.comment,
             "conversation_id": feedback_data.conversation_id,
             "feedback_updated_in_db": feedback_updated,
             "enhanced_features_used": True,
             "concision_system_active": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
-            "response_versions_supported": True,  # 🚀 NOUVEAU
+            "response_versions_supported": True,  # 🚀 Support response_versions
+            "taxonomic_filtering_active": True,  # 🏷️ NOUVEAU
             "timestamp": datetime.now().isoformat()
         }
     
@@ -2071,11 +2136,17 @@ class ExpertService:
                 "auto_concision_detection": True,
                 "concision_enabled": self.concision_processor.config.ENABLE_CONCISE_RESPONSES,
                 
-                # 🚀 NOUVEAU: Informations response_versions
+                # 🚀 Informations response_versions
                 "response_versions_available": True,
                 "multiple_concision_levels_generation": True,
                 "dynamic_level_switching_support": True,
-                "concision_metrics_available": True
+                "concision_metrics_available": True,
+                
+                # 🏷️ NOUVEAU: Informations filtrage taxonomique
+                "taxonomic_filtering_available": True,
+                "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
+                "automatic_taxonomy_detection": True,
+                "taxonomy_based_document_filtering": True
             },
             "system_status": {
                 "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
@@ -2083,7 +2154,8 @@ class ExpertService:
                 "intelligent_memory_enabled": self.integrations.intelligent_memory_available,
                 "api_enhancements_enabled": True,
                 "concision_processor_enabled": True,
-                "response_versions_generator_enabled": True  # 🚀 NOUVEAU
+                "response_versions_generator_enabled": True,  # 🚀 Support response_versions
+                "taxonomic_filtering_enabled": True  # 🏷️ NOUVEAU
             },
             
             # ✅ CONSERVÉ: Configuration concision par défaut
@@ -2094,7 +2166,7 @@ class ExpertService:
                 "ultra_concise_keywords": self.concision_processor.config.ULTRA_CONCISE_KEYWORDS,
                 "complex_keywords": self.concision_processor.config.COMPLEX_KEYWORDS,
                 
-                # 🚀 NOUVEAU: Support response_versions
+                # 🚀 Support response_versions
                 "response_versions_generation": {
                     "enabled": True,
                     "supported_levels": [level.value for level in ConcisionLevel],
@@ -2102,17 +2174,31 @@ class ExpertService:
                     "cache_supported": False,  # Le système existant ne cache pas
                     "fallback_strategy": "simple_truncation"
                 }
+            },
+            
+            # 🏷️ NOUVEAU: Configuration filtrage taxonomique
+            "taxonomic_config": {
+                "enabled": True,
+                "supported_categories": {
+                    "broiler": ["ross", "cobb", "hubbard", "indian river"],
+                    "layer": ["lohmann", "isa", "dekalb", "hy-line", "bovans", "h&n", "shaver"],
+                    "swine": ["gestation_day", "parity"],
+                    "dairy": ["days_in_milk", "milk_yield_liters"]
+                },
+                "auto_detection_enabled": True,
+                "filter_fallback_enabled": True,
+                "question_enhancement_enabled": True
             }
         }
 
 # =============================================================================
-# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION + RESPONSE VERSIONS (OPTIONNEL)
+# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING (OPTIONNEL)
 # =============================================================================
 
 def create_concision_control_endpoint():
     """
     Endpoint optionnel pour contrôler la concision côté backend
-    🚀 MODIFIÉ: Ajout support response_versions
+    🚀 MODIFIÉ: Ajout support response_versions + taxonomic_filtering
     """
     
     from fastapi import APIRouter
@@ -2124,7 +2210,8 @@ def create_concision_control_endpoint():
         enabled: bool = True
         default_level: ConcisionLevel = ConcisionLevel.CONCISE
         max_lengths: Optional[Dict[str, int]] = None
-        enable_response_versions: bool = True  # 🚀 NOUVEAU
+        enable_response_versions: bool = True  # 🚀 Support response_versions
+        enable_taxonomic_filtering: bool = True  # 🏷️ NOUVEAU
     
     class ConcisionSettingsResponse(BaseModel):
         success: bool
@@ -2133,7 +2220,7 @@ def create_concision_control_endpoint():
     
     @router.post("/concision/settings", response_model=ConcisionSettingsResponse)
     async def update_concision_settings(request: ConcisionSettingsRequest):
-        """Mettre à jour les paramètres de concision + response_versions du système"""
+        """Mettre à jour les paramètres de concision + response_versions + taxonomic_filtering du système"""
         
         try:
             # Mettre à jour la configuration globale
@@ -2149,9 +2236,10 @@ def create_concision_control_endpoint():
                     "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
                     "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
                     "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH,
-                    "response_versions_enabled": request.enable_response_versions  # 🚀 NOUVEAU
+                    "response_versions_enabled": request.enable_response_versions,  # 🚀 Support response_versions
+                    "taxonomic_filtering_enabled": request.enable_taxonomic_filtering  # 🏷️ NOUVEAU
                 },
-                message="Paramètres de concision + response_versions mis à jour avec succès"
+                message="Paramètres de concision + response_versions + taxonomic_filtering mis à jour avec succès"
             )
         except Exception as e:
             return ConcisionSettingsResponse(
@@ -2162,7 +2250,7 @@ def create_concision_control_endpoint():
     
     @router.get("/concision/settings", response_model=Dict[str, Any])
     async def get_concision_settings():
-        """Récupérer les paramètres actuels de concision + response_versions"""
+        """Récupérer les paramètres actuels de concision + response_versions + taxonomic_filtering"""
         
         return {
             "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
@@ -2172,25 +2260,34 @@ def create_concision_control_endpoint():
             "ultra_concise_keywords": ConcisionConfig.ULTRA_CONCISE_KEYWORDS,
             "complex_keywords": ConcisionConfig.COMPLEX_KEYWORDS,
             
-            # 🚀 NOUVEAU: Configuration response_versions
+            # 🚀 Configuration response_versions
             "response_versions": {
                 "supported": True,
                 "generation_method": "existing_processor_based",
                 "cache_enabled": False,
                 "fallback_enabled": True,
                 "metrics_included": True
+            },
+            
+            # 🏷️ NOUVEAU: Configuration taxonomic_filtering
+            "taxonomic_filtering": {
+                "supported": True,
+                "auto_detection_enabled": True,
+                "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
+                "question_enhancement_enabled": True,
+                "filter_fallback_enabled": True
             }
         }
     
     return router
 
 # =============================================================================
-# CONFIGURATION FINALE AVEC CONCISION + RESPONSE VERSIONS
+# CONFIGURATION FINALE AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING
 # =============================================================================
 
 logger.info("🚀" * 30)
-logger.info("🚀 [EXPERT SERVICES] VERSION 3.7.0 - RESPONSE_VERSIONS INTÉGRÉ!")
-logger.info("🚀 [INTÉGRATION] Système concision existant + response_versions:")
+logger.info("🚀 [EXPERT SERVICES] VERSION 3.8.0 - TAXONOMIC FILTERING INTÉGRÉ!")
+logger.info("🚀 [INTÉGRATION] Système concision + response_versions + taxonomie:")
 logger.info("   ✅ ResponseVersionsGenerator utilise ResponseConcisionProcessor existant")
 logger.info("   ✅ Génération 4 versions: ultra_concise, concise, standard, detailed")
 logger.info("   ✅ Sélection automatique selon concision_level")
@@ -2198,15 +2295,19 @@ logger.info("   ✅ Métriques détaillées avec ConcisionMetrics")
 logger.info("   ✅ Compatible avec toute la logique existante")
 logger.info("   ✅ Fallback automatique si erreur")
 logger.info("   ✅ Support generate_all_versions flag")
+logger.info("   🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents")
+logger.info("   🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy")
+logger.info("   🏷️ NOUVEAU: Questions enrichies avec contexte taxonomique")
 logger.info("🚀 [BACKEND READY] Frontend peut maintenant:")
 logger.info("   - Demander concision_level spécifique")
 logger.info("   - Recevoir response_versions complètes") 
 logger.info("   - Changer niveau dynamiquement côté frontend")
 logger.info("   - Profiter du cache et performance optimisée")
+logger.info("   - Bénéficier du filtrage taxonomique automatique")
 logger.info("🚀" * 30)
 
-logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION + RESPONSE VERSIONS intégré")
-logger.info("🚀 [Expert Service] NOUVELLES FONCTIONNALITÉS V3.7.0:")
+logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING intégré")
+logger.info("🚀 [Expert Service] NOUVELLES FONCTIONNALITÉS V3.8.0:")
 logger.info("   - ✅ Système de concision intelligent multi-niveaux (CONSERVÉ)")
 logger.info("   - ✅ Détection automatique type de question (CONSERVÉ)")
 logger.info("   - ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)")
@@ -2217,6 +2318,10 @@ logger.info("   - 🚀 Génération toutes versions (ultra_concise, concise, sta
 logger.info("   - 🚀 ConcisionMetrics avec compression ratios et métriques")
 logger.info("   - 🚀 Support generate_all_versions flag pour contrôle frontend")
 logger.info("   - 🚀 Sélection intelligente version selon concision_level")
+logger.info("   - 🏷️ NOUVEAU: Filtrage taxonomique intelligent des documents RAG")
+logger.info("   - 🏷️ NOUVEAU: Détection automatique broiler/layer/swine/dairy/general")
+logger.info("   - 🏷️ NOUVEAU: Enhancement questions avec contexte taxonomique")
+logger.info("   - 🏷️ NOUVEAU: Filtres RAG adaptatifs selon la taxonomie détectée")
 logger.info("🔧 [Expert Service] FONCTIONNALITÉS CONSERVÉES:")
 logger.info("   - ✅ Système de clarification intelligent complet")
 logger.info("   - ✅ Mémoire conversationnelle enrichie")
@@ -2225,10 +2330,14 @@ logger.info("   - ✅ Multi-LLM support et validation agricole")
 logger.info("   - ✅ Support multilingue FR/EN/ES")
 logger.info("🎯 [Expert Service] RÉSULTATS ATTENDUS:")
 logger.info('   - Question: "Quel est le poids d\'un poulet Ross 308 mâle de 18 jours ?"')
+logger.info('   - Taxonomie détectée: "broiler" (à partir de Ross 308)')
+logger.info('   - Filtres RAG: {"taxonomy": "broiler", "category": "broiler"}')
+logger.info('   - Question enrichie: "[CONTEXTE: poulets de chair] Quel est le poids..."')
+logger.info('   - Documents filtrés: Seulement les docs broiler pertinents')
 logger.info('   - response_versions["ultra_concise"]: "410-450g"')
 logger.info('   - response_versions["concise"]: "Le poids se situe entre 410g et 450g."')
 logger.info('   - response_versions["standard"]: Réponse normale sans conseils excessifs')
 logger.info('   - response_versions["detailed"]: Version complète originale')
 logger.info('   - response (sélection): Selon concision_level demandé')
 logger.info('   - concision_metrics: Métriques génération et compression')
-logger.info("✅ [Expert Service] SYSTÈME COMPLET RESPONSE_VERSIONS PARFAITEMENT INTÉGRÉ!")
+logger.info("✅ [Expert Service] SYSTÈME COMPLET TAXONOMIC FILTERING PARFAITEMENT INTÉGRÉ!")

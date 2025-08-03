@@ -1,6 +1,6 @@
-// types/index.ts - Mise à jour COMPLÈTE avec support de concision
+// types/index.ts - Mise à jour COMPLÈTE avec support de concision ET response_versions
 
-// ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ====================
+// ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ET RESPONSE_VERSIONS ====================
 
 export interface Message {
   id: string
@@ -19,13 +19,21 @@ export interface Message {
   original_question?: string               // Question originale avant clarification
   clarification_entities?: Record<string, any>    // Entités extraites des réponses de clarification
   
-  // 🆕 NOUVEAU: Champs pour le système de concision
+  // 🚀 NOUVEAU: Champs pour le système de concision backend
+  response_versions?: {
+    ultra_concise: string
+    concise: string
+    standard: string
+    detailed: string
+  }
+  
+  // ✅ CONSERVÉS: Champs pour compatibilité (peuvent être supprimés plus tard)
   originalResponse?: string  // Réponse originale avant concision
   processedResponse?: string // Réponse après traitement de concision
   concisionLevel?: ConcisionLevel // Niveau de concision appliqué
 }
 
-// ==================== NOUVEAUX TYPES POUR CONCISION ====================
+// ==================== TYPES POUR CONCISION BACKEND ====================
 
 export enum ConcisionLevel {
   ULTRA_CONCISE = 'ultra_concise',  // Réponse minimale
@@ -45,6 +53,14 @@ export interface ConcisionControlProps {
   compact?: boolean;
 }
 
+// 🚀 NOUVEAU: Interface pour sélection de versions backend
+export interface ResponseVersionSelection {
+  selectedVersion: string;
+  availableVersions: Record<string, string>;
+  selectedLevel: ConcisionLevel;
+}
+
+// ✅ CONSERVÉ: Interface pour traitement legacy (compatibilité)
 export interface ResponseProcessingResult {
   processedContent: string;
   originalContent: string;
@@ -68,9 +84,16 @@ export interface ExpertApiResponse {
   logged: boolean
   validation_passed?: boolean
   validation_confidence?: number
-  // 🆕 CONSERVÉS: NOUVEAUX CHAMPS POUR CLARIFICATION
+  // ✅ CONSERVÉS: CHAMPS POUR CLARIFICATION
   is_clarification_request?: boolean
   clarification_questions?: string[]
+  // 🚀 NOUVEAU: Champs pour versions backend
+  response_versions?: {
+    ultra_concise: string
+    concise: string
+    standard: string
+    detailed: string
+  }
 }
 
 // ✅ CONSERVÉ: INTERFACE ConversationData ÉTENDUE AVEC FEEDBACK
@@ -85,19 +108,6 @@ export interface ConversationData {
   rag_used?: boolean
   feedback?: 1 | -1 | null          // ✅ CONSERVÉ: Feedback numérique pour le backend
   feedback_comment?: string          // ✅ CONSERVÉ: Commentaire feedback
-}
-
-export interface ConversationData {
-  user_id: string
-  question: string
-  response: string
-  conversation_id: string
-  confidence_score?: number
-  response_time_ms?: number
-  language?: string
-  rag_used?: boolean
-  feedback?: 1 | -1 | null
-  feedback_comment?: string
 }
 
 export interface ConversationItem {
@@ -179,7 +189,7 @@ export interface ConversationStats {
 
 // ==================== CONSERVÉS: TYPES POUR CLARIFICATIONS INLINE ====================
 
-// ✅ CONSERVÉ: Interface simplifiée pour clarifications inline (REMPLACE ClarificationModalProps)
+// ✅ CONSERVÉ: Interface simplifiée pour clarifications inline
 export interface ClarificationInlineProps {
   questions: string[]
   originalQuestion: string
@@ -602,6 +612,44 @@ export const CLARIFICATION_CONFIG = {
   VALIDATION_DEBOUNCE: 500
 } as const
 
+// 🚀 NOUVELLE: CONFIGURATION POUR CONCISION BACKEND
+export const CONCISION_CONFIG = {
+  LEVELS: {
+    ULTRA_CONCISE: {
+      value: 'ultra_concise' as const,
+      label: 'Minimal',
+      icon: '⚡',
+      description: 'Juste l\'essentiel',
+      example: 'Données clés uniquement'
+    },
+    CONCISE: {
+      value: 'concise' as const,
+      label: 'Concis', 
+      icon: '🎯',
+      description: 'Information principale avec contexte',
+      example: 'Réponse courte avec explication essentielle'
+    },
+    STANDARD: {
+      value: 'standard' as const,
+      label: 'Standard',
+      icon: '📝', 
+      description: 'Réponse équilibrée avec conseils',
+      example: 'Réponse complète sans détails techniques'
+    },
+    DETAILED: {
+      value: 'detailed' as const,
+      label: 'Détaillé',
+      icon: '📚',
+      description: 'Réponse complète avec explications',
+      example: 'Réponse exhaustive avec conseils détaillés'
+    }
+  },
+  DEFAULT_LEVEL: 'concise' as const,
+  AUTO_DETECT: true,
+  SAVE_PREFERENCE: true,
+  STORAGE_KEY: 'intelia_concision_level'
+} as const
+
 // ✅ CONSERVÉS: UTILITAIRES ANALYTICS
 export const ANALYTICS_UTILS = {
   calculateSatisfactionRate: (positive: number, negative: number): number => {
@@ -713,6 +761,137 @@ export const ClarificationUtils = {
   }
 } as const
 
+// 🚀 NOUVEAUX: UTILITAIRES POUR CONCISION BACKEND
+export const ConcisionUtils = {
+  selectVersionFromResponse: (
+    responseVersions: Record<string, string>,
+    level: ConcisionLevel
+  ): string => {
+    // Retourner la version demandée si elle existe
+    if (responseVersions[level]) {
+      return responseVersions[level]
+    }
+    
+    // Fallback intelligent si version manquante
+    const fallbackOrder: ConcisionLevel[] = [
+      ConcisionLevel.DETAILED,
+      ConcisionLevel.STANDARD, 
+      ConcisionLevel.CONCISE,
+      ConcisionLevel.ULTRA_CONCISE
+    ]
+    
+    for (const fallbackLevel of fallbackOrder) {
+      if (responseVersions[fallbackLevel]) {
+        console.warn(`⚠️ [ConcisionUtils] Fallback vers ${fallbackLevel} (${level} manquant)`)
+        return responseVersions[fallbackLevel]
+      }
+    }
+    
+    // Ultime fallback - première version disponible
+    const firstAvailable = Object.values(responseVersions)[0]
+    console.warn('⚠️ [ConcisionUtils] Aucune version standard - utilisation première disponible')
+    return firstAvailable || 'Réponse non disponible'
+  },
+
+  validateResponseVersions: (responseVersions: any): boolean => {
+    if (!responseVersions || typeof responseVersions !== 'object') {
+      return false
+    }
+    
+    const requiredLevels = [
+      ConcisionLevel.ULTRA_CONCISE,
+      ConcisionLevel.CONCISE,
+      ConcisionLevel.STANDARD,
+      ConcisionLevel.DETAILED
+    ]
+    
+    // Vérifier qu'au moins une version est présente
+    const hasAnyVersion = requiredLevels.some(level => 
+      responseVersions[level] && typeof responseVersions[level] === 'string'
+    )
+    
+    return hasAnyVersion
+  },
+
+  detectOptimalLevel: (question: string): ConcisionLevel => {
+    const questionLower = question.toLowerCase()
+    
+    // Questions ultra-concises (poids, température, mesures simples)
+    const ultraConciseKeywords = [
+      'poids', 'weight', 'peso',
+      'température', 'temperature', 'temperatura', 
+      'combien', 'how much', 'cuánto',
+      'quel est', 'what is', 'cuál es',
+      'quelle est', 'âge', 'age'
+    ]
+    
+    if (ultraConciseKeywords.some(keyword => questionLower.includes(keyword))) {
+      return ConcisionLevel.ULTRA_CONCISE
+    }
+
+    // Questions complexes (comment, pourquoi, procédures)
+    const complexKeywords = [
+      'comment', 'how to', 'cómo',
+      'pourquoi', 'why', 'por qué', 
+      'expliquer', 'explain', 'explicar',
+      'procédure', 'procedure', 'procedimiento',
+      'diagnostic', 'diagnosis', 'diagnóstico',
+      'traitement', 'treatment', 'tratamiento'
+    ]
+
+    if (complexKeywords.some(keyword => questionLower.includes(keyword))) {
+      return ConcisionLevel.DETAILED
+    }
+
+    // Par défaut: concis pour questions générales
+    return ConcisionLevel.CONCISE
+  },
+
+  analyzeResponseComplexity: (response: string): {
+    wordCount: number
+    sentenceCount: number
+    hasNumbers: boolean
+    hasAdvice: boolean
+    complexity: 'simple' | 'moderate' | 'complex'
+  } => {
+    const wordCount = response.split(/\s+/).length
+    const sentenceCount = response.split('.').filter(s => s.trim().length > 0).length
+    const hasNumbers = /\d+/.test(response)
+    
+    const adviceKeywords = [
+      'recommandé', 'essentiel', 'important', 'devrait', 'doit',
+      'recommended', 'essential', 'important', 'should', 'must',
+      'recomendado', 'esencial', 'importante', 'debería', 'debe'
+    ]
+    const hasAdvice = adviceKeywords.some(keyword => 
+      response.toLowerCase().includes(keyword)
+    )
+    
+    let complexity: 'simple' | 'moderate' | 'complex' = 'simple'
+    if (wordCount > 100 || sentenceCount > 3) complexity = 'moderate'
+    if (wordCount > 200 || sentenceCount > 6) complexity = 'complex'
+    
+    return {
+      wordCount,
+      sentenceCount,
+      hasNumbers,
+      hasAdvice,
+      complexity
+    }
+  },
+
+  debugResponseVersions: (responseVersions: Record<string, string>): void => {
+    console.group('🔍 [ConcisionUtils] Versions disponibles')
+    Object.entries(responseVersions).forEach(([level, content]) => {
+      console.log(`${level}: ${content?.length || 0} caractères`)
+      if (content) {
+        console.log(`  Aperçu: "${content.substring(0, 50)}..."`)
+      }
+    })
+    console.groupEnd()
+  }
+} as const
+
 // ✅ CONSERVÉES: CONSTANTES DE VALIDATION
 export const VALIDATION_RULES = {
   FEEDBACK: {
@@ -740,6 +919,15 @@ export const VALIDATION_RULES = {
     MAX_ANSWER_LENGTH: 200,
     MAX_QUESTIONS: 4,
     REQUIRED_ANSWER_PERCENTAGE: 0.5
+  },
+  // 🚀 NOUVELLES: RÈGLES POUR CONCISION
+  CONCISION: {
+    MIN_RESPONSE_LENGTH: 10,
+    MAX_ULTRA_CONCISE_LENGTH: 50,
+    MAX_CONCISE_LENGTH: 200,
+    MAX_STANDARD_LENGTH: 500,
+    // Pas de limite pour DETAILED
+    AUTO_DETECT_ENABLED: true
   }
 } as const
 
@@ -768,6 +956,13 @@ export const ERROR_MESSAGES = {
     INVALID_ANSWERS: 'Réponses invalides. Veuillez vérifier vos réponses.',
     SUBMISSION_FAILED: 'Erreur lors de l\'envoi des clarifications',
     TIMEOUT: 'Timeout lors du traitement des clarifications'
+  },
+  // 🚀 NOUVEAUX: MESSAGES POUR CONCISION
+  CONCISION: {
+    VERSION_NOT_FOUND: 'Version de réponse non trouvée',
+    INVALID_LEVEL: 'Niveau de concision invalide',
+    BACKEND_ERROR: 'Erreur lors de la génération des versions de réponse',
+    FALLBACK_USED: 'Version de secours utilisée'
   },
   GENERAL: {
     UNAUTHORIZED: 'Session expirée - reconnexion nécessaire',
@@ -805,6 +1000,19 @@ export interface AnalyticsApiResponse {
 export const TypeGuards = {
   isFeedbackType: (value: any): value is 'positive' | 'negative' => {
     return typeof value === 'string' && ['positive', 'negative'].includes(value)
+  },
+
+  // 🚀 NOUVEAU: Type guard pour ConcisionLevel
+  isConcisionLevel: (value: any): value is ConcisionLevel => {
+    return typeof value === 'string' && Object.values(ConcisionLevel).includes(value as ConcisionLevel)
+  },
+
+  // 🚀 NOUVEAU: Type guard pour response_versions
+  isValidResponseVersions: (value: any): value is Record<string, string> => {
+    if (!value || typeof value !== 'object') return false
+    return Object.values(ConcisionLevel).some(level => 
+      value[level] && typeof value[level] === 'string'
+    )
   },
   
   isValidMessage: (value: any): value is Message => {

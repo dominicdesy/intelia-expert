@@ -1,117 +1,4 @@
-"""Script to fix RAG structure and imports."""
-
-import os
-import shutil
-from pathlib import Path
-
-def fix_rag_structure():
-    """Fix RAG directory structure and file names."""
-    
-    print("🔧 Fixing RAG structure...")
-    
-    # Get project root
-    project_root = Path.cwd()
-    rag_dir = project_root / "rag"
-    parsers_dir = rag_dir / "parsers"
-    
-    print(f"Working in: {project_root}")
-    print(f"RAG directory: {rag_dir}")
-    print(f"Parsers directory: {parsers_dir}")
-    
-    # Step 1: Fix _init_.py → __init__.py in rag/
-    rag_init_old = rag_dir / "_init_.py"
-    rag_init_new = rag_dir / "__init__.py"
-    
-    if rag_init_old.exists():
-        print(f"✅ Renaming {rag_init_old} → {rag_init_new}")
-        shutil.move(str(rag_init_old), str(rag_init_new))
-    else:
-        print(f"⚠️ {rag_init_old} not found")
-    
-    # Step 2: Fix _init_.py → __init__.py in rag/parsers/
-    parsers_init_old = parsers_dir / "_init_.py"
-    parsers_init_new = parsers_dir / "__init__.py"
-    
-    if parsers_init_old.exists():
-        print(f"✅ Renaming {parsers_init_old} → {parsers_init_new}")
-        shutil.move(str(parsers_init_old), str(parsers_init_new))
-    else:
-        print(f"⚠️ {parsers_init_old} not found")
-    
-    # Step 3: Create proper __init__.py for rag/ if it doesn't exist
-    if not rag_init_new.exists():
-        print("📝 Creating rag/__init__.py")
-        with open(rag_init_new, 'w', encoding='utf-8') as f:
-            f.write(RAG_INIT_CONTENT)
-    
-    # Step 4: Create proper __init__.py for rag/parsers/ if it doesn't exist
-    if not parsers_init_new.exists():
-        print("📝 Creating rag/parsers/__init__.py")
-        with open(parsers_init_new, 'w', encoding='utf-8') as f:
-            f.write(PARSERS_INIT_CONTENT)
-    
-    # Step 5: List current files
-    print("\n📂 Current RAG structure:")
-    for file_path in sorted(rag_dir.rglob("*.py")):
-        relative_path = file_path.relative_to(project_root)
-        print(f"   {relative_path}")
-    
-    print("\n✅ RAG structure fix completed!")
-
-# Content for rag/__init__.py
-RAG_INIT_CONTENT = '''"""RAG (Retrieval-Augmented Generation) system for broiler management expertise."""
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-# Try to import main classes
-try:
-    from .embedder import RAGEmbedder, EnhancedDocumentEmbedder
-    EMBEDDER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"RAG embedder not available: {e}")
-    RAGEmbedder = None
-    EnhancedDocumentEmbedder = None
-    EMBEDDER_AVAILABLE = False
-
-try:
-    from .retriever import RAGRetriever
-    RETRIEVER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"RAG retriever not available: {e}")
-    RAGRetriever = None
-    RETRIEVER_AVAILABLE = False
-
-try:
-    from .parser_router import ParserRouter
-    PARSER_ROUTER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Parser router not available: {e}")
-    ParserRouter = None
-    PARSER_ROUTER_AVAILABLE = False
-
-# Export available classes
-__all__ = []
-if EMBEDDER_AVAILABLE:
-    __all__.extend(['RAGEmbedder', 'EnhancedDocumentEmbedder'])
-if RETRIEVER_AVAILABLE:
-    __all__.append('RAGRetriever')
-if PARSER_ROUTER_AVAILABLE:
-    __all__.append('ParserRouter')
-
-def get_rag_status():
-    """Get RAG system status."""
-    return {
-        'embedder_available': EMBEDDER_AVAILABLE,
-        'retriever_available': RETRIEVER_AVAILABLE,
-        'parser_router_available': PARSER_ROUTER_AVAILABLE,
-        'system_ready': all([EMBEDDER_AVAILABLE, RETRIEVER_AVAILABLE, PARSER_ROUTER_AVAILABLE])
-    }
-'''
-
-# Content for rag/parsers/__init__.py
-PARSERS_INIT_CONTENT = '''"""Document parsers for RAG system."""
+"""Document parsers for RAG system - Enhanced Version."""
 
 import logging
 
@@ -126,7 +13,29 @@ except ImportError as e:
     logger.warning(f"Base parser classes not available: {e}")
     BASE_CLASSES_AVAILABLE = False
 
-# Try to import parsers
+# Try to import metadata enrichment
+try:
+    from .metadata_enrichment import MetadataEnricher, extract_hierarchical_metadata, infer_tags_from_text
+    METADATA_ENRICHMENT_AVAILABLE = True
+    logger.debug("Metadata enrichment loaded")
+except ImportError as e:
+    logger.warning(f"Metadata enrichment not available: {e}")
+    MetadataEnricher = None
+    extract_hierarchical_metadata = None
+    infer_tags_from_text = None
+    METADATA_ENRICHMENT_AVAILABLE = False
+
+# Try to import table parsers (NEW)
+try:
+    from .table_parsers import PerformanceTableParser
+    TABLE_PARSER_AVAILABLE = True
+    logger.debug("Table parsers loaded")
+except ImportError as e:
+    logger.warning(f"Table parser not available: {e}")
+    PerformanceTableParser = None
+    TABLE_PARSER_AVAILABLE = False
+
+# Try to import document parsers
 try:
     from .document_parsers import PDFParser, TextParser, MarkdownParser, DocumentParser
     DOCUMENT_PARSER_AVAILABLE = True
@@ -139,67 +48,224 @@ except ImportError as e:
     DocumentParser = None
     DOCUMENT_PARSER_AVAILABLE = False
 
+# Try to import general parsers
 try:
-    from .general_parsers import GeneralParser
+    from .general_parsers import GeneralCSVParser, GeneralExcelParser
     GENERAL_PARSER_AVAILABLE = True
-    logger.debug("General parser loaded")
+    logger.debug("General parsers loaded")
 except ImportError as e:
-    logger.warning(f"General parser not available: {e}")
-    GeneralParser = None
+    logger.warning(f"General parsers not available: {e}")
+    GeneralCSVParser = None
+    GeneralExcelParser = None
     GENERAL_PARSER_AVAILABLE = False
 
+# Try to import broiler parsers (ENHANCED)
 try:
-    from .ross308_parsers import Ross308Parser
-    ROSS308_PARSER_AVAILABLE = True
-    logger.debug("Ross308 parser loaded")
+    from .broiler_parsers import BroilerPerformanceParser, BroilerTemperatureParser
+    BROILER_PARSER_AVAILABLE = True
+    logger.debug("Broiler parsers loaded")
 except ImportError as e:
-    logger.warning(f"Ross308 parser not available: {e}")
-    Ross308Parser = None
-    ROSS308_PARSER_AVAILABLE = False
+    logger.warning(f"Broiler parsers not available: {e}")
+    BroilerPerformanceParser = None
+    BroilerTemperatureParser = None
+    BROILER_PARSER_AVAILABLE = False
 
+# Try to import fallback parsers
 try:
-    from .fallback_parsers import FallbackParser
+    from .fallback_parsers import TikaFallbackParser, RawTextFallbackParser, EmptyFileParser
     FALLBACK_PARSER_AVAILABLE = True
-    logger.debug("Fallback parser loaded")
+    logger.debug("Fallback parsers loaded")
 except ImportError as e:
-    logger.warning(f"Fallback parser not available: {e}")
-    FallbackParser = None
+    logger.warning(f"Fallback parsers not available: {e}")
+    TikaFallbackParser = None
+    RawTextFallbackParser = None
+    EmptyFileParser = None
     FALLBACK_PARSER_AVAILABLE = False
 
-# Export available parsers
+# Export available classes
 __all__ = []
 
 if BASE_CLASSES_AVAILABLE:
     __all__.extend(['BaseParser', 'ParserCapability', 'Document'])
 
+if METADATA_ENRICHMENT_AVAILABLE:
+    __all__.extend(['MetadataEnricher', 'extract_hierarchical_metadata', 'infer_tags_from_text'])
+
+if TABLE_PARSER_AVAILABLE:
+    __all__.append('PerformanceTableParser')
+
 if DOCUMENT_PARSER_AVAILABLE:
     __all__.extend(['PDFParser', 'TextParser', 'MarkdownParser', 'DocumentParser'])
 
 if GENERAL_PARSER_AVAILABLE:
-    __all__.append('GeneralParser')
+    __all__.extend(['GeneralCSVParser', 'GeneralExcelParser'])
 
-if ROSS308_PARSER_AVAILABLE:
-    __all__.append('Ross308Parser')
+if BROILER_PARSER_AVAILABLE:
+    __all__.extend(['BroilerPerformanceParser', 'BroilerTemperatureParser'])
 
 if FALLBACK_PARSER_AVAILABLE:
-    __all__.append('FallbackParser')
+    __all__.extend(['TikaFallbackParser', 'RawTextFallbackParser', 'EmptyFileParser'])
+
+
+def get_all_available_parsers():
+    """
+    Get list of all available parser instances, ordered by priority.
+    
+    Returns:
+        List of parser instances, ordered from highest to lowest priority
+    """
+    parsers = []
+    
+    # High priority: Specialized parsers (90-100)
+    if TABLE_PARSER_AVAILABLE and PerformanceTableParser:
+        parsers.append(PerformanceTableParser())
+    
+    if BROILER_PARSER_AVAILABLE:
+        if BroilerPerformanceParser:
+            parsers.append(BroilerPerformanceParser())
+        if BroilerTemperatureParser:
+            parsers.append(BroilerTemperatureParser())
+    
+    # Medium-high priority: General purpose parsers (40-60)
+    if GENERAL_PARSER_AVAILABLE:
+        if GeneralCSVParser:
+            parsers.append(GeneralCSVParser())
+        if GeneralExcelParser:
+            parsers.append(GeneralExcelParser())
+    
+    # Medium priority: Document parsers (35-45)
+    if DOCUMENT_PARSER_AVAILABLE:
+        if MarkdownParser:
+            parsers.append(MarkdownParser())
+        if PDFParser:
+            parsers.append(PDFParser())
+        if TextParser:
+            parsers.append(TextParser())
+    
+    # Low priority: Fallback parsers (1-10)
+    if FALLBACK_PARSER_AVAILABLE:
+        if TikaFallbackParser:
+            parsers.append(TikaFallbackParser())
+        if RawTextFallbackParser:
+            parsers.append(RawTextFallbackParser())
+        if EmptyFileParser:
+            parsers.append(EmptyFileParser())
+    
+    # Sort by priority (highest first)
+    parsers.sort(key=lambda p: p.capability.priority, reverse=True)
+    
+    logger.info(f"Loaded {len(parsers)} parsers")
+    return parsers
+
+
+def get_parsers_by_extension(file_extension: str):
+    """
+    Get parsers that support a specific file extension.
+    
+    Args:
+        file_extension: File extension (e.g., '.pdf', '.xlsx')
+        
+    Returns:
+        List of parser instances that support the extension
+    """
+    all_parsers = get_all_available_parsers()
+    matching_parsers = [
+        parser for parser in all_parsers 
+        if file_extension.lower() in [ext.lower() for ext in parser.get_supported_extensions()]
+        or '*' in parser.get_supported_extensions()  # Universal parsers
+    ]
+    
+    return matching_parsers
+
 
 def get_parsers_status():
-    """Get parsers status."""
-    return {
+    """Get detailed parsers status."""
+    status = {
         'base_classes': BASE_CLASSES_AVAILABLE,
+        'metadata_enrichment': METADATA_ENRICHMENT_AVAILABLE,
+        'table_parser': TABLE_PARSER_AVAILABLE,
         'document_parser': DOCUMENT_PARSER_AVAILABLE,
         'general_parser': GENERAL_PARSER_AVAILABLE,
-        'ross308_parser': ROSS308_PARSER_AVAILABLE,
+        'broiler_parser': BROILER_PARSER_AVAILABLE,
         'fallback_parser': FALLBACK_PARSER_AVAILABLE,
         'any_available': any([
+            TABLE_PARSER_AVAILABLE,
             DOCUMENT_PARSER_AVAILABLE,
             GENERAL_PARSER_AVAILABLE,
-            ROSS308_PARSER_AVAILABLE,
+            BROILER_PARSER_AVAILABLE,
             FALLBACK_PARSER_AVAILABLE
         ])
     }
-'''
+    
+    # Add parser counts
+    if status['any_available']:
+        all_parsers = get_all_available_parsers()
+        status['total_parsers'] = len(all_parsers)
+        status['parser_priorities'] = [p.capability.priority for p in all_parsers]
+        status['supported_extensions'] = list(set(
+            ext for parser in all_parsers 
+            for ext in parser.get_supported_extensions()
+            if ext != '*'
+        ))
+    else:
+        status['total_parsers'] = 0
+        status['parser_priorities'] = []
+        status['supported_extensions'] = []
+    
+    return status
 
-if __name__ == "__main__":
-    fix_rag_structure()
+
+def create_parser_router():
+    """
+    Create a parser router with all available parsers.
+    
+    Returns:
+        ParserRouter instance or None if not available
+    """
+    try:
+        # Try to import parser router
+        from ..parser_router import ParserRouter
+        
+        # Get all available parsers
+        parsers = get_all_available_parsers()
+        
+        if not parsers:
+            logger.warning("No parsers available for router")
+            return None
+        
+        # Create router with parsers
+        router = ParserRouter(parsers)
+        logger.info(f"Created parser router with {len(parsers)} parsers")
+        return router
+        
+    except ImportError as e:
+        logger.warning(f"ParserRouter not available: {e}")
+        return None
+
+
+# Legacy compatibility - maintain existing interface
+ALL_PARSERS = get_all_available_parsers()
+
+# Add legacy names for backward compatibility
+try:
+    # Map old names to new ones if needed
+    if DOCUMENT_PARSER_AVAILABLE and DocumentParser:
+        GenericPDFParser = DocumentParser  # Alias
+    if GENERAL_PARSER_AVAILABLE and GeneralCSVParser:
+        GeneralParser = GeneralCSVParser  # Alias
+    if FALLBACK_PARSER_AVAILABLE and TikaFallbackParser:
+        FallbackParser = TikaFallbackParser  # Alias
+        
+except Exception as e:
+    logger.debug(f"Legacy compatibility mapping failed: {e}")
+
+
+# Add to exports for legacy support
+if 'GenericPDFParser' in locals():
+    __all__.append('GenericPDFParser')
+if 'GeneralParser' in locals():
+    __all__.append('GeneralParser')
+if 'FallbackParser' in locals():
+    __all__.append('FallbackParser')
+
+__all__.extend(['get_all_available_parsers', 'get_parsers_by_extension', 'get_parsers_status', 'create_parser_router', 'ALL_PARSERS'])
