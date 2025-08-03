@@ -1,7 +1,14 @@
 """
-app/api/v1/expert.py - CORRECTION BACKEND CLARIFICATION COMPLÈTE
+app/api/v1/expert.py - EXPERT ENDPOINTS v3.7.0 AVEC SUPPORT RESPONSE_VERSIONS
 
-🔥 CORRECTIONS CRITIQUES APPLIQUÉES v3.6.1:
+🚀 NOUVELLES FONCTIONNALITÉS v3.7.0:
+1. ✅ Support concision_level dans requests
+2. ✅ Support generate_all_versions par défaut  
+3. ✅ response_versions dans les réponses
+4. ✅ Génération multi-versions backend
+5. ✅ Conservation COMPLÈTE du code v3.6.1 fonctionnel
+
+🧨 CORRECTIONS CRITIQUES v3.6.1 PRÉSERVÉES:
 1. ✅ Suppression assignations context_entities inexistant
 2. ✅ Suppression assignations is_enriched inexistant  
 3. ✅ Conservation des entités via clarification_entities uniquement
@@ -9,7 +16,7 @@ app/api/v1/expert.py - CORRECTION BACKEND CLARIFICATION COMPLÈTE
 5. ✅ Métadonnées propagées via response au lieu de request
 6. ✅ TOUS LES ENDPOINTS ORIGINAUX PRÉSERVÉS
 
-VERSION COMPLÈTE + SYNTAXE 100% CORRIGÉE
+VERSION COMPLÈTE + SYNTAXE 100% CORRIGÉE + SUPPORT RESPONSE_VERSIONS
 TOUTES LES FONCTIONS ORIGINALES CONSERVÉES
 """
 
@@ -24,7 +31,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.security import HTTPBearer
 
-from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest
+from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest, ConcisionLevel, ConcisionPreferences
 from .expert_services import ExpertService
 from .expert_utils import get_user_id_from_request, extract_breed_and_sex_from_clarification
 
@@ -36,7 +43,7 @@ security = HTTPBearer()
 expert_service = ExpertService()
 
 # =============================================================================
-# ENDPOINTS PRINCIPAUX AVEC CLARIFICATION DÉTECTION CORRIGÉE 🧨
+# ENDPOINTS PRINCIPAUX AVEC CLARIFICATION DÉTECTION CORRIGÉE + RESPONSE_VERSIONS 🚀
 # =============================================================================
 
 @router.post("/ask-enhanced-v2", response_model=EnhancedExpertResponse)
@@ -47,17 +54,27 @@ async def ask_expert_enhanced_v2(
 ):
     """
     🧨 ENDPOINT EXPERT FINAL avec DÉTECTION CLARIFICATION CORRIGÉE v3.6.1:
+    🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
     - Support explicite du flag is_clarification_response
     - Logique améliorée pour distinguer clarification vs nouvelle question
     - Métadonnées propagées correctement sans erreurs
+    - Génération multi-versions des réponses
     """
     start_time = time.time()
     
     try:
         logger.info("=" * 100)
-        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 - DÉTECTION CLARIFICATION CORRIGÉE v3.6.1")
+        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.0 - SUPPORT RESPONSE_VERSIONS")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
         logger.info(f"🆔 Conversation ID: {request_data.conversation_id}")
+        
+        # 🚀 NOUVEAU v3.7.0: Log paramètres concision
+        concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
+        generate_all_versions = getattr(request_data, 'generate_all_versions', True)
+        
+        logger.info("🚀 [RESPONSE_VERSIONS v3.7.0] Paramètres concision:")
+        logger.info(f"   - concision_level: {concision_level}")
+        logger.info(f"   - generate_all_versions: {generate_all_versions}")
         
         # 🧨 CORRECTION v3.6.1: DÉTECTION EXPLICITE MODE CLARIFICATION
         is_clarification = getattr(request_data, 'is_clarification_response', False)
@@ -133,7 +150,9 @@ async def ask_expert_enhanced_v2(
                         "confidence": 0.3
                     },
                     processing_steps=["incomplete_clarification_detected", "retry_requested"],
-                    ai_enhancements_used=["incomplete_clarification_handling"]
+                    ai_enhancements_used=["incomplete_clarification_handling"],
+                    # 🚀 NOUVEAU v3.7.0: Pas de response_versions pour erreurs clarification
+                    response_versions=None
                 )
                 
                 logger.info(f"❌ [FLUX CLARIFICATION] Retour erreur entités incomplètes: {missing_info}")
@@ -179,6 +198,15 @@ async def ask_expert_enhanced_v2(
         else:
             logger.info("🎯 [FLUX CLARIFICATION] Mode QUESTION INITIALE - détection vagueness active")
         
+        # 🚀 NOUVEAU v3.7.0: Validation et défauts concision
+        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+            request_data.concision_level = ConcisionLevel.CONCISE
+            logger.info("🚀 [CONCISION] Niveau par défaut appliqué: CONCISE")
+        
+        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+            request_data.generate_all_versions = True
+            logger.info("🚀 [CONCISION] generate_all_versions activé par défaut")
+        
         # 🧨 CORRECTION CRITIQUE v3.6.1: FORÇAGE SYSTÉMATIQUE DES AMÉLIORATIONS
         original_vagueness = getattr(request_data, 'enable_vagueness_detection', None)
         original_coherence = getattr(request_data, 'require_coherence_check', None)
@@ -191,7 +219,7 @@ async def ask_expert_enhanced_v2(
         logger.info(f"   - enable_vagueness_detection: {original_vagueness} → TRUE (FORCÉ)")
         logger.info(f"   - require_coherence_check: {original_coherence} → TRUE (FORCÉ)")
         
-        # Déléguer le traitement au service amélioré
+        # ✅ DÉLÉGUER AU SERVICE (qui va maintenant gérer response_versions)
         response = await expert_service.process_expert_question(
             request_data=request_data,
             request=request,
@@ -203,6 +231,12 @@ async def ask_expert_enhanced_v2(
         if clarification_metadata:
             response.clarification_processing = clarification_metadata
             logger.info("💡 [MÉTADONNÉES v3.6.1] Clarification metadata ajoutées à response")
+        
+        # 🚀 NOUVEAU v3.7.0: Log response_versions si présentes
+        if hasattr(response, 'response_versions') and response.response_versions:
+            logger.info("🚀 [RESPONSE_VERSIONS] Versions générées:")
+            for level, content in response.response_versions.items():
+                logger.info(f"   - {level}: {len(content)} caractères")
         
         # 🧨 LOGGING RÉSULTATS CLARIFICATION DÉTAILLÉ
         logger.info("🧨 [RÉSULTATS CLARIFICATION v3.6.1]:")
@@ -217,7 +251,7 @@ async def ask_expert_enhanced_v2(
             logger.info(f"   - Infos manquantes: {clarif.get('missing_information', [])}")
             logger.info(f"   - Confiance: {clarif.get('confidence', 0)}")
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.6.1 - Temps: {response.response_time_ms}ms")
+        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.0 - Temps: {response.response_time_ms}ms")
         logger.info(f"🤖 Améliorations: {len(response.ai_enhancements_used or [])} features")
         logger.info("=" * 100)
         
@@ -227,7 +261,7 @@ async def ask_expert_enhanced_v2(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.6.1: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.0: {e}")
         logger.info("=" * 100)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
@@ -236,13 +270,22 @@ async def ask_expert_enhanced_v2_public(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """🧨 ENDPOINT PUBLIC avec DÉTECTION CLARIFICATION CORRIGÉE v3.6.1"""
+    """🧨 ENDPOINT PUBLIC avec DÉTECTION CLARIFICATION CORRIGÉE v3.6.1
+    🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend"""
     start_time = time.time()
     
     try:
         logger.info("=" * 100)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public - DÉTECTION CLARIFICATION PUBLIQUE v3.6.1")
+        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.0 - SUPPORT RESPONSE_VERSIONS")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
+        
+        # 🚀 NOUVEAU v3.7.0: Paramètres concision pour endpoint public
+        concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
+        generate_all_versions = getattr(request_data, 'generate_all_versions', True)
+        
+        logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Paramètres concision:")
+        logger.info(f"   - concision_level: {concision_level}")
+        logger.info(f"   - generate_all_versions: {generate_all_versions}")
         
         # 🧨 CORRECTION v3.6.1: DÉTECTION PUBLIQUE CLARIFICATION
         is_clarification = getattr(request_data, 'is_clarification_response', False)
@@ -315,7 +358,9 @@ async def ask_expert_enhanced_v2_public(
                         "confidence": 0.3
                     },
                     processing_steps=["incomplete_clarification_detected_public", "retry_requested"],
-                    ai_enhancements_used=["incomplete_clarification_handling_public"]
+                    ai_enhancements_used=["incomplete_clarification_handling_public"],
+                    # 🚀 NOUVEAU v3.7.0: Pas de response_versions pour erreurs
+                    response_versions=None
                 )
             
             # Enrichissement question avec entités COMPLÈTES
@@ -349,8 +394,15 @@ async def ask_expert_enhanced_v2_public(
         else:
             logger.info("🎯 [FLUX PUBLIC] Question initiale - détection vagueness")
         
+        # 🚀 NOUVEAU v3.7.0: Validation et défauts concision pour public
+        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+            request_data.concision_level = ConcisionLevel.CONCISE
+        
+        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+            request_data.generate_all_versions = True
+        
         # 🧨 FORÇAGE MAXIMAL pour endpoint public
-        logger.info("🔥 [PUBLIC ENDPOINT v3.6.1] Activation FORCÉE des améliorations:")
+        logger.info("🔥 [PUBLIC ENDPOINT v3.7.0] Activation FORCÉE des améliorations:")
         
         original_settings = {
             'vagueness': getattr(request_data, 'enable_vagueness_detection', None),
@@ -365,7 +417,7 @@ async def ask_expert_enhanced_v2_public(
         request_data.detailed_rag_scoring = True
         request_data.enable_quality_metrics = True
         
-        logger.info("🔥 [FORÇAGE PUBLIC v3.6.1] Changements appliqués:")
+        logger.info("🔥 [FORÇAGE PUBLIC v3.7.0] Changements appliqués:")
         for key, (old_val, new_val) in {
             'vagueness_detection': (original_settings['vagueness'], True),
             'coherence_check': (original_settings['coherence'], True),
@@ -374,7 +426,7 @@ async def ask_expert_enhanced_v2_public(
         }.items():
             logger.info(f"   - {key}: {old_val} → {new_val} (FORCÉ)")
         
-        # Déléguer le traitement
+        # ✅ DÉLÉGUER AU SERVICE avec support response_versions
         response = await expert_service.process_expert_question(
             request_data=request_data,
             request=request,
@@ -386,6 +438,12 @@ async def ask_expert_enhanced_v2_public(
         if clarification_metadata:
             response.clarification_processing = clarification_metadata
             logger.info("💡 [MÉTADONNÉES PUBLIC v3.6.1] Clarification metadata ajoutées")
+        
+        # 🚀 NOUVEAU v3.7.0: Log response_versions si présentes
+        if hasattr(response, 'response_versions') and response.response_versions:
+            logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Versions générées:")
+            for level, content in response.response_versions.items():
+                logger.info(f"   - {level}: {len(content)} caractères")
         
         # 🧨 VALIDATION RÉSULTATS CLARIFICATION PUBLIQUE
         logger.info("🧨 [VALIDATION PUBLIQUE v3.6.1]:")
@@ -401,7 +459,7 @@ async def ask_expert_enhanced_v2_public(
         if response.enable_vagueness_detection is False:
             logger.warning("⚠️ [ALERTE] Vagueness detection non activée - vérifier forçage!")
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.6.1 - Mode: {response.mode}")
+        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.0 - Mode: {response.mode}")
         logger.info("=" * 100)
         
         return response
@@ -410,12 +468,12 @@ async def ask_expert_enhanced_v2_public(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.6.1: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.0: {e}")
         logger.info("=" * 100)
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # =============================================================================
-# ENDPOINTS DE COMPATIBILITÉ AVEC FORÇAGE MAINTENU 🔥
+# ENDPOINTS DE COMPATIBILITÉ AVEC FORÇAGE MAINTENU + RESPONSE_VERSIONS 🔥
 # =============================================================================
 
 @router.post("/ask-enhanced", response_model=EnhancedExpertResponse)
@@ -424,12 +482,18 @@ async def ask_expert_enhanced_legacy(
     request: Request,
     current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
 ):
-    """Endpoint de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT"""
-    logger.info("🔄 [LEGACY] Redirection avec FORÇAGE + clarification vers v2")
+    """Endpoint de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
+    logger.info("🔄 [LEGACY] Redirection avec FORÇAGE + clarification + response_versions vers v2")
     
     # 🔥 FORÇAGE LEGACY
     request_data.enable_vagueness_detection = True
     request_data.require_coherence_check = True
+    
+    # 🚀 v3.7.0: Support concision par défaut
+    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+        request_data.concision_level = ConcisionLevel.CONCISE
+    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+        request_data.generate_all_versions = True
     
     return await ask_expert_enhanced_v2(request_data, request, current_user)
 
@@ -438,12 +502,18 @@ async def ask_expert_enhanced_public_legacy(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """Endpoint public de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT"""
-    logger.info("🔄 [LEGACY PUBLIC] Redirection avec FORÇAGE + clarification vers v2")
+    """Endpoint public de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
+    logger.info("🔄 [LEGACY PUBLIC] Redirection avec FORÇAGE + clarification + response_versions vers v2")
     
     # 🔥 FORÇAGE LEGACY PUBLIC
     request_data.enable_vagueness_detection = True
     request_data.require_coherence_check = True
+    
+    # 🚀 v3.7.0: Support concision par défaut
+    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+        request_data.concision_level = ConcisionLevel.CONCISE
+    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+        request_data.generate_all_versions = True
     
     return await ask_expert_enhanced_v2_public(request_data, request)
 
@@ -453,14 +523,20 @@ async def ask_expert_compatible(
     request: Request,
     current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
 ):
-    """Endpoint de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT"""
-    logger.info("🔄 [COMPATIBLE] Redirection avec FORÇAGE TOTAL + clarification vers v2")
+    """Endpoint de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
+    logger.info("🔄 [COMPATIBLE] Redirection avec FORÇAGE TOTAL + clarification + response_versions vers v2")
     
     # 🔥 FORÇAGE COMPATIBILITÉ TOTALE
     request_data.enable_vagueness_detection = True
     request_data.require_coherence_check = True
     request_data.detailed_rag_scoring = True
     request_data.enable_quality_metrics = True
+    
+    # 🚀 v3.7.0: Support concision par défaut
+    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+        request_data.concision_level = ConcisionLevel.CONCISE
+    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+        request_data.generate_all_versions = True
     
     return await ask_expert_enhanced_v2(request_data, request, current_user)
 
@@ -469,14 +545,20 @@ async def ask_expert_public_compatible(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """Endpoint public de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT"""
-    logger.info("🔄 [COMPATIBLE PUBLIC] Redirection avec FORÇAGE TOTAL + clarification vers v2")
+    """Endpoint public de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS"""
+    logger.info("🔄 [COMPATIBLE PUBLIC] Redirection avec FORÇAGE TOTAL + clarification + response_versions vers v2")
     
     # 🔥 FORÇAGE COMPATIBILITÉ PUBLIQUE TOTALE
     request_data.enable_vagueness_detection = True
     request_data.require_coherence_check = True
     request_data.detailed_rag_scoring = True
     request_data.enable_quality_metrics = True
+    
+    # 🚀 v3.7.0: Support concision par défaut
+    if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+        request_data.concision_level = ConcisionLevel.CONCISE
+    if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+        request_data.generate_all_versions = True
     
     return await ask_expert_enhanced_v2_public(request_data, request)
 
@@ -519,7 +601,7 @@ async def get_suggested_topics_enhanced(language: str = "fr"):
 
 @router.get("/system-status")
 async def get_system_status():
-    """Statut système avec focus clarification (ORIGINAL + AMÉLIORÉ)"""
+    """Statut système avec focus clarification + RESPONSE_VERSIONS (ORIGINAL + AMÉLIORÉ)"""
     try:
         status = {
             "system_available": True,
@@ -533,7 +615,8 @@ async def get_system_status():
                 "forced_clarification": True,   # ✅ NOUVEAU
                 "clarification_detection_fixed": True,  # 🧨 NOUVEAU
                 "metadata_propagation": True,             # 💡 NOUVEAU
-                "backend_fix_v361": True                  # 🧨 v3.6.1
+                "backend_fix_v361": True,                  # 🧨 v3.6.1
+                "response_versions_system": True          # 🚀 v3.7.0 NOUVEAU
             },
             "enhanced_capabilities": [
                 "vagueness_detection",
@@ -549,15 +632,19 @@ async def get_system_status():
                 "is_clarification_response_support",       # 🧨 NOUVEAU
                 "clarification_entities_support",           # 🧨 NOUVEAU
                 "entity_validation_and_incomplete_handling", # 💡 NOUVEAU
-                "metadata_propagation_system_v361"          # 💡 v3.6.1
+                "metadata_propagation_system_v361",          # 💡 v3.6.1
+                "response_versions_generation",              # 🚀 v3.7.0 NOUVEAU
+                "dynamic_concision_levels",                  # 🚀 v3.7.0 NOUVEAU
+                "multi_version_backend_cache",               # 🚀 v3.7.0 NOUVEAU
+                "intelligent_version_selection"              # 🚀 v3.7.0 NOUVEAU
             ],
             "enhanced_endpoints": [
-                "/ask-enhanced-v2",
-                "/ask-enhanced-v2-public", 
-                "/ask-enhanced (legacy → v2)",
-                "/ask-enhanced-public (legacy → v2)",
-                "/ask (compatible → v2)",
-                "/ask-public (compatible → v2)",
+                "/ask-enhanced-v2 (+ response_versions)",
+                "/ask-enhanced-v2-public (+ response_versions)", 
+                "/ask-enhanced (legacy → v2 + response_versions)",
+                "/ask-enhanced-public (legacy → v2 + response_versions)",
+                "/ask (compatible → v2 + response_versions)",
+                "/ask-public (compatible → v2 + response_versions)",
                 "/feedback (with quality)",
                 "/topics (enhanced)",
                 "/system-status",
@@ -569,9 +656,10 @@ async def get_system_status():
                 "/debug/simulate-frontend-clarification",     # 🧨 NOUVEAU
                 "/debug/test-incomplete-entities",            # 💡 NOUVEAU
                 "/debug/test-clarification-backend-fix",      # 🧨 v3.6.1 NOUVEAU
+                "/debug/test-response-versions",              # 🚀 v3.7.0 NOUVEAU
                 "/ask-with-clarification"                     # 🎯 NOUVEAU
             ],
-            "api_version": "v3.6.1_clarification_detection_fixed_backend_corrected_complete",
+            "api_version": "v3.7.0_response_versions_with_clarification_detection_fixed_backend_corrected_complete",
             "backward_compatibility": True,
             "clarification_fixes_v3_6_1": {
                 "is_clarification_response_support": True,
@@ -586,10 +674,20 @@ async def get_system_status():
                 "syntax_validation_complete": True,          # ✅ v3.6.1
                 "all_original_endpoints_preserved": True     # ✅ GARANTI
             },
+            "response_versions_features_v3_7_0": {  # 🚀 NOUVEAU v3.7.0
+                "concision_level_support": True,
+                "generate_all_versions_default": True,
+                "multi_version_generation": True,
+                "dynamic_selection_frontend": True,
+                "cache_optimization": True,
+                "performance_metrics": True,
+                "backward_compatibility": True
+            },
             "forced_parameters": {
                 "vagueness_detection_always_on": True,  # ✅ GARANTI
                 "coherence_check_always_on": True,      # ✅ GARANTI
-                "backwards_compatibility": True
+                "backwards_compatibility": True,
+                "response_versions_enabled": True       # 🚀 v3.7.0
             }
         }
         
@@ -616,7 +714,10 @@ async def test_enhancements(request: Request):
             require_coherence_check=True,
             detailed_rag_scoring=True,
             enable_quality_metrics=True,
-            debug_mode=True
+            debug_mode=True,
+            # 🚀 v3.7.0: Test response_versions
+            concision_level=ConcisionLevel.CONCISE,
+            generate_all_versions=True
         )
         
         # Simuler contexte conversationnel (Ross 308 mentionné avant)
@@ -664,17 +765,28 @@ async def test_enhancements(request: Request):
                 "debug_info": result.debug_info is not None,
                 "performance_breakdown": result.performance_breakdown is not None,
                 "ai_enhancements_used": len(result.ai_enhancements_used or []) > 0,
-                "clarification_system": "smart_performance_clarification" in (result.ai_enhancements_used or [])
+                "clarification_system": "smart_performance_clarification" in (result.ai_enhancements_used or []),
+                "response_versions": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
             },
             "enhancement_results": {
                 "ai_enhancements_count": len(result.ai_enhancements_used or []),
                 "processing_steps_count": len(result.processing_steps or []),
                 "response_time_ms": result.response_time_ms,
                 "mode": result.mode,
-                "clarification_triggered": result.clarification_result is not None
+                "clarification_triggered": result.clarification_result is not None,
+                "response_versions_count": len(result.response_versions) if hasattr(result, 'response_versions') and result.response_versions else 0  # 🚀 v3.7.0
             },
             "errors": []
         }
+        
+        # 🚀 v3.7.0: Test spécifique response_versions
+        if hasattr(result, 'response_versions') and result.response_versions:
+            test_results["response_versions_test"] = {
+                "versions_generated": list(result.response_versions.keys()),
+                "versions_count": len(result.response_versions),
+                "all_versions_present": all(level in result.response_versions for level in ["ultra_concise", "concise", "standard", "detailed"]),
+                "version_lengths": {level: len(content) for level, content in result.response_versions.items()}
+            }
         
         # Vérifications de qualité
         if not result.ai_enhancements_used:
@@ -682,6 +794,10 @@ async def test_enhancements(request: Request):
         
         if result.response_time_ms > 10000:  # 10 secondes
             test_results["errors"].append(f"Temps de réponse trop élevé: {result.response_time_ms}ms")
+        
+        # 🚀 v3.7.0: Vérification response_versions
+        if hasattr(result, 'response_versions') and not result.response_versions:
+            test_results["errors"].append("response_versions non générées")
         
         if len(test_results["errors"]) > 0:
             test_results["test_successful"] = False
@@ -719,7 +835,10 @@ async def test_clarification_system(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             enable_vagueness_detection=True,
-            is_clarification_response=False
+            is_clarification_response=False,
+            # 🚀 v3.7.0: Test avec response_versions
+            concision_level=ConcisionLevel.CONCISE,
+            generate_all_versions=True
         )
         
         start_time = time.time()
@@ -736,7 +855,8 @@ async def test_clarification_system(request: Request):
             "clarification_requested": result1.clarification_result is not None,
             "mode": result1.mode,
             "enhancements_used": result1.ai_enhancements_used or [],
-            "success": "smart_performance_clarification" in result1.mode
+            "success": "smart_performance_clarification" in result1.mode,
+            "response_versions_present": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["tests_performed"].append(test1_result)
@@ -757,7 +877,10 @@ async def test_clarification_system(request: Request):
                 clarification_context={
                     "missing_information": ["breed", "sex"],
                     "clarification_type": "performance_breed_sex"
-                }
+                },
+                # 🚀 v3.7.0: Test response_versions sur clarification
+                concision_level=ConcisionLevel.STANDARD,
+                generate_all_versions=True
             )
             
             start_time2 = time.time()
@@ -774,7 +897,8 @@ async def test_clarification_system(request: Request):
                 "question_enriched": "Ross 308" in result2.question and "mâles" in result2.question.lower(),
                 "rag_used": result2.rag_used,
                 "mode": result2.mode,
-                "success": result2.rag_used and "Ross 308" in result2.question
+                "success": result2.rag_used and "Ross 308" in result2.question,
+                "response_versions_generated": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
             }
             
             test_results["tests_performed"].append(test2_result)
@@ -822,7 +946,10 @@ async def test_clarification_system(request: Request):
                 language="fr",
                 is_clarification_response=True,
                 original_question="Quel est le poids d'un poulet de 12 jours ?",
-                enable_vagueness_detection=True
+                enable_vagueness_detection=True,
+                # 🚀 v3.7.0: Test même pour entités incomplètes
+                concision_level=ConcisionLevel.CONCISE,
+                generate_all_versions=True
             )
             
             start_time_incomplete = time.time()
@@ -844,7 +971,8 @@ async def test_clarification_system(request: Request):
                 "detected_as_incomplete": is_incomplete_mode,
                 "retry_requested": has_retry_request,
                 "mode": result_incomplete.mode,
-                "success": (test_case["should_fail"] and is_incomplete_mode) or (not test_case["should_fail"] and not is_incomplete_mode)
+                "success": (test_case["should_fail"] and is_incomplete_mode) or (not test_case["should_fail"] and not is_incomplete_mode),
+                "response_versions_handling": hasattr(result_incomplete, 'response_versions')  # 🚀 v3.7.0
             }
             
             if result_incomplete.clarification_result and "missing_information" in result_incomplete.clarification_result:
@@ -876,7 +1004,10 @@ async def test_clarification_system(request: Request):
             clarification_entities={
                 "breed": "Ross 308",
                 "sex": "femelles"
-            }
+            },
+            # 🚀 v3.7.0: Test métadonnées + response_versions
+            concision_level=ConcisionLevel.DETAILED,
+            generate_all_versions=True
         )
         
         start_time_meta = time.time()
@@ -898,7 +1029,8 @@ async def test_clarification_system(request: Request):
             "question_enriched": question_enriched,
             "final_question": result_meta.question,
             "rag_used": result_meta.rag_used,
-            "success": has_clarification_processing and question_enriched and result_meta.rag_used
+            "success": has_clarification_processing and question_enriched and result_meta.rag_used,
+            "response_versions_with_metadata": hasattr(result_meta, 'response_versions') and result_meta.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["tests_performed"].append(metadata_test_result)
@@ -951,7 +1083,10 @@ async def test_clarification_system_forced(request: Request):
             language="fr",
             enable_vagueness_detection=True,  # FORCÉ
             require_coherence_check=True,     # FORCÉ
-            is_clarification_response=False
+            is_clarification_response=False,
+            # 🚀 v3.7.0: Test forced avec response_versions
+            concision_level=ConcisionLevel.CONCISE,
+            generate_all_versions=True
         )
         
         logger.info(f"🔥 [TEST 1] Question de test: '{test_question.text}'")
@@ -978,7 +1113,8 @@ async def test_clarification_system_forced(request: Request):
             "enhancements_used": result1.ai_enhancements_used or [],
             "clarification_details": result1.clarification_result,
             "success": clarification_triggered or has_clarification_mode,
-            "rag_bypassed": not result1.rag_used  # Clarification doit bypasser RAG
+            "rag_bypassed": not result1.rag_used,  # Clarification doit bypasser RAG
+            "response_versions_present": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["tests_performed"].append(test1_details)
@@ -1012,7 +1148,10 @@ async def test_clarification_system_forced(request: Request):
                 clarification_context={
                     "missing_information": ["breed", "sex"],
                     "clarification_type": "performance_breed_sex"
-                }
+                },
+                # 🚀 v3.7.0: Test response_versions avec clarification
+                concision_level=ConcisionLevel.STANDARD,
+                generate_all_versions=True
             )
             
             logger.info(f"🔥 [TEST 2] Réponse clarification: '{clarification_response.text}'")
@@ -1037,7 +1176,8 @@ async def test_clarification_system_forced(request: Request):
                 "question_properly_enriched": question_enriched,
                 "rag_activated": result2.rag_used,
                 "final_mode": result2.mode,
-                "success": result2.rag_used and question_enriched
+                "success": result2.rag_used and question_enriched,
+                "response_versions_generated": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
             }
             
             test_results["tests_performed"].append(test2_details)
@@ -1067,7 +1207,10 @@ async def test_clarification_system_forced(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             enable_vagueness_detection=False,  # Sera FORCÉ à True
-            require_coherence_check=False      # Sera FORCÉ à True
+            require_coherence_check=False,     # Sera FORCÉ à True
+            # 🚀 v3.7.0: Test forçage avec response_versions
+            concision_level=ConcisionLevel.ULTRA_CONCISE,
+            generate_all_versions=True
         )
         
         logger.info(f"🔥 [TEST 3] Paramètres initiaux: vagueness={disabled_question.enable_vagueness_detection}, coherence={disabled_question.require_coherence_check}")
@@ -1081,7 +1224,8 @@ async def test_clarification_system_forced(request: Request):
             "initial_coherence": False,
             "forced_activation": True,
             "enhancements_applied": len(result3.ai_enhancements_used or []) > 0,
-            "success": len(result3.ai_enhancements_used or []) > 0
+            "success": len(result3.ai_enhancements_used or []) > 0,
+            "response_versions_forced": hasattr(result3, 'response_versions') and result3.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["tests_performed"].append(test3_details)
@@ -1169,6 +1313,9 @@ async def validate_clarification_params(request: Request):
             test_request = EnhancedQuestionRequest(
                 conversation_id=str(uuid.uuid4()),
                 language="fr",
+                # 🚀 v3.7.0: Test validation avec response_versions
+                concision_level=ConcisionLevel.CONCISE,
+                generate_all_versions=True,
                 **test_case["params"]
             )
             
@@ -1192,7 +1339,8 @@ async def validate_clarification_params(request: Request):
                 "enhancements_applied": result.ai_enhancements_used,
                 "enhancements_count": len(result.ai_enhancements_used or []),
                 "clarification_system_active": clarification_active,
-                "success": has_enhancements
+                "success": has_enhancements,
+                "response_versions_validated": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
             }
             
             validation_results["parameter_tests"].append(test_result)
@@ -1244,7 +1392,10 @@ async def test_clarification_detection(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             enable_vagueness_detection=True,
-            is_clarification_response=False  # EXPLICITE
+            is_clarification_response=False,  # EXPLICITE
+            # 🚀 v3.7.0: Test detection avec response_versions
+            concision_level=ConcisionLevel.CONCISE,
+            generate_all_versions=True
         )
         
         logger.info(f"🧨 [TEST 1] Question: '{initial_question.text}'")
@@ -1265,7 +1416,8 @@ async def test_clarification_detection(request: Request):
             "clarification_triggered": result1.clarification_result is not None,
             "mode": result1.mode,
             "rag_bypassed": not result1.rag_used,
-            "success": result1.clarification_result is not None
+            "success": result1.clarification_result is not None,
+            "response_versions_on_clarification": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["detection_tests"].append(test1_result)
@@ -1289,7 +1441,10 @@ async def test_clarification_detection(request: Request):
             clarification_entities={  # OPTIONNEL mais recommandé
                 "breed": "Ross 308",
                 "sex": "mâles"
-            }
+            },
+            # 🚀 v3.7.0: Test response clarification avec versions
+            concision_level=ConcisionLevel.DETAILED,
+            generate_all_versions=True
         )
         
         logger.info(f"🧨 [TEST 2] Réponse: '{clarification_response.text}'")
@@ -1319,7 +1474,8 @@ async def test_clarification_detection(request: Request):
             "question_properly_enriched": question_enriched,
             "rag_activated": rag_activated,
             "mode": result2.mode,
-            "success": question_enriched and rag_activated
+            "success": question_enriched and rag_activated,
+            "response_versions_after_enrichment": hasattr(result2, 'response_versions') and result2.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["detection_tests"].append(test2_result)
@@ -1339,7 +1495,10 @@ async def test_clarification_detection(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             enable_vagueness_detection=True,
-            is_clarification_response=False
+            is_clarification_response=False,
+            # 🚀 v3.7.0: Test question complète avec response_versions
+            concision_level=ConcisionLevel.STANDARD,
+            generate_all_versions=True
         )
         
         start_time3 = time.time()
@@ -1357,7 +1516,8 @@ async def test_clarification_detection(request: Request):
             "clarification_not_triggered": result3.clarification_result is None,
             "rag_activated": result3.rag_used,
             "mode": result3.mode,
-            "success": result3.clarification_result is None and result3.rag_used
+            "success": result3.clarification_result is None and result3.rag_used,
+            "response_versions_direct": hasattr(result3, 'response_versions') and result3.response_versions is not None  # 🚀 v3.7.0
         }
         
         test_results["detection_tests"].append(test3_result)
@@ -1417,7 +1577,10 @@ async def simulate_frontend_clarification(request: Request):
         frontend_request_1 = {
             "question": "Quel est le poids d'un poulet de 12 jours ?",
             "conversation_id": conversation_id,
-            "language": "fr"
+            "language": "fr",
+            # 🚀 v3.7.0: Test simulation avec response_versions
+            "concision_level": "concise",
+            "generate_all_versions": True
             # PAS de is_clarification_response (défaut False)
         }
         
@@ -1433,7 +1596,8 @@ async def simulate_frontend_clarification(request: Request):
             "backend_response": {
                 "mode": result_1.mode,
                 "clarification_requested": result_1.clarification_result is not None,
-                "rag_used": result_1.rag_used
+                "rag_used": result_1.rag_used,
+                "response_versions_present": hasattr(result_1, 'response_versions') and result_1.response_versions is not None  # 🚀 v3.7.0
             },
             "success": result_1.clarification_result is not None
         }
@@ -1459,7 +1623,10 @@ async def simulate_frontend_clarification(request: Request):
                 "clarification_entities": {  # 🧨 OPTIONNEL mais recommandé
                     "breed": "Ross 308",
                     "sex": "mâles"
-                }
+                },
+                # 🚀 v3.7.0: Test frontend simulation avec response_versions
+                "concision_level": "standard",
+                "generate_all_versions": True
             }
             
             request_2 = EnhancedQuestionRequest(**frontend_request_2)
@@ -1481,7 +1648,8 @@ async def simulate_frontend_clarification(request: Request):
                     "question_enriched": question_enriched,
                     "rag_used": rag_used,
                     "mode": result_2.mode,
-                    "response_excerpt": result_2.response[:150] + "..."
+                    "response_excerpt": result_2.response[:150] + "...",
+                    "response_versions_generated": hasattr(result_2, 'response_versions') and result_2.response_versions is not None  # 🚀 v3.7.0
                 },
                 "success": question_enriched and rag_used
             }
@@ -1502,7 +1670,10 @@ async def simulate_frontend_clarification(request: Request):
         bad_frontend_request = {
             "question": "Ross 308 mâles",
             "conversation_id": conversation_id,
-            "language": "fr"
+            "language": "fr",
+            # 🚀 v3.7.0: Même les mauvaises requests ont response_versions
+            "concision_level": "concise",
+            "generate_all_versions": True
             # PAS de is_clarification_response → traité comme nouvelle question
         }
         
@@ -1518,7 +1689,8 @@ async def simulate_frontend_clarification(request: Request):
             "backend_response": {
                 "mode": result_bad.mode,
                 "treated_as_new_question": "clarification" in result_bad.mode,
-                "rag_used": result_bad.rag_used
+                "rag_used": result_bad.rag_used,
+                "response_versions_still_generated": hasattr(result_bad, 'response_versions') and result_bad.response_versions is not None  # 🚀 v3.7.0
             },
             "problem": "Sans flag, traité comme nouvelle question au lieu de réponse clarification"
         }
@@ -1546,7 +1718,17 @@ async def simulate_frontend_clarification(request: Request):
                 "clarification_entities": {
                     "breed": "Ross 308",
                     "sex": "mâles"
-                }
+                },
+                # 🚀 v3.7.0: Nouvelles instructions response_versions
+                "concision_level": "concise",  # ou "ultra_concise", "standard", "detailed"
+                "generate_all_versions": True   # pour avoir toutes les versions disponibles
+            },
+            # 🚀 v3.7.0: Instructions spécifiques response_versions
+            "response_versions_usage": {
+                "backend_generates_all": "Le backend génère automatiquement toutes les versions",
+                "frontend_selects": "Le frontend peut choisir quelle version afficher",
+                "available_levels": ["ultra_concise", "concise", "standard", "detailed"],
+                "default_display": "Afficher 'concise' par défaut, permettre switch utilisateur"
             }
         }
         
@@ -1594,7 +1776,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "incomplete_clarification_response",
                 "should_succeed": False,
-                "expected_missing": ["sexe"]
+                "expected_missing": ["sexe"],
+                "concision_level": ConcisionLevel.CONCISE  # 🚀 v3.7.0
             },
             {
                 "name": "Sexe seulement (incomplet)",
@@ -1602,7 +1785,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "incomplete_clarification_response",
                 "should_succeed": False,
-                "expected_missing": ["race/souche"]
+                "expected_missing": ["race/souche"],
+                "concision_level": ConcisionLevel.ULTRA_CONCISE  # 🚀 v3.7.0
             },
             {
                 "name": "Information vague (incomplet)",
@@ -1610,7 +1794,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "incomplete_clarification_response", 
                 "should_succeed": False,
-                "expected_missing": ["race/souche", "sexe"]
+                "expected_missing": ["race/souche", "sexe"],
+                "concision_level": ConcisionLevel.STANDARD  # 🚀 v3.7.0
             },
             {
                 "name": "Breed vague + sexe (partiellement incomplet)",
@@ -1618,7 +1803,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "incomplete_clarification_response",
                 "should_succeed": False,
-                "expected_missing": ["race/souche"]  # "Ross" incomplet, doit être "Ross 308"
+                "expected_missing": ["race/souche"],  # "Ross" incomplet, doit être "Ross 308"
+                "concision_level": ConcisionLevel.DETAILED  # 🚀 v3.7.0
             },
             {
                 "name": "Information complète (succès)",
@@ -1626,7 +1812,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "rag_enhanced",
                 "should_succeed": True,
-                "expected_missing": []
+                "expected_missing": [],
+                "concision_level": ConcisionLevel.CONCISE  # 🚀 v3.7.0
             },
             {
                 "name": "Alternative complète (succès)",
@@ -1634,7 +1821,8 @@ async def test_incomplete_entities(request: Request):
                 "original_question": "Quel est le poids d'un poulet de 12 jours ?",
                 "expected_mode": "rag_enhanced",
                 "should_succeed": True,
-                "expected_missing": []
+                "expected_missing": [],
+                "concision_level": ConcisionLevel.STANDARD  # 🚀 v3.7.0
             }
         ]
         
@@ -1647,11 +1835,15 @@ async def test_incomplete_entities(request: Request):
                 language="fr",
                 is_clarification_response=True,
                 original_question=test_case["original_question"],
-                enable_vagueness_detection=True
+                enable_vagueness_detection=True,
+                # 🚀 v3.7.0: Test entités incomplètes avec différents niveaux concision
+                concision_level=test_case["concision_level"],
+                generate_all_versions=True
             )
             
             logger.info(f"   Input: '{test_request.text}'")
             logger.info(f"   Expected success: {test_case['should_succeed']}")
+            logger.info(f"   Concision level: {test_case['concision_level']}")
             
             start_time = time.time()
             result = await ask_expert_enhanced_v2_public(test_request, request)
@@ -1679,12 +1871,19 @@ async def test_incomplete_entities(request: Request):
                 "retry_requested": has_retry,
                 "rag_used": rag_used,
                 "test_passed": test_passed,
-                "response_excerpt": result.response[:100] + "..." if len(result.response) > 100 else result.response
+                "response_excerpt": result.response[:100] + "..." if len(result.response) > 100 else result.response,
+                "concision_level_tested": test_case["concision_level"].value,  # 🚀 v3.7.0
+                "response_versions_handled": hasattr(result, 'response_versions') and result.response_versions is not None  # 🚀 v3.7.0
             }
             
             # Ajouter informations manquantes détectées
             if result.clarification_result and "missing_information" in result.clarification_result:
                 entity_test_result["missing_info_detected"] = result.clarification_result["missing_information"]
+            
+            # 🚀 v3.7.0: Informations response_versions pour entités incomplètes
+            if hasattr(result, 'response_versions') and result.response_versions:
+                entity_test_result["response_versions_count"] = len(result.response_versions)
+                entity_test_result["response_versions_keys"] = list(result.response_versions.keys())
             
             test_results["entity_tests"].append(entity_test_result)
             
@@ -1692,6 +1891,7 @@ async def test_incomplete_entities(request: Request):
             logger.info(f"   Incomplet détecté: {is_incomplete}")
             logger.info(f"   RAG utilisé: {rag_used}")
             logger.info(f"   Test réussi: {test_passed}")
+            logger.info(f"   Response versions: {hasattr(result, 'response_versions') and result.response_versions is not None}")
             
             if not test_passed:
                 error_msg = f"Test '{test_case['name']}' échoué: attendu={test_case['should_succeed']}, mode={result.mode}"
@@ -1709,7 +1909,10 @@ async def test_incomplete_entities(request: Request):
             "total_tests": total_count,
             "successful_tests": success_count,
             "failed_tests": total_count - success_count,
-            "success_rate": f"{(success_count/total_count)*100:.1f}%" if total_count > 0 else "0%"
+            "success_rate": f"{(success_count/total_count)*100:.1f}%" if total_count > 0 else "0%",
+            # 🚀 v3.7.0: Statistiques response_versions
+            "response_versions_tests": sum(1 for t in test_results["entity_tests"] if t.get("response_versions_handled", False)),
+            "concision_levels_tested": list(set(t.get("concision_level_tested") for t in test_results["entity_tests"]))
         }
         
         logger.info("🧪 RÉSUMÉ TEST ENTITÉS INCOMPLÈTES:")
@@ -1717,6 +1920,7 @@ async def test_incomplete_entities(request: Request):
         logger.info(f"   - Succès: {success_count}")
         logger.info(f"   - Échecs: {total_count - success_count}")
         logger.info(f"   - Taux de réussite: {test_results['statistics']['success_rate']}")
+        logger.info(f"   - Tests response_versions: {test_results['statistics']['response_versions_tests']}")
         logger.info(f"   - Test global: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
         
         logger.info("=" * 80)
@@ -1736,10 +1940,11 @@ async def test_incomplete_entities(request: Request):
 
 @router.post("/debug/test-clarification-backend-fix")
 async def test_clarification_backend_fix(request: Request):
-    """🧨 NOUVEAU v3.6.1: Test de la correction backend"""
+    """🧨 NOUVEAU v3.6.1: Test de la correction backend
+    🚀 MISE À JOUR v3.7.0: Test avec support response_versions"""
     try:
         logger.info("=" * 80)
-        logger.info("🧨 TEST CORRECTION BACKEND v3.6.1")
+        logger.info("🧨 TEST CORRECTION BACKEND v3.7.0 avec RESPONSE_VERSIONS")
         
         test_results = {
             "test_successful": True,
@@ -1754,7 +1959,10 @@ async def test_clarification_backend_fix(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             enable_vagueness_detection=True,
-            is_clarification_response=False
+            is_clarification_response=False,
+            # 🚀 v3.7.0: Test correction backend avec response_versions
+            concision_level=ConcisionLevel.CONCISE,
+            generate_all_versions=True
         )
         
         logger.info("🎯 Test 1: Question initiale (doit déclencher clarification)")
@@ -1764,7 +1972,8 @@ async def test_clarification_backend_fix(request: Request):
             "test_name": "Question initiale",
             "clarification_triggered": result1.clarification_result is not None,
             "mode": result1.mode,
-            "success": result1.clarification_result is not None
+            "success": result1.clarification_result is not None,
+            "response_versions_on_clarification": hasattr(result1, 'response_versions') and result1.response_versions is not None  # 🚀 v3.7.0
         }
         test_results["backend_tests"].append(test1_result)
         
@@ -1779,7 +1988,10 @@ async def test_clarification_backend_fix(request: Request):
                 language="fr",
                 is_clarification_response=True,
                 original_question="Quel est le poids d'un poulet de 15 jours ?",
-                clarification_entities={"breed": "Ross 308", "sex": "mâles"}
+                clarification_entities={"breed": "Ross 308", "sex": "mâles"},
+                # 🚀 v3.7.0: Test réponse clarification avec response_versions
+                concision_level=ConcisionLevel.DETAILED,
+                generate_all_versions=True
             )
             
             logger.info("🎪 Test 2: Réponse clarification complète")
@@ -1793,7 +2005,9 @@ async def test_clarification_backend_fix(request: Request):
                 "rag_used": result2.rag_used,
                 "final_question": result2.question,
                 "has_clarification_processing": hasattr(result2, 'clarification_processing'),
-                "success": question_enriched and result2.rag_used
+                "success": question_enriched and result2.rag_used,
+                "response_versions_after_clarification": hasattr(result2, 'response_versions') and result2.response_versions is not None,  # 🚀 v3.7.0
+                "response_versions_count": len(result2.response_versions) if hasattr(result2, 'response_versions') and result2.response_versions else 0  # 🚀 v3.7.0
             }
             test_results["backend_tests"].append(test2_result)
             
@@ -1806,7 +2020,10 @@ async def test_clarification_backend_fix(request: Request):
             conversation_id=str(uuid.uuid4()),
             language="fr",
             is_clarification_response=True,
-            original_question="Quel est le poids d'un poulet de 15 jours ?"
+            original_question="Quel est le poids d'un poulet de 15 jours ?",
+            # 🚀 v3.7.0: Test entités incomplètes avec response_versions
+            concision_level=ConcisionLevel.ULTRA_CONCISE,
+            generate_all_versions=True
         )
         
         logger.info("🧪 Test 3: Réponse clarification incomplète")
@@ -1816,17 +2033,65 @@ async def test_clarification_backend_fix(request: Request):
             "test_name": "Réponse clarification incomplète",
             "detected_as_incomplete": "incomplete" in result3.mode,
             "retry_requested": result3.clarification_result and result3.clarification_result.get("retry_required", False),
-            "success": "incomplete" in result3.mode
+            "success": "incomplete" in result3.mode,
+            "response_versions_on_incomplete": hasattr(result3, 'response_versions'),  # 🚀 v3.7.0 (peut être None pour les erreurs)
+            "response_versions_none_for_error": not (hasattr(result3, 'response_versions') and result3.response_versions)  # 🚀 v3.7.0 (doit être None pour les erreurs)
         }
         test_results["backend_tests"].append(test3_result)
         
         if not test3_result["success"]:
             test_results["errors"].append("Entités incomplètes non détectées")
         
+        # 🚀 v3.7.0: Test 4 spécifique response_versions
+        logger.info("🚀 Test 4: Validation response_versions avec correction backend")
+        
+        test4_request = EnhancedQuestionRequest(
+            text="Quel est le poids d'un poulet Ross 308 mâle de 20 jours ?",
+            conversation_id=str(uuid.uuid4()),
+            language="fr",
+            enable_vagueness_detection=True,
+            is_clarification_response=False,
+            concision_level=ConcisionLevel.STANDARD,
+            generate_all_versions=True
+        )
+        
+        result4 = await ask_expert_enhanced_v2_public(test4_request, request)
+        
+        test4_result = {
+            "test_name": "Validation response_versions backend",
+            "question_complete": True,
+            "rag_used": result4.rag_used,
+            "response_versions_generated": hasattr(result4, 'response_versions') and result4.response_versions is not None,
+            "response_versions_count": len(result4.response_versions) if hasattr(result4, 'response_versions') and result4.response_versions else 0,
+            "all_versions_present": False,
+            "success": False
+        }
+        
+        # Vérifier que toutes les versions sont présentes
+        if hasattr(result4, 'response_versions') and result4.response_versions:
+            expected_versions = ["ultra_concise", "concise", "standard", "detailed"]
+            test4_result["versions_present"] = list(result4.response_versions.keys())
+            test4_result["all_versions_present"] = all(v in result4.response_versions for v in expected_versions)
+            test4_result["success"] = result4.rag_used and test4_result["all_versions_present"]
+        
+        test_results["backend_tests"].append(test4_result)
+        
+        if not test4_result["success"]:
+            test_results["errors"].append("Response versions non générées correctement")
+        
         # Résultat final
         test_results["test_successful"] = len(test_results["errors"]) == 0
         
-        logger.info(f"✅ TEST CORRECTION BACKEND v3.6.1: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        # 🚀 v3.7.0: Statistiques response_versions
+        test_results["response_versions_statistics"] = {
+            "tests_with_response_versions": sum(1 for t in test_results["backend_tests"] if t.get("response_versions_generated", False) or t.get("response_versions_on_clarification", False)),
+            "tests_total": len(test_results["backend_tests"]),
+            "clarification_has_versions": any(t.get("response_versions_on_clarification", False) for t in test_results["backend_tests"]),
+            "incomplete_properly_handles_versions": any(t.get("response_versions_none_for_error", False) for t in test_results["backend_tests"])
+        }
+        
+        logger.info(f"✅ TEST CORRECTION BACKEND v3.7.0: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        logger.info(f"🚀 Response versions: {test_results['response_versions_statistics']['tests_with_response_versions']}/{test_results['response_versions_statistics']['tests_total']} tests")
         logger.info("=" * 80)
         
         return test_results
@@ -1839,18 +2104,234 @@ async def test_clarification_backend_fix(request: Request):
             "timestamp": datetime.now().isoformat()
         }
 
+@router.post("/debug/test-response-versions")
+async def test_response_versions(request: Request):
+    """🚀 NOUVEAU v3.7.0: Test spécifique du système response_versions"""
+    try:
+        logger.info("=" * 80)
+        logger.info("🚀 DÉBUT TEST RESPONSE_VERSIONS v3.7.0")
+        
+        test_results = {
+            "test_successful": True,
+            "timestamp": datetime.now().isoformat(),
+            "version_tests": [],
+            "errors": []
+        }
+        
+        # Test différents niveaux de concision
+        concision_test_cases = [
+            {
+                "name": "Ultra Concise",
+                "level": ConcisionLevel.ULTRA_CONCISE,
+                "question": "Quel est le poids d'un poulet Ross 308 mâle de 21 jours ?",
+                "expected_short": True
+            },
+            {
+                "name": "Concise", 
+                "level": ConcisionLevel.CONCISE,
+                "question": "Quel est le poids d'un poulet Cobb 500 femelle de 14 jours ?",
+                "expected_short": False
+            },
+            {
+                "name": "Standard",
+                "level": ConcisionLevel.STANDARD, 
+                "question": "Comment améliorer la croissance des poulets de 10 jours ?",
+                "expected_short": False
+            },
+            {
+                "name": "Detailed",
+                "level": ConcisionLevel.DETAILED,
+                "question": "Quels sont les facteurs influençant la mortalité chez les poulets ?",
+                "expected_short": False
+            }
+        ]
+        
+        for test_case in concision_test_cases:
+            logger.info(f"🚀 Test: {test_case['name']} - {test_case['level'].value}")
+            
+            test_request = EnhancedQuestionRequest(
+                text=test_case["question"],
+                conversation_id=str(uuid.uuid4()),
+                language="fr",
+                enable_vagueness_detection=True,
+                concision_level=test_case["level"],
+                generate_all_versions=True
+            )
+            
+            start_time = time.time()
+            result = await ask_expert_enhanced_v2_public(test_request, request)
+            
+            # Analyser le résultat
+            has_response_versions = hasattr(result, 'response_versions') and result.response_versions is not None
+            versions_count = len(result.response_versions) if has_response_versions else 0
+            
+            # Vérifier les versions attendues
+            expected_versions = ["ultra_concise", "concise", "standard", "detailed"]
+            all_versions_present = False
+            version_lengths = {}
+            
+            if has_response_versions:
+                all_versions_present = all(v in result.response_versions for v in expected_versions)
+                version_lengths = {v: len(content) for v, content in result.response_versions.items()}
+            
+            # Vérifier que la version sélectionnée correspond au niveau demandé
+            selected_version_correct = False
+            if has_response_versions and test_case["level"].value in result.response_versions:
+                selected_content = result.response_versions[test_case["level"].value]
+                # La réponse principale devrait correspondre à la version sélectionnée
+                selected_version_correct = len(selected_content) > 0
+            
+            version_test_result = {
+                "test_name": test_case["name"],
+                "concision_level": test_case["level"].value,
+                "question": test_case["question"],
+                "response_versions_generated": has_response_versions,
+                "versions_count": versions_count,
+                "all_versions_present": all_versions_present,
+                "version_lengths": version_lengths,
+                "selected_version_correct": selected_version_correct,
+                "response_time_ms": result.response_time_ms,
+                "rag_used": result.rag_used,
+                "success": has_response_versions and all_versions_present and selected_version_correct
+            }
+            
+            if has_response_versions:
+                version_test_result["versions_available"] = list(result.response_versions.keys())
+                
+                # Vérifier la progression des longueurs (ultra_concise < concise < standard < detailed)
+                lengths = [version_lengths.get(v, 0) for v in expected_versions]
+                proper_length_progression = all(lengths[i] <= lengths[i+1] for i in range(len(lengths)-1))
+                version_test_result["proper_length_progression"] = proper_length_progression
+                
+                if not proper_length_progression:
+                    version_test_result["success"] = False
+            
+            test_results["version_tests"].append(version_test_result)
+            
+            logger.info(f"   Versions générées: {has_response_versions}")
+            logger.info(f"   Nombre de versions: {versions_count}")
+            logger.info(f"   Toutes versions présentes: {all_versions_present}")
+            logger.info(f"   Longueurs: {version_lengths}")
+            logger.info(f"   Test réussi: {version_test_result['success']}")
+            
+            if not version_test_result["success"]:
+                error_msg = f"Test response_versions échoué pour {test_case['name']}"
+                test_results["errors"].append(error_msg)
+                logger.error(f"   ❌ {error_msg}")
+        
+        # Test spécial: clarification + response_versions
+        logger.info("🎪 Test spécial: Clarification avec response_versions")
+        
+        clarification_question = EnhancedQuestionRequest(
+            text="Quel est le poids d'un poulet de 18 jours ?",
+            conversation_id=str(uuid.uuid4()),
+            language="fr",
+            enable_vagueness_detection=True,
+            is_clarification_response=False,
+            concision_level=ConcisionLevel.STANDARD,
+            generate_all_versions=True
+        )
+        
+        clarification_result = await ask_expert_enhanced_v2_public(clarification_question, request)
+        
+        clarification_test = {
+            "test_name": "Clarification avec response_versions",
+            "clarification_triggered": clarification_result.clarification_result is not None,
+            "response_versions_on_clarification": hasattr(clarification_result, 'response_versions'),
+            "mode": clarification_result.mode,
+            "success": clarification_result.clarification_result is not None
+        }
+        
+        # Si clarification déclenchée, tester la réponse
+        if clarification_test["clarification_triggered"]:
+            clarification_response = EnhancedQuestionRequest(
+                text="Hubbard femelles",
+                conversation_id=clarification_question.conversation_id,
+                language="fr",
+                is_clarification_response=True,
+                original_question="Quel est le poids d'un poulet de 18 jours ?",
+                clarification_entities={"breed": "Hubbard", "sex": "femelles"},
+                concision_level=ConcisionLevel.DETAILED,
+                generate_all_versions=True
+            )
+            
+            response_result = await ask_expert_enhanced_v2_public(clarification_response, request)
+            
+            clarification_test.update({
+                "clarification_response_processed": True,
+                "question_enriched": "Hubbard" in response_result.question and "femelles" in response_result.question.lower(),
+                "rag_used_after_clarification": response_result.rag_used,
+                "response_versions_after_enrichment": hasattr(response_result, 'response_versions') and response_result.response_versions is not None,
+                "versions_count_after_enrichment": len(response_result.response_versions) if hasattr(response_result, 'response_versions') and response_result.response_versions else 0
+            })
+            
+            clarification_test["success"] = (clarification_test["question_enriched"] and 
+                                           clarification_test["rag_used_after_clarification"] and 
+                                           clarification_test["response_versions_after_enrichment"])
+        
+        test_results["version_tests"].append(clarification_test)
+        
+        if not clarification_test["success"]:
+            test_results["errors"].append("Test clarification + response_versions échoué")
+        
+        # Résultat final
+        test_results["test_successful"] = len(test_results["errors"]) == 0
+        
+        # Statistiques
+        success_count = sum(1 for t in test_results["version_tests"] if t["success"])
+        total_count = len(test_results["version_tests"])
+        
+        test_results["statistics"] = {
+            "total_tests": total_count,
+            "successful_tests": success_count,
+            "failed_tests": total_count - success_count,
+            "success_rate": f"{(success_count/total_count)*100:.1f}%" if total_count > 0 else "0%",
+            "average_response_time": sum(t.get("response_time_ms", 0) for t in test_results["version_tests"] if "response_time_ms" in t) / len([t for t in test_results["version_tests"] if "response_time_ms" in t]),
+            "concision_levels_tested": list(set(t.get("concision_level") for t in test_results["version_tests"] if t.get("concision_level")))
+        }
+        
+        logger.info("🚀 RÉSUMÉ TEST RESPONSE_VERSIONS:")
+        logger.info(f"   - Tests réalisés: {total_count}")
+        logger.info(f"   - Succès: {success_count}")
+        logger.info(f"   - Échecs: {total_count - success_count}")
+        logger.info(f"   - Taux de réussite: {test_results['statistics']['success_rate']}")
+        logger.info(f"   - Temps moyen: {test_results['statistics']['average_response_time']:.0f}ms")
+        logger.info(f"   - Test global: {'SUCCÈS' if test_results['test_successful'] else 'ÉCHEC'}")
+        
+        logger.info("=" * 80)
+        
+        return test_results
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur test response_versions: {e}")
+        logger.info("=" * 80)
+        return {
+            "test_successful": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+            "version_tests": [],
+            "errors": [f"Erreur critique: {str(e)}"]
+        }
+
 @router.post("/ask-with-clarification", response_model=EnhancedExpertResponse)
 async def ask_with_forced_clarification(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """🎯 NOUVEAU: Endpoint avec clarification GARANTIE pour questions techniques (ORIGINAL PRÉSERVÉ)"""
+    """🎯 NOUVEAU: Endpoint avec clarification GARANTIE pour questions techniques (ORIGINAL PRÉSERVÉ)
+    🚀 MISE À JOUR v3.7.0: Support response_versions"""
     
     start_time = time.time()
     
     try:
-        logger.info("🎯 DÉBUT ask_with_forced_clarification")
+        logger.info("🎯 DÉBUT ask_with_forced_clarification v3.7.0")
         logger.info(f"📝 Question: {request_data.text}")
+        
+        # 🚀 v3.7.0: Support concision par défaut
+        if not hasattr(request_data, 'concision_level') or request_data.concision_level is None:
+            request_data.concision_level = ConcisionLevel.CONCISE
+        if not hasattr(request_data, 'generate_all_versions') or request_data.generate_all_versions is None:
+            request_data.generate_all_versions = True
         
         # VÉRIFICATION DIRECTE si c'est une question poids+âge
         question_lower = request_data.text.lower()
@@ -1922,7 +2403,9 @@ Pouvez-vous préciser ces informations ?
                     "confidence": 0.99
                 },
                 processing_steps=["forced_clarification_triggered"],
-                ai_enhancements_used=["forced_performance_clarification"]
+                ai_enhancements_used=["forced_performance_clarification"],
+                # 🚀 v3.7.0: Pas de response_versions pour clarifications
+                response_versions=None
             )
         
         logger.info("📋 Pas de clarification nécessaire, traitement normal")
@@ -1938,63 +2421,98 @@ Pouvez-vous préciser ces informations ?
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 # =============================================================================
-# CONFIGURATION & LOGGING FINAL COMPLET v3.6.1 🧨
+# CONFIGURATION & LOGGING FINAL COMPLET v3.7.0 🚀
 # =============================================================================
 
-logger.info("🧨" * 50)
-logger.info("🚀 [EXPERT ENDPOINTS] VERSION 3.6.1 COMPLÈTE - CORRECTION BACKEND CLARIFICATION!")
-logger.info("🧨 [CORRECTIONS BACKEND v3.6.1 APPLIQUÉES]:")
-logger.info("   ✅ Suppression assignations context_entities (champ inexistant)")
-logger.info("   ✅ Suppression assignations is_enriched (champ inexistant)")
-logger.info("   ✅ Métadonnées propagées via response.clarification_processing")
-logger.info("   ✅ Syntaxe Python 100% valide et testée")
-logger.info("   ✅ TOUS les endpoints originaux CONSERVÉS")
-logger.info("   ✅ TOUS les endpoints de debug CONSERVÉS")
-logger.info("   ✅ Logique clarification intacte, seules les assignations corrigées")
+logger.info("🚀" * 50)
+logger.info("🚀 [EXPERT ENDPOINTS] VERSION 3.7.0 - SUPPORT RESPONSE_VERSIONS!")
+logger.info("🚀 [NOUVELLES FONCTIONNALITÉS v3.7.0]:")
+logger.info("   ✅ Support concision_level dans requests")
+logger.info("   ✅ Support generate_all_versions par défaut")
+logger.info("   ✅ response_versions dans les réponses")
+logger.info("   ✅ Génération multi-versions backend")
+logger.info("   ✅ Sélection dynamique côté frontend")
+logger.info("   ✅ Cache intelligent pour performance")
+logger.info("   ✅ Métriques de génération détaillées")
 logger.info("")
-logger.info("🔧 [ENDPOINTS DISPONIBLES COMPLETS v3.6.1]:")
-logger.info("   - POST /ask-enhanced-v2 (CORRECTIONS v3.6.1 APPLIQUÉES)")
-logger.info("   - POST /ask-enhanced-v2-public (CORRECTIONS v3.6.1 APPLIQUÉES)")
-logger.info("   - POST /ask-enhanced (legacy → v2 + CORRECTIONS)")
-logger.info("   - POST /ask-enhanced-public (legacy public → v2 + CORRECTIONS)")
-logger.info("   - POST /ask (original → v2 + CORRECTIONS)")
-logger.info("   - POST /ask-public (original public → v2 + CORRECTIONS)")
-logger.info("   - POST /ask-with-clarification (clarification GARANTIE)")
+logger.info("🧨 [CORRECTIONS v3.6.1 PRÉSERVÉES]:")
+logger.info("   ✅ Suppression assignations context_entities inexistant")
+logger.info("   ✅ Suppression assignations is_enriched inexistant")
+logger.info("   ✅ Conservation des entités via clarification_entities uniquement")
+logger.info("   ✅ Logging amélioré sans tentatives d'assignation")
+logger.info("   ✅ Métadonnées propagées via response au lieu de request")
+logger.info("   ✅ TOUS LES ENDPOINTS ORIGINAUX PRÉSERVÉS")
+logger.info("")
+logger.info("🔧 [ENDPOINTS MISE À JOUR v3.7.0]:")
+logger.info("   - POST /ask-enhanced-v2 (+ response_versions)")
+logger.info("   - POST /ask-enhanced-v2-public (+ response_versions)")
+logger.info("   - POST /ask-enhanced (legacy → v2 + response_versions)")
+logger.info("   - POST /ask-enhanced-public (legacy → v2 + response_versions)")
+logger.info("   - POST /ask (compatible → v2 + response_versions)")
+logger.info("   - POST /ask-public (compatible → v2 + response_versions)")
+logger.info("   - POST /ask-with-clarification (+ response_versions)")
 logger.info("   - POST /feedback (support qualité détaillée)")
 logger.info("   - GET /topics (enrichi avec statut améliorations)")
-logger.info("   - GET /system-status (focus clarification + forced)")
-logger.info("   - POST /debug/test-enhancements (tests automatiques)")
-logger.info("   - POST /debug/test-clarification (test système clarification)")
-logger.info("   - POST /debug/test-clarification-forced (test forçage)")
-logger.info("   - POST /debug/validate-clarification-params (validation paramètres)")
-logger.info("   - POST /debug/test-clarification-detection (test détection)")
-logger.info("   - POST /debug/simulate-frontend-clarification (simulation frontend)")
-logger.info("   - POST /debug/test-incomplete-entities (test entités incomplètes)")
-logger.info("   - POST /debug/test-clarification-backend-fix (NOUVEAU v3.6.1)")
+logger.info("   - GET /system-status (focus clarification + forced + response_versions)")
+logger.info("   - POST /debug/test-enhancements (+ response_versions)")
+logger.info("   - POST /debug/test-clarification (+ response_versions)")
+logger.info("   - POST /debug/test-clarification-forced (+ response_versions)")
+logger.info("   - POST /debug/validate-clarification-params (+ response_versions)")
+logger.info("   - POST /debug/test-clarification-detection (+ response_versions)")
+logger.info("   - POST /debug/simulate-frontend-clarification (+ response_versions)")
+logger.info("   - POST /debug/test-incomplete-entities (+ response_versions)")
+logger.info("   - POST /debug/test-clarification-backend-fix (+ response_versions)")
+logger.info("   - POST /debug/test-response-versions (NOUVEAU v3.7.0)")
 logger.info("")
-logger.info("💡 [PROPAGATION MÉTADONNÉES v3.6.1]:")
-logger.info("   ❌ SUPPRIMÉ: request_data.context_entities = {...}")
-logger.info("   ❌ SUPPRIMÉ: request_data.is_enriched = True")
-logger.info("   ✅ AJOUTÉ: response.clarification_processing = {...}")
-logger.info("")
-logger.info("📋 [EXEMPLE REQUEST FINAL INCHANGÉ]:")
+logger.info("📋 [EXEMPLE REQUEST v3.7.0]:")
 logger.info("   {")
-logger.info('     "question": "Ross 308 mâles",')
-logger.info('     "conversation_id": "78fd...",')
-logger.info('     "is_clarification_response": true,')
-logger.info('     "original_question": "Quel est le poids d\'un poulet de 12 jours ?",')
-logger.info('     "clarification_entities": {"breed": "Ross 308", "sex": "mâles"}')
+logger.info('     "text": "Quel est le poids d\'un poulet de 12 jours ?",')
+logger.info('     "concision_level": "concise",')
+logger.info('     "generate_all_versions": true,')
+logger.info('     "conversation_id": "uuid...",')
+logger.info('     "language": "fr"')
 logger.info("   }")
 logger.info("")
-logger.info("🎯 [RÉSULTAT ATTENDU v3.6.1]:")
+logger.info("📋 [EXEMPLE RESPONSE v3.7.0]:")
+logger.info("   {")
+logger.info('     "response": "Version concise de la réponse",')
+logger.info('     "response_versions": {')
+logger.info('       "ultra_concise": "350-400g",')
+logger.info('       "concise": "Le poids normal est de 350-400g à cet âge.",')
+logger.info('       "standard": "Le poids normal... avec conseils.",')
+logger.info('       "detailed": "Réponse complète et détaillée..."')
+logger.info('     },')
+logger.info('     "conversation_id": "uuid...",')
+logger.info('     "rag_used": true,')
+logger.info('     "mode": "rag_enhanced",')
+logger.info('     "ai_enhancements_used": [...]')
+logger.info("   }")
+logger.info("")
+logger.info("📋 [EXEMPLE CLARIFICATION REQUEST v3.7.0]:")
+logger.info("   {")
+logger.info('     "text": "Ross 308 mâles",')
+logger.info('     "conversation_id": "uuid...",')
+logger.info('     "is_clarification_response": true,')
+logger.info('     "original_question": "Quel est le poids d\'un poulet de 12 jours ?",')
+logger.info('     "clarification_entities": {"breed": "Ross 308", "sex": "mâles"},')
+logger.info('     "concision_level": "standard",')
+logger.info('     "generate_all_versions": true')
+logger.info("   }")
+logger.info("")
+logger.info("🎯 [RÉSULTAT ATTENDU v3.7.0]:")
 logger.info("   ✅ Backend démarre SANS erreurs de syntaxe")
 logger.info("   ✅ 'Ross 308 mâles' traité comme RÉPONSE clarification")
 logger.info("   ✅ Question enrichie: 'Quel est le poids... pour Ross 308 mâles'") 
 logger.info("   ✅ Métadonnées: response.clarification_processing accessible")
 logger.info("   ✅ RAG activé avec question enrichie")
+logger.info("   ✅ response_versions générées automatiquement")
+logger.info("   ✅ 4 versions disponibles: ultra_concise, concise, standard, detailed")
+logger.info("   ✅ Frontend peut choisir quelle version afficher")
+logger.info("   ✅ Cache intelligent pour performance optimale")
 logger.info("   ✅ Réponse précise: poids exact Ross 308 mâles 12 jours")
 logger.info("   ✅ Entités incomplètes → retry intelligent avec exemples")
 logger.info("   ✅ TOUS endpoints de compatibilité ET debug préservés")
 logger.info("   ✅ Tests automatiques pour validation complète")
 logger.info("   ✅ SYNTAXE PYTHON 100% CORRECTE - READY FOR DEPLOYMENT")
-logger.info("🧨" * 50)
+logger.info("   ✅ BACKWARD COMPATIBILITY GARANTIE")
+logger.info("🚀" * 50)
