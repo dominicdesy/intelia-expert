@@ -1,15 +1,16 @@
 """
-app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS
+app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS AVEC VALIDATION
 
 🎯 OBJECTIF: Centraliser et standardiser les prompts pour le système RAG
 🔧 AMÉLIORATION: Éliminer les références aux documents dans les réponses
 ✨ QUALITÉ: Réponses plus naturelles et professionnelles
 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
-🐛 FIX: Ajout import List manquant
+🔧 NOUVEAU: Validation des questions générées dynamiquement
+🐛 FIX: Ajout import List manquant (CORRIGÉ)
 """
 
 import logging
-from typing import Dict, Any, Optional, List  # 🐛 FIX: Ajout de List à l'import
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +116,11 @@ INSTRUCCIONES CRÍTICAS:
 
 RESPUESTA EXPERTA:"""
 
-# 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique
+# 🆕 NOUVEAU: Prompt de contextualisation pour mode sémantique dynamique (MODIFIÉ)
 def build_contextualization_prompt(user_question: str, language: str = "fr") -> str:
     """
     🆕 NOUVEAU: Construit un prompt pour générer des questions de clarification dynamiques.
+    🔧 MODIFIÉ: Prompt optimisé pour éviter les exemples génériques non pertinents
     
     Args:
         user_question: Question originale de l'utilisateur
@@ -131,95 +133,65 @@ def build_contextualization_prompt(user_question: str, language: str = "fr") -> 
     if language.lower() == "en":
         return f"""You are a poultry farming expert specialized in providing practical advice.
 
-The user asks: "{user_question}"
+Your task is to help another AI agent better understand the following question: "{user_question}"
 
-TASK: Generate 2-4 clarification questions to better understand their specific situation and provide the most relevant advice.
+Analyze the question and deduce its main theme (e.g., laying drop, mortality, temperature, feeding, etc.). Then generate between 2 and 4 **targeted and concrete** clarification questions to better understand the problem.
 
-FOCUS ON:
-- Missing technical details (breed, age, housing conditions)
-- Context of the problem (symptoms, timeline, environment)
-- Scale of operation (flock size, production type)
-- Specific objectives (what outcome they want)
+Do not propose generic examples.
+Do not reformulate the question.
+Do not answer the question.
+Do not mention breeds or species that are not already cited by the user.
 
-INSTRUCTIONS:
-- Ask practical, specific questions
-- Prioritize the most critical missing information
-- Make questions easy to answer
-- Focus on actionable context
-
-Respond in JSON format:
+Respond in this JSON format:
 {{
   "clarification_questions": [
-    "What specific breed or strain are you raising?",
-    "What age are your birds currently?",
-    "What symptoms or issues are you observing?",
-    "What is your housing setup (closed barn, free-range, etc.)?"
+    "Question 1",
+    "Question 2",
+    "Question 3"
   ]
-}}
-
-Generate 2-4 questions maximum. Make them specific and practical."""
+}}"""
 
     elif language.lower() == "es":
         return f"""Eres un experto en avicultura especializado en brindar asesoría práctica.
 
-El usuario pregunta: "{user_question}"
+Tu tarea es ayudar a otro agente de IA a entender mejor la siguiente pregunta: "{user_question}"
 
-TAREA: Genera 2-4 preguntas de aclaración para entender mejor su situación específica y brindar el consejo más relevante.
+Analiza la pregunta y deduce su tema principal (ej. caída de postura, mortalidad, temperatura, alimentación, etc.). Luego genera entre 2 y 4 preguntas de aclaración **dirigidas y concretas** para entender mejor el problema.
 
-ENFÓCATE EN:
-- Detalles técnicos faltantes (raza, edad, condiciones de alojamiento)
-- Contexto del problema (síntomas, cronología, ambiente)
-- Escala de operación (tamaño del lote, tipo de producción)
-- Objetivos específicos (qué resultado buscan)
+No propongas ejemplos genéricos.
+No reformules la pregunta.
+No respondas la pregunta.
+No menciones razas o especies que no hayan sido ya citadas por el usuario.
 
-INSTRUCCIONES:
-- Haz preguntas prácticas y específicas
-- Prioriza la información más crítica faltante
-- Haz que las preguntas sean fáciles de responder
-- Enfócate en contexto accionable
-
-Responde en formato JSON:
+Responde en este formato JSON:
 {{
   "clarification_questions": [
-    "¿Qué raza o cepa específica está criando?",
-    "¿Qué edad tienen actualmente sus aves?",
-    "¿Qué síntomas o problemas está observando?",
-    "¿Cuál es su configuración de alojamiento (galpón cerrado, campo libre, etc.)?"
+    "Pregunta 1",
+    "Pregunta 2",
+    "Pregunta 3"
   ]
-}}
-
-Genera máximo 2-4 preguntas. Hazlas específicas y prácticas."""
+}}"""
 
     else:  # français
         return f"""Tu es un expert en aviculture spécialisé dans les conseils pratiques.
 
-L'utilisateur pose la question suivante : "{user_question}"
+Ta tâche est d'aider un autre agent IA à mieux comprendre la question suivante : "{user_question}"
 
-TÂCHE : Génère 2-4 questions de clarification pour mieux comprendre sa situation spécifique et fournir les conseils les plus pertinents.
+Analyse la question et déduis son thème principal (ex. baisse de ponte, mortalité, température, alimentation, etc.). Puis génère entre 2 et 4 questions de clarification **ciblées et concrètes** pour mieux comprendre le problème.
 
-CONCENTRE-TOI SUR :
-- Détails techniques manquants (race, âge, conditions d'élevage)
-- Contexte du problème (symptômes, chronologie, environnement)
-- Échelle d'opération (taille du troupeau, type de production)
-- Objectifs spécifiques (quel résultat ils recherchent)
+Ne propose pas d'exemples génériques.
+Ne reformule pas la question.
+Ne réponds pas à la question.
+Ne mentionne pas de races ou d'espèces qui ne sont pas déjà citées par l'utilisateur.
 
-INSTRUCTIONS :
-- Pose des questions pratiques et spécifiques
-- Priorise les informations critiques manquantes
-- Rends les questions faciles à répondre
-- Concentre-toi sur un contexte actionnable
-
-Réponds en format JSON :
+Réponds dans ce format JSON :
 {{
   "clarification_questions": [
-    "Quelle race ou souche spécifique élevez-vous ?",
-    "Quel âge ont actuellement vos volailles ?",
-    "Quels symptômes ou problèmes observez-vous ?",
-    "Quelle est votre configuration d'élevage (bâtiment fermé, plein air, etc.) ?"
+    "Question 1",
+    "Question 2",
+    "Question 3"
   ]
-}}
-
-Génère 2-4 questions maximum. Rends-les spécifiques et pratiques."""
+}}"""
 
 def build_clarification_prompt(missing_info: list, detected_age: str, language: str = "fr") -> str:
     """
@@ -421,8 +393,113 @@ def validate_prompt_context(context: Dict[str, str]) -> Dict[str, Any]:
     return validation_result
 
 # =============================================================================
-# 🆕 NOUVELLES FONCTIONS POUR MODE SÉMANTIQUE DYNAMIQUE
+# 🔧 NOUVELLES FONCTIONS POUR VALIDATION QUESTIONS DYNAMIQUES
 # =============================================================================
+
+def validate_dynamic_questions(questions: List[str], language: str = "fr") -> Dict[str, Any]:
+    """
+    🔧 NOUVEAU: Valide la qualité des questions générées dynamiquement
+    
+    Args:
+        questions: Liste des questions à valider
+        language: Langue des questions (fr/en/es)
+        
+    Returns:
+        Dict avec résultats de validation incluant quality_score
+    """
+    
+    validation = {
+        "valid_questions": [],
+        "invalid_questions": [],
+        "quality_score": 0.0,
+        "issues": []
+    }
+    
+    if not questions:
+        validation["quality_score"] = 0.0
+        validation["issues"].append("Aucune question fournie")
+        return validation
+    
+    # Mots-clés de questions par langue
+    question_words = {
+        "fr": ["quel", "quelle", "combien", "comment", "où", "quand", "pourquoi", "dans quel", "depuis quand"],
+        "en": ["what", "which", "how", "where", "when", "why", "who", "how long", "what type"],
+        "es": ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "quién", "cuánto tiempo", "qué tipo"]
+    }
+    
+    # Mots-clés génériques à éviter (indiquent des questions trop vagues)
+    generic_keywords = {
+        "fr": ["exemple", "par exemple", "etc", "quelque chose", "peut-être", "généralement"],
+        "en": ["example", "for example", "etc", "something", "maybe", "generally"],
+        "es": ["ejemplo", "por ejemplo", "etc", "algo", "tal vez", "generalmente"]
+    }
+    
+    words = question_words.get(language, question_words["fr"])
+    generic_words = generic_keywords.get(language, generic_keywords["fr"])
+    
+    for question in questions:
+        if not question or len(question.strip()) < 10:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop courte: '{question}'")
+            continue
+        
+        question_lower = question.lower().strip()
+        
+        # Vérifier si c'est une vraie question
+        has_question_word = any(word in question_lower for word in words)
+        has_question_mark = question.strip().endswith('?')
+        
+        if not has_question_word and not has_question_mark:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Pas une question valide: '{question}'")
+            continue
+        
+        # Vérifier si la question n'est pas trop générique
+        is_generic = any(generic_word in question_lower for generic_word in generic_words)
+        if is_generic:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop générique: '{question}'")
+            continue
+        
+        # Vérifier la longueur (pas trop courte, pas trop longue)
+        if len(question) < 20:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question manque de contexte: '{question}'")
+            continue
+        
+        if len(question) > 150:
+            validation["invalid_questions"].append(question)
+            validation["issues"].append(f"Question trop longue: '{question[:50]}...'")
+            continue
+        
+        # Si toutes les validations passent
+        validation["valid_questions"].append(question)
+    
+    # Calculer score de qualité
+    if questions:
+        base_score = len(validation["valid_questions"]) / len(questions)
+        
+        # Bonus pour diversité des questions
+        if len(validation["valid_questions"]) > 1:
+            # Vérifier que les questions ne sont pas trop similaires
+            unique_starts = set()
+            for q in validation["valid_questions"]:
+                first_words = " ".join(q.split()[:3]).lower()
+                unique_starts.add(first_words)
+            
+            diversity_bonus = len(unique_starts) / len(validation["valid_questions"]) * 0.2
+            base_score += diversity_bonus
+        
+        # Malus pour questions invalides
+        invalid_penalty = len(validation["invalid_questions"]) / len(questions) * 0.3
+        base_score -= invalid_penalty
+        
+        validation["quality_score"] = max(0.0, min(1.0, base_score))
+    
+    logger.info(f"🔧 [Question Validation] Score calculé: {validation['quality_score']:.2f}")
+    logger.info(f"🔧 [Question Validation] Questions valides: {len(validation['valid_questions'])}/{len(questions)}")
+    
+    return validation
 
 def get_dynamic_clarification_examples(language: str = "fr") -> List[str]:
     """
@@ -464,53 +541,11 @@ def get_dynamic_clarification_examples(language: str = "fr") -> List[str]:
     
     return examples.get(language, examples["fr"])
 
-def validate_dynamic_questions(questions: List[str], language: str = "fr") -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Valide la qualité des questions générées dynamiquement
-    """
-    
-    validation = {
-        "valid_questions": [],
-        "invalid_questions": [],
-        "quality_score": 0.0,
-        "issues": []
-    }
-    
-    question_words = {
-        "fr": ["quel", "quelle", "combien", "comment", "où", "quand", "pourquoi"],
-        "en": ["what", "which", "how", "where", "when", "why", "who"],
-        "es": ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "quién"]
-    }
-    
-    words = question_words.get(language, question_words["fr"])
-    
-    for question in questions:
-        if not question or len(question.strip()) < 10:
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Question trop courte: '{question}'")
-            continue
-        
-        question_lower = question.lower()
-        
-        # Vérifier si c'est une vraie question
-        if not any(word in question_lower for word in words) and not question.endswith('?'):
-            validation["invalid_questions"].append(question)
-            validation["issues"].append(f"Pas une question valide: '{question}'")
-            continue
-        
-        validation["valid_questions"].append(question)
-    
-    # Calculer score de qualité
-    if questions:
-        validation["quality_score"] = len(validation["valid_questions"]) / len(questions)
-    
-    return validation
-
 # =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
 
-logger.info("✅ [Prompt Templates] Templates de prompts structurés chargés")
+logger.info("✅ [Prompt Templates] Templates de prompts structurés chargés avec validation")
 logger.info("🎯 [Prompt Templates] Fonctionnalités disponibles:")
 logger.info("   - 🇫🇷 Prompts français optimisés")
 logger.info("   - 🇬🇧 Prompts anglais optimisés") 
@@ -519,12 +554,19 @@ logger.info("   - 🎪 Prompts de clarification spécialisés")
 logger.info("   - 🎯 Prompts pour questions floues")
 logger.info("   - 🔍 Extraction contexte depuis entités")
 logger.info("   - ✅ Validation qualité contexte")
-logger.info("🆕 [Prompt Templates] NOUVELLE FONCTIONNALITÉ:")
+logger.info("🆕 [Prompt Templates] FONCTIONNALITÉ MODE SÉMANTIQUE:")
 logger.info("   - 🎭 Prompt de contextualisation pour mode sémantique dynamique")
 logger.info("   - 🤖 Génération intelligente de questions via GPT")
 logger.info("   - 🌐 Support multilingue pour questions dynamiques")
-logger.info("   - ✅ Validation qualité questions générées")
 logger.info("   - 📝 Exemples de questions par langue")
+logger.info("🔧 [Prompt Templates] NOUVELLE FONCTIONNALITÉ VALIDATION:")
+logger.info("   - ✅ Validation qualité questions générées (validate_dynamic_questions)")
+logger.info("   - 📊 Score de qualité (0.0 à 1.0)")
+logger.info("   - 🎯 Filtrage questions génériques/trop courtes/trop longues")
+logger.info("   - 🔍 Vérification mots-clés question par langue")
+logger.info("   - 📈 Bonus diversité + malus répétition")
+logger.info("   - 📝 Logs détaillés résultats validation")
 logger.info("🧹 [Prompt Templates] OBJECTIF: Éliminer références aux documents")
-logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles")
+logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles + questions validées")
 logger.info("🐛 [Prompt Templates] FIX: Import List ajouté - erreur corrigée!")
+logger.info("🔧 [Prompt Templates] AMÉLIORATION: Prompt contextualisation optimisé pour éviter exemples génériques")
