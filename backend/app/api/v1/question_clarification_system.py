@@ -15,6 +15,8 @@ CORRECTIONS APPORTÉES:
 - Gestion des attributs optionnels
 - Logging sécurisé
 - Méthodes d'extension mieux structurées
+- LIGNE 1511 CORRIGÉE : Parenthèse manquante ajoutée
+- Fin du fichier complétée
 """
 
 import os
@@ -622,6 +624,574 @@ IMPORTANT POUR LES RACES/SOUCHES:
                 openai_client = openai.OpenAI(api_key=api_key)
             
             try:
+                if hasattr(openai, 'chat') and hasattr(openai.chat, 'completions'):
+                    # Ancienne version
+                    response = openai.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches et focus sur les entités critiques. Réponds uniquement avec du JSON valide."},
+                            {"role": "user", "content": extraction_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=500,
+                        timeout=self.timeout
+                    )
+                else:
+                    # Nouvelle version avec client
+                    response = openai_client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches et focus sur les entités critiques. Réponds uniquement avec du JSON valide."},
+                            {"role": "user", "content": extraction_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=500,
+                        timeout=self.timeout
+                    )
+            except Exception as openai_error:
+                logger.error(f"❌ [Enhanced Clarification] Erreur appel OpenAI: {openai_error}")
+                return await self._extract_entities_fallback(question, language)
+            
+            answer = response.choices[0].message.content.strip()
+            
+            # Extraire le JSON de la réponse
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                json_match = re.search(r'\{.*\}', answer, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    logger.warning("⚠️ [Enhanced Clarification] Pas de JSON trouvé dans la réponse")
+                    return await self._extract_entities_fallback(question, language)
+            
+            # Parser le JSON
+            try:
+                extracted_data = json.loads(json_str)
+                
+                # Convertir en ExtractedEntities avec validation des types
+                entities = ExtractedEntities(
+                    breed=extracted_data.get("breed"),
+                    breed_type=extracted_data.get("breed_type"),
+                    sex=extracted_data.get("sex"),
+                    age_days=self._safe_int_conversion(extracted_data.get("age_days")),
+                    age_weeks=self._safe_int_conversion(extracted_data.get("age_weeks")),
+                    weight_grams=self._safe_float_conversion(extracted_data.get("weight_grams")),
+                    mortality_rate=self._safe_float_conversion(extracted_data.get("mortality_rate")),
+                    temperature=self._safe_float_conversion(extracted_data.get("temperature")),
+                    humidity=self._safe_float_conversion(extracted_data.get("humidity")),
+                    housing_type=extracted_data.get("housing_type"),
+                    feed_type=extracted_data.get("feed_type"),
+                    flock_size=self._safe_int_conversion(extracted_data.get("flock_size")),
+                    symptoms=self._safe_list_conversion(extracted_data.get("symptoms")),
+                    duration_problem=extracted_data.get("duration_problem"),
+                    previous_treatments=self._safe_list_conversion(extracted_data.get("previous_treatments"))
+                )
+                
+                # Appliquer normalisation et inférence
+                if self.enable_breed_normalization or self.enable_sex_inference:
+                    entities.normalize_and_infer()
+                
+                logger.info(f"🤖 [Enhanced Clarification] Entités extraites intelligemment: {entities.to_dict()}")
+                return entities
+                
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ [Enhanced Clarification] Erreur parsing JSON: {e}")
+                return await self._extract_entities_fallback(question, language)
+        
+        except Exception as e:
+            logger.error(f"❌ [Enhanced Clarification] Erreur extraction intelligente: {e}")
+            return await self._extract_entities_fallback(question, language)
+
+    def _safe_int_conversion(self, value) -> Optional[int]:
+        """Conversion sécurisée vers int"""
+        if value is None:
+            return None
+        try:
+            return int(float(value))  # Float d'abord pour gérer "3.0"
+        except (ValueError, TypeError):
+            return None
+
+    def _safe_float_conversion(self, value) -> Optional[float]:
+        """Conversion sécurisée vers float"""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
+    def _safe_list_conversion(self, value) -> Optional[List[str]]:
+        """Conversion sécurisée vers liste"""
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [str(item) for item in value if item is not None]
+        if isinstance(value, str):
+            return [value] if value.strip() else None
+        return None
+
+    async def _extract_entities_fallback(self, question: str, language: str) -> ExtractedEntities:
+        """Extraction d'entités fallback avec reconnaissance souches (règles basiques)"""
+        
+        entities = ExtractedEntities()
+        
+        if not question or not isinstance(question, str):
+            return entities
+        
+        question_lower = question.lower()
+        
+        # Détection race spécifique avec nouvelles souches
+        specific_patterns = self.specific_breed_patterns.get(language, self.specific_breed_patterns.get("fr", []))
+        for pattern in specific_patterns:
+            try:
+                match = re.search(pattern, question_lower, re.IGNORECASE)
+                if match:
+                    raw_breed = match.group(0).strip()
+                    entities.breed = raw_breed
+                    entities.breed_type = "specific"
+                    break
+            except re.error as e:
+                logger.warning(f"Erreur dans le pattern regex '{pattern}': {e}")
+                continue
+        
+        # Détection race générique si pas spécifique
+        if not entities.breed:
+            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'poultry', r'pollos?', r'aves?', r'poules?']
+            for pattern in generic_patterns:
+                try:
+                    match = re.search(pattern, question_lower, re.IGNORECASE)
+                    if match:
+                        entities.breed = match.group(0).strip()
+                        entities.breed_type = "generic"
+                        break
+                except re.error as e:
+                    logger.warning(f"Erreur dans le pattern regex générique '{pattern}': {e}")
+                    continue
+        
+        # Détection sexe explicite
+        sex_patterns = {
+            "fr": [r'mâles?', r'femelles?', r'coqs?', r'poules?', r'poulettes?', r'mixte'],
+            "en": [r'males?', r'females?', r'roosters?', r'hens?', r'pullets?', r'mixed'],
+            "es": [r'machos?', r'hembras?', r'gallos?', r'gallinas?', r'pollas?', r'mixto']
+        }
+        
+        patterns = sex_patterns.get(language, sex_patterns.get("fr", []))
+        for pattern in patterns:
+            try:
+                match = re.search(pattern, question_lower, re.IGNORECASE)
+                if match:
+                    sex_word = match.group(0).lower()
+                    if sex_word in ['mâle', 'mâles', 'male', 'males', 'macho', 'machos', 'coq', 'coqs', 'rooster', 'roosters', 'gallo', 'gallos']:
+                        entities.sex = "mâle"
+                    elif sex_word in ['femelle', 'femelles', 'female', 'females', 'hembra', 'hembras', 'poule', 'poules', 'hen', 'hens', 'gallina', 'gallinas', 'poulette', 'poulettes', 'pullet', 'pullets', 'polla', 'pollas']:
+                        entities.sex = "femelle"
+                    elif sex_word in ['mixte', 'mixed', 'mixto']:
+                        entities.sex = "mixte"
+                    break
+            except re.error as e:
+                logger.warning(f"Erreur dans le pattern regex sexe '{pattern}': {e}")
+                continue
+        
+        # Détection âge
+        age_patterns = [
+            r'(\d+)\s*jours?', r'(\d+)\s*days?', r'(\d+)\s*días?',
+            r'(\d+)\s*semaines?', r'(\d+)\s*weeks?', r'(\d+)\s*semanas?',
+            r'jour\s*(\d+)', r'day\s*(\d+)', r'día\s*(\d+)'
+        ]
+        
+        for pattern in age_patterns:
+            try:
+                match = re.search(pattern, question_lower, re.IGNORECASE)
+                if match:
+                    value = int(match.group(1))
+                    if 'semaine' in pattern or 'week' in pattern or 'semana' in pattern:
+                        entities.age_weeks = value
+                        entities.age_days = value * 7
+                    else:
+                        entities.age_days = value
+                    break
+            except (re.error, ValueError) as e:
+                logger.warning(f"Erreur dans le pattern regex âge '{pattern}': {e}")
+                continue
+        
+        # Détection poids
+        weight_patterns = [
+            r'(\d+(?:\.\d+)?)\s*(?:kg|gramm?es?|g|lbs?)',
+            r'pèsent?\s+(\d+(?:\.\d+)?)', r'weigh\s+(\d+(?:\.\d+)?)'
+        ]
+        
+        for pattern in weight_patterns:
+            try:
+                match = re.search(pattern, question_lower, re.IGNORECASE)
+                if match:
+                    entities.weight_grams = float(match.group(1))
+                    break
+            except (re.error, ValueError) as e:
+                logger.warning(f"Erreur dans le pattern regex poids '{pattern}': {e}")
+                continue
+        
+        # Appliquer normalisation et inférence même en fallback
+        if self.enable_breed_normalization or self.enable_sex_inference:
+            try:
+                entities.normalize_and_infer()
+            except Exception as e:
+                logger.warning(f"Erreur lors de la normalisation fallback: {e}")
+        
+        return entities
+
+    async def analyze_question_enhanced(
+        self, 
+        question: str, 
+        language: str = "fr",
+        user_id: str = "unknown",
+        conversation_id: str = None,
+        conversation_context: Dict = None,
+        original_question: str = None,
+        mode: str = None
+    ) -> ClarificationResult:
+        """
+        ANALYSE AMÉLIORÉE avec extraction intelligente, gestion du contexte et analyse des entités critiques
+        """
+        
+        start_time = time.time()
+        
+        if not self.enabled:
+            logger.info(f"🔧 [Enhanced Clarification] Système désactivé")
+            return ClarificationResult(
+                needs_clarification=False,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="system_disabled",
+                clarification_state=ClarificationState.NONE
+            )
+        
+        if not question or not isinstance(question, str) or len(question.strip()) < self.min_question_length:
+            logger.info(f"⚠️ [Enhanced Clarification] Question trop courte: {len(question) if question else 0}")
+            return ClarificationResult(
+                needs_clarification=False,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="question_too_short",
+                clarification_state=ClarificationState.NONE
+            )
+        
+        # Classification du type de question
+        question_type = self.classify_question_type(question, language)
+        logger.info(f"🏷️ [Enhanced Clarification] Type de question: {question_type}")
+        
+        # Extraction intelligente d'entités avec reconnaissance souches
+        extracted_entities = await self.extract_entities_intelligent(
+            question, 
+            language, 
+            conversation_context
+        )
+        
+        logger.info(f"🔍 [Enhanced Clarification] Analyse: '{question[:80]}...'")
+        logger.info(f"📊 [Enhanced Clarification] Entités extraites: {extracted_entities.to_dict()}")
+        
+        # Logging de reconnaissance automatique
+        if hasattr(extracted_entities, 'breed_normalized') and extracted_entities.breed_normalized:
+            logger.info(f"🔄 [Breed Recognition] Souche normalisée automatiquement: {extracted_entities.breed}")
+        if hasattr(extracted_entities, 'sex_inferred') and extracted_entities.sex_inferred:
+            logger.info(f"🚺 [Sex Inference] Sexe inféré automatiquement: {extracted_entities.sex}")
+        
+        # NOUVELLE FONCTIONNALITÉ: Analyse des entités critiques
+        critical_analysis = self.analyze_critical_entities(extracted_entities, question_type)
+        
+        # Déterminer les informations critiques manquantes (ancien système)
+        try:
+            missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
+        except Exception as e:
+            logger.warning(f"Erreur lors de l'obtention des infos critiques manquantes: {e}")
+            missing_critical_info = []
+        
+        logger.info(f"❌ [Enhanced Clarification] Informations critiques manquantes (ancien): {missing_critical_info}")
+        logger.info(f"🎯 [Critical Analysis] Résultats: {critical_analysis}")
+        
+        # Gestion du mode sémantique dynamique avec validation robuste
+        if (mode == "semantic_dynamic" or 
+            self.clarification_mode == ClarificationMode.SEMANTIC_DYNAMIC) and \
+           self.enable_semantic_dynamic:
+            
+            logger.info(f"🎯 [Semantic Dynamic] Mode activé pour: '{question[:50]}...'")
+            
+            # Générer questions dynamiques avec métadonnées de validation
+            try:
+                dynamic_questions, validation_metadata = self.question_generator.generate_dynamic_questions_with_validation(question, language)
+            except Exception as e:
+                logger.error(f"Erreur génération questions dynamiques: {e}")
+                dynamic_questions, validation_metadata = [], {"validation_score": 0.5, "gpt_success": False, "fallback_used": True}
+            
+            if dynamic_questions and len(dynamic_questions) > 0:
+                processing_time_ms = int((time.time() - start_time) * 1000)
+                
+                result = ClarificationResult(
+                    needs_clarification=True,
+                    questions=dynamic_questions,
+                    processing_time_ms=processing_time_ms,
+                    reason="semantic_dynamic_clarification_generated",
+                    model_used=f"{self.model}_semantic_dynamic",
+                    extracted_entities=extracted_entities,
+                    question_type=question_type,
+                    clarification_mode=ClarificationMode.SEMANTIC_DYNAMIC,
+                    clarification_state=ClarificationState.NEEDED,
+                    missing_critical_info=missing_critical_info,
+                    confidence_score=0.9,
+                    original_question=original_question or question,
+                    validation_score=validation_metadata.get("validation_score", 0.8),
+                    validation_details=validation_metadata,
+                    fallback_used=validation_metadata.get("fallback_used", False),
+                    gpt_failed=not validation_metadata.get("gpt_success", False),
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
+                )
+                
+                logger.info(f"✅ [Semantic Dynamic] {len(dynamic_questions)} questions générées dynamiquement")
+                
+                if self.log_all_clarifications:
+                    await self._log_clarification_decision(
+                        question, language, user_id, conversation_id, result
+                    )
+                
+                return result
+            else:
+                logger.warning("⚠️ [Semantic Dynamic] Aucune question générée, fallback vers mode normal")
+        
+        # Logique de clarification basée sur les entités critiques
+        if critical_analysis["clarification_required_critical"]:
+            logger.info(f"🚨 [Critical Entities] Clarification critique requise - entités manquantes: {critical_analysis['missing_critical_entities']}")
+            
+            # Générer questions spécifiques aux entités critiques manquantes
+            try:
+                critical_questions = self.question_generator.generate_critical_entity_questions(
+                    language, 
+                    critical_analysis["missing_critical_entities"], 
+                    question_type
+                )
+            except Exception as e:
+                logger.error(f"Erreur génération questions critiques: {e}")
+                critical_questions = self.question_generator.generate_adaptive_questions(
+                    language, missing_critical_info, question_type
+                )
+            
+            return ClarificationResult(
+                needs_clarification=True,
+                questions=critical_questions,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="critical_entities_missing",
+                model_used="rule_based_critical_entities",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_mode=self.clarification_mode,
+                clarification_state=ClarificationState.NEEDED,
+                missing_critical_info=missing_critical_info,
+                confidence_score=95.0,
+                original_question=original_question or question,
+                validation_score=0.9,
+                fallback_used=False,
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=True
+            )
+        
+        # Logique de clarification intelligente (ancien système amélioré)
+        if hasattr(extracted_entities, 'breed_type') and extracted_entities.breed_type == "generic":
+            logger.info(f"🚨 [Enhanced Clarification] Race générique détectée - clarification obligatoire")
+            
+            try:
+                generic_questions = self.question_generator.generate_adaptive_questions(
+                    language, missing_critical_info, question_type
+                )
+            except Exception as e:
+                logger.error(f"Erreur génération questions adaptatives: {e}")
+                generic_questions = ["Quelle est la race exacte de vos volailles ?"]
+            
+            return ClarificationResult(
+                needs_clarification=True,
+                questions=generic_questions,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="generic_breed_detected",
+                model_used="rule_based_enhanced",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_mode=self.clarification_mode,
+                clarification_state=ClarificationState.NEEDED,
+                missing_critical_info=missing_critical_info,
+                confidence_score=95.0,
+                original_question=original_question or question,
+                validation_score=0.9,
+                fallback_used=False,
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=critical_analysis["clarification_required_critical"]
+            )
+        
+        # Si race spécifique + âge présents = OK
+        if (hasattr(extracted_entities, 'breed_type') and extracted_entities.breed_type == "specific" and 
+            (hasattr(extracted_entities, 'age_days') and extracted_entities.age_days or 
+             hasattr(extracted_entities, 'age_weeks') and extracted_entities.age_weeks)):
+            logger.info(f"✅ [Enhanced Clarification] Race spécifique + âge - question complète")
+            return ClarificationResult(
+                needs_clarification=False,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="specific_breed_and_age_detected",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_state=ClarificationState.NONE,
+                validation_score=1.0,
+                fallback_used=False,
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=False
+            )
+        
+        # Si pas d'informations critiques manquantes (ancien + nouveau système)
+        if not missing_critical_info and not critical_analysis["clarification_required_critical"]:
+            logger.info(f"✅ [Enhanced Clarification] Toutes les informations critiques présentes")
+            return ClarificationResult(
+                needs_clarification=False,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="all_critical_info_present",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_state=ClarificationState.NONE,
+                validation_score=1.0,
+                fallback_used=False,
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=False
+            )
+        
+        # Analyse via OpenAI pour les cas complexes (avec informations d'entités critiques)
+        if not OPENAI_AVAILABLE or not openai:
+            logger.warning(f"⚠️ [Enhanced Clarification] OpenAI non disponible - fallback vers questions adaptatives")
+            
+            try:
+                adaptive_questions = self.question_generator.generate_adaptive_questions(
+                    language, missing_critical_info, question_type
+                )
+            except Exception as e:
+                logger.error(f"Erreur génération questions adaptatives fallback: {e}")
+                adaptive_questions = ["Pouvez-vous donner plus de détails sur votre situation ?"]
+            
+            return ClarificationResult(
+                needs_clarification=True,
+                questions=adaptive_questions,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="openai_unavailable_adaptive_fallback",
+                model_used="rule_based_adaptive",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_mode=self.clarification_mode,
+                clarification_state=ClarificationState.NEEDED,
+                missing_critical_info=missing_critical_info,
+                confidence_score=0.7,
+                original_question=original_question or question,
+                validation_score=0.8,
+                fallback_used=True,
+                gpt_failed=True,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=critical_analysis["clarification_required_critical"]
+            )
+        
+        try:
+            # Configuration OpenAI
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                logger.warning(f"⚠️ [Enhanced Clarification] Clé API OpenAI manquante - fallback adaptatif")
+                
+                try:
+                    adaptive_questions = self.question_generator.generate_adaptive_questions(
+                        language, missing_critical_info, question_type
+                    )
+                except Exception as e:
+                    logger.error(f"Erreur génération questions adaptatives (clé manquante): {e}")
+                    adaptive_questions = ["Pouvez-vous donner plus de détails ?"]
+                
+                return ClarificationResult(
+                    needs_clarification=True,
+                    questions=adaptive_questions,
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                    reason="openai_key_missing_adaptive_fallback",
+                    model_used="rule_based_adaptive",
+                    extracted_entities=extracted_entities,
+                    question_type=question_type,
+                    clarification_mode=self.clarification_mode,
+                    clarification_state=ClarificationState.NEEDED,
+                    missing_critical_info=missing_critical_info,
+                    confidence_score=0.7,
+                    original_question=original_question or question,
+                    validation_score=0.8,
+                    fallback_used=True,
+                    gpt_failed=True,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
+                )
+            
+            # Configuration sécurisée d'OpenAI
+            if hasattr(openai, 'api_key'):
+                openai.api_key = api_key
+            else:
+                openai_client = openai.OpenAI(api_key=api_key)
+            
+            # PROMPT ENRICHI avec toutes les informations + entités critiques
+            prompt_template = self.clarification_prompts.get(language.lower(), self.clarification_prompts["fr"])
+            
+            context_str = "Aucun contexte"
+            if conversation_context and isinstance(conversation_context, dict):
+                try:
+                    context_str = json.dumps(conversation_context, ensure_ascii=False)
+                except (TypeError, ValueError):
+                    context_str = "Contexte disponible mais non sérialisable"
+            
+            try:
+                entities_str = json.dumps(extracted_entities.to_dict(), ensure_ascii=False)
+            except Exception:
+                entities_str = "Entités non sérialisables"
+            
+            missing_info_str = ", ".join(missing_critical_info) if missing_critical_info else "Aucune"
+            missing_critical_entities_str = ", ".join(critical_analysis["missing_critical_entities"]) if critical_analysis["missing_critical_entities"] else "Aucune"
+            critical_entities_for_type_str = ", ".join(critical_analysis["critical_entities_for_type"])
+            
+            user_prompt = prompt_template.format(
+                question=question,
+                question_type=question_type,
+                extracted_entities=entities_str,
+                conversation_context=context_str,
+                missing_info=missing_info_str,
+                missing_critical_entities=missing_critical_entities_str,
+                critical_entities_for_type=critical_entities_for_type_str
+            )
+            
+            system_prompt = f"""Tu es un assistant expert qui détermine si une question d'aviculture nécessite des clarifications. 
+
+Mode de clarification: {self.clarification_mode.value}
+Questions adaptatives: {'activées' if self.adaptive_question_count else 'désactivées'}
+Analyse entités critiques: {'activée' if self.enable_critical_entity_analysis else 'désactivée'}
+
+FOCUS PRIORITAIRE sur les entités critiques: {', '.join(CRITICAL_ENTITIES)}
+
+Sois très précis et utilise intelligemment le contexte conversationnel pour éviter les questions redondantes."""
+            
+            # Appel OpenAI enrichi
+            logger.info(f"🤖 [Enhanced Clarification] Appel GPT-4o-mini enrichi avec analyse entités critiques...")
+            
+            try:
+                # ✅ CORRECTION LIGNE 1511: Parenthèse manquante corrigée
                 if hasattr(openai, 'chat') and hasattr(openai.chat, 'completions'):
                     # Ancienne version
                     response = openai.chat.completions.create(
@@ -1508,571 +2078,4 @@ except Exception as e:
 
 logger.info("🔧 [Error Handling] Gestion d'erreurs robuste activée pour tous les composants")
 logger.info("🛡️ [Stability] Système de fallback et de récupération d'erreurs en place")
-ai.chat, 'completions'):
-                    # Ancienne version
-                    response = openai.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches et focus sur les entités critiques. Réponds uniquement avec du JSON valide."},
-                            {"role": "user", "content": extraction_prompt}
-                        ],
-                        temperature=0.1,
-                        max_tokens=500,
-                        timeout=self.timeout
-                    )
-                else:
-                    # Nouvelle version avec client
-                    response = openai_client.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches et focus sur les entités critiques. Réponds uniquement avec du JSON valide."},
-                            {"role": "user", "content": extraction_prompt}
-                        ],
-                        temperature=0.1,
-                        max_tokens=500,
-                        timeout=self.timeout
-                    )
-            except Exception as openai_error:
-                logger.error(f"❌ [Enhanced Clarification] Erreur appel OpenAI: {openai_error}")
-                return await self._extract_entities_fallback(question, language)
-            
-            answer = response.choices[0].message.content.strip()
-            
-            # Extraire le JSON de la réponse
-            json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                json_match = re.search(r'\{.*\}', answer, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                else:
-                    logger.warning("⚠️ [Enhanced Clarification] Pas de JSON trouvé dans la réponse")
-                    return await self._extract_entities_fallback(question, language)
-            
-            # Parser le JSON
-            try:
-                extracted_data = json.loads(json_str)
-                
-                # Convertir en ExtractedEntities avec validation des types
-                entities = ExtractedEntities(
-                    breed=extracted_data.get("breed"),
-                    breed_type=extracted_data.get("breed_type"),
-                    sex=extracted_data.get("sex"),
-                    age_days=self._safe_int_conversion(extracted_data.get("age_days")),
-                    age_weeks=self._safe_int_conversion(extracted_data.get("age_weeks")),
-                    weight_grams=self._safe_float_conversion(extracted_data.get("weight_grams")),
-                    mortality_rate=self._safe_float_conversion(extracted_data.get("mortality_rate")),
-                    temperature=self._safe_float_conversion(extracted_data.get("temperature")),
-                    humidity=self._safe_float_conversion(extracted_data.get("humidity")),
-                    housing_type=extracted_data.get("housing_type"),
-                    feed_type=extracted_data.get("feed_type"),
-                    flock_size=self._safe_int_conversion(extracted_data.get("flock_size")),
-                    symptoms=self._safe_list_conversion(extracted_data.get("symptoms")),
-                    duration_problem=extracted_data.get("duration_problem"),
-                    previous_treatments=self._safe_list_conversion(extracted_data.get("previous_treatments"))
-                )
-                
-                # Appliquer normalisation et inférence
-                if self.enable_breed_normalization or self.enable_sex_inference:
-                    entities.normalize_and_infer()
-                
-                logger.info(f"🤖 [Enhanced Clarification] Entités extraites intelligemment: {entities.to_dict()}")
-                return entities
-                
-            except json.JSONDecodeError as e:
-                logger.warning(f"⚠️ [Enhanced Clarification] Erreur parsing JSON: {e}")
-                return await self._extract_entities_fallback(question, language)
-        
-        except Exception as e:
-            logger.error(f"❌ [Enhanced Clarification] Erreur extraction intelligente: {e}")
-            return await self._extract_entities_fallback(question, language)
-
-    def _safe_int_conversion(self, value) -> Optional[int]:
-        """Conversion sécurisée vers int"""
-        if value is None:
-            return None
-        try:
-            return int(float(value))  # Float d'abord pour gérer "3.0"
-        except (ValueError, TypeError):
-            return None
-
-    def _safe_float_conversion(self, value) -> Optional[float]:
-        """Conversion sécurisée vers float"""
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return None
-
-    def _safe_list_conversion(self, value) -> Optional[List[str]]:
-        """Conversion sécurisée vers liste"""
-        if value is None:
-            return None
-        if isinstance(value, list):
-            return [str(item) for item in value if item is not None]
-        if isinstance(value, str):
-            return [value] if value.strip() else None
-        return None
-
-    async def _extract_entities_fallback(self, question: str, language: str) -> ExtractedEntities:
-        """Extraction d'entités fallback avec reconnaissance souches (règles basiques)"""
-        
-        entities = ExtractedEntities()
-        
-        if not question or not isinstance(question, str):
-            return entities
-        
-        question_lower = question.lower()
-        
-        # Détection race spécifique avec nouvelles souches
-        specific_patterns = self.specific_breed_patterns.get(language, self.specific_breed_patterns.get("fr", []))
-        for pattern in specific_patterns:
-            try:
-                match = re.search(pattern, question_lower, re.IGNORECASE)
-                if match:
-                    raw_breed = match.group(0).strip()
-                    entities.breed = raw_breed
-                    entities.breed_type = "specific"
-                    break
-            except re.error as e:
-                logger.warning(f"Erreur dans le pattern regex '{pattern}': {e}")
-                continue
-        
-        # Détection race générique si pas spécifique
-        if not entities.breed:
-            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'poultry', r'pollos?', r'aves?', r'poules?']
-            for pattern in generic_patterns:
-                try:
-                    match = re.search(pattern, question_lower, re.IGNORECASE)
-                    if match:
-                        entities.breed = match.group(0).strip()
-                        entities.breed_type = "generic"
-                        break
-                except re.error as e:
-                    logger.warning(f"Erreur dans le pattern regex générique '{pattern}': {e}")
-                    continue
-        
-        # Détection sexe explicite
-        sex_patterns = {
-            "fr": [r'mâles?', r'femelles?', r'coqs?', r'poules?', r'poulettes?', r'mixte'],
-            "en": [r'males?', r'females?', r'roosters?', r'hens?', r'pullets?', r'mixed'],
-            "es": [r'machos?', r'hembras?', r'gallos?', r'gallinas?', r'pollas?', r'mixto']
-        }
-        
-        patterns = sex_patterns.get(language, sex_patterns.get("fr", []))
-        for pattern in patterns:
-            try:
-                match = re.search(pattern, question_lower, re.IGNORECASE)
-                if match:
-                    sex_word = match.group(0).lower()
-                    if sex_word in ['mâle', 'mâles', 'male', 'males', 'macho', 'machos', 'coq', 'coqs', 'rooster', 'roosters', 'gallo', 'gallos']:
-                        entities.sex = "mâle"
-                    elif sex_word in ['femelle', 'femelles', 'female', 'females', 'hembra', 'hembras', 'poule', 'poules', 'hen', 'hens', 'gallina', 'gallinas', 'poulette', 'poulettes', 'pullet', 'pullets', 'polla', 'pollas']:
-                        entities.sex = "femelle"
-                    elif sex_word in ['mixte', 'mixed', 'mixto']:
-                        entities.sex = "mixte"
-                    break
-            except re.error as e:
-                logger.warning(f"Erreur dans le pattern regex sexe '{pattern}': {e}")
-                continue
-        
-        # Détection âge
-        age_patterns = [
-            r'(\d+)\s*jours?', r'(\d+)\s*days?', r'(\d+)\s*días?',
-            r'(\d+)\s*semaines?', r'(\d+)\s*weeks?', r'(\d+)\s*semanas?',
-            r'jour\s*(\d+)', r'day\s*(\d+)', r'día\s*(\d+)'
-        ]
-        
-        for pattern in age_patterns:
-            try:
-                match = re.search(pattern, question_lower, re.IGNORECASE)
-                if match:
-                    value = int(match.group(1))
-                    if 'semaine' in pattern or 'week' in pattern or 'semana' in pattern:
-                        entities.age_weeks = value
-                        entities.age_days = value * 7
-                    else:
-                        entities.age_days = value
-                    break
-            except (re.error, ValueError) as e:
-                logger.warning(f"Erreur dans le pattern regex âge '{pattern}': {e}")
-                continue
-        
-        # Détection poids
-        weight_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:kg|gramm?es?|g|lbs?)',
-            r'pèsent?\s+(\d+(?:\.\d+)?)', r'weigh\s+(\d+(?:\.\d+)?)'
-        ]
-        
-        for pattern in weight_patterns:
-            try:
-                match = re.search(pattern, question_lower, re.IGNORECASE)
-                if match:
-                    entities.weight_grams = float(match.group(1))
-                    break
-            except (re.error, ValueError) as e:
-                logger.warning(f"Erreur dans le pattern regex poids '{pattern}': {e}")
-                continue
-        
-        # Appliquer normalisation et inférence même en fallback
-        if self.enable_breed_normalization or self.enable_sex_inference:
-            try:
-                entities.normalize_and_infer()
-            except Exception as e:
-                logger.warning(f"Erreur lors de la normalisation fallback: {e}")
-        
-        return entities
-
-    async def analyze_question_enhanced(
-        self, 
-        question: str, 
-        language: str = "fr",
-        user_id: str = "unknown",
-        conversation_id: str = None,
-        conversation_context: Dict = None,
-        original_question: str = None,
-        mode: str = None
-    ) -> ClarificationResult:
-        """
-        ANALYSE AMÉLIORÉE avec extraction intelligente, gestion du contexte et analyse des entités critiques
-        """
-        
-        start_time = time.time()
-        
-        if not self.enabled:
-            logger.info(f"🔧 [Enhanced Clarification] Système désactivé")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="system_disabled",
-                clarification_state=ClarificationState.NONE
-            )
-        
-        if not question or not isinstance(question, str) or len(question.strip()) < self.min_question_length:
-            logger.info(f"⚠️ [Enhanced Clarification] Question trop courte: {len(question) if question else 0}")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="question_too_short",
-                clarification_state=ClarificationState.NONE
-            )
-        
-        # Classification du type de question
-        question_type = self.classify_question_type(question, language)
-        logger.info(f"🏷️ [Enhanced Clarification] Type de question: {question_type}")
-        
-        # Extraction intelligente d'entités avec reconnaissance souches
-        extracted_entities = await self.extract_entities_intelligent(
-            question, 
-            language, 
-            conversation_context
-        )
-        
-        logger.info(f"🔍 [Enhanced Clarification] Analyse: '{question[:80]}...'")
-        logger.info(f"📊 [Enhanced Clarification] Entités extraites: {extracted_entities.to_dict()}")
-        
-        # Logging de reconnaissance automatique
-        if hasattr(extracted_entities, 'breed_normalized') and extracted_entities.breed_normalized:
-            logger.info(f"🔄 [Breed Recognition] Souche normalisée automatiquement: {extracted_entities.breed}")
-        if hasattr(extracted_entities, 'sex_inferred') and extracted_entities.sex_inferred:
-            logger.info(f"🚺 [Sex Inference] Sexe inféré automatiquement: {extracted_entities.sex}")
-        
-        # NOUVELLE FONCTIONNALITÉ: Analyse des entités critiques
-        critical_analysis = self.analyze_critical_entities(extracted_entities, question_type)
-        
-        # Déterminer les informations critiques manquantes (ancien système)
-        try:
-            missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
-        except Exception as e:
-            logger.warning(f"Erreur lors de l'obtention des infos critiques manquantes: {e}")
-            missing_critical_info = []
-        
-        logger.info(f"❌ [Enhanced Clarification] Informations critiques manquantes (ancien): {missing_critical_info}")
-        logger.info(f"🎯 [Critical Analysis] Résultats: {critical_analysis}")
-        
-        # Gestion du mode sémantique dynamique avec validation robuste
-        if (mode == "semantic_dynamic" or 
-            self.clarification_mode == ClarificationMode.SEMANTIC_DYNAMIC) and \
-           self.enable_semantic_dynamic:
-            
-            logger.info(f"🎯 [Semantic Dynamic] Mode activé pour: '{question[:50]}...'")
-            
-            # Générer questions dynamiques avec métadonnées de validation
-            try:
-                dynamic_questions, validation_metadata = self.question_generator.generate_dynamic_questions_with_validation(question, language)
-            except Exception as e:
-                logger.error(f"Erreur génération questions dynamiques: {e}")
-                dynamic_questions, validation_metadata = [], {"validation_score": 0.5, "gpt_success": False, "fallback_used": True}
-            
-            if dynamic_questions and len(dynamic_questions) > 0:
-                processing_time_ms = int((time.time() - start_time) * 1000)
-                
-                result = ClarificationResult(
-                    needs_clarification=True,
-                    questions=dynamic_questions,
-                    processing_time_ms=processing_time_ms,
-                    reason="semantic_dynamic_clarification_generated",
-                    model_used=f"{self.model}_semantic_dynamic",
-                    extracted_entities=extracted_entities,
-                    question_type=question_type,
-                    clarification_mode=ClarificationMode.SEMANTIC_DYNAMIC,
-                    clarification_state=ClarificationState.NEEDED,
-                    missing_critical_info=missing_critical_info,
-                    confidence_score=0.9,
-                    original_question=original_question or question,
-                    validation_score=validation_metadata.get("validation_score", 0.8),
-                    validation_details=validation_metadata,
-                    fallback_used=validation_metadata.get("fallback_used", False),
-                    gpt_failed=not validation_metadata.get("gpt_success", False),
-                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                    missing_entities=critical_analysis["missing_entities"],
-                    missing_critical_entities=critical_analysis["missing_critical_entities"],
-                    clarification_required_critical=critical_analysis["clarification_required_critical"]
-                )
-                
-                logger.info(f"✅ [Semantic Dynamic] {len(dynamic_questions)} questions générées dynamiquement")
-                
-                if self.log_all_clarifications:
-                    await self._log_clarification_decision(
-                        question, language, user_id, conversation_id, result
-                    )
-                
-                return result
-            else:
-                logger.warning("⚠️ [Semantic Dynamic] Aucune question générée, fallback vers mode normal")
-        
-        # Logique de clarification basée sur les entités critiques
-        if critical_analysis["clarification_required_critical"]:
-            logger.info(f"🚨 [Critical Entities] Clarification critique requise - entités manquantes: {critical_analysis['missing_critical_entities']}")
-            
-            # Générer questions spécifiques aux entités critiques manquantes
-            try:
-                critical_questions = self.question_generator.generate_critical_entity_questions(
-                    language, 
-                    critical_analysis["missing_critical_entities"], 
-                    question_type
-                )
-            except Exception as e:
-                logger.error(f"Erreur génération questions critiques: {e}")
-                critical_questions = self.question_generator.generate_adaptive_questions(
-                    language, missing_critical_info, question_type
-                )
-            
-            return ClarificationResult(
-                needs_clarification=True,
-                questions=critical_questions,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="critical_entities_missing",
-                model_used="rule_based_critical_entities",
-                extracted_entities=extracted_entities,
-                question_type=question_type,
-                clarification_mode=self.clarification_mode,
-                clarification_state=ClarificationState.NEEDED,
-                missing_critical_info=missing_critical_info,
-                confidence_score=95.0,
-                original_question=original_question or question,
-                validation_score=0.9,
-                fallback_used=False,
-                gpt_failed=False,
-                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                missing_entities=critical_analysis["missing_entities"],
-                missing_critical_entities=critical_analysis["missing_critical_entities"],
-                clarification_required_critical=True
-            )
-        
-        # Logique de clarification intelligente (ancien système amélioré)
-        if hasattr(extracted_entities, 'breed_type') and extracted_entities.breed_type == "generic":
-            logger.info(f"🚨 [Enhanced Clarification] Race générique détectée - clarification obligatoire")
-            
-            try:
-                generic_questions = self.question_generator.generate_adaptive_questions(
-                    language, missing_critical_info, question_type
-                )
-            except Exception as e:
-                logger.error(f"Erreur génération questions adaptatives: {e}")
-                generic_questions = ["Quelle est la race exacte de vos volailles ?"]
-            
-            return ClarificationResult(
-                needs_clarification=True,
-                questions=generic_questions,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="generic_breed_detected",
-                model_used="rule_based_enhanced",
-                extracted_entities=extracted_entities,
-                question_type=question_type,
-                clarification_mode=self.clarification_mode,
-                clarification_state=ClarificationState.NEEDED,
-                missing_critical_info=missing_critical_info,
-                confidence_score=95.0,
-                original_question=original_question or question,
-                validation_score=0.9,
-                fallback_used=False,
-                gpt_failed=False,
-                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                missing_entities=critical_analysis["missing_entities"],
-                missing_critical_entities=critical_analysis["missing_critical_entities"],
-                clarification_required_critical=critical_analysis["clarification_required_critical"]
-            )
-        
-        # Si race spécifique + âge présents = OK
-        if (hasattr(extracted_entities, 'breed_type') and extracted_entities.breed_type == "specific" and 
-            (hasattr(extracted_entities, 'age_days') and extracted_entities.age_days or 
-             hasattr(extracted_entities, 'age_weeks') and extracted_entities.age_weeks)):
-            logger.info(f"✅ [Enhanced Clarification] Race spécifique + âge - question complète")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="specific_breed_and_age_detected",
-                extracted_entities=extracted_entities,
-                question_type=question_type,
-                clarification_state=ClarificationState.NONE,
-                validation_score=1.0,
-                fallback_used=False,
-                gpt_failed=False,
-                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                missing_entities=critical_analysis["missing_entities"],
-                missing_critical_entities=critical_analysis["missing_critical_entities"],
-                clarification_required_critical=False
-            )
-        
-        # Si pas d'informations critiques manquantes (ancien + nouveau système)
-        if not missing_critical_info and not critical_analysis["clarification_required_critical"]:
-            logger.info(f"✅ [Enhanced Clarification] Toutes les informations critiques présentes")
-            return ClarificationResult(
-                needs_clarification=False,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="all_critical_info_present",
-                extracted_entities=extracted_entities,
-                question_type=question_type,
-                clarification_state=ClarificationState.NONE,
-                validation_score=1.0,
-                fallback_used=False,
-                gpt_failed=False,
-                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                missing_entities=critical_analysis["missing_entities"],
-                missing_critical_entities=critical_analysis["missing_critical_entities"],
-                clarification_required_critical=False
-            )
-        
-        # Analyse via OpenAI pour les cas complexes (avec informations d'entités critiques)
-        if not OPENAI_AVAILABLE or not openai:
-            logger.warning(f"⚠️ [Enhanced Clarification] OpenAI non disponible - fallback vers questions adaptatives")
-            
-            try:
-                adaptive_questions = self.question_generator.generate_adaptive_questions(
-                    language, missing_critical_info, question_type
-                )
-            except Exception as e:
-                logger.error(f"Erreur génération questions adaptatives fallback: {e}")
-                adaptive_questions = ["Pouvez-vous donner plus de détails sur votre situation ?"]
-            
-            return ClarificationResult(
-                needs_clarification=True,
-                questions=adaptive_questions,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                reason="openai_unavailable_adaptive_fallback",
-                model_used="rule_based_adaptive",
-                extracted_entities=extracted_entities,
-                question_type=question_type,
-                clarification_mode=self.clarification_mode,
-                clarification_state=ClarificationState.NEEDED,
-                missing_critical_info=missing_critical_info,
-                confidence_score=0.7,
-                original_question=original_question or question,
-                validation_score=0.8,
-                fallback_used=True,
-                gpt_failed=True,
-                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                missing_entities=critical_analysis["missing_entities"],
-                missing_critical_entities=critical_analysis["missing_critical_entities"],
-                clarification_required_critical=critical_analysis["clarification_required_critical"]
-            )
-        
-        try:
-            # Configuration OpenAI
-            api_key = os.getenv('OPENAI_API_KEY')
-            if not api_key:
-                logger.warning(f"⚠️ [Enhanced Clarification] Clé API OpenAI manquante - fallback adaptatif")
-                
-                try:
-                    adaptive_questions = self.question_generator.generate_adaptive_questions(
-                        language, missing_critical_info, question_type
-                    )
-                except Exception as e:
-                    logger.error(f"Erreur génération questions adaptatives (clé manquante): {e}")
-                    adaptive_questions = ["Pouvez-vous donner plus de détails ?"]
-                
-                return ClarificationResult(
-                    needs_clarification=True,
-                    questions=adaptive_questions,
-                    processing_time_ms=int((time.time() - start_time) * 1000),
-                    reason="openai_key_missing_adaptive_fallback",
-                    model_used="rule_based_adaptive",
-                    extracted_entities=extracted_entities,
-                    question_type=question_type,
-                    clarification_mode=self.clarification_mode,
-                    clarification_state=ClarificationState.NEEDED,
-                    missing_critical_info=missing_critical_info,
-                    confidence_score=0.7,
-                    original_question=original_question or question,
-                    validation_score=0.8,
-                    fallback_used=True,
-                    gpt_failed=True,
-                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
-                    missing_entities=critical_analysis["missing_entities"],
-                    missing_critical_entities=critical_analysis["missing_critical_entities"],
-                    clarification_required_critical=critical_analysis["clarification_required_critical"]
-                )
-            
-            # Configuration sécurisée d'OpenAI
-            if hasattr(openai, 'api_key'):
-                openai.api_key = api_key
-            else:
-                openai_client = openai.OpenAI(api_key=api_key)
-            
-            # PROMPT ENRICHI avec toutes les informations + entités critiques
-            prompt_template = self.clarification_prompts.get(language.lower(), self.clarification_prompts["fr"])
-            
-            context_str = "Aucun contexte"
-            if conversation_context and isinstance(conversation_context, dict):
-                try:
-                    context_str = json.dumps(conversation_context, ensure_ascii=False)
-                except (TypeError, ValueError):
-                    context_str = "Contexte disponible mais non sérialisable"
-            
-            try:
-                entities_str = json.dumps(extracted_entities.to_dict(), ensure_ascii=False)
-            except Exception:
-                entities_str = "Entités non sérialisables"
-            
-            missing_info_str = ", ".join(missing_critical_info) if missing_critical_info else "Aucune"
-            missing_critical_entities_str = ", ".join(critical_analysis["missing_critical_entities"]) if critical_analysis["missing_critical_entities"] else "Aucune"
-            critical_entities_for_type_str = ", ".join(critical_analysis["critical_entities_for_type"])
-            
-            user_prompt = prompt_template.format(
-                question=question,
-                question_type=question_type,
-                extracted_entities=entities_str,
-                conversation_context=context_str,
-                missing_info=missing_info_str,
-                missing_critical_entities=missing_critical_entities_str,
-                critical_entities_for_type=critical_entities_for_type_str
-            )
-            
-            system_prompt = f"""Tu es un assistant expert qui détermine si une question d'aviculture nécessite des clarifications. 
-
-Mode de clarification: {self.clarification_mode.value}
-Questions adaptatives: {'activées' if self.adaptive_question_count else 'désactivées'}
-Analyse entités critiques: {'activée' if self.enable_critical_entity_analysis else 'désactivée'}
-
-FOCUS PRIORITAIRE sur les entités critiques: {', '.join(CRITICAL_ENTITIES)}
-
-Sois très précis et utilise intelligemment le contexte conversationnel pour éviter les questions redondantes."""
-            
-            # Appel OpenAI enrichi
-            logger.info(f"🤖 [Enhanced Clarification] Appel GPT-4o-mini enrichi avec analyse entités critiques...")
-            
-            try:
-                if hasattr(openai, 'chat') and hasattr(open
+logger.info("🔧 [CORRECTION LIGNE 1511] Parenthèse manquante corrigée - Fichier complet et fonctionnel")
