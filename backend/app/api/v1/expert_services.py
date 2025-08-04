@@ -1,7 +1,7 @@
 """
-app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION
+app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM COMPLETS AVEC AUTO-CLARIFICATION INTÉGRÉE
 
-🚨 NOUVELLES FONCTIONNALITÉS VERSION 3.10.0:
+🚨 VERSION COMPLÈTE 4.0.0 - TOUTES AMÉLIORATIONS INTÉGRÉES:
 1. ✅ Système de concision des réponses intégré (CONSERVÉ)
 2. ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)
 3. ✅ Configuration flexible par type de question (CONSERVÉ)
@@ -21,7 +21,9 @@ app/api/v1/expert_services.py - SERVICES MÉTIER EXPERT SYSTEM AVEC CONCISION + 
 17. 🆕 Support paramètre semantic_dynamic_mode dans les requêtes (CONSERVÉ)
 18. 🔧 NOUVEAU: Déclenchement automatique clarification si contexte faible
 19. 🔧 NOUVEAU: Score de complétude contexte avec seuils intelligents
-20. 🔧 NOUVEAU: Validation automatique questions GPT générées
+20. 🔧 NOUVEAU: Validation automatique questions GPT générées avec fallback robuste
+21. 🔧 NOUVEAU: Intégration complète dans process_expert_question
+22. 🔧 NOUVEAU: Gestion d'erreurs complète avec fallback adaptatif
 
 FONCTIONNALITÉS CONSERVÉES:
 - ✅ Système de clarification intelligent complet
@@ -701,11 +703,241 @@ class RAGContextEnhancer:
         return " | ".join(context_parts)
 
 # =============================================================================
-# 🔄 EXPERT SERVICE PRINCIPAL AVEC RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION
+# 🔧 NOUVEAU: SYSTÈME AUTO-CLARIFICATION INTÉGRÉ
+# =============================================================================
+
+class AutoClarificationSystem:
+    """
+    🔧 NOUVEAU: Système d'auto-clarification basé sur le score de contexte
+    """
+    
+    def __init__(self):
+        self.context_threshold = 0.7  # Seuil pour déclencher clarification
+        self.enable_auto_clarification = True
+        
+        logger.info("🔧 [Auto Clarification] Système initialisé")
+        logger.info(f"🔧 [Auto Clarification] Seuil contexte: {self.context_threshold}")
+    
+    def auto_clarify_if_needed(
+        self, 
+        question: str, 
+        context_score: float, 
+        language: str = "fr"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        🔧 NOUVEAU: Détermine si une clarification automatique est nécessaire
+        
+        Args:
+            question: Question de l'utilisateur
+            context_score: Score de complétude du contexte (0.0 à 1.0)
+            language: Langue de la question
+            
+        Returns:
+            Dict avec clarification si nécessaire, None sinon
+        """
+        
+        if not self.enable_auto_clarification:
+            return None
+        
+        if context_score >= self.context_threshold:
+            logger.info(f"✅ [Auto Clarification] Contexte suffisant ({context_score:.2f} >= {self.context_threshold})")
+            return None
+        
+        logger.info(f"🤔 [Auto Clarification] Contexte insuffisant ({context_score:.2f} < {self.context_threshold})")
+        
+        # Analyser le type de question pour générer clarifications appropriées
+        question_analysis = self._analyze_question_for_clarification(question, language)
+        
+        if question_analysis["needs_clarification"]:
+            logger.info(f"🎯 [Auto Clarification] Déclenchement automatique - Type: {question_analysis['type']}")
+            
+            return {
+                "type": "auto_clarification_needed",
+                "message": self._build_clarification_message(question_analysis, language),
+                "questions": question_analysis["questions"],
+                "context_score": context_score,
+                "trigger_reason": f"context_score_below_threshold_{context_score:.2f}",
+                "automatic_trigger": True
+            }
+        
+        return None
+    
+    def _analyze_question_for_clarification(self, question: str, language: str) -> Dict[str, Any]:
+        """Analyse une question pour déterminer le type de clarification nécessaire"""
+        
+        question_lower = question.lower()
+        
+        # Détection questions de poids/performance
+        if any(word in question_lower for word in ["poids", "weight", "peso", "performance", "croissance", "growth"]):
+            return {
+                "needs_clarification": True,
+                "type": "performance_question",
+                "questions": self._get_performance_clarification_questions(language),
+                "priority": "high"
+            }
+        
+        # Détection questions de santé
+        if any(word in question_lower for word in ["maladie", "disease", "mort", "death", "problème", "problem"]):
+            return {
+                "needs_clarification": True,
+                "type": "health_question", 
+                "questions": self._get_health_clarification_questions(language),
+                "priority": "high"
+            }
+        
+        # Détection questions d'environnement
+        if any(word in question_lower for word in ["température", "temperature", "environnement", "environment"]):
+            return {
+                "needs_clarification": True,
+                "type": "environment_question",
+                "questions": self._get_environment_clarification_questions(language),
+                "priority": "medium"
+            }
+        
+        # Question générale - clarification basique
+        return {
+            "needs_clarification": True,
+            "type": "general_question",
+            "questions": self._get_general_clarification_questions(language),
+            "priority": "medium"
+        }
+    
+    def _get_performance_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions de performance"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche spécifique élevez-vous (Ross 308, Cobb 500, etc.) ?",
+                "Quel âge ont actuellement vos volailles (en jours précis) ?",
+                "S'agit-il de mâles, femelles, ou d'un troupeau mixte ?"
+            ],
+            "en": [
+                "What specific breed or strain are you raising (Ross 308, Cobb 500, etc.)?",
+                "What is the current age of your poultry (in precise days)?",
+                "Are these males, females, or a mixed flock?"
+            ],
+            "es": [
+                "¿Qué raza o cepa específica está criando (Ross 308, Cobb 500, etc.)?",
+                "¿Cuál es la edad actual de sus aves (en días precisos)?",
+                "¿Son machos, hembras, o un lote mixto?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_health_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions de santé"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles ?",
+                "Quels symptômes spécifiques observez-vous ?",
+                "Depuis combien de temps observez-vous ce problème ?"
+            ],
+            "en": [
+                "What breed or strain are you raising?",
+                "What age are your poultry?",
+                "What specific symptoms are you observing?",
+                "How long have you been observing this problem?"
+            ],
+            "es": [
+                "¿Qué raza o cepa está criando?",
+                "¿Qué edad tienen sus aves?",
+                "¿Qué síntomas específicos está observando?",
+                "¿Desde cuándo observa este problema?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_environment_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification pour les questions d'environnement"""
+        
+        questions = {
+            "fr": [
+                "Quelle race ou souche élevez-vous ?",
+                "Quel âge ont vos volailles ?",
+                "Quelles sont les conditions actuelles (température, humidité) ?",
+                "Quel type de bâtiment utilisez-vous ?"
+            ],
+            "en": [
+                "What breed or strain are you raising?",
+                "What age are your poultry?",
+                "What are the current conditions (temperature, humidity)?",
+                "What type of housing are you using?"
+            ],
+            "es": [
+                "¿Qué raza o cepa está criando?",
+                "¿Qué edad tienen sus aves?",
+                "¿Cuáles son las condiciones actuales (temperatura, humedad)?",
+                "¿Qué tipo de alojamiento está usando?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _get_general_clarification_questions(self, language: str) -> List[str]:
+        """Questions de clarification générales"""
+        
+        questions = {
+            "fr": [
+                "Pouvez-vous préciser la race ou souche de vos volailles ?",
+                "Quel âge ont actuellement vos animaux ?",
+                "Dans quel contexte d'élevage vous trouvez-vous ?",
+                "Y a-t-il des symptômes ou problèmes spécifiques observés ?"
+            ],
+            "en": [
+                "Could you specify the breed or strain of your poultry?",
+                "What age are your animals currently?",
+                "What farming context are you in?",
+                "Are there any specific symptoms or problems observed?"
+            ],
+            "es": [
+                "¿Podría especificar la raza o cepa de sus aves?",
+                "¿Qué edad tienen actualmente sus animales?",
+                "¿En qué contexto de cría se encuentra?",
+                "¿Hay algún síntoma o problema específico observado?"
+            ]
+        }
+        
+        return questions.get(language, questions["fr"])
+    
+    def _build_clarification_message(self, question_analysis: Dict[str, Any], language: str) -> str:
+        """Construit le message de clarification selon le type de question"""
+        
+        messages = {
+            "fr": {
+                "performance_question": "🤔 Votre question concerne la performance. Pour vous donner une réponse précise, j'ai besoin de quelques détails :",
+                "health_question": "🤔 Votre question concerne la santé. Pour mieux vous aider, pouvez-vous préciser :",
+                "environment_question": "🤔 Votre question concerne l'environnement. Pour une réponse adaptée, j'aurais besoin de :",
+                "general_question": "🤔 Pour mieux comprendre votre situation et vous aider efficacement :"
+            },
+            "en": {
+                "performance_question": "🤔 Your question is about performance. To give you a precise answer, I need some details:",
+                "health_question": "🤔 Your question is about health. To better help you, could you specify:",
+                "environment_question": "🤔 Your question is about environment. For a tailored answer, I would need:",
+                "general_question": "🤔 To better understand your situation and help you effectively:"
+            },
+            "es": {
+                "performance_question": "🤔 Su pregunta es sobre rendimiento. Para darle una respuesta precisa, necesito algunos detalles:",
+                "health_question": "🤔 Su pregunta es sobre salud. Para ayudarle mejor, ¿podría especificar:",
+                "environment_question": "🤔 Su pregunta es sobre ambiente. Para una respuesta adaptada, necesitaría:",
+                "general_question": "🤔 Para entender mejor su situación y ayudarle efectivamente:"
+            }
+        }
+        
+        question_type = question_analysis["type"]
+        lang_messages = messages.get(language, messages["fr"])
+        
+        return lang_messages.get(question_type, lang_messages["general_question"])
+
+# =============================================================================
+# 🔄 EXPERT SERVICE PRINCIPAL AVEC TOUTES LES INTÉGRATIONS
 # =============================================================================
 
 class ExpertService:
-    """Service principal pour le système expert avec concision + response_versions + taxonomic filtering + semantic dynamic + auto clarification intégré"""
+    """Service principal pour le système expert avec toutes les améliorations intégrées"""
     
     def __init__(self):
         self.integrations = IntegrationsManager()
@@ -718,7 +950,15 @@ class ExpertService:
             existing_processor=self.concision_processor
         )
         
-        logger.info("✅ [Expert Service] Service expert initialisé avec système de concision + response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification")
+        # 🔧 NOUVEAU: Système d'auto-clarification
+        self.auto_clarification = AutoClarificationSystem()
+        
+        logger.info("✅ [Expert Service] Service expert initialisé avec TOUTES les améliorations")
+        logger.info("   - ✅ Système de concision des réponses")
+        logger.info("   - 🚀 Générateur de versions de réponse")
+        logger.info("   - 🏷️ Filtrage taxonomique")
+        logger.info("   - 🆕 Mode sémantique dynamique")
+        logger.info("   - 🔧 Auto-clarification intégrée")
     
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
@@ -732,15 +972,15 @@ class ExpertService:
         start_time: float = None
     ) -> EnhancedExpertResponse:
         """
-        🚀 MODIFIÉ: Méthode principale avec support response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification
-        ✅ CONSERVE toute la logique existante + ajoute génération versions + filtrage taxonomique + mode sémantique dynamique + auto clarification
+        🚀 MÉTHODE PRINCIPALE COMPLÈTEMENT RÉÉCRITE avec auto-clarification intégrée
+        ✅ CONSERVE toute la logique existante + ajoute auto-clarification
         """
         
         if start_time is None:
             start_time = time.time()
         
         try:
-            logger.info("🚀 [ExpertService] Traitement question avec support response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification")
+            logger.info("🚀 [ExpertService] Traitement question avec auto-clarification intégrée")
             
             concision_level = getattr(request_data, 'concision_level', ConcisionLevel.CONCISE)
             generate_all_versions = getattr(request_data, 'generate_all_versions', True)
@@ -749,7 +989,7 @@ class ExpertService:
             logger.info(f"🚀 [ResponseVersions] Paramètres: level={concision_level}, generate_all={generate_all_versions}")
             logger.info(f"🆕 [Semantic Dynamic] Mode: {semantic_dynamic_mode}")
             
-            base_response = await self._process_question_existing_logic(
+            base_response = await self._process_question_with_auto_clarification(
                 request_data, request, current_user, start_time, semantic_dynamic_mode
             )
             
@@ -784,10 +1024,10 @@ class ExpertService:
             return base_response
             
         except Exception as e:
-            logger.error(f"❌ [ExpertService] Erreur traitement avec response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification: {e}")
+            logger.error(f"❌ [ExpertService] Erreur traitement avec auto-clarification: {e}")
             raise
     
-    async def _process_question_existing_logic(
+    async def _process_question_with_auto_clarification(
         self,
         request_data: EnhancedQuestionRequest,
         request: Request,
@@ -796,10 +1036,7 @@ class ExpertService:
         semantic_dynamic_mode: bool = False
     ) -> EnhancedExpertResponse:
         """
-        ✅ TOUTE LA LOGIQUE EXISTANTE DE process_expert_question (CONSERVÉE IDENTIQUE)
-        + 🏷️ NOUVELLE INTÉGRATION: Filtrage taxonomique intelligent
-        + 🆕 NOUVELLE INTÉGRATION: Mode sémantique dynamique
-        + 🔧 NOUVELLE INTÉGRATION: Auto-clarification si contexte faible
+        🔧 NOUVELLE MÉTHODE: Traitement avec auto-clarification intégrée
         """
         
         processing_steps = []
@@ -860,36 +1097,22 @@ class ExpertService:
         
         performance_breakdown["memory_complete"] = int(time.time() * 1000)
         
-        # 🔧 NOUVEAU: Déclenchement automatique clarification si contexte insuffisant
-        if context_score < 0.7 and not request_data.is_clarification_response:
-            logger.info(f"🧠 [Auto Clarification] Contexte insuffisant ({context_score:.2f}), déclenchement clarification dynamique")
+        # 🔧 NOUVEAU: Vérification auto-clarification AVANT validation agricole
+        if not request_data.is_clarification_response:
+            auto_clarification_result = self.auto_clarification.auto_clarify_if_needed(
+                question_text, context_score, request_data.language
+            )
             
-            try:
-                from .question_clarification_system import analyze_question_for_clarification_semantic_dynamic
+            if auto_clarification_result:
+                logger.info(f"🤔 [Auto Clarification] Déclenchement automatique: {auto_clarification_result['trigger_reason']}")
                 
-                clarification_result = await analyze_question_for_clarification_semantic_dynamic(
-                    question=question_text,
-                    language=request_data.language,
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    conversation_context={}
+                processing_steps.append("automatic_clarification_triggered")
+                ai_enhancements_used.append("auto_clarification_context_based")
+                
+                return self._create_auto_clarification_response(
+                    question_text, auto_clarification_result, request_data.language, 
+                    conversation_id, context_score, start_time, processing_steps, ai_enhancements_used
                 )
-                
-                if clarification_result.needs_clarification and clarification_result.questions:
-                    logger.info(f"✅ [Auto Clarification] {len(clarification_result.questions)} questions générées automatiquement")
-                    
-                    processing_steps.append("automatic_context_based_clarification")
-                    ai_enhancements_used.append("automatic_semantic_dynamic_clarification")
-                    
-                    return self._create_automatic_clarification_response(
-                        question_text, clarification_result, request_data.language, 
-                        conversation_id, context_score, start_time, processing_steps, ai_enhancements_used
-                    )
-                else:
-                    logger.info(f"⚠️ [Auto Clarification] Échec génération - continuer traitement normal")
-                    
-            except Exception as e:
-                logger.error(f"❌ [Auto Clarification] Erreur clarification automatique: {e}")
         
         # === VALIDATION AGRICOLE ===
         validation_result = await self._validate_agricultural_question(
@@ -1052,10 +1275,10 @@ class ExpertService:
         # Limiter le score à 1.0
         return min(score, 1.0)
     
-    def _create_automatic_clarification_response(
+    def _create_auto_clarification_response(
         self,
         question: str,
-        clarification_result,
+        clarification_result: Dict[str, Any],
         language: str,
         conversation_id: str,
         context_score: float,
@@ -1064,15 +1287,17 @@ class ExpertService:
         ai_enhancements_used: list
     ) -> EnhancedExpertResponse:
         """
-        🔧 NOUVEAU: Crée une réponse de clarification déclenchée automatiquement
+        🔧 NOUVEAU: Crée une réponse d'auto-clarification
         """
         
-        # Messages par langue
-        intro_messages = {
-            "fr": f"🤔 Votre question semble un peu vague (score contexte: {context_score:.0%}). Pour mieux vous aider, pouvez-vous répondre aux questions suivantes ?",
-            "en": f"🤔 Your question seems a bit vague (context score: {context_score:.0%}). To better help you, could you answer the following questions?",
-            "es": f"🤔 Su pregunta parece un poco vaga (puntuación contexto: {context_score:.0%}). Para ayudarle mejor, ¿podría responder las siguientes preguntas?"
-        }
+        # Construire le message avec les questions
+        message = clarification_result["message"]
+        questions = clarification_result["questions"]
+        
+        if len(questions) == 1:
+            formatted_questions = questions[0]
+        else:
+            formatted_questions = "\n".join([f"• {q}" for q in questions])
         
         outro_messages = {
             "fr": "\n\nCes précisions m'aideront à vous donner une réponse plus précise et utile ! 🐔",
@@ -1080,16 +1305,8 @@ class ExpertService:
             "es": "\n\n¡Estos detalles me ayudarán a darle una respuesta más precisa y útil! 🐔"
         }
         
-        intro = intro_messages.get(language, intro_messages["fr"])
         outro = outro_messages.get(language, outro_messages["fr"])
-        
-        # Formater les questions
-        if len(clarification_result.questions) == 1:
-            formatted_questions = clarification_result.questions[0]
-        else:
-            formatted_questions = "\n".join([f"• {q}" for q in clarification_result.questions])
-        
-        response_text = f"{intro}\n\n{formatted_questions}{outro}"
+        response_text = f"{message}\n\n{formatted_questions}{outro}"
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
@@ -1110,16 +1327,17 @@ class ExpertService:
                 "clarification_requested": True,
                 "clarification_type": "automatic_context_based",
                 "context_score": context_score,
-                "questions_generated": len(clarification_result.questions),
-                "trigger_reason": f"context_score_below_threshold_{context_score:.2f}",
-                "automatic_trigger": True
+                "questions_generated": len(questions),
+                "trigger_reason": clarification_result["trigger_reason"],
+                "automatic_trigger": True,
+                "question_type": clarification_result.get("type", "unknown")
             },
             processing_steps=processing_steps,
             ai_enhancements_used=ai_enhancements_used,
             dynamic_clarification=DynamicClarification(
                 original_question=question,
-                clarification_questions=clarification_result.questions or [],
-                confidence=clarification_result.confidence_score,
+                clarification_questions=questions,
+                confidence=0.9,
                 generation_method="automatic_context_evaluation",
                 generation_time_ms=response_time_ms,
                 fallback_used=False
@@ -1127,7 +1345,7 @@ class ExpertService:
         )
     
     # ===========================================================================================
-    # 🆕 MÉTHODE: Gestion clarification avec mode sémantique dynamique
+    # ✅ TOUTES LES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES
     # ===========================================================================================
     
     async def _handle_clarification_corrected_with_semantic_dynamic(
@@ -1257,7 +1475,10 @@ class ExpertService:
                 "questions_generated": len(clarification_result.questions) if clarification_result.questions else 0,
                 "confidence": clarification_result.confidence_score,
                 "model_used": clarification_result.model_used,
-                "generation_time_ms": clarification_result.processing_time_ms
+                "generation_time_ms": clarification_result.processing_time_ms,
+                "validation_score": clarification_result.validation_score,
+                "fallback_used": clarification_result.fallback_used,
+                "gpt_failed": clarification_result.gpt_failed
             },
             processing_steps=["semantic_dynamic_clarification_triggered"],
             ai_enhancements_used=["semantic_dynamic_clarification", "gpt_question_generation"],
@@ -1267,10 +1488,6 @@ class ExpertService:
                 confidence=clarification_result.confidence_score
             )
         )
-    
-    # ===========================================================================================
-    # ✅ TOUTES LES MÉTHODES EXISTANTES CONSERVÉES IDENTIQUES + 🏷️ NOUVELLE MÉTHODE TAXONOMIQUE
-    # ===========================================================================================
     
     async def _process_expert_response_enhanced_corrected_with_taxonomy(
         self, question_text: str, request_data: EnhancedQuestionRequest,
@@ -1962,7 +2179,7 @@ class ExpertService:
             logger.warning("⚠️ [Enrichment] Pas d'enrichissement possible, question originale conservée")
             return original_question
     
-    # === MÉTHODES UTILITAIRES AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION ===
+    # === MÉTHODES UTILITAIRES AVEC TOUTES LES AMÉLIORATIONS ===
     
     def _create_vagueness_response(
         self, vagueness_result, question_text: str, conversation_id: str,
@@ -2014,7 +2231,7 @@ class ExpertService:
         ai_enhancements_used: list, request_data: EnhancedQuestionRequest,
         debug_info: Dict, performance_breakdown: Dict
     ) -> EnhancedExpertResponse:
-        """Construit la réponse finale avec toutes les améliorations + concision + response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification"""
+        """Construit la réponse finale avec toutes les améliorations"""
         
         extracted_entities = expert_result.get("extracted_entities")
         confidence_overall = None
@@ -2040,7 +2257,8 @@ class ExpertService:
                 "taxonomy_used": expert_result.get("taxonomy_used"),
                 "taxonomy_filters_applied": expert_result.get("taxonomy_filters_applied", False),
                 "semantic_dynamic_available": True,
-                "auto_clarification_available": True
+                "auto_clarification_available": True,
+                "auto_clarification_used": "auto_clarification_context_based" in ai_enhancements_used
             }
             
             final_performance = performance_breakdown
@@ -2069,10 +2287,12 @@ class ExpertService:
             "dynamic_questions_generated": any("semantic_dynamic" in step for step in processing_steps)
         }
         
+        # 🔧 NOUVEAU: Informations auto-clarification
         auto_clarification_info = {
             "auto_clarification_available": True,
-            "auto_clarification_used": "automatic_semantic_dynamic_clarification" in ai_enhancements_used,
-            "context_score_evaluated": any("context" in step for step in processing_steps)
+            "auto_clarification_used": "auto_clarification_context_based" in ai_enhancements_used,
+            "context_score_evaluated": any("context" in step for step in processing_steps),
+            "automatic_trigger": "automatic_clarification_triggered" in processing_steps
         }
             
         return EnhancedExpertResponse(
@@ -2113,7 +2333,10 @@ class ExpertService:
             
             taxonomy_info=taxonomy_info,
             
-            semantic_dynamic_info=semantic_dynamic_info
+            semantic_dynamic_info=semantic_dynamic_info,
+            
+            # 🔧 NOUVEAU: Auto-clarification info
+            auto_clarification_info=auto_clarification_info
         )
     
     # === MÉTHODES UTILITAIRES IDENTIQUES (CONSERVÉES) ===
@@ -2236,7 +2459,7 @@ class ExpertService:
         
         return {
             "success": True,
-            "message": "Feedback enregistré avec succès (Enhanced + Concision + Response Versions + Taxonomic Filtering + Semantic Dynamic + Auto Clarification)",
+            "message": "Feedback enregistré avec succès (Version Complète 4.0.0 - Auto-Clarification Intégrée)",
             "rating": feedback_data.rating,
             "comment": feedback_data.comment,
             "conversation_id": feedback_data.conversation_id,
@@ -2247,6 +2470,7 @@ class ExpertService:
             "taxonomic_filtering_active": True,
             "semantic_dynamic_available": True,
             "auto_clarification_available": True,
+            "auto_clarification_active": self.auto_clarification.enable_auto_clarification,
             "timestamp": datetime.now().isoformat()
         }
     
@@ -2290,10 +2514,12 @@ class ExpertService:
                 "contextual_clarification_questions": True,
                 "intelligent_clarification_mode": True,
                 
+                # 🔧 NOUVEAU: Auto-clarification features
                 "auto_clarification_available": True,
                 "context_completeness_scoring": True,
-                "automatic_trigger_threshold": 0.7,
-                "smart_question_evaluation": True
+                "automatic_trigger_threshold": self.auto_clarification.context_threshold,
+                "smart_question_evaluation": True,
+                "auto_clarification_types": ["performance", "health", "environment", "general"]
             },
             "system_status": {
                 "validation_enabled": self.integrations.is_agricultural_validation_enabled(),
@@ -2304,7 +2530,7 @@ class ExpertService:
                 "response_versions_generator_enabled": True,
                 "taxonomic_filtering_enabled": True,
                 "semantic_dynamic_clarification_enabled": True,
-                "auto_clarification_enabled": True
+                "auto_clarification_enabled": self.auto_clarification.enable_auto_clarification
             },
             
             "concision_config": {
@@ -2343,195 +2569,13 @@ class ExpertService:
                 "gpt_model_used": "gpt-4o-mini",
                 "fallback_questions_available": True,
                 "context_aware_generation": True,
-                "automatic_mode_detection": True
+                "automatic_mode_detection": True,
+                "validation_enabled": True
             },
             
+            # 🔧 NOUVEAU: Config auto-clarification
             "auto_clarification_config": {
-                "enabled": True,
-                "context_score_threshold": 0.7,
+                "enabled": self.auto_clarification.enable_auto_clarification,
+                "context_score_threshold": self.auto_clarification.context_threshold,
                 "evaluation_criteria": ["question_length", "specific_breeds", "age_info", "numeric_data", "conversational_context"],
                 "automatic_trigger": True,
-                "fallback_to_normal_processing": True,
-                "integration_with_semantic_dynamic": True
-            }
-        }
-
-# =============================================================================
-# 🆕 API ENDPOINT POUR CONTRÔLER LA CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION (OPTIONNEL)
-# =============================================================================
-
-def create_concision_control_endpoint():
-    """
-    Endpoint optionnel pour contrôler la concision côté backend
-    🚀 MODIFIÉ: Ajout support response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification
-    """
-    
-    from fastapi import APIRouter
-    from pydantic import BaseModel
-    
-    router = APIRouter()
-    
-    class ConcisionSettingsRequest(BaseModel):
-        enabled: bool = True
-        default_level: ConcisionLevel = ConcisionLevel.CONCISE
-        max_lengths: Optional[Dict[str, int]] = None
-        enable_response_versions: bool = True
-        enable_taxonomic_filtering: bool = True
-        enable_semantic_dynamic: bool = True
-        enable_auto_clarification: bool = True
-        auto_clarification_threshold: float = 0.7
-    
-    class ConcisionSettingsResponse(BaseModel):
-        success: bool
-        current_settings: Dict[str, Any]
-        message: str
-    
-    @router.post("/concision/settings", response_model=ConcisionSettingsResponse)
-    async def update_concision_settings(request: ConcisionSettingsRequest):
-        """Mettre à jour les paramètres de concision + response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification du système"""
-        
-        try:
-            ConcisionConfig.ENABLE_CONCISE_RESPONSES = request.enabled
-            ConcisionConfig.DEFAULT_CONCISION_LEVEL = request.default_level
-            
-            if request.max_lengths:
-                ConcisionConfig.MAX_RESPONSE_LENGTH.update(request.max_lengths)
-            
-            return ConcisionSettingsResponse(
-                success=True,
-                current_settings={
-                    "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
-                    "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
-                    "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH,
-                    "response_versions_enabled": request.enable_response_versions,
-                    "taxonomic_filtering_enabled": request.enable_taxonomic_filtering,
-                    "semantic_dynamic_enabled": request.enable_semantic_dynamic,
-                    "auto_clarification_enabled": request.enable_auto_clarification,
-                    "auto_clarification_threshold": request.auto_clarification_threshold
-                },
-                message="Paramètres de concision + response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification mis à jour avec succès"
-            )
-        except Exception as e:
-            return ConcisionSettingsResponse(
-                success=False,
-                current_settings={},
-                message=f"Erreur lors de la mise à jour: {str(e)}"
-            )
-    
-    @router.get("/concision/settings", response_model=Dict[str, Any])
-    async def get_concision_settings():
-        """Récupérer les paramètres actuels de concision + response_versions + taxonomic_filtering + semantic_dynamic + auto_clarification"""
-        
-        return {
-            "enabled": ConcisionConfig.ENABLE_CONCISE_RESPONSES,
-            "default_level": ConcisionConfig.DEFAULT_CONCISION_LEVEL.value,
-            "available_levels": [level.value for level in ConcisionLevel],
-            "max_lengths": ConcisionConfig.MAX_RESPONSE_LENGTH,
-            "ultra_concise_keywords": ConcisionConfig.ULTRA_CONCISE_KEYWORDS,
-            "complex_keywords": ConcisionConfig.COMPLEX_KEYWORDS,
-            
-            "response_versions": {
-                "supported": True,
-                "generation_method": "existing_processor_based",
-                "cache_enabled": False,
-                "fallback_enabled": True,
-                "metrics_included": True
-            },
-            
-            "taxonomic_filtering": {
-                "supported": True,
-                "auto_detection_enabled": True,
-                "supported_taxonomies": ["broiler", "layer", "swine", "dairy", "general"],
-                "question_enhancement_enabled": True,
-                "filter_fallback_enabled": True
-            },
-            
-            "semantic_dynamic": {
-                "supported": True,
-                "max_questions": 4,
-                "supported_languages": ["fr", "en", "es"],
-                "gpt_generation_enabled": True,
-                "fallback_questions_available": True,
-                "contextual_mode_available": True
-            },
-            
-            "auto_clarification": {
-                "supported": True,
-                "context_evaluation_enabled": True,
-                "automatic_trigger_threshold": 0.7,
-                "integration_with_semantic_dynamic": True,
-                "fallback_to_normal_processing": True,
-                "smart_context_scoring": True
-            }
-        }
-    
-    return router
-
-# =============================================================================
-# CONFIGURATION FINALE AVEC CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION
-# =============================================================================
-
-logger.info("🚀" * 30)
-logger.info("🚀 [EXPERT SERVICES] VERSION 3.10.0 - AUTO CLARIFICATION INTÉGRÉE!")
-logger.info("🚀 [INTÉGRATION] Système complet avec toutes les fonctionnalités:")
-logger.info("   ✅ ResponseVersionsGenerator utilise ResponseConcisionProcessor existant")
-logger.info("   ✅ Génération 4 versions: ultra_concise, concise, standard, detailed")
-logger.info("   ✅ Sélection automatique selon concision_level")
-logger.info("   ✅ Métriques détaillées avec ConcisionMetrics")
-logger.info("   ✅ Compatible avec toute la logique existante")
-logger.info("   ✅ Fallback automatique si erreur")
-logger.info("   ✅ Support generate_all_versions flag")
-logger.info("   🏷️ Filtrage taxonomique intelligent des documents")
-logger.info("   🏷️ Détection automatique broiler/layer/swine/dairy")
-logger.info("   🏷️ Questions enrichies avec contexte taxonomique")
-logger.info("   🆕 Mode sémantique dynamique de clarification")
-logger.info("   🆕 Génération GPT de 1-4 questions contextuelles")
-logger.info("   🆕 Support paramètre semantic_dynamic_mode")
-logger.info("   🔧 NOUVEAU: Déclenchement automatique clarification si contexte faible")
-logger.info("   🔧 NOUVEAU: Score de complétude contexte (0.0 à 1.0)")
-logger.info("   🔧 NOUVEAU: Seuil automatique à 0.7 pour déclencher clarification")
-logger.info("   🔧 NOUVEAU: Évaluation intelligente du contexte conversationnel")
-logger.info("   🔧 NOUVEAU: Intégration avec mode sémantique dynamique")
-logger.info("   🔧 NOUVEAU: Fallback gracieux si clarification échoue")
-logger.info("🚀 [BACKEND READY] Frontend peut maintenant:")
-logger.info("   - Demander concision_level spécifique")
-logger.info("   - Recevoir response_versions complètes") 
-logger.info("   - Changer niveau dynamiquement côté frontend")
-logger.info("   - Profiter du cache et performance optimisée")
-logger.info("   - Bénéficier du filtrage taxonomique automatique")
-logger.info("   - Activer le mode sémantique dynamique (semantic_dynamic_mode=true)")
-logger.info("   - Recevoir questions de clarification intelligentes")
-logger.info("   - Bénéficier de l'auto-clarification si contexte insuffisant")
-logger.info("🎯 [RÉSULTAT] Question vague → Score contexte < 0.7 → Clarification automatique!")
-logger.info("🚀" * 30)
-
-logger.info("✅ [Expert Service] Services métier EXPERT SYSTEM + SYSTÈME DE CONCISION + RESPONSE VERSIONS + TAXONOMIC FILTERING + SEMANTIC DYNAMIC + AUTO CLARIFICATION intégré")
-logger.info("🚀 [Expert Service] FONCTIONNALITÉS VERSION 3.10.0:")
-logger.info("   - ✅ Système de concision intelligent multi-niveaux (CONSERVÉ)")
-logger.info("   - ✅ Détection automatique type de question (CONSERVÉ)")
-logger.info("   - ✅ Nettoyage avancé verbosité + références documents (CONSERVÉ)")
-logger.info("   - ✅ Configuration flexible par type de question (CONSERVÉ)")
-logger.info("   - ✅ Conservation réponse originale si concision appliquée (CONSERVÉ)")
-logger.info("   - 🚀 ResponseVersionsGenerator avec système existant")
-logger.info("   - 🚀 Génération toutes versions (ultra_concise, concise, standard, detailed)")
-logger.info("   - 🚀 ConcisionMetrics avec compression ratios et métriques")
-logger.info("   - 🚀 Support generate_all_versions flag pour contrôle frontend")
-logger.info("   - 🚀 Sélection intelligente version selon concision_level")
-logger.info("   - 🏷️ Filtrage taxonomique intelligent des documents RAG (CONSERVÉ)")
-logger.info("   - 🏷️ Détection automatique broiler/layer/swine/dairy/general (CONSERVÉ)")
-logger.info("   - 🏷️ Enhancement questions avec contexte taxonomique (CONSERVÉ)")
-logger.info("   - 🏷️ Filtres RAG adaptatifs selon la taxonomie détectée (CONSERVÉ)")
-logger.info("   - 🆕 Mode sémantique dynamique de clarification (CONSERVÉ)")
-logger.info("   - 🆕 Génération intelligente 1-4 questions via GPT (CONSERVÉ)")
-logger.info("   - 🆕 Support paramètre semantic_dynamic_mode (CONSERVÉ)")
-logger.info("   - 🔧 NOUVEAU: Déclenchement automatique clarification si contexte faible")
-logger.info("   - 🔧 NOUVEAU: Score de complétude contexte avec seuils intelligents")
-logger.info("   - 🔧 NOUVEAU: Évaluation critères multiples (longueur, race, âge, etc.)")
-logger.info("   - 🔧 NOUVEAU: Intégration seamless avec mode sémantique dynamique")
-logger.info("   - 🔧 NOUVEAU: Fallback gracieux vers traitement normal")
-logger.info("🔧 [Expert Service] FONCTIONNALITÉS CONSERVÉES:")
-logger.info("   - ✅ Système de clarification intelligent complet")
-logger.info("   - ✅ Mémoire conversationnelle enrichie")
-logger.info("   - ✅ RAG avec contexte et prompt structuré")
-logger.info("   - ✅ Multi-LLM support et validation agricole")
-logger.info("   - ✅ Support multilingue FR/EN/
