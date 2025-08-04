@@ -3,11 +3,13 @@ app/api/v1/expert_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
 
 Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Toutes les fonctions référencées dans expert.py et expert_services.py
+✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
 """
 
 import re
 import uuid
 import logging
+import time
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -811,8 +813,6 @@ def extract_key_entities_simple(text: str, language: str = "fr") -> Dict[str, An
 # CONFIGURATION ET LOGGING
 # =============================================================================
 
-import time
-
 logger.info("✅ [Expert Utils] Fonctions utilitaires chargées avec succès")
 logger.info("🔧 [Expert Utils] Fonctions disponibles:")
 logger.info("   - get_user_id_from_request: Extraction ID utilisateur")
@@ -827,4 +827,3 @@ logger.info("   - log_performance_metrics: Métriques de performance")
 logger.info("   - create_fallback_response: Réponses de fallback")
 logger.info("   - extract_key_entities_simple: Extraction entités simple")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")
-        "
