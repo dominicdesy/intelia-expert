@@ -201,9 +201,8 @@ class EnhancedQuestionClarificationSystem:
             self.validation_threshold = float(os.getenv('VALIDATION_THRESHOLD', '0.5'))
             self.enable_intelligent_fallback = os.getenv('ENABLE_INTELLIGENT_FALLBACK', 'true').lower() == 'true'
         
-        # Configuration des logs détaillés: métadonnées validation + fallback + erreurs
-        logger.info("✅ [EnhancedQuestionClarificationSystem] READY: Agent de clarification avec VALIDATION ROBUSTE + FALLBACK INTELLIGENT opérationnel!")
-        logger.info(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
+           - Logs détaillés: métadonnées validation + fallback + erreurs
+logger.info("✅ [EnhancedQuestionClarificationSystem] READY: Agent de clarification avec VALIDATION ROBUSTE + FALLBACK INTELLIGENT opérationnel!")(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
         logger.info(f"🔧 [Enhanced Clarification] Extraction entités: {'✅' if self.smart_entity_extraction else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Auto-reprocess: {'✅' if self.auto_reprocess_after_clarification else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Questions adaptatives: {'✅' if self.adaptive_question_count else '❌'}")
