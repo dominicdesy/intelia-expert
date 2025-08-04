@@ -526,13 +526,26 @@ def detect_poultry_type_safe(question_lower: str) -> str:
                 contextualization_info, enhancement_info, optional_clarifications,
                 conversation_context, entities, missing_entities, question_for_rag
             )
-            
+
+        try:
+            # Code qui peut échouer dans le "normal pipeline"
+            response_time_ms = int((time.time() - start_time) * 1000)
+            user_email = current_user.get("email") if current_user and isinstance(current_user, dict) else None
+
+            return self._create_enhanced_response_safe(
+                question_text, final_answer, conversation_id, language, response_time_ms,
+                user_email, processing_steps, ai_enhancements_used, rag_score, mode,
+                contextualization_info, enhancement_info, optional_clarifications,
+                conversation_context, entities, missing_entities, question_for_rag
+            )
+
         except Exception as e:
             logger.error(f"❌ [Normal Pipeline] Erreur: {e}")
             return await self._handle_pipeline_error_safe(
                 e, question_text, conversation_id, language, start_time, 
                 processing_steps, ai_enhancements_used
             )
+
     
     # === MÉTHODES DE CRÉATION DE RÉPONSES SÉCURISÉES ===
     
