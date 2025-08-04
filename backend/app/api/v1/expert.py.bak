@@ -2572,97 +2572,10 @@ class ExpertService:
                 "automatic_mode_detection": True,
                 "validation_enabled": True
             },
-
-            # 🔧 NOUVEAU: Config auto-clarification (CORRECTION)
+            
+            # 🔧 NOUVEAU: Config auto-clarification
             "auto_clarification_config": {
                 "enabled": self.auto_clarification.enable_auto_clarification,
                 "context_score_threshold": self.auto_clarification.context_threshold,
-                "evaluation_criteria": [
-                    "question_length", 
-                    "specific_breeds", 
-                    "age_info", 
-                    "numeric_data", 
-                    "conversational_context"
-                ],
+                "evaluation_criteria": ["question_length", "specific_breeds", "age_info", "numeric_data", "conversational_context"],
                 "automatic_trigger": True,
-                "supported_question_types": [
-                    "performance_question",
-                    "health_question", 
-                    "environment_question",
-                    "general_question"
-                ],
-                "clarification_questions_generated": True,
-                "context_completeness_scoring": True,
-                "smart_fallback_enabled": True
-            },
-            
-            "timestamp": datetime.now().isoformat(),
-            "version": "4.0.0_auto_clarification_complete"
-        }
-
-# =============================================================================
-# 🧨 LOGGING ET CONFIGURATION FINALE
-# =============================================================================
-
-logger.info("🚀" * 50)
-logger.info("✅ [EXPERT SERVICE] VERSION 4.0.0 COMPLÈTE - AUTO-CLARIFICATION INTÉGRÉE!")
-logger.info("")
-logger.info("🔧 [NOUVELLES FONCTIONNALITÉS AUTO-CLARIFICATION v4.0.0]:")
-logger.info("   ✅ Système d'auto-clarification basé sur score de contexte")
-logger.info("   ✅ Évaluation intelligente de complétude contextuelle")
-logger.info("   ✅ Déclenchement automatique avant validation agricole")
-logger.info("   ✅ Questions de clarification adaptées par type")
-logger.info("   ✅ Support questions performance, santé, environnement")
-logger.info("   ✅ Seuil configurable de déclenchement (0.7 par défaut)")
-logger.info("   ✅ Intégration complète dans process_expert_question")
-logger.info("   ✅ Métadonnées et logging détaillés")
-logger.info("   ✅ Gestion d'erreurs robuste avec fallback")
-logger.info("")
-logger.info("🚀 [FONCTIONNALITÉS CONSERVÉES INTACTES]:")
-logger.info("   ✅ Système de concision des réponses")
-logger.info("   ✅ Générateur de versions multiples")
-logger.info("   ✅ Filtrage taxonomique intelligent")
-logger.info("   ✅ Mode sémantique dynamique")
-logger.info("   ✅ Clarification intelligente existante")
-logger.info("   ✅ Mémoire conversationnelle")
-logger.info("   ✅ RAG avec contexte enrichi")
-logger.info("   ✅ Multi-LLM support")
-logger.info("   ✅ Validation agricole")
-logger.info("   ✅ Support multilingue")
-logger.info("")
-logger.info("📊 [MÉTRIQUES AUTO-CLARIFICATION]:")
-logger.info(f"   - Seuil contexte: {AutoClarificationSystem().context_threshold}")
-logger.info("   - Types supportés: performance, santé, environnement, général")
-logger.info("   - Languages: FR, EN, ES")
-logger.info("   - Intégration: AVANT validation agricole")
-logger.info("   - Fallback: Questions génériques si erreur")
-logger.info("")
-logger.info("🎯 [FLUX TRAITEMENT COMPLET]:")
-logger.info("   1. Authentification")
-logger.info("   2. Validation question")
-logger.info("   3. Mémoire conversationnelle + calcul score contexte")
-logger.info("   4. 🔧 NOUVEAU: Auto-clarification si score < seuil")
-logger.info("   5. Validation agricole")
-logger.info("   6. Système de clarification intelligent existant")
-logger.info("   7. Détection vagueness")
-logger.info("   8. Traitement expert RAG + taxonomie")
-logger.info("   9. Application concision")
-logger.info("   10. Génération versions multiples")
-logger.info("   11. Enregistrement réponse")
-logger.info("   12. Construction réponse finale enrichie")
-logger.info("")
-logger.info("✨ [EXEMPLE DÉCLENCHEMENT AUTO-CLARIFICATION]:")
-logger.info("   Question: 'Mes poulets ont des problèmes'")
-logger.info("   Score contexte: 0.3 (< 0.7)")
-logger.info("   → Auto-clarification déclenchée")
-logger.info("   → Questions: race, âge, symptômes, durée")
-logger.info("   → Mode: automatic_context_based_clarification")
-logger.info("")
-logger.info("🔧 [CONFIGURATION AUTO-CLARIFICATION]:")
-logger.info("   - Activation: AutoClarificationSystem.enable_auto_clarification")
-logger.info("   - Seuil: AutoClarificationSystem.context_threshold")
-logger.info("   - Position: AVANT validation agricole")
-logger.info("   - Bypass: Si is_clarification_response=True")
-logger.info("   - Intégration: 100% avec système existant")
-logger.info("")
-logger.info("🚀" * 50)
