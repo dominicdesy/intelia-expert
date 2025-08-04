@@ -561,6 +561,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc", 
     openapi_url="/openapi.json",
+    root_path="/api",  # ← ROOT_PATH REMIS POUR SWAGGER + ROUTES
     lifespan=lifespan
 )
 
@@ -636,8 +637,8 @@ app.add_middleware(
 # Router expert
 if EXPERT_ROUTER_AVAILABLE and expert_router:
     try:
-        app.include_router(expert_router, prefix="/api/v1/expert", tags=["Expert System UTF-8"])
-        logger.info("✅ Router expert UTF-8 CORRIGÉ monté sur /api/v1/expert")
+        app.include_router(expert_router, prefix="/v1/expert", tags=["Expert System UTF-8"])
+        logger.info("✅ Router expert UTF-8 CORRIGÉ monté sur /v1/expert")
         
         if hasattr(expert_router, 'setup_rag_references'):
             expert_router.setup_rag_references(app)
@@ -648,48 +649,48 @@ if EXPERT_ROUTER_AVAILABLE and expert_router:
 # Router logging
 if LOGGING_AVAILABLE and logging_router:
     try:
-        app.include_router(logging_router, prefix="/api/v1", tags=["Logging System"])
-        logger.info("✅ Router logging CORRIGÉ monté sur /api/v1")
+        app.include_router(logging_router, prefix="/v1", tags=["Logging System"])
+        logger.info("✅ Router logging CORRIGÉ monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router logging: {e}")
 
 # Router auth
 if AUTH_ROUTER_AVAILABLE and auth_router:
     try:
-        app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
-        logger.info("✅ Router auth monté sur /api/v1")
+        app.include_router(auth_router, prefix="/v1", tags=["Authentication"])
+        logger.info("✅ Router auth monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router auth: {e}")
 
 # Router admin
 if ADMIN_ROUTER_AVAILABLE and admin_router:
     try:
-        app.include_router(admin_router, prefix="/api/v1", tags=["Administration"])
-        logger.info("✅ Router admin monté sur /api/v1")
+        app.include_router(admin_router, prefix="/v1", tags=["Administration"])
+        logger.info("✅ Router admin monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router admin: {e}")
 
 # Router health
 if HEALTH_ROUTER_AVAILABLE and health_router:
     try:
-        app.include_router(health_router, prefix="/api/v1", tags=["Health Monitoring"])
-        logger.info("✅ Router health monté sur /api/v1")
+        app.include_router(health_router, prefix="/v1", tags=["Health Monitoring"])
+        logger.info("✅ Router health monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router health: {e}")
 
 # Router system
 if SYSTEM_ROUTER_AVAILABLE and system_router:
     try:
-        app.include_router(system_router, prefix="/api/v1", tags=["System Monitoring"])
-        logger.info("✅ Router system monté sur /api/v1")
+        app.include_router(system_router, prefix="/v1", tags=["System Monitoring"])
+        logger.info("✅ Router system monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router system: {e}")
 
 # Router invitations
 if INVITATIONS_ROUTER_AVAILABLE and invitations_router:
     try:
-        app.include_router(invitations_router, prefix="/api/v1", tags=["Invitations"])
-        logger.info("✅ Router invitations monté sur /api/v1")
+        app.include_router(invitations_router, prefix="/v1", tags=["Invitations"])
+        logger.info("✅ Router invitations monté sur /v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router invitations: {e}")
 
@@ -709,11 +710,11 @@ async def root():
         "rag_system": get_rag_status(),
         "conversation_memory": conversation_memory is not None,
         "critical_fix_v3_5_2": {
-            "issue": "Frontend appelle /api/v1/* mais backend expose /v1/*",
-            "cause": "Router prefixes manquent le préfixe /api",
-            "solution": "Ajouté /api/ à tous les préfixes de routers",
-            "files_modified": ["main.py - router mounting prefixes"],
-            "expected_result": "Endpoints accessibles sur /api/v1/* comme attendu par frontend"
+            "issue": "root_path supprimé cassait Swagger + routes",
+            "cause": "root_path sert à la fois pour OpenAPI et routing",
+            "solution": "root_path remis + préfixes routers adaptés (/v1 au lieu de /api/v1)",
+            "files_modified": ["main.py - root_path + router prefixes"],
+            "expected_result": "Swagger fonctionnel + endpoints /api/v1/* accessibles"
         },
         "all_fixes_applied": {
             "router_prefixes_fix": "✅ Tous les routers montés avec /api/v1 prefix",
@@ -725,13 +726,13 @@ async def root():
             "logger_initialization_fix": "✅ Logger defined before usage - CRITICAL"
         },
         "routers_mounted": {
-            "expert": f"/api/v1/expert - {'✅' if EXPERT_ROUTER_AVAILABLE else '❌'}",
-            "auth": f"/api/v1 - {'✅' if AUTH_ROUTER_AVAILABLE else '❌'}",
-            "admin": f"/api/v1 - {'✅' if ADMIN_ROUTER_AVAILABLE else '❌'}",
-            "health": f"/api/v1 - {'✅' if HEALTH_ROUTER_AVAILABLE else '❌'}",
-            "system": f"/api/v1 - {'✅' if SYSTEM_ROUTER_AVAILABLE else '❌'}",
-            "logging": f"/api/v1 - {'✅' if LOGGING_AVAILABLE else '❌'}",
-            "invitations": f"/api/v1 - {'✅' if INVITATIONS_ROUTER_AVAILABLE else '❌'}"
+            "expert": f"/v1/expert (→/api/v1/expert) - {'✅' if EXPERT_ROUTER_AVAILABLE else '❌'}",
+            "auth": f"/v1 (→/api/v1) - {'✅' if AUTH_ROUTER_AVAILABLE else '❌'}",
+            "admin": f"/v1 (→/api/v1) - {'✅' if ADMIN_ROUTER_AVAILABLE else '❌'}",
+            "health": f"/v1 (→/api/v1) - {'✅' if HEALTH_ROUTER_AVAILABLE else '❌'}",
+            "system": f"/v1 (→/api/v1) - {'✅' if SYSTEM_ROUTER_AVAILABLE else '❌'}",
+            "logging": f"/v1 (→/api/v1) - {'✅' if LOGGING_AVAILABLE else '❌'}",
+            "invitations": f"/v1 (→/api/v1) - {'✅' if INVITATIONS_ROUTER_AVAILABLE else '❌'}"
         },
         "endpoints_now_available": {
             "expert_main": "/api/v1/expert/ask-enhanced-v2",
@@ -764,7 +765,7 @@ async def health_check():
             "deployment": "DigitalOcean App Platform",
             "encoding": "UTF-8 Native Python",
             "version": "3.5.2",
-            "critical_fix": "Router prefixes corrected - all endpoints on /api/v1/*"
+            "critical_fix": "root_path remis + router prefixes corrigés - Swagger + routes fonctionnels"
         },
         database_status="connected" if supabase else "disconnected",
         rag_status=get_rag_status()
