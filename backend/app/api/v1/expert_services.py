@@ -21,10 +21,13 @@ from typing import Optional, Dict, Any, Tuple, List
 
 from fastapi import HTTPException, Request
 
+logger = logging.getLogger(__name__)
+
 # 🚀 NOUVEAU: Imports centralisation clarification_entities
 try:
     from .clarification_entities import normalize_breed_name, infer_sex_from_breed, get_breed_type, get_supported_breeds
     CLARIFICATION_ENTITIES_AVAILABLE = True
+    logger.info("✅ [Services] clarification_entities importé avec succès")
 except ImportError as e:
     logger.warning(f"⚠️ [Services] clarification_entities non disponible: {e}")
     # Fonctions fallback

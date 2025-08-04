@@ -5,6 +5,7 @@ Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Toutes les fonctions référencées dans expert.py et expert_services.py
 ✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
 🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
+🚀 INTÉGRÉ: Centralisation via clarification_entities
 """
 
 import re
@@ -15,6 +16,22 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# 🚀 NOUVEAU: Imports centralisation clarification_entities
+try:
+    from .clarification_entities import normalize_breed_name, infer_sex_from_breed
+    CLARIFICATION_ENTITIES_AVAILABLE = True
+    logger.info("✅ [Utils] clarification_entities importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ [Utils] clarification_entities non disponible: {e}")
+    # Fonctions fallback
+    def normalize_breed_name(breed):
+        return breed.lower().strip() if breed else "", "manual"
+    def infer_sex_from_breed(breed):
+        layer_breeds = ['isa brown', 'lohmann brown', 'hy-line', 'bovans', 'shaver']
+        is_layer = any(layer in breed.lower() for layer in layer_breeds)
+        return "femelles" if is_layer else None, is_layer
+    CLARIFICATION_ENTITIES_AVAILABLE = False
 
 # =============================================================================
 # UTILITAIRES D'AUTHENTIFICATION ET SESSION
@@ -193,25 +210,19 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             if sex:
                 break
     
-    # 🚀 CORRECTION BUG PONDEUSES: Auto-détection sexe pour races pondeuses
+    # 🚀 Utilisation de la centralisation pour normaliser la race et inférer le sexe
     if breed and not sex:
-        breed_clean = breed.lower().strip()
-        layer_breeds = [
-            'isa brown', 'isa', 'lohmann brown', 'lohmann', 
-            'hy-line', 'hyline', 'hy line', 'bovans', 'shaver', 'hissex',
-            'novogen', 'tetra', 'hendrix', 'dominant'
-        ]
+        normalized_breed, _ = normalize_breed_name(breed)
+        inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
         
-        # Vérifier si c'est une race pondeuse
-        if any(layer_breed in breed_clean for layer_breed in layer_breeds):
-            # Sexe selon la langue
+        if was_inferred and inferred_sex:
             sex_mapping = {
                 "fr": "femelles",
                 "en": "females", 
                 "es": "hembras"
             }
             sex = sex_mapping.get(language, "femelles")
-            logger.info(f"🥚 [Auto-Fix Utils] Race pondeuse détectée: {breed} → sexe='{sex}'")
+            logger.info(f"🥚 [Auto-Fix Utils] Race détectée: {normalized_breed} → sexe='{sex}' (via clarification_entities)")
     
     result = {"breed": breed, "sex": sex}
     
@@ -857,4 +868,9 @@ logger.info("   - log_performance_metrics: Métriques de performance")
 logger.info("   - create_fallback_response: Réponses de fallback")
 logger.info("   - extract_key_entities_simple: Extraction entités simple")
 logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
+logger.info("🚀 [Expert Utils] INTÉGRÉ: Centralisation via clarification_entities")
+if CLARIFICATION_ENTITIES_AVAILABLE:
+    logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
+else:
+    logger.info("   ⚠️ clarification_entities: Mode fallback actif")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")
