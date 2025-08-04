@@ -4,7 +4,6 @@ app/api/v1/expert_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
 Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Toutes les fonctions référencées dans expert.py et expert_services.py
 ✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
-🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
 """
 
 import re
@@ -73,10 +72,7 @@ def extract_session_info(request) -> Dict[str, Any]:
 # =============================================================================
 
 def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") -> Optional[Dict[str, str]]:
-    """
-    Extrait race et sexe depuis une réponse de clarification
-    🚀 CORRIGÉ: Auto-détection sexe pour races pondeuses
-    """
+    """Extrait race et sexe depuis une réponse de clarification"""
     
     if not text or not text.strip():
         return {"breed": None, "sex": None}
@@ -89,8 +85,6 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             # Races complètes courantes
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
-            # 🚀 NOUVEAU: Patterns pondeuses étendus
-            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             # Mentions génériques
             r'\brace[:\s]*([a-zA-Z0-9\s]+)',
             r'\bsouche[:\s]*([a-zA-Z0-9\s]+)',
@@ -98,16 +92,12 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
         "en": [
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
-            # 🚀 NOUVEAU: Patterns pondeuses étendus
-            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             r'\bbreed[:\s]*([a-zA-Z0-9\s]+)',
             r'\bstrain[:\s]*([a-zA-Z0-9\s]+)',
         ],
         "es": [
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
-            # 🚀 NOUVEAU: Patterns pondeuses étendus
-            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             r'\braza[:\s]*([a-zA-Z0-9\s]+)',
             r'\bcepa[:\s]*([a-zA-Z0-9\s]+)',
         ]
@@ -144,7 +134,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
     for pattern in patterns:
         match = re.search(pattern, text_lower, re.IGNORECASE)
         if match:
-            if pattern.startswith(r'\b(ross') or pattern.startswith(r'\b(isa'):  # Pattern de races spécifiques
+            if pattern.startswith(r'\b(ross'):  # Pattern de races spécifiques
                 breed = match.group(1).strip()
             else:  # Pattern avec groupe de capture
                 breed = match.group(1).strip() if match.lastindex and match.lastindex >= 1 else match.group(0).strip()
@@ -158,7 +148,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             else:
                 breed = None
     
-    # Extraction sexe (CODE ORIGINAL)
+    # Extraction sexe
     sex = None
     patterns = sex_patterns.get(language, sex_patterns["fr"])
     
@@ -192,26 +182,6 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             
             if sex:
                 break
-    
-    # 🚀 CORRECTION BUG PONDEUSES: Auto-détection sexe pour races pondeuses
-    if breed and not sex:
-        breed_clean = breed.lower().strip()
-        layer_breeds = [
-            'isa brown', 'isa', 'lohmann brown', 'lohmann', 
-            'hy-line', 'hyline', 'hy line', 'bovans', 'shaver', 'hissex',
-            'novogen', 'tetra', 'hendrix', 'dominant'
-        ]
-        
-        # Vérifier si c'est une race pondeuse
-        if any(layer_breed in breed_clean for layer_breed in layer_breeds):
-            # Sexe selon la langue
-            sex_mapping = {
-                "fr": "femelles",
-                "en": "females", 
-                "es": "hembras"
-            }
-            sex = sex_mapping.get(language, "femelles")
-            logger.info(f"🥚 [Auto-Fix Utils] Race pondeuse détectée: {breed} → sexe='{sex}'")
     
     result = {"breed": breed, "sex": sex}
     
@@ -856,5 +826,4 @@ logger.info("   - create_debug_info: Informations debug structurées")
 logger.info("   - log_performance_metrics: Métriques de performance")
 logger.info("   - create_fallback_response: Réponses de fallback")
 logger.info("   - extract_key_entities_simple: Extraction entités simple")
-logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")
