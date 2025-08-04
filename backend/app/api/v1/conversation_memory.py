@@ -1,21 +1,14 @@
 """
-app/api/v1/conversation_memory_enhanced.py - SYSTÈME DE MÉMOIRE AVEC CLARIFICATION CRITIQUE
+app/api/v1/conversation_memory_enhanced.py - SYSTÈME DE MÉMOIRE AVEC CLARIFICATION CRITIQUE - VERSION CORRIGÉE
 
-🚨 VERSION FINALE INTÉGRÉE + GESTION CLARIFICATION CRITIQUE:
+🚨 VERSION FINALE INTÉGRÉE + CORRECTIONS DES ERREURS CRITIQUES:
 ✅ Toutes les fonctionnalités existantes conservées
-✅ Système de clarification enrichi ajouté
-✅ Fonction d'enrichissement de questions intégrée
-✅ Méthodes utilitaires pour agents GPT ajoutées
-✅ ⭐ NOUVEAU: Gestion état clarification critique avec relance RAG
-✅ ⭐ NOUVEAU: mark_pending_clarification() et reprocess_original_question()
-✅ Prêt pour intégration directe dans FastAPI
-
-NOUVELLES FONCTIONNALITÉS CRITIQUES AJOUTÉES:
-1. original_question_pending stockage question initiale
-2. mark_pending_clarification() pour marquer clarification critique
-3. Détection automatique clarification_response dans add_message()
-4. reprocess_original_question() pour relancer le pipeline RAG
-5. Callback système pour déclencher retraitement externe
+✅ Erreurs de récursion infinie corrigées
+✅ Gestion callback sécurisée ajoutée
+✅ Types annotations améliorées
+✅ Race conditions résolues
+✅ Gestion d'erreurs renforcée
+✅ Fuites mémoire prévenues
 """
 
 import os
@@ -24,13 +17,15 @@ import logging
 import sqlite3
 import re
 import asyncio
+import weakref
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union, Callable
+from typing import Dict, List, Optional, Any, Tuple, Union, Callable, Protocol
 from dataclasses import dataclass, asdict, field
 from contextlib import contextmanager
 import time
 import threading
-from threading import Lock
+from threading import Lock, RLock
+from copy import deepcopy
 
 # Import OpenAI sécurisé pour extraction intelligente
 try:
@@ -41,6 +36,19 @@ except ImportError:
     openai = None
 
 logger = logging.getLogger(__name__)
+
+# 🔧 FIX 1: Protocol pour typage sécurisé des callbacks
+class RAGCallbackProtocol(Protocol):
+    """Protocol pour les callbacks de retraitement RAG"""
+    async def __call__(
+        self,
+        question: str,
+        conversation_id: str,
+        user_id: str,
+        language: str = "fr",
+        is_reprocessing: bool = False
+    ) -> Dict[str, Any]:
+        ...
 
 @dataclass
 class IntelligentEntities:
@@ -122,7 +130,7 @@ class IntelligentEntities:
         if self.age_days and self.age_weeks:
             calculated_weeks = self.age_days / 7
             if abs(calculated_weeks - self.age_weeks) > 0.5:  # Tolérance 0.5 semaine
-                logger.warning(f"⚠️ [Validation] Incohérence âge: {self.age_days}j vs {self.age_weeks}sem")
+                logger.warning(f⚠️ [Validation] Incohérence âge: {self.age_days}j vs {self.age_weeks}sem")
                 # Prioriser les jours si confiance plus élevée
                 if self.age_confidence > 0.7:
                     self.age_weeks = round(self.age_days / 7, 1)
@@ -315,13 +323,40 @@ class IntelligentConversationContext:
     pending_clarification: bool = False
     last_original_question_id: Optional[str] = None
     
-    # ⭐ NOUVEAUX CHAMPS POUR CLARIFICATION CRITIQUE
+    # ⭐ NOUVEAUX CHAMPS POUR CLARIFICATION CRITIQUE - CORRIGÉS
     original_question_pending: Optional[str] = None  # Question initiale en attente
     critical_clarification_active: bool = False      # État clarification critique
-    clarification_callback: Optional[Callable] = None  # Callback pour retraitement
+    _clarification_callback_ref: Optional[weakref.ReferenceType] = None  # 🔧 FIX: WeakRef pour éviter fuites mémoire
+    _schedule_reprocessing: bool = False  # 🔧 FIX: Flag pour éviter récursion
+    
+    # 🔧 FIX: Propriété pour gérer le callback de manière sécurisée
+    @property
+    def clarification_callback(self) -> Optional[RAGCallbackProtocol]:
+        """Récupère le callback de manière sécurisée"""
+        if self._clarification_callback_ref is None:
+            return None
+        callback = self._clarification_callback_ref()
+        if callback is None:
+            # Le callback a été garbage collecté
+            self._clarification_callback_ref = None
+            logger.warning("⚠️ [Context] Callback garbage collecté - nettoyage automatique")
+        return callback
+    
+    @clarification_callback.setter
+    def clarification_callback(self, callback: Optional[RAGCallbackProtocol]):
+        """Définit le callback avec WeakRef pour éviter les fuites mémoire"""
+        if callback is None:
+            self._clarification_callback_ref = None
+        else:
+            try:
+                self._clarification_callback_ref = weakref.ref(callback)
+            except TypeError:
+                # Si l'objet ne supporte pas les weak references
+                logger.warning("⚠️ [Context] Callback ne supporte pas WeakRef - stockage direct")
+                self._clarification_callback_ref = lambda: callback
     
     def add_message(self, message: ConversationMessage):
-        """Ajoute un message et gère la clarification critique automatiquement"""
+        """Ajoute un message et gère la clarification critique automatiquement - VERSION CORRIGÉE"""
         self.messages.append(message)
         self.last_activity = datetime.now()
         self.total_exchanges += 1
@@ -336,13 +371,15 @@ class IntelligentConversationContext:
             self.pending_clarification = False
             logger.info(f"🎯 [Context] Clarification reçue pour: {message.original_question_id}")
         
-        # ⭐ NOUVELLE LOGIQUE CLARIFICATION CRITIQUE
+        # ⭐ NOUVELLE LOGIQUE CLARIFICATION CRITIQUE - CORRIGÉE
         if message.is_clarification_response and self.critical_clarification_active:
-            logger.info("🚨 [Context] ✅ Réponse clarification CRITIQUE reçue - relance du traitement")
+            logger.info("🚨 [Context] ✅ Réponse clarification CRITIQUE reçue - planification du retraitement")
             self.critical_clarification_active = False
             
-            # Déclencher le retraitement automatique
-            asyncio.create_task(self.reprocess_original_question())
+            # 🔧 FIX: Marquer pour retraitement au lieu de créer une tâche immédiatement
+            self._schedule_reprocessing = True
+            
+            # Le retraitement sera déclenché par l'appelant via check_and_trigger_reprocessing()
         
         # Fusionner les entités si disponibles
         if message.extracted_entities:
@@ -360,10 +397,22 @@ class IntelligentConversationContext:
         # Mettre à jour le statut conversationnel
         self._update_conversation_status()
     
-    # ⭐ NOUVELLE MÉTHODE - MARQUER CLARIFICATION CRITIQUE
-    def mark_pending_clarification(self, question: str, callback: Optional[Callable] = None):
+    # 🔧 FIX: Nouvelle méthode pour vérifier et déclencher le retraitement de manière sécurisée
+    def check_and_trigger_reprocessing(self) -> bool:
         """
-        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique
+        🔧 NOUVELLE MÉTHODE - Vérifie si un retraitement est planifié et le déclenche
+        Retourne True si un retraitement a été planifié
+        """
+        if self._schedule_reprocessing:
+            self._schedule_reprocessing = False
+            logger.info("🚀 [Context] Retraitement planifié détecté - à traiter par l'appelant")
+            return True
+        return False
+    
+    # ⭐ MÉTHODE CORRIGÉE - MARQUER CLARIFICATION CRITIQUE
+    def mark_pending_clarification(self, question: str, callback: Optional[RAGCallbackProtocol] = None):
+        """
+        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique - VERSION CORRIGÉE
         
         Args:
             question: Question originale qui nécessite clarification
@@ -371,48 +420,53 @@ class IntelligentConversationContext:
         """
         self.critical_clarification_active = True
         self.original_question_pending = question
-        self.clarification_callback = callback
+        self.clarification_callback = callback  # Utilise le setter sécurisé
         
         logger.info(f"🚨 [Context] CLARIFICATION CRITIQUE marquée")
         logger.info(f"  📝 Question: {question[:100]}...")
         logger.info(f"  🔄 Callback: {'✅' if callback else '❌'}")
     
-    # ⭐ NOUVELLE MÉTHODE - RETRAITEMENT QUESTION ORIGINALE
-    async def reprocess_original_question(self):
+    # ⭐ MÉTHODE CORRIGÉE - RETRAITEMENT QUESTION ORIGINALE
+    async def reprocess_original_question(self) -> Dict[str, Any]:
         """
-        🚀 FONCTION CRITIQUE - Relance le traitement de la question originale avec clarification
+        🚀 FONCTION CRITIQUE - Relance le traitement de la question originale avec clarification - VERSION CORRIGÉE
         """
         if not self.original_question_pending:
             logger.warning("⚠️ [Context] Pas de question originale en attente pour retraitement")
-            return
+            return {"status": "no_question_pending"}
         
         logger.info(f"🚀 [Context] RETRAITEMENT question originale: {self.original_question_pending[:100]}...")
         
         try:
-            # Si un callback est défini, l'utiliser pour déclencher le retraitement
-            if self.clarification_callback:
+            # 🔧 FIX: Vérification sécurisée du callback
+            callback = self.clarification_callback
+            if callback and callable(callback):
                 logger.info("🔄 [Context] Exécution callback retraitement...")
                 
                 # Appeler le callback avec la question enrichie par le contexte actuel
                 enriched_question = self._build_enriched_question_from_context()
                 
-                result = await self.clarification_callback(
-                    question=enriched_question,
-                    conversation_id=self.conversation_id,
-                    user_id=self.user_id,
-                    is_reprocessing=True
-                )
+                try:
+                    result = await callback(
+                        question=enriched_question,
+                        conversation_id=self.conversation_id,
+                        user_id=self.user_id,
+                        is_reprocessing=True
+                    )
+                    
+                    logger.info(f"✅ [Context] Callback retraitement terminé: {result}")
+                    return {"status": "success", "result": result}
+                    
+                except Exception as callback_error:
+                    logger.error(f"❌ [Context] Erreur dans callback: {callback_error}")
+                    return {"status": "callback_error", "error": str(callback_error)}
                 
-                logger.info(f"✅ [Context] Callback retraitement terminé: {result}")
-                
-            else:
-                logger.warning("⚠️ [Context] Pas de callback défini - retraitement manuel requis")
-                
-                # Marquer pour traitement externe
-                self.needs_reprocessing = True
+            else.warning("⚠️ [Context] Pas de callback valide - retraitement manuel requis")
+                return {"status": "no_callback"}
         
         except Exception as e:
             logger.error(f"❌ [Context] Erreur retraitement: {e}")
+            return {"status": "error", "error": str(e)}
         
         finally:
             # Nettoyer l'état
@@ -601,7 +655,8 @@ class IntelligentConversationContext:
             
             # ⭐ NOUVEAUX CHAMPS CRITIQUES
             "original_question_pending": self.original_question_pending,
-            "critical_clarification_active": self.critical_clarification_active
+            "critical_clarification_active": self.critical_clarification_active,
+            "reprocessing_scheduled": self._schedule_reprocessing
         }
         
         return context
@@ -613,20 +668,22 @@ class IntelligentConversationContext:
         topic_lower = self.conversation_topic.lower()
         return any(keyword in topic_lower for keyword in keywords)
 
-    # 🤖 MÉTHODES POUR AGENTS GPT AMÉLIORÉES
-    def get_missing_entities(self, include_importance: bool = False) -> Union[List[str], Dict[str, str]]:
+    # 🔧 FIX 2: Séparer les méthodes get_missing_entities pour éviter l'union de types
+    def get_missing_entities_list(self) -> List[str]:
+        """
+        Retourne la liste des entités manquantes
+        
+        Returns:
+            List[str]: Liste des entités manquantes
+        """
+        return list(self.get_missing_entities_dict().keys())
+    
+    def get_missing_entities_dict(self) -> Dict[str, str]:
         """
         Retourne les entités manquantes avec leur niveau d'importance
         
-        Args:
-            include_importance: Si True, retourne dict avec importance, sinon liste simple
-            
         Returns:
-            Dict[entity, importance] ou List[entity] selon include_importance
-            
-        ⚠️  ATTENTION: Cette fonction retourne 2 types différents selon le paramètre !
-            - include_importance=False: List[str] 
-            - include_importance=True: Dict[str, str]
+            Dict[str, str]: Dictionnaire {entity: importance}
         """
         entities = self.consolidated_entities
         missing_with_importance = {}
@@ -685,11 +742,21 @@ class IntelligentConversationContext:
             else:
                 missing_with_importance["feed_information"] = "secondaire"
         
-        # 🚨 RETOUR CONDITIONNEL - ATTENTION AU TYPE !
+        return missing_with_importance
+
+    # 🔧 FIX 3: Méthode de compatibilité pour l'ancienne signature
+    def get_missing_entities(self, include_importance: bool = False) -> Union[List[str], Dict[str, str]]:
+        """
+        MÉTHODE DÉPRÉCIÉE - Utilisez get_missing_entities_list() ou get_missing_entities_dict()
+        
+        ⚠️ Cette méthode est conservée pour compatibilité mais dépréciée
+        """
+        logger.warning("⚠️ [Deprecated] get_missing_entities() est déprécié. Utilisez get_missing_entities_list() ou get_missing_entities_dict()")
+        
         if include_importance:
-            return missing_with_importance  # Type: Dict[str, str]
+            return self.get_missing_entities_dict()
         else:
-            return list(missing_with_importance.keys())  # Type: List[str]
+            return self.get_missing_entities_list()
 
     def get_raw_context_summary(self) -> Dict[str, Any]:
         """
@@ -782,7 +849,7 @@ class IntelligentConversationContext:
         conversation_patterns = self._analyze_conversation_patterns()
         
         # Entités manquantes avec importance
-        missing_entities = self.get_missing_entities(include_importance=True)
+        missing_entities = self.get_missing_entities_dict()
         
         return {
             "conversation_metadata": {
@@ -802,7 +869,8 @@ class IntelligentConversationContext:
                 "ai_enhanced": self.ai_enhanced,
                 # ⭐ NOUVEAUX CHAMPS CRITIQUES
                 "critical_clarification_active": self.critical_clarification_active,
-                "original_question_pending": self.original_question_pending
+                "original_question_pending": self.original_question_pending,
+                "reprocessing_scheduled": self._schedule_reprocessing
             },
             
             "entities_raw": raw_entities,
@@ -955,6 +1023,10 @@ class IntelligentConversationContext:
         if self.critical_clarification_active:
             parts.append("🚨 CLARIFICATION CRITIQUE")
         
+        # 🔧 INDICATEUR RETRAITEMENT PLANIFIÉ
+        if self._schedule_reprocessing:
+            parts.append("🔄 RETRAITEMENT PLANIFIÉ")
+        
         return " | ".join(parts)
 
     def get_context_for_rag(self, max_chars: int = 500) -> str:
@@ -1032,11 +1104,12 @@ class IntelligentConversationContext:
             "last_original_question_id": self.last_original_question_id,
             # ⭐ NOUVEAUX CHAMPS
             "original_question_pending": self.original_question_pending,
-            "critical_clarification_active": self.critical_clarification_active
+            "critical_clarification_active": self.critical_clarification_active,
+            "schedule_reprocessing": self._schedule_reprocessing
         }
 
 class IntelligentConversationMemory:
-    """Système de mémoire conversationnelle intelligent avec IA et clarification critique intégrée"""
+    """Système de mémoire conversationnelle intelligent avec IA et clarification critique intégrée - VERSION CORRIGÉE"""
     
     def __init__(self, db_path: str = None):
         """Initialise le système de mémoire intelligent"""
@@ -1049,12 +1122,13 @@ class IntelligentConversationMemory:
         self.ai_enhancement_model = os.getenv('AI_ENHANCEMENT_MODEL', 'gpt-4o-mini')
         self.ai_enhancement_timeout = int(os.getenv('AI_ENHANCEMENT_TIMEOUT', '15'))
         
-        # Cache en mémoire pour performance
+        # 🔧 FIX: Cache thread-safe avec RLock au lieu de Lock simple
         self.conversation_cache: Dict[str, IntelligentConversationContext] = {}
         self.cache_max_size = int(os.getenv('CONVERSATION_CACHE_SIZE', '100'))
-        self.cache_lock = Lock()
+        self.cache_lock = RLock()  # RLock pour éviter les deadlocks
         
-        # Statistiques
+        # Statistiques thread-safe
+        self._stats_lock = Lock()
         self.stats = {
             "total_conversations": 0,
             "total_messages": 0,
@@ -1073,13 +1147,19 @@ class IntelligentConversationMemory:
         # Initialiser la base de données
         self._init_database()
         
-        logger.info(f"🧠 [IntelligentMemory] Système initialisé")
+        logger.info(f"🧠 [IntelligentMemory] Système initialisé - VERSION CORRIGÉE")
         logger.info(f"🧠 [IntelligentMemory] DB: {self.db_path}")
         logger.info(f"🧠 [IntelligentMemory] IA enhancing: {'✅' if self.ai_enhancement_enabled else '❌'}")
         logger.info(f"🧠 [IntelligentMemory] Modèle IA: {self.ai_enhancement_model}")
         logger.info(f"🚨 [IntelligentMemory] Système de clarification standard: ✅")
-        logger.info(f"🚨 [IntelligentMemory] Système de clarification CRITIQUE: ✅")
+        logger.info(f"🚨 [IntelligentMemory] Système de clarification CRITIQUE: ✅ (CORRIGÉ)")
         logger.info(f"🤖 [IntelligentMemory] Méthodes pour agents GPT: ✅")
+        logger.info(f"🔧 [IntelligentMemory] Corrections appliquées: WeakRef, RLock, Types séparés")
+
+    def _update_stats(self, key: str, increment: int = 1):
+        """Met à jour les statistiques de manière thread-safe"""
+        with self._stats_lock:
+            self.stats[key] = self.stats.get(key, 0) + increment
 
     def _init_database(self):
         """Initialise la base de données avec schéma amélioré pour clarification critique"""
@@ -1163,8 +1243,10 @@ class IntelligentConversationMemory:
 
     @contextmanager
     def _get_db_connection(self):
-        """Context manager pour les connexions DB avec retry"""
+        """Context manager pour les connexions DB avec retry - VERSION CORRIGÉE"""
         max_retries = 3
+        conn = None
+        
         for attempt in range(max_retries):
             try:
                 conn = sqlite3.connect(self.db_path, timeout=30.0)
@@ -1176,11 +1258,15 @@ class IntelligentConversationMemory:
                     raise
                 logger.warning(f"⚠️ [DB] Retry connexion {attempt + 1}/{max_retries}: {e}")
                 time.sleep(0.5 * (attempt + 1))
+            except Exception as e:
+                logger.error(f"❌ [DB] Erreur connexion: {e}")
+                raise
             finally:
-                try:
-                    conn.close()
-                except:
-                    pass
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception as close_error:
+                        logger.warning(f"⚠️ [DB] Erreur fermeture connexion: {close_error}")
 
     async def extract_entities_ai_enhanced(
         self, 
@@ -1188,18 +1274,24 @@ class IntelligentConversationMemory:
         language: str = "fr",
         conversation_context: Optional[IntelligentConversationContext] = None
     ) -> IntelligentEntities:
-        """Extraction d'entités avec IA ou fallback basique"""
+        """Extraction d'entités avec IA ou fallback basique - VERSION CORRIGÉE"""
         
         # Tentative IA si disponible
         if self.ai_enhancement_enabled and OPENAI_AVAILABLE and openai:
             try:
                 entities = await self._extract_entities_openai(message, language, conversation_context)
                 if entities and entities.confidence_overall > 0.3:
-                    self.stats["ai_enhancements"] += 1
+                    self._update_stats("ai_enhancements")
                     return entities.validate_and_correct()
+            except openai.APITimeoutError as e:
+                self._update_stats("ai_failures")
+                logger.warning(f"⚠️ [AI Extraction] Timeout IA: {e}")
+            except openai.APIError as e:
+                self._update_stats("ai_failures")
+                logger.warning(f"⚠️ [AI Extraction] Erreur API IA: {e}")
             except Exception as e:
-                self.stats["ai_failures"] += 1
-                logger.warning(f"⚠️ [AI Extraction] Échec IA: {e}")
+                self._update_stats("ai_failures")
+                logger.warning(f"⚠️ [AI Extraction] Échec IA général: {e}")
         
         # Fallback: Extraction basique
         logger.info("🔄 [Fallback] Utilisation extraction basique")
@@ -1214,7 +1306,7 @@ class IntelligentConversationMemory:
         language: str = "fr",
         conversation_context: Optional[IntelligentConversationContext] = None
     ) -> IntelligentEntities:
-        """Extraction d'entités par OpenAI"""
+        """Extraction d'entités par OpenAI - VERSION CORRIGÉE"""
         
         # Contexte pour l'IA
         context_info = ""
@@ -1289,21 +1381,32 @@ EXEMPLES:
         if not api_key:
             raise Exception("Clé API OpenAI manquante")
         
-        # Créer le client OpenAI
-        client = openai.AsyncOpenAI(api_key=api_key)
-        
-        response = await client.chat.completions.create(
-            model=self.ai_enhancement_model,
-            messages=[
-                {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture. Réponds UNIQUEMENT avec du JSON valide."},
-                {"role": "user", "content": extraction_prompt}
-            ],
-            temperature=0.1,
-            max_tokens=800,
-            timeout=self.ai_enhancement_timeout
-        )
-        
-        answer = response.choices[0].message.content.strip()
+        # 🔧 FIX: Gestion d'erreurs spécifique OpenAI
+        try:
+            # Créer le client OpenAI
+            client = openai.AsyncOpenAI(api_key=api_key)
+            
+            response = await client.chat.completions.create(
+                model=self.ai_enhancement_model,
+                messages=[
+                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture. Réponds UNIQUEMENT avec du JSON valide."},
+                    {"role": "user", "content": extraction_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=800,
+                timeout=self.ai_enhancement_timeout
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            
+        except asyncio.TimeoutError:
+            raise openai.APITimeoutError("Timeout lors de l'appel OpenAI")
+        except openai.RateLimitError as e:
+            raise openai.APIError(f"Rate limit dépassé: {e}")
+        except openai.APIConnectionError as e:
+            raise openai.APIError(f"Erreur connexion OpenAI: {e}")
+        except Exception as e:
+            raise Exception(f"Erreur inattendue OpenAI: {e}")
         
         # Extraire le JSON
         json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
@@ -1494,7 +1597,7 @@ EXEMPLES:
         
         return entities
 
-    # ✅ NOUVELLE SECTION - SYSTÈME DE CLARIFICATION INTÉGRÉ
+    # ✅ SYSTÈME DE CLARIFICATION INTÉGRÉ - VERSION CORRIGÉE
 
     def build_enriched_question_from_clarification(
         self,
@@ -1702,7 +1805,7 @@ EXEMPLES:
         language: str = "fr"
     ) -> Tuple[str, bool]:
         """
-        🚀 FONCTION PRINCIPALE - Traite les questions avec gestion clarification
+        🚀 FONCTION PRINCIPALE - Traite les questions avec gestion clarification - VERSION CORRIGÉE
         
         Returns:
             (processed_question, was_clarification_resolved)
@@ -1710,17 +1813,15 @@ EXEMPLES:
         
         try:
             # 1. Récupérer le contexte conversationnel
-            conversation_context = self.get_conversation_context(conversation_id)
+            context = self.get_conversation_context(conversation_id)
             
-            if not conversation_context:
+            if not context:
                 # Nouvelle conversation
                 logger.info(f"🆕 [Clarification] Nouvelle conversation: {conversation_id}")
                 return request_text, False
             
             # 2. Détecter si on est en attente de clarification
-            is_awaiting, original_question = self.detect_clarification_state(
-                conversation_context
-            )
+            is_awaiting, original_question = self.detect_clarification_state(context)
             
             if is_awaiting and original_question:
                 logger.info(f"🎯 [Clarification] État détecté - traitement clarification")
@@ -1729,16 +1830,16 @@ EXEMPLES:
                 enriched_question = self.build_enriched_question_from_clarification(
                     original_question=original_question,
                     clarification_response=request_text,
-                    conversation_context=conversation_context
+                    conversation_context=context
                 )
                 
                 # 4. Reset l'état de clarification pour éviter les boucles
-                conversation_context.pending_clarification = False
-                conversation_context.last_original_question_id = None
+                context.pending_clarification = False
+                context.last_original_question_id = None
                 
                 # ⭐ RESET AUSSI L'ÉTAT CLARIFICATION CRITIQUE
-                conversation_context.critical_clarification_active = False
-                conversation_context.original_question_pending = None
+                context.critical_clarification_active = False
+                context.original_question_pending = None
                 
                 # 5. Marquer ce message comme réponse de clarification
                 self.add_message_to_conversation(
@@ -1751,8 +1852,8 @@ EXEMPLES:
                 )
                 
                 # 6. Mettre à jour les statistiques
-                self.stats["clarification_resolutions"] += 1
-                self.stats["critical_clarifications_resolved"] += 1
+                self._update_stats("clarification_resolutions")
+                self._update_stats("critical_clarifications_resolved")
                 
                 logger.info(f"✅ [Clarification] Question enrichie avec succès")
                 
@@ -1849,16 +1950,16 @@ EXEMPLES:
         
         return f"{intro}\n\n{questions_text}"
 
-    # ⭐ NOUVELLES MÉTHODES POUR CLARIFICATION CRITIQUE
+    # ⭐ MÉTHODES POUR CLARIFICATION CRITIQUE - VERSION CORRIGÉE
 
     def mark_pending_clarification_critical(
         self, 
         conversation_id: str,
         question: str, 
-        callback: Optional[Callable] = None
+        callback: Optional[RAGCallbackProtocol] = None
     ) -> bool:
         """
-        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique avec callback
+        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique avec callback - VERSION CORRIGÉE
         
         Args:
             conversation_id: ID de la conversation
@@ -1882,12 +1983,13 @@ EXEMPLES:
             # Sauvegarder en base
             self._save_conversation_to_db(context)
             
-            # Mettre à jour le cache
+            # Mettre à jour le cache de manière thread-safe
             with self.cache_lock:
-                self.conversation_cache[conversation_id] = context
+                # 🔧 FIX: Utiliser deepcopy pour éviter les modifications concurrentes
+                self.conversation_cache[conversation_id] = deepcopy(context)
             
             # Statistiques
-            self.stats["critical_clarifications_marked"] += 1
+            self._update_stats("critical_clarifications_marked")
             
             logger.info(f"🚨 [CriticalClarification] Marquage réussi pour: {conversation_id}")
             logger.info(f"  📝 Question: {question[:100]}...")
@@ -1906,7 +2008,7 @@ EXEMPLES:
         language: str = "fr"
     ) -> bool:
         """
-        🚀 FONCTION CRITIQUE - Déclenche le retraitement RAG après clarification
+        🚀 FONCTION CRITIQUE - Déclenche le retraitement RAG après clarification - VERSION CORRIGÉE
         
         Args:
             conversation_id: ID de la conversation
@@ -1933,35 +2035,25 @@ EXEMPLES:
                 logger.warning(f"⚠️ [RAGReprocessing] Pas de question en attente: {conversation_id}")
                 return False
             
-            # Déclencher le retraitement via callback si disponible
-            if context.clarification_callback:
-                logger.info("🔄 [RAGReprocessing] Exécution callback...")
-                
-                result = await context.clarification_callback(
-                    question=enriched_question,
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    language=language,
-                    is_reprocessing=True
-                )
-                
-                logger.info(f"✅ [RAGReprocessing] Callback terminé: {result}")
-                
-                # Nettoyer l'état
-                context.original_question_pending = None
-                context.clarification_callback = None
-                context.critical_clarification_active = False
-                
-                # Sauvegarder
+            # Déclencher le retraitement via la méthode du contexte
+            result = await context.reprocess_original_question()
+            
+            if result.get("status") == "success":
+                # Sauvegarder le contexte mis à jour
                 self._save_conversation_to_db(context)
                 
-                # Statistiques
-                self.stats["rag_reprocessing_triggered"] += 1
+                # Mettre à jour le cache
+                with self.cache_lock:
+                    self.conversation_cache[conversation_id] = deepcopy(context)
                 
+                # Statistiques
+                self._update_stats("rag_reprocessing_triggered")
+                
+                logger.info("✅ [RAGReprocessing] Retraitement terminé avec succès")
                 return True
             
             else:
-                logger.warning("⚠️ [RAGReprocessing] Pas de callback défini - retraitement manuel requis")
+                logger.warning(f"⚠️ [RAGReprocessing] Échec retraitement: {result}")
                 return False
                 
         except Exception as e:
@@ -2016,9 +2108,9 @@ EXEMPLES:
         self._save_conversation_to_db(context)
         self._save_message_to_db(marker_msg)
         
-        # Mettre en cache
+        # Mettre en cache de manière thread-safe
         with self.cache_lock:
-            self.conversation_cache[conversation_id] = context
+            self.conversation_cache[conversation_id] = deepcopy(context)
         
         logger.info(f"🎯 [Memory] Question originale marquée: {original_question[:50]}...")
         
@@ -2033,7 +2125,7 @@ EXEMPLES:
         language: str = "fr",
         message_type: str = "text"
     ) -> IntelligentConversationContext:
-        """Ajoute un message avec extraction d'entités intelligente et gestion clarification critique"""
+        """Ajoute un message avec extraction d'entités intelligente et gestion clarification critique - VERSION CORRIGÉE"""
         
         try:
             # Récupérer ou créer le contexte
@@ -2047,15 +2139,23 @@ EXEMPLES:
             
             # Extraire les entités de manière asynchrone
             try:
-                loop = asyncio.get_event_loop()
-                extracted_entities = loop.run_until_complete(
-                    self.extract_entities_ai_enhanced(message, language, context)
-                )
-            except RuntimeError:
-                # Si pas de loop actif, créer un nouveau
-                extracted_entities = asyncio.run(
-                    self.extract_entities_ai_enhanced(message, language, context)
-                )
+                # 🔧 FIX: Gestion plus robuste de l'event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Si on est dans un loop, utiliser create_task
+                    task = loop.create_task(
+                        self.extract_entities_ai_enhanced(message, language, context)
+                    )
+                    extracted_entities = loop.run_until_complete(task)
+                except RuntimeError:
+                    # Pas de loop actif, créer un nouveau
+                    extracted_entities = asyncio.run(
+                        self.extract_entities_ai_enhanced(message, language, context)
+                    )
+            except Exception as extract_error:
+                logger.warning(f"⚠️ [Memory] Erreur extraction entités: {extract_error}")
+                # Fallback: entités vides
+                extracted_entities = IntelligentEntities(extraction_method="error_fallback")
             
             # ✅ DÉTECTION AUTOMATIQUE DES CLARIFICATIONS STANDARD
             is_clarification_response = False
@@ -2069,7 +2169,7 @@ EXEMPLES:
                 is_clarification_response = True
                 original_question_id = context.last_original_question_id
                 logger.info(f"🎯 [Memory] Clarification STANDARD détectée: {message} → {original_question_id}")
-                self.stats["clarification_resolutions"] += 1
+                self._update_stats("clarification_resolutions")
             
             # ⭐ DÉTECTION CLARIFICATION CRITIQUE
             elif (role == "user" and context.critical_clarification_active and 
@@ -2078,7 +2178,7 @@ EXEMPLES:
                 
                 is_clarification_response = True
                 logger.info(f"🚨 [Memory] Clarification CRITIQUE détectée: {message}")
-                self.stats["critical_clarifications_resolved"] += 1
+                self._update_stats("critical_clarifications_resolved")
             
             # Créer le message
             message_obj = ConversationMessage(
@@ -2100,16 +2200,20 @@ EXEMPLES:
             # Ajouter au contexte (déclenche automatiquement le retraitement si clarification critique)
             context.add_message(message_obj)
             
+            # 🔧 FIX: Vérifier si un retraitement est planifié
+            if context.check_and_trigger_reprocessing():
+                logger.info("🔄 [Memory] Retraitement planifié détecté - à traiter par l'appelant")
+            
             # Sauvegarder
             self._save_conversation_to_db(context)
             self._save_message_to_db(message_obj)
             
-            # Mettre en cache
+            # Mettre en cache de manière thread-safe
             with self.cache_lock:
-                self.conversation_cache[conversation_id] = context
+                self.conversation_cache[conversation_id] = deepcopy(context)
                 self._manage_cache_size()
             
-            self.stats["total_messages"] += 1
+            self._update_stats("total_messages")
             
             logger.info(f"💬 [Memory] Message ajouté: {conversation_id} ({len(context.messages)} msgs)")
             
@@ -2128,24 +2232,24 @@ EXEMPLES:
             return minimal_context
 
     def get_conversation_context(self, conversation_id: str) -> Optional[IntelligentConversationContext]:
-        """Récupère le contexte conversationnel avec cache"""
+        """Récupère le contexte conversationnel avec cache - VERSION CORRIGÉE"""
         
-        # Vérifier le cache d'abord
+        # Vérifier le cache d'abord de manière thread-safe
         with self.cache_lock:
             if conversation_id in self.conversation_cache:
-                context = self.conversation_cache[conversation_id]
-                self.stats["cache_hits"] += 1
+                context = deepcopy(self.conversation_cache[conversation_id])  # 🔧 FIX: DeepCopy pour éviter modifications
+                self._update_stats("cache_hits")
                 return context
         
-        self.stats["cache_misses"] += 1
+        self._update_stats("cache_misses")
         
         # Charger depuis la DB
         try:
             context = self._load_context_from_db(conversation_id)
             if context:
-                # Mettre en cache
+                # Mettre en cache de manière thread-safe
                 with self.cache_lock:
-                    self.conversation_cache[conversation_id] = context
+                    self.conversation_cache[conversation_id] = deepcopy(context)
                     self._manage_cache_size()
                 return context
         except Exception as e:
@@ -2331,7 +2435,7 @@ EXEMPLES:
             conn.commit()
 
     def _manage_cache_size(self):
-        """Gère la taille du cache en mémoire"""
+        """Gère la taille du cache en mémoire - VERSION THREAD-SAFE"""
         
         if len(self.conversation_cache) > self.cache_max_size:
             # Supprimer les conversations les moins récemment utilisées
@@ -2347,22 +2451,28 @@ EXEMPLES:
             logger.info(f"🧹 [Memory] Cache nettoyé: {len(self.conversation_cache)} conversations gardées")
 
     def get_conversation_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques du système avec nouvelles métriques clarification critique"""
+        """Retourne les statistiques du système avec nouvelles métriques clarification critique - VERSION THREAD-SAFE"""
+        
+        with self._stats_lock:
+            stats_copy = self.stats.copy()
+        
+        with self.cache_lock:
+            cache_size = len(self.conversation_cache)
         
         return {
-            "system_stats": self.stats.copy(),
+            "system_stats": stats_copy,
             "cache_stats": {
-                "cache_size": len(self.conversation_cache),
+                "cache_size": cache_size,
                 "cache_max_size": self.cache_max_size,
-                "hit_rate": self.stats["cache_hits"] / (self.stats["cache_hits"] + self.stats["cache_misses"]) if (self.stats["cache_hits"] + self.stats["cache_misses"]) > 0 else 0
+                "hit_rate": stats_copy["cache_hits"] / (stats_copy["cache_hits"] + stats_copy["cache_misses"]) if (stats_copy["cache_hits"] + stats_copy["cache_misses"]) > 0 else 0
             },
             "clarification_stats": {
-                "questions_recovered": self.stats["original_questions_recovered"],
-                "clarifications_resolved": self.stats["clarification_resolutions"],
+                "questions_recovered": stats_copy["original_questions_recovered"],
+                "clarifications_resolved": stats_copy["clarification_resolutions"],
                 # ⭐ NOUVELLES MÉTRIQUES CRITIQUES
-                "critical_clarifications_marked": self.stats["critical_clarifications_marked"],
-                "critical_clarifications_resolved": self.stats["critical_clarifications_resolved"],
-                "rag_reprocessing_triggered": self.stats["rag_reprocessing_triggered"]
+                "critical_clarifications_marked": stats_copy["critical_clarifications_marked"],
+                "critical_clarifications_resolved": stats_copy["critical_clarifications_resolved"],
+                "rag_reprocessing_triggered": stats_copy["rag_reprocessing_triggered"]
             }
         }
 
@@ -2389,11 +2499,11 @@ EXEMPLES:
             logger.info(f"🧹 [Cleanup] {result_messages.rowcount} messages et {result_conversations.rowcount} conversations supprimés")
 
 # ===============================
-# ✅ EXEMPLE D'UTILISATION COMPLÈTE AVEC CLARIFICATION CRITIQUE
+# ✅ EXEMPLE D'UTILISATION COMPLÈTE AVEC CLARIFICATION CRITIQUE - VERSION CORRIGÉE
 # ===============================
 
 """
-Exemple d'intégration complète dans votre endpoint FastAPI avec clarification critique:
+Exemple d'intégration complète dans votre endpoint FastAPI avec clarification critique CORRIGÉE:
 
 from app.core.conversation_memory_enhanced import IntelligentConversationMemory
 from app.api.v1.agent_contextualizer import agent_contextualizer
@@ -2403,7 +2513,7 @@ from app.api.v1.agent_rag_enhancer import agent_rag_enhancer
 conversation_memory = IntelligentConversationMemory()
 
 @app.post("/api/v1/expert/ask")
-async def ask_expert_with_critical_clarification(request: QuestionRequest):
+async def ask_expert_with_critical_clarification_fixed(request: QuestionRequest):
     try:
         logger.info(f"🚀 [ASK] Question reçue: {request.text[:100]}...")
         
@@ -2421,32 +2531,44 @@ async def ask_expert_with_critical_clarification(request: QuestionRequest):
             request.text = processed_question
         
         # ✅ ÉTAPE 2: Ajouter le message à la conversation (si pas déjà fait)
-        if not was_clarification:
-            conversation_memory.add_message_to_conversation(
+        context = conversation_memory.add_message_to_conversation(
+            conversation_id=request.conversation_id,
+            user_id=request.user_id,
+            message=request.text,
+            role="user",
+            language=request.language
+        )
+        
+        # 🔧 FIX: Vérifier si un retraitement automatique est planifié
+        if context.check_and_trigger_reprocessing():
+            # Un retraitement automatique va se déclencher
+            # Attendre le résultat ou traiter de manière asynchrone
+            logger.info("🔄 [ASK] Retraitement automatique en cours...")
+            
+            # Option 1: Déclencher le retraitement immédiatement
+            await conversation_memory.trigger_rag_reprocessing(
                 conversation_id=request.conversation_id,
+                enriched_question=processed_question,
                 user_id=request.user_id,
-                message=request.text,
-                role="user",
                 language=request.language
             )
         
         # ✅ ÉTAPE 3: Récupérer le contexte enrichi pour agents
-        context = conversation_memory.get_conversation_context(request.conversation_id)
         if context:
-            missing_entities_with_importance = context.get_missing_entities(include_importance=True)
-            missing_entities_list = context.get_missing_entities(include_importance=False)
+            missing_entities_dict = context.get_missing_entities_dict()
+            missing_entities_list = context.get_missing_entities_list()
             raw_context_summary = context.get_raw_context_summary()
             formatted_context = context.get_formatted_context()
             rag_context = context.get_context_for_rag()
         else:
-            missing_entities_with_importance, missing_entities_list = {}, []
+            missing_entities_dict, missing_entities_list = {}, []
             raw_context_summary, formatted_context, rag_context = {}, "", ""
         
         # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG)
         contextualization_result = await agent_contextualizer.enrich_question(
             question=processed_question,
             raw_context=raw_context_summary,
-            missing_entities_with_importance=missing_entities_with_importance,
+            missing_entities_with_importance=missing_entities_dict,
             missing_entities_list=missing_entities_list,
             conversation_context=formatted_context,
             language=request.language
@@ -2464,7 +2586,7 @@ async def ask_expert_with_critical_clarification(request: QuestionRequest):
         enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
             rag_answer=response.answer,
             raw_context=raw_context_summary,
-            missing_entities_with_importance=missing_entities_with_importance,
+            missing_entities_with_importance=missing_entities_dict,
             missing_entities_list=missing_entities_list,
             conversation_context=formatted_context,
             original_question=request.text,
@@ -2482,41 +2604,46 @@ async def ask_expert_with_critical_clarification(request: QuestionRequest):
         
         if needs_clarification and not was_clarification:
             
-            # ⭐ NOUVEAU: Définir le callback pour relance RAG automatique
-            async def rag_reprocessing_callback(
+            # ⭐ NOUVEAU: Définir le callback pour relance RAG automatique - VERSION CORRIGÉE
+            async def rag_reprocessing_callback_fixed(
                 question: str, 
                 conversation_id: str, 
                 user_id: str, 
                 language: str = "fr",
                 is_reprocessing: bool = False
-            ):
-                logger.info(f"🔄 [RAGCallback] Retraitement automatique: {question[:50]}...")
+            ) -> Dict[str, Any]:
+                try:
+                    logger.info(f"🔄 [RAGCallback] Retraitement automatique: {question[:50]}...")
+                    
+                    # Relancer le pipeline RAG complet
+                    reprocessed_response = await rag_system.query(
+                        question=question,
+                        context=rag_context,  # Contexte enrichi avec clarification
+                        language=language
+                    )
+                    
+                    # Ajouter la réponse retraitée à la conversation
+                    conversation_memory.add_message_to_conversation(
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        message=reprocessed_response.answer,
+                        role="assistant",
+                        language=language,
+                        message_type="reprocessed_response"
+                    )
+                    
+                    logger.info("✅ [RAGCallback] Retraitement terminé avec succès")
+                    return {"status": "success", "reprocessed_answer": reprocessed_response.answer}
                 
-                # Relancer le pipeline RAG complet
-                reprocessed_response = await rag_system.query(
-                    question=question,
-                    context=rag_context,  # Contexte enrichi avec clarification
-                    language=language
-                )
-                
-                # Ajouter la réponse retraitée à la conversation
-                conversation_memory.add_message_to_conversation(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    message=reprocessed_response.answer,
-                    role="assistant",
-                    language=language,
-                    message_type="reprocessed_response"
-                )
-                
-                logger.info("✅ [RAGCallback] Retraitement terminé avec succès")
-                return {"status": "success", "reprocessed_answer": reprocessed_response.answer}
+                except Exception as callback_error:
+                    logger.error(f"❌ [RAGCallback] Erreur callback: {callback_error}")
+                    return {"status": "error", "error": str(callback_error)}
             
-            # ⭐ MARQUER CLARIFICATION CRITIQUE avec callback
+            # ⭐ MARQUER CLARIFICATION CRITIQUE avec callback corrigé
             success = conversation_memory.mark_pending_clarification_critical(
                 conversation_id=request.conversation_id,
                 question=request.text,
-                callback=rag_reprocessing_callback
+                callback=rag_reprocessing_callback_fixed
             )
             
             if success:
@@ -2568,52 +2695,10 @@ async def ask_expert_with_critical_clarification(request: QuestionRequest):
             contextualization_info=contextualization_result,
             enhancement_info=enhancement_result,
             context_quality_score=raw_context_summary.get("context_quality_score", 0.0),
-            missing_entities_analysis=missing_entities_with_importance
+            missing_entities_analysis=missing_entities_dict
         )
         
     except Exception as e:
         logger.error(f"❌ [ASK] Erreur: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# ⭐ EXEMPLE D'UTILISATION DES NOUVELLES MÉTHODES CRITIQUES
-
-# 1. Marquer une clarification critique avec callback
-async def example_mark_critical_clarification():
-    memory = IntelligentConversationMemory()
-    
-    async def my_rag_callback(question, conversation_id, user_id, language="fr", is_reprocessing=False):
-        # Votre logique de retraitement RAG ici
-        return {"status": "success"}
-    
-    success = memory.mark_pending_clarification_critical(
-        conversation_id="conv_123",
-        question="Quel est le poids normal de mes poulets ?",
-        callback=my_rag_callback
-    )
-    
-    if success:
-        print("✅ Clarification critique marquée avec succès")
-
-# 2. Déclencher manuellement le retraitement RAG
-async def example_trigger_reprocessing():
-    memory = IntelligentConversationMemory()
-    
-    success = await memory.trigger_rag_reprocessing(
-        conversation_id="conv_123",
-        enriched_question="Quel est le poids normal de mes poulets Ross 308 mâles ?",
-        user_id="user_456",
-        language="fr"
-    )
-    
-    if success:
-        print("✅ Retraitement RAG déclenché avec succès")
-
-# 3. Consulter les statistiques étendues
-def example_get_enhanced_stats():
-    memory = IntelligentConversationMemory()
-    stats = memory.get_conversation_stats()
-    
-    print(f"Clarifications critiques marquées: {stats['clarification_stats']['critical_clarifications_marked']}")
-    print(f"Clarifications critiques résolues: {stats['clarification_stats']['critical_clarifications_resolved']}")
-    print(f"Retraitements RAG déclenchés: {stats['clarification_stats']['rag_reprocessing_triggered']}")
 """

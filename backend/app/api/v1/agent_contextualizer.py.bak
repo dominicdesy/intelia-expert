@@ -5,14 +5,17 @@ Agent Contextualizer - Enrichissement des questions avant RAG
 🎯 FONCTIONNALITÉS:
 - Enrichit les questions avec le contexte conversationnel
 - Intègre les entités connues (race, sexe, âge, etc.)
+- Fonctionne même SANS entités (inférence contextuelle)
 - Reformule pour optimiser la recherche RAG
+- NOUVEAU: Support multi-variants pour rag_context_enhancer
 - Gestion fallback sans OpenAI
 """
 
 import os
 import logging
 import json
-from typing import Dict, List, Any, Optional
+import re
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
 # Import OpenAI sécurisé
@@ -34,54 +37,138 @@ class AgentContextualizer:
         self.timeout = int(os.getenv('CONTEXTUALIZER_TIMEOUT', '10'))
         self.max_retries = int(os.getenv('CONTEXTUALIZER_RETRIES', '2'))
         
-        # Statistiques
+        # Statistiques - version étendue
         self.stats = {
             "total_requests": 0,
+            "single_variant_requests": 0,
+            "multi_variant_requests": 0,
             "openai_success": 0,
             "openai_failures": 0,
             "fallback_used": 0,
-            "questions_enriched": 0
+            "questions_enriched": 0,
+            "inference_only": 0,
+            "with_entities": 0,
+            "variants_generated": 0
         }
         
-        logger.info(f"🤖 [AgentContextualizer] Initialisé")
+        logger.info(f"🤖 [AgentContextualizer] Initialisé - Version Multi-Variants")
         logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
         logger.info(f"   Modèle: {self.model}")
+        logger.info(f"   Support multi-variants: ✅")
     
     async def enrich_question(
         self,
         question: str,
-        entities: Dict[str, Any],
-        missing_entities: List[str],
-        conversation_context: str,
-        language: str = "fr"
-    ) -> Dict[str, Any]:
+        entities: Dict[str, Any] = None,
+        missing_entities: List[str] = None,
+        conversation_context: str = "",
+        language: str = "fr",
+        multi_variant: bool = False
+    ) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
         """
         Enrichit une question avec le contexte conversationnel
         
         Args:
             question: Question originale
-            entities: Entités extraites (race, sexe, âge, etc.)
-            missing_entities: Entités manquantes critiques
+            entities: Entités extraites (race, sexe, âge, etc.) - OPTIONNEL
+            missing_entities: Entités manquantes critiques - OPTIONNEL  
             conversation_context: Contexte conversationnel
             language: Langue de la conversation
+            multi_variant: Si True, retourne plusieurs enrichissements différents
             
         Returns:
+            Si multi_variant=False:
             {
                 "enriched_question": "question optimisée",
                 "reasoning_notes": "explications",
                 "entities_used": ["race", "age"],
+                "inference_used": true,
                 "method_used": "openai/fallback",
                 "confidence": 0.8
             }
+            
+            Si multi_variant=True:
+            {
+                "variants": [
+                    {"enriched_question": "variant 1", "type": "standard", ...},
+                    {"enriched_question": "variant 2", "type": "contextual", ...},
+                    {"enriched_question": "variant 3", "type": "detailed", ...}
+                ],
+                "total_variants": 3,
+                "recommended_variant": 0
+            }
         """
         
+        # Valeurs par défaut
+        entities = entities or {}
+        missing_entities = missing_entities or []
+        
         self.stats["total_requests"] += 1
+        
+        # Tracker le type de requête
+        if multi_variant:
+            self.stats["multi_variant_requests"] += 1
+        else:
+            self.stats["single_variant_requests"] += 1
+        
+        # Tracker si on a des entités ou pas
+        has_entities = bool(entities and any(entities.get(key) for key in ["breed", "sex", "age_days", "symptoms"]))
+        if has_entities:
+            self.stats["with_entities"] += 1
+        else:
+            self.stats["inference_only"] += 1
+        
+        try:
+            if multi_variant:
+                return await self._generate_multi_variants(
+                    question, entities, missing_entities, conversation_context, language, has_entities
+                )
+            else:
+                # Mode single variant (comportement original)
+                return await self._generate_single_variant(
+                    question, entities, missing_entities, conversation_context, language, has_entities
+                )
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
+            
+            # Fallback d'erreur
+            error_result = {
+                "enriched_question": question,
+                "reasoning_notes": f"Erreur: {str(e)}",
+                "entities_used": [],
+                "inference_used": True,
+                "method_used": "error_fallback",
+                "confidence": 0.1,
+                "success": False
+            }
+            
+            if multi_variant:
+                return {
+                    "variants": [error_result],
+                    "total_variants": 1,
+                    "recommended_variant": 0,
+                    "error": str(e)
+                }
+            else:
+                return error_result
+    
+    async def _generate_single_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un seul enrichissement (comportement original)"""
         
         try:
             # Tentative OpenAI si disponible
             if self.openai_available:
                 result = await self._enrich_with_openai(
-                    question, entities, missing_entities, conversation_context, language
+                    question, entities, missing_entities, conversation_context, language, has_entities
                 )
                 if result["success"]:
                     self.stats["openai_success"] += 1
@@ -93,41 +180,406 @@ class AgentContextualizer:
             
             # Fallback: Enrichissement basique
             logger.info("🔄 [AgentContextualizer] Utilisation fallback basique")
-            result = self._enrich_fallback(question, entities, missing_entities, language)
+            result = self._enrich_fallback(question, entities, missing_entities, conversation_context, language, has_entities)
             self.stats["fallback_used"] += 1
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
-            return {
+            logger.error(f"❌ [AgentContextualizer] Erreur single variant: {e}")
+            raise
+    
+    async def _generate_multi_variants(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère plusieurs variants d'enrichissement pour rag_context_enhancer"""
+        
+        logger.info(f"🔄 [AgentContextualizer] Génération multi-variants pour: {question[:50]}...")
+        
+        variants = []
+        
+        try:
+            # Variant 1: Enrichissement standard (méthode originale)
+            standard_variant = await self._generate_single_variant(
+                question, entities, missing_entities, conversation_context, language, has_entities
+            )
+            standard_variant["variant_type"] = "standard"
+            standard_variant["variant_description"] = "Enrichissement standard avec entités disponibles"
+            variants.append(standard_variant)
+            
+            # Variant 2: Enrichissement contextuel (focus sur le contexte conversationnel)
+            contextual_variant = self._generate_contextual_variant(
+                question, entities, conversation_context, language, has_entities
+            )
+            variants.append(contextual_variant)
+            
+            # Variant 3: Enrichissement détaillé (toutes les entités explicites)
+            detailed_variant = self._generate_detailed_variant(
+                question, entities, missing_entities, language, has_entities
+            )
+            variants.append(detailed_variant)
+            
+            # Variant 4: Enrichissement technique (terminologie spécialisée)
+            technical_variant = self._generate_technical_variant(
+                question, entities, language, has_entities
+            )
+            variants.append(technical_variant)
+            
+            # Si on a du contexte ou des entités, ajouter un variant minimal
+            if conversation_context or has_entities:
+                minimal_variant = self._generate_minimal_variant(question, language)
+                variants.append(minimal_variant)
+            
+            # Statistiques
+            self.stats["variants_generated"] += len(variants)
+            
+            # Déterminer le variant recommandé (celui avec la meilleure confiance)
+            recommended_idx = max(range(len(variants)), key=lambda i: variants[i].get("confidence", 0))
+            
+            result = {
+                "variants": variants,
+                "total_variants": len(variants),
+                "recommended_variant": recommended_idx,
+                "generation_method": "openai" if self.openai_available else "fallback",
+                "has_entities": has_entities,
+                "processing_time": datetime.now().isoformat()
+            }
+            
+            logger.info(f"✅ [AgentContextualizer] {len(variants)} variants générés")
+            logger.debug(f"   Variant recommandé: #{recommended_idx} ({variants[recommended_idx]['variant_type']})")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur génération multi-variants: {e}")
+            
+            # Fallback: au moins retourner la question originale
+            fallback_variant = {
                 "enriched_question": question,
-                "reasoning_notes": f"Erreur: {str(e)}",
+                "reasoning_notes": f"Erreur génération variants: {str(e)}",
                 "entities_used": [],
+                "inference_used": True,
                 "method_used": "error_fallback",
                 "confidence": 0.1,
-                "success": False
+                "variant_type": "error",
+                "variant_description": "Variant d'erreur - question originale"
+            }
+            
+            return {
+                "variants": [fallback_variant],
+                "total_variants": 1,
+                "recommended_variant": 0,
+                "error": str(e)
             }
     
+    def _generate_contextual_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant focalisé sur le contexte conversationnel"""
+        
+        if not conversation_context:
+            # Pas de contexte, variant simple
+            variant = {
+                "enriched_question": question,
+                "reasoning_notes": "Pas de contexte conversationnel disponible",
+                "entities_used": [],
+                "inference_used": False,
+                "method_used": "contextual_fallback",
+                "confidence": 0.3,
+                "variant_type": "contextual",
+                "variant_description": "Variant contextuel - pas de contexte disponible"
+            }
+        else:
+            # Intégrer le contexte
+            if language == "fr":
+                enriched_question = f"{question} (Contexte conversation précédente: {conversation_context})"
+            elif language == "en":
+                enriched_question = f"{question} (Previous conversation context: {conversation_context})"
+            else:  # Spanish
+                enriched_question = f"{question} (Contexto conversación previa: {conversation_context})"
+            
+            variant = {
+                "enriched_question": enriched_question,
+                "reasoning_notes": "Enrichissement avec contexte conversationnel explicite",
+                "entities_used": ["context"],
+                "inference_used": False,
+                "method_used": "contextual_enhancement",
+                "confidence": 0.7,
+                "variant_type": "contextual",
+                "variant_description": "Variant contextuel - intégration contexte conversationnel"
+            }
+        
+        return variant
+    
+    def _generate_detailed_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant avec tous les détails d'entités explicites"""
+        
+        if not has_entities:
+            # Pas d'entités, utiliser inférence
+            variant = {
+                "enriched_question": self._add_technical_terminology(question, language),
+                "reasoning_notes": "Variant détaillé par inférence - pas d'entités disponibles",
+                "entities_used": [],
+                "inference_used": True,
+                "method_used": "detailed_inference",
+                "confidence": 0.4,
+                "variant_type": "detailed",
+                "variant_description": "Variant détaillé - inférence sans entités"
+            }
+        else:
+            # Construire détails explicites
+            details = []
+            entities_used = []
+            
+            if entities.get("breed"):
+                details.append(f"Race: {entities['breed']}")
+                entities_used.append("breed")
+            
+            if entities.get("sex"):
+                details.append(f"Sexe: {entities['sex']}")
+                entities_used.append("sex")
+            
+            if entities.get("age_days"):
+                details.append(f"Âge: {entities['age_days']} jours")
+                entities_used.append("age")
+            
+            if entities.get("weight_grams"):
+                details.append(f"Poids: {entities['weight_grams']}g")
+                entities_used.append("weight")
+            
+            if entities.get("symptoms"):
+                symptoms = ", ".join(entities["symptoms"])
+                details.append(f"Symptômes: {symptoms}")
+                entities_used.append("symptoms")
+            
+            if details:
+                detail_string = ", ".join(details)
+                if language == "fr":
+                    enriched_question = f"{question} - Détails: {detail_string}"
+                elif language == "en":
+                    enriched_question = f"{question} - Details: {detail_string}"
+                else:  # Spanish
+                    enriched_question = f"{question} - Detalles: {detail_string}"
+                
+                confidence = 0.8
+            else:
+                enriched_question = question
+                confidence = 0.3
+            
+            # Mentionner les entités manquantes si pertinentes
+            if missing_entities:
+                missing_str = ", ".join(missing_entities)
+                if language == "fr":
+                    enriched_question += f" (Informations manquantes: {missing_str})"
+                elif language == "en":
+                    enriched_question += f" (Missing information: {missing_str})"
+                else:  # Spanish
+                    enriched_question += f" (Información faltante: {missing_str})"
+            
+            variant = {
+                "enriched_question": enriched_question,
+                "reasoning_notes": f"Variant détaillé avec {len(details)} entités explicites",
+                "entities_used": entities_used,
+                "inference_used": False,
+                "method_used": "detailed_explicit",
+                "confidence": confidence,
+                "variant_type": "detailed",
+                "variant_description": "Variant détaillé - toutes entités explicites"
+            }
+        
+        return variant
+    
+    def _generate_technical_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant avec terminologie technique avancée"""
+        
+        # Commencer avec la question de base
+        enriched_question = question
+        
+        # Remplacements techniques selon la langue
+        if language == "fr":
+            technical_mappings = [
+                # Problèmes de croissance
+                (r'\bne grossit pas\b', 'déficit de croissance pondérale'),
+                (r'\bcroissance lente\b', 'retard de croissance'),
+                (r'\bproblème de croissance\b', 'pathologie de la croissance'),
+                
+                # Problèmes de santé
+                (r'\bmalade\b', 'pathologique'),
+                (r'\bmourir\b', 'mortalité'),
+                (r'\bproblème de santé\b', 'syndrome pathologique'),
+                (r'\bfièvre\b', 'hyperthermie'),
+                
+                # Alimentation
+                (r'\bne mange pas\b', 'anorexie'),
+                (r'\bproblème d\'alimentation\b', 'troubles nutritionnels'),
+                
+                # Général
+                (r'\bproblème\b', 'pathologie'),
+                (r'\bautre chose\b', 'diagnostic différentiel')
+            ]
+        elif language == "en":
+            technical_mappings = [
+                # Growth issues
+                (r'\bnot growing\b', 'suboptimal growth performance'),
+                (r'\bslow growth\b', 'growth retardation'),
+                (r'\bgrowth problem\b', 'growth pathology'),
+                
+                # Health issues
+                (r'\bsick\b', 'pathological'),
+                (r'\bdying\b', 'mortality syndrome'),
+                (r'\bhealth problem\b', 'pathological condition'),
+                (r'\bfever\b', 'hyperthermia'),
+                
+                # Feeding
+                (r'\bnot eating\b', 'anorexia'),
+                (r'\bfeeding problem\b', 'nutritional disorders'),
+                
+                # General
+                (r'\bproblem\b', 'pathological condition'),
+                (r'\bsomething else\b', 'differential diagnosis')
+            ]
+        else:  # Spanish
+            technical_mappings = [
+                # Problemas de crecimiento
+                (r'\bno crecen\b', 'déficit de rendimiento de crecimiento'),
+                (r'\bcrecimiento lento\b', 'retraso del crecimiento'),
+                (r'\bproblema de crecimiento\b', 'patología del crecimiento'),
+                
+                # Problemas de salud
+                (r'\benfermos?\b', 'patológicos'),
+                (r'\bmuriendo\b', 'síndrome de mortalidad'),
+                (r'\bproblema de salud\b', 'condición patológica'),
+                (r'\bfiebre\b', 'hipertermia'),
+                
+                # Alimentación
+                (r'\bno comen\b', 'anorexia'),
+                (r'\bproblema de alimentación\b', 'trastornos nutricionales'),
+                
+                # General
+                (r'\bproblema\b', 'condición patológica'),
+                (r'\botra cosa\b', 'diagnóstico diferencial')
+            ]
+        
+        # Appliquer les remplacements
+        replacements_applied = 0
+        for pattern, replacement in technical_mappings:
+            new_question = re.sub(pattern, replacement, enriched_question, flags=re.IGNORECASE)
+            if new_question != enriched_question:
+                replacements_applied += 1
+                enriched_question = new_question
+        
+        # Ajouter contexte technique si entités disponibles
+        if has_entities:
+            technical_context = self._build_technical_context(entities, language)
+            if technical_context:
+                if language == "fr":
+                    enriched_question += f" - Contexte technique: {technical_context}"
+                elif language == "en":
+                    enriched_question += f" - Technical context: {technical_context}"
+                else:  # Spanish
+                    enriched_question += f" - Contexto técnico: {technical_context}"
+        
+        confidence = min(0.9, 0.5 + (replacements_applied * 0.1) + (0.2 if has_entities else 0))
+        
+        variant = {
+            "enriched_question": enriched_question,
+            "reasoning_notes": f"Variant technique avec {replacements_applied} améliorations terminologiques",
+            "entities_used": list(entities.keys()) if has_entities else [],
+            "inference_used": replacements_applied > 0,
+            "method_used": "technical_enhancement",
+            "confidence": confidence,
+            "variant_type": "technical",
+            "variant_description": "Variant technique - terminologie vétérinaire spécialisée"
+        }
+        
+        return variant
+    
+    def _generate_minimal_variant(self, question: str, language: str) -> Dict[str, Any]:
+        """Génère un variant minimal (question quasi-originale)"""
+        
+        # Juste une légère amélioration grammaticale
+        minimal_question = question.strip()
+        if not minimal_question.endswith(('?', '.', '!')):
+            minimal_question += '?'
+        
+        return {
+            "enriched_question": minimal_question,
+            "reasoning_notes": "Variant minimal - question quasi-originale",
+            "entities_used": [],
+            "inference_used": False,
+            "method_used": "minimal_enhancement",
+            "confidence": 0.5,
+            "variant_type": "minimal",
+            "variant_description": "Variant minimal - préservation question originale"
+        }
+    
+    def _build_technical_context(self, entities: Dict[str, Any], language: str) -> str:
+        """Construit un contexte technique à partir des entités"""
+        
+        context_parts = []
+        
+        # Informations d'élevage
+        if entities.get("breed"):
+            context_parts.append(f"souche {entities['breed']}" if language == "fr" else 
+                               f"strain {entities['breed']}" if language == "en" else f"cepa {entities['breed']}")
+        
+        if entities.get("age_days"):
+            context_parts.append(f"J{entities['age_days']}" if language == "fr" else 
+                               f"D{entities['age_days']}" if language == "en" else f"D{entities['age_days']}")
+        
+        # Performance
+        if entities.get("weight_grams") and entities.get("age_days"):
+            gmq = entities["weight_grams"] / entities["age_days"]  # Gain moyen quotidien approximatif
+            context_parts.append(f"GMQ≈{gmq:.1f}g/j" if language == "fr" else 
+                               f"ADG≈{gmq:.1f}g/d" if language == "en" else f"GDP≈{gmq:.1f}g/d")
+        
+        return ", ".join(context_parts)
+    
+    # Méthodes existantes inchangées (conservées pour compatibilité)
     async def _enrich_with_openai(
         self,
         question: str,
         entities: Dict[str, Any],
         missing_entities: List[str],
         conversation_context: str,
-        language: str
+        language: str,
+        has_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement avec OpenAI GPT"""
+        """Enrichissement avec OpenAI GPT (méthode conservée)"""
         
         try:
             # Préparer le contexte pour GPT
-            entities_summary = self._format_entities_for_gpt(entities)
+            entities_summary = self._format_entities_for_gpt(entities) if has_entities else "Aucune entité extraite"
             missing_summary = ", ".join(missing_entities) if missing_entities else "Aucune"
             
-            # Prompt spécialisé selon la langue
-            system_prompt = self._get_system_prompt(language)
+            # Prompt spécialisé selon la langue et la présence d'entités
+            system_prompt = self._get_system_prompt(language, has_entities)
             user_prompt = self._build_enrichment_prompt(
-                question, entities_summary, missing_summary, conversation_context, language
+                question, entities_summary, missing_summary, conversation_context, language, has_entities
             )
             
             # Appel OpenAI
@@ -147,13 +599,15 @@ class AgentContextualizer:
             answer = response.choices[0].message.content.strip()
             
             # Parser la réponse JSON
-            result = self._parse_gpt_response(answer, question, entities)
+            result = self._parse_gpt_response(answer, question, entities, has_entities)
             result["success"] = True
             result["method_used"] = "openai"
             
             logger.info(f"✅ [AgentContextualizer] Enrichissement OpenAI réussi")
             logger.debug(f"   Original: {question}")
             logger.debug(f"   Enrichi: {result['enriched_question']}")
+            logger.debug(f"   Entités disponibles: {'✅' if has_entities else '❌'}")
+            logger.debug(f"   Inférence utilisée: {'✅' if result.get('inference_used') else '❌'}")
             
             return result
             
@@ -161,45 +615,73 @@ class AgentContextualizer:
             logger.error(f"❌ [AgentContextualizer] Erreur OpenAI: {e}")
             return {"success": False, "error": str(e)}
     
-    def _get_system_prompt(self, language: str) -> str:
-        """Retourne le prompt système selon la langue"""
+    def _get_system_prompt(self, language: str, has_entities: bool) -> str:
+        """Retourne le prompt système selon la langue et la présence d'entités"""
         
-        system_prompts = {
-            "fr": """Tu es un expert en aviculture spécialisé dans l'optimisation de questions pour systèmes RAG.
+        if language == "fr":
+            base_prompt = """Tu es un expert en aviculture spécialisé dans l'optimisation de questions pour systèmes RAG.
 
 Ta mission:
-1. Reformuler la question en intégrant TOUTES les entités connues de manière naturelle
-2. Optimiser pour la recherche documentaire (mots-clés techniques précis)
-3. Mentionner si des informations critiques manquent
-4. Garder le sens et l'intention originale
-5. Utiliser la terminologie vétérinaire appropriée
-
-IMPORTANT: Réponds UNIQUEMENT en JSON avec la structure exacte demandée.""",
+1. Reformuler la question pour optimiser la recherche documentaire
+2. Utiliser la terminologie vétérinaire précise et technique
+3. Intégrer le contexte conversationnel disponible
+4. Garder le sens et l'intention originale"""
             
-            "en": """You are a poultry expert specialized in optimizing questions for RAG systems.
+            if has_entities:
+                base_prompt += """
+5. Intégrer NATURELLEMENT toutes les entités connues (race, âge, sexe, etc.)
+6. Mentionner si des informations critiques manquent encore"""
+            else:
+                base_prompt += """
+5. INFÉRER les informations probables à partir du contexte et de la question
+6. Reformuler avec terminologie technique même sans entités précises
+7. Utiliser des termes génériques mais techniques si nécessaire"""
+            
+            base_prompt += "\n\nIMPORTANT: Réponds UNIQUEMENT en JSON avec la structure exacte demandée."
+            
+        elif language == "en":
+            base_prompt = """You are a poultry expert specialized in optimizing questions for RAG systems.
 
 Your mission:
-1. Reformulate the question by naturally integrating ALL known entities
-2. Optimize for document search (precise technical keywords)
-3. Mention if critical information is missing
-4. Keep original meaning and intention
-5. Use appropriate veterinary terminology
-
-IMPORTANT: Respond ONLY in JSON with the exact requested structure.""",
+1. Reformulate the question to optimize document search
+2. Use precise and technical veterinary terminology
+3. Integrate available conversational context
+4. Keep original meaning and intention"""
             
-            "es": """Eres un experto en avicultura especializado en optimizar preguntas para sistemas RAG.
+            if has_entities:
+                base_prompt += """
+5. NATURALLY integrate all known entities (breed, age, sex, etc.)
+6. Mention if critical information is still missing"""
+            else:
+                base_prompt += """
+5. INFER probable information from context and question
+6. Reformulate with technical terminology even without precise entities
+7. Use generic but technical terms if necessary"""
+            
+            base_prompt += "\n\nIMPORTANT: Respond ONLY in JSON with the exact requested structure."
+            
+        else:  # Spanish
+            base_prompt = """Eres un experto en avicultura especializado en optimizar preguntas para sistemas RAG.
 
 Tu misión:
-1. Reformular la pregunta integrando naturalmente TODAS las entidades conocidas
-2. Optimizar para búsqueda documental (palabras clave técnicas precisas)
-3. Mencionar si falta información crítica
-4. Mantener el sentido e intención original
-5. Usar terminología veterinaria apropiada
-
-IMPORTANTE: Responde SOLO en JSON con la estructura exacta solicitada."""
-        }
+1. Reformular la pregunta para optimizar la búsqueda documental
+2. Usar terminología veterinaria precisa y técnica
+3. Integrar el contexto conversacional disponible
+4. Mantener el sentido e intención original"""
+            
+            if has_entities:
+                base_prompt += """
+5. Integrar NATURALMENTE todas las entidades conocidas (raza, edad, sexo, etc.)
+6. Mencionar si aún falta información crítica"""
+            else:
+                base_prompt += """
+5. INFERIR información probable del contexto y la pregunta
+6. Reformular con terminología técnica incluso sin entidades precisas
+7. Usar términos genéricos pero técnicos si es necesario"""
+            
+            base_prompt += "\n\nIMPORTANTE: Responde SOLO en JSON con la estructura exacta solicitada."
         
-        return system_prompts.get(language, system_prompts["fr"])
+        return base_prompt
     
     def _build_enrichment_prompt(
         self,
@@ -207,20 +689,24 @@ IMPORTANTE: Responde SOLO en JSON con la estructura exacta solicitada."""
         entities_summary: str,
         missing_summary: str,
         conversation_context: str,
-        language: str
+        language: str,
+        has_entities: bool
     ) -> str:
-        """Construit le prompt d'enrichissement"""
+        """Construit le prompt d'enrichissement adapté selon la présence d'entités"""
         
         if language == "fr":
-            return f"""QUESTION ORIGINALE: "{question}"
+            prompt = f"""QUESTION ORIGINALE: "{question}"
 
 ENTITÉS CONNUES:
 {entities_summary}
 
-ENTITÉS MANQUANTES CRITIQUES: {missing_summary}
-
 CONTEXTE CONVERSATIONNEL:
-{conversation_context}
+{conversation_context or "Aucun contexte conversationnel"}"""
+            
+            if has_entities:
+                prompt += f"""
+
+ENTITÉS MANQUANTES CRITIQUES: {missing_summary}
 
 INSTRUCTIONS:
 1. Reformule la question en intégrant naturellement les entités connues
@@ -228,30 +714,50 @@ INSTRUCTIONS:
 3. Si des entités critiques manquent, adapte la formulation
 4. Garde l'intention originale
 
-EXEMPLE:
+EXEMPLE AVEC ENTITÉS:
 Original: "Mes poulets ne grossissent pas bien"
 Avec entités (race: Ross 308, sexe: mâles, âge: 21 jours):
-Enrichi: "Mes poulets de chair Ross 308 mâles de 21 jours ont une croissance insuffisante - diagnostic et solutions"
+Enrichi: "Mes poulets de chair Ross 308 mâles de 21 jours ont une croissance insuffisante - diagnostic et solutions"""
+            else:
+                prompt += """
+
+INSTRUCTIONS (MODE INFÉRENCE - SANS ENTITÉS):
+1. Analyse la question pour identifier le type de problème agricole
+2. Infère le contexte probable (élevage de poulets, problème de santé, nutrition, etc.)
+3. Reformule avec terminologie technique vétérinaire appropriée
+4. Utilise des termes génériques mais précis si les spécificités manquent
+5. Optimise pour la recherche documentaire même sans entités
+
+EXEMPLE SANS ENTITÉS:
+Original: "Mes poulets ne grossissent pas bien"
+Sans entités spécifiques:
+Enrichi: "Retard de croissance chez les poulets de chair - diagnostic des causes et protocoles thérapeutiques"""
+            
+            prompt += """
 
 Réponds en JSON:
-{{
-  "enriched_question": "question reformulée avec entités intégrées",
+{
+  "enriched_question": "question reformulée optimisée",
   "reasoning_notes": "explication des modifications apportées",
   "entities_used": ["race", "sexe", "âge"],
+  "inference_used": true/false,
   "confidence": 0.9,
-  "optimization_applied": "ajout terminologie technique + intégration entités"
-}}"""
+  "optimization_applied": "description des améliorations"
+}"""
         
         elif language == "en":
-            return f"""ORIGINAL QUESTION: "{question}"
+            prompt = f"""ORIGINAL QUESTION: "{question}"
 
 KNOWN ENTITIES:
 {entities_summary}
 
-MISSING CRITICAL ENTITIES: {missing_summary}
-
 CONVERSATIONAL CONTEXT:
-{conversation_context}
+{conversation_context or "No conversational context"}"""
+            
+            if has_entities:
+                prompt += f"""
+
+MISSING CRITICAL ENTITIES: {missing_summary}
 
 INSTRUCTIONS:
 1. Reformulate question naturally integrating known entities
@@ -259,30 +765,50 @@ INSTRUCTIONS:
 3. If critical entities missing, adapt formulation
 4. Keep original intention
 
-EXAMPLE:
+EXAMPLE WITH ENTITIES:
 Original: "My chickens are not growing well"
 With entities (breed: Ross 308, sex: males, age: 21 days):
-Enriched: "My Ross 308 male broiler chickens at 21 days have poor growth performance - diagnosis and solutions"
+Enriched: "My Ross 308 male broiler chickens at 21 days have poor growth performance - diagnosis and solutions"""
+            else:
+                prompt += """
+
+INSTRUCTIONS (INFERENCE MODE - NO ENTITIES):
+1. Analyze question to identify type of agricultural problem
+2. Infer probable context (poultry farming, health issue, nutrition, etc.)
+3. Reformulate with appropriate veterinary technical terminology
+4. Use generic but precise terms if specifics are missing
+5. Optimize for document search even without entities
+
+EXAMPLE WITHOUT ENTITIES:
+Original: "My chickens are not growing well"
+Without specific entities:
+Enriched: "Growth retardation in broiler chickens - diagnosis of causes and therapeutic protocols"""
+            
+            prompt += """
 
 Respond in JSON:
-{{
-  "enriched_question": "reformulated question with integrated entities",
+{
+  "enriched_question": "optimized reformulated question",
   "reasoning_notes": "explanation of modifications made",
   "entities_used": ["breed", "sex", "age"],
+  "inference_used": true/false,
   "confidence": 0.9,
-  "optimization_applied": "added technical terminology + integrated entities"
-}}"""
+  "optimization_applied": "description of improvements"
+}"""
         
         else:  # Spanish
-            return f"""PREGUNTA ORIGINAL: "{question}"
+            prompt = f"""PREGUNTA ORIGINAL: "{question}"
 
 ENTIDADES CONOCIDAS:
 {entities_summary}
 
-ENTIDADES CRÍTICAS FALTANTES: {missing_summary}
-
 CONTEXTO CONVERSACIONAL:
-{conversation_context}
+{conversation_context or "Sin contexto conversacional"}"""
+            
+            if has_entities:
+                prompt += f"""
+
+ENTIDADES CRÍTICAS FALTANTES: {missing_summary}
 
 INSTRUCCIONES:
 1. Reformula la pregunta integrando naturalmente las entidades conocidas
@@ -290,19 +816,38 @@ INSTRUCCIONES:
 3. Si faltan entidades críticas, adapta la formulación
 4. Mantén la intención original
 
-EJEMPLO:
+EJEMPLO CON ENTIDADES:
 Original: "Mis pollos no crecen bien"
 Con entidades (raza: Ross 308, sexo: machos, edad: 21 días):
-Enriquecida: "Mis pollos de engorde Ross 308 machos de 21 días tienen crecimiento deficiente - diagnóstico y soluciones"
+Enriquecida: "Mis pollos de engorde Ross 308 machos de 21 días tienen crecimiento deficiente - diagnóstico y soluciones"""
+            else:
+                prompt += """
+
+INSTRUCCIONES (MODO INFERENCIA - SIN ENTIDADES):
+1. Analiza la pregunta para identificar el tipo de problema agrícola
+2. Infiere el contexto probable (avicultura, problema de salud, nutrición, etc.)
+3. Reformula con terminología técnica veterinaria apropiada
+4. Usa términos genéricos pero precisos si faltan especificidades
+5. Optimiza para búsqueda documental incluso sin entidades
+
+EJEMPLO SIN ENTIDADES:
+Original: "Mis pollos no crecen bien"
+Sin entidades específicas:
+Enriquecida: "Retraso del crecimiento en pollos de engorde - diagnóstico de causas y protocolos terapéuticos"""
+            
+            prompt += """
 
 Responde en JSON:
-{{
-  "enriched_question": "pregunta reformulada con entidades integradas",
+{
+  "enriched_question": "pregunta reformulada optimizada",
   "reasoning_notes": "explicación de modificaciones realizadas",
   "entities_used": ["raza", "sexo", "edad"],
+  "inference_used": true/false,
   "confidence": 0.9,
-  "optimization_applied": "agregada terminología técnica + entidades integradas"
-}}"""
+  "optimization_applied": "descripción de mejoras"
+}"""
+        
+        return prompt
     
     def _format_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
         """Formate les entités pour le prompt GPT"""
@@ -356,7 +901,7 @@ Responde en JSON:
         
         return "\n".join(formatted_parts) if formatted_parts else "Aucune entité extraite"
     
-    def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any], has_entities: bool) -> Dict[str, Any]:
         """Parse la réponse JSON de GPT"""
         
         try:
@@ -364,7 +909,6 @@ Responde en JSON:
             json_match = None
             
             # Chercher JSON dans des blocs code
-            import re
             json_patterns = [
                 r'```json\s*(\{.*?\})\s*```',
                 r'```\s*(\{.*?\})\s*```',
@@ -388,6 +932,7 @@ Responde en JSON:
                 "enriched_question": data.get("enriched_question", original_question),
                 "reasoning_notes": data.get("reasoning_notes", "Aucune explication fournie"),
                 "entities_used": data.get("entities_used", []),
+                "inference_used": data.get("inference_used", not has_entities),
                 "confidence": min(max(data.get("confidence", 0.5), 0.0), 1.0),
                 "optimization_applied": data.get("optimization_applied", "Optimisation basique"),
                 "method_used": "openai",
@@ -406,51 +951,109 @@ Responde en JSON:
                     "enriched_question": response.strip(),
                     "reasoning_notes": "JSON parsing failed, used raw response",
                     "entities_used": [],
+                    "inference_used": True,
                     "confidence": 0.3,
                     "optimization_applied": "Réponse brute GPT",
                     "method_used": "openai_fallback"
                 }
             else:
                 # Fallback final
-                return self._enrich_fallback(original_question, entities, [], "fr")
+                return self._enrich_fallback(original_question, entities, [], "", "fr", has_entities)
     
     def _enrich_fallback(
         self,
         question: str,
         entities: Dict[str, Any],
         missing_entities: List[str],
-        language: str
+        conversation_context: str,
+        language: str,
+        has_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement fallback sans OpenAI"""
+        """Enrichissement fallback sans OpenAI - amélioration pour fonctionner sans entités"""
         
         enriched_parts = []
         entities_used = []
+        inference_used = False
         
-        # Intégrer les entités connues
-        if entities.get("breed") and entities.get("breed_confidence", 0) > 0.5:
-            enriched_parts.append(entities["breed"])
-            entities_used.append("breed")
-        
-        if entities.get("sex") and entities.get("sex_confidence", 0) > 0.5:
-            enriched_parts.append(entities["sex"])
-            entities_used.append("sex")
-        
-        if entities.get("age_days") and entities.get("age_confidence", 0) > 0.5:
-            enriched_parts.append(f"{entities['age_days']} jours")
-            entities_used.append("age")
+        if has_entities:
+            # Mode avec entités - comportement original
+            if entities.get("breed") and entities.get("breed_confidence", 0) > 0.5:
+                enriched_parts.append(entities["breed"])
+                entities_used.append("breed")
+            
+            if entities.get("sex") and entities.get("sex_confidence", 0) > 0.5:
+                enriched_parts.append(entities["sex"])
+                entities_used.append("sex")
+            
+            if entities.get("age_days") and entities.get("age_confidence", 0) > 0.5:
+                enriched_parts.append(f"{entities['age_days']} jours")
+                entities_used.append("age")
+        else:
+            # Mode sans entités - inférence contextuelle
+            inference_used = True
+            
+            # Analyser la question pour inférer le contexte
+            question_lower = question.lower()
+            
+            # Détection du type d'animal
+            if any(word in question_lower for word in ["poulet", "chicken", "pollo", "broiler"]):
+                enriched_parts.append("poulets de chair" if language == "fr" else 
+                                   "broiler chickens" if language == "en" else "pollos de engorde")
+            elif any(word in question_lower for word in ["poule", "hen", "gallina"]):
+                enriched_parts.append("poules pondeuses" if language == "fr" else 
+                                   "laying hens" if language == "en" else "gallinas ponedoras")
+            
+            # Détection des problèmes types
+            if any(word in question_lower for word in ["croissance", "growth", "crecimiento", "grossir", "grow"]):
+                if language == "fr":
+                    enriched_parts.append("retard de croissance")
+                elif language == "en":
+                    enriched_parts.append("growth performance issues")
+                else:
+                    enriched_parts.append("problemas de crecimiento")
+            
+            if any(word in question_lower for word in ["mortalité", "mortality", "mortalidad", "mourir", "dying", "muerte"]):
+                if language == "fr":
+                    enriched_parts.append("mortalité élevée")
+                elif language == "en":
+                    enriched_parts.append("high mortality")
+                else:
+                    enriched_parts.append("mortalidad elevada")
+            
+            if any(word in question_lower for word in ["maladie", "disease", "enfermedad", "malade", "sick"]):
+                if language == "fr":
+                    enriched_parts.append("problème sanitaire")
+                elif language == "en":
+                    enriched_parts.append("health issue")
+                else:
+                    enriched_parts.append("problema sanitario")
         
         # Construire la question enrichie
         if enriched_parts:
-            # Remplacer "poulet(s)" par la version enrichie
             enrichment = " ".join(enriched_parts)
             
-            # Patterns de remplacement
-            replacements = [
-                (r'\bmes poulets\b', f'mes poulets {enrichment}'),
-                (r'\bpoulets?\b', f'poulets {enrichment}'),
-                (r'\bchickens?\b', f'{enrichment} chickens'),
-                (r'\bpollos?\b', f'pollos {enrichment}')
-            ]
+            # Patterns de remplacement selon la langue
+            if language == "fr":
+                replacements = [
+                    (r'\bmes poulets\b', f'mes {enrichment}'),
+                    (r'\bpoulets?\b', enrichment),
+                    (r'\bmes poules\b', f'mes {enrichment}'),
+                    (r'\bpoules?\b', enrichment)
+                ]
+            elif language == "en":
+                replacements = [
+                    (r'\bmy chickens?\b', f'my {enrichment}'),
+                    (r'\bchickens?\b', enrichment),
+                    (r'\bmy hens?\b', f'my {enrichment}'),
+                    (r'\bhens?\b', enrichment)
+                ]
+            else:  # Spanish
+                replacements = [
+                    (r'\bmis pollos?\b', f'mis {enrichment}'),
+                    (r'\bpollos?\b', enrichment),
+                    (r'\bmis gallinas?\b', f'mis {enrichment}'),
+                    (r'\bgallinas?\b', enrichment)
+                ]
             
             enriched_question = question
             for pattern, replacement in replacements:
@@ -458,36 +1061,99 @@ Responde en JSON:
             
             # Si aucun remplacement, ajouter en contexte
             if enriched_question == question:
-                enriched_question = f"{question} (Contexte: {enrichment})"
+                if language == "fr":
+                    enriched_question = f"{question} (Contexte: {enrichment})"
+                elif language == "en":
+                    enriched_question = f"{question} (Context: {enrichment})"
+                else:
+                    enriched_question = f"{question} (Contexto: {enrichment})"
         else:
-            enriched_question = question
+            # Même sans entités ni inférence, améliorer avec terminologie technique
+            enriched_question = self._add_technical_terminology(question, language)
+            if enriched_question != question:
+                inference_used = True
         
-        # Notes sur les entités manquantes
-        reasoning_notes = "Enrichissement basique"
-        if missing_entities:
-            reasoning_notes += f". Informations manquantes: {', '.join(missing_entities)}"
+        # Notes sur les entités manquantes ou l'inférence
+        if has_entities:
+            reasoning_notes = "Enrichissement basique avec entités"
+            if missing_entities:
+                reasoning_notes += f". Informations manquantes: {', '.join(missing_entities)}"
+        else:
+            reasoning_notes = "Enrichissement par inférence contextuelle - pas d'entités disponibles"
         
         return {
             "enriched_question": enriched_question,
             "reasoning_notes": reasoning_notes,
             "entities_used": entities_used,
-            "confidence": 0.6 if entities_used else 0.3,
-            "optimization_applied": "Intégration entités basique",
+            "inference_used": inference_used,
+            "confidence": 0.6 if entities_used else (0.4 if inference_used else 0.3),
+            "optimization_applied": "Intégration entités" if has_entities else "Inférence contextuelle",
             "method_used": "fallback"
         }
     
+    def _add_technical_terminology(self, question: str, language: str) -> str:
+        """Ajoute de la terminologie technique même sans entités"""
+        
+        question_lower = question.lower()
+        
+        # Remplacements techniques selon la langue
+        if language == "fr":
+            technical_replacements = [
+                (r'\bproblème de croissance\b', 'retard de croissance'),
+                (r'\bne grossit pas\b', 'croissance insuffisante'),
+                (r'\bproblème de santé\b', 'pathologie'),
+                (r'\bmourir\b', 'mortalité'),
+                (r'\bmal manger\b', 'troubles alimentaires'),
+                (r'\bfièvre\b', 'hyperthermie'),
+            ]
+        elif language == "en":
+            technical_replacements = [
+                (r'\bgrowth problem\b', 'growth performance deficit'),
+                (r'\bnot growing\b', 'suboptimal growth'),
+                (r'\bhealth problem\b', 'pathological condition'),
+                (r'\bdying\b', 'mortality'),
+                (r'\bnot eating\b', 'feed intake disorders'),
+                (r'\bfever\b', 'hyperthermia'),
+            ]
+        else:  # Spanish
+            technical_replacements = [
+                (r'\bproblema de crecimiento\b', 'déficit de rendimiento de crecimiento'),
+                (r'\bno crecen\b', 'crecimiento subóptimo'),
+                (r'\bproblema de salud\b', 'condición patológica'),
+                (r'\bmuriendo\b', 'mortalidad'),
+                (r'\bno comen\b', 'trastornos de ingesta'),
+                (r'\bfiebre\b', 'hipertermia'),
+            ]
+        
+        enhanced_question = question
+        for pattern, replacement in technical_replacements:
+            enhanced_question = re.sub(pattern, replacement, enhanced_question, flags=re.IGNORECASE)
+        
+        return enhanced_question
+    
     def get_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques de l'agent"""
+        """Retourne les statistiques de l'agent - version multi-variants"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
         enrichment_rate = (self.stats["questions_enriched"] / total * 100) if total > 0 else 0
+        inference_rate = (self.stats["inference_only"] / total * 100) if total > 0 else 0
+        with_entities_rate = (self.stats["with_entities"] / total * 100) if total > 0 else 0
+        multi_variant_rate = (self.stats["multi_variant_requests"] / total * 100) if total > 0 else 0
+        avg_variants = (self.stats["variants_generated"] / self.stats["multi_variant_requests"]) if self.stats["multi_variant_requests"] > 0 else 0
         
         return {
             "agent_type": "contextualizer",
+            "version": "multi_variant_v3",
             "total_requests": total,
+            "single_variant_requests": self.stats["single_variant_requests"],
+            "multi_variant_requests": self.stats["multi_variant_requests"],
+            "multi_variant_rate": f"{multi_variant_rate:.1f}%",
+            "avg_variants_per_multi_request": f"{avg_variants:.1f}",
             "openai_success_rate": f"{success_rate:.1f}%",
             "question_enrichment_rate": f"{enrichment_rate:.1f}%",
+            "inference_only_rate": f"{inference_rate:.1f}%",
+            "with_entities_rate": f"{with_entities_rate:.1f}%",
             "openai_available": self.openai_available,
             "model_used": self.model,
             "detailed_stats": self.stats.copy()
@@ -496,15 +1162,30 @@ Responde en JSON:
 # Instance globale
 agent_contextualizer = AgentContextualizer()
 
-# Fonction utilitaire pour usage externe
+# Fonction utilitaire pour usage externe - signature mise à jour avec multi_variant
 async def enrich_question(
     question: str,
-    entities: Dict[str, Any],
-    missing_entities: List[str],
-    conversation_context: str,
-    language: str = "fr"
-) -> Dict[str, Any]:
-    """Fonction utilitaire pour enrichir une question"""
+    entities: Dict[str, Any] = None,
+    missing_entities: List[str] = None,
+    conversation_context: str = "",
+    language: str = "fr",
+    multi_variant: bool = False
+) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
+    """
+    Fonction utilitaire pour enrichir une question - fonctionne avec ou sans entités
+    
+    Args:
+        question: Question à enrichir
+        entities: Entités extraites (optionnel)
+        missing_entities: Entités manquantes (optionnel)
+        conversation_context: Contexte conversationnel
+        language: Langue (fr/en/es)
+        multi_variant: Si True, génère plusieurs variants d'enrichissement
+    
+    Returns:
+        Si multi_variant=False: Dict avec question enrichie
+        Si multi_variant=True: Dict avec liste de variants
+    """
     return await agent_contextualizer.enrich_question(
-        question, entities, missing_entities, conversation_context, language
+        question, entities, missing_entities, conversation_context, language, multi_variant
     )

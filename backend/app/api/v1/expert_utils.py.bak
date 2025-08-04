@@ -4,6 +4,9 @@ app/api/v1/expert_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
 Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Toutes les fonctions référencées dans expert.py et expert_services.py
 ✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
+🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
+🚀 INTÉGRÉ: Centralisation via clarification_entities
+🚀 AJOUTÉ: score_question_variant() pour scoring générique des variantes
 """
 
 import re
@@ -14,6 +17,22 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# 🚀 NOUVEAU: Imports centralisation clarification_entities
+try:
+    from .clarification_entities import normalize_breed_name, infer_sex_from_breed
+    CLARIFICATION_ENTITIES_AVAILABLE = True
+    logger.info("✅ [Utils] clarification_entities importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ [Utils] clarification_entities non disponible: {e}")
+    # Fonctions fallback
+    def normalize_breed_name(breed):
+        return breed.lower().strip() if breed else "", "manual"
+    def infer_sex_from_breed(breed):
+        layer_breeds = ['isa brown', 'lohmann brown', 'hy-line', 'bovans', 'shaver']
+        is_layer = any(layer in breed.lower() for layer in layer_breeds)
+        return "femelles" if is_layer else None, is_layer
+    CLARIFICATION_ENTITIES_AVAILABLE = False
 
 # =============================================================================
 # UTILITAIRES D'AUTHENTIFICATION ET SESSION
@@ -72,7 +91,10 @@ def extract_session_info(request) -> Dict[str, Any]:
 # =============================================================================
 
 def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") -> Optional[Dict[str, str]]:
-    """Extrait race et sexe depuis une réponse de clarification"""
+    """
+    Extrait race et sexe depuis une réponse de clarification
+    🚀 CORRIGÉ: Auto-détection sexe pour races pondeuses
+    """
     
     if not text or not text.strip():
         return {"breed": None, "sex": None}
@@ -85,19 +107,25 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             # Races complètes courantes
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
+            # 🚀 NOUVEAU: Patterns pondeuses étendus
+            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             # Mentions génériques
-            r'\brace[:\s]*([a-zA-Z0-9\s]+)',
+            r'\bace[:\s]*([a-zA-Z0-9\s]+)',
             r'\bsouche[:\s]*([a-zA-Z0-9\s]+)',
         ],
         "en": [
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
+            # 🚀 NOUVEAU: Patterns pondeuses étendus
+            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             r'\bbreed[:\s]*([a-zA-Z0-9\s]+)',
             r'\bstrain[:\s]*([a-zA-Z0-9\s]+)',
         ],
         "es": [
             r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
             r'\b(ross|cobb|hubbard)\s*\d{2,3}\b',
+            # 🚀 NOUVEAU: Patterns pondeuses étendus
+            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             r'\braza[:\s]*([a-zA-Z0-9\s]+)',
             r'\bcepa[:\s]*([a-zA-Z0-9\s]+)',
         ]
@@ -134,7 +162,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
     for pattern in patterns:
         match = re.search(pattern, text_lower, re.IGNORECASE)
         if match:
-            if pattern.startswith(r'\b(ross'):  # Pattern de races spécifiques
+            if pattern.startswith(r'\b(ross') or pattern.startswith(r'\b(isa'):  # Pattern de races spécifiques
                 breed = match.group(1).strip()
             else:  # Pattern avec groupe de capture
                 breed = match.group(1).strip() if match.lastindex and match.lastindex >= 1 else match.group(0).strip()
@@ -148,7 +176,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             else:
                 breed = None
     
-    # Extraction sexe
+    # Extraction sexe (CODE ORIGINAL)
     sex = None
     patterns = sex_patterns.get(language, sex_patterns["fr"])
     
@@ -182,6 +210,20 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             
             if sex:
                 break
+    
+    # 🚀 Utilisation de la centralisation pour normaliser la race et inférer le sexe
+    if breed and not sex:
+        normalized_breed, _ = normalize_breed_name(breed)
+        inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
+        
+        if was_inferred and inferred_sex:
+            sex_mapping = {
+                "fr": "femelles",
+                "en": "females", 
+                "es": "hembras"
+            }
+            sex = sex_mapping.get(language, "femelles")
+            logger.info(f"🥚 [Auto-Fix Utils] Race détectée: {normalized_breed} → sexe='{sex}' (via clarification_entities)")
     
     result = {"breed": breed, "sex": sex}
     
@@ -455,6 +497,57 @@ def extract_conversation_context(conversation_history: List[Dict[str, Any]], max
 # =============================================================================
 # UTILITAIRES VALIDATION ET FORMATS
 # =============================================================================
+
+def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
+    """
+    Score une variante de question en fonction des entités présentes
+    
+    Args:
+        variant: La variante de question à scorer
+        entities: Dictionnaire des entités extraites (breed, sex, age, etc.)
+    
+    Returns:
+        float: Score entre 0 et 1 (1 = toutes les entités présentes)
+    
+    Example:
+        entities = {"breed": "Ross 308", "sex": "mâles", "age": "25 jours"}
+        variant = "Pour des poulets Ross 308 mâles de 25 jours"
+        score = score_question_variant(variant, entities) # Returns 1.0
+    """
+    if not variant or not entities:
+        return 0.0
+    
+    variant_lower = variant.lower()
+    matched_entities = 0
+    total_entities = 0
+    
+    for entity_key, entity_value in entities.items():
+        if entity_value:  # Ignore empty entities
+            total_entities += 1
+            entity_str = str(entity_value).lower()
+            
+            # Score différent selon le type d'entité
+            if entity_key == "breed":
+                # Pour les races, chercher le nom exact ou des parties
+                breed_parts = entity_str.split()
+                if len(breed_parts) > 1:
+                    # Race composée (ex: "ross 308") - chercher toutes les parties
+                    if all(part in variant_lower for part in breed_parts):
+                        matched_entities += 1
+                else:
+                    # Race simple - chercher le nom exact
+                    if entity_str in variant_lower:
+                        matched_entities += 1
+            elif entity_key == "sex":
+                # Pour le sexe, chercher le terme exact
+                if entity_str in variant_lower:
+                    matched_entities += 1
+            else:
+                # Pour les autres entités (age, poids, etc.), chercher la valeur
+                if entity_str in variant_lower:
+                    matched_entities += 1
+    
+    return matched_entities / max(total_entities, 1)
 
 def validate_question_length(question: str, min_length: int = 3, max_length: int = 5000) -> Dict[str, Any]:
     """Valide la longueur d'une question"""
@@ -821,9 +914,18 @@ logger.info("   - validate_clarification_completeness: Validation complétude cl
 logger.info("   - build_enriched_question_*: Construction questions enrichies")
 logger.info("   - get_enhanced_topics_by_language: Topics suggérés multilingues")
 logger.info("   - save_conversation_auto_enhanced: Sauvegarde conversation")
+logger.info("   - score_question_variant: Scoring variantes de questions")
+logger.info("   - validate_question_length: Validation longueur questions")
 logger.info("   - validate_and_sanitize_input: Validation et nettoyage input")
 logger.info("   - create_debug_info: Informations debug structurées") 
 logger.info("   - log_performance_metrics: Métriques de performance")
 logger.info("   - create_fallback_response: Réponses de fallback")
 logger.info("   - extract_key_entities_simple: Extraction entités simple")
+logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
+logger.info("🚀 [Expert Utils] INTÉGRÉ: Centralisation via clarification_entities")
+logger.info("🚀 [Expert Utils] NOUVEAU: score_question_variant() - Scoring générique des variantes")
+if CLARIFICATION_ENTITIES_AVAILABLE:
+    logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
+else:
+    logger.info("   ⚠️ clarification_entities: Mode fallback actif")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")

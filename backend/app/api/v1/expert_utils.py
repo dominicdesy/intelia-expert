@@ -4,6 +4,8 @@ app/api/v1/expert_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
 Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Toutes les fonctions référencées dans expert.py et expert_services.py
 ✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
+✅ CORRIGÉ: Gestion des exceptions améliorée
+✅ CORRIGÉ: Validation des types et None-safety
 🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
 🚀 INTÉGRÉ: Centralisation via clarification_entities
 🚀 AJOUTÉ: score_question_variant() pour scoring générique des variantes
@@ -13,7 +15,7 @@ import re
 import uuid
 import logging
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -26,12 +28,20 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ [Utils] clarification_entities non disponible: {e}")
     # Fonctions fallback
-    def normalize_breed_name(breed):
-        return breed.lower().strip() if breed else "", "manual"
-    def infer_sex_from_breed(breed):
+    def normalize_breed_name(breed: str) -> tuple[str, str]:
+        """Fallback function for breed normalization"""
+        if not breed:
+            return "", "manual"
+        return breed.lower().strip(), "manual"
+    
+    def infer_sex_from_breed(breed: str) -> tuple[Optional[str], bool]:
+        """Fallback function for sex inference from breed"""
+        if not breed:
+            return None, False
         layer_breeds = ['isa brown', 'lohmann brown', 'hy-line', 'bovans', 'shaver']
         is_layer = any(layer in breed.lower() for layer in layer_breeds)
         return "femelles" if is_layer else None, is_layer
+    
     CLARIFICATION_ENTITIES_AVAILABLE = False
 
 # =============================================================================
@@ -42,14 +52,16 @@ def get_user_id_from_request(request) -> str:
     """Extrait l'ID utilisateur depuis la requête"""
     try:
         # Essayer d'extraire depuis les headers
-        if hasattr(request, 'headers'):
+        if hasattr(request, 'headers') and request.headers:
             user_id = request.headers.get('X-User-ID')
-            if user_id:
-                return user_id
+            if user_id and isinstance(user_id, str) and user_id.strip():
+                return user_id.strip()
         
         # Fallback vers l'IP client
-        if hasattr(request, 'client') and request.client:
-            return f"ip_{request.client.host}"
+        if hasattr(request, 'client') and request.client and hasattr(request.client, 'host'):
+            client_host = request.client.host
+            if client_host:
+                return f"ip_{client_host}"
         
         # Dernier fallback
         return f"anonymous_{uuid.uuid4().hex[:8]}"
@@ -68,11 +80,13 @@ def extract_session_info(request) -> Dict[str, Any]:
             "timestamp": datetime.now().isoformat()
         }
         
-        if hasattr(request, 'headers'):
+        if hasattr(request, 'headers') and request.headers:
             session_info["user_agent"] = request.headers.get('User-Agent')
-            session_info["request_id"] = request.headers.get('X-Request-ID', session_info["request_id"])
+            request_id_header = request.headers.get('X-Request-ID')
+            if request_id_header:
+                session_info["request_id"] = request_id_header
         
-        if hasattr(request, 'client') and request.client:
+        if hasattr(request, 'client') and request.client and hasattr(request.client, 'host'):
             session_info["ip_address"] = request.client.host
         
         return session_info
@@ -90,13 +104,13 @@ def extract_session_info(request) -> Dict[str, Any]:
 # EXTRACTION ENTITÉS POUR CLARIFICATION
 # =============================================================================
 
-def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") -> Optional[Dict[str, str]]:
+def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") -> Dict[str, Optional[str]]:
     """
     Extrait race et sexe depuis une réponse de clarification
     🚀 CORRIGÉ: Auto-détection sexe pour races pondeuses
     """
     
-    if not text or not text.strip():
+    if not text or not isinstance(text, str) or not text.strip():
         return {"breed": None, "sex": None}
     
     text_lower = text.lower().strip()
@@ -110,7 +124,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             # 🚀 NOUVEAU: Patterns pondeuses étendus
             r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             # Mentions génériques
-            r'\bace[:\s]*([a-zA-Z0-9\s]+)',
+            r'\brace[:\s]*([a-zA-Z0-9\s]+)',
             r'\bsouche[:\s]*([a-zA-Z0-9\s]+)',
         ],
         "en": [
@@ -160,70 +174,87 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
     patterns = breed_patterns.get(language, breed_patterns["fr"])
     
     for pattern in patterns:
-        match = re.search(pattern, text_lower, re.IGNORECASE)
-        if match:
-            if pattern.startswith(r'\b(ross') or pattern.startswith(r'\b(isa'):  # Pattern de races spécifiques
-                breed = match.group(1).strip()
-            else:  # Pattern avec groupe de capture
-                breed = match.group(1).strip() if match.lastindex and match.lastindex >= 1 else match.group(0).strip()
-            
-            # Nettoyer la race extraite
-            breed = re.sub(r'^(race|breed|souche|strain|raza|cepa)[:\s]*', '', breed, flags=re.IGNORECASE)
-            breed = breed.strip()
-            
-            if len(breed) >= 3:  # Garde seulement les races avec au moins 3 caractères
-                break
-            else:
-                breed = None
+        try:
+            match = re.search(pattern, text_lower, re.IGNORECASE)
+            if match:
+                if pattern.startswith(r'\b(ross') or pattern.startswith(r'\b(isa'):  # Pattern de races spécifiques
+                    breed = match.group(1).strip()
+                else:  # Pattern avec groupe de capture
+                    if match.lastindex and match.lastindex >= 1:
+                        breed = match.group(1).strip()
+                    else:
+                        breed = match.group(0).strip()
+                
+                # Nettoyer la race extraite
+                breed = re.sub(r'^(race|breed|souche|strain|raza|cepa)[:\s]*', '', breed, flags=re.IGNORECASE)
+                breed = breed.strip()
+                
+                if len(breed) >= 3:  # Garde seulement les races avec au moins 3 caractères
+                    break
+                else:
+                    breed = None
+        except re.error as e:
+            logger.warning(f"⚠️ [Utils] Erreur regex pattern breed: {e}")
+            continue
     
-    # Extraction sexe (CODE ORIGINAL)
+    # Extraction sexe
     sex = None
     patterns = sex_patterns.get(language, sex_patterns["fr"])
     
     for pattern in patterns:
-        match = re.search(pattern, text_lower, re.IGNORECASE)
-        if match:
-            matched_text = match.group(1) if match.lastindex and match.lastindex >= 1 else match.group(0)
-            
-            # Normalisation du sexe selon la langue
-            if language == "fr":
-                if any(word in matched_text.lower() for word in ["mâle", "male"]):
-                    sex = "mâles"
-                elif any(word in matched_text.lower() for word in ["femelle", "female"]):
-                    sex = "femelles"
-                elif any(word in matched_text.lower() for word in ["mixte", "mixed", "mélangé"]):
-                    sex = "mixte"
-            elif language == "en":
-                if any(word in matched_text.lower() for word in ["male", "rooster", "cock"]):
-                    sex = "males"
-                elif any(word in matched_text.lower() for word in ["female", "hen"]):
-                    sex = "females"
-                elif any(word in matched_text.lower() for word in ["mixed", "both"]):
-                    sex = "mixed"
-            elif language == "es":
-                if any(word in matched_text.lower() for word in ["macho", "gallo"]):
-                    sex = "machos"
-                elif any(word in matched_text.lower() for word in ["hembra", "gallina"]):
-                    sex = "hembras"
-                elif any(word in matched_text.lower() for word in ["mixto", "mezclado", "ambos"]):
-                    sex = "mixto"
-            
-            if sex:
-                break
+        try:
+            match = re.search(pattern, text_lower, re.IGNORECASE)
+            if match:
+                if match.lastindex and match.lastindex >= 1:
+                    matched_text = match.group(1)
+                else:
+                    matched_text = match.group(0)
+                
+                # Normalisation du sexe selon la langue
+                if language == "fr":
+                    if any(word in matched_text.lower() for word in ["mâle", "male"]):
+                        sex = "mâles"
+                    elif any(word in matched_text.lower() for word in ["femelle", "female"]):
+                        sex = "femelles"
+                    elif any(word in matched_text.lower() for word in ["mixte", "mixed", "mélangé"]):
+                        sex = "mixte"
+                elif language == "en":
+                    if any(word in matched_text.lower() for word in ["male", "rooster", "cock"]):
+                        sex = "males"
+                    elif any(word in matched_text.lower() for word in ["female", "hen"]):
+                        sex = "females"
+                    elif any(word in matched_text.lower() for word in ["mixed", "both"]):
+                        sex = "mixed"
+                elif language == "es":
+                    if any(word in matched_text.lower() for word in ["macho", "gallo"]):
+                        sex = "machos"
+                    elif any(word in matched_text.lower() for word in ["hembra", "gallina"]):
+                        sex = "hembras"
+                    elif any(word in matched_text.lower() for word in ["mixto", "mezclado", "ambos"]):
+                        sex = "mixto"
+                
+                if sex:
+                    break
+        except re.error as e:
+            logger.warning(f"⚠️ [Utils] Erreur regex pattern sex: {e}")
+            continue
     
     # 🚀 Utilisation de la centralisation pour normaliser la race et inférer le sexe
     if breed and not sex:
-        normalized_breed, _ = normalize_breed_name(breed)
-        inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
-        
-        if was_inferred and inferred_sex:
-            sex_mapping = {
-                "fr": "femelles",
-                "en": "females", 
-                "es": "hembras"
-            }
-            sex = sex_mapping.get(language, "femelles")
-            logger.info(f"🥚 [Auto-Fix Utils] Race détectée: {normalized_breed} → sexe='{sex}' (via clarification_entities)")
+        try:
+            normalized_breed, _ = normalize_breed_name(breed)
+            inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
+            
+            if was_inferred and inferred_sex:
+                sex_mapping = {
+                    "fr": "femelles",
+                    "en": "females", 
+                    "es": "hembras"
+                }
+                sex = sex_mapping.get(language, "femelles")
+                logger.info(f"🥚 [Auto-Fix Utils] Race détectée: {normalized_breed} → sexe='{sex}' (via clarification_entities)")
+        except Exception as e:
+            logger.warning(f"⚠️ [Utils] Erreur inférence sexe: {e}")
     
     result = {"breed": breed, "sex": sex}
     
@@ -232,6 +263,12 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
 
 def validate_clarification_completeness(text: str, missing_info: List[str], language: str = "fr") -> Dict[str, Any]:
     """Valide si une clarification contient toutes les informations nécessaires"""
+    
+    if not isinstance(text, str):
+        text = str(text) if text is not None else ""
+    
+    if not isinstance(missing_info, list):
+        missing_info = []
     
     extracted = extract_breed_and_sex_from_clarification(text, language)
     if not extracted:
@@ -272,6 +309,12 @@ def build_enriched_question_from_clarification(
 ) -> str:
     """Construit une question enrichie à partir de la clarification"""
     
+    if not isinstance(original_question, str):
+        original_question = str(original_question) if original_question is not None else ""
+    
+    if not isinstance(clarification_response, str):
+        clarification_response = str(clarification_response) if clarification_response is not None else ""
+    
     entities = extract_breed_and_sex_from_clarification(clarification_response, language)
     if not entities:
         return original_question
@@ -288,6 +331,9 @@ def build_enriched_question_with_breed_sex(
     language: str = "fr"
 ) -> str:
     """Construit une question enrichie avec race et sexe"""
+    
+    if not isinstance(original_question, str):
+        original_question = str(original_question) if original_question is not None else ""
     
     if not breed and not sex:
         return original_question
@@ -315,12 +361,16 @@ def build_enriched_question_with_breed_sex(
     
     # Construire le préfixe
     prefix = ""
-    if breed and sex:
-        prefix = template_set["both"].format(breed=breed, sex=sex)
-    elif breed:
-        prefix = template_set["breed_only"].format(breed=breed)
-    elif sex:
-        prefix = template_set["sex_only"].format(sex=sex)
+    try:
+        if breed and sex:
+            prefix = template_set["both"].format(breed=breed, sex=sex)
+        elif breed:
+            prefix = template_set["breed_only"].format(breed=breed)
+        elif sex:
+            prefix = template_set["sex_only"].format(sex=sex)
+    except (KeyError, TypeError) as e:
+        logger.warning(f"⚠️ [Utils] Erreur formatage template: {e}")
+        return original_question
     
     # Combiner avec la question originale
     if prefix:
@@ -383,12 +433,18 @@ def get_contextualized_suggestions(
 ) -> List[str]:
     """Génère des suggestions contextuelles basées sur la conversation"""
     
+    if not isinstance(current_question, str):
+        current_question = str(current_question) if current_question is not None else ""
+    
+    if not isinstance(conversation_history, list):
+        conversation_history = []
+    
     all_topics = get_enhanced_topics_by_language()
     base_topics = all_topics.get(language, all_topics["fr"])
     
     # Simple contextualisation basée sur les mots-clés
     question_lower = current_question.lower()
-    history_text = " ".join(conversation_history).lower()
+    history_text = " ".join(str(item) for item in conversation_history).lower()
     
     contextualized = []
     
@@ -433,19 +489,24 @@ def save_conversation_auto_enhanced(
     user_id: str,
     question: str,
     response: str,
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 ) -> bool:
     """Sauvegarde automatique de conversation avec métadonnées enrichies"""
     
     try:
+        # Validation des paramètres
+        if not conversation_id or not user_id:
+            logger.error("❌ [Utils] conversation_id et user_id requis")
+            return False
+        
         # Cette fonction serait intégrée avec le système de logging
         # Pour l'instant, on log juste l'information
         
         enhanced_metadata = {
             "timestamp": datetime.now().isoformat(),
             "auto_enhanced": True,
-            "question_length": len(question),
-            "response_length": len(response),
+            "question_length": len(str(question)),
+            "response_length": len(str(response)),
             **(metadata or {})
         }
         
@@ -467,30 +528,39 @@ def generate_conversation_id() -> str:
 def extract_conversation_context(conversation_history: List[Dict[str, Any]], max_context: int = 500) -> str:
     """Extrait le contexte pertinent d'un historique de conversation"""
     
-    if not conversation_history:
+    if not isinstance(conversation_history, list) or not conversation_history:
         return ""
     
     context_parts = []
     current_length = 0
     
     # Prendre les messages les plus récents en premier
-    for message in reversed(conversation_history[-5:]):  # 5 derniers messages maximum
-        role = message.get("role", "unknown")
-        content = message.get("content", "")
-        
-        if role in ["user", "assistant"] and content:
-            part = f"{role}: {content}"
+    recent_history = conversation_history[-5:] if len(conversation_history) > 5 else conversation_history
+    
+    for message in reversed(recent_history):
+        try:
+            if not isinstance(message, dict):
+                continue
             
-            if current_length + len(part) <= max_context:
-                context_parts.insert(0, part)  # Insérer au début pour garder l'ordre chronologique
-                current_length += len(part)
-            else:
-                # Tronquer le dernier message si nécessaire
-                remaining_space = max_context - current_length
-                if remaining_space > 50:  # Garder seulement si on peut avoir au moins 50 caractères
-                    truncated_part = f"{role}: {content[:remaining_space-10]}..."
-                    context_parts.insert(0, truncated_part)
-                break
+            role = message.get("role", "unknown")
+            content = message.get("content", "")
+            
+            if role in ["user", "assistant"] and content:
+                part = f"{role}: {content}"
+                
+                if current_length + len(part) <= max_context:
+                    context_parts.insert(0, part)  # Insérer au début pour garder l'ordre chronologique
+                    current_length += len(part)
+                else:
+                    # Tronquer le dernier message si nécessaire
+                    remaining_space = max_context - current_length
+                    if remaining_space > 50:  # Garder seulement si on peut avoir au moins 50 caractères
+                        truncated_part = f"{role}: {content[:remaining_space-10]}..."
+                        context_parts.insert(0, truncated_part)
+                    break
+        except Exception as e:
+            logger.warning(f"⚠️ [Utils] Erreur traitement message: {e}")
+            continue
     
     return " | ".join(context_parts)
 
@@ -514,7 +584,10 @@ def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
         variant = "Pour des poulets Ross 308 mâles de 25 jours"
         score = score_question_variant(variant, entities) # Returns 1.0
     """
-    if not variant or not entities:
+    if not variant or not isinstance(variant, str):
+        return 0.0
+    
+    if not entities or not isinstance(entities, dict):
         return 0.0
     
     variant_lower = variant.lower()
@@ -552,6 +625,9 @@ def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
 def validate_question_length(question: str, min_length: int = 3, max_length: int = 5000) -> Dict[str, Any]:
     """Valide la longueur d'une question"""
     
+    if not isinstance(question, str):
+        question = str(question) if question is not None else ""
+    
     if not question:
         return {
             "valid": False,
@@ -583,7 +659,7 @@ def validate_question_length(question: str, min_length: int = 3, max_length: int
 
 def normalize_language_code(language: str) -> str:
     """Normalise un code de langue"""
-    if not language:
+    if not language or not isinstance(language, str):
         return "fr"
     
     lang_lower = language.lower().strip()
@@ -606,9 +682,12 @@ def normalize_language_code(language: str) -> str:
 
 def format_response_with_metadata(
     response_text: str, 
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Formate une réponse avec ses métadonnées"""
+    
+    if not isinstance(response_text, str):
+        response_text = str(response_text) if response_text is not None else ""
     
     formatted_response = {
         "text": response_text,
@@ -619,12 +698,15 @@ def format_response_with_metadata(
     }
     
     # Ajouter des statistiques automatiques
-    formatted_response["metadata"].update({
-        "has_numbers": bool(re.search(r'\d+', response_text)),
-        "has_bullet_points": '•' in response_text or '-' in response_text,
-        "paragraph_count": len([p for p in response_text.split('\n\n') if p.strip()]),
-        "estimated_reading_time_seconds": max(1, len(response_text.split()) * 0.25)  # ~240 mots/minute
-    })
+    try:
+        formatted_response["metadata"].update({
+            "has_numbers": bool(re.search(r'\d+', response_text)),
+            "has_bullet_points": '•' in response_text or '-' in response_text,
+            "paragraph_count": len([p for p in response_text.split('\n\n') if p.strip()]),
+            "estimated_reading_time_seconds": max(1, len(response_text.split()) * 0.25)  # ~240 mots/minute
+        })
+    except Exception as e:
+        logger.warning(f"⚠️ [Utils] Erreur ajout métadonnées automatiques: {e}")
     
     return formatted_response
 
@@ -636,6 +718,9 @@ def safe_extract_field(data: Any, field_path: str, default: Any = None) -> Any:
     """Extraction sécurisée d'un champ avec path en dot notation"""
     
     try:
+        if not data or not isinstance(field_path, str):
+            return default
+        
         current = data
         for field in field_path.split('.'):
             if hasattr(current, field):
@@ -653,12 +738,16 @@ def safe_extract_field(data: Any, field_path: str, default: Any = None) -> Any:
         logger.warning(f"⚠️ [Utils] Erreur extraction {field_path}: {e}")
         return default
 
-def safe_string_operation(text: str, operation: str, *args, **kwargs) -> str:
+def safe_string_operation(text: Any, operation: str, *args, **kwargs) -> str:
     """Opération sur string sécurisée"""
     
     try:
         if not isinstance(text, str):
             text = str(text) if text is not None else ""
+        
+        if not isinstance(operation, str):
+            logger.warning(f"⚠️ [Utils] Opération doit être une string: {operation}")
+            return text
         
         if operation == "lower":
             return text.lower()
@@ -688,39 +777,51 @@ def validate_and_sanitize_input(
 ) -> Dict[str, Any]:
     """Valide et nettoie l'input utilisateur"""
     
+    if not isinstance(user_input, str):
+        user_input = str(user_input) if user_input is not None else ""
+    
     if not user_input:
         return {
             "valid": False,
             "sanitized": "",
             "reason": "Input vide",
-            "length": 0
+            "length": 0,
+            "original_length": 0,
+            "sanitized_length": 0,
+            "warnings": []
         }
     
     original_length = len(user_input)
     sanitized = user_input
     warnings = []
     
-    # Nettoyage HTML basique
-    if remove_html:
-        html_pattern = re.compile(r'<[^>]+>')
-        if html_pattern.search(sanitized):
-            sanitized = html_pattern.sub('', sanitized)
-            warnings.append("HTML tags supprimés")
+    try:
+        # Nettoyage HTML basique
+        if remove_html:
+            html_pattern = re.compile(r'<[^>]+>')
+            if html_pattern.search(sanitized):
+                sanitized = html_pattern.sub('', sanitized)
+                warnings.append("HTML tags supprimés")
+        
+        # Nettoyage SQL basique
+        if remove_sql_keywords:
+            sql_keywords = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE', 'ALTER', 'EXEC']
+            for keyword in sql_keywords:
+                if re.search(rf'\b{keyword}\b', sanitized, re.IGNORECASE):
+                    warnings.append(f"Mot-clé SQL potentiellement dangereux détecté: {keyword}")
+        
+        # Limitation de longueur
+        if len(sanitized) > max_length:
+            sanitized = sanitized[:max_length]
+            warnings.append(f"Texte tronqué à {max_length} caractères")
+        
+        # Nettoyage des espaces
+        sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     
-    # Nettoyage SQL basique
-    if remove_sql_keywords:
-        sql_keywords = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE', 'ALTER', 'EXEC']
-        for keyword in sql_keywords:
-            if re.search(rf'\b{keyword}\b', sanitized, re.IGNORECASE):
-                warnings.append(f"Mot-clé SQL potentiellement dangereux détecté: {keyword}")
-    
-    # Limitation de longueur
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length]
-        warnings.append(f"Texte tronqué à {max_length} caractères")
-    
-    # Nettoyage des espaces
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    except Exception as e:
+        logger.warning(f"⚠️ [Utils] Erreur nettoyage input: {e}")
+        sanitized = user_input
+        warnings.append(f"Erreur lors du nettoyage: {str(e)}")
     
     return {
         "valid": len(sanitized) > 0,
@@ -737,10 +838,10 @@ def validate_and_sanitize_input(
 
 def create_debug_info(
     function_name: str,
-    inputs: Dict[str, Any] = None,
-    outputs: Dict[str, Any] = None,
-    execution_time_ms: float = None,
-    errors: List[str] = None
+    inputs: Optional[Dict[str, Any]] = None,
+    outputs: Optional[Dict[str, Any]] = None,
+    execution_time_ms: Optional[float] = None,
+    errors: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """Crée des informations de debug structurées"""
     
@@ -772,8 +873,8 @@ def create_debug_info(
 def log_performance_metrics(
     operation: str,
     start_time: float,
-    end_time: float = None,
-    additional_metrics: Dict[str, Any] = None
+    end_time: Optional[float] = None,
+    additional_metrics: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Log des métriques de performance"""
     
@@ -818,6 +919,9 @@ def create_fallback_response(
 ) -> Dict[str, Any]:
     """Crée une réponse de fallback standardisée"""
     
+    if not isinstance(original_question, str):
+        original_question = str(original_question) if original_question is not None else ""
+    
     fallback_messages = {
         "fr": f"Je m'excuse, le service est temporairement indisponible. Votre question '{original_question}' a été reçue. Veuillez réessayer dans quelques minutes.",
         "en": f"I apologize, the service is temporarily unavailable. Your question '{original_question}' was received. Please try again in a few minutes.",
@@ -834,8 +938,11 @@ def create_fallback_response(
         "suggested_action": "retry_later"
     }
 
-def extract_key_entities_simple(text: str, language: str = "fr") -> Dict[str, Any]:
+def extract_key_entities_simple(text: str, language: str = "fr") -> Dict[str, List[Union[int, float]]]:
     """Extraction simple d'entités clés sans dépendances externes"""
+    
+    if not isinstance(text, str):
+        text = str(text) if text is not None else ""
     
     entities = {
         "numbers": [],
@@ -848,57 +955,61 @@ def extract_key_entities_simple(text: str, language: str = "fr") -> Dict[str, An
     
     text_lower = text.lower()
     
-    # Extraction nombres
-    numbers = re.findall(r'\b\d+(?:[.,]\d+)?\b', text)
-    entities["numbers"] = [float(n.replace(',', '.')) for n in numbers]
+    try:
+        # Extraction nombres
+        numbers = re.findall(r'\b\d+(?:[.,]\d+)?\b', text)
+        entities["numbers"] = [float(n.replace(',', '.')) for n in numbers if n]
+        
+        # Extraction races communes
+        breed_patterns = [
+            r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
+            r'\b(ross|cobb)\s*\d{2,3}\b'
+        ]
+        
+        for pattern in breed_patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            entities["breeds"].extend([str(match) for match in matches if match])
+        
+        # Extraction âges
+        age_patterns = [
+            r'(\d+)\s*(?:jour|day|día)s?',
+            r'(\d+)\s*(?:semaine|week|semana)s?'
+        ]
+        
+        for pattern in age_patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            entities["ages"].extend([int(m) for m in matches if m.isdigit()])
+        
+        # Extraction poids
+        weight_patterns = [
+            r'(\d+(?:[.,]\d+)?)\s*(?:g|gr|gram|gramme)s?',
+            r'(\d+(?:[.,]\d+)?)\s*(?:kg|kilo)s?'
+        ]
+        
+        for pattern in weight_patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            entities["weights"].extend([float(m.replace(',', '.')) for m in matches if m])
+        
+        # Extraction températures
+        temp_patterns = [
+            r'(\d+(?:[.,]\d+)?)\s*(?:°c|celsius|degré)s?',
+            r'(\d+(?:[.,]\d+)?)\s*(?:°f|fahrenheit)s?'
+        ]
+        
+        for pattern in temp_patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            entities["temperatures"].extend([float(m.replace(',', '.')) for m in matches if m])
+        
+        # Extraction pourcentages
+        percentage_pattern = r'(\d+(?:[.,]\d+)?)\s*%'
+        matches = re.findall(percentage_pattern, text_lower)
+        entities["percentages"] = [float(m.replace(',', '.')) for m in matches if m]
+        
+        # Nettoyer les listes vides et déduplication
+        entities = {k: list(set(v)) for k, v in entities.items() if v}
     
-    # Extraction races communes
-    breed_patterns = [
-        r'\b(ross\s*308|cobb\s*500|hubbard|arbor\s*acres)\b',
-        r'\b(ross|cobb)\s*\d{2,3}\b'
-    ]
-    
-    for pattern in breed_patterns:
-        matches = re.findall(pattern, text_lower, re.IGNORECASE)
-        entities["breeds"].extend(matches)
-    
-    # Extraction âges
-    age_patterns = [
-        r'(\d+)\s*(?:jour|day|día)s?',
-        r'(\d+)\s*(?:semaine|week|semana)s?'
-    ]
-    
-    for pattern in age_patterns:
-        matches = re.findall(pattern, text_lower, re.IGNORECASE)
-        entities["ages"].extend([int(m) for m in matches])
-    
-    # Extraction poids
-    weight_patterns = [
-        r'(\d+(?:[.,]\d+)?)\s*(?:g|gr|gram|gramme)s?',
-        r'(\d+(?:[.,]\d+)?)\s*(?:kg|kilo)s?'
-    ]
-    
-    for pattern in weight_patterns:
-        matches = re.findall(pattern, text_lower, re.IGNORECASE)
-        entities["weights"].extend([float(m.replace(',', '.')) for m in matches])
-    
-    # Extraction températures
-    temp_patterns = [
-        r'(\d+(?:[.,]\d+)?)\s*(?:°c|celsius|degré)s?',
-        r'(\d+(?:[.,]\d+)?)\s*(?:°f|fahrenheit)s?'
-    ]
-    
-    for pattern in temp_patterns:
-        matches = re.findall(pattern, text_lower, re.IGNORECASE)
-        entities["temperatures"].extend([float(m.replace(',', '.')) for m in matches])
-    
-    # Extraction pourcentages
-    percentage_pattern = r'(\d+(?:[.,]\d+)?)\s*%'
-    matches = re.findall(percentage_pattern, text_lower)
-    entities["percentages"] = [float(m.replace(',', '.')) for m in matches]
-    
-    # Nettoyer les listes vides et déduplication
-    entities = {k: list(set(v)) for k, v in entities.items() if v}
+    except Exception as e:
+        logger.warning(f"⚠️ [Utils] Erreur extraction entités: {e}")
     
     return entities
 
@@ -924,6 +1035,12 @@ logger.info("   - extract_key_entities_simple: Extraction entités simple")
 logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
 logger.info("🚀 [Expert Utils] INTÉGRÉ: Centralisation via clarification_entities")
 logger.info("🚀 [Expert Utils] NOUVEAU: score_question_variant() - Scoring générique des variantes")
+logger.info("✅ [Expert Utils] CORRECTIONS APPLIQUÉES:")
+logger.info("   - Type annotations améliorées")
+logger.info("   - Gestion des exceptions renforcée")
+logger.info("   - Validation des paramètres None-safe")
+logger.info("   - Gestion des erreurs regex")
+logger.info("   - Validation des types d'entrée")
 if CLARIFICATION_ENTITIES_AVAILABLE:
     logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
 else:
