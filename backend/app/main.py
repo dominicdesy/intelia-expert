@@ -1,7 +1,7 @@
 """
 Intelia Expert - API Backend Principal
-Version 3.5.1 - CORRECTION CRITIQUE LOGGER INITIALIZATION
-CORRECTION: Logger initialization order fixed - plus d'erreur NameError
+Version 3.5.2 - CORRECTION PRÉFIXES API
+CORRECTION: Router prefixes fixed pour correspondre au frontend /api/v1
 """
 
 import os
@@ -510,7 +510,7 @@ def get_rag_status() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
-    logger.info("🚀 Démarrage Intelia Expert API v3.5.1 - LOGGER INITIALIZATION FIXED...")
+    logger.info("🚀 Démarrage Intelia Expert API v3.5.2 - ROUTER PREFIXES FIXED...")
     
     # Initialisation des services
     supabase_success = initialize_supabase()
@@ -527,7 +527,7 @@ async def lifespan(app: FastAPI):
     
     # Logs de statut
     logger.info("✅ Application créée avec succès")
-    logger.info("🔧 CORRECTION CRITIQUE: Logger initialization order fixed")
+    logger.info("🔧 CORRECTION CRITIQUE: Router prefixes fixed - /api/v1 endpoints")
     logger.info("🔤 Support UTF-8 COMPLET: Validation réécrite")
     logger.info("🔧 Router logging: Endpoints 404 corrigés")
     logger.info("🧬 Consigne lignée génétique: Réponses générales")
@@ -556,8 +556,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Intelia Expert API",
-    description="Assistant IA Expert pour la Santé et Nutrition Animale - Logger Initialization Fixed v3.5.1",
-    version="3.5.1",
+    description="Assistant IA Expert pour la Santé et Nutrition Animale - Router Prefixes Fixed v3.5.2",
+    version="3.5.2",
     docs_url="/docs",
     redoc_url="/redoc", 
     openapi_url="/openapi.json",
@@ -630,14 +630,14 @@ app.add_middleware(
 )
 
 # =============================================================================
-# MONTAGE DES ROUTERS
+# MONTAGE DES ROUTERS - CORRECTION PRÉFIXES /api/v1
 # =============================================================================
 
 # Router expert
 if EXPERT_ROUTER_AVAILABLE and expert_router:
     try:
-        app.include_router(expert_router, prefix="/v1/expert", tags=["Expert System UTF-8"])
-        logger.info("✅ Router expert UTF-8 CORRIGÉ monté sur /v1/expert")
+        app.include_router(expert_router, prefix="/api/v1/expert", tags=["Expert System UTF-8"])
+        logger.info("✅ Router expert UTF-8 CORRIGÉ monté sur /api/v1/expert")
         
         if hasattr(expert_router, 'setup_rag_references'):
             expert_router.setup_rag_references(app)
@@ -648,48 +648,48 @@ if EXPERT_ROUTER_AVAILABLE and expert_router:
 # Router logging
 if LOGGING_AVAILABLE and logging_router:
     try:
-        app.include_router(logging_router, prefix="/v1", tags=["Logging System"])
-        logger.info("✅ Router logging CORRIGÉ monté sur /v1")
+        app.include_router(logging_router, prefix="/api/v1", tags=["Logging System"])
+        logger.info("✅ Router logging CORRIGÉ monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router logging: {e}")
 
 # Router auth
 if AUTH_ROUTER_AVAILABLE and auth_router:
     try:
-        app.include_router(auth_router, prefix="/v1", tags=["Authentication"])
-        logger.info("✅ Router auth monté sur /v1")
+        app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
+        logger.info("✅ Router auth monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router auth: {e}")
 
 # Router admin
 if ADMIN_ROUTER_AVAILABLE and admin_router:
     try:
-        app.include_router(admin_router, prefix="/v1", tags=["Administration"])
-        logger.info("✅ Router admin monté sur /v1")
+        app.include_router(admin_router, prefix="/api/v1", tags=["Administration"])
+        logger.info("✅ Router admin monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router admin: {e}")
 
 # Router health
 if HEALTH_ROUTER_AVAILABLE and health_router:
     try:
-        app.include_router(health_router, prefix="/v1", tags=["Health Monitoring"])
-        logger.info("✅ Router health monté sur /v1")
+        app.include_router(health_router, prefix="/api/v1", tags=["Health Monitoring"])
+        logger.info("✅ Router health monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router health: {e}")
 
 # Router system
 if SYSTEM_ROUTER_AVAILABLE and system_router:
     try:
-        app.include_router(system_router, prefix="/v1", tags=["System Monitoring"])
-        logger.info("✅ Router system monté sur /v1")
+        app.include_router(system_router, prefix="/api/v1", tags=["System Monitoring"])
+        logger.info("✅ Router system monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router system: {e}")
 
 # Router invitations
 if INVITATIONS_ROUTER_AVAILABLE and invitations_router:
     try:
-        app.include_router(invitations_router, prefix="/v1", tags=["Invitations"])
-        logger.info("✅ Router invitations monté sur /v1")
+        app.include_router(invitations_router, prefix="/api/v1", tags=["Invitations"])
+        logger.info("✅ Router invitations monté sur /api/v1")
     except Exception as e:
         logger.error(f"❌ Erreur montage router invitations: {e}")
 
@@ -701,21 +701,22 @@ if INVITATIONS_ROUTER_AVAILABLE and invitations_router:
 async def root():
     """Endpoint racine avec status des corrections appliquées"""
     return {
-        "message": "Intelia Expert API v3.5.1 - LOGGER INITIALIZATION FIXED",
+        "message": "Intelia Expert API v3.5.2 - ROUTER PREFIXES FIXED",
         "status": "running",
         "environment": os.getenv('ENV', 'production'),
-        "api_version": "3.5.1",
+        "api_version": "3.5.2",
         "database": supabase is not None,
         "rag_system": get_rag_status(),
         "conversation_memory": conversation_memory is not None,
-        "critical_fix_v3_5_1": {
-            "issue": "NameError: name 'logger' is not defined",
-            "cause": "Logger configuration after conversation memory initialization",
-            "solution": "Moved logging configuration before any imports that use logger",
-            "files_modified": ["main.py - initialization order"],
-            "expected_result": "No more NameError on startup + all features working"
+        "critical_fix_v3_5_2": {
+            "issue": "Frontend appelle /api/v1/* mais backend expose /v1/*",
+            "cause": "Router prefixes manquent le préfixe /api",
+            "solution": "Ajouté /api/ à tous les préfixes de routers",
+            "files_modified": ["main.py - router mounting prefixes"],
+            "expected_result": "Endpoints accessibles sur /api/v1/* comme attendu par frontend"
         },
         "all_fixes_applied": {
+            "router_prefixes_fix": "✅ Tous les routers montés avec /api/v1 prefix",
             "utf8_validation_fix": "✅ Pydantic models ultra-permissive",
             "logging_404_fix": "✅ All missing endpoints added",
             "exception_handler_fix": "✅ UTF-8 specialized exception handler",
@@ -724,21 +725,20 @@ async def root():
             "logger_initialization_fix": "✅ Logger defined before usage - CRITICAL"
         },
         "routers_mounted": {
-            "expert": EXPERT_ROUTER_AVAILABLE,
-            "auth": AUTH_ROUTER_AVAILABLE,
-            "admin": ADMIN_ROUTER_AVAILABLE,
-            "health": HEALTH_ROUTER_AVAILABLE,
-            "system": SYSTEM_ROUTER_AVAILABLE,
-            "logging": LOGGING_AVAILABLE,
-            "invitations": INVITATIONS_ROUTER_AVAILABLE
+            "expert": f"/api/v1/expert - {'✅' if EXPERT_ROUTER_AVAILABLE else '❌'}",
+            "auth": f"/api/v1 - {'✅' if AUTH_ROUTER_AVAILABLE else '❌'}",
+            "admin": f"/api/v1 - {'✅' if ADMIN_ROUTER_AVAILABLE else '❌'}",
+            "health": f"/api/v1 - {'✅' if HEALTH_ROUTER_AVAILABLE else '❌'}",
+            "system": f"/api/v1 - {'✅' if SYSTEM_ROUTER_AVAILABLE else '❌'}",
+            "logging": f"/api/v1 - {'✅' if LOGGING_AVAILABLE else '❌'}",
+            "invitations": f"/api/v1 - {'✅' if INVITATIONS_ROUTER_AVAILABLE else '❌'}"
         },
-        "startup_sequence_fixed": {
-            "step_1": "✅ Logging configuration (lines 25-35)",
-            "step_2": "✅ Logger available (line 36)",
-            "step_3": "✅ Conversation memory import (line 40)",
-            "step_4": "✅ Memory initialization with logger (lines 42-52)",
-            "step_5": "✅ All router imports with logger available",
-            "result": "No more NameError - clean startup"
+        "endpoints_now_available": {
+            "expert_main": "/api/v1/expert/ask-enhanced-v2",
+            "expert_public": "/api/v1/expert/ask-enhanced-v2-public",
+            "conversations": "/api/v1/conversations/user/{user_id}",
+            "health": "/api/v1/health",
+            "system": "/api/v1/system"
         }
     }
 
@@ -753,7 +753,7 @@ async def health_check():
             "database": "connected" if supabase else "disconnected",
             "rag_system": get_rag_status(),
             "conversation_memory": "initialized" if conversation_memory else "failed",
-            "logger_fix": "APPLIED - initialization order corrected",
+            "router_prefixes": "FIXED - all endpoints on /api/v1/*",
             "utf8_support": "FIXED - validation rewritten",
             "logging_system": "FIXED - endpoints added",
             "genetic_line_policy": "UPDATED - generic responses",
@@ -763,8 +763,8 @@ async def health_check():
             "environment": os.getenv('ENV', 'production'),
             "deployment": "DigitalOcean App Platform",
             "encoding": "UTF-8 Native Python",
-            "version": "3.5.1",
-            "critical_fix": "Logger initialization order - NameError eliminated"
+            "version": "3.5.2",
+            "critical_fix": "Router prefixes corrected - all endpoints on /api/v1/*"
         },
         database_status="connected" if supabase else "disconnected",
         rag_status=get_rag_status()
@@ -783,9 +783,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "detail": exc.detail,
             "timestamp": datetime.now().isoformat(),
             "path": str(request.url.path),
-            "version": "3.5.1",
+            "version": "3.5.2",
             "encoding": "utf-8",
-            "logger_fix": "initialization order corrected"
+            "router_fix": "prefixes corrected - all endpoints on /api/v1/*"
         },
         headers={"content-type": "application/json; charset=utf-8"}
     )
@@ -802,9 +802,9 @@ async def general_exception_handler(request: Request, exc: Exception):
             "detail": "Erreur interne du serveur",
             "timestamp": datetime.now().isoformat(),
             "path": str(request.url.path),
-            "version": "3.5.1",
+            "version": "3.5.2",
             "encoding": "utf-8",
-            "note": "Logger initialization fixed + all critical corrections applied"
+            "note": "Router prefixes fixed + all critical corrections applied"
         },
         headers={"content-type": "application/json; charset=utf-8"}
     )
@@ -819,13 +819,15 @@ if __name__ == "__main__":
     port = int(os.getenv('PORT', 8080))
     host = os.getenv('HOST', '0.0.0.0')
     
-    logger.info(f"🚀 Démarrage Intelia Expert API v3.5.1 sur {host}:{port}")
+    logger.info(f"🚀 Démarrage Intelia Expert API v3.5.2 sur {host}:{port}")
     logger.info(f"🔧 CORRECTION CRITIQUE APPLIQUÉE:")
-    logger.info(f"   ✅ Logger Initialization: Configuration déplacée AVANT imports")
-    logger.info(f"   ✅ Memory System: Initialisation avec logger disponible")
-    logger.info(f"   ✅ No NameError: Plus d'erreur 'logger' not defined")
+    logger.info(f"   ✅ Router Prefixes: Tous les endpoints sur /api/v1/*")
+    logger.info(f"   ✅ Expert Endpoint: /api/v1/expert/ask-enhanced-v2")
+    logger.info(f"   ✅ Conversations: /api/v1/conversations/user/{{user_id}}")
+    logger.info(f"   ✅ Health: /api/v1/health")
+    logger.info(f"   ✅ System: /api/v1/system")
     logger.info(f"   ✅ All Previous Fixes: UTF-8, logging 404, genetic lines, invitations")
-    logger.info(f"🎯 RÉSULTAT: Démarrage propre sans erreurs + toutes fonctionnalités opérationnelles")
+    logger.info(f"🎯 RÉSULTAT: Frontend peut maintenant atteindre tous les endpoints!")
     
     uvicorn.run(
         app,
