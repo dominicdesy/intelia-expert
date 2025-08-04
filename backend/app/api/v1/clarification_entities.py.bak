@@ -77,55 +77,42 @@ class ExtractedEntities:
     def get_missing_critical_info(self, question_type: str) -> List[str]:
         """
         Détermine les informations critiques manquantes selon le type de question
-        🔧 CORRIGÉ: Logique simplifiée et plus efficace
+        Utilise maintenant la liste centralisée CRITICAL_ENTITIES
         """
         missing = []
         
-        # 🔧 FIX: Définir quelles entités sont critiques par type de question
-        critical_for_question_type = self._get_critical_entities_for_question_type(question_type)
+        # Vérification breed (entité critique)
+        if not self.breed or self.breed_type == "generic":
+            if is_critical_entity("breed"):
+                missing.append("breed")
         
-        # 🔧 FIX: Vérifier seulement les entités critiques pour ce type de question
-        for entity in critical_for_question_type:
-            if not self._has_entity_value(entity):
-                missing.append(entity)
+        # Vérification age (entité critique)
+        if not self.age_days and not self.age_weeks:
+            if is_critical_entity("age"):
+                missing.append("age")
+        
+        # Vérifications spécifiques par type de question
+        if question_type in ["health", "mortality", "disease"]:
+            # Symptoms (entité critique pour questions santé)
+            if not self.symptoms and is_critical_entity("symptoms"):
+                missing.append("symptoms")
+        
+        elif question_type in ["environment", "temperature", "housing"]:
+            # Environment info critique pour questions environnement
+            if not self.temperature and not self.housing_type and is_critical_entity("environment"):
+                missing.append("environment")
+        
+        elif question_type in ["feeding", "nutrition"]:
+            # Feed info critique pour questions nutrition
+            if not self.feed_type and is_critical_entity("feed"):
+                missing.append("feed")
+        
+        # Sex peut être critique selon le contexte
+        if question_type in ["growth", "weight", "performance", "feeding"]:
+            if not self.sex and is_critical_entity("sex"):
+                missing.append("sex")
         
         return missing
-    
-    def _get_critical_entities_for_question_type(self, question_type: str) -> List[str]:
-        """
-        🔧 NOUVEAU: Retourne les entités critiques selon le type de question
-        """
-        base_entities = ["breed", "age"]  # Toujours critiques
-        
-        if question_type in ["health", "mortality", "disease"]:
-            return base_entities + ["symptoms"]
-        elif question_type in ["environment", "temperature", "housing"]:
-            return base_entities + ["environment"]
-        elif question_type in ["feeding", "nutrition"]:
-            return base_entities + ["feed"]
-        elif question_type in ["growth", "weight", "performance"]:
-            return base_entities + ["sex"]
-        else:
-            return base_entities
-    
-    def _has_entity_value(self, entity: str) -> bool:
-        """
-        🔧 NOUVEAU: Vérifie si une entité a une valeur valide
-        """
-        if entity == "breed":
-            return bool(self.breed and self.breed_type != "generic")
-        elif entity == "age":
-            return bool(self.age_days or self.age_weeks)
-        elif entity == "sex":
-            return bool(self.sex)
-        elif entity == "symptoms":
-            return bool(self.symptoms and len(self.symptoms) > 0)
-        elif entity == "environment":
-            return bool(self.temperature or self.housing_type or self.humidity)
-        elif entity == "feed":
-            return bool(self.feed_type)
-        else:
-            return False
     
     def get_critical_entities_status(self) -> Dict[str, bool]:
         """
@@ -137,14 +124,26 @@ class ExtractedEntities:
         status = {}
         
         for entity in CRITICAL_ENTITIES:
-            status[entity] = self._has_entity_value(entity)
+            if entity == "breed":
+                status[entity] = bool(self.breed and self.breed_type != "generic")
+            elif entity == "age":
+                status[entity] = bool(self.age_days or self.age_weeks)
+            elif entity == "sex":
+                status[entity] = bool(self.sex)
+            elif entity == "symptoms":
+                status[entity] = bool(self.symptoms)
+            elif entity == "environment":
+                status[entity] = bool(self.temperature or self.housing_type or self.humidity)
+            elif entity == "feed":
+                status[entity] = bool(self.feed_type)
+            else:
+                status[entity] = False
         
         return status
     
     def normalize_breed_name(self, raw_breed: str) -> Tuple[str, bool]:
         """
         🆕 NOUVEAU: Normalise le nom de la souche selon les patterns connus
-        🔧 CORRIGÉ: Gestion None et recherche plus précise
         
         Args:
             raw_breed: Nom brut de la souche
@@ -153,9 +152,8 @@ class ExtractedEntities:
             Tuple[str, bool]: (nom_normalisé, a_été_normalisé)
         """
         
-        # 🔧 FIX: Gestion correcte de None/empty
-        if not raw_breed or not raw_breed.strip():
-            return raw_breed or "", False
+        if not raw_breed:
+            return raw_breed, False
         
         raw_lower = raw_breed.lower().strip()
         
@@ -217,44 +215,24 @@ class ExtractedEntities:
             "redbro": "Red Bro"
         }
         
-        # 🔧 FIX: Recherche exacte d'abord
+        # Recherche exacte d'abord
         if raw_lower in breed_normalization:
             normalized = breed_normalization[raw_lower]
             logger.info(f"🔄 [Breed Normalization] '{raw_breed}' → '{normalized}' (exact match)")
             return normalized, True
         
-        # 🔧 FIX: Recherche par mots-clés plus précise (ordre par longueur décroissante)
-        # Pour éviter que "ross" match avant "ross 308"
-        patterns_sorted = sorted(breed_normalization.keys(), key=len, reverse=True)
-        
-        for pattern in patterns_sorted:
-            # 🔧 FIX: Recherche plus précise avec limites de mots
-            if self._is_breed_pattern_match(raw_lower, pattern):
-                normalized_name = breed_normalization[pattern]
-                logger.info(f"🔄 [Breed Normalization] '{raw_breed}' → '{normalized_name}' (pattern match: '{pattern}')")
+        # Recherche par mots-clés
+        for pattern, normalized_name in breed_normalization.items():
+            if pattern in raw_lower:
+                logger.info(f"🔄 [Breed Normalization] '{raw_breed}' → '{normalized_name}' (keyword match: '{pattern}')")
                 return normalized_name, True
         
         # Aucune normalisation trouvée
         return raw_breed, False
     
-    def _is_breed_pattern_match(self, text: str, pattern: str) -> bool:
-        """
-        🔧 NOUVEAU: Matching plus intelligent pour éviter les faux positifs
-        """
-        # Pour les patterns courts (< 4 chars), exiger match exact ou en début/fin de mot
-        if len(pattern) < 4:
-            import re
-            # Match exact ou entouré d'espaces/début/fin
-            regex_pattern = rf'\b{re.escape(pattern)}\b'
-            return bool(re.search(regex_pattern, text))
-        else:
-            # Pour les patterns plus longs, simple substring matching
-            return pattern in text
-    
     def infer_sex_from_breed(self, breed: str) -> Tuple[Optional[str], bool]:
         """
         🆕 NOUVEAU: Infère automatiquement le sexe selon la souche
-        🔧 CORRIGÉ: Matching plus précis pour éviter faux positifs
         
         Args:
             breed: Nom de la souche (normalisé)
@@ -263,13 +241,13 @@ class ExtractedEntities:
             Tuple[Optional[str], bool]: (sexe_inféré, a_été_inféré)
         """
         
-        if not breed or not breed.strip():
+        if not breed:
             return None, False
         
-        breed_lower = breed.lower().strip()
+        breed_lower = breed.lower()
         
-        # 🔧 FIX: Lignées femelles (poules pondeuses) - matching plus précis
-        female_breeds_exact = {
+        # Lignées femelles (poules pondeuses)
+        female_breeds = [
             "lohmann lsl-lite",
             "bovans brown", 
             "bovans white",
@@ -279,10 +257,10 @@ class ExtractedEntities:
             "isa white",
             "hyline brown",
             "hyline white"
-        }
+        ]
         
-        # 🔧 FIX: Lignées mixtes (poulets de chair) - pas d'inférence automatique
-        mixed_breeds_exact = {
+        # Lignées mixtes (poulets de chair) - pas d'inférence automatique
+        mixed_breeds = [
             "ross 308",
             "ross 708", 
             "ross ap95",
@@ -294,51 +272,29 @@ class ExtractedEntities:
             "hubbard classic",
             "arbor acres",
             "red bro"
-        }
+        ]
         
-        # 🔧 FIX: Vérification exacte d'abord pour éviter faux positifs
-        if breed_lower in female_breeds_exact:
-            logger.info(f"🚺 [Sex Inference] '{breed}' → 'femelle' (lignée pondeuse - exact match)")
-            return "femelle", True
-        
-        if breed_lower in mixed_breeds_exact:
-            logger.info(f"🔄 [Sex Inference] '{breed}' → None (lignée mixte - exact match)")
-            return None, False
-        
-        # 🔧 FIX: Recherche par substring plus intelligente
-        for female_breed in female_breeds_exact:
-            if self._is_breed_substring_match(breed_lower, female_breed):
-                logger.info(f"🚺 [Sex Inference] '{breed}' → 'femelle' (lignée pondeuse - substring match)")
+        # Vérifier si c'est une lignée femelle
+        for female_breed in female_breeds:
+            if female_breed in breed_lower:
+                logger.info(f"🚺 [Sex Inference] '{breed}' → 'femelle' (lignée pondeuse)")
                 return "femelle", True
         
-        for mixed_breed in mixed_breeds_exact:
-            if self._is_breed_substring_match(breed_lower, mixed_breed):
-                logger.info(f"🔄 [Sex Inference] '{breed}' → None (lignée mixte - substring match)")
+        # Pour les lignées mixtes, pas d'inférence (retourner None)
+        for mixed_breed in mixed_breeds:
+            if mixed_breed in breed_lower:
+                logger.info(f"🔄 [Sex Inference] '{breed}' → None (lignée mixte - pas d'inférence)")
                 return None, False
         
         # Breed non reconnu
         logger.info(f"❓ [Sex Inference] '{breed}' → None (souche non reconnue)")
         return None, False
     
-    def _is_breed_substring_match(self, breed_text: str, reference_breed: str) -> bool:
-        """
-        🔧 NOUVEAU: Matching substring intelligent pour inférence sexe
-        """
-        # Extraire les mots clés principaux de la référence
-        ref_keywords = reference_breed.split()
-        
-        # Il faut que la majorité des mots clés soient présents
-        matches = sum(1 for keyword in ref_keywords if keyword in breed_text)
-        return matches >= len(ref_keywords) * 0.6  # Au moins 60% des mots clés
-    
     def normalize_and_infer(self):
         """
         🆕 NOUVEAU: Applique la normalisation de souche et l'inférence de sexe
-        🔧 CORRIGÉ: Évite la race condition en gardant l'original
         Modifie l'objet en place
         """
-        
-        original_breed = self.breed  # 🔧 FIX: Conserver l'original
         
         # 1. Normaliser la souche si présente
         if self.breed:
@@ -348,16 +304,13 @@ class ExtractedEntities:
                 self.breed_normalized = True
                 self.breed_type = "specific"  # Les souches normalisées sont spécifiques
         
-        # 2. 🔧 FIX: Inférer le sexe si pas déjà spécifié et si souche présente
-        # Utiliser la souche normalisée si disponible, sinon l'originale
-        breed_for_inference = self.breed if self.breed else original_breed
-        
-        if not self.sex and breed_for_inference:
-            inferred_sex, was_inferred = self.infer_sex_from_breed(breed_for_inference)
+        # 2. Inférer le sexe si pas déjà spécifié et si souche présente
+        if not self.sex and self.breed:
+            inferred_sex, was_inferred = self.infer_sex_from_breed(self.breed)
             if was_inferred and inferred_sex:
                 self.sex = inferred_sex
                 self.sex_inferred = True
-                logger.info(f"✅ [Auto Inference] Sexe inféré automatiquement: {inferred_sex} pour {breed_for_inference}")
+                logger.info(f"✅ [Auto Inference] Sexe inféré automatiquement: {inferred_sex} pour {self.breed}")
 
 @dataclass
 class ClarificationResult:
@@ -382,7 +335,7 @@ class ClarificationResult:
     
     def to_dict(self) -> Dict:
         """Convertit en dictionnaire pour les logs"""
-        result = {
+        return {
             "needs_clarification": self.needs_clarification,
             "questions": self.questions,
             "questions_count": len(self.questions) if self.questions else 0,
@@ -402,9 +355,6 @@ class ClarificationResult:
             "fallback_used": self.fallback_used,
             "gpt_failed": self.gpt_failed
         }
-        
-        # 🔧 FIX: Retourner le dict, pas None
-        return result
 
 # ==================== FONCTIONS UTILITAIRES ====================
 

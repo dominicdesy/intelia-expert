@@ -15,28 +15,7 @@ import re
 from typing import Optional, Dict, Any, List
 from enum import Enum
 
-# Import des modèles - correction de l'import qui peut échouer
-try:
-    from .expert_models import ConcisionLevel, ConcisionMetrics
-except ImportError:
-    # Définir les enums localement si import échoue
-    class ConcisionLevel(Enum):
-        ULTRA_CONCISE = "ultra_concise"
-        CONCISE = "concise"
-        STANDARD = "standard"
-        DETAILED = "detailed"
-    
-    class ConcisionMetrics:
-        def __init__(self, generation_time_ms: int, versions_generated: int, 
-                     cache_hit: bool, fallback_used: bool, 
-                     compression_ratios: Dict[str, float], 
-                     quality_scores: Dict[str, float]):
-            self.generation_time_ms = generation_time_ms
-            self.versions_generated = versions_generated
-            self.cache_hit = cache_hit
-            self.fallback_used = fallback_used
-            self.compression_ratios = compression_ratios
-            self.quality_scores = quality_scores
+from .expert_models import ConcisionLevel, ConcisionMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +62,6 @@ class ResponseConcisionProcessor:
     def detect_question_type(self, question: str) -> str:
         """Détecte le type de question pour appliquer les bonnes règles"""
         
-        if not question:
-            return "general_question"
-            
         question_lower = question.lower().strip()
         
         weight_keywords = ["poids", "weight", "peso", "grammes", "grams", "gramos", "kg"]
@@ -111,9 +87,6 @@ class ResponseConcisionProcessor:
         if user_preference:
             return user_preference
         
-        if not question:
-            return self.config.DEFAULT_CONCISION_LEVEL
-            
         question_lower = question.lower().strip()
         
         if any(keyword in question_lower for keyword in self.config.ULTRA_CONCISE_KEYWORDS):
@@ -133,7 +106,7 @@ class ResponseConcisionProcessor:
     ) -> str:
         """Méthode unified pour appliquer la concision"""
         
-        if not self.config.ENABLE_CONCISE_RESPONSES or not response:
+        if not self.config.ENABLE_CONCISE_RESPONSES:
             return response
         
         logger.info(f"🎯 [Concision] Application niveau {concision_level.value}")
@@ -156,7 +129,7 @@ class ResponseConcisionProcessor:
     ) -> str:
         """Traite une réponse selon le niveau de concision demandé"""
         
-        if not self.config.ENABLE_CONCISE_RESPONSES or not response:
+        if not self.config.ENABLE_CONCISE_RESPONSES:
             return response
         
         level = concision_level or self.detect_optimal_concision_level(question)
@@ -166,12 +139,8 @@ class ResponseConcisionProcessor:
     def _extract_essential_info(self, response: str, question: str, language: str = "fr") -> str:
         """Extrait uniquement l'information essentielle (mode ultra-concis)"""
         
-        if not response or not question:
-            return response
-            
         question_lower = question.lower()
         
-        # Traitement des questions de poids
         if any(word in question_lower for word in ["poids", "weight", "peso"]):
             weight_patterns = [
                 r'(?:entre\s+)?(\d+(?:-\d+|[^\d]*\d+)?)\s*(?:grammes?|g\b)',
@@ -182,7 +151,7 @@ class ResponseConcisionProcessor:
             for pattern in weight_patterns:
                 match = re.search(pattern, response, re.IGNORECASE)
                 if match:
-                    if len(match.groups()) >= 2 and match.group(2):
+                    if len(match.groups()) >= 2:
                         return f"{match.group(1)}-{match.group(2)}g"
                     else:
                         value = match.group(1)
@@ -191,7 +160,6 @@ class ResponseConcisionProcessor:
                         else:
                             return f"~{value}g"
         
-        # Traitement des questions de température
         if any(word in question_lower for word in ["température", "temperature"]):
             temp_patterns = [
                 r'(\d+(?:-\d+)?)\s*(?:°C|degrés?|degrees?)',
@@ -201,19 +169,17 @@ class ResponseConcisionProcessor:
             for pattern in temp_patterns:
                 match = re.search(pattern, response, re.IGNORECASE)
                 if match:
-                    if len(match.groups()) >= 2 and match.group(2):
+                    if len(match.groups()) >= 2:
                         return f"{match.group(1)}-{match.group(2)}°C"
                     else:
                         return f"{match.group(1)}°C"
         
-        # Fallback: première phrase avec des chiffres
         sentences = response.split('.')
         for sentence in sentences:
             if re.search(r'\d+', sentence) and len(sentence.strip()) > 10:
                 return sentence.strip() + '.'
         
-        # Dernière option: première phrase
-        if sentences and sentences[0].strip():
+        if sentences:
             return sentences[0].strip() + '.'
         
         return response
@@ -221,9 +187,6 @@ class ResponseConcisionProcessor:
     def _make_concise(self, response: str, question: str, language: str = "fr") -> str:
         """Rend concis (enlève conseils mais garde info principale)"""
         
-        if not response:
-            return response
-            
         cleaned = self._clean_document_references_only(response)
         
         verbose_patterns = [
@@ -256,13 +219,11 @@ class ResponseConcisionProcessor:
         for pattern in verbose_patterns:
             cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
         
-        # Correction: nettoyage des points multiples et espaces
         cleaned = re.sub(r'\.+', '.', cleaned)
         cleaned = re.sub(r'\s+', ' ', cleaned)
         cleaned = cleaned.strip()
         
-        # Traitement spécial pour les questions de poids
-        if question and any(word in question.lower() for word in ['poids', 'weight', 'peso']) and len(cleaned) > 100:
+        if any(word in question.lower() for word in ['poids', 'weight', 'peso']) and len(cleaned) > 100:
             weight_sentence = self._extract_weight_sentence(cleaned)
             if weight_sentence:
                 return weight_sentence
@@ -272,9 +233,6 @@ class ResponseConcisionProcessor:
     def _remove_excessive_advice(self, response: str, language: str = "fr") -> str:
         """Enlève seulement les conseils excessifs (mode standard)"""
         
-        if not response:
-            return response
-            
         cleaned = self._clean_document_references_only(response)
         
         excessive_patterns = [
@@ -289,10 +247,7 @@ class ResponseConcisionProcessor:
         for pattern in excessive_patterns:
             cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
         
-        # Correction: utiliser re.sub au lieu de replace avec regex
-        cleaned = re.sub(r'\.+', '.', cleaned)
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        return cleaned.strip()
+        return re.sub(r'\.+', '.', cleaned).replace(r'\s+', ' ').strip()
     
     def _clean_document_references_only(self, response_text: str) -> str:
         """Nettoie uniquement les références aux documents"""
@@ -332,8 +287,7 @@ class ResponseConcisionProcessor:
         cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
         cleaned_response = cleaned_response.strip()
         
-        # Correction: vérifier que la chaîne n'est pas vide avant d'accéder à l'index
-        if cleaned_response and len(cleaned_response) > 0 and cleaned_response[0].islower():
+        if cleaned_response and cleaned_response[0].islower():
             cleaned_response = cleaned_response[0].upper() + cleaned_response[1:]
         
         return cleaned_response
@@ -341,9 +295,6 @@ class ResponseConcisionProcessor:
     def _extract_weight_sentence(self, text: str) -> Optional[str]:
         """Extrait la phrase principale contenant l'information de poids"""
         
-        if not text:
-            return None
-            
         weight_patterns = [
             r'[^.]*\d+[^.]*(?:grammes?|g\b|kg|livres?|pounds?)[^.]*\.',
             r'[^.]*(?:entre|between|entre)\s+\d+[^.]*\d+[^.]*\.',
@@ -355,14 +306,12 @@ class ResponseConcisionProcessor:
             if match:
                 sentence = match.group(0).strip()
                 sentence = re.sub(r'^\W+', '', sentence)
-                # Correction: vérifier que la phrase n'est pas vide
-                if sentence and len(sentence) > 0 and sentence[0].islower():
+                if sentence and sentence[0].islower():
                     sentence = sentence[0].upper() + sentence[1:]
                 return sentence
         
-        # Fallback: première phrase
         sentences = text.split('.')
-        if sentences and sentences[0].strip():
+        if sentences:
             first_sentence = sentences[0].strip() + '.'
             return first_sentence
         
@@ -375,29 +324,20 @@ class ResponseConcisionProcessor:
 class ResponseVersionsGenerator:
     """Générateur de toutes les versions de réponse pour le frontend"""
     
-    def __init__(self, existing_processor: Optional[ResponseConcisionProcessor] = None):
-        # Correction: permettre d'initialiser sans processeur existant
-        self.existing_processor = existing_processor or ResponseConcisionProcessor()
+    def __init__(self, existing_processor: ResponseConcisionProcessor):
+        self.existing_processor = existing_processor
         logger.info("🚀 [ResponseVersions] Générateur initialisé avec système existant")
     
     async def generate_all_response_versions(
         self, 
         original_response: str, 
         question: str, 
-        context: Optional[Dict[str, Any]] = None,
+        context: Dict[str, Any],
         requested_level: ConcisionLevel = ConcisionLevel.CONCISE
     ) -> Dict[str, Any]:
         """Génère toutes les versions de réponse en utilisant le système existant"""
         
         start_time = time.time()
-        
-        # Correction: valeurs par défaut pour éviter les erreurs
-        if not original_response:
-            original_response = ""
-        if not question:
-            question = ""
-        if context is None:
-            context = {}
         
         try:
             logger.info("🚀 [ResponseVersions] Génération toutes versions")
@@ -442,28 +382,23 @@ class ResponseVersionsGenerator:
             
             generation_time_ms = int((time.time() - start_time) * 1000)
             
-            # Calculer métriques - Correction: éviter division par zéro
-            compression_ratios = {}
-            if len(original_response) > 0:
-                compression_ratios = {
-                    level: len(content) / len(original_response) 
-                    for level, content in versions.items()
-                    if content is not None
-                }
-            
+            # Calculer métriques
             metrics = ConcisionMetrics(
                 generation_time_ms=generation_time_ms,
                 versions_generated=len(versions),
                 cache_hit=False,
                 fallback_used=False,
-                compression_ratios=compression_ratios,
+                compression_ratios={
+                    level: len(content) / len(original_response) 
+                    for level, content in versions.items()
+                    if content and len(original_response) > 0
+                },
                 quality_scores={}
             )
             
             logger.info("✅ [ResponseVersions] Versions générées avec système existant:")
             for level, content in versions.items():
-                content_length = len(content) if content else 0
-                logger.info(f"   - {level}: {content_length} caractères")
+                logger.info(f"   - {level}: {len(content)} caractères")
             
             return {
                 "response_versions": versions,

@@ -12,39 +12,19 @@ import json
 import re
 from typing import Dict, Optional, Any, List
 from datetime import datetime, timedelta
-from enum import Enum
-from dataclasses import dataclass
 
-# ✅ CORRECTION: Import OpenAI moderne
-from openai import AsyncOpenAI
+import openai
+
+from .expert_models import ConcisionLevel, ConcisionMetrics
 
 logger = logging.getLogger(__name__)
-
-# ✅ CORRECTION: Définition des modèles manquants
-class ConcisionLevel(Enum):
-    ULTRA_CONCISE = "ultra_concise"
-    CONCISE = "concise"
-    STANDARD = "standard"
-    DETAILED = "detailed"
-
-@dataclass
-class ConcisionMetrics:
-    generation_time_ms: int
-    versions_generated: int
-    cache_hit: bool
-    fallback_used: bool
-    compression_ratios: Dict[str, float]
-    quality_scores: Dict[str, float]
 
 class ConcisionService:
     """Service pour générer différentes versions de réponses selon le niveau de concision"""
     
-    def __init__(self, openai_api_key: Optional[str] = None):
+    def __init__(self):
         self.cache = {}  # Cache simple en mémoire (remplacer par Redis en prod)
         self.cache_ttl = 3600  # 1 heure
-        
-        # ✅ CORRECTION: Initialisation client OpenAI
-        self.openai_client = AsyncOpenAI(api_key=openai_api_key)
         
         # Templates de prompts pour chaque niveau
         self.concision_prompts = {
@@ -258,8 +238,8 @@ Réponse complète à transformer:
 Réécris la réponse selon le niveau {level.value}:"""
         
         try:
-            # ✅ CORRECTION: Appel OpenAI moderne
-            response = await self.openai_client.chat.completions.create(
+            # Appel OpenAI
+            response = await openai.ChatCompletion.acreate(
                 model="gpt-4o",  # ou le modèle configuré dans expert_services
                 messages=[{
                     "role": "user", 
@@ -410,18 +390,13 @@ Réécris la réponse selon le niveau {level.value}:"""
             )
         }
 
-# ✅ CORRECTION: Initialisation avec gestion d'erreurs
-try:
-    # Instance globale du service
-    concision_service = ConcisionService()
-    
-    logger.info("✅ [ConcisionService] Service de génération response_versions initialisé")
-    logger.info("🚀 [ConcisionService] Fonctionnalités:")
-    logger.info("   - Génération 4 niveaux: ultra_concise, concise, standard, detailed")
-    logger.info("   - Cache intelligent pour performance")
-    logger.info("   - Fallback automatique si erreur LLM")
-    logger.info("   - Métriques détaillées de génération")
-    logger.info("   - Compatible avec architecture expert_services existante")
-except Exception as e:
-    logger.error(f"❌ [ConcisionService] Erreur initialisation: {e}")
-    concision_service = None
+# Instance globale du service
+concision_service = ConcisionService()
+
+logger.info("✅ [ConcisionService] Service de génération response_versions initialisé")
+logger.info("🚀 [ConcisionService] Fonctionnalités:")
+logger.info("   - Génération 4 niveaux: ultra_concise, concise, standard, detailed")
+logger.info("   - Cache intelligent pour performance")
+logger.info("   - Fallback automatique si erreur LLM")
+logger.info("   - Métriques détaillées de génération")
+logger.info("   - Compatible avec architecture expert_services existante")
