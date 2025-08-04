@@ -15,9 +15,8 @@ NOUVELLES FONCTIONNALITÉS AJOUTÉES:
 4. detect_clarification_state()
 5. check_if_clarification_needed()
 🤖 NOUVELLES MÉTHODES POUR AGENTS:
-6. get_missing_entities() - Liste entités manquantes AVEC IMPORTANCE
+6. get_missing_entities() - Liste entités manquantes
 7. get_formatted_context() - Contexte formaté pour agents
-8. get_raw_context_summary() - Contexte brut complet pour inférence
 """
 
 import os
@@ -27,7 +26,7 @@ import sqlite3
 import re
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict, field
 from contextlib import contextmanager
 import time
@@ -495,290 +494,10 @@ class IntelligentConversationContext:
         
         return context
     
-    # 🤖 MÉTHODES POUR AGENTS GPT AMÉLIORÉES
-    def get_missing_entities(self, include_importance: bool = False) -> Union[List[str], Dict[str, str]]:
-        """
-        Retourne les entités manquantes avec leur niveau d'importance
-        
-        Args:
-            include_importance: Si True, retourne dict avec importance, sinon liste simple
-            
-        Returns:
-            Dict[entity, importance] ou List[entity] selon include_importance
-        """
-        entities = self.consolidated_entities
-        missing_with_importance = {}
-        
-        # Race - toujours critique pour questions techniques
-        if not entities.breed or entities.breed_type == "generic" or entities.breed_confidence < 0.7:
-            missing_with_importance["breed"] = "critique"
-        
-        # Sexe - critique pour performance, secondaire pour santé
-        if not entities.sex or entities.sex_confidence < 0.7:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else "" 
-                   for keyword in ["performance", "weight", "growth", "croissance", "poids"]):
-                missing_with_importance["sex"] = "critique"
-            else:
-                missing_with_importance["sex"] = "secondaire"
-        
-        # Âge - critique pour la plupart des questions
-        if not entities.age_days or entities.age_confidence < 0.7:
-            missing_with_importance["age"] = "critique"
-        
-        # Poids - critique pour questions de performance
-        if not entities.weight_grams and not entities.growth_rate:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["performance", "weight", "growth", "croissance", "poids"]):
-                missing_with_importance["current_performance"] = "critique"
-            else:
-                missing_with_importance["current_performance"] = "secondaire"
-        
-        # Symptômes - critique pour questions de santé
-        if not entities.symptoms and not entities.health_status:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["health", "mortality", "disease", "santé", "mortalité", "maladie"]):
-                missing_with_importance["symptoms"] = "critique"
-            else:
-                missing_with_importance["symptoms"] = "secondaire"
-        
-        # Mortalité - critique si mentionnée dans la conversation
-        if entities.mortality_rate is None:
-            recent_messages_text = " ".join([msg.message.lower() for msg in self.messages[-3:]])
-            if any(keyword in recent_messages_text for keyword in ["mortality", "mortalité", "meurent", "dying"]):
-                missing_with_importance["mortality_rate"] = "critique"
-        
-        # Conditions environnementales - secondaire sauf si problème mentionné
-        if not entities.housing_type and not entities.temperature:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["environment", "temperature", "housing", "environnement", "température"]):
-                missing_with_importance["housing_conditions"] = "critique"
-            else:
-                missing_with_importance["housing_conditions"] = "secondaire"
-        
-        # Alimentation - secondaire sauf si problème nutritionnel
-        if not entities.feed_type:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["feeding", "nutrition", "alimentation", "nourriture"]):
-                missing_with_importance["feed_information"] = "critique"
-            else:
-                missing_with_importance["feed_information"] = "secondaire"
-        
-        if include_importance:
-            return missing_with_importance
-        else:
-            return list(missing_with_importance.keys())
-
-    def get_raw_context_summary(self) -> Dict[str, Any]:
-        """
-        Retourne TOUT le contexte conversationnel brut pour les agents
-        Même les données non validées ou partielles pour permettre l'inférence
-        """
-        entities = self.consolidated_entities
-        
-        # Messages récents pour analyse contextuelle
-        recent_messages = []
-        for msg in self.messages[-5:]:  # 5 derniers messages
-            recent_messages.append({
-                "role": msg.role,
-                "message": msg.message,
-                "timestamp": msg.timestamp.isoformat(),
-                "confidence": msg.confidence_score,
-                "entities_extracted": msg.extracted_entities.to_dict() if msg.extracted_entities else None
-            })
-        
-        # Toutes les entités, même partielles
-        raw_entities = {
-            # Informations de base (même non validées)
-            "breed": {
-                "value": entities.breed,
-                "confidence": entities.breed_confidence,
-                "type": entities.breed_type,
-                "validated": entities.breed_confidence > 0.7
-            },
-            "sex": {
-                "value": entities.sex,
-                "confidence": entities.sex_confidence,
-                "validated": entities.sex_confidence > 0.7
-            },
-            "age": {
-                "days": entities.age_days,
-                "weeks": entities.age_weeks,
-                "confidence": entities.age_confidence,
-                "last_updated": entities.age_last_updated.isoformat() if entities.age_last_updated else None,
-                "validated": entities.age_confidence > 0.7
-            },
-            
-            # Performance et croissance
-            "performance": {
-                "weight_grams": entities.weight_grams,
-                "weight_confidence": entities.weight_confidence,
-                "expected_range": entities.expected_weight_range,
-                "growth_rate": entities.growth_rate,
-                "validated": entities.weight_confidence > 0.7
-            },
-            
-            # Santé
-            "health": {
-                "mortality_rate": entities.mortality_rate,
-                "mortality_confidence": entities.mortality_confidence,
-                "symptoms": entities.symptoms,
-                "health_status": entities.health_status,
-                "previous_treatments": entities.previous_treatments,
-                "validated": len(entities.symptoms) > 0 or entities.health_status is not None
-            },
-            
-            # Environnement
-            "environment": {
-                "temperature": entities.temperature,
-                "humidity": entities.humidity,
-                "housing_type": entities.housing_type,
-                "ventilation_quality": entities.ventilation_quality,
-                "validated": entities.temperature is not None or entities.housing_type is not None
-            },
-            
-            # Gestion
-            "management": {
-                "flock_size": entities.flock_size,
-                "feed_type": entities.feed_type,
-                "feed_conversion": entities.feed_conversion,
-                "water_consumption": entities.water_consumption,
-                "vaccination_status": entities.vaccination_status,
-                "validated": entities.flock_size is not None or entities.feed_type is not None
-            },
-            
-            # Problème contextuel
-            "problem_context": {
-                "severity": entities.problem_severity,
-                "duration": entities.problem_duration,
-                "urgency": entities.intervention_urgency,
-                "validated": entities.problem_severity is not None
-            }
-        }
-        
-        # Patterns et indices dans les messages pour inférence
-        conversation_patterns = self._analyze_conversation_patterns()
-        
-        # Entités manquantes avec importance
-        missing_entities = self.get_missing_entities(include_importance=True)
-        
-        return {
-            "conversation_metadata": {
-                "conversation_id": self.conversation_id,
-                "user_id": self.user_id,
-                "language": self.language,
-                "total_exchanges": self.total_exchanges,
-                "created_at": self.created_at.isoformat(),
-                "last_activity": self.last_activity.isoformat()
-            },
-            
-            "conversation_state": {
-                "topic": self.conversation_topic,
-                "urgency": self.conversation_urgency,
-                "resolution_status": self.problem_resolution_status,
-                "pending_clarification": self.pending_clarification,
-                "ai_enhanced": self.ai_enhanced
-            },
-            
-            "entities_raw": raw_entities,
-            "missing_entities": missing_entities,
-            "conversation_patterns": conversation_patterns,
-            "recent_messages": recent_messages,
-            
-            "extraction_metadata": {
-                "overall_confidence": entities.confidence_overall,
-                "last_ai_update": entities.last_ai_update.isoformat() if entities.last_ai_update else None,
-                "extraction_method": entities.extraction_method,
-                "data_validated": entities.data_validated,
-                "extraction_attempts": entities.extraction_attempts
-            },
-            
-            "context_quality_score": self._calculate_context_quality_score()
-        }
-    
-    def _analyze_conversation_patterns(self) -> Dict[str, Any]:
-        """Analyse les patterns dans la conversation pour aider l'inférence"""
-        
-        if not self.messages:
-            return {}
-        
-        all_text = " ".join([msg.message.lower() for msg in self.messages if msg.role == "user"])
-        
-        patterns = {
-            "breeds_mentioned": [],
-            "numbers_mentioned": [],
-            "symptoms_mentioned": [],
-            "time_indicators": [],
-            "urgency_indicators": [],
-            "performance_indicators": []
-        }
-        
-        # Rechercher mentions de races (même partielles)
-        breed_patterns = [
-            r'ross\s*\d*', r'cobb\s*\d*', r'hubbard', r'arbor', 
-            r'poulets?\s+de\s+chair', r'broilers?'
-        ]
-        for pattern in breed_patterns:
-            matches = re.findall(pattern, all_text, re.IGNORECASE)
-            patterns["breeds_mentioned"].extend(matches)
-        
-        # Rechercher nombres (âges, poids, quantités)
-        number_matches = re.findall(r'\d+(?:\.\d+)?', all_text)
-        patterns["numbers_mentioned"] = [float(n) for n in number_matches[:10]]  # Limiter à 10
-        
-        # Rechercher indicateurs temporels
-        time_indicators = re.findall(r'\d+\s*(?:jours?|semaines?|mois|days?|weeks?|months?)', all_text, re.IGNORECASE)
-        patterns["time_indicators"] = time_indicators
-        
-        # Rechercher indicateurs d'urgence
-        urgency_words = ["urgent", "urgence", "critique", "emergency", "problème", "problem", "meurent", "dying"]
-        for word in urgency_words:
-            if word in all_text:
-                patterns["urgency_indicators"].append(word)
-        
-        # Rechercher indicateurs de performance
-        performance_words = ["poids", "weight", "croissance", "growth", "performance", "développement"]
-        for word in performance_words:
-            if word in all_text:
-                patterns["performance_indicators"].append(word)
-        
-        return patterns
-    
-    def _calculate_context_quality_score(self) -> float:
-        """Calcule un score de qualité du contexte (0.0 à 1.0)"""
-        
-        entities = self.consolidated_entities
-        score_components = []
-        
-        # Score basé sur les entités critiques présentes
-        if entities.breed and entities.breed_confidence > 0.7:
-            score_components.append(0.25)
-        elif entities.breed:
-            score_components.append(0.15)
-        
-        if entities.age_days and entities.age_confidence > 0.7:
-            score_components.append(0.25)
-        elif entities.age_days:
-            score_components.append(0.15)
-        
-        if entities.sex and entities.sex_confidence > 0.7:
-            score_components.append(0.20)
-        elif entities.sex:
-            score_components.append(0.10)
-        
-        # Score basé sur les informations additionnelles
-        additional_info_score = 0
-        if entities.weight_grams:
-            additional_info_score += 0.1
-        if entities.symptoms:
-            additional_info_score += 0.1
-        if entities.flock_size:
-            additional_info_score += 0.05
-        if entities.temperature:
-            additional_info_score += 0.05
-        
-        score_components.append(min(additional_info_score, 0.30))
-        
-        return sum(score_components)
+    # 🤖 NOUVELLES MÉTHODES POUR AGENTS GPT
+    def get_missing_entities(self) -> List[str]:
+        """Retourne la liste des entités critiques manquantes"""
+        return self.consolidated_entities.get_critical_missing_info()
 
     def get_formatted_context(self) -> str:
         """Retourne un résumé texte du contexte conversationnel pour les agents"""
@@ -2140,19 +1859,18 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
         # ✅ ÉTAPE 3: Récupérer le contexte enrichi pour agents
         context = conversation_memory.get_conversation_context(request.conversation_id)
         if context:
-            # 🔥 NOUVELLES MÉTHODES AMÉLIORÉES
-            missing_entities = context.get_missing_entities(include_importance=True)  # Avec importance
-            raw_context_summary = context.get_raw_context_summary()  # Contexte brut complet
+            entities = context.consolidated_entities.to_dict()
+            missing_entities = context.get_missing_entities()
             formatted_context = context.get_formatted_context()
             rag_context = context.get_context_for_rag()
         else:
-            missing_entities, raw_context_summary, formatted_context, rag_context = {}, {}, "", ""
+            entities, missing_entities, formatted_context, rag_context = {}, [], "", ""
         
-        # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG) avec contexte enrichi
+        # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG)
         contextualization_result = await agent_contextualizer.enrich_question(
             question=processed_question,
-            raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities=missing_entities,  # 🔥 AVEC NIVEAUX D'IMPORTANCE
+            entities=entities,
+            missing_entities=missing_entities,
             conversation_context=formatted_context,
             language=request.language
         )
@@ -2165,11 +1883,11 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
             language=request.language
         )
         
-        # ✅ ÉTAPE 6: Agent RAG Enhancer (post-RAG) avec contexte enrichi
+        # ✅ ÉTAPE 6: Agent RAG Enhancer (post-RAG)
         enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
             rag_answer=response.answer,
-            raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities=missing_entities,  # 🔥 AVEC NIVEAUX D'IMPORTANCE
+            entities=entities,
+            missing_entities=missing_entities,
             conversation_context=formatted_context,
             original_question=request.text,
             language=request.language
@@ -2217,11 +1935,10 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
                 needs_clarification=True,
                 conversation_id=request.conversation_id,
                 contextualization_info=contextualization_result,
-                enhancement_info=enhancement_result,
-                context_quality_score=raw_context_summary.get("context_quality_score", 0.0)  # 🔥 NOUVEAU
+                enhancement_info=enhancement_result
             )
         
-        # ✅ ÉTAPE 8: Réponse normale avec métadonnées agents enrichies
+        # ✅ ÉTAPE 8: Réponse normale avec métadonnées agents
         conversation_memory.add_message_to_conversation(
             conversation_id=request.conversation_id,
             user_id=request.user_id,
@@ -2239,9 +1956,7 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
             sources=response.sources,
             optional_clarifications=optional_clarifications,
             contextualization_info=contextualization_result,
-            enhancement_info=enhancement_result,
-            context_quality_score=raw_context_summary.get("context_quality_score", 0.0),  # 🔥 NOUVEAU
-            missing_entities_analysis=missing_entities  # 🔥 NOUVEAU - pour debugging/analytics
+            enhancement_info=enhancement_result
         )
         
     except Exception as e:

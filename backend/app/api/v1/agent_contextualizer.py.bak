@@ -1,0 +1,510 @@
+# app/api/v1/agent_contextualizer.py
+"""
+Agent Contextualizer - Enrichissement des questions avant RAG
+
+🎯 FONCTIONNALITÉS:
+- Enrichit les questions avec le contexte conversationnel
+- Intègre les entités connues (race, sexe, âge, etc.)
+- Reformule pour optimiser la recherche RAG
+- Gestion fallback sans OpenAI
+"""
+
+import os
+import logging
+import json
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+
+# Import OpenAI sécurisé
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    openai = None
+
+logger = logging.getLogger(__name__)
+
+class AgentContextualizer:
+    """Agent intelligent pour enrichir les questions avant RAG"""
+    
+    def __init__(self):
+        self.openai_available = OPENAI_AVAILABLE and os.getenv('OPENAI_API_KEY')
+        self.model = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
+        self.timeout = int(os.getenv('CONTEXTUALIZER_TIMEOUT', '10'))
+        self.max_retries = int(os.getenv('CONTEXTUALIZER_RETRIES', '2'))
+        
+        # Statistiques
+        self.stats = {
+            "total_requests": 0,
+            "openai_success": 0,
+            "openai_failures": 0,
+            "fallback_used": 0,
+            "questions_enriched": 0
+        }
+        
+        logger.info(f"🤖 [AgentContextualizer] Initialisé")
+        logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
+        logger.info(f"   Modèle: {self.model}")
+    
+    async def enrich_question(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str = "fr"
+    ) -> Dict[str, Any]:
+        """
+        Enrichit une question avec le contexte conversationnel
+        
+        Args:
+            question: Question originale
+            entities: Entités extraites (race, sexe, âge, etc.)
+            missing_entities: Entités manquantes critiques
+            conversation_context: Contexte conversationnel
+            language: Langue de la conversation
+            
+        Returns:
+            {
+                "enriched_question": "question optimisée",
+                "reasoning_notes": "explications",
+                "entities_used": ["race", "age"],
+                "method_used": "openai/fallback",
+                "confidence": 0.8
+            }
+        """
+        
+        self.stats["total_requests"] += 1
+        
+        try:
+            # Tentative OpenAI si disponible
+            if self.openai_available:
+                result = await self._enrich_with_openai(
+                    question, entities, missing_entities, conversation_context, language
+                )
+                if result["success"]:
+                    self.stats["openai_success"] += 1
+                    if result["enriched_question"] != question:
+                        self.stats["questions_enriched"] += 1
+                    return result
+                else:
+                    self.stats["openai_failures"] += 1
+            
+            # Fallback: Enrichissement basique
+            logger.info("🔄 [AgentContextualizer] Utilisation fallback basique")
+            result = self._enrich_fallback(question, entities, missing_entities, language)
+            self.stats["fallback_used"] += 1
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
+            return {
+                "enriched_question": question,
+                "reasoning_notes": f"Erreur: {str(e)}",
+                "entities_used": [],
+                "method_used": "error_fallback",
+                "confidence": 0.1,
+                "success": False
+            }
+    
+    async def _enrich_with_openai(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str
+    ) -> Dict[str, Any]:
+        """Enrichissement avec OpenAI GPT"""
+        
+        try:
+            # Préparer le contexte pour GPT
+            entities_summary = self._format_entities_for_gpt(entities)
+            missing_summary = ", ".join(missing_entities) if missing_entities else "Aucune"
+            
+            # Prompt spécialisé selon la langue
+            system_prompt = self._get_system_prompt(language)
+            user_prompt = self._build_enrichment_prompt(
+                question, entities_summary, missing_summary, conversation_context, language
+            )
+            
+            # Appel OpenAI
+            client = openai.AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.2,
+                max_tokens=400,
+                timeout=self.timeout
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            
+            # Parser la réponse JSON
+            result = self._parse_gpt_response(answer, question, entities)
+            result["success"] = True
+            result["method_used"] = "openai"
+            
+            logger.info(f"✅ [AgentContextualizer] Enrichissement OpenAI réussi")
+            logger.debug(f"   Original: {question}")
+            logger.debug(f"   Enrichi: {result['enriched_question']}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur OpenAI: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def _get_system_prompt(self, language: str) -> str:
+        """Retourne le prompt système selon la langue"""
+        
+        system_prompts = {
+            "fr": """Tu es un expert en aviculture spécialisé dans l'optimisation de questions pour systèmes RAG.
+
+Ta mission:
+1. Reformuler la question en intégrant TOUTES les entités connues de manière naturelle
+2. Optimiser pour la recherche documentaire (mots-clés techniques précis)
+3. Mentionner si des informations critiques manquent
+4. Garder le sens et l'intention originale
+5. Utiliser la terminologie vétérinaire appropriée
+
+IMPORTANT: Réponds UNIQUEMENT en JSON avec la structure exacte demandée.""",
+            
+            "en": """You are a poultry expert specialized in optimizing questions for RAG systems.
+
+Your mission:
+1. Reformulate the question by naturally integrating ALL known entities
+2. Optimize for document search (precise technical keywords)
+3. Mention if critical information is missing
+4. Keep original meaning and intention
+5. Use appropriate veterinary terminology
+
+IMPORTANT: Respond ONLY in JSON with the exact requested structure.""",
+            
+            "es": """Eres un experto en avicultura especializado en optimizar preguntas para sistemas RAG.
+
+Tu misión:
+1. Reformular la pregunta integrando naturalmente TODAS las entidades conocidas
+2. Optimizar para búsqueda documental (palabras clave técnicas precisas)
+3. Mencionar si falta información crítica
+4. Mantener el sentido e intención original
+5. Usar terminología veterinaria apropiada
+
+IMPORTANTE: Responde SOLO en JSON con la estructura exacta solicitada."""
+        }
+        
+        return system_prompts.get(language, system_prompts["fr"])
+    
+    def _build_enrichment_prompt(
+        self,
+        question: str,
+        entities_summary: str,
+        missing_summary: str,
+        conversation_context: str,
+        language: str
+    ) -> str:
+        """Construit le prompt d'enrichissement"""
+        
+        if language == "fr":
+            return f"""QUESTION ORIGINALE: "{question}"
+
+ENTITÉS CONNUES:
+{entities_summary}
+
+ENTITÉS MANQUANTES CRITIQUES: {missing_summary}
+
+CONTEXTE CONVERSATIONNEL:
+{conversation_context}
+
+INSTRUCTIONS:
+1. Reformule la question en intégrant naturellement les entités connues
+2. Optimise pour la recherche RAG (terminologie technique précise)
+3. Si des entités critiques manquent, adapte la formulation
+4. Garde l'intention originale
+
+EXEMPLE:
+Original: "Mes poulets ne grossissent pas bien"
+Avec entités (race: Ross 308, sexe: mâles, âge: 21 jours):
+Enrichi: "Mes poulets de chair Ross 308 mâles de 21 jours ont une croissance insuffisante - diagnostic et solutions"
+
+Réponds en JSON:
+{{
+  "enriched_question": "question reformulée avec entités intégrées",
+  "reasoning_notes": "explication des modifications apportées",
+  "entities_used": ["race", "sexe", "âge"],
+  "confidence": 0.9,
+  "optimization_applied": "ajout terminologie technique + intégration entités"
+}}"""
+        
+        elif language == "en":
+            return f"""ORIGINAL QUESTION: "{question}"
+
+KNOWN ENTITIES:
+{entities_summary}
+
+MISSING CRITICAL ENTITIES: {missing_summary}
+
+CONVERSATIONAL CONTEXT:
+{conversation_context}
+
+INSTRUCTIONS:
+1. Reformulate question naturally integrating known entities
+2. Optimize for RAG search (precise technical terminology)
+3. If critical entities missing, adapt formulation
+4. Keep original intention
+
+EXAMPLE:
+Original: "My chickens are not growing well"
+With entities (breed: Ross 308, sex: males, age: 21 days):
+Enriched: "My Ross 308 male broiler chickens at 21 days have poor growth performance - diagnosis and solutions"
+
+Respond in JSON:
+{{
+  "enriched_question": "reformulated question with integrated entities",
+  "reasoning_notes": "explanation of modifications made",
+  "entities_used": ["breed", "sex", "age"],
+  "confidence": 0.9,
+  "optimization_applied": "added technical terminology + integrated entities"
+}}"""
+        
+        else:  # Spanish
+            return f"""PREGUNTA ORIGINAL: "{question}"
+
+ENTIDADES CONOCIDAS:
+{entities_summary}
+
+ENTIDADES CRÍTICAS FALTANTES: {missing_summary}
+
+CONTEXTO CONVERSACIONAL:
+{conversation_context}
+
+INSTRUCCIONES:
+1. Reformula la pregunta integrando naturalmente las entidades conocidas
+2. Optimiza para búsqueda RAG (terminología técnica precisa)
+3. Si faltan entidades críticas, adapta la formulación
+4. Mantén la intención original
+
+EJEMPLO:
+Original: "Mis pollos no crecen bien"
+Con entidades (raza: Ross 308, sexo: machos, edad: 21 días):
+Enriquecida: "Mis pollos de engorde Ross 308 machos de 21 días tienen crecimiento deficiente - diagnóstico y soluciones"
+
+Responde en JSON:
+{{
+  "enriched_question": "pregunta reformulada con entidades integradas",
+  "reasoning_notes": "explicación de modificaciones realizadas",
+  "entities_used": ["raza", "sexo", "edad"],
+  "confidence": 0.9,
+  "optimization_applied": "agregada terminología técnica + entidades integradas"
+}}"""
+    
+    def _format_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
+        """Formate les entités pour le prompt GPT"""
+        
+        formatted_parts = []
+        
+        # Informations de base
+        if entities.get("breed"):
+            confidence = entities.get("breed_confidence", 0.0)
+            formatted_parts.append(f"• Race: {entities['breed']} (confiance: {confidence:.1f})")
+        
+        if entities.get("sex"):
+            confidence = entities.get("sex_confidence", 0.0)
+            formatted_parts.append(f"• Sexe: {entities['sex']} (confiance: {confidence:.1f})")
+        
+        if entities.get("age_days"):
+            confidence = entities.get("age_confidence", 0.0)
+            weeks = entities.get("age_weeks", entities["age_days"] / 7)
+            formatted_parts.append(f"• Âge: {entities['age_days']} jours ({weeks:.1f} semaines) (confiance: {confidence:.1f})")
+        
+        # Performance
+        if entities.get("weight_grams"):
+            confidence = entities.get("weight_confidence", 0.0)
+            formatted_parts.append(f"• Poids: {entities['weight_grams']}g (confiance: {confidence:.1f})")
+        
+        if entities.get("growth_rate"):
+            formatted_parts.append(f"• Croissance: {entities['growth_rate']}")
+        
+        # Santé
+        if entities.get("symptoms"):
+            symptoms = ", ".join(entities["symptoms"])
+            formatted_parts.append(f"• Symptômes: {symptoms}")
+        
+        if entities.get("mortality_rate"):
+            confidence = entities.get("mortality_confidence", 0.0)
+            formatted_parts.append(f"• Mortalité: {entities['mortality_rate']}% (confiance: {confidence:.1f})")
+        
+        # Environnement
+        if entities.get("temperature"):
+            formatted_parts.append(f"• Température: {entities['temperature']}°C")
+        
+        if entities.get("housing_type"):
+            formatted_parts.append(f"• Logement: {entities['housing_type']}")
+        
+        # Élevage
+        if entities.get("flock_size"):
+            formatted_parts.append(f"• Taille troupeau: {entities['flock_size']}")
+        
+        if entities.get("feed_type"):
+            formatted_parts.append(f"• Alimentation: {entities['feed_type']}")
+        
+        return "\n".join(formatted_parts) if formatted_parts else "Aucune entité extraite"
+    
+    def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse la réponse JSON de GPT"""
+        
+        try:
+            # Extraire le JSON de la réponse
+            json_match = None
+            
+            # Chercher JSON dans des blocs code
+            import re
+            json_patterns = [
+                r'```json\s*(\{.*?\})\s*```',
+                r'```\s*(\{.*?\})\s*```',
+                r'(\{.*?\})'
+            ]
+            
+            for pattern in json_patterns:
+                match = re.search(pattern, response, re.DOTALL)
+                if match:
+                    json_match = match.group(1)
+                    break
+            
+            if not json_match:
+                raise ValueError("Pas de JSON trouvé dans la réponse")
+            
+            # Parser le JSON
+            data = json.loads(json_match)
+            
+            # Valider et enrichir la réponse
+            result = {
+                "enriched_question": data.get("enriched_question", original_question),
+                "reasoning_notes": data.get("reasoning_notes", "Aucune explication fournie"),
+                "entities_used": data.get("entities_used", []),
+                "confidence": min(max(data.get("confidence", 0.5), 0.0), 1.0),
+                "optimization_applied": data.get("optimization_applied", "Optimisation basique"),
+                "method_used": "openai",
+                "processing_time": datetime.now().isoformat()
+            }
+            
+            return result
+            
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur parsing JSON: {e}")
+            logger.debug(f"   Réponse GPT: {response}")
+            
+            # Fallback: utiliser la réponse brute si elle semble être une question
+            if len(response) > 10 and ("?" in response[-10:] or any(word in response.lower() for word in ["comment", "pourquoi", "quel", "combien"])):
+                return {
+                    "enriched_question": response.strip(),
+                    "reasoning_notes": "JSON parsing failed, used raw response",
+                    "entities_used": [],
+                    "confidence": 0.3,
+                    "optimization_applied": "Réponse brute GPT",
+                    "method_used": "openai_fallback"
+                }
+            else:
+                # Fallback final
+                return self._enrich_fallback(original_question, entities, [], "fr")
+    
+    def _enrich_fallback(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        language: str
+    ) -> Dict[str, Any]:
+        """Enrichissement fallback sans OpenAI"""
+        
+        enriched_parts = []
+        entities_used = []
+        
+        # Intégrer les entités connues
+        if entities.get("breed") and entities.get("breed_confidence", 0) > 0.5:
+            enriched_parts.append(entities["breed"])
+            entities_used.append("breed")
+        
+        if entities.get("sex") and entities.get("sex_confidence", 0) > 0.5:
+            enriched_parts.append(entities["sex"])
+            entities_used.append("sex")
+        
+        if entities.get("age_days") and entities.get("age_confidence", 0) > 0.5:
+            enriched_parts.append(f"{entities['age_days']} jours")
+            entities_used.append("age")
+        
+        # Construire la question enrichie
+        if enriched_parts:
+            # Remplacer "poulet(s)" par la version enrichie
+            enrichment = " ".join(enriched_parts)
+            
+            # Patterns de remplacement
+            replacements = [
+                (r'\bmes poulets\b', f'mes poulets {enrichment}'),
+                (r'\bpoulets?\b', f'poulets {enrichment}'),
+                (r'\bchickens?\b', f'{enrichment} chickens'),
+                (r'\bpollos?\b', f'pollos {enrichment}')
+            ]
+            
+            enriched_question = question
+            for pattern, replacement in replacements:
+                enriched_question = re.sub(pattern, replacement, enriched_question, flags=re.IGNORECASE)
+            
+            # Si aucun remplacement, ajouter en contexte
+            if enriched_question == question:
+                enriched_question = f"{question} (Contexte: {enrichment})"
+        else:
+            enriched_question = question
+        
+        # Notes sur les entités manquantes
+        reasoning_notes = "Enrichissement basique"
+        if missing_entities:
+            reasoning_notes += f". Informations manquantes: {', '.join(missing_entities)}"
+        
+        return {
+            "enriched_question": enriched_question,
+            "reasoning_notes": reasoning_notes,
+            "entities_used": entities_used,
+            "confidence": 0.6 if entities_used else 0.3,
+            "optimization_applied": "Intégration entités basique",
+            "method_used": "fallback"
+        }
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques de l'agent"""
+        
+        total = self.stats["total_requests"]
+        success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
+        enrichment_rate = (self.stats["questions_enriched"] / total * 100) if total > 0 else 0
+        
+        return {
+            "agent_type": "contextualizer",
+            "total_requests": total,
+            "openai_success_rate": f"{success_rate:.1f}%",
+            "question_enrichment_rate": f"{enrichment_rate:.1f}%",
+            "openai_available": self.openai_available,
+            "model_used": self.model,
+            "detailed_stats": self.stats.copy()
+        }
+
+# Instance globale
+agent_contextualizer = AgentContextualizer()
+
+# Fonction utilitaire pour usage externe
+async def enrich_question(
+    question: str,
+    entities: Dict[str, Any],
+    missing_entities: List[str],
+    conversation_context: str,
+    language: str = "fr"
+) -> Dict[str, Any]:
+    """Fonction utilitaire pour enrichir une question"""
+    return await agent_contextualizer.enrich_question(
+        question, entities, missing_entities, conversation_context, language
+    )
