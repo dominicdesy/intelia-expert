@@ -1,13 +1,15 @@
 """
-app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (VERSION PIPELINE AMÉLIORÉ)
+app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (VERSION PIPELINE AVEC CLARIFICATION CRITIQUE)
 
 🚀 MODIFICATIONS APPLIQUÉES:
 1. Agent Contextualizer TOUJOURS ACTIF (même sans entités existantes)
-2. Clarification NON BLOQUANTE (réponse RAG + suggestions optionnelles)
-3. Agent RAG Enhancer reçoit la question ENRICHIE (pas seulement l'originale)
-4. Fallback intelligent VIA agent post-RAG (même sans RAG)
+2. Clarification CRITIQUE BLOQUANTE (stoppe avant RAG si nécessaire)
+3. Clarification NON CRITIQUE reste non bloquante
+4. Agent RAG Enhancer reçoit la question ENRICHIE (pas seulement l'originale)
+5. Fallback intelligent VIA agent post-RAG (même sans RAG)
+6. Mémoire conversationnelle track les clarifications pendantes
 
-✨ RÉSULTAT: Pipeline plus fluide, expérience utilisateur améliorée, qualité maintenue
+✨ RÉSULTAT: Pipeline plus intelligent avec clarifications critiques bloquantes mais non critiques fluides
 """
 
 import os
@@ -119,6 +121,20 @@ except ImportError as e:
             self.intelligent_memory_available = False
             self.agricultural_validator_available = False
             self.auth_available = False
+            # 🚀 NOUVEAU: Support clarification critique
+            self._clarification_functions = {
+                'analyze_question_for_clarification_enhanced': self._mock_analyze_clarification
+            }
+        
+        def _mock_analyze_clarification(self, question, language):
+            """Mock pour analyse clarification critique"""
+            return {
+                "clarification_required_critical": False,
+                "clarification_required_optional": False,
+                "missing_critical_entities": [],
+                "missing_optional_entities": [],
+                "confidence": 0.5
+            }
         
         def get_current_user_dependency(self):
             return lambda: {"id": "fallback", "email": "fallback@intelia.com"}
@@ -153,6 +169,24 @@ try:
     logger.info("✅ [Services] Mémoire conversationnelle importée")
 except ImportError as e:
     logger.warning(f"⚠️ [Services] Mémoire conversationnelle non disponible: {e}")
+    # Mock pour mémoire avec support clarification
+    class MockConversationMemory:
+        def get_conversation_context(self, conversation_id):
+            return None
+        
+        def add_message_to_conversation(self, *args, **kwargs):
+            pass
+        
+        def mark_pending_clarification(self, conversation_id, question, critical_entities):
+            """🚀 NOUVEAU: Marquer clarification pendante"""
+            logger.info(f"🛑 [Mock Memory] Clarification critique marquée: {critical_entities}")
+            return True
+        
+        def clear_pending_clarification(self, conversation_id):
+            """Nettoyer clarification résolue"""
+            logger.info("✅ [Mock Memory] Clarification résolue")
+            return True
+    
     CONVERSATION_MEMORY_AVAILABLE = False
 
 # Imports optionnels avec fallbacks
@@ -178,13 +212,26 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# 🚀 AMÉLIORATION : SYSTÈME CLARIFICATION NON BLOQUANT
+# 🚀 NOUVEAU : SYSTÈME CLARIFICATION CRITIQUE VS NON CRITIQUE
 # =============================================================================
 
-def enhanced_vagueness_detection(question: str, language: str = "fr") -> dict:
+def analyze_question_for_clarification_enhanced(question: str, language: str = "fr") -> dict:
     """
-    🔧 SYSTÈME CLARIFICATION AMÉLIORÉ - Support pondeuses ET poulets de chair
-    🚀 MODIFICATION: Retourne toujours les suggestions mais ne bloque plus
+    🛑 ANALYSE CLARIFICATION CRITIQUE vs NON CRITIQUE
+    
+    🚀 LOGIQUE:
+    - CRITIQUE: Informations essentielles manquantes, stoppe le pipeline
+    - NON CRITIQUE: Suggestions d'amélioration, ne stoppe pas
+    
+    Returns:
+        dict: {
+            "clarification_required_critical": bool,
+            "clarification_required_optional": bool, 
+            "missing_critical_entities": list,
+            "missing_optional_entities": list,
+            "confidence": float,
+            "reasoning": str
+        }
     """
     
     question_lower = question.lower()
@@ -192,15 +239,143 @@ def enhanced_vagueness_detection(question: str, language: str = "fr") -> dict:
     # 🐔 DÉTECTION TYPE VOLAILLE
     poultry_type = detect_poultry_type(question_lower)
     
-    logger.info(f"🔍 [Enhanced Clarification] Type volaille détecté: {poultry_type}")
+    logger.info(f"🔍 [Critical Clarification] Type volaille détecté: {poultry_type}")
     
-    # LOGIQUE CLARIFICATION SELON TYPE (NON BLOQUANTE)
+    # LOGIQUE CLARIFICATION SELON TYPE
     if poultry_type == "layers":  # Pondeuses
-        return detect_layer_clarification_suggestions(question_lower, language)
+        return analyze_layer_clarification_critical(question_lower, language)
     elif poultry_type == "broilers":  # Poulets de chair
-        return detect_broiler_clarification_suggestions(question_lower, language)
-    else:  # Indéterminé - suggérer type + infos
-        return detect_general_clarification_suggestions(question_lower, language)
+        return analyze_broiler_clarification_critical(question_lower, language)
+    else:  # Indéterminé
+        return analyze_general_clarification_critical(question_lower, language)
+
+def analyze_layer_clarification_critical(question_lower: str, language: str) -> dict:
+    """
+    🥚 ANALYSE CLARIFICATION CRITIQUE PONDEUSES
+    
+    CRITIQUES: race (pour dosages), âge production (pour normes)
+    NON CRITIQUES: logement, éclairage, détails secondaires
+    """
+    
+    critical_missing = []
+    optional_missing = []
+    confidence = 0.0
+    
+    # ENTITÉS CRITIQUES pour pondeuses
+    critical_layer_info = {
+        "breed": ["isa", "brown", "lohmann", "hy-line", "race", "souche", "breed"],
+        "production_stage": ["semaine", "semaines", "week", "weeks", "âge", "age", "mois", "months", "début", "pic", "fin"]
+    }
+    
+    # ENTITÉS NON CRITIQUES
+    optional_layer_info = {
+        "production_rate": ["œufs/jour", "eggs/day", "production", "combien", "how many"],
+        "housing": ["cage", "sol", "parcours", "free range", "battery", "barn"],
+        "lighting": ["lumière", "éclairage", "light", "hours", "heures"],
+        "feeding": ["alimentation", "feed", "nutrition", "protein", "protéine"]
+    }
+    
+    # Vérifier entités CRITIQUES
+    for info_type, keywords in critical_layer_info.items():
+        if not any(keyword in question_lower for keyword in keywords):
+            critical_missing.append(info_type)
+            confidence += 0.4  # Plus élevé pour critique
+    
+    # Vérifier entités NON CRITIQUES
+    for info_type, keywords in optional_layer_info.items():
+        if not any(keyword in question_lower for keyword in keywords):
+            optional_missing.append(info_type)
+            confidence += 0.1  # Plus faible pour optionnel
+    
+    # DÉCISION CRITIQUE
+    is_critical = len(critical_missing) >= 1  # Au moins 1 entité critique manquante
+    is_optional = len(optional_missing) >= 2   # Au moins 2 entités optionnelles manquantes
+    
+    logger.info(f"🥚 [Layer Critical] Critique: {critical_missing}, Optionnel: {optional_missing}")
+    
+    return {
+        "clarification_required_critical": is_critical,
+        "clarification_required_optional": is_optional,
+        "missing_critical_entities": critical_missing,
+        "missing_optional_entities": optional_missing,
+        "confidence": min(confidence, 0.9),
+        "reasoning": f"Pondeuses - Entités critiques manquantes: {critical_missing}",
+        "poultry_type": "layers"
+    }
+
+def analyze_broiler_clarification_critical(question_lower: str, language: str) -> dict:
+    """
+    🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR
+    
+    CRITIQUES: race (dosages différents), âge (courbes croissance), sexe (performances)
+    NON CRITIQUES: environnement, conditions secondaires
+    """
+    
+    critical_missing = []
+    optional_missing = []
+    confidence = 0.0
+    
+    # ENTITÉS CRITIQUES pour poulets de chair
+    critical_broiler_info = {
+        "breed": ["ross", "cobb", "hubbard", "race", "souche", "breed", "strain"],
+        "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
+        "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
+    }
+    
+    # ENTITÉS NON CRITIQUES
+    optional_broiler_info = {
+        "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],
+        "housing": ["température", "temperature", "ventilation", "density", "densité"],
+        "feeding": ["alimentation", "feed", "fcr", "conversion", "nutrition"]
+    }
+    
+    # Vérifier entités CRITIQUES
+    for info_type, keywords in critical_broiler_info.items():
+        if not any(keyword in question_lower for keyword in keywords):
+            critical_missing.append(info_type)
+            confidence += 0.3
+    
+    # Vérifier entités NON CRITIQUES
+    for info_type, keywords in optional_broiler_info.items():
+        if not any(keyword in question_lower for keyword in keywords):
+            optional_missing.append(info_type)
+            confidence += 0.1
+    
+    # DÉCISION CRITIQUE - Plus strict pour poulets de chair
+    is_critical = len(critical_missing) >= 2  # Au moins 2 entités critiques manquantes
+    is_optional = len(optional_missing) >= 1   # Au moins 1 entité optionnelle manquante
+    
+    logger.info(f"🍗 [Broiler Critical] Critique: {critical_missing}, Optionnel: {optional_missing}")
+    
+    return {
+        "clarification_required_critical": is_critical,
+        "clarification_required_optional": is_optional,
+        "missing_critical_entities": critical_missing,
+        "missing_optional_entities": optional_missing,
+        "confidence": confidence,
+        "reasoning": f"Poulets de chair - Entités critiques manquantes: {critical_missing}",
+        "poultry_type": "broilers"
+    }
+
+def analyze_general_clarification_critical(question_lower: str, language: str) -> dict:
+    """
+    ❓ ANALYSE CLARIFICATION GÉNÉRALE
+    
+    CRITIQUE: Type de volaille indéterminé
+    NON CRITIQUE: Détails spécifiques
+    """
+    
+    logger.info("❓ [General Critical] Type volaille indéterminé - clarification critique requise")
+    
+    return {
+        "clarification_required_critical": True,  # Type indéterminé = critique
+        "clarification_required_optional": False,
+        "missing_critical_entities": ["poultry_type", "species"],
+        "missing_optional_entities": ["breed", "age", "purpose"],
+        "confidence": 0.8,
+        "reasoning": "Type de volaille indéterminé - clarification critique nécessaire",
+        "poultry_type": "unknown"
+    }
 
 def detect_poultry_type(question_lower: str) -> str:
     """
@@ -303,200 +478,90 @@ def extract_breeds_from_question(question_lower: str) -> List[str]:
     
     return unique_breeds
 
-def detect_layer_clarification_suggestions(question_lower: str, language: str) -> dict:
+def generate_critical_clarification_message(missing_entities: List[str], poultry_type: str, language: str) -> str:
     """
-    🥚 SUGGESTIONS PONDEUSES (NON BLOQUANT)
-    🚀 MODIFICATION: Retourne toujours suggestions mais ne force plus l'arrêt
+    🛑 Génère le message de clarification critique selon le type et la langue
     """
-    missing_info = []
-    confidence = 0.0
     
-    # Informations critiques pondeuses
-    required_layer_info = {
-        "breed": ["isa", "brown", "lohmann", "hy-line", "race", "souche", "breed"],
-        "age": ["semaine", "semaines", "week", "weeks", "âge", "age", "mois", "months"],
-        "production_rate": ["œufs/jour", "eggs/day", "production", "combien", "how many", "par jour"],
-        "laying_period": ["début", "pic", "fin", "start", "peak", "end", "since", "depuis"],
-        "housing": ["cage", "sol", "parcours", "free range", "battery", "barn", "logement"],
-        "lighting": ["lumière", "éclairage", "light", "hours", "heures", "jour", "dark"]
-    }
-    
-    # Vérification présence informations
-    for info_type, keywords in required_layer_info.items():
-        if not any(keyword in question_lower for keyword in keywords):
-            missing_info.append(info_type)
-            confidence += 0.15
-    
-    logger.info(f"🥚 [Layer Suggestions] Infos manquantes: {missing_info}, Confidence: {confidence}")
-    
-    # 🚀 MODIFICATION: Toujours retourner les suggestions (pas de blocage)
-    if len(missing_info) >= 2:  # Seuil abaissé pour plus de suggestions
-        return {
-            "has_suggestions": True,
-            "suggestion_type": "layer_production_analysis",
-            "poultry_type": "layers",
-            "missing_information": missing_info,
-            "confidence": min(confidence, 0.9),
-            "clarification_questions": generate_layer_questions(missing_info, language),
-            "blocking": False  # 🚀 NOUVEAU: Non bloquant
-        }
-    
-    return {"has_suggestions": False, "blocking": False}
-
-def detect_broiler_clarification_suggestions(question_lower: str, language: str) -> dict:
-    """
-    🍗 SUGGESTIONS POULETS DE CHAIR (NON BLOQUANT)
-    🚀 MODIFICATION: Retourne suggestions sans bloquer
-    """
-    missing_info = []
-    confidence = 0.0
-    
-    # Détection race
-    breed_keywords = ["ross", "cobb", "hubbard", "race", "souche", "breed", "strain"]
-    if not any(keyword in question_lower for keyword in breed_keywords):
-        missing_info.append("breed")
-        confidence += 0.3
-    
-    # Détection sexe
-    sex_keywords = ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
-    if not any(keyword in question_lower for keyword in sex_keywords):
-        missing_info.append("sex")
-        confidence += 0.3
-    
-    # Détection âge
-    age_keywords = ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"]
-    if not any(keyword in question_lower for keyword in age_keywords):
-        missing_info.append("age")
-        confidence += 0.2
-    
-    logger.info(f"🍗 [Broiler Suggestions] Infos manquantes: {missing_info}, Confidence: {confidence}")
-    
-    # 🚀 MODIFICATION: Suggestions non bloquantes
-    if len(missing_info) >= 1:  # Seuil abaissé
-        return {
-            "has_suggestions": True,
-            "suggestion_type": "broiler_breed_sex_age",
-            "poultry_type": "broilers", 
-            "missing_information": missing_info,
-            "confidence": confidence,
-            "clarification_questions": generate_broiler_questions(missing_info, language),
-            "blocking": False  # 🚀 NOUVEAU: Non bloquant
-        }
-    
-    return {"has_suggestions": False, "blocking": False}
-
-def detect_general_clarification_suggestions(question_lower: str, language: str) -> dict:
-    """
-    ❓ SUGGESTIONS GÉNÉRALES (NON BLOQUANT)
-    🚀 MODIFICATION: Suggestions pour améliorer sans bloquer
-    """
-    logger.info("❓ [General Suggestions] Type volaille indéterminé")
-    
-    return {
-        "has_suggestions": True,
-        "suggestion_type": "poultry_type_identification",
-        "poultry_type": "unknown",
-        "missing_information": ["poultry_type", "breed", "purpose"],
-        "confidence": 0.6,  # Abaissé car non critique
-        "clarification_questions": generate_general_questions(language),
-        "blocking": False  # 🚀 NOUVEAU: Non bloquant
-    }
-
-def generate_layer_questions(missing_info: list, language: str) -> list:
-    """Génère questions spécifiques aux pondeuses"""
-    layer_questions = {
+    messages = {
         "fr": {
-            "breed": "Quelle est la race de vos pondeuses ? (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
-            "age": "Quel est l'âge de vos pondeuses ? (en semaines ou mois)",
-            "production_rate": "Combien d'œufs produisent-elles actuellement par jour ?",
-            "laying_period": "Depuis quand ont-elles commencé à pondre ? Sont-elles en début, pic ou fin de ponte ?",
-            "housing": "Comment sont-elles logées ? (cages, sol, parcours libre)",
-            "lighting": "Combien d'heures de lumière reçoivent-elles par jour ?"
+            "layers": {
+                "breed": "Précisez la race de vos pondeuses (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
+                "production_stage": "Indiquez l'âge ou le stade de production de vos pondeuses",
+                "general": "Pour vous donner une réponse précise sur vos pondeuses, j'ai besoin de connaître :"
+            },
+            "broilers": {
+                "breed": "Précisez la race/souche de vos poulets (Ross 308, Cobb 500, Hubbard, etc.)",
+                "age": "Indiquez l'âge de vos poulets (en jours ou semaines)",
+                "sex": "Précisez s'il s'agit de mâles, femelles, ou un troupeau mixte",
+                "general": "Pour vous donner une réponse précise sur vos poulets de chair, j'ai besoin de connaître :"
+            },
+            "unknown": {
+                "poultry_type": "Précisez le type de volailles (pondeuses, poulets de chair, etc.)",
+                "species": "Indiquez l'espèce exacte de vos animaux",
+                "general": "Pour vous donner une réponse précise, j'ai besoin de connaître :"
+            }
         },
         "en": {
-            "breed": "What breed are your laying hens? (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
-            "age": "How old are your laying hens? (in weeks or months)",
-            "production_rate": "How many eggs are they currently producing per day?",
-            "laying_period": "When did they start laying? Are they at start, peak, or end of laying period?",
-            "housing": "How are they housed? (cages, floor, free range)",
-            "lighting": "How many hours of light do they receive per day?"
+            "layers": {
+                "breed": "Specify the breed of your laying hens (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
+                "production_stage": "Indicate the age or production stage of your laying hens",
+                "general": "To give you a precise answer about your laying hens, I need to know:"
+            },
+            "broilers": {
+                "breed": "Specify the breed/strain of your chickens (Ross 308, Cobb 500, Hubbard, etc.)",
+                "age": "Indicate the age of your chickens (in days or weeks)",
+                "sex": "Specify if they are males, females, or a mixed flock",
+                "general": "To give you a precise answer about your broilers, I need to know:"
+            },
+            "unknown": {
+                "poultry_type": "Specify the type of poultry (laying hens, broilers, etc.)",
+                "species": "Indicate the exact species of your animals",
+                "general": "To give you a precise answer, I need to know:"
+            }
         },
         "es": {
-            "breed": "¿Qué raza son sus gallinas ponedoras? (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
-            "age": "¿Qué edad tienen sus gallinas ponedoras? (en semanas o meses)",
-            "production_rate": "¿Cuántos huevos están produciendo actualmente por día?",
-            "laying_period": "¿Cuándo empezaron a poner? ¿Están al inicio, pico o final del período de puesta?",
-            "housing": "¿Cómo están alojadas? (jaulas, suelo, corral libre)",
-            "lighting": "¿Cuántas horas de luz reciben por día?"
+            "layers": {
+                "breed": "Especifique la raza de sus gallinas ponedoras (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
+                "production_stage": "Indique la edad o etapa de producción de sus gallinas ponedoras",
+                "general": "Para darle una respuesta precisa sobre sus gallinas ponedoras, necesito saber:"
+            },
+            "broilers": {
+                "breed": "Especifique la raza/cepa de sus pollos (Ross 308, Cobb 500, Hubbard, etc.)",
+                "age": "Indique la edad de sus pollos (en días o semanas)",
+                "sex": "Especifique si son machos, hembras, o una bandada mixta",
+                "general": "Para darle una respuesta precisa sobre sus pollos de engorde, necesito saber:"
+            },
+            "unknown": {
+                "poultry_type": "Especifique el tipo de aves (gallinas ponedoras, pollos de engorde, etc.)",
+                "species": "Indique la especie exacta de sus animales",
+                "general": "Para darle una respuesta precisa, necesito saber:"
+            }
         }
     }
     
-    lang = language if language in layer_questions else "fr"
-    questions = []
+    lang = language if language in messages else "fr"
+    type_messages = messages[lang].get(poultry_type, messages[lang]["unknown"])
     
-    for info in missing_info:
-        if info in layer_questions[lang]:
-            questions.append(layer_questions[lang][info])
+    # Construire le message
+    general_msg = type_messages["general"]
+    specific_msgs = []
     
-    return questions
-
-def generate_broiler_questions(missing_info: list, language: str) -> list:
-    """Génère questions poulets de chair"""
-    broiler_questions = {
-        "fr": {
-            "breed": "Quelle est la race/souche de vos poulets ? (Ross 308, Cobb 500, Hubbard, etc.)",
-            "sex": "S'agit-il de mâles, femelles, ou un troupeau mixte ?",
-            "age": "Quel est l'âge de vos poulets ? (en jours ou semaines)"
-        },
-        "en": {
-            "breed": "What breed/strain are your broilers? (Ross 308, Cobb 500, Hubbard, etc.)",
-            "sex": "Are they males, females, or a mixed flock?",
-            "age": "How old are your broilers? (in days or weeks)"
-        },
-        "es": {
-            "breed": "¿Qué raza/cepa son sus pollos de engorde? (Ross 308, Cobb 500, Hubbard, etc.)",
-            "sex": "¿Son machos, hembras, o una bandada mixta?",
-            "age": "¿Qué edad tienen sus pollos? (en días o semanas)"
-        }
-    }
+    for entity in missing_entities:
+        if entity in type_messages:
+            specific_msgs.append(f"• {type_messages[entity]}")
     
-    lang = language if language in broiler_questions else "fr"
-    questions = []
-    
-    for info in missing_info:
-        if info in broiler_questions[lang]:
-            questions.append(broiler_questions[lang][info])
-    
-    return questions
-
-def generate_general_questions(language: str) -> list:
-    """Questions générales pour identifier le type"""
-    general_questions = {
-        "fr": [
-            "S'agit-il de pondeuses (pour les œufs) ou de poulets de chair (pour la viande) ?",
-            "Quelle est la race ou souche de vos volailles ?",
-            "Quel est l'objectif de votre élevage ? (production d'œufs, viande, mixte)"
-        ],
-        "en": [
-            "Are these laying hens (for eggs) or broilers (for meat)?",
-            "What breed or strain are your poultry?", 
-            "What is the purpose of your flock? (egg production, meat, mixed)"
-        ],
-        "es": [
-            "¿Son gallinas ponedoras (para huevos) o pollos de engorde (para carne)?",
-            "¿Qué raza o cepa son sus aves?",
-            "¿Cuál es el propósito de su rebaño? (producción de huevos, carne, mixto)"
-        ]
-    }
-    
-    return general_questions.get(language, general_questions["fr"])
+    if specific_msgs:
+        return f"{general_msg}\n\n" + "\n".join(specific_msgs)
+    else:
+        return general_msg
 
 # =============================================================================
-# 🚀 SERVICE PRINCIPAL EXPERT AVEC PIPELINE AMÉLIORÉ
+# 🚀 SERVICE PRINCIPAL EXPERT AVEC PIPELINE CLARIFICATION CRITIQUE
 # =============================================================================
 
 class ExpertService:
-    """Service principal pour le système expert avec pipeline amélioré"""
+    """Service principal pour le système expert avec clarification critique"""
     
     def __init__(self):
         self.integrations = IntegrationsManager()
@@ -509,28 +574,29 @@ class ExpertService:
                 logger.info("✅ [Expert Service] Mémoire conversationnelle initialisée")
             except Exception as e:
                 logger.error(f"❌ [Expert Service] Erreur init mémoire: {e}")
-                self.conversation_memory = None
+                self.conversation_memory = MockConversationMemory()
         else:
-            self.conversation_memory = None
-            logger.warning("⚠️ [Expert Service] Mémoire conversationnelle non disponible")
+            self.conversation_memory = MockConversationMemory()
+            logger.warning("⚠️ [Expert Service] Mémoire conversationnelle mock utilisée")
         
-        # Configuration avec améliorations
+        # Configuration avec clarification critique
         self.config = {
             "enable_concise_responses": True,
             "default_concision_level": ConcisionLevel.CONCISE,
             "max_response_length": {"ultra_concise": 50, "concise": 200, "standard": 500, "detailed": 1000},
             "fallback_mode": not all([MODELS_AVAILABLE, UTILS_AVAILABLE, INTEGRATIONS_AVAILABLE]),
-            # 🚀 NOUVEAU: Clarification non bloquante
-            "non_blocking_clarification": True,
+            # 🚀 NOUVEAU: Clarification critique bloquante
+            "critical_clarification_blocking": True,
+            "optional_clarification_non_blocking": True,
             # 🤖 Agents toujours actifs
             "agents_always_active": True,
             "agents_enabled": AGENTS_AVAILABLE,
             "conversation_memory_enabled": CONVERSATION_MEMORY_AVAILABLE
         }
         
-        logger.info("🚀 [Expert Service] Service expert initialisé avec pipeline amélioré")
-        logger.info(f"🔧 [Expert Service] Clarification non bloquante: {self.config['non_blocking_clarification']}")
-        logger.info(f"🤖 [Expert Service] Agents toujours actifs: {self.config['agents_always_active']}")
+        logger.info("🚀 [Expert Service] Service expert initialisé avec clarification critique")
+        logger.info(f"🛑 [Expert Service] Clarification critique bloquante: {self.config['critical_clarification_blocking']}")
+        logger.info(f"💡 [Expert Service] Clarification optionnelle non bloquante: {self.config['optional_clarification_non_blocking']}")
     
     def get_current_user_dependency(self):
         """Retourne la dépendance pour l'authentification"""
@@ -543,13 +609,13 @@ class ExpertService:
         current_user: Optional[Dict[str, Any]] = None,
         start_time: float = None
     ) -> EnhancedExpertResponse:
-        """🚀 MÉTHODE PRINCIPALE AVEC PIPELINE AMÉLIORÉ"""
+        """🚀 MÉTHODE PRINCIPALE AVEC CLARIFICATION CRITIQUE"""
         
         if start_time is None:
             start_time = time.time()
         
         try:
-            logger.info("🚀 [ExpertService] Traitement avec pipeline amélioré")
+            logger.info("🚀 [ExpertService] Traitement avec clarification critique")
             
             # Extraction sécurisée des paramètres
             question_text = getattr(request_data, 'text', 'Question vide')
@@ -585,8 +651,8 @@ class ExpertService:
                     question_text, conversation_id, language, user_email, start_time, processing_steps
                 )
             
-            # === TRAITEMENT PIPELINE AMÉLIORÉ ===
-            return await self._process_question_improved_pipeline(
+            # === TRAITEMENT PIPELINE AVEC CLARIFICATION CRITIQUE ===
+            return await self._process_question_critical_clarification_pipeline(
                 request_data, request, current_user, start_time, processing_steps, ai_enhancements_used,
                 question_text, language, conversation_id, user_id
             )
@@ -601,14 +667,14 @@ class ExpertService:
                 start_time
             )
     
-    async def _process_question_improved_pipeline(
+    async def _process_question_critical_clarification_pipeline(
         self, request_data, request, current_user, start_time, processing_steps, ai_enhancements_used,
         question_text, language, conversation_id, user_id
     ) -> EnhancedExpertResponse:
-        """🚀 NOUVEAU: Pipeline amélioré avec agents toujours actifs et clarification non bloquante"""
+        """🛑 NOUVEAU: Pipeline avec clarification critique bloquante"""
         
-        logger.info("🚀 [ExpertService] Pipeline amélioré activé")
-        processing_steps.append("improved_pipeline_activated")
+        logger.info("🛑 [ExpertService] Pipeline clarification critique activé")
+        processing_steps.append("critical_clarification_pipeline_activated")
         
         # === TRAITEMENT CLARIFICATION (SI APPLICABLE) ===
         is_clarification = getattr(request_data, 'is_clarification_response', False)
@@ -636,7 +702,83 @@ class ExpertService:
             except Exception as e:
                 logger.warning(f"⚠️ [ExpertService] Erreur validation agricole: {e}")
         
-        # 🚀 === PIPELINE AMÉLIORÉ AVEC AGENTS TOUJOURS ACTIFS ===
+        # 🛑 === ÉTAPE CRITIQUE: ANALYSE CLARIFICATION AVANT RAG ===
+        try:
+            logger.info("🛑 [Pipeline] Analyse clarification critique AVANT RAG")
+            
+            # 🚀 MODIFICATION 1: Utiliser la fonction d'analyse critique
+            if hasattr(self.integrations, '_clarification_functions') and 'analyze_question_for_clarification_enhanced' in self.integrations._clarification_functions:
+                clarification_result = self.integrations._clarification_functions['analyze_question_for_clarification_enhanced'](question_text, language)
+            else:
+                # Fallback vers notre fonction locale
+                clarification_result = analyze_question_for_clarification_enhanced(question_text, language)
+            
+            processing_steps.append("critical_clarification_analysis")
+            ai_enhancements_used.append("critical_clarification_analysis")
+            
+            # 🛑 MODIFICATION 2: Vérifier si clarification critique requise
+            if clarification_result.get("clarification_required_critical", False):
+                logger.info("🛑 [Pipeline] Clarification critique requise - ARRÊT AVANT RAG")
+                processing_steps.append("critical_clarification_blocking")
+                
+                # 🚀 MODIFICATION 3: Marquer dans la mémoire
+                missing_critical_entities = clarification_result.get("missing_critical_entities", [])
+                
+                try:
+                    self.conversation_memory.mark_pending_clarification(
+                        conversation_id, question_text, missing_critical_entities
+                    )
+                    logger.info(f"🧠 [Pipeline] Clarification critique marquée en mémoire: {missing_critical_entities}")
+                except Exception as e:
+                    logger.error(f"❌ [Pipeline] Erreur marquage mémoire: {e}")
+                
+                # 🚀 MODIFICATION 4: Générer message de clarification critique
+                poultry_type = clarification_result.get("poultry_type", "unknown")
+                critical_message = generate_critical_clarification_message(
+                    missing_critical_entities, poultry_type, language
+                )
+                
+                # 🚀 MODIFICATION 5: Retourner immédiatement la réponse de clarification
+                response_time_ms = int((time.time() - start_time) * 1000)
+                
+                if MODELS_AVAILABLE:
+                    return EnhancedExpertResponse(
+                        question=question_text,
+                        response=critical_message,
+                        conversation_id=conversation_id,
+                        rag_used=False,
+                        rag_score=None,
+                        timestamp=datetime.now().isoformat(),
+                        language=language,
+                        response_time_ms=response_time_ms,
+                        mode="clarification_blocking",
+                        user=current_user.get("email") if current_user else None,
+                        logged=True,
+                        validation_passed=True,
+                        processing_steps=processing_steps,
+                        ai_enhancements_used=ai_enhancements_used,
+                        # 🚀 NOUVEAUX CHAMPS CLARIFICATION CRITIQUE
+                        clarification_required_critical=True,
+                        missing_critical_entities=missing_critical_entities,
+                        clarification_confidence=clarification_result.get("confidence", 0.8),
+                        clarification_reasoning=clarification_result.get("reasoning", "Informations critiques manquantes"),
+                        pipeline_version="critical_clarification",
+                        pipeline_blocked_at="before_rag"
+                    )
+                else:
+                    return self._create_basic_response(
+                        question_text, critical_message, conversation_id, 
+                        language, response_time_ms, processing_steps
+                    )
+                
+        except Exception as e:
+            logger.error(f"❌ [Pipeline] Erreur analyse clarification critique: {e}")
+            # Continuer le pipeline normal en cas d'erreur
+            processing_steps.append("critical_clarification_error_continue")
+        
+        # 🚀 === PIPELINE NORMAL SI PAS DE CLARIFICATION CRITIQUE ===
+        logger.info("✅ [Pipeline] Pas de clarification critique - continuation pipeline normal")
+        
         try:
             # 🧠 ÉTAPE 1: RÉCUPÉRATION CONTEXTE CONVERSATIONNEL
             conversation_context = None
@@ -666,10 +808,9 @@ class ExpertService:
                 try:
                     logger.info("🤖 [Pipeline] Agent Contextualizer - TOUJOURS ACTIF")
                     
-                    # 🚀 MODIFICATION 1: Agent appelé même sans entités existantes
                     contextualization_result = await agent_contextualizer.enrich_question(
                         question=question_text,
-                        entities=entities,  # Peut être vide pour première question
+                        entities=entities,
                         missing_entities=missing_entities,
                         conversation_context=formatted_context,
                         language=language
@@ -681,8 +822,6 @@ class ExpertService:
                     
                     if question_for_rag != question_text:
                         logger.info(f"✨ [Pipeline] Question enrichie par agent")
-                        logger.debug(f"   Original: {question_text}")
-                        logger.debug(f"   Enrichie: {question_for_rag}")
                     else:
                         logger.info("📝 [Pipeline] Question maintenue (déjà optimale)")
                     
@@ -690,24 +829,32 @@ class ExpertService:
                     logger.error(f"❌ [Pipeline] Erreur Agent Contextualizer: {e}")
                     question_for_rag = question_text
             
-            # 💡 ÉTAPE 2.5: SUGGESTIONS CLARIFICATION NON BLOQUANTES
-            clarification_suggestions = []
+            # 💡 ÉTAPE 2.5: SUGGESTIONS CLARIFICATION NON CRITIQUES (NON BLOQUANTES)
+            optional_clarifications = []
             
-            if self.config["non_blocking_clarification"] and not is_clarification:
+            if self.config["optional_clarification_non_blocking"] and not is_clarification:
                 try:
-                    logger.info("💡 [Pipeline] Génération suggestions clarification non bloquantes")
+                    logger.info("💡 [Pipeline] Génération suggestions clarification optionnelles")
                     
-                    # 🚀 MODIFICATION 2: Clarification non bloquante
-                    suggestion_result = enhanced_vagueness_detection(question_text, language)
+                    # Utiliser le résultat déjà calculé ou recalculer
+                    if 'clarification_result' not in locals():
+                        if hasattr(self.integrations, '_clarification_functions') and 'analyze_question_for_clarification_enhanced' in self.integrations._clarification_functions:
+                            clarification_result = self.integrations._clarification_functions['analyze_question_for_clarification_enhanced'](question_text, language)
+                        else:
+                            clarification_result = analyze_question_for_clarification_enhanced(question_text, language)
                     
-                    if suggestion_result.get("has_suggestions", False):
-                        clarification_suggestions = suggestion_result.get("clarification_questions", [])
-                        ai_enhancements_used.append(f"non_blocking_clarification_{suggestion_result.get('suggestion_type', 'general')}")
-                        
-                        logger.info(f"💡 [Pipeline] {len(clarification_suggestions)} suggestions générées (non bloquantes)")
+                    if clarification_result.get("clarification_required_optional", False):
+                        optional_missing = clarification_result.get("missing_optional_entities", [])
+                        if optional_missing:
+                            optional_clarifications = self._generate_optional_clarification_suggestions(
+                                optional_missing, clarification_result.get("poultry_type", "unknown"), language
+                            )
+                            ai_enhancements_used.append("optional_clarification_suggestions")
+                            
+                        logger.info(f"💡 [Pipeline] {len(optional_clarifications)} suggestions optionnelles générées")
                     
                 except Exception as e:
-                    logger.error(f"❌ [Pipeline] Erreur suggestions clarification: {e}")
+                    logger.error(f"❌ [Pipeline] Erreur suggestions optionnelles: {e}")
             
             # 🤖 ÉTAPE 3: TRAITEMENT RAG AVEC QUESTION ENRICHIE
             rag_answer = ""
@@ -723,9 +870,8 @@ class ExpertService:
                 processing_steps.append("rag_processing_with_enriched_question")
                 ai_enhancements_used.append("rag_system_enriched")
                 
-                # 🚀 MODIFICATION: RAG appelé avec question enrichie par agent
                 result = await process_rag(
-                    question=question_for_rag,  # Question enrichie, pas originale
+                    question=question_for_rag,
                     user=current_user,
                     language=language,
                     speed_mode=getattr(request_data, 'speed_mode', 'balanced')
@@ -736,7 +882,6 @@ class ExpertService:
                 mode = "rag_processing_with_enriched_question"
                 
             else:
-                # 🚀 MODIFICATION 4: Fallback intelligent même sans RAG
                 logger.info("🔄 [Pipeline] RAG non disponible - Fallback avec question enrichie")
                 processing_steps.append("no_rag_fallback_enriched")
                 
@@ -748,25 +893,24 @@ class ExpertService:
             # 🤖 ÉTAPE 4: AGENT RAG ENHANCER - AVEC QUESTION ENRICHIE
             final_answer = rag_answer
             enhancement_info = {}
-            optional_clarifications = []
+            additional_clarifications = []
             
             if self.config["agents_enabled"]:
                 try:
                     logger.info("🔧 [Pipeline] Agent RAG Enhancer avec question enrichie")
                     
-                    # 🚀 MODIFICATION 3: Agent reçoit la question enrichie
                     enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
                         rag_answer=rag_answer,
                         entities=entities,
                         missing_entities=missing_entities,
                         conversation_context=formatted_context,
                         original_question=question_text,
-                        enriched_question=question_for_rag,  # 🚀 NOUVEAU: Question enrichie
+                        enriched_question=question_for_rag,
                         language=language
                     )
                     
                     final_answer = enhancement_result["enhanced_answer"]
-                    optional_clarifications.extend(enhancement_result.get("optional_clarifications", []))
+                    additional_clarifications.extend(enhancement_result.get("optional_clarifications", []))
                     enhancement_info = enhancement_result
                     ai_enhancements_used.append(f"rag_enhancer_{enhancement_result['method_used']}")
                     
@@ -775,40 +919,22 @@ class ExpertService:
                     
                 except Exception as e:
                     logger.error(f"❌ [Pipeline] Erreur Agent RAG Enhancer: {e}")
-                    # 🚀 MODIFICATION 4: Même en cas d'erreur, on traite via agent
-                    if rag_answer:
-                        final_answer = rag_answer
-                    else:
-                        # Fallback intelligent via agent (même si mock)
-                        try:
-                            fallback_enhancement = await agent_rag_enhancer.enhance_rag_answer(
-                                rag_answer="Je m'excuse, je n'ai pas pu traiter votre question complètement.",
-                                entities={},
-                                missing_entities=[],
-                                conversation_context="",
-                                original_question=question_text,
-                                enriched_question=question_for_rag,
-                                language=language
-                            )
-                            final_answer = fallback_enhancement["enhanced_answer"]
-                        except:
-                            final_answer = self._generate_fallback_responses(question_for_rag, language)["response"]
+                    final_answer = rag_answer if rag_answer else self._generate_fallback_responses(question_for_rag, language)["response"]
             
-            # 💡 ÉTAPE 5: CONSOLIDATION CLARIFICATIONS
-            # Combiner suggestions clarification non bloquantes + agent enhancer
-            all_clarifications = []
-            
-            if clarification_suggestions:
-                all_clarifications.extend(clarification_suggestions)
+            # 💡 ÉTAPE 5: CONSOLIDATION CLARIFICATIONS OPTIONNELLES
+            all_optional_clarifications = []
             
             if optional_clarifications:
-                all_clarifications.extend(optional_clarifications)
+                all_optional_clarifications.extend(optional_clarifications)
             
-            # Déduplication des clarifications
-            unique_clarifications = list(dict.fromkeys(all_clarifications))
+            if additional_clarifications:
+                all_optional_clarifications.extend(additional_clarifications)
             
-            if unique_clarifications:
-                logger.info(f"💡 [Pipeline] {len(unique_clarifications)} clarifications consolidées")
+            # Déduplication
+            unique_optional_clarifications = list(dict.fromkeys(all_optional_clarifications))
+            
+            if unique_optional_clarifications:
+                logger.info(f"💡 [Pipeline] {len(unique_optional_clarifications)} clarifications optionnelles consolidées")
             
             # 🧠 ÉTAPE 6: MISE À JOUR MÉMOIRE CONVERSATIONNELLE
             if self.conversation_memory:
@@ -817,7 +943,7 @@ class ExpertService:
                     self.conversation_memory.add_message_to_conversation(
                         conversation_id=conversation_id,
                         user_id=user_id,
-                        message=question_for_rag,  # Question enrichie stockée
+                        message=question_for_rag,
                         role="user",
                         language=language
                     )
@@ -837,10 +963,9 @@ class ExpertService:
                     logger.error(f"❌ [Pipeline] Erreur mise à jour mémoire: {e}")
             
         except Exception as e:
-            logger.error(f"❌ [Pipeline] Erreur traitement pipeline amélioré: {e}")
+            logger.error(f"❌ [Pipeline] Erreur traitement pipeline normal: {e}")
             processing_steps.append("pipeline_error_fallback")
             
-            # 🚀 MODIFICATION 4: Même les erreurs passent par l'agent si possible
             try:
                 if self.config["agents_enabled"]:
                     error_enhancement = await agent_rag_enhancer.enhance_rag_answer(
@@ -862,10 +987,10 @@ class ExpertService:
             rag_score = None
             mode = "pipeline_error_fallback"
             enhancement_info = {}
-            unique_clarifications = []
+            unique_optional_clarifications = []
             contextualization_info = {}
         
-        # === CONSTRUCTION RÉPONSE FINALE AMÉLIORÉE ===
+        # === CONSTRUCTION RÉPONSE FINALE ===
         response_time_ms = int((time.time() - start_time) * 1000)
         user_email = current_user.get("email") if current_user else None
         
@@ -887,23 +1012,21 @@ class ExpertService:
             ai_enhancements_used=ai_enhancements_used
         )
         
-        # 🚀 AJOUTER MÉTADONNÉES PIPELINE AMÉLIORÉ
+        # Métadonnées pipeline avec clarification critique
         if self.config["agents_enabled"]:
-            # Métadonnées contextualizer
             if contextualization_info:
                 response.contextualization_info = contextualization_info
-                response.enriched_question = question_for_rag  # Question enrichie exposée
+                response.enriched_question = question_for_rag
                 
-            # Métadonnées enhancer
             if enhancement_info:
                 response.enhancement_info = enhancement_info
         
-        # 💡 Clarifications consolidées (non bloquantes)
-        if unique_clarifications:
-            response.optional_clarifications = unique_clarifications
-            response.clarification_mode = "non_blocking"
+        # Clarifications optionnelles (non bloquantes)
+        if unique_optional_clarifications:
+            response.optional_clarifications = unique_optional_clarifications
+            response.clarification_mode = "optional_non_blocking"
         
-        # 🧠 Métadonnées mémoire
+        # Métadonnées mémoire
         if self.conversation_memory and conversation_context:
             response.conversation_context = {
                 "total_exchanges": conversation_context.total_exchanges,
@@ -913,16 +1036,89 @@ class ExpertService:
                 "overall_confidence": conversation_context.consolidated_entities.confidence_overall
             }
         
-        # 🏷️ Marquer comme pipeline amélioré
-        response.pipeline_version = "improved"
+        # Marquer comme pipeline avec clarification critique
+        response.pipeline_version = "critical_clarification"
         response.pipeline_improvements = [
             "agents_always_active",
-            "non_blocking_clarification", 
+            "critical_clarification_blocking",
+            "optional_clarification_non_blocking", 
             "enriched_question_to_rag",
             "intelligent_fallback"
         ]
         
         return response
+    
+    def _generate_optional_clarification_suggestions(self, missing_entities: List[str], poultry_type: str, language: str) -> List[str]:
+        """
+        💡 Génère des suggestions de clarification optionnelles (non bloquantes)
+        """
+        
+        suggestions = {
+            "fr": {
+                "layers": {
+                    "production_rate": "Combien d'œufs produisent-elles actuellement par jour ?",
+                    "housing": "Comment sont-elles logées ? (cages, sol, parcours libre)",
+                    "lighting": "Combien d'heures de lumière reçoivent-elles par jour ?",
+                    "feeding": "Quel type d'alimentation utilisez-vous ?"
+                },
+                "broilers": {
+                    "weight": "Quel est leur poids actuel ?",
+                    "housing": "Quelles sont les conditions d'élevage ? (température, densité)",
+                    "feeding": "Quel type d'aliment utilisez-vous ? (démarrage, croissance, finition)"
+                },
+                "unknown": {
+                    "breed": "Quelle est la race exacte de vos volailles ?",
+                    "age": "Quel est l'âge de vos animaux ?",
+                    "purpose": "Quel est l'objectif de votre élevage ?"
+                }
+            },
+            "en": {
+                "layers": {
+                    "production_rate": "How many eggs are they currently producing per day?",
+                    "housing": "How are they housed? (cages, floor, free range)",
+                    "lighting": "How many hours of light do they receive per day?",
+                    "feeding": "What type of feed are you using?"
+                },
+                "broilers": {
+                    "weight": "What is their current weight?",
+                    "housing": "What are the farming conditions? (temperature, density)",
+                    "feeding": "What type of feed are you using? (starter, grower, finisher)"
+                },
+                "unknown": {
+                    "breed": "What is the exact breed of your poultry?",
+                    "age": "What is the age of your animals?",
+                    "purpose": "What is the purpose of your farming?"
+                }
+            },
+            "es": {
+                "layers": {
+                    "production_rate": "¿Cuántos huevos están produciendo actualmente por día?",
+                    "housing": "¿Cómo están alojadas? (jaulas, suelo, corral libre)",
+                    "lighting": "¿Cuántas horas de luz reciben por día?",
+                    "feeding": "¿Qué tipo de alimento está usando?"
+                },
+                "broilers": {
+                    "weight": "¿Cuál es su peso actual?",
+                    "housing": "¿Cuáles son las condiciones de cría? (temperatura, densidad)",
+                    "feeding": "¿Qué tipo de alimento está usando? (iniciador, crecimiento, acabado)"
+                },
+                "unknown": {
+                    "breed": "¿Cuál es la raza exacta de sus aves?",
+                    "age": "¿Cuál es la edad de sus animales?",
+                    "purpose": "¿Cuál es el propósito de su cría?"
+                }
+            }
+        }
+        
+        lang = language if language in suggestions else "fr"
+        type_suggestions = suggestions[lang].get(poultry_type, suggestions[lang]["unknown"])
+        
+        result = []
+        for entity in missing_entities:
+            if entity in type_suggestions:
+                result.append(type_suggestions[entity])
+        
+        return result
     
     # === TOUTES LES AUTRES MÉTHODES PRÉSERVÉES ===
     
@@ -997,6 +1193,13 @@ class ExpertService:
         
         logger.info(f"✨ [ExpertService] Question enrichie: {enriched_question}")
         processing_steps.append("question_enriched_enhanced")
+        
+        # 🧠 Nettoyer la clarification pendante en mémoire
+        try:
+            self.conversation_memory.clear_pending_clarification(conversation_id)
+            logger.info("✅ [ExpertService] Clarification critique résolue en mémoire")
+        except Exception as e:
+            logger.error(f"❌ [ExpertService] Erreur nettoyage clarification: {e}")
         
         return None  # Continuer le traitement avec la question enrichie
     
@@ -1278,15 +1481,16 @@ class ExpertService:
             
             return {
                 "success": True,
-                "message": "Feedback enregistré avec succès (Pipeline Amélioré)",
+                "message": "Feedback enregistré avec succès (Pipeline Clarification Critique)",
                 "rating": rating,
                 "comment": comment,
                 "conversation_id": conversation_id,
                 "feedback_updated_in_db": feedback_updated,
-                "pipeline_version": "improved",
+                "pipeline_version": "critical_clarification",
                 "improvements_active": [
                     "agents_always_active",
-                    "non_blocking_clarification", 
+                    "critical_clarification_blocking",
+                    "optional_clarification_non_blocking", 
                     "enriched_question_to_rag",
                     "intelligent_fallback"
                 ],
@@ -1345,10 +1549,11 @@ class ExpertService:
                 "topics": topics,
                 "language": lang,
                 "count": len(topics),
-                "pipeline_version": "improved",
+                "pipeline_version": "critical_clarification",
                 "improvements_active": [
                     "agents_always_active",
-                    "non_blocking_clarification", 
+                    "critical_clarification_blocking",
+                    "optional_clarification_non_blocking", 
                     "enriched_question_to_rag",
                     "intelligent_fallback"
                 ],
@@ -1375,109 +1580,144 @@ class ExpertService:
             }
 
 # =============================================================================
-# 🚀 FONCTION DE TEST POUR VÉRIFIER LES AMÉLIORATIONS
+# 🚀 FONCTION DE TEST POUR VÉRIFIER LES CLARIFICATIONS CRITIQUES
 # =============================================================================
 
-def test_improved_pipeline_system():
-    """Test du pipeline amélioré avec agents toujours actifs"""
+def test_critical_clarification_system():
+    """Test du système de clarification critique vs optionnelle"""
     
     test_scenarios = [
         {
-            "name": "Première question sans contexte",
+            "name": "Question broiler sans race ni âge - CRITIQUE",
             "question": "Mes poulets ne grossissent pas bien",
-            "expected": "Agent contextualizer actif même sans entités"
+            "expected_critical": True,
+            "expected_entities": ["breed", "age"]
         },
         {
-            "name": "Question avec clarification possible",
-            "question": "Problème de ponte",
-            "expected": "Suggestions non bloquantes + réponse RAG"
+            "name": "Question pondeuse sans race - CRITIQUE",
+            "question": "Mes pondeuses ne pondent pas",
+            "expected_critical": True,
+            "expected_entities": ["breed"]
         },
         {
-            "name": "Question enrichie pour RAG",
-            "question": "Ross 308 poids normal",
-            "expected": "Question enrichie transmise au RAG"
+            "name": "Question Ross 308 avec âge - OPTIONNEL",
+            "question": "Mes Ross 308 de 21 jours pèsent 800g",
+            "expected_critical": False,
+            "expected_optional": True
         },
         {
-            "name": "Fallback intelligent",
-            "question": "Erreur technique simulée",
-            "expected": "Agent enhancer traite même les erreurs"
+            "name": "Question type indéterminé - CRITIQUE",
+            "question": "Problème avec mes animaux",
+            "expected_critical": True,
+            "expected_entities": ["poultry_type", "species"]
+        },
+        {
+            "name": "Question ISA Brown complète - PAS DE CLARIFICATION",
+            "question": "Mes ISA Brown de 30 semaines pondent 280 œufs",
+            "expected_critical": False,
+            "expected_optional": False
         }
     ]
     
-    print("🧪 [Test Pipeline Amélioré] Démarrage des tests...")
+    print("🧪 [Test Clarification Critique] Démarrage des tests...")
     
     for scenario in test_scenarios:
         print(f"\n🎯 Scénario: {scenario['name']}")
         print(f"   Question: {scenario['question']}")
-        print(f"   Attendu: {scenario['expected']}")
         
-        # Test des améliorations
-        suggestion_result = enhanced_vagueness_detection(scenario['question'], "fr")
-        print(f"   ✅ Suggestions: {suggestion_result.get('has_suggestions', False)}")
-        print(f"   📊 Bloquant: {suggestion_result.get('blocking', True)}")
+        # Test de l'analyse critique
+        result = analyze_question_for_clarification_enhanced(scenario['question'], "fr")
         
-        poultry_type = detect_poultry_type(scenario['question'].lower())
-        print(f"   🎯 Type: {poultry_type}")
+        is_critical = result.get("clarification_required_critical", False)
+        is_optional = result.get("clarification_required_optional", False)
+        missing_critical = result.get("missing_critical_entities", [])
+        missing_optional = result.get("missing_optional_entities", [])
+        
+        print(f"   🛑 Critique: {is_critical} (attendu: {scenario.get('expected_critical', False)})")
+        print(f"   💡 Optionnel: {is_optional} (attendu: {scenario.get('expected_optional', False)})")
+        print(f"   📋 Entités critiques manquantes: {missing_critical}")
+        print(f"   📝 Entités optionnelles manquantes: {missing_optional}")
+        
+        # Vérification des attentes
+        if 'expected_critical' in scenario:
+            status = "✅" if is_critical == scenario['expected_critical'] else "❌"
+            print(f"   {status} Test critique: {'PASSED' if is_critical == scenario['expected_critical'] else 'FAILED'}")
+        
+        if 'expected_entities' in scenario and is_critical:
+            expected_entities = scenario['expected_entities']
+            entities_match = all(entity in missing_critical for entity in expected_entities)
+            status = "✅" if entities_match else "❌"
+            print(f"   {status} Test entités: {'PASSED' if entities_match else 'FAILED'}")
     
-    print("\n🚀 [Test Pipeline Amélioré] Améliorations validées:")
-    print("   ✅ Agent Contextualizer: Toujours actif")
-    print("   ✅ Clarification: Non bloquante")
-    print("   ✅ Question enrichie: Transmise au RAG")
-    print("   ✅ Fallback: Intelligent via agents")
-    print("   ✅ Pipeline: Plus fluide et robuste")
+    print("\n🚀 [Test Clarification Critique] Résumé des améliorations:")
+    print("   🛑 Clarification CRITIQUE: Stoppe avant RAG")
+    print("   💡 Clarification OPTIONNELLE: Suggestions non bloquantes")
+    print("   🧠 Mémoire: Track clarifications pendantes")
+    print("   🎯 Précision: Détection type volaille améliorée")
+    print("   🌐 Multilingue: Support FR/EN/ES")
+    print("   ✅ Pipeline: Plus intelligent et adaptatif")
     
-    print("✅ [Test Pipeline Amélioré] Tests terminés!")
+    print("✅ [Test Clarification Critique] Tests terminés!")
 
 # =============================================================================
-# CONFIGURATION FINALE AVEC PIPELINE AMÉLIORÉ
+# CONFIGURATION FINALE AVEC CLARIFICATION CRITIQUE
 # =============================================================================
 
-logger.info("🚀" * 50)
-logger.info("🚀 [EXPERT SERVICE] PIPELINE AMÉLIORÉ - MODIFICATIONS APPLIQUÉES!")
-logger.info("🚀 [AMÉLIORATIONS IMPLÉMENTÉES]:")
+logger.info("🛑" * 50)
+logger.info("🛑 [EXPERT SERVICE] CLARIFICATION CRITIQUE - MODIFICATIONS APPLIQUÉES!")
+logger.info("🛑 [NOUVELLES FONCTIONNALITÉS IMPLÉMENTÉES]:")
 logger.info("")
-logger.info("🤖 [1. AGENT CONTEXTUALIZER TOUJOURS ACTIF]:")
-logger.info("   ✅ AVANT: Actif seulement si entités présentes")
-logger.info("   ✅ APRÈS: Actif pour TOUTES les questions (même première)")
-logger.info("   ✅ RÉSULTAT: Enrichissement dès le premier échange")
+logger.info("🛑 [1. CLARIFICATION CRITIQUE BLOQUANTE]:")
+logger.info("   ✅ AVANT: Toutes clarifications non bloquantes")
+logger.info("   ✅ APRÈS: Clarifications CRITIQUES stoppent avant RAG")
+logger.info("   ✅ RÉSULTAT: Évite réponses imprécises sur infos critiques")
 logger.info("")
-logger.info("💡 [2. CLARIFICATION NON BLOQUANTE]:")
-logger.info("   ✅ AVANT: Pipeline s'arrête si clarification requise")
-logger.info("   ✅ APRÈS: Réponse RAG + suggestions optionnelles")
-logger.info("   ✅ RÉSULTAT: Expérience utilisateur fluide")
+logger.info("💡 [2. CLARIFICATION OPTIONNELLE NON BLOQUANTE]:")
+logger.info("   ✅ AVANT: Pas de distinction critique/optionnel")
+logger.info("   ✅ APRÈS: Suggestions optionnelles en parallèle RAG")
+logger.info("   ✅ RÉSULTAT: Fluidité + suggestions d'amélioration")
 logger.info("")
-logger.info("🔧 [3. QUESTION ENRICHIE VERS RAG]:")
-logger.info("   ✅ AVANT: Agent enhancer ne recevait que question originale")
-logger.info("   ✅ APRÈS: Reçoit question enrichie du contextualizer")
-logger.info("   ✅ RÉSULTAT: Cohérence complète dans le pipeline")
+logger.info("🧠 [3. MÉMOIRE CLARIFICATIONS PENDANTES]:")
+logger.info("   ✅ NOUVEAU: mark_pending_clarification() en mémoire")
+logger.info("   ✅ NOUVEAU: clear_pending_clarification() après résolution")
+logger.info("   ✅ RÉSULTAT: Suivi état clarifications par conversation")
 logger.info("")
-logger.info("🛡️ [4. FALLBACK INTELLIGENT]:")
-logger.info("   ✅ AVANT: Réponse basique si RAG échoue")
-logger.info("   ✅ APRÈS: Agent post-RAG traite même les fallbacks")
-logger.info("   ✅ RÉSULTAT: Qualité maintenue en toutes circonstances")
+logger.info("🎯 [4. DÉTECTION CRITIQUE INTELLIGENTE]:")
+logger.info("   ✅ POULETS DE CHAIR: race + âge + sexe (critique)")
+logger.info("   ✅ PONDEUSES: race + stade production (critique)")
+logger.info("   ✅ INDÉTERMINÉ: type volaille (critique)")
+logger.info("   ✅ RÉSULTAT: Précision maximale sur entités essentielles")
 logger.info("")
-logger.info("🏃 [NOUVEAUX FLUX PIPELINE]:")
-logger.info("   📝 Question → 🤖 Contextualizer (TOUJOURS)")
-logger.info("   💡 → Suggestions clarification (NON BLOQUANT)")
+logger.info("🌐 [5. MESSAGES CLARIFICATION MULTILINGUES]:")
+logger.info("   ✅ FRANÇAIS: Messages contextuels par type")
+logger.info("   ✅ ANGLAIS: Traductions adaptées")
+logger.info("   ✅ ESPAGNOL: Support complet")
+logger.info("   ✅ RÉSULTAT: UX naturelle selon langue utilisateur")
+logger.info("")
+logger.info("🔄 [NOUVEAU FLUX PIPELINE CRITIQUE]:")
+logger.info("   📝 Question → 🛑 Analyse Clarification CRITIQUE")
+logger.info("   ❓ → Si CRITIQUE: ARRÊT + Message + Mémoire")
+logger.info("   ✅ → Si OK: 🤖 Contextualizer + 💡 Optionnelles")
 logger.info("   🔍 → RAG avec question enrichie")
-logger.info("   🔧 → Enhancer avec question enrichie")
-logger.info("   📤 → Réponse + clarifications optionnelles")
+logger.info("   🔧 → Enhancer + Consolidation clarifications")
+logger.info("   📤 → Réponse finale + suggestions optionnelles")
 logger.info("")
-logger.info("🎯 [BÉNÉFICES UTILISATEUR]:")
-logger.info("   ✅ Plus de blocage par clarifications")
-logger.info("   ✅ Réponses toujours fournies")
-logger.info("   ✅ Qualité améliorée dès premier échange")
-logger.info("   ✅ Suggestions utiles mais non intrusives")
-logger.info("   ✅ Robustesse maximale du système")
+logger.info("🎯 [LOGIQUE CRITIQUE vs OPTIONNELLE]:")
+logger.info("   🛑 CRITIQUE: Informations ESSENTIELLES pour réponse précise")
+logger.info("   💡 OPTIONNELLE: Améliorations SOUHAITABLES mais pas bloquantes")
+logger.info("   ⚖️ ÉQUILIBRE: Qualité garantie + Fluidité préservée")
 logger.info("")
-logger.info("🔧 [CONFIGURATION PIPELINE]:")
-logger.info(f"   - Agents toujours actifs: True")
-logger.info(f"   - Clarification non bloquante: True")
-logger.info(f"   - Question enrichie vers RAG: True")
-logger.info(f"   - Fallback intelligent: True")
+logger.info("📊 [NOUVEAUX CHAMPS RÉPONSE]:")
+logger.info("   - clarification_required_critical: bool")
+logger.info("   - missing_critical_entities: list")
+logger.info("   - clarification_confidence: float")
+logger.info("   - clarification_reasoning: str")
+logger.info("   - pipeline_blocked_at: str")
 logger.info("")
 logger.info("✨ [STATUS FINAL]:")
-logger.info("   🚀 PIPELINE AMÉLIORÉ PRÊT POUR PRODUCTION")
-logger.info("   🚀 EXPÉRIENCE UTILISATEUR OPTIMISÉE")
-logger.info("   🚀 ROBUSTESSE ET FLUIDITÉ MAXIMALES")
-logger.info("🚀" * 50)
+logger.info("   🛑 CLARIFICATION CRITIQUE OPÉRATIONNELLE")
+logger.info("   🧠 MÉMOIRE CONVERSATIONNELLE INTÉGRÉE")
+logger.info("   🎯 PRÉCISION MAXIMALE GARANTIE")
+logger.info("   💡 SUGGESTIONS INTELLIGENTES PRÉSERVÉES")
+logger.info("   🚀 PIPELINE PLUS INTELLIGENT ET ADAPTATIF")
+logger.info("🛑" * 50)

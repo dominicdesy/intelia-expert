@@ -1,5 +1,5 @@
-# Nouveau module: rag_context_enhancer.py
-# Améliore le contexte conversationnel pour le RAG - Version Structurée
+# Module amélioré: rag_context_enhancer.py
+# Améliore le contexte conversationnel pour le RAG avec sélection multi-variantes
 
 import re
 import logging
@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple, Any
 logger = logging.getLogger(__name__)
 
 class RAGContextEnhancer:
-    """Améliore le contexte conversationnel pour optimiser les requêtes RAG"""
+    """Améliore le contexte conversationnel pour optimiser les requêtes RAG avec sélection multi-variantes"""
     
     def __init__(self):
         # Patterns pour détecter les références contextuelles
@@ -45,6 +45,7 @@ class RAGContextEnhancer:
     ) -> Dict[str, Any]:
         """
         Améliore une question pour le RAG en utilisant le contexte conversationnel
+        Génère plusieurs variantes et sélectionne la meilleure
         
         Args:
             question: Question originale
@@ -54,7 +55,7 @@ class RAGContextEnhancer:
         
         Returns:
             Dict contenant:
-            - question: Question optimisée pour RAG
+            - question: Meilleure question optimisée pour RAG
             - missing_entities: Liste des entités manquantes identifiées
             - context_entities: Dictionnaire des entités extraites du contexte
             - enhancement_info: Métadonnées sur les améliorations appliquées
@@ -62,7 +63,7 @@ class RAGContextEnhancer:
         
         # Initialiser le résultat structuré
         result = {
-            "question": question,  # Question enrichie (sera modifiée si nécessaire)
+            "question": question,  # Sera remplacée par la meilleure variante
             "missing_entities": missing_entities or [],
             "context_entities": {},
             "enhancement_info": {
@@ -70,7 +71,10 @@ class RAGContextEnhancer:
                 "question_enriched": False,
                 "original_question": question,
                 "technical_context_added": False,
-                "missing_context_added": False
+                "missing_context_added": False,
+                "variants_tested": [],
+                "best_variant_score": 0.0,
+                "variant_selection_method": "entity_coverage"
             }
         }
         
@@ -93,37 +97,268 @@ class RAGContextEnhancer:
                 question, context_entities, language
             )
         
-        # 4. Enrichir la question si nécessaire
-        enriched_question = question
+        # 4. Générer plusieurs variantes enrichies
+        variants = self._generate_question_variants(
+            question, context_entities, language, result["missing_entities"]
+        )
         
-        if has_pronouns and context_entities:
-            enriched_question = self._build_enriched_question(
-                question, context_entities, language
-            )
-            result["enhancement_info"]["question_enriched"] = True
-            logger.info(f"✨ [RAG Context] Question enrichie: '{enriched_question}'")
+        result["enhancement_info"]["variants_tested"] = variants
+        logger.info(f"🎯 [RAG Context] {len(variants)} variantes générées")
         
-        # 5. Ajouter contexte technique si pertinent
-        if context_entities or has_pronouns:
-            technical_context = self._build_technical_context(context_entities, language)
-            if technical_context:
-                enriched_question += f"\n\nContexte technique: {technical_context}"
-                result["enhancement_info"]["technical_context_added"] = True
-        
-        # 6. Ajouter information sur les entités manquantes
-        if result["missing_entities"]:
-            missing_context = self._build_missing_entities_context(
-                result["missing_entities"], language
-            )
-            if missing_context:
-                enriched_question += f"\n\n{missing_context}"
-                result["enhancement_info"]["missing_context_added"] = True
-                logger.info(f"ℹ️ [RAG Context] Entités manquantes ajoutées: {result['missing_entities']}")
-        
-        # 7. Mettre à jour la question finale
-        result["question"] = enriched_question
+        # 5. Sélectionner la meilleure variante
+        if variants:
+            best_variant = self._select_best_variant(variants, context_entities)
+            best_score = self._score_variant(best_variant, context_entities)
+            
+            result["question"] = best_variant
+            result["enhancement_info"]["question_enriched"] = (best_variant != question)
+            result["enhancement_info"]["best_variant_score"] = best_score
+            
+            logger.info(f"✨ [RAG Context] Meilleure variante sélectionnée (score: {best_score:.2f}): '{best_variant}'")
+        else:
+            # Fallback si aucune variante générée
+            result["question"] = question
+            result["enhancement_info"]["variants_tested"] = [question]
         
         return result
+    
+    def _generate_question_variants(
+        self, 
+        question: str, 
+        context_entities: Dict[str, str], 
+        language: str,
+        missing_entities: List[str]
+    ) -> List[str]:
+        """Génère plusieurs variantes enrichies de la question"""
+        
+        variants = []
+        
+        # Variante 1: Question originale (baseline)
+        variants.append(question)
+        
+        # Variante 2: Question enrichie avec remplacement des pronoms
+        if context_entities:
+            enriched_question = self._build_enriched_question(question, context_entities, language)
+            if enriched_question != question:
+                variants.append(enriched_question)
+        
+        # Variante 3: Question + contexte technique inline
+        technical_context = self._build_technical_context(context_entities, language)
+        if technical_context:
+            variants.append(f"{question} - Infos: {technical_context}")
+        
+        # Variante 4: Question avec entités entre parenthèses
+        if context_entities:
+            entity_values = [v for v in context_entities.values() if v]
+            if entity_values:
+                variants.append(f"{question} ({', '.join(entity_values)})")
+        
+        # Variante 5: Question avec contexte technique séparé
+        if technical_context:
+            variants.append(f"{question}\n\nContexte: {technical_context}")
+        
+        # Variante 6: Question enrichie + informations manquantes
+        missing_context = self._build_missing_entities_context(missing_entities, language)
+        if missing_context:
+            variants.append(f"{question}\n\n{missing_context}")
+        
+        # Variante 7: Question complètement restructurée avec tout le contexte
+        if context_entities and technical_context:
+            full_context_question = self._build_full_context_question(
+                question, context_entities, technical_context, language
+            )
+            if full_context_question != question:
+                variants.append(full_context_question)
+        
+        # Variante 8: Question avec focus entités clés
+        key_entities_context = self._build_key_entities_focus(context_entities, language)
+        if key_entities_context:
+            variants.append(f"{key_entities_context}: {question}")
+        
+        # Supprimer les doublons tout en préservant l'ordre
+        seen = set()
+        unique_variants = []
+        for variant in variants:
+            if variant not in seen:
+                seen.add(variant)
+                unique_variants.append(variant)
+        
+        return unique_variants
+    
+    def _select_best_variant(self, variants: List[str], context_entities: Dict[str, str]) -> str:
+        """Sélectionne la meilleure variante basée sur le scoring"""
+        
+        if not variants:
+            return ""
+        
+        if len(variants) == 1:
+            return variants[0]
+        
+        # Calculer le score de chaque variante
+        scores = {variant: self._score_variant(variant, context_entities) for variant in variants}
+        
+        # Sélectionner la variante avec le meilleur score
+        best_variant = max(scores, key=scores.get)
+        
+        # Log des scores pour debug
+        logger.debug(f"🎯 [RAG Context] Scores des variantes:")
+        for variant, score in scores.items():
+            logger.debug(f"  Score {score:.2f}: '{variant[:100]}{'...' if len(variant) > 100 else ''}'")
+        
+        return best_variant
+    
+    def _score_variant(self, variant: str, context_entities: Dict[str, str]) -> float:
+        """
+        Score une variante basée sur la couverture des entités et d'autres facteurs
+        
+        Args:
+            variant: Variante à scorer
+            context_entities: Entités du contexte
+        
+        Returns:
+            Score entre 0.0 et 1.0+ (peut dépasser 1.0 avec bonus)
+        """
+        
+        if not variant:
+            return 0.0
+        
+        variant_lower = variant.lower()
+        score = 0.0
+        
+        # 1. Score de base: couverture des entités (40% du score)
+        entity_coverage = 0.0
+        if context_entities:
+            entities_found = sum(1 for entity_value in context_entities.values() 
+                               if entity_value and entity_value.lower() in variant_lower)
+            entity_coverage = entities_found / len(context_entities)
+        
+        score += entity_coverage * 0.4
+        
+        # 2. Longueur optimale (20% du score)
+        # Longueur idéale entre 100-300 caractères
+        length_score = 0.0
+        variant_length = len(variant)
+        if 100 <= variant_length <= 300:
+            length_score = 1.0
+        elif variant_length < 100:
+            length_score = variant_length / 100.0
+        else:  # > 300
+            length_score = max(0.0, 1.0 - (variant_length - 300) / 200.0)
+        
+        score += length_score * 0.2
+        
+        # 3. Présence de mots-clés techniques importants (20% du score)
+        technical_keywords = [
+            "race", "breed", "raza", "âge", "age", "edad", "poids", "weight", "peso",
+            "jour", "day", "día", "semaine", "week", "semana", "gram", "kg",
+            "symptôme", "symptom", "síntoma", "problème", "problem", "problema"
+        ]
+        
+        keywords_found = sum(1 for keyword in technical_keywords if keyword in variant_lower)
+        keyword_score = min(1.0, keywords_found / 5.0)  # Normalisé sur 5 mots-clés max
+        
+        score += keyword_score * 0.2
+        
+        # 4. Structure et lisibilité (10% du score)
+        readability_score = 0.0
+        
+        # Bonus pour contexte structuré
+        if "contexte:" in variant_lower or "infos:" in variant_lower:
+            readability_score += 0.3
+        
+        # Bonus pour séparation claire
+        if "\n\n" in variant:
+            readability_score += 0.2
+        
+        # Bonus pour parenthèses informationnelles
+        if "(" in variant and ")" in variant:
+            readability_score += 0.1
+        
+        # Malus pour répétitions excessives
+        words = variant_lower.split()
+        if len(words) != len(set(words)):  # Il y a des répétitions
+            word_repetition = 1.0 - (len(words) - len(set(words))) / len(words)
+            readability_score *= word_repetition
+        
+        readability_score = min(1.0, readability_score)
+        score += readability_score * 0.1
+        
+        # 5. Bonus spéciaux (10% du score)
+        bonus_score = 0.0
+        
+        # Bonus pour mentions d'entités critiques
+        critical_entities = ["ross 308", "cobb 500", "jour", "day", "kg", "gram"]
+        for entity in critical_entities:
+            if entity in variant_lower:
+                bonus_score += 0.1
+        
+        # Bonus pour questions bien structurées
+        if variant.endswith("?"):
+            bonus_score += 0.05
+        
+        # Bonus pour contexte multilingue approprié
+        language_indicators = {"fr": ["âge", "poids", "jour"], "en": ["age", "weight", "day"], "es": ["edad", "peso", "día"]}
+        for lang, indicators in language_indicators.items():
+            if any(indicator in variant_lower for indicator in indicators):
+                bonus_score += 0.05
+                break
+        
+        bonus_score = min(1.0, bonus_score)
+        score += bonus_score * 0.1
+        
+        # Assurer que le score reste dans une plage raisonnable
+        final_score = min(2.0, max(0.0, score))  # Entre 0.0 et 2.0
+        
+        return final_score
+    
+    def _build_full_context_question(
+        self, 
+        question: str, 
+        context_entities: Dict[str, str], 
+        technical_context: str, 
+        language: str
+    ) -> str:
+        """Construit une question complètement restructurée avec tout le contexte"""
+        
+        # Templates pour questions complètes
+        templates = {
+            "fr": "Contexte: {technical_context}\n\nQuestion: {question}",
+            "en": "Context: {technical_context}\n\nQuestion: {question}",
+            "es": "Contexto: {technical_context}\n\nPregunta: {question}"
+        }
+        
+        template = templates.get(language, templates["fr"])
+        return template.format(technical_context=technical_context, question=question)
+    
+    def _build_key_entities_focus(self, context_entities: Dict[str, str], language: str) -> str:
+        """Construit un focus sur les entités clés les plus importantes"""
+        
+        if not context_entities:
+            return ""
+        
+        # Ordre de priorité des entités par importance
+        priority_order = ["breed", "age", "weight", "symptoms"]
+        
+        # Sélectionner les 2-3 entités les plus importantes présentes
+        key_entities = []
+        for entity in priority_order:
+            if entity in context_entities and context_entities[entity]:
+                key_entities.append(context_entities[entity])
+                if len(key_entities) >= 3:  # Limiter à 3 entités max
+                    break
+        
+        if not key_entities:
+            return ""
+        
+        # Templates par langue
+        templates = {
+            "fr": "Pour: {entities}",
+            "en": "For: {entities}",
+            "es": "Para: {entities}"
+        }
+        
+        template = templates.get(language, templates["fr"])
+        return template.format(entities=", ".join(key_entities))
     
     def _detect_contextual_references(self, question: str, language: str) -> bool:
         """Détecte si la question contient des pronoms/références contextuelles"""
@@ -432,13 +667,14 @@ def enhance_question_for_rag(
 ) -> Dict[str, Any]:
     """
     Fonction utilitaire pour améliorer une question pour le RAG
+    Génère plusieurs variantes et retourne la meilleure
     
     Returns:
         Dict contenant:
-        - question: Question optimisée pour RAG
+        - question: Meilleure question optimisée pour RAG
         - missing_entities: Liste des entités manquantes identifiées
         - context_entities: Dictionnaire des entités extraites du contexte
-        - enhancement_info: Métadonnées sur les améliorations appliquées
+        - enhancement_info: Métadonnées sur les améliorations appliquées (incluant variants_tested)
     """
     return rag_context_enhancer.enhance_question_for_rag(
         question, conversation_context, language, missing_entities

@@ -6,6 +6,7 @@ Contient:
 - ClarificationResult 
 - Enums (ClarificationMode, ClarificationState)
 - Utilitaires de reconnaissance
+- Gestion centralisée des entités critiques
 """
 
 import logging
@@ -14,6 +15,22 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# ==================== CONSTANTES ENTITÉS CRITIQUES ====================
+
+CRITICAL_ENTITIES = ["breed", "age", "sex", "symptoms", "environment", "feed"]
+
+def is_critical_entity(entity_name: str) -> bool:
+    """
+    Vérifie si une entité est considérée comme critique
+    
+    Args:
+        entity_name: Nom de l'entité à vérifier
+        
+    Returns:
+        bool: True si l'entité est critique
+    """
+    return entity_name in CRITICAL_ENTITIES
 
 class ClarificationMode(Enum):
     """Modes de clarification disponibles"""
@@ -58,28 +75,71 @@ class ExtractedEntities:
         return {k: v for k, v in asdict(self).items() if v is not None}
     
     def get_missing_critical_info(self, question_type: str) -> List[str]:
-        """Détermine les informations critiques manquantes selon le type de question"""
+        """
+        Détermine les informations critiques manquantes selon le type de question
+        Utilise maintenant la liste centralisée CRITICAL_ENTITIES
+        """
         missing = []
         
+        # Vérification breed (entité critique)
         if not self.breed or self.breed_type == "generic":
-            missing.append("breed")
+            if is_critical_entity("breed"):
+                missing.append("breed")
         
-        if question_type in ["growth", "weight", "performance"]:
-            if not self.age_days and not self.age_weeks:
+        # Vérification age (entité critique)
+        if not self.age_days and not self.age_weeks:
+            if is_critical_entity("age"):
                 missing.append("age")
-        elif question_type in ["health", "mortality", "disease"]:
-            if not self.age_days and not self.age_weeks:
-                missing.append("age")
-            if not self.symptoms:
+        
+        # Vérifications spécifiques par type de question
+        if question_type in ["health", "mortality", "disease"]:
+            # Symptoms (entité critique pour questions santé)
+            if not self.symptoms and is_critical_entity("symptoms"):
                 missing.append("symptoms")
+        
         elif question_type in ["environment", "temperature", "housing"]:
-            if not self.age_days and not self.age_weeks:
-                missing.append("age")
+            # Environment info critique pour questions environnement
+            if not self.temperature and not self.housing_type and is_critical_entity("environment"):
+                missing.append("environment")
+        
         elif question_type in ["feeding", "nutrition"]:
-            if not self.age_days and not self.age_weeks:
-                missing.append("age")
+            # Feed info critique pour questions nutrition
+            if not self.feed_type and is_critical_entity("feed"):
+                missing.append("feed")
+        
+        # Sex peut être critique selon le contexte
+        if question_type in ["growth", "weight", "performance", "feeding"]:
+            if not self.sex and is_critical_entity("sex"):
+                missing.append("sex")
         
         return missing
+    
+    def get_critical_entities_status(self) -> Dict[str, bool]:
+        """
+        Retourne le statut de présence de toutes les entités critiques
+        
+        Returns:
+            Dict[str, bool]: Mapping entité_critique -> présente
+        """
+        status = {}
+        
+        for entity in CRITICAL_ENTITIES:
+            if entity == "breed":
+                status[entity] = bool(self.breed and self.breed_type != "generic")
+            elif entity == "age":
+                status[entity] = bool(self.age_days or self.age_weeks)
+            elif entity == "sex":
+                status[entity] = bool(self.sex)
+            elif entity == "symptoms":
+                status[entity] = bool(self.symptoms)
+            elif entity == "environment":
+                status[entity] = bool(self.temperature or self.housing_type or self.humidity)
+            elif entity == "feed":
+                status[entity] = bool(self.feed_type)
+            else:
+                status[entity] = False
+        
+        return status
     
     def normalize_breed_name(self, raw_breed: str) -> Tuple[str, bool]:
         """
@@ -321,4 +381,20 @@ def get_supported_breeds() -> Dict[str, List[str]]:
             "Cobb 500", "Cobb 700", "Cobb Sasso",
             "Hubbard Flex", "Hubbard Classic", "Arbor Acres", "Red Bro"
         ]
+    }
+
+def get_critical_entities_info() -> Dict[str, str]:
+    """
+    Retourne des informations sur chaque entité critique
+    
+    Returns:
+        Dict[str, str]: Mapping entité -> description
+    """
+    return {
+        "breed": "Souche ou race des animaux (ex: Ross 308, Cobb 500)",
+        "age": "Âge des animaux en jours ou semaines",
+        "sex": "Sexe des animaux (mâle/femelle/mixte)",
+        "symptoms": "Symptômes observés pour questions de santé",
+        "environment": "Conditions environnementales (température, humidité, logement)",
+        "feed": "Type d'alimentation ou formule nutritionnelle"
     }
