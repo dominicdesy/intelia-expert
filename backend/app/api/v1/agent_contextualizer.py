@@ -7,6 +7,7 @@ Agent Contextualizer - Enrichissement des questions avant RAG
 - Intègre les entités connues (race, sexe, âge, etc.)
 - Fonctionne même SANS entités (inférence contextuelle)
 - Reformule pour optimiser la recherche RAG
+- NOUVEAU: Support multi-variants pour rag_context_enhancer
 - Gestion fallback sans OpenAI
 """
 
@@ -14,7 +15,7 @@ import os
 import logging
 import json
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
 # Import OpenAI sécurisé
@@ -36,20 +37,24 @@ class AgentContextualizer:
         self.timeout = int(os.getenv('CONTEXTUALIZER_TIMEOUT', '10'))
         self.max_retries = int(os.getenv('CONTEXTUALIZER_RETRIES', '2'))
         
-        # Statistiques
+        # Statistiques - version étendue
         self.stats = {
             "total_requests": 0,
+            "single_variant_requests": 0,
+            "multi_variant_requests": 0,
             "openai_success": 0,
             "openai_failures": 0,
             "fallback_used": 0,
             "questions_enriched": 0,
-            "inference_only": 0,  # Nouveau: sans entités
-            "with_entities": 0    # Nouveau: avec entités
+            "inference_only": 0,
+            "with_entities": 0,
+            "variants_generated": 0
         }
         
-        logger.info(f"🤖 [AgentContextualizer] Initialisé - Version améliorée")
+        logger.info(f"🤖 [AgentContextualizer] Initialisé - Version Multi-Variants")
         logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
         logger.info(f"   Modèle: {self.model}")
+        logger.info(f"   Support multi-variants: ✅")
     
     async def enrich_question(
         self,
@@ -57,8 +62,9 @@ class AgentContextualizer:
         entities: Dict[str, Any] = None,
         missing_entities: List[str] = None,
         conversation_context: str = "",
-        language: str = "fr"
-    ) -> Dict[str, Any]:
+        language: str = "fr",
+        multi_variant: bool = False
+    ) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
         """
         Enrichit une question avec le contexte conversationnel
         
@@ -68,15 +74,28 @@ class AgentContextualizer:
             missing_entities: Entités manquantes critiques - OPTIONNEL  
             conversation_context: Contexte conversationnel
             language: Langue de la conversation
+            multi_variant: Si True, retourne plusieurs enrichissements différents
             
         Returns:
+            Si multi_variant=False:
             {
                 "enriched_question": "question optimisée",
                 "reasoning_notes": "explications",
                 "entities_used": ["race", "age"],
-                "inference_used": true,  # NOUVEAU: si agent a dû deviner
+                "inference_used": true,
                 "method_used": "openai/fallback",
                 "confidence": 0.8
+            }
+            
+            Si multi_variant=True:
+            {
+                "variants": [
+                    {"enriched_question": "variant 1", "type": "standard", ...},
+                    {"enriched_question": "variant 2", "type": "contextual", ...},
+                    {"enriched_question": "variant 3", "type": "detailed", ...}
+                ],
+                "total_variants": 3,
+                "recommended_variant": 0
             }
         """
         
@@ -86,12 +105,64 @@ class AgentContextualizer:
         
         self.stats["total_requests"] += 1
         
+        # Tracker le type de requête
+        if multi_variant:
+            self.stats["multi_variant_requests"] += 1
+        else:
+            self.stats["single_variant_requests"] += 1
+        
         # Tracker si on a des entités ou pas
         has_entities = bool(entities and any(entities.get(key) for key in ["breed", "sex", "age_days", "symptoms"]))
         if has_entities:
             self.stats["with_entities"] += 1
         else:
             self.stats["inference_only"] += 1
+        
+        try:
+            if multi_variant:
+                return await self._generate_multi_variants(
+                    question, entities, missing_entities, conversation_context, language, has_entities
+                )
+            else:
+                # Mode single variant (comportement original)
+                return await self._generate_single_variant(
+                    question, entities, missing_entities, conversation_context, language, has_entities
+                )
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
+            
+            # Fallback d'erreur
+            error_result = {
+                "enriched_question": question,
+                "reasoning_notes": f"Erreur: {str(e)}",
+                "entities_used": [],
+                "inference_used": True,
+                "method_used": "error_fallback",
+                "confidence": 0.1,
+                "success": False
+            }
+            
+            if multi_variant:
+                return {
+                    "variants": [error_result],
+                    "total_variants": 1,
+                    "recommended_variant": 0,
+                    "error": str(e)
+                }
+            else:
+                return error_result
+    
+    async def _generate_single_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un seul enrichissement (comportement original)"""
         
         try:
             # Tentative OpenAI si disponible
@@ -115,17 +186,380 @@ class AgentContextualizer:
             return result
             
         except Exception as e:
-            logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
-            return {
+            logger.error(f"❌ [AgentContextualizer] Erreur single variant: {e}")
+            raise
+    
+    async def _generate_multi_variants(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère plusieurs variants d'enrichissement pour rag_context_enhancer"""
+        
+        logger.info(f"🔄 [AgentContextualizer] Génération multi-variants pour: {question[:50]}...")
+        
+        variants = []
+        
+        try:
+            # Variant 1: Enrichissement standard (méthode originale)
+            standard_variant = await self._generate_single_variant(
+                question, entities, missing_entities, conversation_context, language, has_entities
+            )
+            standard_variant["variant_type"] = "standard"
+            standard_variant["variant_description"] = "Enrichissement standard avec entités disponibles"
+            variants.append(standard_variant)
+            
+            # Variant 2: Enrichissement contextuel (focus sur le contexte conversationnel)
+            contextual_variant = self._generate_contextual_variant(
+                question, entities, conversation_context, language, has_entities
+            )
+            variants.append(contextual_variant)
+            
+            # Variant 3: Enrichissement détaillé (toutes les entités explicites)
+            detailed_variant = self._generate_detailed_variant(
+                question, entities, missing_entities, language, has_entities
+            )
+            variants.append(detailed_variant)
+            
+            # Variant 4: Enrichissement technique (terminologie spécialisée)
+            technical_variant = self._generate_technical_variant(
+                question, entities, language, has_entities
+            )
+            variants.append(technical_variant)
+            
+            # Si on a du contexte ou des entités, ajouter un variant minimal
+            if conversation_context or has_entities:
+                minimal_variant = self._generate_minimal_variant(question, language)
+                variants.append(minimal_variant)
+            
+            # Statistiques
+            self.stats["variants_generated"] += len(variants)
+            
+            # Déterminer le variant recommandé (celui avec la meilleure confiance)
+            recommended_idx = max(range(len(variants)), key=lambda i: variants[i].get("confidence", 0))
+            
+            result = {
+                "variants": variants,
+                "total_variants": len(variants),
+                "recommended_variant": recommended_idx,
+                "generation_method": "openai" if self.openai_available else "fallback",
+                "has_entities": has_entities,
+                "processing_time": datetime.now().isoformat()
+            }
+            
+            logger.info(f"✅ [AgentContextualizer] {len(variants)} variants générés")
+            logger.debug(f"   Variant recommandé: #{recommended_idx} ({variants[recommended_idx]['variant_type']})")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ [AgentContextualizer] Erreur génération multi-variants: {e}")
+            
+            # Fallback: au moins retourner la question originale
+            fallback_variant = {
                 "enriched_question": question,
-                "reasoning_notes": f"Erreur: {str(e)}",
+                "reasoning_notes": f"Erreur génération variants: {str(e)}",
                 "entities_used": [],
                 "inference_used": True,
                 "method_used": "error_fallback",
                 "confidence": 0.1,
-                "success": False
+                "variant_type": "error",
+                "variant_description": "Variant d'erreur - question originale"
+            }
+            
+            return {
+                "variants": [fallback_variant],
+                "total_variants": 1,
+                "recommended_variant": 0,
+                "error": str(e)
             }
     
+    def _generate_contextual_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        conversation_context: str,
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant focalisé sur le contexte conversationnel"""
+        
+        if not conversation_context:
+            # Pas de contexte, variant simple
+            variant = {
+                "enriched_question": question,
+                "reasoning_notes": "Pas de contexte conversationnel disponible",
+                "entities_used": [],
+                "inference_used": False,
+                "method_used": "contextual_fallback",
+                "confidence": 0.3,
+                "variant_type": "contextual",
+                "variant_description": "Variant contextuel - pas de contexte disponible"
+            }
+        else:
+            # Intégrer le contexte
+            if language == "fr":
+                enriched_question = f"{question} (Contexte conversation précédente: {conversation_context})"
+            elif language == "en":
+                enriched_question = f"{question} (Previous conversation context: {conversation_context})"
+            else:  # Spanish
+                enriched_question = f"{question} (Contexto conversación previa: {conversation_context})"
+            
+            variant = {
+                "enriched_question": enriched_question,
+                "reasoning_notes": "Enrichissement avec contexte conversationnel explicite",
+                "entities_used": ["context"],
+                "inference_used": False,
+                "method_used": "contextual_enhancement",
+                "confidence": 0.7,
+                "variant_type": "contextual",
+                "variant_description": "Variant contextuel - intégration contexte conversationnel"
+            }
+        
+        return variant
+    
+    def _generate_detailed_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        missing_entities: List[str],
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant avec tous les détails d'entités explicites"""
+        
+        if not has_entities:
+            # Pas d'entités, utiliser inférence
+            variant = {
+                "enriched_question": self._add_technical_terminology(question, language),
+                "reasoning_notes": "Variant détaillé par inférence - pas d'entités disponibles",
+                "entities_used": [],
+                "inference_used": True,
+                "method_used": "detailed_inference",
+                "confidence": 0.4,
+                "variant_type": "detailed",
+                "variant_description": "Variant détaillé - inférence sans entités"
+            }
+        else:
+            # Construire détails explicites
+            details = []
+            entities_used = []
+            
+            if entities.get("breed"):
+                details.append(f"Race: {entities['breed']}")
+                entities_used.append("breed")
+            
+            if entities.get("sex"):
+                details.append(f"Sexe: {entities['sex']}")
+                entities_used.append("sex")
+            
+            if entities.get("age_days"):
+                details.append(f"Âge: {entities['age_days']} jours")
+                entities_used.append("age")
+            
+            if entities.get("weight_grams"):
+                details.append(f"Poids: {entities['weight_grams']}g")
+                entities_used.append("weight")
+            
+            if entities.get("symptoms"):
+                symptoms = ", ".join(entities["symptoms"])
+                details.append(f"Symptômes: {symptoms}")
+                entities_used.append("symptoms")
+            
+            if details:
+                detail_string = ", ".join(details)
+                if language == "fr":
+                    enriched_question = f"{question} - Détails: {detail_string}"
+                elif language == "en":
+                    enriched_question = f"{question} - Details: {detail_string}"
+                else:  # Spanish
+                    enriched_question = f"{question} - Detalles: {detail_string}"
+                
+                confidence = 0.8
+            else:
+                enriched_question = question
+                confidence = 0.3
+            
+            # Mentionner les entités manquantes si pertinentes
+            if missing_entities:
+                missing_str = ", ".join(missing_entities)
+                if language == "fr":
+                    enriched_question += f" (Informations manquantes: {missing_str})"
+                elif language == "en":
+                    enriched_question += f" (Missing information: {missing_str})"
+                else:  # Spanish
+                    enriched_question += f" (Información faltante: {missing_str})"
+            
+            variant = {
+                "enriched_question": enriched_question,
+                "reasoning_notes": f"Variant détaillé avec {len(details)} entités explicites",
+                "entities_used": entities_used,
+                "inference_used": False,
+                "method_used": "detailed_explicit",
+                "confidence": confidence,
+                "variant_type": "detailed",
+                "variant_description": "Variant détaillé - toutes entités explicites"
+            }
+        
+        return variant
+    
+    def _generate_technical_variant(
+        self,
+        question: str,
+        entities: Dict[str, Any],
+        language: str,
+        has_entities: bool
+    ) -> Dict[str, Any]:
+        """Génère un variant avec terminologie technique avancée"""
+        
+        # Commencer avec la question de base
+        enriched_question = question
+        
+        # Remplacements techniques selon la langue
+        if language == "fr":
+            technical_mappings = [
+                # Problèmes de croissance
+                (r'\bne grossit pas\b', 'déficit de croissance pondérale'),
+                (r'\bcroissance lente\b', 'retard de croissance'),
+                (r'\bproblème de croissance\b', 'pathologie de la croissance'),
+                
+                # Problèmes de santé
+                (r'\bmalade\b', 'pathologique'),
+                (r'\bmourir\b', 'mortalité'),
+                (r'\bproblème de santé\b', 'syndrome pathologique'),
+                (r'\bfièvre\b', 'hyperthermie'),
+                
+                # Alimentation
+                (r'\bne mange pas\b', 'anorexie'),
+                (r'\bproblème d\'alimentation\b', 'troubles nutritionnels'),
+                
+                # Général
+                (r'\bproblème\b', 'pathologie'),
+                (r'\bautre chose\b', 'diagnostic différentiel')
+            ]
+        elif language == "en":
+            technical_mappings = [
+                # Growth issues
+                (r'\bnot growing\b', 'suboptimal growth performance'),
+                (r'\bslow growth\b', 'growth retardation'),
+                (r'\bgrowth problem\b', 'growth pathology'),
+                
+                # Health issues
+                (r'\bsick\b', 'pathological'),
+                (r'\bdying\b', 'mortality syndrome'),
+                (r'\bhealth problem\b', 'pathological condition'),
+                (r'\bfever\b', 'hyperthermia'),
+                
+                # Feeding
+                (r'\bnot eating\b', 'anorexia'),
+                (r'\bfeeding problem\b', 'nutritional disorders'),
+                
+                # General
+                (r'\bproblem\b', 'pathological condition'),
+                (r'\bsomething else\b', 'differential diagnosis')
+            ]
+        else:  # Spanish
+            technical_mappings = [
+                # Problemas de crecimiento
+                (r'\bno crecen\b', 'déficit de rendimiento de crecimiento'),
+                (r'\bcrecimiento lento\b', 'retraso del crecimiento'),
+                (r'\bproblema de crecimiento\b', 'patología del crecimiento'),
+                
+                # Problemas de salud
+                (r'\benfermos?\b', 'patológicos'),
+                (r'\bmuriendo\b', 'síndrome de mortalidad'),
+                (r'\bproblema de salud\b', 'condición patológica'),
+                (r'\bfiebre\b', 'hipertermia'),
+                
+                # Alimentación
+                (r'\bno comen\b', 'anorexia'),
+                (r'\bproblema de alimentación\b', 'trastornos nutricionales'),
+                
+                # General
+                (r'\bproblema\b', 'condición patológica'),
+                (r'\botra cosa\b', 'diagnóstico diferencial')
+            ]
+        
+        # Appliquer les remplacements
+        replacements_applied = 0
+        for pattern, replacement in technical_mappings:
+            new_question = re.sub(pattern, replacement, enriched_question, flags=re.IGNORECASE)
+            if new_question != enriched_question:
+                replacements_applied += 1
+                enriched_question = new_question
+        
+        # Ajouter contexte technique si entités disponibles
+        if has_entities:
+            technical_context = self._build_technical_context(entities, language)
+            if technical_context:
+                if language == "fr":
+                    enriched_question += f" - Contexte technique: {technical_context}"
+                elif language == "en":
+                    enriched_question += f" - Technical context: {technical_context}"
+                else:  # Spanish
+                    enriched_question += f" - Contexto técnico: {technical_context}"
+        
+        confidence = min(0.9, 0.5 + (replacements_applied * 0.1) + (0.2 if has_entities else 0))
+        
+        variant = {
+            "enriched_question": enriched_question,
+            "reasoning_notes": f"Variant technique avec {replacements_applied} améliorations terminologiques",
+            "entities_used": list(entities.keys()) if has_entities else [],
+            "inference_used": replacements_applied > 0,
+            "method_used": "technical_enhancement",
+            "confidence": confidence,
+            "variant_type": "technical",
+            "variant_description": "Variant technique - terminologie vétérinaire spécialisée"
+        }
+        
+        return variant
+    
+    def _generate_minimal_variant(self, question: str, language: str) -> Dict[str, Any]:
+        """Génère un variant minimal (question quasi-originale)"""
+        
+        # Juste une légère amélioration grammaticale
+        minimal_question = question.strip()
+        if not minimal_question.endswith(('?', '.', '!')):
+            minimal_question += '?'
+        
+        return {
+            "enriched_question": minimal_question,
+            "reasoning_notes": "Variant minimal - question quasi-originale",
+            "entities_used": [],
+            "inference_used": False,
+            "method_used": "minimal_enhancement",
+            "confidence": 0.5,
+            "variant_type": "minimal",
+            "variant_description": "Variant minimal - préservation question originale"
+        }
+    
+    def _build_technical_context(self, entities: Dict[str, Any], language: str) -> str:
+        """Construit un contexte technique à partir des entités"""
+        
+        context_parts = []
+        
+        # Informations d'élevage
+        if entities.get("breed"):
+            context_parts.append(f"souche {entities['breed']}" if language == "fr" else 
+                               f"strain {entities['breed']}" if language == "en" else f"cepa {entities['breed']}")
+        
+        if entities.get("age_days"):
+            context_parts.append(f"J{entities['age_days']}" if language == "fr" else 
+                               f"D{entities['age_days']}" if language == "en" else f"D{entities['age_days']}")
+        
+        # Performance
+        if entities.get("weight_grams") and entities.get("age_days"):
+            gmq = entities["weight_grams"] / entities["age_days"]  # Gain moyen quotidien approximatif
+            context_parts.append(f"GMQ≈{gmq:.1f}g/j" if language == "fr" else 
+                               f"ADG≈{gmq:.1f}g/d" if language == "en" else f"GDP≈{gmq:.1f}g/d")
+        
+        return ", ".join(context_parts)
+    
+    # Méthodes existantes inchangées (conservées pour compatibilité)
     async def _enrich_with_openai(
         self,
         question: str,
@@ -135,7 +569,7 @@ class AgentContextualizer:
         language: str,
         has_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement avec OpenAI GPT"""
+        """Enrichissement avec OpenAI GPT (méthode conservée)"""
         
         try:
             # Préparer le contexte pour GPT
@@ -498,7 +932,7 @@ Responde en JSON:
                 "enriched_question": data.get("enriched_question", original_question),
                 "reasoning_notes": data.get("reasoning_notes", "Aucune explication fournie"),
                 "entities_used": data.get("entities_used", []),
-                "inference_used": data.get("inference_used", not has_entities),  # NOUVEAU CHAMP
+                "inference_used": data.get("inference_used", not has_entities),
                 "confidence": min(max(data.get("confidence", 0.5), 0.0), 1.0),
                 "optimization_applied": data.get("optimization_applied", "Optimisation basique"),
                 "method_used": "openai",
@@ -517,7 +951,7 @@ Responde en JSON:
                     "enriched_question": response.strip(),
                     "reasoning_notes": "JSON parsing failed, used raw response",
                     "entities_used": [],
-                    "inference_used": True,  # NOUVEAU CHAMP
+                    "inference_used": True,
                     "confidence": 0.3,
                     "optimization_applied": "Réponse brute GPT",
                     "method_used": "openai_fallback"
@@ -555,7 +989,7 @@ Responde en JSON:
                 enriched_parts.append(f"{entities['age_days']} jours")
                 entities_used.append("age")
         else:
-            # Mode sans entités - NOUVEAU : inférence contextuelle
+            # Mode sans entités - inférence contextuelle
             inference_used = True
             
             # Analyser la question pour inférer le contexte
@@ -651,7 +1085,7 @@ Responde en JSON:
             "enriched_question": enriched_question,
             "reasoning_notes": reasoning_notes,
             "entities_used": entities_used,
-            "inference_used": inference_used,  # NOUVEAU CHAMP
+            "inference_used": inference_used,
             "confidence": 0.6 if entities_used else (0.4 if inference_used else 0.3),
             "optimization_applied": "Intégration entités" if has_entities else "Inférence contextuelle",
             "method_used": "fallback"
@@ -698,22 +1132,28 @@ Responde en JSON:
         return enhanced_question
     
     def get_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques de l'agent - version améliorée"""
+        """Retourne les statistiques de l'agent - version multi-variants"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
         enrichment_rate = (self.stats["questions_enriched"] / total * 100) if total > 0 else 0
         inference_rate = (self.stats["inference_only"] / total * 100) if total > 0 else 0
         with_entities_rate = (self.stats["with_entities"] / total * 100) if total > 0 else 0
+        multi_variant_rate = (self.stats["multi_variant_requests"] / total * 100) if total > 0 else 0
+        avg_variants = (self.stats["variants_generated"] / self.stats["multi_variant_requests"]) if self.stats["multi_variant_requests"] > 0 else 0
         
         return {
             "agent_type": "contextualizer",
-            "version": "improved_v2",
+            "version": "multi_variant_v3",
             "total_requests": total,
+            "single_variant_requests": self.stats["single_variant_requests"],
+            "multi_variant_requests": self.stats["multi_variant_requests"],
+            "multi_variant_rate": f"{multi_variant_rate:.1f}%",
+            "avg_variants_per_multi_request": f"{avg_variants:.1f}",
             "openai_success_rate": f"{success_rate:.1f}%",
             "question_enrichment_rate": f"{enrichment_rate:.1f}%",
-            "inference_only_rate": f"{inference_rate:.1f}%",  # NOUVEAU
-            "with_entities_rate": f"{with_entities_rate:.1f}%",  # NOUVEAU
+            "inference_only_rate": f"{inference_rate:.1f}%",
+            "with_entities_rate": f"{with_entities_rate:.1f}%",
             "openai_available": self.openai_available,
             "model_used": self.model,
             "detailed_stats": self.stats.copy()
@@ -722,15 +1162,30 @@ Responde en JSON:
 # Instance globale
 agent_contextualizer = AgentContextualizer()
 
-# Fonction utilitaire pour usage externe - signature mise à jour
+# Fonction utilitaire pour usage externe - signature mise à jour avec multi_variant
 async def enrich_question(
     question: str,
     entities: Dict[str, Any] = None,
     missing_entities: List[str] = None,
     conversation_context: str = "",
-    language: str = "fr"
-) -> Dict[str, Any]:
-    """Fonction utilitaire pour enrichir une question - fonctionne avec ou sans entités"""
+    language: str = "fr",
+    multi_variant: bool = False
+) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
+    """
+    Fonction utilitaire pour enrichir une question - fonctionne avec ou sans entités
+    
+    Args:
+        question: Question à enrichir
+        entities: Entités extraites (optionnel)
+        missing_entities: Entités manquantes (optionnel)
+        conversation_context: Contexte conversationnel
+        language: Langue (fr/en/es)
+        multi_variant: Si True, génère plusieurs variants d'enrichissement
+    
+    Returns:
+        Si multi_variant=False: Dict avec question enrichie
+        Si multi_variant=True: Dict avec liste de variants
+    """
     return await agent_contextualizer.enrich_question(
-        question, entities, missing_entities, conversation_context, language
+        question, entities, missing_entities, conversation_context, language, multi_variant
     )

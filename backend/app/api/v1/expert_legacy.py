@@ -1,12 +1,18 @@
 """
-app/api/v1/expert_legacy.py - ENDPOINTS DE COMPATIBILITÉ v3.7.2 - CORRIGÉ
+app/api/v1/expert_legacy.py - ENDPOINTS DE COMPATIBILITÉ v3.7.3 - NOUVEAUX CHAMPS API
 
 🔄 ENDPOINTS DE COMPATIBILITÉ BACKWARD:
 - Maintien des anciens endpoints avec redirection
 - Forçage automatique des améliorations
 - Support response_versions ajouté
 - Garantie de compatibilité 100%
+- ✅ NOUVEAUTÉ v3.7.3: Propagation nouveaux champs API
 - ✅ CORRECTIONS: Import circulaire résolu définitivement, vérifications ajoutées
+
+✅ NOUVEAUX CHAMPS API v3.7.3:
+- clarification_required_critical: bool - Clarification critique requise
+- missing_critical_entities: List[str] - Entités critiques manquantes
+- variants_tested: List[str] - Variantes testées pour optimisation
 
 ✅ CORRECTION IMPORTS CIRCULAIRES:
 - Import dynamique dans les fonctions pour éviter les dépendances circulaires
@@ -19,7 +25,7 @@ import time
 import re
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Request, Depends, HTTPException
 
@@ -41,6 +47,9 @@ except ImportError as e:
         response: str
         conversation_id: str
         timestamp: str = ""
+        clarification_required_critical: bool = False
+        missing_critical_entities: List[str] = []
+        variants_tested: List[str] = []
         
     class ConcisionLevel:
         CONCISE = "concise"
@@ -92,7 +101,8 @@ async def fallback_expert_response(
     current_user: Optional[Dict[str, Any]] = None,
     endpoint_type: str = "legacy"
 ) -> EnhancedExpertResponse:
-    """Réponse fallback si les endpoints principaux ne sont pas disponibles"""
+    """Réponse fallback si les endpoints principaux ne sont pas disponibles
+    ✅ v3.7.3: Ajout des nouveaux champs API"""
     
     fallback_responses = {
         "fr": f"Service expert temporairement indisponible. Votre question '{request_data.text}' a été reçue mais ne peut être traitée actuellement. Veuillez réessayer dans quelques minutes.",
@@ -102,11 +112,13 @@ async def fallback_expert_response(
     
     language = getattr(request_data, 'language', 'fr')
     response_text = fallback_responses.get(language, fallback_responses['fr'])
+    conversation_id = getattr(request_data, 'conversation_id', None) or str(uuid.uuid4())
     
+    # ✅ v3.7.3: Construction avec nouveaux champs API
     return EnhancedExpertResponse(
         question=request_data.text,
         response=response_text,
-        conversation_id=getattr(request_data, 'conversation_id', None) or str(uuid.uuid4()),
+        conversation_id=conversation_id,
         timestamp=datetime.now().isoformat(),
         rag_used=False,
         rag_score=None,
@@ -117,7 +129,11 @@ async def fallback_expert_response(
         logged=False,
         validation_passed=False,
         processing_steps=[f"legacy_{endpoint_type}_fallback"],
-        ai_enhancements_used=["fallback_response"]
+        ai_enhancements_used=["fallback_response"],
+        # 🆕 v3.7.3: Nouveaux champs API
+        clarification_required_critical=False,
+        missing_critical_entities=[],
+        variants_tested=[f"fallback_{endpoint_type}"]
     )
 
 # =============================================================================
@@ -131,10 +147,11 @@ async def ask_expert_enhanced_legacy(
     current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
 ):
     """Endpoint de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS
-    ✅ CORRIGÉ: Import dynamique, vérifications robustes"""
+    ✅ CORRIGÉ: Import dynamique, vérifications robustes
+    ✅ v3.7.3: Support nouveaux champs API"""
     
     try:
-        logger.info("🔄 [LEGACY] ask-enhanced avec FORÇAGE + clarification + response_versions vers v2")
+        logger.info("🔄 [LEGACY] ask-enhanced avec FORÇAGE + clarification + response_versions + nouveaux champs vers v2")
         
         # ✅ CORRECTION: Vérification existence request_data
         if not request_data:
@@ -155,7 +172,17 @@ async def ask_expert_enhanced_legacy(
         # ✅ CORRECTION: Import dynamique pour éviter import circulaire
         endpoint_func = get_expert_endpoint_function("ask_expert_enhanced_v2")
         if endpoint_func:
-            return await endpoint_func(request_data, request, current_user)
+            response = await endpoint_func(request_data, request, current_user)
+            
+            # ✅ v3.7.3: Vérification et ajout des nouveaux champs si manquants
+            if not hasattr(response, 'clarification_required_critical'):
+                response.clarification_required_critical = False
+            if not hasattr(response, 'missing_critical_entities'):
+                response.missing_critical_entities = []
+            if not hasattr(response, 'variants_tested'):
+                response.variants_tested = ["legacy_enhanced"]
+                
+            return response
         else:
             logger.warning("⚠️ [Legacy] Fonction principale non disponible - fallback")
             return await fallback_expert_response(request_data, current_user, "legacy_enhanced")
@@ -172,10 +199,11 @@ async def ask_expert_enhanced_public_legacy(
     request: Request
 ):
     """Endpoint public de compatibilité v1 - FORÇAGE APPLIQUÉ + CLARIFICATION SUPPORT + RESPONSE_VERSIONS
-    ✅ CORRIGÉ: Import dynamique, vérifications robustes"""
+    ✅ CORRIGÉ: Import dynamique, vérifications robustes
+    ✅ v3.7.3: Support nouveaux champs API"""
     
     try:
-        logger.info("🔄 [LEGACY PUBLIC] ask-enhanced-public avec FORÇAGE + clarification + response_versions vers v2")
+        logger.info("🔄 [LEGACY PUBLIC] ask-enhanced-public avec FORÇAGE + clarification + response_versions + nouveaux champs vers v2")
         
         # ✅ CORRECTION: Vérification existence request_data
         if not request_data:
@@ -196,7 +224,17 @@ async def ask_expert_enhanced_public_legacy(
         # ✅ CORRECTION: Import dynamique pour éviter import circulaire
         endpoint_func = get_expert_endpoint_function("ask_expert_enhanced_v2_public")
         if endpoint_func:
-            return await endpoint_func(request_data, request)
+            response = await endpoint_func(request_data, request)
+            
+            # ✅ v3.7.3: Vérification et ajout des nouveaux champs si manquants
+            if not hasattr(response, 'clarification_required_critical'):
+                response.clarification_required_critical = False
+            if not hasattr(response, 'missing_critical_entities'):
+                response.missing_critical_entities = []
+            if not hasattr(response, 'variants_tested'):
+                response.variants_tested = ["legacy_public"]
+                
+            return response
         else:
             logger.warning("⚠️ [Legacy Public] Fonction principale non disponible - fallback")
             return await fallback_expert_response(request_data, None, "legacy_public")
@@ -214,10 +252,11 @@ async def ask_expert_compatible(
     current_user: Dict[str, Any] = Depends(expert_service.get_current_user_dependency())
 ):
     """Endpoint de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS
-    ✅ CORRIGÉ: Import dynamique, vérifications robustes"""
+    ✅ CORRIGÉ: Import dynamique, vérifications robustes
+    ✅ v3.7.3: Support nouveaux champs API"""
     
     try:
-        logger.info("🔄 [COMPATIBLE] ask avec FORÇAGE TOTAL + clarification + response_versions vers v2")
+        logger.info("🔄 [COMPATIBLE] ask avec FORÇAGE TOTAL + clarification + response_versions + nouveaux champs vers v2")
         
         # ✅ CORRECTION: Vérification existence request_data
         if not request_data:
@@ -242,7 +281,17 @@ async def ask_expert_compatible(
         # ✅ CORRECTION: Import dynamique pour éviter import circulaire
         endpoint_func = get_expert_endpoint_function("ask_expert_enhanced_v2")
         if endpoint_func:
-            return await endpoint_func(request_data, request, current_user)
+            response = await endpoint_func(request_data, request, current_user)
+            
+            # ✅ v3.7.3: Vérification et ajout des nouveaux champs si manquants
+            if not hasattr(response, 'clarification_required_critical'):
+                response.clarification_required_critical = False
+            if not hasattr(response, 'missing_critical_entities'):
+                response.missing_critical_entities = []
+            if not hasattr(response, 'variants_tested'):
+                response.variants_tested = ["compatible"]
+                
+            return response
         else:
             logger.warning("⚠️ [Compatible] Fonction principale non disponible - fallback")
             return await fallback_expert_response(request_data, current_user, "compatible")
@@ -259,10 +308,11 @@ async def ask_expert_public_compatible(
     request: Request
 ):
     """Endpoint public de compatibilité original - FORÇAGE TOTAL + CLARIFICATION SUPPORT + RESPONSE_VERSIONS
-    ✅ CORRIGÉ: Import dynamique, vérifications robustes"""
+    ✅ CORRIGÉ: Import dynamique, vérifications robustes
+    ✅ v3.7.3: Support nouveaux champs API"""
     
     try:
-        logger.info("🔄 [COMPATIBLE PUBLIC] ask-public avec FORÇAGE TOTAL + clarification + response_versions vers v2")
+        logger.info("🔄 [COMPATIBLE PUBLIC] ask-public avec FORÇAGE TOTAL + clarification + response_versions + nouveaux champs vers v2")
         
         # ✅ CORRECTION: Vérification existence request_data
         if not request_data:
@@ -287,7 +337,17 @@ async def ask_expert_public_compatible(
         # ✅ CORRECTION: Import dynamique pour éviter import circulaire
         endpoint_func = get_expert_endpoint_function("ask_expert_enhanced_v2_public")
         if endpoint_func:
-            return await endpoint_func(request_data, request)
+            response = await endpoint_func(request_data, request)
+            
+            # ✅ v3.7.3: Vérification et ajout des nouveaux champs si manquants
+            if not hasattr(response, 'clarification_required_critical'):
+                response.clarification_required_critical = False
+            if not hasattr(response, 'missing_critical_entities'):
+                response.missing_critical_entities = []
+            if not hasattr(response, 'variants_tested'):
+                response.variants_tested = ["compatible_public"]
+                
+            return response
         else:
             logger.warning("⚠️ [Compatible Public] Fonction principale non disponible - fallback")
             return await fallback_expert_response(request_data, None, "compatible_public")
@@ -305,12 +365,13 @@ async def ask_with_forced_clarification(
 ):
     """🎯 Endpoint avec clarification GARANTIE untuk questions techniques
     🚀 v3.7.2: Support response_versions + logique clarification granulaire
-    ✅ CORRIGÉ: Import dynamique, vérifications ajoutées"""
+    ✅ CORRIGÉ: Import dynamique, vérifications ajoutées
+    ✅ v3.7.3: Nouveaux champs API intégrés"""
     
     start_time = time.time()
     
     try:
-        logger.info("🎯 DÉBUT ask_with_forced_clarification v3.7.2")
+        logger.info("🎯 DÉBUT ask_with_forced_clarification v3.7.3")
         
         # ✅ CORRECTION: Vérification existence request_data
         if not request_data or not getattr(request_data, 'text', None):
@@ -327,6 +388,7 @@ async def ask_with_forced_clarification(
         # VÉRIFICATION DIRECTE si c'est une question poids+âge
         question_lower = request_data.text.lower()
         needs_clarification = False
+        missing_entities = []
         
         # Patterns simplifiés pour détecter poids+âge
         weight_age_patterns = [
@@ -350,7 +412,12 @@ async def ask_with_forced_clarification(
             logger.info(f"🏷️ Race détectée: {has_breed}")
             logger.info(f"⚧ Sexe détecté: {has_sex}")
             
-            if not has_breed and not has_sex:
+            if not has_breed:
+                missing_entities.append("breed")
+            if not has_sex:
+                missing_entities.append("sex")
+                
+            if missing_entities:
                 needs_clarification = True
                 logger.info("🎯 CLARIFICATION NÉCESSAIRE!")
         
@@ -373,10 +440,13 @@ Pouvez-vous préciser ces informations ?
             
             logger.info("✅ CLARIFICATION DÉCLENCHÉE!")
             
+            conversation_id = getattr(request_data, 'conversation_id', None) or str(uuid.uuid4())
+            
+            # ✅ v3.7.3: Construction avec nouveaux champs API
             return EnhancedExpertResponse(
                 question=request_data.text,
                 response=clarification_message,
-                conversation_id=getattr(request_data, 'conversation_id', None) or str(uuid.uuid4()),
+                conversation_id=conversation_id,
                 rag_used=False,
                 rag_score=None,
                 timestamp=datetime.now().isoformat(),
@@ -389,13 +459,17 @@ Pouvez-vous préciser ces informations ?
                 clarification_result={
                     "clarification_requested": True,
                     "clarification_type": "performance_breed_sex_forced",
-                    "missing_information": ["breed", "sex"],
+                    "missing_information": missing_entities,
                     "age_detected": age,
                     "confidence": 0.99
                 },
                 processing_steps=["forced_clarification_triggered"],
                 ai_enhancements_used=["forced_performance_clarification"],
-                response_versions=None  # Pas de response_versions pour clarifications
+                response_versions=None,  # Pas de response_versions pour clarifications
+                # 🆕 v3.7.3: Nouveaux champs API pour clarification
+                clarification_required_critical=True,
+                missing_critical_entities=missing_entities,
+                variants_tested=["forced_clarification_detection"]
             )
         
         logger.info("📋 Pas de clarification nécessaire, traitement normal")
@@ -409,7 +483,17 @@ Pouvez-vous préciser ces informations ?
         # ✅ CORRECTION CRITIQUE: Import dynamique pour éviter import circulaire
         endpoint_func = get_expert_endpoint_function("ask_expert_enhanced_v2_public")
         if endpoint_func:
-            return await endpoint_func(request_data, request)
+            response = await endpoint_func(request_data, request)
+            
+            # ✅ v3.7.3: Vérification et ajout des nouveaux champs si manquants
+            if not hasattr(response, 'clarification_required_critical'):
+                response.clarification_required_critical = False
+            if not hasattr(response, 'missing_critical_entities'):
+                response.missing_critical_entities = []
+            if not hasattr(response, 'variants_tested'):
+                response.variants_tested = ["forced_clarification_normal"]
+                
+            return response
         else:
             logger.warning("⚠️ [Forced Clarification] Fonction principale non disponible - fallback")
             return await fallback_expert_response(request_data, None, "forced_clarification")
@@ -426,10 +510,12 @@ Pouvez-vous préciser ces informations ?
 
 @router.get("/legacy-health")
 async def legacy_health():
-    """Health check spécifique pour les endpoints legacy"""
+    """Health check spécifique pour les endpoints legacy
+    ✅ v3.7.3: Info nouveaux champs API"""
     return {
         "status": "healthy",
         "module": "expert_legacy",
+        "version": "3.7.3",
         "models_available": MODELS_AVAILABLE,
         "service_available": SERVICE_AVAILABLE,
         "endpoints": [
@@ -442,16 +528,28 @@ async def legacy_health():
         ],
         "import_strategy": "dynamic_imports",
         "fallback_enabled": True,
+        "new_api_fields": [
+            "clarification_required_critical",
+            "missing_critical_entities",
+            "variants_tested"
+        ],
         "timestamp": datetime.now().isoformat()
     }
 
 # =============================================================================
-# CONFIGURATION LEGACY CORRIGÉE 🔄
+# CONFIGURATION LEGACY CORRIGÉE + NOUVEAUX CHAMPS 🔄
 # =============================================================================
 
 logger.info("🔄" * 50)
-logger.info("🔄 [EXPERT LEGACY] VERSION 3.7.2 - ENDPOINTS DE COMPATIBILITÉ CORRIGÉS!")
-logger.info("🔄 [CORRECTIONS APPLIQUÉES]:")
+logger.info("🔄 [EXPERT LEGACY] VERSION 3.7.3 - NOUVEAUX CHAMPS API INTÉGRÉS!")
+logger.info("🔄 [NOUVEAUTÉS v3.7.3]:")
+logger.info("   ✅ clarification_required_critical: bool")
+logger.info("   ✅ missing_critical_entities: List[str]")
+logger.info("   ✅ variants_tested: List[str]")
+logger.info("   ✅ Propagation automatique dans tous les endpoints")
+logger.info("   ✅ Fallback enrichi avec nouveaux champs")
+logger.info("")
+logger.info("🔄 [CORRECTIONS MAINTENUES]:")
 logger.info("   ✅ Imports circulaires définitivement résolus")
 logger.info("   ✅ Import dynamique des fonctions d'endpoint")
 logger.info("   ✅ Gestion d'erreur robuste avec fallbacks")
@@ -459,24 +557,26 @@ logger.info("   ✅ Vérifications de sécurité renforcées")
 logger.info("   ✅ Health check spécifique legacy")
 logger.info("   ✅ Service expert initialisé de façon sécurisée")
 logger.info("")
-logger.info("🔄 [FONCTIONNALITÉS LEGACY]:")
+logger.info("🔄 [FONCTIONNALITÉS LEGACY ENRICHIES]:")
 logger.info("   ✅ Redirection automatique vers endpoints v2")
 logger.info("   ✅ Forçage automatique des améliorations")
 logger.info("   ✅ Support response_versions ajouté")
+logger.info("   ✅ Nouveaux champs API propagés automatiquement")
 logger.info("   ✅ Compatibilité backward 100% garantie")
 logger.info("")
-logger.info("🔧 [ENDPOINTS LEGACY CORRIGÉS]:")
-logger.info("   - POST /ask-enhanced (legacy → v2)")
-logger.info("   - POST /ask-enhanced-public (legacy → v2)")
-logger.info("   - POST /ask (compatible → v2)")
-logger.info("   - POST /ask-public (compatible → v2)")
-logger.info("   - POST /ask-with-clarification (clarification forcée)")
-logger.info("   - GET /legacy-health (diagnostic legacy)")
+logger.info("🔧 [ENDPOINTS LEGACY ENRICHIS]:")
+logger.info("   - POST /ask-enhanced (legacy → v2 + nouveaux champs)")
+logger.info("   - POST /ask-enhanced-public (legacy → v2 + nouveaux champs)")
+logger.info("   - POST /ask (compatible → v2 + nouveaux champs)")
+logger.info("   - POST /ask-public (compatible → v2 + nouveaux champs)")
+logger.info("   - POST /ask-with-clarification (clarification forcée + nouveaux champs)")
+logger.info("   - GET /legacy-health (diagnostic legacy + info nouveaux champs)")
 logger.info("")
-logger.info("🎯 [AVANTAGES CORRECTIONS]:")
-logger.info("   ✅ Imports circulaires complètement éliminés")
-logger.info("   ✅ Fallbacks fonctionnels même si modules manquent")
-logger.info("   ✅ Gestion d'erreur à tous les niveaux")
+logger.info("🎯 [AVANTAGES v3.7.3]:")
+logger.info("   ✅ Nouveaux champs API disponibles partout")
+logger.info("   ✅ Clarification critique détectée automatiquement")
+logger.info("   ✅ Entités manquantes trackées précisément")
+logger.info("   ✅ Variantes testées pour optimisation")
 logger.info("   ✅ Compatibilité préservée dans tous les cas")
-logger.info("   ✅ PRÊT POUR PRODUCTION - LEGACY ROBUSTE")
+logger.info("   ✅ PRÊT POUR PRODUCTION - LEGACY ENRICHI")
 logger.info("🔄" * 50)
