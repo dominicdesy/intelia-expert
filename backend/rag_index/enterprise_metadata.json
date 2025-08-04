@@ -1,0 +1,139 @@
+{
+  "build_info": {
+    "builder_version": "Enterprise RAG Builder v1.0 (Modified for C:/intelia_gpt/rag_index)",
+    "build_date": "2025-08-03T17:14:22.123964",
+    "build_duration_seconds": 166.0148468017578,
+    "python_version": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+    "output_directory": "C:\\intelia_gpt\\rag_index"
+  },
+  "index_specifications": {
+    "total_vectors": 1481,
+    "vector_dimension": 384,
+    "index_type": "IVFFlat_nlist38",
+    "estimated_size_mb": 2.6033203124999997
+  },
+  "parser_ecosystem": {
+    "total_parsers_loaded": 10,
+    "specialized_parsers": [
+      "pdf",
+      "text",
+      "markdown",
+      "csv",
+      "excel",
+      "broiler_performance",
+      "broiler_temperature"
+    ],
+    "fallback_parsers": [
+      "tika",
+      "raw_text",
+      "empty_file"
+    ],
+    "parser_loading_report": {
+      "successful_loads": [
+        {
+          "category": "Document Format Parsers",
+          "parsers": [
+            "PDFParser",
+            "TextParser",
+            "MarkdownParser"
+          ],
+          "count": 3,
+          "specializations": [
+            "PDF documents",
+            "Plain text",
+            "Structured markdown"
+          ]
+        },
+        {
+          "category": "General Data Parsers",
+          "parsers": [
+            "GeneralCSVParser",
+            "GeneralExcelParser"
+          ],
+          "count": 2,
+          "specializations": [
+            "CSV contextual chunking",
+            "Multi-sheet Excel processing"
+          ]
+        },
+        {
+          "category": "Broiler Specialized Parsers",
+          "parsers": [
+            "BroilerPerformanceParser",
+            "BroilerTemperatureParser"
+          ],
+          "count": 2,
+          "specializations": [
+            "Ross 308/Cobb 500 performance data",
+            "Environmental temperature management",
+            "Breed-specific optimization",
+            "Agricultural domain expertise"
+          ]
+        },
+        {
+          "category": "Fallback Emergency Parsers",
+          "parsers": [
+            "TikaFallbackParser",
+            "RawTextFallbackParser",
+            "EmptyFileParser"
+          ],
+          "count": 3,
+          "specializations": [
+            "Universal format support (1000+ formats)",
+            "Emergency raw text extraction",
+            "Empty file handling"
+          ]
+        },
+        {
+          "category": "Parser Router System",
+          "parsers": [
+            "EnhancedParserRouter"
+          ],
+          "count": 1,
+          "specializations": [
+            "Intelligent parser selection",
+            "Performance monitoring"
+          ]
+        }
+      ],
+      "failed_loads": [],
+      "parser_count": 10,
+      "loading_time": 8.345574617385864
+    }
+  },
+  "processing_statistics": {
+    "total_files": 56,
+    "successful_parsings": 56,
+    "failed_parsings": 0,
+    "total_chunks": 1481,
+    "total_processing_time": 77.66253566741943,
+    "parser_usage": {
+      "pdf": {
+        "total_attempts": 56,
+        "successful_attempts": 56,
+        "total_time": 77.66253566741943,
+        "total_chunks": 1481,
+        "success_rate": 1.0
+      }
+    },
+    "overall_success_rate": 100.0,
+    "avg_processing_time": 1.3868309940610613,
+    "avg_chunks_per_document": 26.446428571428573,
+    "performance_benchmarks": {
+      "documents_per_second": 0.7210683957038608,
+      "chunks_per_second": 19.069683822096746,
+      "top_performing_parser": "pdf"
+    }
+  },
+  "content_analysis": {
+    "total_documents_discovered": 56,
+    "successful_processings": 56,
+    "failed_processings": 0,
+    "overall_success_rate": 100.0,
+    "total_chunks_generated": 1481
+  },
+  "source_information": {
+    "documents_source_path": "C:\\intelia_gpt\\documents",
+    "total_source_files": 56
+  }
+}
