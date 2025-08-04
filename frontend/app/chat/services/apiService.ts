@@ -1,4 +1,4 @@
-// ==================== API SERVICE COMPLET - CONSERVATION CODE ORIGINAL + MODIFICATIONS ====================
+// ==================== API SERVICE COMPLET - CONSERVATION CODE ORIGINAL + CORRECTIONS CONVERSATION_ID ====================
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -86,6 +86,21 @@ const getAuthHeaders = (): Record<string, string> => {
   return headers
 }
 
+// 🚀 NOUVELLE FONCTION : Génération UUID compatible navigateur
+const generateUUID = (): string => {
+  // Utiliser crypto.randomUUID si disponible (navigateurs modernes)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  
+  // Fallback pour navigateurs plus anciens
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 // 🚀 INTERFACE MODIFIÉE : Ajout response_versions
 interface EnhancedAIResponse {
   response: string
@@ -132,7 +147,7 @@ interface APIError {
 }
 
 /**
- * 🚀 FONCTION PRINCIPALE MODIFIÉE : Ajout paramètre concisionLevel
+ * 🚀 FONCTION PRINCIPALE CORRIGÉE : conversation_id toujours généré
  */
 export const generateAIResponse = async (
   question: string,
@@ -154,9 +169,13 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
+  // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
+  const finalConversationId = conversationId || generateUUID()
+
   console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
     question: question.substring(0, 50) + '...',
-    concisionLevel, // 🚀 NOUVEAU
+    conversation_id: finalConversationId, // 🔧 NOUVEAU : Log de l'ID généré
+    concisionLevel,
     isClarificationResponse,
     originalQuestion: originalQuestion?.substring(0, 30) + '...'
   })
@@ -184,14 +203,15 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🚀 BODY MODIFIÉ : Ajout paramètres concision
+    // 🔧 BODY CORRIGÉ : conversation_id toujours présent
     const requestBody = {
       text: finalQuestion,
       language: language,
       // 🚀 NOUVEAU : Paramètres concision
       concision_level: concisionLevel,
       generate_all_versions: true,
-      ...(conversationId && { conversation_id: conversationId }),
+      // 🔧 FIX CRITIQUE : Toujours inclure conversation_id
+      conversation_id: finalConversationId,
       // ✅ CLARIFICATIONS INCHANGÉES
       ...(isClarificationResponse && {
         is_clarification_response: true,
@@ -201,7 +221,10 @@ export const generateAIResponse = async (
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body pour ask-enhanced-v2:', requestBody)
+    console.log('📤 [apiService] Body pour ask-enhanced-v2 (CORRIGÉ):', {
+      ...requestBody,
+      conversation_id: `${finalConversationId.substring(0, 8)}...` // Log partiel pour sécurité
+    })
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -235,7 +258,7 @@ export const generateAIResponse = async (
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-enhanced-v2 reçue:', {
+    console.log('✅ [apiService] Réponse ask-enhanced-v2 reçue (CORRIGÉE):', {
       conversation_id: data.conversation_id,
       language: data.language,
       mode: data.mode,
@@ -243,7 +266,11 @@ export const generateAIResponse = async (
       response_length: data.response?.length || 0,
       // 🚀 NOUVEAU : Log versions reçues
       versions_received: Object.keys(data.response_versions || {}),
-      clarification_requested: data.clarification_result?.clarification_requested || false
+      clarification_requested: data.clarification_result?.clarification_requested || false,
+      // 🔧 NOUVEAU : Confirmation que conversation_id a été traité
+      conversation_id_sent: finalConversationId,
+      conversation_id_received: data.conversation_id,
+      ids_match: finalConversationId === data.conversation_id
     })
 
     // 🚀 FALLBACK : Si backend pas encore modifié
@@ -289,12 +316,14 @@ export const generateAIResponse = async (
       vague_entities: data.clarification_result?.missing_information || []
     }
 
-    console.log('🎯 [apiService] Données traitées avec mapping clarification:', {
+    console.log('🎯 [apiService] Données traitées avec mapping clarification (CORRIGÉES):', {
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
       clarification_result_exists: !!processedData.clarification_result,
       // 🚀 NOUVEAU
-      versions_available: Object.keys(processedData.response_versions || {})
+      versions_available: Object.keys(processedData.response_versions || {}),
+      // 🔧 CORRECTION CONFIRMÉE
+      conversation_id_final: processedData.conversation_id
     })
 
     return processedData
@@ -311,7 +340,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🚀 VERSION PUBLIQUE MODIFIÉE : Ajout paramètre concisionLevel
+ * 🚀 VERSION PUBLIQUE CORRIGÉE : conversation_id toujours généré
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -324,19 +353,24 @@ export const generateAIResponsePublic = async (
     throw new Error('Question requise')
   }
 
-  console.log('🌐 [apiService] Question publique vers ask-enhanced-v2-public:', {
+  // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
+  const finalConversationId = conversationId || generateUUID()
+
+  console.log('🌐 [apiService] Question publique vers ask-enhanced-v2-public (CORRIGÉE):', {
     question: question.substring(0, 50) + '...',
-    concisionLevel // 🚀 NOUVEAU
+    conversation_id: finalConversationId, // 🔧 NOUVEAU
+    concisionLevel
   })
 
   try {
-    // 🚀 BODY MODIFIÉ : Ajout paramètres concision
+    // 🔧 BODY CORRIGÉ : conversation_id toujours présent
     const requestBody = {
       text: question.trim(),
       language: language,
       concision_level: concisionLevel,
       generate_all_versions: true,
-      ...(conversationId && { conversation_id: conversationId })
+      // 🔧 FIX CRITIQUE : Toujours inclure conversation_id
+      conversation_id: finalConversationId
     }
 
     const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2-public`, {
@@ -354,7 +388,14 @@ export const generateAIResponsePublic = async (
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-enhanced-v2-public reçue')
+    console.log('✅ [apiService] Réponse ask-enhanced-v2-public reçue (CORRIGÉE):', {
+      conversation_id: data.conversation_id,
+      mode: data.mode,
+      rag_used: data.rag_used,
+      // 🔧 NOUVEAU : Confirmation conversation_id
+      conversation_id_sent: finalConversationId,
+      conversation_id_received: data.conversation_id
+    })
 
     // 🚀 FALLBACK : Si backend pas modifié
     if (!data.response_versions) {
@@ -596,10 +637,10 @@ export const buildClarificationEntities = (
 }
 
 /**
- * ✅ FONCTION DEBUG INCHANGÉE (avec mentions nouvelles features)
+ * ✅ FONCTION DEBUG MISE À JOUR avec corrections
  */
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration ask-enhanced-v2 + RESPONSE_VERSIONS')
+  console.group('🔧 [apiService] Configuration ask-enhanced-v2 + RESPONSE_VERSIONS + CORRECTIONS')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Endpoints:')
   console.log('- Ask enhanced v2 (auth):', `${API_BASE_URL}/expert/ask-enhanced-v2`)
@@ -607,6 +648,11 @@ export const debugEnhancedAPI = () => {
   console.log('- Feedback enhanced:', `${API_BASE_URL}/expert/feedback`)
   console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
   console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
+  console.log('🔧 CORRECTIONS APPLIQUÉES:')
+  console.log('  ✅ conversation_id toujours généré automatiquement')
+  console.log('  ✅ Fonction generateUUID() compatible tous navigateurs')
+  console.log('  ✅ Logs détaillés conversation_id envoyé/reçu')
+  console.log('  ✅ Fix appliqué aux versions auth ET publique')
   console.log('NOUVELLES FEATURES:')
   console.log('  🚀 concision_level dans body request')
   console.log('  🚀 generate_all_versions: true')
@@ -622,7 +668,7 @@ export const debugEnhancedAPI = () => {
 }
 
 /**
- * ✅ FONCTION TEST INCHANGÉE
+ * ✅ FONCTION TEST CORRIGÉE
  */
 export const testEnhancedConversationContinuity = async (
   user: any,
@@ -635,7 +681,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité conversation ask-enhanced-v2...')
+    console.log('🧪 [apiService] Test continuité conversation ask-enhanced-v2 (CORRIGÉ)...')
     
     const firstResponse = await generateAIResponse(
       "Test question 1: Qu'est-ce que les poulets de chair ?",
@@ -654,12 +700,14 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test ask-enhanced-v2 résultat:', {
+    console.log('🧪 [apiService] Test ask-enhanced-v2 résultat (CORRIGÉ):', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
       first_enhancements: firstResponse.ai_enhancements_used,
-      second_enhancements: secondResponse.ai_enhancements_used
+      second_enhancements: secondResponse.ai_enhancements_used,
+      // 🔧 NOUVEAU : Confirmation que les IDs ne sont plus None
+      both_ids_present: !!(firstResponse.conversation_id && secondResponse.conversation_id)
     })
     
     return {
@@ -714,7 +762,7 @@ export const debugEnhancedConversationFlow = (
   additionalInfo?: any
 ) => {
   console.log(`🔍 [Enhanced Conversation Debug] ${step}:`, {
-    conversation_id: conversationId || 'NOUVEAU',
+    conversation_id: conversationId || 'GÉNÉRÉ_AUTO', // 🔧 CORRIGÉ
     endpoint: 'ask-enhanced-v2',
     timestamp: new Date().toISOString(),
     ...additionalInfo
@@ -777,12 +825,17 @@ export const generateAIResponseSmart = async (
 }
 
 /**
- * 🚀 NOUVELLE FONCTION : Information configuration avec response_versions
+ * 🚀 NOUVELLE FONCTION : Information configuration avec corrections
  */
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 + Response Versions')
-  console.log('Version:', 'Enhanced v2 avec response_versions')
+  console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 + Response Versions + CORRECTIONS')
+  console.log('Version:', 'Enhanced v2 avec response_versions + conversation_id fix')
   console.log('Base URL:', API_BASE_URL)
+  console.log('🔧 CORRECTIONS CRITIQUES:')
+  console.log('  - 🔧 conversation_id: TOUJOURS généré automatiquement (UUID)')
+  console.log('  - 🔧 generateUUID(): Compatible tous navigateurs')
+  console.log('  - 🔧 Logs conversation_id envoyé/reçu pour debugging')
+  console.log('  - 🔧 Fix appliqué versions auth ET publique')
   console.log('NOUVELLES FONCTIONNALITÉS:')
   console.log('  - 🚀 concision_level: ultra_concise|concise|standard|detailed')
   console.log('  - 🚀 generate_all_versions: true (backend génère toutes versions)')
