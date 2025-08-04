@@ -495,6 +495,13 @@ class IntelligentConversationContext:
         
         return context
     
+    def _safe_topic_check(self, keywords: List[str]) -> bool:
+        """Helper sécurisé pour vérifier les mots-clés dans conversation_topic"""
+        if not self.conversation_topic:
+            return False
+        topic_lower = self.conversation_topic.lower()
+        return any(keyword in topic_lower for keyword in keywords)
+
     # 🤖 MÉTHODES POUR AGENTS GPT AMÉLIORÉES
     def get_missing_entities(self, include_importance: bool = False) -> Union[List[str], Dict[str, str]]:
         """
@@ -505,6 +512,10 @@ class IntelligentConversationContext:
             
         Returns:
             Dict[entity, importance] ou List[entity] selon include_importance
+            
+        ⚠️  ATTENTION: Cette fonction retourne 2 types différents selon le paramètre !
+            - include_importance=False: List[str] 
+            - include_importance=True: Dict[str, str]
         """
         entities = self.consolidated_entities
         missing_with_importance = {}
@@ -515,8 +526,8 @@ class IntelligentConversationContext:
         
         # Sexe - critique pour performance, secondaire pour santé
         if not entities.sex or entities.sex_confidence < 0.7:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else "" 
-                   for keyword in ["performance", "weight", "growth", "croissance", "poids"]):
+            # 🔒 PROTECTION None avec helper sécurisé
+            if self._safe_topic_check(["performance", "weight", "growth", "croissance", "poids"]):
                 missing_with_importance["sex"] = "critique"
             else:
                 missing_with_importance["sex"] = "secondaire"
@@ -527,16 +538,16 @@ class IntelligentConversationContext:
         
         # Poids - critique pour questions de performance
         if not entities.weight_grams and not entities.growth_rate:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["performance", "weight", "growth", "croissance", "poids"]):
+            # 🔒 PROTECTION None avec helper sécurisé
+            if self._safe_topic_check(["performance", "weight", "growth", "croissance", "poids"]):
                 missing_with_importance["current_performance"] = "critique"
             else:
                 missing_with_importance["current_performance"] = "secondaire"
         
         # Symptômes - critique pour questions de santé
         if not entities.symptoms and not entities.health_status:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["health", "mortality", "disease", "santé", "mortalité", "maladie"]):
+            # 🔒 PROTECTION None avec helper sécurisé
+            if self._safe_topic_check(["health", "mortality", "disease", "santé", "mortalité", "maladie"]):
                 missing_with_importance["symptoms"] = "critique"
             else:
                 missing_with_importance["symptoms"] = "secondaire"
@@ -549,24 +560,25 @@ class IntelligentConversationContext:
         
         # Conditions environnementales - secondaire sauf si problème mentionné
         if not entities.housing_type and not entities.temperature:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["environment", "temperature", "housing", "environnement", "température"]):
+            # 🔒 PROTECTION None avec helper sécurisé
+            if self._safe_topic_check(["environment", "temperature", "housing", "environnement", "température"]):
                 missing_with_importance["housing_conditions"] = "critique"
             else:
                 missing_with_importance["housing_conditions"] = "secondaire"
         
         # Alimentation - secondaire sauf si problème nutritionnel
         if not entities.feed_type:
-            if any(keyword in self.conversation_topic.lower() if self.conversation_topic else ""
-                   for keyword in ["feeding", "nutrition", "alimentation", "nourriture"]):
+            # 🔒 PROTECTION None avec helper sécurisé
+            if self._safe_topic_check(["feeding", "nutrition", "alimentation", "nourriture"]):
                 missing_with_importance["feed_information"] = "critique"
             else:
                 missing_with_importance["feed_information"] = "secondaire"
         
+        # 🚨 RETOUR CONDITIONNEL - ATTENTION AU TYPE !
         if include_importance:
-            return missing_with_importance
+            return missing_with_importance  # Type: Dict[str, str]
         else:
-            return list(missing_with_importance.keys())
+            return list(missing_with_importance.keys())  # Type: List[str]
 
     def get_raw_context_summary(self) -> Dict[str, Any]:
         """
@@ -2140,19 +2152,22 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
         # ✅ ÉTAPE 3: Récupérer le contexte enrichi pour agents
         context = conversation_memory.get_conversation_context(request.conversation_id)
         if context:
-            # 🔥 NOUVELLES MÉTHODES AMÉLIORÉES
-            missing_entities = context.get_missing_entities(include_importance=True)  # Avec importance
+            # 🔥 NOUVELLES MÉTHODES AMÉLIORÉES - ATTENTION AUX TYPES
+            missing_entities_with_importance = context.get_missing_entities(include_importance=True)  # Dict
+            missing_entities_list = context.get_missing_entities(include_importance=False)  # List
             raw_context_summary = context.get_raw_context_summary()  # Contexte brut complet
             formatted_context = context.get_formatted_context()
             rag_context = context.get_context_for_rag()
         else:
-            missing_entities, raw_context_summary, formatted_context, rag_context = {}, {}, "", ""
+            missing_entities_with_importance, missing_entities_list = {}, []
+            raw_context_summary, formatted_context, rag_context = {}, "", ""
         
         # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG) avec contexte enrichi
         contextualization_result = await agent_contextualizer.enrich_question(
             question=processed_question,
             raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities=missing_entities,  # 🔥 AVEC NIVEAUX D'IMPORTANCE
+            missing_entities_with_importance=missing_entities_with_importance,  # 🔥 Dict avec importance
+            missing_entities_list=missing_entities_list,  # 🔥 Liste simple (compatibilité)
             conversation_context=formatted_context,
             language=request.language
         )
@@ -2169,7 +2184,8 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
         enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
             rag_answer=response.answer,
             raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities=missing_entities,  # 🔥 AVEC NIVEAUX D'IMPORTANCE
+            missing_entities_with_importance=missing_entities_with_importance,  # 🔥 Dict avec importance
+            missing_entities_list=missing_entities_list,  # 🔥 Liste simple (compatibilité)
             conversation_context=formatted_context,
             original_question=request.text,
             language=request.language
@@ -2241,7 +2257,7 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
             contextualization_info=contextualization_result,
             enhancement_info=enhancement_result,
             context_quality_score=raw_context_summary.get("context_quality_score", 0.0),  # 🔥 NOUVEAU
-            missing_entities_analysis=missing_entities  # 🔥 NOUVEAU - pour debugging/analytics
+            missing_entities_analysis=missing_entities_with_importance  # 🔥 NOUVEAU - pour debugging/analytics
         )
         
     except Exception as e:
