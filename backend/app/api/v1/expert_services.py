@@ -1481,4 +1481,3 @@ logger.info("   🚀 PIPELINE AMÉLIORÉ PRÊT POUR PRODUCTION")
 logger.info("   🚀 EXPÉRIENCE UTILISATEUR OPTIMISÉE")
 logger.info("   🚀 ROBUSTESSE ET FLUIDITÉ MAXIMALES")
 logger.info("🚀" * 50)
-            "
