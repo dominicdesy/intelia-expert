@@ -1,5 +1,5 @@
 """
-app/api/v1/question_clarification_system.py - VERSION COMPLÈTE AVEC VALIDATION GPT INTÉGRÉE
+app/api/v1/question_clarification_system.py - VERSION COMPLÈTE AVEC VALIDATION GPT INTÉGRÉE + RECONNAISSANCE SOUCHES
 
 AMÉLIORATIONS MAJEURES:
 1. ✅ Extraction intelligente d'entités via OpenAI avec raisonnement dynamique (CONSERVÉ)
@@ -13,6 +13,8 @@ AMÉLIORATIONS MAJEURES:
 9. 🔧 NOUVEAU: Filtrage avancé des questions non pertinentes
 10. 🔧 NOUVEAU: Fallback intelligent si validation échoue
 11. 🔧 NOUVEAU: Fallback lisible si GPT échoue complètement
+12. 🆕 NOUVEAU: Reconnaissance automatique des souches (Lohmann LSL-Lite, etc.)
+13. 🆕 NOUVEAU: Inférence automatique du sexe selon la souche
 """
 
 import os
@@ -60,9 +62,10 @@ class ClarificationState(Enum):
 
 @dataclass
 class ExtractedEntities:
-    """Entités extraites intelligemment du contexte"""
+    """Entités extraites intelligemment du contexte avec reconnaissance de souches"""
     breed: Optional[str] = None
     breed_type: Optional[str] = None
+    sex: Optional[str] = None
     age_days: Optional[int] = None
     age_weeks: Optional[float] = None
     weight_grams: Optional[float] = None
@@ -75,6 +78,10 @@ class ExtractedEntities:
     symptoms: Optional[List[str]] = None
     duration_problem: Optional[str] = None
     previous_treatments: Optional[List[str]] = None
+    
+    # 🆕 NOUVEAUX CHAMPS: Métadonnées d'inférence
+    sex_inferred: Optional[bool] = None  # True si sexe inféré automatiquement
+    breed_normalized: Optional[bool] = None  # True si race normalisée automatiquement
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire pour logs"""
@@ -103,6 +110,180 @@ class ExtractedEntities:
                 missing.append("age")
         
         return missing
+    
+    # 🆕 NOUVELLE MÉTHODE: Normalisation des souches
+    def normalize_breed_name(self, raw_breed: str) -> Tuple[str, bool]:
+        """
+        🆕 NOUVEAU: Normalise le nom de la souche selon les patterns connus
+        
+        Args:
+            raw_breed: Nom brut de la souche
+            
+        Returns:
+            Tuple[str, bool]: (nom_normalisé, a_été_normalisé)
+        """
+        
+        if not raw_breed:
+            return raw_breed, False
+        
+        raw_lower = raw_breed.lower().strip()
+        
+        # Dictionnaire de normalisation des souches
+        breed_normalization = {
+            # Poules pondeuses
+            "lohmann": "Lohmann LSL-Lite",
+            "lohmann lsl": "Lohmann LSL-Lite", 
+            "lohmann lsl-lite": "Lohmann LSL-Lite",
+            "lohmann lsl lite": "Lohmann LSL-Lite",
+            "lsl": "Lohmann LSL-Lite",
+            "lsl-lite": "Lohmann LSL-Lite",
+            "lsl lite": "Lohmann LSL-Lite",
+            
+            "bovans": "Bovans Brown",
+            "bovans brown": "Bovans Brown",
+            "bovans blanc": "Bovans White",
+            "bovans white": "Bovans White",
+            
+            "hisex": "Hisex Brown",
+            "hisex brown": "Hisex Brown",
+            "hisex blanc": "Hisex White",
+            "hisex white": "Hisex White",
+            
+            "isa": "ISA Brown",
+            "isa brown": "ISA Brown",
+            "isa blanc": "ISA White",
+            "isa white": "ISA White",
+            
+            "hyline": "Hyline Brown",
+            "hyline brown": "Hyline Brown",
+            "hyline white": "Hyline White",
+            
+            # Poulets de chair (déjà existants mais ajout de variantes)
+            "ross": "Ross 308",
+            "ross308": "Ross 308",
+            "ross 308": "Ross 308",
+            "ross708": "Ross 708",
+            "ross 708": "Ross 708",
+            "ross ap95": "Ross AP95",
+            "ross pm3": "Ross PM3",
+            
+            "cobb": "Cobb 500",
+            "cobb500": "Cobb 500",
+            "cobb 500": "Cobb 500",
+            "cobb700": "Cobb 700",
+            "cobb 700": "Cobb 700",
+            "cobb sasso": "Cobb Sasso",
+            
+            "hubbard": "Hubbard Flex",
+            "hubbard flex": "Hubbard Flex",
+            "hubbard classic": "Hubbard Classic",
+            
+            "arbor acres": "Arbor Acres",
+            "arbor": "Arbor Acres",
+            
+            # Autres
+            "red bro": "Red Bro",
+            "redbro": "Red Bro"
+        }
+        
+        # Recherche exacte d'abord
+        if raw_lower in breed_normalization:
+            normalized = breed_normalization[raw_lower]
+            logger.info(f"🔄 [Breed Normalization] '{raw_breed}' → '{normalized}' (exact match)")
+            return normalized, True
+        
+        # Recherche par mots-clés
+        for pattern, normalized_name in breed_normalization.items():
+            if pattern in raw_lower:
+                logger.info(f"🔄 [Breed Normalization] '{raw_breed}' → '{normalized_name}' (keyword match: '{pattern}')")
+                return normalized_name, True
+        
+        # Aucune normalisation trouvée
+        return raw_breed, False
+    
+    # 🆕 NOUVELLE MÉTHODE: Inférence automatique du sexe
+    def infer_sex_from_breed(self, breed: str) -> Tuple[Optional[str], bool]:
+        """
+        🆕 NOUVEAU: Infère automatiquement le sexe selon la souche
+        
+        Args:
+            breed: Nom de la souche (normalisé)
+            
+        Returns:
+            Tuple[Optional[str], bool]: (sexe_inféré, a_été_inféré)
+        """
+        
+        if not breed:
+            return None, False
+        
+        breed_lower = breed.lower()
+        
+        # Lignées femelles (poules pondeuses)
+        female_breeds = [
+            "lohmann lsl-lite",
+            "bovans brown", 
+            "bovans white",
+            "hisex brown",
+            "hisex white", 
+            "isa brown",
+            "isa white",
+            "hyline brown",
+            "hyline white"
+        ]
+        
+        # Lignées mixtes (poulets de chair) - pas d'inférence automatique
+        mixed_breeds = [
+            "ross 308",
+            "ross 708", 
+            "ross ap95",
+            "ross pm3",
+            "cobb 500",
+            "cobb 700",
+            "cobb sasso",
+            "hubbard flex",
+            "hubbard classic",
+            "arbor acres",
+            "red bro"
+        ]
+        
+        # Vérifier si c'est une lignée femelle
+        for female_breed in female_breeds:
+            if female_breed in breed_lower:
+                logger.info(f"🚺 [Sex Inference] '{breed}' → 'femelle' (lignée pondeuse)")
+                return "femelle", True
+        
+        # Pour les lignées mixtes, pas d'inférence (retourner None)
+        for mixed_breed in mixed_breeds:
+            if mixed_breed in breed_lower:
+                logger.info(f"🔄 [Sex Inference] '{breed}' → None (lignée mixte - pas d'inférence)")
+                return None, False
+        
+        # Breed non reconnu
+        logger.info(f"❓ [Sex Inference] '{breed}' → None (souche non reconnue)")
+        return None, False
+    
+    # 🆕 NOUVELLE MÉTHODE: Normalisation et inférence combinées
+    def normalize_and_infer(self):
+        """
+        🆕 NOUVEAU: Applique la normalisation de souche et l'inférence de sexe
+        Modifie l'objet en place
+        """
+        
+        # 1. Normaliser la souche si présente
+        if self.breed:
+            normalized_breed, was_normalized = self.normalize_breed_name(self.breed)
+            if was_normalized:
+                self.breed = normalized_breed
+                self.breed_normalized = True
+                self.breed_type = "specific"  # Les souches normalisées sont spécifiques
+        
+        # 2. Inférer le sexe si pas déjà spécifié et si souche présente
+        if not self.sex and self.breed:
+            inferred_sex, was_inferred = self.infer_sex_from_breed(self.breed)
+            if was_inferred and inferred_sex:
+                self.sex = inferred_sex
+                self.sex_inferred = True
+                logger.info(f"✅ [Auto Inference] Sexe inféré automatiquement: {inferred_sex} pour {self.breed}")
 
 @dataclass
 class ClarificationResult:
@@ -150,7 +331,7 @@ class ClarificationResult:
 
 class EnhancedQuestionClarificationSystem:
     """
-    Système de clarification intelligent AMÉLIORÉ avec validation GPT robuste intégrée
+    Système de clarification intelligent AMÉLIORÉ avec validation GPT robuste intégrée + reconnaissance souches
     """
     
     def __init__(self):
@@ -178,6 +359,10 @@ class EnhancedQuestionClarificationSystem:
             self.enable_question_validation = getattr(settings, 'enable_question_validation', True)
             self.validation_threshold = getattr(settings, 'validation_threshold', 0.5)
             self.enable_intelligent_fallback = getattr(settings, 'enable_intelligent_fallback', True)
+            
+            # 🆕 NOUVEAU: Configuration reconnaissance souches
+            self.enable_breed_normalization = getattr(settings, 'enable_breed_normalization', True)
+            self.enable_sex_inference = getattr(settings, 'enable_sex_inference', True)
         else:
             self.enabled = os.getenv('ENABLE_CLARIFICATION_SYSTEM', 'true').lower() == 'true'
             self.model = os.getenv('CLARIFICATION_MODEL', 'gpt-4o-mini')
@@ -200,9 +385,13 @@ class EnhancedQuestionClarificationSystem:
             self.enable_question_validation = os.getenv('ENABLE_QUESTION_VALIDATION', 'true').lower() == 'true'
             self.validation_threshold = float(os.getenv('VALIDATION_THRESHOLD', '0.5'))
             self.enable_intelligent_fallback = os.getenv('ENABLE_INTELLIGENT_FALLBACK', 'true').lower() == 'true'
+            
+            # 🆕 NOUVEAU: Configuration reconnaissance souches
+            self.enable_breed_normalization = os.getenv('ENABLE_BREED_NORMALIZATION', 'true').lower() == 'true'
+            self.enable_sex_inference = os.getenv('ENABLE_SEX_INFERENCE', 'true').lower() == 'true'
         
-        # Configuration des logs détaillés: métadonnées validation + fallback + erreurs
-        logger.info("✅ [EnhancedQuestionClarificationSystem] READY: Agent de clarification avec VALIDATION ROBUSTE + FALLBACK INTELLIGENT opérationnel!")
+        # Configuration des logs détaillés: métadonnées validation + fallback + erreurs + reconnaissance souches
+        logger.info("✅ [EnhancedQuestionClarificationSystem] READY: Agent de clarification avec VALIDATION ROBUSTE + RECONNAISSANCE SOUCHES opérationnel!")
         logger.info(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
         logger.info(f"🔧 [Enhanced Clarification] Extraction entités: {'✅' if self.smart_entity_extraction else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Auto-reprocess: {'✅' if self.auto_reprocess_after_clarification else '❌'}")
@@ -210,33 +399,59 @@ class EnhancedQuestionClarificationSystem:
         logger.info(f"🔧 [Enhanced Clarification] Validation GPT robuste: {'✅' if self.enable_question_validation else '❌'}")
         logger.info(f"🔧 [Enhanced Clarification] Fallback intelligent: {'✅' if self.enable_intelligent_fallback else '❌'}")
         logger.info(f"🆕 [Semantic Dynamic] Mode dynamique: {'✅' if self.enable_semantic_dynamic else '❌'}")
+        logger.info(f"🆕 [Breed Recognition] Normalisation souches: {'✅' if self.enable_breed_normalization else '❌'}")
+        logger.info(f"🆕 [Sex Inference] Inférence sexe: {'✅' if self.enable_sex_inference else '❌'}")
         
         self._init_patterns()
         self._init_enhanced_prompts()
         self._init_clarification_logger()
 
     def _init_patterns(self):
-        """Patterns de détection améliorés"""
+        """Patterns de détection améliorés avec reconnaissance souches"""
         
-        # Races spécifiques (identiques)
+        # 🆕 AMÉLIORÉ: Races spécifiques avec nouvelles souches pondeuses
         self.specific_breed_patterns = {
             "fr": [
+                # Poulets de chair (existants)
                 r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
                 r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
                 r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
+                r'arbor\s*acres', r'isa\s*15', r'red\s*bro',
+                
+                # 🆕 NOUVEAUX: Poules pondeuses
+                r'lohmann(?:\s*lsl)?(?:\s*-?\s*lite)?', r'lsl\s*-?\s*lite?',
+                r'bovans\s*(?:brown|blanc|white)?', 
+                r'hisex\s*(?:brown|blanc|white)?',
+                r'isa\s*(?:brown|blanc|white)?',
+                r'hyline\s*(?:brown|white)?'
             ],
             "en": [
+                # Poulets de chair (existants)
                 r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
                 r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
                 r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
+                r'arbor\s*acres', r'isa\s*15', r'red\s*bro',
+                
+                # 🆕 NOUVEAUX: Poules pondeuses
+                r'lohmann(?:\s*lsl)?(?:\s*-?\s*lite)?', r'lsl\s*-?\s*lite?',
+                r'bovans\s*(?:brown|white)?', 
+                r'hisex\s*(?:brown|white)?',
+                r'isa\s*(?:brown|white)?',
+                r'hyline\s*(?:brown|white)?'
             ],
             "es": [
+                # Poulets de chair (existants)
                 r'ross\s*308', r'ross\s*708', r'ross\s*ap95', r'ross\s*pm3',
                 r'cobb\s*500', r'cobb\s*700', r'cobb\s*sasso',
                 r'hubbard\s*flex', r'hubbard\s*classic',
-                r'arbor\s*acres', r'isa\s*15', r'red\s*bro'
+                r'arbor\s*acres', r'isa\s*15', r'red\s*bro',
+                
+                # 🆕 NOUVEAUX: Poules pondeuses
+                r'lohmann(?:\s*lsl)?(?:\s*-?\s*lite)?', r'lsl\s*-?\s*lite?',
+                r'bovans\s*(?:brown|blanco|white)?', 
+                r'hisex\s*(?:brown|blanco|white)?',
+                r'isa\s*(?:brown|blanco|white)?',
+                r'hyline\s*(?:brown|white)?'
             ]
         }
         
@@ -249,7 +464,8 @@ class EnhancedQuestionClarificationSystem:
             "temperature": [r'température', r'temperature', r'temperatura', r'chaud', r'hot', r'caliente', r'froid', r'cold', r'frío'],
             "feeding": [r'alimentation', r'feeding', r'alimentación', r'nourriture', r'food', r'comida', r'aliment'],
             "environment": [r'environnement', r'environment', r'ambiente', r'ventilation', r'humidity', r'humidité'],
-            "performance": [r'performance', r'rendement', r'efficacité', r'efficiency', r'eficiencia', r'conversion']
+            "performance": [r'performance', r'rendement', r'efficacité', r'efficiency', r'eficiencia', r'conversion'],
+            "laying": [r'ponte', r'laying', r'puesta', r'oeufs?', r'eggs?', r'huevos?']  # 🆕 NOUVEAU: Questions ponte
         }
 
     # 🔧 MÉTHODE COMPLÈTEMENT RÉÉCRITE: Génération dynamique avec validation robuste intégrée
@@ -495,7 +711,7 @@ class EnhancedQuestionClarificationSystem:
         return questions
 
     async def extract_entities_intelligent(self, question: str, language: str, conversation_context: Dict = None) -> ExtractedEntities:
-        """✅ NOUVEAU: Extraction intelligente d'entités via OpenAI (CONSERVÉ IDENTIQUE)"""
+        """✅ AMÉLIORÉ: Extraction intelligente d'entités via OpenAI avec reconnaissance souches"""
         
         if not self.smart_entity_extraction or not OPENAI_AVAILABLE or not openai:
             logger.warning("⚠️ [Enhanced Clarification] Extraction intelligente désactivée ou OpenAI indisponible")
@@ -507,16 +723,24 @@ class EnhancedQuestionClarificationSystem:
             if conversation_context:
                 context_info = f"\n\nContexte conversationnel disponible:\n{json.dumps(conversation_context, ensure_ascii=False, indent=2)}"
             
+            # 🆕 AMÉLIORÉ: Prompt avec reconnaissance des souches pondeuses
             extraction_prompt = f"""Tu es un expert en extraction d'informations pour l'aviculture. Extrait TOUTES les informations pertinentes de cette question et du contexte.
 
 Question: "{question}"{context_info}
 
 CONSIGNE: Extrait les informations sous format JSON strict. Utilise null pour les valeurs manquantes.
 
+IMPORTANT POUR LES RACES/SOUCHES:
+- Reconnaître les souches pondeuses: Lohmann LSL-Lite, Bovans Brown, Hisex Brown, ISA Brown, Hyline
+- Reconnaître les souches de chair: Ross 308, Cobb 500, Hubbard Flex, etc.
+- Normaliser les noms (ex: "lohmann" → "Lohmann LSL-Lite")
+- Inférer le sexe si possible (souches pondeuses = femelles)
+
 ```json
 {{
-  "breed": "race spécifique (ex: Ross 308) ou null",
+  "breed": "race spécifique (ex: Ross 308, Lohmann LSL-Lite) ou null",
   "breed_type": "specific/generic/null",
+  "sex": "mâle/femelle/mixte ou null (inférer si souche pondeuse)",
   "age_days": nombre_jours_ou_null,
   "age_weeks": nombre_semaines_ou_null,
   "weight_grams": poids_grammes_ou_null,
@@ -534,7 +758,8 @@ CONSIGNE: Extrait les informations sous format JSON strict. Utilise null pour le
 
 IMPORTANT: 
 - Si une race générique est mentionnée (poulet, volaille), breed_type = "generic"
-- Si une race spécifique est mentionnée (Ross 308), breed_type = "specific"
+- Si une race spécifique est mentionnée (Ross 308, Lohmann), breed_type = "specific"
+- Pour souches pondeuses (Lohmann, Bovans, Hisex, ISA, Hyline), inférer sex = "femelle"
 - Convertir les semaines en jours si nécessaire (1 semaine = 7 jours)
 - Être très précis sur les valeurs numériques"""
 
@@ -547,7 +772,7 @@ IMPORTANT:
             response = openai.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture. Réponds uniquement avec du JSON valide."},
+                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches. Réponds uniquement avec du JSON valide."},
                     {"role": "user", "content": extraction_prompt}
                 ],
                 temperature=0.1,
@@ -578,6 +803,7 @@ IMPORTANT:
                 entities = ExtractedEntities(
                     breed=extracted_data.get("breed"),
                     breed_type=extracted_data.get("breed_type"),
+                    sex=extracted_data.get("sex"),
                     age_days=extracted_data.get("age_days"),
                     age_weeks=extracted_data.get("age_weeks"),
                     weight_grams=extracted_data.get("weight_grams"),
@@ -592,6 +818,10 @@ IMPORTANT:
                     previous_treatments=extracted_data.get("previous_treatments")
                 )
                 
+                # 🆕 NOUVEAU: Appliquer normalisation et inférence
+                if self.enable_breed_normalization or self.enable_sex_inference:
+                    entities.normalize_and_infer()
+                
                 logger.info(f"🤖 [Enhanced Clarification] Entités extraites intelligemment: {entities.to_dict()}")
                 return entities
                 
@@ -604,29 +834,50 @@ IMPORTANT:
             return await self._extract_entities_fallback(question, language)
 
     async def _extract_entities_fallback(self, question: str, language: str) -> ExtractedEntities:
-        """Extraction d'entités fallback (règles basiques) (CONSERVÉ IDENTIQUE)"""
+        """🆕 AMÉLIORÉ: Extraction d'entités fallback avec reconnaissance souches (règles basiques)"""
         
         entities = ExtractedEntities()
         question_lower = question.lower()
         
-        # Détection race spécifique
+        # 🆕 AMÉLIORÉ: Détection race spécifique avec nouvelles souches
         specific_patterns = self.specific_breed_patterns.get(language, self.specific_breed_patterns["fr"])
         for pattern in specific_patterns:
             match = re.search(pattern, question_lower, re.IGNORECASE)
             if match:
-                entities.breed = match.group(0).strip()
+                raw_breed = match.group(0).strip()
+                entities.breed = raw_breed
                 entities.breed_type = "specific"
                 break
         
         # Détection race générique si pas spécifique
         if not entities.breed:
-            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'poultry', r'pollos?', r'aves?']
+            generic_patterns = [r'poulets?', r'volailles?', r'chickens?', r'poultry', r'pollos?', r'aves?', r'poules?']
             for pattern in generic_patterns:
                 match = re.search(pattern, question_lower, re.IGNORECASE)
                 if match:
                     entities.breed = match.group(0).strip()
                     entities.breed_type = "generic"
                     break
+        
+        # Détection sexe explicite
+        sex_patterns = {
+            "fr": [r'mâles?', r'femelles?', r'coqs?', r'poules?', r'poulettes?', r'mixte'],
+            "en": [r'males?', r'females?', r'roosters?', r'hens?', r'pullets?', r'mixed'],
+            "es": [r'machos?', r'hembras?', r'gallos?', r'gallinas?', r'pollas?', r'mixto']
+        }
+        
+        patterns = sex_patterns.get(language, sex_patterns["fr"])
+        for pattern in patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                sex_word = match.group(0).lower()
+                if sex_word in ['mâle', 'mâles', 'male', 'males', 'macho', 'machos', 'coq', 'coqs', 'rooster', 'roosters', 'gallo', 'gallos']:
+                    entities.sex = "mâle"
+                elif sex_word in ['femelle', 'femelles', 'female', 'females', 'hembra', 'hembras', 'poule', 'poules', 'hen', 'hens', 'gallina', 'gallinas', 'poulette', 'poulettes', 'pullet', 'pullets', 'polla', 'pollas']:
+                    entities.sex = "femelle"
+                elif sex_word in ['mixte', 'mixed', 'mixto']:
+                    entities.sex = "mixte"
+                break
         
         # Détection âge
         age_patterns = [
@@ -670,6 +921,10 @@ IMPORTANT:
             if match:
                 entities.mortality_rate = float(match.group(1))
                 break
+        
+        # 🆕 NOUVEAU: Appliquer normalisation et inférence même en fallback
+        if self.enable_breed_normalization or self.enable_sex_inference:
+            entities.normalize_and_infer()
         
         return entities
 
@@ -855,7 +1110,7 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         question_type = self.classify_question_type(question, language)
         logger.info(f"🏷️ [Enhanced Clarification] Type de question: {question_type}")
         
-        # ✅ NOUVEAU: Extraction intelligente d'entités
+        # ✅ AMÉLIORÉ: Extraction intelligente d'entités avec reconnaissance souches
         extracted_entities = await self.extract_entities_intelligent(
             question, 
             language, 
@@ -864,6 +1119,12 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         
         logger.info(f"🔍 [Enhanced Clarification] Analyse: '{question[:80]}...'")
         logger.info(f"📊 [Enhanced Clarification] Entités extraites: {extracted_entities.to_dict()}")
+        
+        # 🆕 NOUVEAU: Logging de reconnaissance automatique
+        if extracted_entities.breed_normalized:
+            logger.info(f"🔄 [Breed Recognition] Souche normalisée automatiquement: {extracted_entities.breed}")
+        if extracted_entities.sex_inferred:
+            logger.info(f"🚺 [Sex Inference] Sexe inféré automatiquement: {extracted_entities.sex}")
         
         # 🆕 NOUVEAU: Gestion du mode sémantique dynamique avec validation robuste
         if (mode == "semantic_dynamic" or 
@@ -1202,7 +1463,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         
         question_templates = {
             "fr": {
-                "breed": "Quelle est la race/lignée exacte de vos poulets (Ross 308, Cobb 500, Hubbard, etc.) ?",
+                "breed": "Quelle est la race/lignée exacte de vos poulets (Ross 308, Cobb 500, Lohmann LSL-Lite, etc.) ?",
                 "age": "Quel âge ont-ils actuellement (en jours précis) ?",
                 "symptoms": "Quels symptômes spécifiques observez-vous ?",
                 "housing": "Dans quel type d'élevage sont-ils logés (bâtiment fermé, semi-ouvert, plein air) ?",
@@ -1211,7 +1472,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "conditions": "Quelles sont les conditions environnementales actuelles (température, humidité) ?"
             },
             "en": {
-                "breed": "What is the exact breed/line of your chickens (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "breed": "What is the exact breed/line of your chickens (Ross 308, Cobb 500, Lohmann LSL-Lite, etc.)?",
                 "age": "How old are they currently (in precise days)?",
                 "symptoms": "What specific symptoms do you observe?",
                 "housing": "What type of housing are they in (closed building, semi-open, free-range)?",
@@ -1220,7 +1481,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "conditions": "What are the current environmental conditions (temperature, humidity)?"
             },
             "es": {
-                "breed": "¿Cuál es la raza/línea exacta de sus pollos (Ross 308, Cobb 500, Hubbard, etc.)?",
+                "breed": "¿Cuál es la raza/línea exacta de sus pollos (Ross 308, Cobb 500, Lohmann LSL-Lite, etc.)?",
                 "age": "¿Qué edad tienen actualmente (en días precisos)?",
                 "symptoms": "¿Qué síntomas específicos observa?",
                 "housing": "¿En qué tipo de alojamiento están (edificio cerrado, semi-abierto, campo libre)?",
@@ -1241,7 +1502,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "mortality": ["breed", "age", "symptoms", "duration"],
             "environment": ["breed", "age", "conditions"],
             "feeding": ["breed", "age", "feed"],
-            "performance": ["breed", "age"]
+            "performance": ["breed", "age"],
+            "laying": ["breed", "age"]  # 🆕 NOUVEAU: Questions ponte
         }
         
         priority_order = priority_mapping.get(question_type, ["breed", "age"])
@@ -1303,7 +1565,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "growth": 15 if not extracted_entities.age_days else 0,
             "weight": 15 if not extracted_entities.age_days else 0,
             "health": 10 if not extracted_entities.symptoms else 0,
-            "mortality": 15 if not extracted_entities.mortality_rate else 0
+            "mortality": 15 if not extracted_entities.mortality_rate else 0,
+            "laying": 10 if not extracted_entities.age_days else 0  # 🆕 NOUVEAU: Bonus ponte
         }
         
         base_score += critical_info_bonus.get(question_type, 5)
@@ -1312,6 +1575,12 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         extracted_count = len([v for v in extracted_entities.to_dict().values() if v is not None])
         if extracted_count > 3:
             base_score -= 10
+        
+        # 🆕 NOUVEAU: Bonus si reconnaissance automatique a fonctionné
+        if extracted_entities.breed_normalized:
+            base_score += 5
+        if extracted_entities.sex_inferred:
+            base_score += 5
         
         return min(base_score, 95.0)
 
@@ -1425,7 +1694,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         conversation_id: str,
         result: ClarificationResult
     ):
-        """Log détaillé des décisions de clarification enrichi avec validation (AMÉLIORÉ)"""
+        """Log détaillé des décisions de clarification enrichi avec validation + reconnaissance souches (AMÉLIORÉ)"""
         
         clarification_data = {
             "timestamp": datetime.now().isoformat(),
@@ -1449,14 +1718,16 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "semantic_dynamic_max_questions": self.semantic_dynamic_max_questions,
                 "enable_question_validation": self.enable_question_validation,
                 "validation_threshold": self.validation_threshold,
-                "enable_intelligent_fallback": self.enable_intelligent_fallback
+                "enable_intelligent_fallback": self.enable_intelligent_fallback,
+                "enable_breed_normalization": self.enable_breed_normalization,  # 🆕 NOUVEAU
+                "enable_sex_inference": self.enable_sex_inference  # 🆕 NOUVEAU
             }
         }
         
         # Log structuré
         self.clarification_logger.info(json.dumps(clarification_data, ensure_ascii=False))
         
-        # Log standard enrichi avec informations de validation
+        # Log standard enrichi avec informations de validation + reconnaissance
         if result.needs_clarification:
             logger.info(
                 f"❓ [Enhanced Clarification] CLARIFICATION - "
@@ -1468,6 +1739,8 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 f"Validation: {result.validation_score:.1f} | "
                 f"Fallback: {'✅' if result.fallback_used else '❌'} | "
                 f"GPT: {'❌' if result.gpt_failed else '✅'} | "
+                f"Breed Norm: {'✅' if result.extracted_entities and result.extracted_entities.breed_normalized else '❌'} | "
+                f"Sex Inf: {'✅' if result.extracted_entities and result.extracted_entities.sex_inferred else '❌'} | "
                 f"Temps: {result.processing_time_ms}ms"
             )
         else:
@@ -1480,11 +1753,13 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 f"Validation: {result.validation_score:.1f} | "
                 f"Fallback: {'✅' if result.fallback_used else '❌'} | "
                 f"GPT: {'❌' if result.gpt_failed else '✅'} | "
+                f"Breed Norm: {'✅' if result.extracted_entities and result.extracted_entities.breed_normalized else '❌'} | "
+                f"Sex Inf: {'✅' if result.extracted_entities and result.extracted_entities.sex_inferred else '❌'} | "
                 f"Temps: {result.processing_time_ms}ms"
             )
 
     def get_stats_enhanced(self) -> Dict:
-        """Retourne les statistiques du système enrichi avec nouvelles fonctionnalités (AMÉLIORÉ)"""
+        """Retourne les statistiques du système enrichi avec nouvelles fonctionnalités + reconnaissance souches (AMÉLIORÉ)"""
         return {
             "enabled": self.enabled,
             "model": self.model,
@@ -1505,7 +1780,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "intelligent_missing_detection": self.intelligent_missing_detection,
             "question_types_supported": list(self.question_type_patterns.keys()),
             "entity_types_extracted": [
-                "breed", "age_days", "weight_grams", "mortality_rate", 
+                "breed", "sex", "age_days", "weight_grams", "mortality_rate", 
                 "temperature", "humidity", "housing_type", "feed_type", 
                 "symptoms", "duration_problem", "previous_treatments"
             ],
@@ -1523,6 +1798,20 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "validation_available": OPENAI_AVAILABLE and bool(os.getenv('OPENAI_API_KEY')),
             "intelligent_fallback_enabled": self.enable_intelligent_fallback,
             
+            # 🆕 NOUVELLES STATISTIQUES RECONNAISSANCE SOUCHES
+            "breed_normalization_enabled": self.enable_breed_normalization,
+            "sex_inference_enabled": self.enable_sex_inference,
+            "supported_laying_breeds": [
+                "Lohmann LSL-Lite", "Bovans Brown", "Bovans White", 
+                "Hisex Brown", "Hisex White", "ISA Brown", "ISA White",
+                "Hyline Brown", "Hyline White"
+            ],
+            "supported_broiler_breeds": [
+                "Ross 308", "Ross 708", "Ross AP95", "Ross PM3",
+                "Cobb 500", "Cobb 700", "Cobb Sasso",
+                "Hubbard Flex", "Hubbard Classic", "Arbor Acres", "Red Bro"
+            ],
+            
             # 🔧 NOUVELLES STATISTIQUES GESTION D'ERREURS
             "error_handling_features": {
                 "openai_unavailable_fallback": True,
@@ -1530,7 +1819,9 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "gpt_error_fallback": self.enable_intelligent_fallback,
                 "validation_failure_fallback": self.enable_intelligent_fallback,
                 "json_parsing_fallback": True,
-                "question_extraction_fallback": True
+                "question_extraction_fallback": True,
+                "breed_normalization_fallback": True,
+                "sex_inference_fallback": True
             },
             
             # 🔧 STATISTIQUES FALLBACK
@@ -1538,13 +1829,15 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "adaptive_clarification_questions": True,
                 "basic_fallback_questions": True,
                 "intelligent_question_selection": True,
-                "type_specific_fallbacks": True
+                "type_specific_fallbacks": True,
+                "breed_recognition_patterns": True,
+                "sex_inference_rules": True
             }
         }
 
 # ==================== INSTANCE GLOBALE AMÉLIORÉE ====================
 
-# Instance singleton du système de clarification AMÉLIORÉ avec validation robuste
+# Instance singleton du système de clarification AMÉLIORÉ avec validation robuste + reconnaissance souches
 enhanced_clarification_system = EnhancedQuestionClarificationSystem()
 
 # ==================== FONCTIONS UTILITAIRES AMÉLIORÉES ====================
@@ -1622,9 +1915,35 @@ def generate_dynamic_clarification_questions_with_validation(question: str, lang
     """Génère dynamiquement des questions de clarification avec validation robuste"""
     return enhanced_clarification_system.generate_dynamic_clarification_questions(question, language)
 
+# 🆕 NOUVELLES FONCTIONS: Reconnaissance souches et inférence sexe
+def normalize_breed_name(raw_breed: str) -> Tuple[str, bool]:
+    """Normalise le nom d'une souche selon les patterns connus"""
+    dummy_entity = ExtractedEntities()
+    return dummy_entity.normalize_breed_name(raw_breed)
+
+def infer_sex_from_breed(breed: str) -> Tuple[Optional[str], bool]:
+    """Infère le sexe automatiquement selon la souche"""
+    dummy_entity = ExtractedEntities()
+    return dummy_entity.infer_sex_from_breed(breed)
+
+def get_supported_breeds() -> Dict[str, List[str]]:
+    """Retourne la liste des souches supportées par catégorie"""
+    return {
+        "laying": [
+            "Lohmann LSL-Lite", "Bovans Brown", "Bovans White", 
+            "Hisex Brown", "Hisex White", "ISA Brown", "ISA White",
+            "Hyline Brown", "Hyline White"
+        ],
+        "broiler": [
+            "Ross 308", "Ross 708", "Ross AP95", "Ross PM3",
+            "Cobb 500", "Cobb 700", "Cobb Sasso",
+            "Hubbard Flex", "Hubbard Classic", "Arbor Acres", "Red Bro"
+        ]
+    }
+
 # ==================== LOGGING DE DÉMARRAGE AMÉLIORÉ ====================
 
-logger.info("❓ [EnhancedQuestionClarificationSystem] Module COMPLÈTEMENT RÉÉCRIT avec VALIDATION ROBUSTE initialisé")
+logger.info("❓ [EnhancedQuestionClarificationSystem] Module COMPLÈTEMENT RÉÉCRIT avec VALIDATION ROBUSTE + RECONNAISSANCE SOUCHES initialisé")
 logger.info(f"📊 [EnhancedQuestionClarificationSystem] Statistiques: {enhanced_clarification_system.get_stats_enhanced()}")
 logger.info("✅ [EnhancedQuestionClarificationSystem] FONCTIONNALITÉS CONSERVÉES:")
 logger.info("   - 🤖 Extraction intelligente d'entités via OpenAI")
@@ -1647,6 +1966,13 @@ logger.info("   - 📊 Score de qualité détaillé (0.0 à 1.0) avec bonus dive
 logger.info("   - 🚫 Détection reformulations, exemples génériques, questions non pertinentes")
 logger.info("   - 🔄 Fallback intelligent par type de question si validation échoue")
 logger.info("   - 📈 Métadonnées validation complètes dans les résultats")
+logger.info("🆕 [EnhancedQuestionClarificationSystem] NOUVELLES FONCTIONNALITÉS RECONNAISSANCE SOUCHES:")
+logger.info("   - 🔄 Normalisation automatique des souches (lohmann → Lohmann LSL-Lite)")
+logger.info("   - 🚺 Inférence automatique du sexe pour lignées pondeuses")
+logger.info("   - 🐔 Support souches pondeuses: Lohmann, Bovans, Hisex, ISA, Hyline")
+logger.info("   - 🐓 Support souches chair: Ross, Cobb, Hubbard, Arbor Acres, Red Bro")
+logger.info("   - 📊 Métadonnées inférence: breed_normalized, sex_inferred")
+logger.info("   - ⚙️ Configuration: enable_breed_normalization, enable_sex_inference")
 logger.info("🔧 [EnhancedQuestionClarificationSystem] GESTION D'ERREURS COMPLÈTE:")
 logger.info("   - 🛡️ Fallback si OpenAI indisponible → Questions adaptatives")
 logger.info("   - 🛡️ Fallback si clé API manquante → Questions adaptatives")
@@ -1654,11 +1980,13 @@ logger.info("   - 🛡️ Fallback si erreur GPT → Questions adaptatives (si e
 logger.info("   - 🛡️ Fallback si validation échoue → Questions par type")
 logger.info("   - 🛡️ Fallback si JSON parsing échoue → Extraction texte libre")
 logger.info("   - 🛡️ Fallback si imports échouent → Questions de base")
+logger.info("   - 🛡️ Fallback si reconnaissance souche échoue → Extraction basique")
 logger.info("   - 📊 Traçabilité complète: gpt_failed, fallback_used dans résultats")
 logger.info("✨ [EnhancedQuestionClarificationSystem] RÉSULTAT FINAL:")
-logger.info('   - Question floue: "J\'ai un problème avec mes poulets"')
+logger.info('   - Question floue: "Mes Lohmann ont un problème"')
+logger.info('   - Reconnaissance: "Lohmann" → "Lohmann LSL-Lite", sexe → "femelle"')
 logger.info('   - Génération GPT: 3-4 questions contextuelles')
 logger.info('   - Validation robuste: score qualité > seuil configurable')
 logger.info('   - Si échec: fallback intelligent par type de question')
 logger.info('   - Si erreur technique: fallback adaptatif garanti')
-logger.info
+logger.info('   - Logs enrichis: normalisation + inférence dans métadonnées')

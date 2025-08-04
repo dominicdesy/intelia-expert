@@ -8,6 +8,7 @@ app/api/v1/prompt_templates.py - TEMPLATES DE PROMPTS STRUCTURÉS AVEC VALIDATIO
 🔧 NOUVEAU: Validation robuste des questions générées dynamiquement
 🔧 NOUVEAU: Fallback intelligent si GPT échoue
 🎯 NOUVEAU: Filtrage avancé des questions non pertinentes
+🔧 MISE À JOUR: Message utilisateur neutre centralisé
 """
 
 import logging
@@ -15,6 +16,13 @@ import re
 from typing import Dict, Any, Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
+
+# ✅ Action 1 : Message utilisateur neutre centralisé
+USER_NEEDS_CLARIFICATION_MSG = (
+    "Votre question manque de contexte. "
+    "Un expert virtuel va vous poser quelques questions pour mieux comprendre la situation. "
+    "💡 Répondez simplement dans le chat avec les informations demandées."
+)
 
 def build_structured_prompt(documents: str, question: str, context: Dict[str, Any]) -> str:
     """
@@ -118,7 +126,7 @@ INSTRUCCIONES CRÍTICAS:
 
 RESPUESTA EXPERTA:"""
 
-# 🆕 NOUVEAU: Prompt de contextualisation optimisé pour mode sémantique dynamique
+# ✅ Action 3 : Seule cette fonction génère des questions via GPT
 def build_contextualization_prompt(user_question: str, language: str = "fr") -> str:
     """
     🆕 NOUVEAU: Construit un prompt pour générer des questions de clarification dynamiques.
@@ -221,78 +229,6 @@ Réponds dans ce format JSON :
     "Question 3"
   ]
 }}"""
-
-def build_clarification_prompt(missing_info: list, detected_age: str, language: str = "fr") -> str:
-    """
-    🎪 PROMPT CLARIFICATION - Pour les demandes de clarification spécialisées
-    """
-    
-    if language.lower() == "en":
-        return _build_clarification_english(missing_info, detected_age)
-    elif language.lower() == "es":
-        return _build_clarification_spanish(missing_info, detected_age)
-    else:
-        return _build_clarification_french(missing_info, detected_age)
-
-def _build_clarification_french(missing_info: list, detected_age: str) -> str:
-    """Clarification française"""
-    
-    missing_text = ", ".join(missing_info)
-    
-    return f"""Pour vous donner le poids de référence exact d'un poulet de {detected_age} jours, j'ai besoin de préciser :
-
-• **{missing_text}**
-
-Ces informations sont essentielles car les performances varient significativement selon :
-- La race/souche (Ross 308, Cobb 500, Hubbard, etc.)
-- Le sexe (mâles plus lourds, femelles différents besoins)
-
-**Exemples de réponses complètes :**
-• "Ross 308 mâles"
-• "Cobb 500 femelles" 
-• "Hubbard troupeau mixte"
-
-💡 Répondez simplement avec ces informations pour obtenir les données précises."""
-
-def _build_clarification_english(missing_info: list, detected_age: str) -> str:
-    """Clarification anglaise"""
-    
-    missing_text = ", ".join(missing_info)
-    
-    return f"""To give you the exact reference weight for a {detected_age}-day chicken, I need to clarify:
-
-• **{missing_text}**
-
-This information is essential because performance varies significantly based on:
-- Breed/strain (Ross 308, Cobb 500, Hubbard, etc.)
-- Sex (males heavier, females different requirements)
-
-**Examples of complete responses:**
-• "Ross 308 males"
-• "Cobb 500 females"
-• "Hubbard mixed flock"
-
-💡 Simply respond with this information to get precise data."""
-
-def _build_clarification_spanish(missing_info: list, detected_age: str) -> str:
-    """Clarification espagnole"""
-    
-    missing_text = ", ".join(missing_info)
-    
-    return f"""Para darle el peso de referencia exacto de un pollo de {detected_age} días, necesito aclarar:
-
-• **{missing_text}**
-
-Esta información es esencial porque el rendimiento varía significativamente según:
-- Raza/cepa (Ross 308, Cobb 500, Hubbard, etc.)
-- Sexo (machos más pesados, hembras diferentes requerimientos)
-
-**Ejemplos de respuestas completas:**
-• "Ross 308 machos"
-• "Cobb 500 hembras"
-• "Hubbard lote mixto"
-
-💡 Responda simplemente con esta información para obtener datos precisos."""
 
 def build_vagueness_prompt(vague_question: str, suggestions: list, language: str = "fr") -> str:
     """
@@ -737,7 +673,6 @@ logger.info("🎯 [Prompt Templates] Fonctionnalités disponibles:")
 logger.info("   - 🇫🇷 Prompts français optimisés")
 logger.info("   - 🇬🇧 Prompts anglais optimisés") 
 logger.info("   - 🇪🇸 Prompts espagnols optimisés")
-logger.info("   - 🎪 Prompts de clarification spécialisés")
 logger.info("   - 🎯 Prompts pour questions floues")
 logger.info("   - 🔍 Extraction contexte depuis entités")
 logger.info("   - ✅ Validation qualité contexte")
@@ -757,3 +692,6 @@ logger.info("   - 🔄 Fallback intelligent par type de question (poids/santé/c
 logger.info("🧹 [Prompt Templates] OBJECTIF: Éliminer références aux documents")
 logger.info("✨ [Prompt Templates] RÉSULTAT: Réponses naturelles et professionnelles + questions validées robustement")
 logger.info("🔧 [Prompt Templates] AMÉLIORATION: Validation complète avec fallback intelligent")
+logger.info("🔧 [Prompt Templates] NOUVEAU: Message utilisateur neutre centralisé")
+logger.info("✅ [Prompt Templates] Action 1: USER_NEEDS_CLARIFICATION_MSG centralisé")
+logger.info("✅ [Prompt Templates] Action 3: Seule build_contextualization_prompt génère des questions")
