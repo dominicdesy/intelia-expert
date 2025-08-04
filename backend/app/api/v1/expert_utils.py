@@ -6,6 +6,7 @@ Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 ✅ CORRIGÉ: Erreur syntaxe ligne 830 résolue
 🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
 🚀 INTÉGRÉ: Centralisation via clarification_entities
+🚀 AJOUTÉ: score_question_variant() pour scoring générique des variantes
 """
 
 import re
@@ -109,7 +110,7 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             # 🚀 NOUVEAU: Patterns pondeuses étendus
             r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver|hissex|novogen|tetra|hendrix|dominant)\b',
             # Mentions génériques
-            r'\brace[:\s]*([a-zA-Z0-9\s]+)',
+            r'\bace[:\s]*([a-zA-Z0-9\s]+)',
             r'\bsouche[:\s]*([a-zA-Z0-9\s]+)',
         ],
         "en": [
@@ -497,6 +498,57 @@ def extract_conversation_context(conversation_history: List[Dict[str, Any]], max
 # UTILITAIRES VALIDATION ET FORMATS
 # =============================================================================
 
+def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
+    """
+    Score une variante de question en fonction des entités présentes
+    
+    Args:
+        variant: La variante de question à scorer
+        entities: Dictionnaire des entités extraites (breed, sex, age, etc.)
+    
+    Returns:
+        float: Score entre 0 et 1 (1 = toutes les entités présentes)
+    
+    Example:
+        entities = {"breed": "Ross 308", "sex": "mâles", "age": "25 jours"}
+        variant = "Pour des poulets Ross 308 mâles de 25 jours"
+        score = score_question_variant(variant, entities) # Returns 1.0
+    """
+    if not variant or not entities:
+        return 0.0
+    
+    variant_lower = variant.lower()
+    matched_entities = 0
+    total_entities = 0
+    
+    for entity_key, entity_value in entities.items():
+        if entity_value:  # Ignore empty entities
+            total_entities += 1
+            entity_str = str(entity_value).lower()
+            
+            # Score différent selon le type d'entité
+            if entity_key == "breed":
+                # Pour les races, chercher le nom exact ou des parties
+                breed_parts = entity_str.split()
+                if len(breed_parts) > 1:
+                    # Race composée (ex: "ross 308") - chercher toutes les parties
+                    if all(part in variant_lower for part in breed_parts):
+                        matched_entities += 1
+                else:
+                    # Race simple - chercher le nom exact
+                    if entity_str in variant_lower:
+                        matched_entities += 1
+            elif entity_key == "sex":
+                # Pour le sexe, chercher le terme exact
+                if entity_str in variant_lower:
+                    matched_entities += 1
+            else:
+                # Pour les autres entités (age, poids, etc.), chercher la valeur
+                if entity_str in variant_lower:
+                    matched_entities += 1
+    
+    return matched_entities / max(total_entities, 1)
+
 def validate_question_length(question: str, min_length: int = 3, max_length: int = 5000) -> Dict[str, Any]:
     """Valide la longueur d'une question"""
     
@@ -862,6 +914,8 @@ logger.info("   - validate_clarification_completeness: Validation complétude cl
 logger.info("   - build_enriched_question_*: Construction questions enrichies")
 logger.info("   - get_enhanced_topics_by_language: Topics suggérés multilingues")
 logger.info("   - save_conversation_auto_enhanced: Sauvegarde conversation")
+logger.info("   - score_question_variant: Scoring variantes de questions")
+logger.info("   - validate_question_length: Validation longueur questions")
 logger.info("   - validate_and_sanitize_input: Validation et nettoyage input")
 logger.info("   - create_debug_info: Informations debug structurées") 
 logger.info("   - log_performance_metrics: Métriques de performance")
@@ -869,6 +923,7 @@ logger.info("   - create_fallback_response: Réponses de fallback")
 logger.info("   - extract_key_entities_simple: Extraction entités simple")
 logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
 logger.info("🚀 [Expert Utils] INTÉGRÉ: Centralisation via clarification_entities")
+logger.info("🚀 [Expert Utils] NOUVEAU: score_question_variant() - Scoring générique des variantes")
 if CLARIFICATION_ENTITIES_AVAILABLE:
     logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
 else:

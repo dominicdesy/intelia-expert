@@ -1,14 +1,15 @@
 """
-app/api/v1/expert.py - EXPERT ENDPOINTS PRINCIPAUX v3.7.2 - CORRIGÉ
+app/api/v1/expert.py - EXPERT ENDPOINTS PRINCIPAUX v3.7.3 - PROPAGATION CHAMPS
 
-🚀 FICHIER PRINCIPAL MAINTENU POUR COMPATIBILITÉ:
-- Garde le nom expert.py pour éviter les changements de liens
-- Endpoints principaux avec clarification granulaire
-- Support response_versions complet
-- Code allégé et maintenable
-- ✅ CORRECTIONS: Variables initialisées, vérifications robustes, imports sécurisés
+🚀 MODIFICATIONS APPLIQUÉES v3.7.3:
+- Propagation clarification_required_critical dans toutes les réponses
+- Propagation missing_critical_entities dans les métadonnées
+- Propagation variants_tested depuis les améliorations RAG
+- Intégration complète dans EnhancedExpertResponse
+- Support dans les endpoints publics et privés
+- Gestion dans les réponses de clarification incomplète
 
-VERSION COMPLÈTE + SYNTAXE 100% CORRIGÉE + SUPPORT RESPONSE_VERSIONS + CLARIFICATION INTELLIGENTE
+VERSION COMPLÈTE + PROPAGATION NOUVEAUX CHAMPS + SUPPORT RESPONSE_VERSIONS + CLARIFICATION INTELLIGENTE
 """
 
 import os
@@ -51,6 +52,10 @@ except ImportError as e:
         user: Optional[str] = None
         logged: bool = False
         validation_passed: Optional[bool] = None
+        # NOUVEAUX CHAMPS v3.7.3
+        clarification_required_critical: bool = False
+        missing_critical_entities: List[str] = []
+        variants_tested: List[str] = []
         
     class FeedbackRequest(BaseModel):
         rating: str
@@ -104,7 +109,91 @@ def get_current_user_dependency():
     return get_current_user_mock
 
 # =============================================================================
-# ENDPOINTS PRINCIPAUX AVEC GESTION D'ERREUR ROBUSTE
+# UTILITAIRES PROPAGATION CHAMPS v3.7.3
+# =============================================================================
+
+def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
+    """Extrait les nouveaux champs à propager depuis la réponse du service"""
+    
+    propagation_fields = {
+        "clarification_required_critical": False,
+        "missing_critical_entities": [],
+        "variants_tested": []
+    }
+    
+    try:
+        # Extraction clarification_required_critical
+        if hasattr(response_data, 'clarification_result') and response_data.clarification_result:
+            clarification_result = response_data.clarification_result
+            propagation_fields["clarification_required_critical"] = clarification_result.get("clarification_required_critical", False)
+            propagation_fields["missing_critical_entities"] = clarification_result.get("missing_critical_entities", [])
+            
+            logger.info(f"📋 [PROPAGATION v3.7.3] Clarification critique: {propagation_fields['clarification_required_critical']}")
+            logger.info(f"📋 [PROPAGATION v3.7.3] Entités critiques manquantes: {propagation_fields['missing_critical_entities']}")
+        
+        # Extraction variants_tested depuis RAG enhancements
+        if hasattr(response_data, 'rag_enhancement_info') and response_data.rag_enhancement_info:
+            rag_enhancement_info = response_data.rag_enhancement_info
+            propagation_fields["variants_tested"] = rag_enhancement_info.get("variants_tested", [])
+            
+            logger.info(f"📋 [PROPAGATION v3.7.3] Variantes testées: {propagation_fields['variants_tested']}")
+        
+        # Extraction alternative depuis processing_metadata
+        elif hasattr(response_data, 'processing_metadata') and response_data.processing_metadata:
+            processing_metadata = response_data.processing_metadata
+            if "rag_enhancement_info" in processing_metadata:
+                rag_info = processing_metadata["rag_enhancement_info"]
+                propagation_fields["variants_tested"] = rag_info.get("variants_tested", [])
+                
+                logger.info(f"📋 [PROPAGATION v3.7.3] Variantes depuis metadata: {propagation_fields['variants_tested']}")
+        
+        # Extraction depuis ai_enhancements_used (fallback)
+        elif hasattr(response_data, 'ai_enhancements_used') and response_data.ai_enhancements_used:
+            # Filtrer les améliorations liées aux variantes
+            variant_enhancements = [
+                enhancement for enhancement in response_data.ai_enhancements_used 
+                if "variant" in enhancement.lower() or "reformulation" in enhancement.lower()
+            ]
+            if variant_enhancements:
+                propagation_fields["variants_tested"] = variant_enhancements
+                logger.info(f"📋 [PROPAGATION v3.7.3] Variantes inférées: {variant_enhancements}")
+        
+        logger.info("✅ [PROPAGATION v3.7.3] Champs extraits avec succès")
+        
+    except Exception as e:
+        logger.error(f"❌ [PROPAGATION v3.7.3] Erreur extraction champs: {e}")
+        # Garder les valeurs par défaut en cas d'erreur
+    
+    return propagation_fields
+
+def _apply_propagation_fields(response: EnhancedExpertResponse, propagation_fields: Dict[str, Any]) -> EnhancedExpertResponse:
+    """Applique les champs de propagation à la réponse finale"""
+    
+    try:
+        # Application des nouveaux champs
+        if hasattr(response, 'clarification_required_critical'):
+            response.clarification_required_critical = propagation_fields.get("clarification_required_critical", False)
+        
+        if hasattr(response, 'missing_critical_entities'):
+            response.missing_critical_entities = propagation_fields.get("missing_critical_entities", [])
+        
+        if hasattr(response, 'variants_tested'):
+            response.variants_tested = propagation_fields.get("variants_tested", [])
+        
+        logger.info("✅ [PROPAGATION v3.7.3] Champs appliqués à la réponse finale")
+        
+        # Log des valeurs appliquées
+        logger.info(f"📋 [PROPAGATION v3.7.3] Appliqué clarification critique: {getattr(response, 'clarification_required_critical', 'N/A')}")
+        logger.info(f"📋 [PROPAGATION v3.7.3] Appliqué entités manquantes: {getattr(response, 'missing_critical_entities', 'N/A')}")
+        logger.info(f"📋 [PROPAGATION v3.7.3] Appliqué variantes testées: {getattr(response, 'variants_tested', 'N/A')}")
+        
+    except Exception as e:
+        logger.error(f"❌ [PROPAGATION v3.7.3] Erreur application champs: {e}")
+    
+    return response
+
+# =============================================================================
+# ENDPOINTS PRINCIPAUX AVEC PROPAGATION v3.7.3
 # =============================================================================
 
 @router.get("/health")
@@ -112,9 +201,15 @@ async def expert_health():
     """Health check pour diagnostiquer les problèmes"""
     return {
         "status": "healthy",
+        "version": "3.7.3",
         "expert_service_available": EXPERT_SERVICE_AVAILABLE,
         "expert_service_initialized": expert_service is not None,
         "timestamp": datetime.now().isoformat(),
+        "propagation_fields_supported": [
+            "clarification_required_critical",
+            "missing_critical_entities", 
+            "variants_tested"
+        ],
         "endpoints": [
             "/health",
             "/ask-enhanced-v2", 
@@ -131,19 +226,19 @@ async def ask_expert_enhanced_v2(
     current_user: Dict[str, Any] = Depends(get_current_user_dependency())
 ):
     """
-    🧨 ENDPOINT EXPERT FINAL avec DÉTECTION CLARIFICATION GRANULAIRE v3.7.2:
+    🧨 ENDPOINT EXPERT FINAL avec PROPAGATION CHAMPS v3.7.3:
     - Support explicite du flag is_clarification_response
     - Logique clarification granulaire et adaptative
     - Métadonnées propagées correctement
     - Génération multi-versions des réponses
-    - Messages de clarification adaptatifs selon ce qui manque réellement
-    ✅ CORRIGÉ: Variables initialisées, vérifications robustes, gestion d'erreurs
+    - NOUVEAUX CHAMPS: clarification_required_critical, missing_critical_entities, variants_tested
+    ✅ CORRIGÉ: Variables initialisées, vérifications robustes, propagation complète
     """
     start_time = time.time()
     
     try:
         logger.info("=" * 100)
-        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.2 - SUPPORT RESPONSE_VERSIONS + CLARIFICATION INTELLIGENTE")
+        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.3 - PROPAGATION CHAMPS + CLARIFICATION INTELLIGENTE")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
         logger.info(f"🆔 Conversation ID: {getattr(request_data, 'conversation_id', 'None')}")
         logger.info(f"🛠️ Service disponible: {expert_service is not None}")
@@ -162,7 +257,7 @@ async def ask_expert_enhanced_v2(
         if generate_all_versions is None:
             generate_all_versions = True
         
-        logger.info("🚀 [RESPONSE_VERSIONS v3.7.2] Paramètres concision:")
+        logger.info("🚀 [RESPONSE_VERSIONS v3.7.3] Paramètres concision:")
         logger.info(f"   - concision_level: {concision_level}")
         logger.info(f"   - generate_all_versions: {generate_all_versions}")
         
@@ -171,7 +266,7 @@ async def ask_expert_enhanced_v2(
         original_question = getattr(request_data, 'original_question', None)
         clarification_entities = getattr(request_data, 'clarification_entities', None)
         
-        logger.info("🧨 [DÉTECTION CLARIFICATION v3.7.2] Analyse du mode:")
+        logger.info("🧨 [DÉTECTION CLARIFICATION v3.7.3] Analyse du mode:")
         logger.info(f"   - is_clarification_response: {is_clarification}")
         logger.info(f"   - original_question fournie: {original_question is not None}")
         logger.info(f"   - clarification_entities: {clarification_entities}")
@@ -213,7 +308,7 @@ async def ask_expert_enhanced_v2(
             # VALIDATION entités complètes AVANT enrichissement
             clarified_entities = {"breed": breed, "sex": sex}
             
-            # 🎯 NOUVELLE LOGIQUE GRANULAIRE v3.7.2: Validation granulaire breed vs sex
+            # 🎯 NOUVELLE LOGIQUE GRANULAIRE v3.7.3: Validation granulaire breed vs sex
             if not breed or not sex:
                 # ✅ CORRECTION: Protection contre None dans le logging
                 breed_safe = breed or "None"
@@ -275,7 +370,7 @@ async def ask_expert_enhanced_v2(
         if hasattr(request_data, 'require_coherence_check'):
             request_data.require_coherence_check = True
         
-        logger.info("🔥 [CLARIFICATION FORCÉE v3.7.2] Paramètres forcés:")
+        logger.info("🔥 [CLARIFICATION FORCÉE v3.7.3] Paramètres forcés:")
         logger.info(f"   - enable_vagueness_detection: {original_vagueness} → TRUE (FORCÉ)")
         logger.info(f"   - require_coherence_check: {original_coherence} → TRUE (FORCÉ)")
         
@@ -291,10 +386,15 @@ async def ask_expert_enhanced_v2(
             logger.error(f"❌ [Expert Service] Erreur traitement: {e}")
             return await _fallback_expert_response(request_data, start_time, current_user, str(e))
         
+        # 🚀 PROPAGATION NOUVEAUX CHAMPS v3.7.3
+        logger.info("📋 [PROPAGATION v3.7.3] Extraction et application nouveaux champs")
+        propagation_fields = _extract_propagation_fields(response)
+        response = _apply_propagation_fields(response, propagation_fields)
+        
         # AJOUT MÉTADONNÉES CLARIFICATION dans response
         if clarification_metadata and hasattr(response, 'clarification_processing'):
             response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES v3.7.2] Clarification metadata ajoutées à response")
+            logger.info("💡 [MÉTADONNÉES v3.7.3] Clarification metadata ajoutées à response")
         
         # Log response_versions si présentes
         if hasattr(response, 'response_versions') and response.response_versions:
@@ -303,7 +403,7 @@ async def ask_expert_enhanced_v2(
                 logger.info(f"   - {level}: {len(content)} caractères")
         
         # LOGGING RÉSULTATS CLARIFICATION DÉTAILLÉ
-        logger.info("🧨 [RÉSULTATS CLARIFICATION v3.7.2]:")
+        logger.info("🧨 [RÉSULTATS CLARIFICATION v3.7.3]:")
         logger.info(f"   - Mode final: {getattr(response, 'mode', 'unknown')}")
         logger.info(f"   - Clarification déclenchée: {getattr(response, 'clarification_result', None) is not None}")
         logger.info(f"   - RAG utilisé: {getattr(response, 'rag_used', False)}")
@@ -317,7 +417,13 @@ async def ask_expert_enhanced_v2(
             if 'provided_parts' in clarification_result:
                 logger.info(f"   - Parties détectées: {clarification_result.get('provided_parts', [])}")
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.2 - Temps: {getattr(response, 'response_time_ms', 0)}ms")
+        # 📋 LOGGING NOUVEAUX CHAMPS v3.7.3
+        logger.info("📋 [NOUVEAUX CHAMPS v3.7.3] Valeurs finales:")
+        logger.info(f"   - clarification_required_critical: {getattr(response, 'clarification_required_critical', 'N/A')}")
+        logger.info(f"   - missing_critical_entities: {getattr(response, 'missing_critical_entities', 'N/A')}")
+        logger.info(f"   - variants_tested: {getattr(response, 'variants_tested', 'N/A')}")
+        
+        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.3 - Temps: {getattr(response, 'response_time_ms', 0)}ms")
         logger.info(f"🤖 Améliorations: {len(getattr(response, 'ai_enhancements_used', []))} features")
         logger.info("=" * 100)
         
@@ -327,7 +433,7 @@ async def ask_expert_enhanced_v2(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.2: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.3: {e}")
         logger.info("=" * 100)
         return await _fallback_expert_response(request_data, start_time, current_user, str(e))
 
@@ -336,13 +442,13 @@ async def ask_expert_enhanced_v2_public(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """🧨 ENDPOINT PUBLIC avec DÉTECTION CLARIFICATION GRANULAIRE v3.7.2
-    ✅ CORRIGÉ: Variables initialisées, vérifications robustes, gestion d'erreurs"""
+    """🧨 ENDPOINT PUBLIC avec PROPAGATION CHAMPS v3.7.3
+    ✅ CORRIGÉ: Variables initialisées, vérifications robustes, propagation complète"""
     start_time = time.time()
     
     try:
         logger.info("=" * 100)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.2 - SUPPORT RESPONSE_VERSIONS + CLARIFICATION INTELLIGENTE")
+        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.3 - PROPAGATION CHAMPS + CLARIFICATION INTELLIGENTE")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
         logger.info(f"🛠️ Service disponible: {expert_service is not None}")
         
@@ -368,7 +474,7 @@ async def ask_expert_enhanced_v2_public(
         is_clarification = getattr(request_data, 'is_clarification_response', False)
         clarification_metadata = {}
         
-        logger.info("🧨 [DÉTECTION PUBLIQUE v3.7.2] Analyse mode clarification:")
+        logger.info("🧨 [DÉTECTION PUBLIQUE v3.7.3] Analyse mode clarification:")
         logger.info(f"   - is_clarification_response: {is_clarification}")
         logger.info(f"   - conversation_id: {getattr(request_data, 'conversation_id', 'None')}")
         
@@ -409,7 +515,7 @@ async def ask_expert_enhanced_v2_public(
             # VALIDATION entités complètes
             clarified_entities = {"breed": breed, "sex": sex}
             
-            # 🎯 LOGIQUE GRANULAIRE PUBLIQUE v3.7.2
+            # 🎯 LOGIQUE GRANULAIRE PUBLIQUE v3.7.3
             if not breed or not sex:
                 breed_safe = breed or "None"
                 sex_safe = sex or "None"
@@ -454,7 +560,7 @@ async def ask_expert_enhanced_v2_public(
             request_data.generate_all_versions = True
         
         # FORÇAGE MAXIMAL pour endpoint public avec gestion d'erreur
-        logger.info("🔥 [PUBLIC ENDPOINT v3.7.2] Activation FORCÉE des améliorations:")
+        logger.info("🔥 [PUBLIC ENDPOINT v3.7.3] Activation FORCÉE des améliorations:")
         
         original_settings = {
             'vagueness': getattr(request_data, 'enable_vagueness_detection', None),
@@ -473,7 +579,7 @@ async def ask_expert_enhanced_v2_public(
         if hasattr(request_data, 'enable_quality_metrics'):
             request_data.enable_quality_metrics = True
         
-        logger.info("🔥 [FORÇAGE PUBLIC v3.7.2] Changements appliqués:")
+        logger.info("🔥 [FORÇAGE PUBLIC v3.7.3] Changements appliqués:")
         for key, (old_val, new_val) in {
             'vagueness_detection': (original_settings['vagueness'], True),
             'coherence_check': (original_settings['coherence'], True),
@@ -494,10 +600,15 @@ async def ask_expert_enhanced_v2_public(
             logger.error(f"❌ [Expert Service Public] Erreur traitement: {e}")
             return await _fallback_expert_response(request_data, start_time, None, str(e))
         
+        # 🚀 PROPAGATION NOUVEAUX CHAMPS v3.7.3 - ENDPOINT PUBLIC
+        logger.info("📋 [PROPAGATION PUBLIC v3.7.3] Extraction et application nouveaux champs")
+        propagation_fields = _extract_propagation_fields(response)
+        response = _apply_propagation_fields(response, propagation_fields)
+        
         # Ajout métadonnées clarification
         if clarification_metadata and hasattr(response, 'clarification_processing'):
             response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES PUBLIC v3.7.2] Clarification metadata ajoutées")
+            logger.info("💡 [MÉTADONNÉES PUBLIC v3.7.3] Clarification metadata ajoutées")
         
         # Log response_versions si présentes
         if hasattr(response, 'response_versions') and response.response_versions:
@@ -506,11 +617,17 @@ async def ask_expert_enhanced_v2_public(
                 logger.info(f"   - {level}: {len(content)} caractères")
         
         # VALIDATION RÉSULTATS CLARIFICATION PUBLIQUE
-        logger.info("🧨 [VALIDATION PUBLIQUE v3.7.2]:")
+        logger.info("🧨 [VALIDATION PUBLIQUE v3.7.3]:")
         logger.info(f"   - Clarification système actif: {'clarification' in getattr(response, 'mode', '')}")
         logger.info(f"   - Améliorations appliquées: {getattr(response, 'ai_enhancements_used', [])}")
         logger.info(f"   - Mode final: {getattr(response, 'mode', 'unknown')}")
         logger.info(f"   - RAG utilisé: {getattr(response, 'rag_used', False)}")
+        
+        # 📋 LOGGING NOUVEAUX CHAMPS PUBLIC v3.7.3
+        logger.info("📋 [NOUVEAUX CHAMPS PUBLIC v3.7.3] Valeurs finales:")
+        logger.info(f"   - clarification_required_critical: {getattr(response, 'clarification_required_critical', 'N/A')}")
+        logger.info(f"   - missing_critical_entities: {getattr(response, 'missing_critical_entities', 'N/A')}")
+        logger.info(f"   - variants_tested: {getattr(response, 'variants_tested', 'N/A')}")
         
         # Vérification critique
         ai_enhancements = getattr(response, 'ai_enhancements_used', [])
@@ -520,7 +637,7 @@ async def ask_expert_enhanced_v2_public(
         if hasattr(response, 'enable_vagueness_detection') and getattr(response, 'enable_vagueness_detection', True) is False:
             logger.warning("⚠️ [ALERTE] Vagueness detection non activée - vérifier forçage!")
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.2 - Mode: {getattr(response, 'mode', 'unknown')}")
+        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.3 - Mode: {getattr(response, 'mode', 'unknown')}")
         logger.info("=" * 100)
         
         return response
@@ -529,7 +646,7 @@ async def ask_expert_enhanced_v2_public(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.2: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.3: {e}")
         logger.info("=" * 100)
         return await _fallback_expert_response(request_data, start_time, None, str(e))
 
@@ -619,7 +736,7 @@ async def get_suggested_topics_enhanced(language: str = "fr"):
         raise HTTPException(status_code=500, detail="Erreur topics")
 
 # =============================================================================
-# FONCTIONS UTILITAIRES POUR GESTION D'ERREUR
+# FONCTIONS UTILITAIRES AVEC PROPAGATION v3.7.3
 # =============================================================================
 
 def _create_incomplete_clarification_response(
@@ -630,21 +747,24 @@ def _create_incomplete_clarification_response(
     start_time: float,
     public: bool = False
 ) -> EnhancedExpertResponse:
-    """Crée une réponse pour clarification incomplète avec gestion d'erreur"""
+    """Crée une réponse pour clarification incomplète avec PROPAGATION CHAMPS v3.7.3"""
     
     # Validation granulaire des informations manquantes
     missing_info = []
     missing_details = []
     provided_parts = []
+    missing_critical_entities = []  # NOUVEAU CHAMP v3.7.3
     
     # Vérification breed avec plus de nuances
     if not breed:
         missing_info.append("race/souche")
         missing_details.append("la race/souche (Ross 308, Cobb 500, Hubbard, etc.)")
+        missing_critical_entities.append("breed")  # NOUVEAU v3.7.3
     elif len(breed.strip()) < 3:  # Breed trop court/vague
         missing_info.append("race/souche complète")
         missing_details.append("la race/souche complète (ex: 'Ross' → 'Ross 308')")
         provided_parts.append(f"Race partielle détectée: {breed}")
+        missing_critical_entities.append("breed_complete")  # NOUVEAU v3.7.3
     else:
         provided_parts.append(f"Race détectée: {breed}")
     
@@ -652,6 +772,7 @@ def _create_incomplete_clarification_response(
     if not sex:
         missing_info.append("sexe")
         missing_details.append("le sexe (mâles, femelles, ou mixte)")
+        missing_critical_entities.append("sex")  # NOUVEAU v3.7.3
     else:
         provided_parts.append(f"Sexe détecté: {sex}")
     
@@ -690,8 +811,10 @@ def _create_incomplete_clarification_response(
     
     error_message += "Pouvez-vous préciser les informations manquantes ?"
     
-    # Retourner erreur clarification incomplète
+    # Retourner erreur clarification incomplète AVEC NOUVEAUX CHAMPS v3.7.3
     mode_suffix = "_public" if public else ""
+    
+    logger.info(f"📋 [CLARIFICATION INCOMPLÈTE v3.7.3] Entités critiques manquantes: {missing_critical_entities}")
     
     return EnhancedExpertResponse(
         question=request_data.text,
@@ -706,6 +829,10 @@ def _create_incomplete_clarification_response(
         user=None,
         logged=True,
         validation_passed=False,
+        # 🚀 NOUVEAUX CHAMPS v3.7.3 POUR CLARIFICATION INCOMPLÈTE
+        clarification_required_critical=True,  # NOUVEAU v3.7.3
+        missing_critical_entities=missing_critical_entities,  # NOUVEAU v3.7.3
+        variants_tested=[],  # NOUVEAU v3.7.3 - vide pour clarification incomplète
         clarification_result={
             "clarification_requested": True,
             "clarification_type": f"incomplete_entities_retry{mode_suffix}",
@@ -714,7 +841,10 @@ def _create_incomplete_clarification_response(
             "provided_parts": provided_parts,
             "missing_details": missing_details,
             "retry_required": True,
-            "confidence": 0.3
+            "confidence": 0.3,
+            # 🚀 NOUVEAUX CHAMPS DANS CLARIFICATION_RESULT v3.7.3
+            "clarification_required_critical": True,
+            "missing_critical_entities": missing_critical_entities
         },
         processing_steps=[f"incomplete_clarification_detected{mode_suffix}", "retry_requested"],
         ai_enhancements_used=[f"incomplete_clarification_handling{mode_suffix}"],
@@ -727,9 +857,9 @@ async def _fallback_expert_response(
     current_user: Optional[Dict[str, Any]] = None,
     error_message: str = "Service expert temporairement indisponible"
 ) -> EnhancedExpertResponse:
-    """Réponse de fallback quand le service expert n'est pas disponible"""
+    """Réponse de fallback quand le service expert n'est pas disponible AVEC NOUVEAUX CHAMPS v3.7.3"""
     
-    logger.info("🔄 [Fallback] Génération réponse de fallback")
+    logger.info("🔄 [Fallback v3.7.3] Génération réponse de fallback avec nouveaux champs")
     
     fallback_responses = {
         "fr": f"Je m'excuse, {error_message}. Votre question '{request_data.text}' a été reçue mais je ne peux pas la traiter actuellement. Veuillez réessayer dans quelques minutes.",
@@ -753,24 +883,32 @@ async def _fallback_expert_response(
         user=current_user.get("email") if current_user else None,
         logged=False,
         validation_passed=False,
+        # 🚀 NOUVEAUX CHAMPS v3.7.3 POUR FALLBACK
+        clarification_required_critical=False,  # NOUVEAU v3.7.3
+        missing_critical_entities=[],  # NOUVEAU v3.7.3
+        variants_tested=[],  # NOUVEAU v3.7.3
         processing_steps=["service_unavailable", "fallback_response_generated"],
         ai_enhancements_used=["fallback_handling"],
         response_versions=None
     )
 
 # =============================================================================
-# CONFIGURATION FINALE v3.7.2 AVEC GESTION D'ERREUR ROBUSTE 🚀
+# CONFIGURATION FINALE v3.7.3 AVEC PROPAGATION NOUVEAUX CHAMPS 🚀
 # =============================================================================
 
 logger.info("🚀" * 50)
-logger.info("🚀 [EXPERT ENDPOINTS MAIN] VERSION 3.7.2 - LOGIQUE CLARIFICATION GRANULAIRE + GESTION D'ERREUR ROBUSTE!")
-logger.info("🚀 [CORRECTIONS APPLIQUÉES]:")
-logger.info("   ✅ Imports sécurisés avec fallback")
-logger.info("   ✅ Gestion d'erreur complète pour service expert")
-logger.info("   ✅ Variables initialisées avec vérifications robustes")
-logger.info("   ✅ Fonctions fallback pour tous les cas d'échec")
-logger.info("   ✅ Health check endpoint pour diagnostic")
-logger.info("   ✅ Logging détaillé pour debugging")
+logger.info("🚀 [EXPERT ENDPOINTS MAIN] VERSION 3.7.3 - PROPAGATION NOUVEAUX CHAMPS + CLARIFICATION GRANULAIRE!")
+logger.info("🚀 [NOUVEAUX CHAMPS PROPAGÉS v3.7.3]:")
+logger.info("   ✅ clarification_required_critical - Indique si clarification critique requise")
+logger.info("   ✅ missing_critical_entities - Liste entités critiques manquantes")
+logger.info("   ✅ variants_tested - Liste variantes testées par RAG enhancement")
+logger.info("")
+logger.info("🚀 [PROPAGATION INTÉGRÉE]:")
+logger.info("   ✅ Extraction automatique depuis clarification_result")
+logger.info("   ✅ Extraction automatique depuis rag_enhancement_info")
+logger.info("   ✅ Application dans toutes les réponses (privé/public)")
+logger.info("   ✅ Support dans clarification incomplète")
+logger.info("   ✅ Support dans réponses fallback")
 logger.info("")
 logger.info("🚀 [FONCTIONNALITÉS CONSERVÉES]:")
 logger.info("   ✅ Support concision_level et generate_all_versions")
@@ -781,19 +919,19 @@ logger.info("   ✅ Exemples contextuels avec race détectée")
 logger.info("   ✅ Métadonnées enrichies (provided_parts, missing_details)")
 logger.info("   ✅ Validation granulaire breed vs sex")
 logger.info("   ✅ UX clarification grandement améliorée")
+logger.info("   ✅ Gestion d'erreur robuste complète")
 logger.info("")
 logger.info("🔧 [ENDPOINTS DISPONIBLES]:")
-logger.info("   - GET /health (diagnostic)")
-logger.info("   - POST /ask-enhanced-v2 (privé + auth)")
-logger.info("   - POST /ask-enhanced-v2-public (public)")
+logger.info("   - GET /health (diagnostic + version)")
+logger.info("   - POST /ask-enhanced-v2 (privé + auth + propagation)")
+logger.info("   - POST /ask-enhanced-v2-public (public + propagation)")
 logger.info("   - POST /feedback (qualité détaillée)")
 logger.info("   - GET /topics (suggestions enrichies)")
 logger.info("")
-logger.info("🎯 [GESTION D'ERREUR ROBUSTE]:")
-logger.info("   ✅ Imports sécurisés avec gestion ImportError")
-logger.info("   ✅ Service expert avec vérification disponibilité")
-logger.info("   ✅ Réponses fallback intelligentes")
-logger.info("   ✅ Logging détaillé pour tous les cas d'erreur")
-logger.info("   ✅ Protection contre variables None/undefined")
-logger.info("   ✅ READY FOR PRODUCTION - ROBUST ERROR HANDLING")
+logger.info("🎯 [PROPAGATION PROCESS v3.7.3]:")
+logger.info("   1. _extract_propagation_fields() - Extraction depuis response")
+logger.info("   2. _apply_propagation_fields() - Application à EnhancedExpertResponse")
+logger.info("   3. Logging détaillé des valeurs propagées")
+logger.info("   4. Support dans tous les types de réponses")
+logger.info("   ✅ READY FOR PRODUCTION - NOUVEAUX CHAMPS PROPAGÉS")
 logger.info("🚀" * 50)

@@ -1,23 +1,21 @@
 """
-app/api/v1/conversation_memory_integrated.py - SYSTÈME DE MÉMOIRE COMPLET INTÉGRÉ
+app/api/v1/conversation_memory_enhanced.py - SYSTÈME DE MÉMOIRE AVEC CLARIFICATION CRITIQUE
 
-🚨 VERSION FINALE INTÉGRÉE + MÉTHODES AGENTS:
+🚨 VERSION FINALE INTÉGRÉE + GESTION CLARIFICATION CRITIQUE:
 ✅ Toutes les fonctionnalités existantes conservées
 ✅ Système de clarification enrichi ajouté
 ✅ Fonction d'enrichissement de questions intégrée
 ✅ Méthodes utilitaires pour agents GPT ajoutées
+✅ ⭐ NOUVEAU: Gestion état clarification critique avec relance RAG
+✅ ⭐ NOUVEAU: mark_pending_clarification() et reprocess_original_question()
 ✅ Prêt pour intégration directe dans FastAPI
 
-NOUVELLES FONCTIONNALITÉS AJOUTÉES:
-1. EnhancedClarificationSystem intégré dans IntelligentConversationMemory
-2. build_enriched_question_from_clarification()
-3. process_enhanced_question_with_clarification()
-4. detect_clarification_state()
-5. check_if_clarification_needed()
-🤖 NOUVELLES MÉTHODES POUR AGENTS:
-6. get_missing_entities() - Liste entités manquantes AVEC IMPORTANCE
-7. get_formatted_context() - Contexte formaté pour agents
-8. get_raw_context_summary() - Contexte brut complet pour inférence
+NOUVELLES FONCTIONNALITÉS CRITIQUES AJOUTÉES:
+1. original_question_pending stockage question initiale
+2. mark_pending_clarification() pour marquer clarification critique
+3. Détection automatique clarification_response dans add_message()
+4. reprocess_original_question() pour relancer le pipeline RAG
+5. Callback système pour déclencher retraitement externe
 """
 
 import os
@@ -27,7 +25,7 @@ import sqlite3
 import re
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple, Union, Callable
 from dataclasses import dataclass, asdict, field
 from contextlib import contextmanager
 import time
@@ -288,7 +286,7 @@ class ConversationMessage:
 
 @dataclass
 class IntelligentConversationContext:
-    """Contexte conversationnel intelligent avec raisonnement"""
+    """Contexte conversationnel intelligent avec raisonnement et clarification critique"""
     conversation_id: str
     user_id: str
     messages: List[ConversationMessage] = field(default_factory=list)
@@ -313,17 +311,22 @@ class IntelligentConversationContext:
     needs_clarification: bool = False
     clarification_questions: List[str] = field(default_factory=list)
     
-    # ✅ CHAMPS POUR CLARIFICATIONS
+    # ✅ CHAMPS POUR CLARIFICATIONS STANDARD
     pending_clarification: bool = False
     last_original_question_id: Optional[str] = None
     
+    # ⭐ NOUVEAUX CHAMPS POUR CLARIFICATION CRITIQUE
+    original_question_pending: Optional[str] = None  # Question initiale en attente
+    critical_clarification_active: bool = False      # État clarification critique
+    clarification_callback: Optional[Callable] = None  # Callback pour retraitement
+    
     def add_message(self, message: ConversationMessage):
-        """Ajoute un message et met à jour le contexte intelligemment"""
+        """Ajoute un message et gère la clarification critique automatiquement"""
         self.messages.append(message)
         self.last_activity = datetime.now()
         self.total_exchanges += 1
         
-        # ✅ TRACKING SPÉCIAL POUR CLARIFICATIONS
+        # ✅ TRACKING SPÉCIAL POUR CLARIFICATIONS STANDARD
         if message.is_original_question:
             self.last_original_question_id = message.id
             self.pending_clarification = True
@@ -332,6 +335,14 @@ class IntelligentConversationContext:
         if message.is_clarification_response and message.original_question_id:
             self.pending_clarification = False
             logger.info(f"🎯 [Context] Clarification reçue pour: {message.original_question_id}")
+        
+        # ⭐ NOUVELLE LOGIQUE CLARIFICATION CRITIQUE
+        if message.is_clarification_response and self.critical_clarification_active:
+            logger.info("🚨 [Context] ✅ Réponse clarification CRITIQUE reçue - relance du traitement")
+            self.critical_clarification_active = False
+            
+            # Déclencher le retraitement automatique
+            asyncio.create_task(self.reprocess_original_question())
         
         # Fusionner les entités si disponibles
         if message.extracted_entities:
@@ -348,6 +359,102 @@ class IntelligentConversationContext:
         
         # Mettre à jour le statut conversationnel
         self._update_conversation_status()
+    
+    # ⭐ NOUVELLE MÉTHODE - MARQUER CLARIFICATION CRITIQUE
+    def mark_pending_clarification(self, question: str, callback: Optional[Callable] = None):
+        """
+        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique
+        
+        Args:
+            question: Question originale qui nécessite clarification
+            callback: Fonction callback pour relancer le traitement RAG
+        """
+        self.critical_clarification_active = True
+        self.original_question_pending = question
+        self.clarification_callback = callback
+        
+        logger.info(f"🚨 [Context] CLARIFICATION CRITIQUE marquée")
+        logger.info(f"  📝 Question: {question[:100]}...")
+        logger.info(f"  🔄 Callback: {'✅' if callback else '❌'}")
+    
+    # ⭐ NOUVELLE MÉTHODE - RETRAITEMENT QUESTION ORIGINALE
+    async def reprocess_original_question(self):
+        """
+        🚀 FONCTION CRITIQUE - Relance le traitement de la question originale avec clarification
+        """
+        if not self.original_question_pending:
+            logger.warning("⚠️ [Context] Pas de question originale en attente pour retraitement")
+            return
+        
+        logger.info(f"🚀 [Context] RETRAITEMENT question originale: {self.original_question_pending[:100]}...")
+        
+        try:
+            # Si un callback est défini, l'utiliser pour déclencher le retraitement
+            if self.clarification_callback:
+                logger.info("🔄 [Context] Exécution callback retraitement...")
+                
+                # Appeler le callback avec la question enrichie par le contexte actuel
+                enriched_question = self._build_enriched_question_from_context()
+                
+                result = await self.clarification_callback(
+                    question=enriched_question,
+                    conversation_id=self.conversation_id,
+                    user_id=self.user_id,
+                    is_reprocessing=True
+                )
+                
+                logger.info(f"✅ [Context] Callback retraitement terminé: {result}")
+                
+            else:
+                logger.warning("⚠️ [Context] Pas de callback défini - retraitement manuel requis")
+                
+                # Marquer pour traitement externe
+                self.needs_reprocessing = True
+        
+        except Exception as e:
+            logger.error(f"❌ [Context] Erreur retraitement: {e}")
+        
+        finally:
+            # Nettoyer l'état
+            self.original_question_pending = None
+            self.clarification_callback = None
+    
+    def _build_enriched_question_from_context(self) -> str:
+        """Enrichit la question originale avec le contexte actuel"""
+        if not self.original_question_pending:
+            return ""
+        
+        enrichments = []
+        entities = self.consolidated_entities
+        
+        # Ajouter les entités importantes
+        if entities.breed and entities.breed_confidence > 0.7:
+            enrichments.append(entities.breed)
+        
+        if entities.sex and entities.sex_confidence > 0.7:
+            enrichments.append(entities.sex)
+        
+        if entities.age_days and entities.age_confidence > 0.7:
+            enrichments.append(f"{entities.age_days} jours")
+        
+        # Construire la question enrichie
+        if enrichments:
+            enrichment_text = " ".join(enrichments)
+            
+            # Intégrer intelligemment dans la question
+            if "poulet" in self.original_question_pending.lower():
+                enriched = self.original_question_pending.replace(
+                    "poulet", f"poulet {enrichment_text}"
+                ).replace(
+                    "poulets", f"poulets {enrichment_text}"
+                )
+            else:
+                enriched = f"{self.original_question_pending} (Contexte: {enrichment_text})"
+            
+            logger.info(f"🔁 [Context] Question enrichie: {enriched}")
+            return enriched
+        
+        return self.original_question_pending
     
     def _update_conversation_status(self):
         """Met à jour le statut conversationnel basé sur les messages récents"""
@@ -486,11 +593,15 @@ class IntelligentConversationContext:
             "missing_critical": self.consolidated_entities.get_critical_missing_info(),
             "overall_confidence": self.consolidated_entities.confidence_overall,
             
-            # ✅ NOUVEAUX CHAMPS CRITIQUES
+            # ✅ CHAMPS STANDARD
             "original_question": original_question.message if original_question else None,
             "original_question_id": original_question.id if original_question else None,
             "pending_clarification": self.pending_clarification,
-            "last_original_question_id": self.last_original_question_id
+            "last_original_question_id": self.last_original_question_id,
+            
+            # ⭐ NOUVEAUX CHAMPS CRITIQUES
+            "original_question_pending": self.original_question_pending,
+            "critical_clarification_active": self.critical_clarification_active
         }
         
         return context
@@ -688,7 +799,10 @@ class IntelligentConversationContext:
                 "urgency": self.conversation_urgency,
                 "resolution_status": self.problem_resolution_status,
                 "pending_clarification": self.pending_clarification,
-                "ai_enhanced": self.ai_enhanced
+                "ai_enhanced": self.ai_enhanced,
+                # ⭐ NOUVEAUX CHAMPS CRITIQUES
+                "critical_clarification_active": self.critical_clarification_active,
+                "original_question_pending": self.original_question_pending
             },
             
             "entities_raw": raw_entities,
@@ -837,6 +951,10 @@ class IntelligentConversationContext:
             icon = urgency_icons.get(self.conversation_urgency, "🟡")
             parts.append(f"Urgence: {self.conversation_urgency} {icon}")
         
+        # ⭐ INDICATEUR CLARIFICATION CRITIQUE
+        if self.critical_clarification_active:
+            parts.append("🚨 CLARIFICATION CRITIQUE")
+        
         return " | ".join(parts)
 
     def get_context_for_rag(self, max_chars: int = 500) -> str:
@@ -911,11 +1029,14 @@ class IntelligentConversationContext:
             "needs_clarification": self.needs_clarification,
             "clarification_questions": self.clarification_questions,
             "pending_clarification": self.pending_clarification,
-            "last_original_question_id": self.last_original_question_id
+            "last_original_question_id": self.last_original_question_id,
+            # ⭐ NOUVEAUX CHAMPS
+            "original_question_pending": self.original_question_pending,
+            "critical_clarification_active": self.critical_clarification_active
         }
 
 class IntelligentConversationMemory:
-    """Système de mémoire conversationnelle intelligent avec IA et clarification intégrée"""
+    """Système de mémoire conversationnelle intelligent avec IA et clarification critique intégrée"""
     
     def __init__(self, db_path: str = None):
         """Initialise le système de mémoire intelligent"""
@@ -941,8 +1062,12 @@ class IntelligentConversationMemory:
             "ai_failures": 0,
             "cache_hits": 0,
             "cache_misses": 0,
-            "original_questions_recovered": 0,  # ✅ NOUVELLE MÉTRIQUE
-            "clarification_resolutions": 0     # ✅ NOUVELLE MÉTRIQUE
+            "original_questions_recovered": 0,
+            "clarification_resolutions": 0,
+            # ⭐ NOUVELLES MÉTRIQUES CRITIQUES
+            "critical_clarifications_marked": 0,
+            "critical_clarifications_resolved": 0,
+            "rag_reprocessing_triggered": 0
         }
         
         # Initialiser la base de données
@@ -952,15 +1077,16 @@ class IntelligentConversationMemory:
         logger.info(f"🧠 [IntelligentMemory] DB: {self.db_path}")
         logger.info(f"🧠 [IntelligentMemory] IA enhancing: {'✅' if self.ai_enhancement_enabled else '❌'}")
         logger.info(f"🧠 [IntelligentMemory] Modèle IA: {self.ai_enhancement_model}")
-        logger.info(f"🚨 [IntelligentMemory] Système de clarification intégré: ✅")
-        logger.info(f"🤖 [IntelligentMemory] Méthodes pour agents GPT ajoutées: ✅")
+        logger.info(f"🚨 [IntelligentMemory] Système de clarification standard: ✅")
+        logger.info(f"🚨 [IntelligentMemory] Système de clarification CRITIQUE: ✅")
+        logger.info(f"🤖 [IntelligentMemory] Méthodes pour agents GPT: ✅")
 
     def _init_database(self):
-        """Initialise la base de données avec schéma amélioré"""
+        """Initialise la base de données avec schéma amélioré pour clarification critique"""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         with sqlite3.connect(self.db_path) as conn:
-            # Table des conversations avec métadonnées étendues
+            # Table des conversations avec métadonnées étendues + clarification critique
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     conversation_id TEXT PRIMARY KEY,
@@ -984,9 +1110,13 @@ class IntelligentConversationMemory:
                     needs_clarification BOOLEAN DEFAULT FALSE,
                     clarification_questions TEXT,
                     
-                    -- ✅ CHAMPS POUR CLARIFICATIONS
+                    -- ✅ CHAMPS POUR CLARIFICATIONS STANDARD
                     pending_clarification BOOLEAN DEFAULT FALSE,
                     last_original_question_id TEXT,
+                    
+                    -- ⭐ NOUVEAUX CHAMPS POUR CLARIFICATION CRITIQUE
+                    original_question_pending TEXT,
+                    critical_clarification_active BOOLEAN DEFAULT FALSE,
                     
                     -- Performance
                     confidence_overall REAL DEFAULT 0.0
@@ -1026,8 +1156,10 @@ class IntelligentConversationMemory:
             # ✅ INDEX POUR CLARIFICATIONS
             conn.execute("CREATE INDEX IF NOT EXISTS idx_original_questions ON conversation_messages (conversation_id, is_original_question)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_clarification_responses ON conversation_messages (original_question_id, is_clarification_response)")
+            # ⭐ NOUVEAUX INDEX POUR CLARIFICATION CRITIQUE
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_critical_clarification ON conversations (critical_clarification_active, last_activity)")
             
-        logger.info(f"✅ [IntelligentMemory] Base de données initialisée avec support clarifications")
+        logger.info(f"✅ [IntelligentMemory] Base de données initialisée avec support clarification critique")
 
     @contextmanager
     def _get_db_connection(self):
@@ -1530,6 +1662,10 @@ EXEMPLES:
             if original_question_msg:
                 return True, original_question_msg.message
         
+        # ⭐ VÉRIFIER AUSSI L'ÉTAT CLARIFICATION CRITIQUE
+        if conversation_context.critical_clarification_active and conversation_context.original_question_pending:
+            return True, conversation_context.original_question_pending
+        
         # Fallback: analyser les derniers messages
         if len(conversation_context.messages) >= 2:
             last_assistant_msg = None
@@ -1600,6 +1736,10 @@ EXEMPLES:
                 conversation_context.pending_clarification = False
                 conversation_context.last_original_question_id = None
                 
+                # ⭐ RESET AUSSI L'ÉTAT CLARIFICATION CRITIQUE
+                conversation_context.critical_clarification_active = False
+                conversation_context.original_question_pending = None
+                
                 # 5. Marquer ce message comme réponse de clarification
                 self.add_message_to_conversation(
                     conversation_id=conversation_id,
@@ -1612,6 +1752,7 @@ EXEMPLES:
                 
                 # 6. Mettre à jour les statistiques
                 self.stats["clarification_resolutions"] += 1
+                self.stats["critical_clarifications_resolved"] += 1
                 
                 logger.info(f"✅ [Clarification] Question enrichie avec succès")
                 
@@ -1708,6 +1849,125 @@ EXEMPLES:
         
         return f"{intro}\n\n{questions_text}"
 
+    # ⭐ NOUVELLES MÉTHODES POUR CLARIFICATION CRITIQUE
+
+    def mark_pending_clarification_critical(
+        self, 
+        conversation_id: str,
+        question: str, 
+        callback: Optional[Callable] = None
+    ) -> bool:
+        """
+        🚨 FONCTION CRITIQUE - Marque une question pour clarification critique avec callback
+        
+        Args:
+            conversation_id: ID de la conversation
+            question: Question originale qui nécessite clarification
+            callback: Fonction callback pour relancer le traitement RAG
+            
+        Returns:
+            bool: True si marquage réussi, False sinon
+        """
+        
+        try:
+            # Récupérer le contexte
+            context = self.get_conversation_context(conversation_id)
+            if not context:
+                logger.error(f"❌ [CriticalClarification] Contexte non trouvé: {conversation_id}")
+                return False
+            
+            # Marquer la clarification critique
+            context.mark_pending_clarification(question, callback)
+            
+            # Sauvegarder en base
+            self._save_conversation_to_db(context)
+            
+            # Mettre à jour le cache
+            with self.cache_lock:
+                self.conversation_cache[conversation_id] = context
+            
+            # Statistiques
+            self.stats["critical_clarifications_marked"] += 1
+            
+            logger.info(f"🚨 [CriticalClarification] Marquage réussi pour: {conversation_id}")
+            logger.info(f"  📝 Question: {question[:100]}...")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ [CriticalClarification] Erreur marquage: {e}")
+            return False
+
+    async def trigger_rag_reprocessing(
+        self,
+        conversation_id: str,
+        enriched_question: str,
+        user_id: str,
+        language: str = "fr"
+    ) -> bool:
+        """
+        🚀 FONCTION CRITIQUE - Déclenche le retraitement RAG après clarification
+        
+        Args:
+            conversation_id: ID de la conversation
+            enriched_question: Question enrichie à retraiter
+            user_id: ID utilisateur
+            language: Langue de la question
+            
+        Returns:
+            bool: True si retraitement déclenché, False sinon
+        """
+        
+        try:
+            logger.info(f"🚀 [RAGReprocessing] Déclenchement retraitement: {conversation_id}")
+            logger.info(f"  📝 Question enrichie: {enriched_question[:100]}...")
+            
+            # Récupérer le contexte
+            context = self.get_conversation_context(conversation_id)
+            if not context:
+                logger.error(f"❌ [RAGReprocessing] Contexte non trouvé: {conversation_id}")
+                return False
+            
+            # Vérifier qu'on a bien une question en attente
+            if not context.original_question_pending:
+                logger.warning(f"⚠️ [RAGReprocessing] Pas de question en attente: {conversation_id}")
+                return False
+            
+            # Déclencher le retraitement via callback si disponible
+            if context.clarification_callback:
+                logger.info("🔄 [RAGReprocessing] Exécution callback...")
+                
+                result = await context.clarification_callback(
+                    question=enriched_question,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    language=language,
+                    is_reprocessing=True
+                )
+                
+                logger.info(f"✅ [RAGReprocessing] Callback terminé: {result}")
+                
+                # Nettoyer l'état
+                context.original_question_pending = None
+                context.clarification_callback = None
+                context.critical_clarification_active = False
+                
+                # Sauvegarder
+                self._save_conversation_to_db(context)
+                
+                # Statistiques
+                self.stats["rag_reprocessing_triggered"] += 1
+                
+                return True
+            
+            else:
+                logger.warning("⚠️ [RAGReprocessing] Pas de callback défini - retraitement manuel requis")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ [RAGReprocessing] Erreur retraitement: {e}")
+            return False
+
     # ✅ MÉTHODE CRITIQUE - MARQUAGE QUESTION ORIGINALE
     def mark_question_for_clarification(
         self, 
@@ -1773,7 +2033,7 @@ EXEMPLES:
         language: str = "fr",
         message_type: str = "text"
     ) -> IntelligentConversationContext:
-        """Ajoute un message avec extraction d'entités intelligente"""
+        """Ajoute un message avec extraction d'entités intelligente et gestion clarification critique"""
         
         try:
             # Récupérer ou créer le contexte
@@ -1797,7 +2057,7 @@ EXEMPLES:
                     self.extract_entities_ai_enhanced(message, language, context)
                 )
             
-            # ✅ DÉTECTION AUTOMATIQUE DES CLARIFICATIONS
+            # ✅ DÉTECTION AUTOMATIQUE DES CLARIFICATIONS STANDARD
             is_clarification_response = False
             original_question_id = None
             
@@ -1808,8 +2068,17 @@ EXEMPLES:
                 
                 is_clarification_response = True
                 original_question_id = context.last_original_question_id
-                logger.info(f"🎯 [Memory] Clarification détectée: {message} → {original_question_id}")
+                logger.info(f"🎯 [Memory] Clarification STANDARD détectée: {message} → {original_question_id}")
                 self.stats["clarification_resolutions"] += 1
+            
+            # ⭐ DÉTECTION CLARIFICATION CRITIQUE
+            elif (role == "user" and context.critical_clarification_active and 
+                  len(message.split()) <= 5 and 
+                  (extracted_entities.breed or extracted_entities.sex)):
+                
+                is_clarification_response = True
+                logger.info(f"🚨 [Memory] Clarification CRITIQUE détectée: {message}")
+                self.stats["critical_clarifications_resolved"] += 1
             
             # Créer le message
             message_obj = ConversationMessage(
@@ -1828,7 +2097,7 @@ EXEMPLES:
                 original_question_id=original_question_id
             )
             
-            # Ajouter au contexte
+            # Ajouter au contexte (déclenche automatiquement le retraitement si clarification critique)
             context.add_message(message_obj)
             
             # Sauvegarder
@@ -1885,7 +2154,7 @@ EXEMPLES:
         return None
 
     def _load_context_from_db(self, conversation_id: str) -> Optional[IntelligentConversationContext]:
-        """Charge un contexte depuis la base de données"""
+        """Charge un contexte depuis la base de données avec support clarification critique"""
         
         with self._get_db_connection() as conn:
             # Récupérer la conversation
@@ -1922,7 +2191,10 @@ EXEMPLES:
                 needs_clarification=bool(conv_row["needs_clarification"]),
                 clarification_questions=json.loads(conv_row["clarification_questions"]) if conv_row["clarification_questions"] else [],
                 pending_clarification=bool(conv_row.get("pending_clarification", False)),
-                last_original_question_id=conv_row.get("last_original_question_id")
+                last_original_question_id=conv_row.get("last_original_question_id"),
+                # ⭐ NOUVEAUX CHAMPS CLARIFICATION CRITIQUE
+                original_question_pending=conv_row.get("original_question_pending"),
+                critical_clarification_active=bool(conv_row.get("critical_clarification_active", False))
             )
             
             # Charger les entités consolidées
@@ -1981,22 +2253,24 @@ EXEMPLES:
         return IntelligentEntities(**{k: v for k, v in data.items() if k in IntelligentEntities.__dataclass_fields__})
 
     def _save_conversation_to_db(self, context: IntelligentConversationContext):
-        """Sauvegarde un contexte en base de données"""
+        """Sauvegarde un contexte en base de données avec support clarification critique"""
         
         with self._get_db_connection() as conn:
             # Préparer les données
             consolidated_entities_json = json.dumps(context.consolidated_entities.to_dict(), ensure_ascii=False)
             clarification_questions_json = json.dumps(context.clarification_questions, ensure_ascii=False)
             
-            # Upsert de la conversation
+            # Upsert de la conversation avec nouveaux champs
             conn.execute("""
                 INSERT OR REPLACE INTO conversations (
                     conversation_id, user_id, language, created_at, last_activity,
                     total_exchanges, consolidated_entities, conversation_topic,
                     conversation_urgency, problem_resolution_status, ai_enhanced,
                     last_ai_analysis, needs_clarification, clarification_questions,
-                    pending_clarification, last_original_question_id, confidence_overall
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    pending_clarification, last_original_question_id, 
+                    original_question_pending, critical_clarification_active,
+                    confidence_overall
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 context.conversation_id,
                 context.user_id,
@@ -2014,6 +2288,9 @@ EXEMPLES:
                 clarification_questions_json,
                 context.pending_clarification,
                 context.last_original_question_id,
+                # ⭐ NOUVEAUX CHAMPS
+                context.original_question_pending,
+                context.critical_clarification_active,
                 context.consolidated_entities.confidence_overall
             ))
             
@@ -2070,7 +2347,7 @@ EXEMPLES:
             logger.info(f"🧹 [Memory] Cache nettoyé: {len(self.conversation_cache)} conversations gardées")
 
     def get_conversation_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques du système"""
+        """Retourne les statistiques du système avec nouvelles métriques clarification critique"""
         
         return {
             "system_stats": self.stats.copy(),
@@ -2081,7 +2358,11 @@ EXEMPLES:
             },
             "clarification_stats": {
                 "questions_recovered": self.stats["original_questions_recovered"],
-                "clarifications_resolved": self.stats["clarification_resolutions"]
+                "clarifications_resolved": self.stats["clarification_resolutions"],
+                # ⭐ NOUVELLES MÉTRIQUES CRITIQUES
+                "critical_clarifications_marked": self.stats["critical_clarifications_marked"],
+                "critical_clarifications_resolved": self.stats["critical_clarifications_resolved"],
+                "rag_reprocessing_triggered": self.stats["rag_reprocessing_triggered"]
             }
         }
 
@@ -2108,13 +2389,13 @@ EXEMPLES:
             logger.info(f"🧹 [Cleanup] {result_messages.rowcount} messages et {result_conversations.rowcount} conversations supprimés")
 
 # ===============================
-# ✅ EXEMPLE D'UTILISATION DANS FASTAPI AVEC AGENTS
+# ✅ EXEMPLE D'UTILISATION COMPLÈTE AVEC CLARIFICATION CRITIQUE
 # ===============================
 
 """
-Exemple d'intégration dans votre endpoint FastAPI avec agents GPT:
+Exemple d'intégration complète dans votre endpoint FastAPI avec clarification critique:
 
-from app.core.conversation_memory_integrated import IntelligentConversationMemory
+from app.core.conversation_memory_enhanced import IntelligentConversationMemory
 from app.api.v1.agent_contextualizer import agent_contextualizer
 from app.api.v1.agent_rag_enhancer import agent_rag_enhancer
 
@@ -2122,11 +2403,11 @@ from app.api.v1.agent_rag_enhancer import agent_rag_enhancer
 conversation_memory = IntelligentConversationMemory()
 
 @app.post("/api/v1/expert/ask")
-async def ask_expert_enhanced_with_agents(request: QuestionRequest):
+async def ask_expert_with_critical_clarification(request: QuestionRequest):
     try:
         logger.info(f"🚀 [ASK] Question reçue: {request.text[:100]}...")
         
-        # ✅ ÉTAPE 1: Traitement clarification avec votre approche
+        # ✅ ÉTAPE 1: Traitement clarification (standard + critique)
         processed_question, was_clarification = await conversation_memory.process_enhanced_question_with_clarification(
             request_text=request.text,
             conversation_id=request.conversation_id,
@@ -2152,48 +2433,46 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
         # ✅ ÉTAPE 3: Récupérer le contexte enrichi pour agents
         context = conversation_memory.get_conversation_context(request.conversation_id)
         if context:
-            # 🔥 NOUVELLES MÉTHODES AMÉLIORÉES - ATTENTION AUX TYPES
-            missing_entities_with_importance = context.get_missing_entities(include_importance=True)  # Dict
-            missing_entities_list = context.get_missing_entities(include_importance=False)  # List
-            raw_context_summary = context.get_raw_context_summary()  # Contexte brut complet
+            missing_entities_with_importance = context.get_missing_entities(include_importance=True)
+            missing_entities_list = context.get_missing_entities(include_importance=False)
+            raw_context_summary = context.get_raw_context_summary()
             formatted_context = context.get_formatted_context()
             rag_context = context.get_context_for_rag()
         else:
             missing_entities_with_importance, missing_entities_list = {}, []
             raw_context_summary, formatted_context, rag_context = {}, "", ""
         
-        # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG) avec contexte enrichi
+        # ✅ ÉTAPE 4: Agent Contextualizer (pré-RAG)
         contextualization_result = await agent_contextualizer.enrich_question(
             question=processed_question,
-            raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities_with_importance=missing_entities_with_importance,  # 🔥 Dict avec importance
-            missing_entities_list=missing_entities_list,  # 🔥 Liste simple (compatibilité)
+            raw_context=raw_context_summary,
+            missing_entities_with_importance=missing_entities_with_importance,
+            missing_entities_list=missing_entities_list,
             conversation_context=formatted_context,
             language=request.language
         )
         question_for_rag = contextualization_result["enriched_question"]
         
-        # ✅ ÉTAPE 5: Appel au système RAG avec contexte enrichi
+        # ✅ ÉTAPE 5: Appel au système RAG
         response = await rag_system.query(
             question=question_for_rag,
             context=rag_context,
             language=request.language
         )
         
-        # ✅ ÉTAPE 6: Agent RAG Enhancer (post-RAG) avec contexte enrichi
+        # ✅ ÉTAPE 6: Agent RAG Enhancer (post-RAG)
         enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
             rag_answer=response.answer,
-            raw_context=raw_context_summary,  # 🔥 CONTEXTE BRUT COMPLET
-            missing_entities_with_importance=missing_entities_with_importance,  # 🔥 Dict avec importance
-            missing_entities_list=missing_entities_list,  # 🔥 Liste simple (compatibilité)
+            raw_context=raw_context_summary,
+            missing_entities_with_importance=missing_entities_with_importance,
+            missing_entities_list=missing_entities_list,
             conversation_context=formatted_context,
             original_question=request.text,
             language=request.language
         )
         final_answer = enhancement_result["enhanced_answer"]
-        optional_clarifications = enhancement_result.get("optional_clarifications", [])
         
-        # ✅ ÉTAPE 7: Vérifier si nouvelle clarification nécessaire
+        # ✅ ÉTAPE 7: Vérifier si clarification CRITIQUE nécessaire
         needs_clarification, clarification_questions = conversation_memory.check_if_clarification_needed(
             question=processed_question,
             rag_response=response,
@@ -2202,42 +2481,74 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
         )
         
         if needs_clarification and not was_clarification:
-            # Marquer pour clarification future
-            conversation_memory.mark_question_for_clarification(
+            
+            # ⭐ NOUVEAU: Définir le callback pour relance RAG automatique
+            async def rag_reprocessing_callback(
+                question: str, 
+                conversation_id: str, 
+                user_id: str, 
+                language: str = "fr",
+                is_reprocessing: bool = False
+            ):
+                logger.info(f"🔄 [RAGCallback] Retraitement automatique: {question[:50]}...")
+                
+                # Relancer le pipeline RAG complet
+                reprocessed_response = await rag_system.query(
+                    question=question,
+                    context=rag_context,  # Contexte enrichi avec clarification
+                    language=language
+                )
+                
+                # Ajouter la réponse retraitée à la conversation
+                conversation_memory.add_message_to_conversation(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    message=reprocessed_response.answer,
+                    role="assistant",
+                    language=language,
+                    message_type="reprocessed_response"
+                )
+                
+                logger.info("✅ [RAGCallback] Retraitement terminé avec succès")
+                return {"status": "success", "reprocessed_answer": reprocessed_response.answer}
+            
+            # ⭐ MARQUER CLARIFICATION CRITIQUE avec callback
+            success = conversation_memory.mark_pending_clarification_critical(
                 conversation_id=request.conversation_id,
-                user_id=request.user_id,
-                original_question=request.text,
-                language=request.language
+                question=request.text,
+                callback=rag_reprocessing_callback
             )
             
-            # Générer la demande de clarification
-            clarification_response = conversation_memory.generate_clarification_request(
-                clarification_questions, 
-                request.language
-            )
-            
-            # Ajouter la réponse de clarification
-            conversation_memory.add_message_to_conversation(
-                conversation_id=request.conversation_id,
-                user_id=request.user_id,
-                message=clarification_response,
-                role="assistant",
-                language=request.language,
-                message_type="clarification_request"
-            )
-            
-            return QuestionResponse(
-                answer=clarification_response,
-                confidence=0.5,
-                context_used=rag_context,
-                needs_clarification=True,
-                conversation_id=request.conversation_id,
-                contextualization_info=contextualization_result,
-                enhancement_info=enhancement_result,
-                context_quality_score=raw_context_summary.get("context_quality_score", 0.0)  # 🔥 NOUVEAU
-            )
+            if success:
+                # Générer la demande de clarification
+                clarification_response = conversation_memory.generate_clarification_request(
+                    clarification_questions, 
+                    request.language
+                )
+                
+                # Ajouter la réponse de clarification
+                conversation_memory.add_message_to_conversation(
+                    conversation_id=request.conversation_id,
+                    user_id=request.user_id,
+                    message=clarification_response,
+                    role="assistant",
+                    language=request.language,
+                    message_type="critical_clarification_request"
+                )
+                
+                return QuestionResponse(
+                    answer=clarification_response,
+                    confidence=0.5,
+                    context_used=rag_context,
+                    needs_clarification=True,
+                    is_critical_clarification=True,  # ⭐ NOUVEAU FLAG
+                    conversation_id=request.conversation_id,
+                    contextualization_info=contextualization_result,
+                    enhancement_info=enhancement_result,
+                    context_quality_score=raw_context_summary.get("context_quality_score", 0.0)
+                )
         
-        # ✅ ÉTAPE 8: Réponse normale avec métadonnées agents enrichies
+        # ✅ ÉTAPE 8: Réponse normale
         conversation_memory.add_message_to_conversation(
             conversation_id=request.conversation_id,
             user_id=request.user_id,
@@ -2251,16 +2562,58 @@ async def ask_expert_enhanced_with_agents(request: QuestionRequest):
             confidence=response.confidence,
             context_used=rag_context,
             needs_clarification=False,
+            is_critical_clarification=False,
             conversation_id=request.conversation_id,
             sources=response.sources,
-            optional_clarifications=optional_clarifications,
             contextualization_info=contextualization_result,
             enhancement_info=enhancement_result,
-            context_quality_score=raw_context_summary.get("context_quality_score", 0.0),  # 🔥 NOUVEAU
-            missing_entities_analysis=missing_entities_with_importance  # 🔥 NOUVEAU - pour debugging/analytics
+            context_quality_score=raw_context_summary.get("context_quality_score", 0.0),
+            missing_entities_analysis=missing_entities_with_importance
         )
         
     except Exception as e:
         logger.error(f"❌ [ASK] Erreur: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ⭐ EXEMPLE D'UTILISATION DES NOUVELLES MÉTHODES CRITIQUES
+
+# 1. Marquer une clarification critique avec callback
+async def example_mark_critical_clarification():
+    memory = IntelligentConversationMemory()
+    
+    async def my_rag_callback(question, conversation_id, user_id, language="fr", is_reprocessing=False):
+        # Votre logique de retraitement RAG ici
+        return {"status": "success"}
+    
+    success = memory.mark_pending_clarification_critical(
+        conversation_id="conv_123",
+        question="Quel est le poids normal de mes poulets ?",
+        callback=my_rag_callback
+    )
+    
+    if success:
+        print("✅ Clarification critique marquée avec succès")
+
+# 2. Déclencher manuellement le retraitement RAG
+async def example_trigger_reprocessing():
+    memory = IntelligentConversationMemory()
+    
+    success = await memory.trigger_rag_reprocessing(
+        conversation_id="conv_123",
+        enriched_question="Quel est le poids normal de mes poulets Ross 308 mâles ?",
+        user_id="user_456",
+        language="fr"
+    )
+    
+    if success:
+        print("✅ Retraitement RAG déclenché avec succès")
+
+# 3. Consulter les statistiques étendues
+def example_get_enhanced_stats():
+    memory = IntelligentConversationMemory()
+    stats = memory.get_conversation_stats()
+    
+    print(f"Clarifications critiques marquées: {stats['clarification_stats']['critical_clarifications_marked']}")
+    print(f"Clarifications critiques résolues: {stats['clarification_stats']['critical_clarifications_resolved']}")
+    print(f"Retraitements RAG déclenchés: {stats['clarification_stats']['rag_reprocessing_triggered']}")
 """

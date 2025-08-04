@@ -6,6 +6,7 @@ Contient:
 - Extraction d'entités intelligente
 - Analyse complète des questions
 - Interface publique + logging
+- Identification des entités critiques
 
 COMPATIBLE: Préserve tous les imports existants
 """
@@ -42,9 +43,49 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ==================== CONSTANTES ENTITÉS CRITIQUES ====================
+
+# Entités considérées comme critiques pour les réponses vétérinaires
+CRITICAL_ENTITIES = [
+    "breed",        # Race/souche (essentiel pour protocoles spécifiques)
+    "age",          # Âge (critique pour nutrition, vaccination, traitements)
+    "sex",          # Sexe (important pour certains protocoles)
+    "symptoms",     # Symptômes (essentiel pour diagnostic)
+    "environment",  # Environnement (température, humidité, logement)
+    "feed",         # Alimentation (critique pour nutrition et performance)
+    "flock_size",   # Taille du troupeau (important pour gestion)
+    "mortality_rate" # Taux de mortalité (critique pour urgences)
+]
+
+# Mappage des entités vers les attributs ExtractedEntities
+ENTITY_ATTRIBUTE_MAPPING = {
+    "breed": ["breed", "breed_type"],
+    "age": ["age_days", "age_weeks"],
+    "sex": ["sex"],
+    "symptoms": ["symptoms"],
+    "environment": ["temperature", "humidity", "housing_type"],
+    "feed": ["feed_type"],
+    "flock_size": ["flock_size"],
+    "mortality_rate": ["mortality_rate"]
+}
+
+# Entités critiques par type de question
+CRITICAL_ENTITIES_BY_QUESTION_TYPE = {
+    "growth": ["breed", "age", "feed"],
+    "weight": ["breed", "age", "feed"],
+    "mortality": ["breed", "age", "symptoms", "mortality_rate"],
+    "health": ["breed", "age", "symptoms"],
+    "temperature": ["age", "environment"],
+    "feeding": ["breed", "age", "feed"],
+    "environment": ["age", "environment"],
+    "performance": ["breed", "age", "feed", "environment"],
+    "laying": ["breed", "age", "feed", "environment"],
+    "general": ["breed", "age"]
+}
+
 class EnhancedQuestionClarificationSystem:
     """
-    Système de clarification intelligent AMÉLIORÉ avec validation GPT robuste intégrée + reconnaissance souches
+    Système de clarification intelligent AMÉLIORÉ avec validation GPT robuste intégrée + reconnaissance souches + entités critiques
     """
     
     def __init__(self):
@@ -75,6 +116,10 @@ class EnhancedQuestionClarificationSystem:
             # Configuration reconnaissance souches
             self.enable_breed_normalization = getattr(settings, 'enable_breed_normalization', True)
             self.enable_sex_inference = getattr(settings, 'enable_sex_inference', True)
+            
+            # Configuration entités critiques
+            self.enable_critical_entity_analysis = getattr(settings, 'enable_critical_entity_analysis', True)
+            self.critical_entities_threshold = getattr(settings, 'critical_entities_threshold', 0.8)
         else:
             self.enabled = os.getenv('ENABLE_CLARIFICATION_SYSTEM', 'true').lower() == 'true'
             self.model = os.getenv('CLARIFICATION_MODEL', 'gpt-4o-mini')
@@ -100,6 +145,10 @@ class EnhancedQuestionClarificationSystem:
             # Configuration reconnaissance souches
             self.enable_breed_normalization = os.getenv('ENABLE_BREED_NORMALIZATION', 'true').lower() == 'true'
             self.enable_sex_inference = os.getenv('ENABLE_SEX_INFERENCE', 'true').lower() == 'true'
+            
+            # Configuration entités critiques
+            self.enable_critical_entity_analysis = os.getenv('ENABLE_CRITICAL_ENTITY_ANALYSIS', 'true').lower() == 'true'
+            self.critical_entities_threshold = float(os.getenv('CRITICAL_ENTITIES_THRESHOLD', '0.8'))
         
         # Initialiser le générateur de questions
         self.question_generator = QuestionGenerator(
@@ -117,6 +166,8 @@ class EnhancedQuestionClarificationSystem:
         logger.info(f"🔧 [Enhanced Clarification] Mode: {self.clarification_mode.value}")
         logger.info(f"🔧 [Enhanced Clarification] Validation GPT robuste: {'✅' if self.enable_question_validation else '❌'}")
         logger.info(f"🆕 [Breed Recognition] Normalisation souches: {'✅' if self.enable_breed_normalization else '❌'}")
+        logger.info(f"🎯 [Critical Entities] Analyse entités critiques: {'✅' if self.enable_critical_entity_analysis else '❌'}")
+        logger.info(f"📊 [Critical Entities] Entités critiques définies: {len(CRITICAL_ENTITIES)} ({', '.join(CRITICAL_ENTITIES)})")
 
     def _init_patterns(self):
         """Patterns de détection améliorés avec reconnaissance souches"""
@@ -181,7 +232,7 @@ class EnhancedQuestionClarificationSystem:
         }
 
     def _init_enhanced_prompts(self):
-        """Prompts améliorés avec gestion du contexte"""
+        """Prompts améliorés avec gestion du contexte et entités critiques"""
         
         self.clarification_prompts = {
             "fr": """Tu es un expert vétérinaire spécialisé en aviculture. Analyse cette question et le contexte pour déterminer si des clarifications sont nécessaires.
@@ -191,12 +242,14 @@ Type de question détecté: {question_type}
 Entités extraites: {extracted_entities}
 Contexte conversationnel: {conversation_context}
 Informations critiques manquantes: {missing_info}
+Entités critiques manquantes: {missing_critical_entities}
 
 RÈGLES STRICTES:
 1. Si TOUTES les informations critiques sont présentes → réponds "CLEAR"
 2. Si des informations critiques manquent → génère des questions PRÉCISES
-3. Adapte le nombre de questions au nombre d'informations manquantes
-4. Priorise les informations les plus critiques pour ce type de question
+3. Priorise TOUJOURS les entités critiques manquantes
+4. Adapte le nombre de questions au nombre d'informations critiques manquantes
+5. Pour {question_type}, ces entités sont particulièrement importantes: {critical_entities_for_type}
 
 Format: soit "CLEAR" soit liste de questions avec tirets.""",
 
@@ -207,12 +260,14 @@ Detected question type: {question_type}
 Extracted entities: {extracted_entities}
 Conversational context: {conversation_context}
 Missing critical information: {missing_info}
+Missing critical entities: {missing_critical_entities}
 
 STRICT RULES:
 1. If ALL critical information is present → answer "CLEAR"
 2. If critical information is missing → generate PRECISE questions
-3. Adapt number of questions to missing information count
-4. Prioritize most critical information for this question type
+3. ALWAYS prioritize missing critical entities
+4. Adapt number of questions to missing critical information count
+5. For {question_type}, these entities are particularly important: {critical_entities_for_type}
 
 Format: either "CLEAR" or bulleted question list.""",
 
@@ -223,12 +278,14 @@ Tipo de pregunta detectado: {question_type}
 Entidades extraídas: {extracted_entities}
 Contexto conversacional: {conversation_context}
 Información crítica faltante: {missing_info}
+Entidades críticas faltantes: {missing_critical_entities}
 
 REGLAS ESTRICTAS:
 1. Si TODA la información crítica está presente → responde "CLEAR"
 2. Si falta información crítica → genera preguntas PRECISAS
-3. Adapta el número de preguntas a la información faltante
-4. Prioriza la información más crítica para este tipo de pregunta
+3. Prioriza SIEMPRE las entidades críticas faltantes
+4. Adapta el número de preguntas a la información crítica faltante
+5. Para {question_type}, estas entidades son particularmente importantes: {critical_entities_for_type}
 
 Formato: "CLEAR" o lista de preguntas con guiones."""
         }
@@ -274,6 +331,78 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
         
         return "general"
 
+    def analyze_critical_entities(self, extracted_entities: ExtractedEntities, question_type: str) -> Dict[str, Any]:
+        """
+        Analyse les entités critiques manquantes selon le type de question
+        
+        Returns:
+            Dict contenant:
+            - missing_entities: Liste de toutes les entités manquantes
+            - missing_critical_entities: Liste des entités critiques manquantes
+            - clarification_required_critical: Boolean indiquant si une clarification critique est nécessaire
+            - critical_entities_for_type: Entités critiques spécifiques au type de question
+        """
+        
+        if not self.enable_critical_entity_analysis:
+            return {
+                "missing_entities": [],
+                "missing_critical_entities": [],
+                "clarification_required_critical": False,
+                "critical_entities_for_type": []
+            }
+            
+        # Obtenir les entités critiques pour ce type de question
+        critical_entities_for_type = CRITICAL_ENTITIES_BY_QUESTION_TYPE.get(
+            question_type, 
+            CRITICAL_ENTITIES_BY_QUESTION_TYPE["general"]
+        )
+        
+        # Analyser toutes les entités manquantes
+        missing_entities = []
+        missing_critical_entities = []
+        
+        entities_dict = extracted_entities.to_dict()
+        
+        for entity in CRITICAL_ENTITIES:
+            # Vérifier si l'entité est présente via son mapping
+            entity_attributes = ENTITY_ATTRIBUTE_MAPPING.get(entity, [entity])
+            entity_present = False
+            
+            for attr in entity_attributes:
+                if attr in entities_dict and entities_dict[attr] is not None:
+                    # Vérifications spéciales pour certains types
+                    if attr == "breed_type" and entities_dict[attr] == "generic":
+                        # Race générique = entité manquante (besoin de spécificité)
+                        continue
+                    if attr == "symptoms" and isinstance(entities_dict[attr], list) and len(entities_dict[attr]) == 0:
+                        # Liste vide de symptômes = entité manquante
+                        continue
+                    entity_present = True
+                    break
+            
+            if not entity_present:
+                missing_entities.append(entity)
+                # Vérifier si c'est critique pour ce type de question
+                if entity in critical_entities_for_type:
+                    missing_critical_entities.append(entity)
+        
+        # Déterminer si une clarification critique est nécessaire
+        clarification_required_critical = len(missing_critical_entities) > 0
+        
+        # Log de l'analyse
+        logger.info(f"🎯 [Critical Entities] Type: {question_type}")
+        logger.info(f"🎯 [Critical Entities] Critiques pour ce type: {critical_entities_for_type}")
+        logger.info(f"❌ [Critical Entities] Manquantes: {missing_entities}")
+        logger.info(f"🚨 [Critical Entities] Critiques manquantes: {missing_critical_entities}")
+        logger.info(f"⚠️ [Critical Entities] Clarification critique requise: {clarification_required_critical}")
+        
+        return {
+            "missing_entities": missing_entities,
+            "missing_critical_entities": missing_critical_entities,
+            "clarification_required_critical": clarification_required_critical,
+            "critical_entities_for_type": critical_entities_for_type
+        }
+
     async def extract_entities_intelligent(self, question: str, language: str, conversation_context: Dict = None) -> ExtractedEntities:
         """Extraction intelligente d'entités via OpenAI avec reconnaissance souches"""
         
@@ -287,12 +416,14 @@ Formato: "CLEAR" o lista de preguntas con guiones."""
             if conversation_context:
                 context_info = f"\n\nContexte conversationnel disponible:\n{json.dumps(conversation_context, ensure_ascii=False, indent=2)}"
             
-            # Prompt avec reconnaissance des souches pondeuses
+            # Prompt avec reconnaissance des souches pondeuses et focus sur entités critiques
             extraction_prompt = f"""Tu es un expert en extraction d'informations pour l'aviculture. Extrait TOUTES les informations pertinentes de cette question et du contexte.
 
 Question: "{question}"{context_info}
 
 CONSIGNE: Extrait les informations sous format JSON strict. Utilise null pour les valeurs manquantes.
+
+PRIORITÉ AUX ENTITÉS CRITIQUES: {', '.join(CRITICAL_ENTITIES)}
 
 IMPORTANT POUR LES RACES/SOUCHES:
 - Reconnaître les souches pondeuses: Lohmann LSL-Lite, Bovans Brown, Hisex Brown, ISA Brown, Hyline
@@ -329,7 +460,7 @@ IMPORTANT POUR LES RACES/SOUCHES:
             response = openai.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches. Réponds uniquement avec du JSON valide."},
+                    {"role": "system", "content": "Tu es un extracteur d'entités expert en aviculture avec reconnaissance des souches et focus sur les entités critiques. Réponds uniquement avec du JSON valide."},
                     {"role": "user", "content": extraction_prompt}
                 ],
                 temperature=0.1,
@@ -482,7 +613,7 @@ IMPORTANT POUR LES RACES/SOUCHES:
         mode: str = None
     ) -> ClarificationResult:
         """
-        ANALYSE AMÉLIORÉE avec extraction intelligente et gestion du contexte
+        ANALYSE AMÉLIORÉE avec extraction intelligente, gestion du contexte et analyse des entités critiques
         """
         
         start_time = time.time()
@@ -525,6 +656,15 @@ IMPORTANT POUR LES RACES/SOUCHES:
         if extracted_entities.sex_inferred:
             logger.info(f"🚺 [Sex Inference] Sexe inféré automatiquement: {extracted_entities.sex}")
         
+        # NOUVELLE FONCTIONNALITÉ: Analyse des entités critiques
+        critical_analysis = self.analyze_critical_entities(extracted_entities, question_type)
+        
+        # Déterminer les informations critiques manquantes (ancien système)
+        missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
+        
+        logger.info(f"❌ [Enhanced Clarification] Informations critiques manquantes (ancien): {missing_critical_info}")
+        logger.info(f"🎯 [Critical Analysis] Résultats: {critical_analysis}")
+        
         # Gestion du mode sémantique dynamique avec validation robuste
         if (mode == "semantic_dynamic" or 
             self.clarification_mode == ClarificationMode.SEMANTIC_DYNAMIC) and \
@@ -548,13 +688,17 @@ IMPORTANT POUR LES RACES/SOUCHES:
                     question_type=question_type,
                     clarification_mode=ClarificationMode.SEMANTIC_DYNAMIC,
                     clarification_state=ClarificationState.NEEDED,
-                    missing_critical_info=["context_understanding"],
+                    missing_critical_info=missing_critical_info,
                     confidence_score=0.9,
                     original_question=original_question or question,
                     validation_score=validation_metadata.get("validation_score", 0.8),
                     validation_details=validation_metadata,
                     fallback_used=validation_metadata.get("fallback_used", False),
-                    gpt_failed=not validation_metadata.get("gpt_success", False)
+                    gpt_failed=not validation_metadata.get("gpt_success", False),
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
                 
                 logger.info(f"✅ [Semantic Dynamic] {len(dynamic_questions)} questions générées dynamiquement")
@@ -568,11 +712,40 @@ IMPORTANT POUR LES RACES/SOUCHES:
             else:
                 logger.warning("⚠️ [Semantic Dynamic] Aucune question générée, fallback vers mode normal")
         
-        # Déterminer les informations critiques manquantes
-        missing_critical_info = extracted_entities.get_missing_critical_info(question_type)
-        logger.info(f"❌ [Enhanced Clarification] Informations critiques manquantes: {missing_critical_info}")
+        # Logique de clarification basée sur les entités critiques
+        if critical_analysis["clarification_required_critical"]:
+            logger.info(f"🚨 [Critical Entities] Clarification critique requise - entités manquantes: {critical_analysis['missing_critical_entities']}")
+            
+            # Générer questions spécifiques aux entités critiques manquantes
+            critical_questions = self.question_generator.generate_critical_entity_questions(
+                language, 
+                critical_analysis["missing_critical_entities"], 
+                question_type
+            )
+            
+            return ClarificationResult(
+                needs_clarification=True,
+                questions=critical_questions,
+                processing_time_ms=int((time.time() - start_time) * 1000),
+                reason="critical_entities_missing",
+                model_used="rule_based_critical_entities",
+                extracted_entities=extracted_entities,
+                question_type=question_type,
+                clarification_mode=self.clarification_mode,
+                clarification_state=ClarificationState.NEEDED,
+                missing_critical_info=missing_critical_info,
+                confidence_score=95.0,
+                original_question=original_question or question,
+                validation_score=0.9,
+                fallback_used=False,
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=True
+            )
         
-        # Logique de clarification intelligente
+        # Logique de clarification intelligente (ancien système amélioré)
         if extracted_entities.breed_type == "generic":
             logger.info(f"🚨 [Enhanced Clarification] Race générique détectée - clarification obligatoire")
             
@@ -595,7 +768,11 @@ IMPORTANT POUR LES RACES/SOUCHES:
                 original_question=original_question or question,
                 validation_score=0.9,
                 fallback_used=False,
-                gpt_failed=False
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=critical_analysis["clarification_required_critical"]
             )
         
         # Si race spécifique + âge présents = OK
@@ -610,11 +787,15 @@ IMPORTANT POUR LES RACES/SOUCHES:
                 clarification_state=ClarificationState.NONE,
                 validation_score=1.0,
                 fallback_used=False,
-                gpt_failed=False
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=False
             )
         
-        # Si pas d'informations critiques manquantes
-        if not missing_critical_info:
+        # Si pas d'informations critiques manquantes (ancien + nouveau système)
+        if not missing_critical_info and not critical_analysis["clarification_required_critical"]:
             logger.info(f"✅ [Enhanced Clarification] Toutes les informations critiques présentes")
             return ClarificationResult(
                 needs_clarification=False,
@@ -625,10 +806,14 @@ IMPORTANT POUR LES RACES/SOUCHES:
                 clarification_state=ClarificationState.NONE,
                 validation_score=1.0,
                 fallback_used=False,
-                gpt_failed=False
+                gpt_failed=False,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=False
             )
         
-        # Analyse via OpenAI pour les cas complexes
+        # Analyse via OpenAI pour les cas complexes (avec informations d'entités critiques)
         if not OPENAI_AVAILABLE or not openai:
             logger.warning(f"⚠️ [Enhanced Clarification] OpenAI non disponible - fallback vers questions adaptatives")
             
@@ -651,7 +836,11 @@ IMPORTANT POUR LES RACES/SOUCHES:
                 original_question=original_question or question,
                 validation_score=0.8,
                 fallback_used=True,
-                gpt_failed=True
+                gpt_failed=True,
+                # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                missing_entities=critical_analysis["missing_entities"],
+                missing_critical_entities=critical_analysis["missing_critical_entities"],
+                clarification_required_critical=critical_analysis["clarification_required_critical"]
             )
         
         try:
@@ -679,35 +868,46 @@ IMPORTANT POUR LES RACES/SOUCHES:
                     original_question=original_question or question,
                     validation_score=0.8,
                     fallback_used=True,
-                    gpt_failed=True
+                    gpt_failed=True,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
             
             openai.api_key = api_key
             
-            # PROMPT ENRICHI avec toutes les informations
+            # PROMPT ENRICHI avec toutes les informations + entités critiques
             prompt_template = self.clarification_prompts.get(language.lower(), self.clarification_prompts["fr"])
             
             context_str = json.dumps(conversation_context, ensure_ascii=False) if conversation_context else "Aucun contexte"
             entities_str = json.dumps(extracted_entities.to_dict(), ensure_ascii=False)
             missing_info_str = ", ".join(missing_critical_info) if missing_critical_info else "Aucune"
+            missing_critical_entities_str = ", ".join(critical_analysis["missing_critical_entities"]) if critical_analysis["missing_critical_entities"] else "Aucune"
+            critical_entities_for_type_str = ", ".join(critical_analysis["critical_entities_for_type"])
             
             user_prompt = prompt_template.format(
                 question=question,
                 question_type=question_type,
                 extracted_entities=entities_str,
                 conversation_context=context_str,
-                missing_info=missing_info_str
+                missing_info=missing_info_str,
+                missing_critical_entities=missing_critical_entities_str,
+                critical_entities_for_type=critical_entities_for_type_str
             )
             
             system_prompt = f"""Tu es un assistant expert qui détermine si une question d'aviculture nécessite des clarifications. 
 
 Mode de clarification: {self.clarification_mode.value}
 Questions adaptatives: {'activées' if self.adaptive_question_count else 'désactivées'}
+Analyse entités critiques: {'activée' if self.enable_critical_entity_analysis else 'désactivée'}
+
+FOCUS PRIORITAIRE sur les entités critiques: {', '.join(CRITICAL_ENTITIES)}
 
 Sois très précis et utilise intelligemment le contexte conversationnel pour éviter les questions redondantes."""
             
             # Appel OpenAI enrichi
-            logger.info(f"🤖 [Enhanced Clarification] Appel GPT-4o-mini enrichi...")
+            logger.info(f"🤖 [Enhanced Clarification] Appel GPT-4o-mini enrichi avec analyse entités critiques...")
             
             response = openai.chat.completions.create(
                 model=self.model,
@@ -737,7 +937,11 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     clarification_state=ClarificationState.NONE,
                     validation_score=1.0,
                     fallback_used=False,
-                    gpt_failed=False
+                    gpt_failed=False,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=False
                 )
                 
                 logger.info(f"✅ [Enhanced Clarification] Question claire selon GPT-4o-mini enrichi")
@@ -754,7 +958,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             
             # Limitation adaptative du nombre de questions
             if self.adaptive_question_count:
-                max_questions = min(len(missing_critical_info) + 1, self.max_questions)
+                max_questions = min(len(critical_analysis["missing_critical_entities"]) + 1, self.max_questions)
             else:
                 max_questions = self.max_questions
             
@@ -781,7 +985,11 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     original_question=original_question or question,
                     validation_score=0.8,
                     fallback_used=False,
-                    gpt_failed=False
+                    gpt_failed=False,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
                 
                 logger.info(f"❓ [Enhanced Clarification] {len(limited_questions)} questions générées (mode: {clarification_mode.value})")
@@ -804,7 +1012,11 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     clarification_state=ClarificationState.NONE,
                     validation_score=1.0,
                     fallback_used=False,
-                    gpt_failed=False
+                    gpt_failed=False,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
         
         except Exception as e:
@@ -834,7 +1046,11 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     original_question=original_question or question,
                     validation_score=0.7,
                     fallback_used=True,
-                    gpt_failed=True
+                    gpt_failed=True,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
             else:
                 return ClarificationResult(
@@ -846,7 +1062,11 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                     question_type=question_type,
                     clarification_state=ClarificationState.NONE,
                     fallback_used=False,
-                    gpt_failed=True
+                    gpt_failed=True,
+                    # NOUVEAUX CHAMPS ENTITÉS CRITIQUES
+                    missing_entities=critical_analysis["missing_entities"],
+                    missing_critical_entities=critical_analysis["missing_critical_entities"],
+                    clarification_required_critical=critical_analysis["clarification_required_critical"]
                 )
 
     def _extract_questions(self, answer: str) -> List[str]:
@@ -880,7 +1100,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         extracted_entities: ExtractedEntities,
         question_type: str
     ) -> float:
-        """Score de confiance plus intelligent avec entités"""
+        """Score de confiance plus intelligent avec entités critiques"""
         
         # Score de base
         base_score = min(len(clarification_questions) * 20, 70)
@@ -899,6 +1119,12 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         }
         
         base_score += critical_info_bonus.get(question_type, 5)
+        
+        # NOUVEAU: Bonus pour entités critiques manquantes
+        if self.enable_critical_entity_analysis:
+            critical_analysis = self.analyze_critical_entities(extracted_entities, question_type)
+            critical_missing_count = len(critical_analysis["missing_critical_entities"])
+            base_score += critical_missing_count * 10  # Bonus de 10 points par entité critique manquante
         
         # Malus si beaucoup d'informations déjà présentes
         extracted_count = len([v for v in extracted_entities.to_dict().values() if v is not None])
@@ -956,7 +1182,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         result: ClarificationResult,
         language: str
     ) -> str:
-        """Formatage enrichi selon le mode de clarification"""
+        """Formatage enrichi selon le mode de clarification avec mention des entités critiques"""
         
         if not result.questions:
             return ""
@@ -1007,13 +1233,23 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         intro = intros.get(language, intros["fr"]).get(mode, intros["fr"][ClarificationMode.BATCH])
         outro = outros.get(language, outros["fr"]).get(mode, outros["fr"][ClarificationMode.BATCH])
         
+        # Ajouter une mention spéciale si des entités critiques sont manquantes
+        critical_mention = ""
+        if hasattr(result, 'clarification_required_critical') and result.clarification_required_critical:
+            critical_mentions = {
+                "fr": " (informations essentielles pour un diagnostic précis)",
+                "en": " (essential information for accurate diagnosis)",
+                "es": " (información esencial para un diagnóstico preciso)"
+            }
+            critical_mention = critical_mentions.get(language, critical_mentions["fr"])
+        
         if mode == ClarificationMode.INTERACTIVE or len(result.questions) == 1:
             # Mode interactif ou une seule question
-            return f"{intro}\n\n{result.questions[0]}{outro}"
+            return f"{intro}{critical_mention}\n\n{result.questions[0]}{outro}"
         else:
             # Mode batch - plusieurs questions
             formatted_questions = "\n".join([f"• {q}" for q in result.questions])
-            return f"{intro}\n\n{formatted_questions}{outro}"
+            return f"{intro}{critical_mention}\n\n{formatted_questions}{outro}"
 
     async def _log_clarification_decision(
         self,
@@ -1023,7 +1259,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
         conversation_id: str,
         result: ClarificationResult
     ):
-        """Log détaillé des décisions de clarification enrichi"""
+        """Log détaillé des décisions de clarification enrichi avec entités critiques"""
         
         clarification_data = {
             "timestamp": datetime.now().isoformat(),
@@ -1042,22 +1278,30 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
                 "enable_semantic_dynamic": self.enable_semantic_dynamic,
                 "enable_question_validation": self.enable_question_validation,
                 "enable_breed_normalization": self.enable_breed_normalization,
-                "enable_sex_inference": self.enable_sex_inference
+                "enable_sex_inference": self.enable_sex_inference,
+                "enable_critical_entity_analysis": self.enable_critical_entity_analysis,
+                "critical_entities_threshold": self.critical_entities_threshold
             }
         }
         
         # Log structuré
         self.clarification_logger.info(json.dumps(clarification_data, ensure_ascii=False))
         
-        # Log standard enrichi
+        # Log standard enrichi avec entités critiques
         if result.needs_clarification:
+            critical_info = ""
+            if hasattr(result, 'clarification_required_critical'):
+                critical_status = "🚨 CRITIQUE" if result.clarification_required_critical else "📝 Standard"
+                critical_entities_count = len(getattr(result, 'missing_critical_entities', []))
+                critical_info = f" | {critical_status} ({critical_entities_count} entités critiques manquantes)"
+            
             logger.info(
                 f"❓ [Enhanced Clarification] CLARIFICATION - "
                 f"User: {user_id[:8]} | Type: {result.question_type} | "
                 f"Questions: {len(result.questions)} | Mode: {result.clarification_mode.value if result.clarification_mode else 'N/A'} | "
                 f"Validation: {result.validation_score:.1f} | "
                 f"Fallback: {'✅' if result.fallback_used else '❌'} | "
-                f"Temps: {result.processing_time_ms}ms"
+                f"Temps: {result.processing_time_ms}ms{critical_info}"
             )
         else:
             logger.info(
@@ -1068,7 +1312,7 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             )
 
     def get_stats_enhanced(self) -> Dict:
-        """Retourne les statistiques du système enrichi"""
+        """Retourne les statistiques du système enrichi avec entités critiques"""
         return {
             "enabled": self.enabled,
             "model": self.model,
@@ -1081,8 +1325,13 @@ Sois très précis et utilise intelligemment le contexte conversationnel pour é
             "question_validation_enabled": self.enable_question_validation,
             "breed_normalization_enabled": self.enable_breed_normalization,
             "sex_inference_enabled": self.enable_sex_inference,
+            "critical_entity_analysis_enabled": self.enable_critical_entity_analysis,
+            "critical_entities_threshold": self.critical_entities_threshold,
+            "critical_entities": CRITICAL_ENTITIES,
+            "critical_entities_count": len(CRITICAL_ENTITIES),
             "supported_question_types": list(self.question_type_patterns.keys()),
-            "supported_languages": ["fr", "en", "es"]
+            "supported_languages": ["fr", "en", "es"],
+            "critical_entities_by_question_type": CRITICAL_ENTITIES_BY_QUESTION_TYPE
         }
 
 
@@ -1117,6 +1366,36 @@ async def analyze_question_for_clarification_semantic_dynamic(
     return await enhanced_clarification_system.analyze_question_enhanced(
         question, language, user_id, conversation_id, conversation_context, mode="semantic_dynamic"
     )
+
+def analyze_critical_entities_for_question(
+    extracted_entities: ExtractedEntities, 
+    question_type: str
+) -> Dict[str, Any]:
+    """Fonction utilitaire pour analyser les entités critiques d'une question"""
+    return enhanced_clarification_system.analyze_critical_entities(extracted_entities, question_type)
+
+def get_critical_entities_for_question_type(question_type: str) -> List[str]:
+    """Retourne les entités critiques pour un type de question donné"""
+    return CRITICAL_ENTITIES_BY_QUESTION_TYPE.get(question_type, CRITICAL_ENTITIES_BY_QUESTION_TYPE["general"])
+
+def is_critical_entity_missing(entity_name: str, extracted_entities: ExtractedEntities) -> bool:
+    """Vérifie si une entité critique spécifique est manquante"""
+    if entity_name not in CRITICAL_ENTITIES:
+        return False
+    
+    entity_attributes = ENTITY_ATTRIBUTE_MAPPING.get(entity_name, [entity_name])
+    entities_dict = extracted_entities.to_dict()
+    
+    for attr in entity_attributes:
+        if attr in entities_dict and entities_dict[attr] is not None:
+            # Vérifications spéciales
+            if attr == "breed_type" and entities_dict[attr] == "generic":
+                continue
+            if attr == "symptoms" and isinstance(entities_dict[attr], list) and len(entities_dict[attr]) == 0:
+                continue
+            return False
+    
+    return True
 
 def format_clarification_response_enhanced(result: ClarificationResult, language: str) -> str:
     """Formate la réponse de clarification avec le système amélioré"""
@@ -1160,8 +1439,198 @@ def build_enriched_question_enhanced(
     
     return enriched_question
 
+def get_missing_critical_entities_summary(result: ClarificationResult, language: str = "fr") -> str:
+    """Génère un résumé des entités critiques manquantes"""
+    if not hasattr(result, 'missing_critical_entities') or not result.missing_critical_entities:
+        return ""
+    
+    summaries = {
+        "fr": {
+            "breed": "race/souche",
+            "age": "âge",
+            "sex": "sexe",
+            "symptoms": "symptômes",
+            "environment": "environnement",
+            "feed": "alimentation",
+            "flock_size": "taille du troupeau",
+            "mortality_rate": "taux de mortalité"
+        },
+        "en": {
+            "breed": "breed/strain",
+            "age": "age",
+            "sex": "sex",
+            "symptoms": "symptoms",
+            "environment": "environment",
+            "feed": "feeding",
+            "flock_size": "flock size",
+            "mortality_rate": "mortality rate"
+        },
+        "es": {
+            "breed": "raza/cepa",
+            "age": "edad",
+            "sex": "sexo",
+            "symptoms": "síntomas",
+            "environment": "ambiente",
+            "feed": "alimentación",
+            "flock_size": "tamaño del rebaño",
+            "mortality_rate": "tasa de mortalidad"
+        }
+    }
+    
+    entity_names = summaries.get(language, summaries["fr"])
+    missing_names = [entity_names.get(entity, entity) for entity in result.missing_critical_entities]
+    
+    if len(missing_names) == 1:
+        return missing_names[0]
+    elif len(missing_names) == 2:
+        conjunction = {"fr": " et ", "en": " and ", "es": " y "}.get(language, " et ")
+        return conjunction.join(missing_names)
+    else:
+        conjunction = {"fr": " et ", "en": " and ", "es": " y "}.get(language, " et ")
+        return ", ".join(missing_names[:-1]) + conjunction + missing_names[-1]
+
+# ==================== EXTENSIONS DU QUESTION GENERATOR ====================
+
+def extend_question_generator_with_critical_entities():
+    """Étend le générateur de questions avec le support des entités critiques"""
+    
+    def generate_critical_entity_questions(self, language: str, missing_critical_entities: List[str], question_type: str) -> List[str]:
+        """Génère des questions spécifiques aux entités critiques manquantes"""
+        
+        questions = []
+        
+        critical_entity_questions = {
+            "fr": {
+                "breed": [
+                    "Quelle est la race ou souche exacte de vos volailles ? (ex: Ross 308, Cobb 500, Lohmann LSL-Lite)",
+                    "Quel type de poulets élevez-vous ? Précisez la souche si possible."
+                ],
+                "age": [
+                    "Quel est l'âge de vos volailles en jours ou en semaines ?",
+                    "Depuis combien de temps vos volailles sont-elles nées ?"
+                ],
+                "sex": [
+                    "S'agit-il de mâles, de femelles ou d'un troupeau mixte ?",
+                    "Quel est le sexe de vos volailles ?"
+                ],
+                "symptoms": [
+                    "Quels symptômes précis observez-vous chez vos volailles ?",
+                    "Pouvez-vous décrire les signes cliniques que vous avez remarqués ?"
+                ],
+                "environment": [
+                    "Quelles sont les conditions d'élevage ? (température, humidité, type de bâtiment)",
+                    "Dans quel environnement vos volailles sont-elles élevées ?"
+                ],
+                "feed": [
+                    "Quel type d'alimentation donnez-vous à vos volailles ?",
+                    "Pouvez-vous préciser le programme alimentaire utilisé ?"
+                ],
+                "flock_size": [
+                    "Combien de volailles avez-vous dans votre troupeau ?",
+                    "Quelle est la taille de votre élevage ?"
+                ],
+                "mortality_rate": [
+                    "Quel est le taux de mortalité observé ? (nombre de morts / total)",
+                    "Combien de volailles sont mortes et sur combien au total ?"
+                ]
+            },
+            "en": {
+                "breed": [
+                    "What is the exact breed or strain of your poultry? (e.g., Ross 308, Cobb 500, Lohmann LSL-Lite)",
+                    "What type of chickens are you raising? Please specify the strain if possible."
+                ],
+                "age": [
+                    "What is the age of your poultry in days or weeks?",
+                    "How long have your poultry been hatched?"
+                ],
+                "sex": [
+                    "Are these males, females, or a mixed flock?",
+                    "What is the sex of your poultry?"
+                ],
+                "symptoms": [
+                    "What specific symptoms are you observing in your poultry?",
+                    "Can you describe the clinical signs you have noticed?"
+                ],
+                "environment": [
+                    "What are the housing conditions? (temperature, humidity, building type)",
+                    "In what environment are your poultry being raised?"
+                ],
+                "feed": [
+                    "What type of feed are you giving to your poultry?",
+                    "Can you specify the feeding program used?"
+                ],
+                "flock_size": [
+                    "How many poultry do you have in your flock?",
+                    "What is the size of your operation?"
+                ],
+                "mortality_rate": [
+                    "What is the observed mortality rate? (number of deaths / total)",
+                    "How many poultry have died and out of how many total?"
+                ]
+            },
+            "es": {
+                "breed": [
+                    "¿Cuál es la raza o cepa exacta de sus aves? (ej: Ross 308, Cobb 500, Lohmann LSL-Lite)",
+                    "¿Qué tipo de pollos está criando? Especifique la cepa si es posible."
+                ],
+                "age": [
+                    "¿Cuál es la edad de sus aves en días o semanas?",
+                    "¿Hace cuánto tiempo nacieron sus aves?"
+                ],
+                "sex": [
+                    "¿Son machos, hembras o un rebaño mixto?",
+                    "¿Cuál es el sexo de sus aves?"
+                ],
+                "symptoms": [
+                    "¿Qué síntomas específicos observa en sus aves?",
+                    "¿Puede describir los signos clínicos que ha notado?"
+                ],
+                "environment": [
+                    "¿Cuáles son las condiciones de crianza? (temperatura, humedad, tipo de edificio)",
+                    "¿En qué ambiente se están criando sus aves?"
+                ],
+                "feed": [
+                    "¿Qué tipo de alimentación da a sus aves?",
+                    "¿Puede especificar el programa alimentario utilizado?"
+                ],
+                "flock_size": [
+                    "¿Cuántas aves tiene en su rebaño?",
+                    "¿Cuál es el tamaño de su operación?"
+                ],
+                "mortality_rate": [
+                    "¿Cuál es la tasa de mortalidad observada? (número de muertes / total)",
+                    "¿Cuántas aves han muerto y de cuántas en total?"
+                ]
+            }
+        }
+        
+        language_questions = critical_entity_questions.get(language, critical_entity_questions["fr"])
+        
+        # Prioriser selon le type de question
+        priority_order = CRITICAL_ENTITIES_BY_QUESTION_TYPE.get(question_type, CRITICAL_ENTITIES)
+        
+        # Trier les entités manquantes par priorité
+        sorted_entities = [entity for entity in priority_order if entity in missing_critical_entities]
+        remaining_entities = [entity for entity in missing_critical_entities if entity not in sorted_entities]
+        sorted_entities.extend(remaining_entities)
+        
+        # Générer les questions dans l'ordre de priorité
+        for entity in sorted_entities[:self.max_questions]:
+            if entity in language_questions:
+                # Prendre la première question pour cette entité
+                questions.append(language_questions[entity][0])
+        
+        return questions
+    
+    # Ajouter la méthode au générateur de questions
+    QuestionGenerator.generate_critical_entity_questions = generate_critical_entity_questions
+
+# Appliquer l'extension
+extend_question_generator_with_critical_entities()
+
 # ==================== LOGGING DE DÉMARRAGE ====================
 
-logger.info("❓ [EnhancedQuestionClarificationSystem] Module MODULAIRE initialisé avec 3 fichiers")
-logger.info("✅ [Clarification System] PRÊT - Toutes fonctionnalités disponibles!")
+logger.info("❓ [EnhancedQuestionClarificationSystem] Module MODULAIRE initialisé avec ENTITÉS CRITIQUES")
+logger.info("✅ [Clarification System] PRÊT - Toutes fonctionnalités disponibles + analyse entités critiques!")
+logger.info(f"🎯 [Critical Entities] {len(CRITICAL_ENTITIES)} entités critiques configurées")
 logger.info(f"📊 [System Stats] {enhanced_clarification_system.get_stats_enhanced()}")
