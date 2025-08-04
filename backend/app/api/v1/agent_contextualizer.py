@@ -18,13 +18,18 @@ import re
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
-# Import OpenAI sécurisé
+# Import OpenAI sécurisé - CORRECTION: Gestion d'erreur plus robuste
 try:
     import openai
     OPENAI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     OPENAI_AVAILABLE = False
     openai = None
+    logging.getLogger(__name__).warning(f"OpenAI non disponible: {e}")
+except Exception as e:
+    OPENAI_AVAILABLE = False
+    openai = None
+    logging.getLogger(__name__).error(f"Erreur inattendue import OpenAI: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +37,14 @@ class AgentContextualizer:
     """Agent intelligent pour enrichir les questions avant RAG"""
     
     def __init__(self):
-        self.openai_available = OPENAI_AVAILABLE and os.getenv('OPENAI_API_KEY')
+        # CORRECTION: Validation OpenAI plus robuste
+        api_key = os.getenv('OPENAI_API_KEY')
+        self.openai_available = (
+            OPENAI_AVAILABLE and 
+            api_key is not None and 
+            api_key.strip() != ""
+        )
+        
         self.model = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
         self.timeout = int(os.getenv('CONTEXTUALIZER_TIMEOUT', '10'))
         self.max_retries = int(os.getenv('CONTEXTUALIZER_RETRIES', '2'))
@@ -98,6 +110,17 @@ class AgentContextualizer:
                 "recommended_variant": 0
             }
         """
+        
+        # CORRECTION: Validation des inputs
+        if not question or not question.strip():
+            error_msg = "Question cannot be empty"
+            logger.error(f"❌ [AgentContextualizer] {error_msg}")
+            raise ValueError(error_msg)
+        
+        if len(question) > 5000:
+            error_msg = "Question too long (max 5000 characters)"
+            logger.error(f"❌ [AgentContextualizer] {error_msg}")
+            raise ValueError(error_msg)
         
         # Valeurs par défaut
         entities = entities or {}
@@ -239,6 +262,10 @@ class AgentContextualizer:
             # Statistiques
             self.stats["variants_generated"] += len(variants)
             
+            # CORRECTION: Protection contre liste vide
+            if not variants:
+                raise ValueError("Aucun variant généré")
+            
             # Déterminer le variant recommandé (celui avec la meilleure confiance)
             recommended_idx = max(range(len(variants)), key=lambda i: variants[i].get("confidence", 0))
             
@@ -288,7 +315,7 @@ class AgentContextualizer:
     ) -> Dict[str, Any]:
         """Génère un variant focalisé sur le contexte conversationnel"""
         
-        if not conversation_context:
+        if not conversation_context or not conversation_context.strip():
             # Pas de contexte, variant simple
             variant = {
                 "enriched_question": question,
@@ -484,10 +511,10 @@ class AgentContextualizer:
                 (r'\botra cosa\b', 'diagnóstico diferencial')
             ]
         
-        # Appliquer les remplacements
+        # CORRECTION: Limiter les substitutions pour éviter les boucles infinies
         replacements_applied = 0
         for pattern, replacement in technical_mappings:
-            new_question = re.sub(pattern, replacement, enriched_question, flags=re.IGNORECASE)
+            new_question = re.sub(pattern, replacement, enriched_question, count=1, flags=re.IGNORECASE)
             if new_question != enriched_question:
                 replacements_applied += 1
                 enriched_question = new_question
@@ -551,15 +578,15 @@ class AgentContextualizer:
             context_parts.append(f"J{entities['age_days']}" if language == "fr" else 
                                f"D{entities['age_days']}" if language == "en" else f"D{entities['age_days']}")
         
-        # Performance
-        if entities.get("weight_grams") and entities.get("age_days"):
+        # Performance - CORRECTION: Vérification division par zéro
+        if entities.get("weight_grams") and entities.get("age_days") and entities["age_days"] > 0:
             gmq = entities["weight_grams"] / entities["age_days"]  # Gain moyen quotidien approximatif
             context_parts.append(f"GMQ≈{gmq:.1f}g/j" if language == "fr" else 
                                f"ADG≈{gmq:.1f}g/d" if language == "en" else f"GDP≈{gmq:.1f}g/d")
         
         return ", ".join(context_parts)
     
-    # Méthodes existantes inchangées (conservées pour compatibilité)
+    # Méthodes existantes avec corrections
     async def _enrich_with_openai(
         self,
         question: str,
@@ -569,7 +596,7 @@ class AgentContextualizer:
         language: str,
         has_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement avec OpenAI GPT (méthode conservée)"""
+        """Enrichissement avec OpenAI GPT (méthode conservée avec gestion d'erreur améliorée)"""
         
         try:
             # Préparer le contexte pour GPT
@@ -582,19 +609,32 @@ class AgentContextualizer:
                 question, entities_summary, missing_summary, conversation_context, language, has_entities
             )
             
-            # Appel OpenAI
+            # CORRECTION: Gestion d'erreur OpenAI spécifique
             client = openai.AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             
-            response = await client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.2,
-                max_tokens=400,
-                timeout=self.timeout
-            )
+            try:
+                response = await client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.2,
+                    max_tokens=400,
+                    timeout=self.timeout
+                )
+            except openai.RateLimitError as e:
+                logger.error(f"Rate limit OpenAI: {e}")
+                return {"success": False, "error": "rate_limit", "retry_after": getattr(e, 'retry_after', 60)}
+            except openai.APITimeoutError as e:
+                logger.error(f"Timeout OpenAI: {e}")
+                return {"success": False, "error": "timeout"}
+            except openai.APIError as e:
+                logger.error(f"Erreur API OpenAI: {e}")
+                return {"success": False, "error": "api_error", "details": str(e)}
+            except Exception as e:
+                logger.error(f"Erreur inattendue OpenAI: {e}")
+                return {"success": False, "error": "unexpected", "details": str(e)}
             
             answer = response.choices[0].message.content.strip()
             
@@ -902,39 +942,23 @@ Responde en JSON:
         return "\n".join(formatted_parts) if formatted_parts else "Aucune entité extraite"
     
     def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any], has_entities: bool) -> Dict[str, Any]:
-        """Parse la réponse JSON de GPT"""
+        """Parse la réponse JSON de GPT - CORRECTION: Extraction JSON plus robuste"""
         
         try:
-            # Extraire le JSON de la réponse
-            json_match = None
+            # CORRECTION: Extraction JSON améliorée
+            parsed_json = self._extract_json_from_response(response)
             
-            # Chercher JSON dans des blocs code
-            json_patterns = [
-                r'```json\s*(\{.*?\})\s*```',
-                r'```\s*(\{.*?\})\s*```',
-                r'(\{.*?\})'
-            ]
-            
-            for pattern in json_patterns:
-                match = re.search(pattern, response, re.DOTALL)
-                if match:
-                    json_match = match.group(1)
-                    break
-            
-            if not json_match:
-                raise ValueError("Pas de JSON trouvé dans la réponse")
-            
-            # Parser le JSON
-            data = json.loads(json_match)
+            if not parsed_json:
+                raise ValueError("Pas de JSON valide trouvé dans la réponse")
             
             # Valider et enrichir la réponse
             result = {
-                "enriched_question": data.get("enriched_question", original_question),
-                "reasoning_notes": data.get("reasoning_notes", "Aucune explication fournie"),
-                "entities_used": data.get("entities_used", []),
-                "inference_used": data.get("inference_used", not has_entities),
-                "confidence": min(max(data.get("confidence", 0.5), 0.0), 1.0),
-                "optimization_applied": data.get("optimization_applied", "Optimisation basique"),
+                "enriched_question": parsed_json.get("enriched_question", original_question),
+                "reasoning_notes": parsed_json.get("reasoning_notes", "Aucune explication fournie"),
+                "entities_used": parsed_json.get("entities_used", []),
+                "inference_used": parsed_json.get("inference_used", not has_entities),
+                "confidence": min(max(parsed_json.get("confidence", 0.5), 0.0), 1.0),
+                "optimization_applied": parsed_json.get("optimization_applied", "Optimisation basique"),
                 "method_used": "openai",
                 "processing_time": datetime.now().isoformat()
             }
@@ -959,6 +983,51 @@ Responde en JSON:
             else:
                 # Fallback final
                 return self._enrich_fallback(original_question, entities, [], "", "fr", has_entities)
+    
+    def _extract_json_from_response(self, response: str) -> Optional[Dict[str, Any]]:
+        """CORRECTION: Extraction JSON plus robuste"""
+        
+        if not response or not response.strip():
+            return None
+        
+        # Nettoyer la réponse
+        cleaned = response.strip()
+        
+        # Chercher des blocs JSON explicites d'abord
+        json_block_patterns = [
+            r'```json\s*(\{[^`]*\})\s*```',
+            r'```\s*(\{[^`]*\})\s*```'
+        ]
+        
+        for pattern in json_block_patterns:
+            match = re.search(pattern, cleaned, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    continue
+        
+        # Chercher JSON en début de réponse
+        if cleaned.startswith('{'):
+            try:
+                # Trouver la fin du premier objet JSON valide
+                decoder = json.JSONDecoder()
+                obj, idx = decoder.raw_decode(cleaned)
+                return obj
+            except json.JSONDecodeError:
+                pass
+        
+        # Chercher n'importe quel JSON dans la réponse (plus prudent)
+        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        matches = re.findall(json_pattern, cleaned)
+        
+        for match in matches:
+            try:
+                return json.loads(match)
+            except json.JSONDecodeError:
+                continue
+        
+        return None
     
     def _enrich_fallback(
         self,
@@ -1032,7 +1101,7 @@ Responde en JSON:
         if enriched_parts:
             enrichment = " ".join(enriched_parts)
             
-            # Patterns de remplacement selon la langue
+            # Patterns de remplacement selon la langue - CORRECTION: Limiter substitutions
             if language == "fr":
                 replacements = [
                     (r'\bmes poulets\b', f'mes {enrichment}'),
@@ -1057,7 +1126,7 @@ Responde en JSON:
             
             enriched_question = question
             for pattern, replacement in replacements:
-                enriched_question = re.sub(pattern, replacement, enriched_question, flags=re.IGNORECASE)
+                enriched_question = re.sub(pattern, replacement, enriched_question, count=1, flags=re.IGNORECASE)
             
             # Si aucun remplacement, ajouter en contexte
             if enriched_question == question:
@@ -1092,7 +1161,7 @@ Responde en JSON:
         }
     
     def _add_technical_terminology(self, question: str, language: str) -> str:
-        """Ajoute de la terminologie technique même sans entités"""
+        """Ajoute de la terminologie technique même sans entités - CORRECTION: Limiter substitutions"""
         
         question_lower = question.lower()
         
@@ -1127,12 +1196,12 @@ Responde en JSON:
         
         enhanced_question = question
         for pattern, replacement in technical_replacements:
-            enhanced_question = re.sub(pattern, replacement, enhanced_question, flags=re.IGNORECASE)
+            enhanced_question = re.sub(pattern, replacement, enhanced_question, count=1, flags=re.IGNORECASE)
         
         return enhanced_question
     
     def get_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques de l'agent - version multi-variants"""
+        """Retourne les statistiques de l'agent - version multi-variants avec CORRECTION division par zéro"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
@@ -1140,11 +1209,15 @@ Responde en JSON:
         inference_rate = (self.stats["inference_only"] / total * 100) if total > 0 else 0
         with_entities_rate = (self.stats["with_entities"] / total * 100) if total > 0 else 0
         multi_variant_rate = (self.stats["multi_variant_requests"] / total * 100) if total > 0 else 0
-        avg_variants = (self.stats["variants_generated"] / self.stats["multi_variant_requests"]) if self.stats["multi_variant_requests"] > 0 else 0
+        
+        # CORRECTION: Protection division par zéro
+        avg_variants = 0
+        if self.stats["multi_variant_requests"] > 0:
+            avg_variants = self.stats["variants_generated"] / self.stats["multi_variant_requests"]
         
         return {
             "agent_type": "contextualizer",
-            "version": "multi_variant_v3",
+            "version": "multi_variant_v3_corrected",
             "total_requests": total,
             "single_variant_requests": self.stats["single_variant_requests"],
             "multi_variant_requests": self.stats["multi_variant_requests"],

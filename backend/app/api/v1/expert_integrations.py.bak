@@ -6,8 +6,7 @@ Gère toutes les intégrations avec les modules externes (clarification, mémoir
 """
 
 import logging
-import asyncio
-from typing import Optional, Dict, Any, Callable, List, Union
+from typing import Optional, Dict, Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -50,36 +49,30 @@ class IntegrationsManager:
                 format_clarification_response_enhanced,
                 check_for_reprocessing_after_clarification,
                 is_enhanced_clarification_system_enabled,
-                get_enhanced_clarification_system_stats
+                get_enhanced_clarification_system_stats,
+                # 🆕 PRIORITAIRE: Import mode sémantique dynamique
+                analyze_question_for_clarification_semantic_dynamic,
+                generate_dynamic_clarification_questions
             )
             
-            # Tentative d'import des fonctions sémantiques dynamiques (optionnelles)
-            try:
-                from app.api.v1.question_clarification_system import (
-                    analyze_question_for_clarification_semantic_dynamic,
-                    generate_dynamic_clarification_questions
-                )
-                self._clarification_functions.update({
-                    'analyze_question_for_clarification_semantic_dynamic': analyze_question_for_clarification_semantic_dynamic,
-                    'generate_dynamic_clarification_questions': generate_dynamic_clarification_questions
-                })
-                logger.info("✅ [Integrations] Fonctions mode sémantique dynamique importées")
-            except ImportError:
-                logger.info("ℹ️ [Integrations] Fonctions sémantiques dynamiques non disponibles, utilisation du fallback")
-            
-            self._clarification_functions.update({
+            self._clarification_functions = {
                 'analyze_question_for_clarification_enhanced': analyze_question_for_clarification_enhanced,
                 'format_clarification_response_enhanced': format_clarification_response_enhanced,
                 'check_for_reprocessing_after_clarification': check_for_reprocessing_after_clarification,
                 'is_enhanced_clarification_system_enabled': is_enhanced_clarification_system_enabled,
-                'get_enhanced_clarification_system_stats': get_enhanced_clarification_system_stats
-            })
+                'get_enhanced_clarification_system_stats': get_enhanced_clarification_system_stats,
+                # 🆕 PRIORITAIRE: Fonctions mode sémantique dynamique
+                'analyze_question_for_clarification_semantic_dynamic': analyze_question_for_clarification_semantic_dynamic,
+                'generate_dynamic_clarification_questions': generate_dynamic_clarification_questions
+            }
             
             self.enhanced_clarification_available = True
-            logger.info("✅ [Integrations] Système de clarification amélioré importé (mode sémantique dynamique FORCÉ ACTIF)")
+            # ✅ Semantic dynamic reste forcé à True même si import réussi
+            logger.info("✅ [Integrations] Système de clarification amélioré + mode sémantique dynamique importé (FORCÉ ACTIF)")
             
         except ImportError as e:
             self.enhanced_clarification_available = False
+            # ✅ Semantic dynamic reste FORCÉ même si import échoue
             logger.warning(f"⚠️ [Integrations] Clarification améliorée non disponible mais mode sémantique dynamique FORCÉ ACTIF: {e}")
         
         # === INTÉGRATION MÉMOIRE INTELLIGENTE ===
@@ -129,25 +122,6 @@ class IntegrationsManager:
             logger.error(f"❌ [Integrations] Validateur agricole non disponible: {e}")
         
         # === INTÉGRATION AUTH ===
-        self._init_auth()
-        
-        # === INTÉGRATION OPENAI ===
-        try:
-            import openai
-            self.openai_available = True
-            logger.info("✅ [Integrations] OpenAI disponible")
-        except ImportError:
-            self.openai_available = False
-            logger.warning("⚠️ [Integrations] OpenAI non disponible mais mode sémantique dynamique FORCÉ")
-        
-        # === INTÉGRATION LOGGING ===
-        self._init_logging()
-        
-        # 🆕 TOUJOURS: Initialisation fonctions mode sémantique dynamique (même si partiellement disponible)
-        self._init_semantic_dynamic_functions()
-    
-    def _init_auth(self):
-        """Initialise l'authentification avec gestion des erreurs"""
         try:
             from .auth import get_current_user
             self._auth_functions = {'get_current_user': get_current_user}
@@ -162,9 +136,17 @@ class IntegrationsManager:
             except ImportError as e:
                 self.auth_available = False
                 logger.error(f"❌ [Integrations] Auth non disponible: {e}")
-    
-    def _init_logging(self):
-        """Initialise le système de logging avec gestion des erreurs"""
+        
+        # === INTÉGRATION OPENAI ===
+        try:
+            import openai
+            self.openai_available = True
+            logger.info("✅ [Integrations] OpenAI disponible")
+        except ImportError:
+            self.openai_available = False
+            logger.warning("⚠️ [Integrations] OpenAI non disponible mais mode sémantique dynamique FORCÉ")
+        
+        # === INTÉGRATION LOGGING ===
         try:
             from app.api.v1.logging import logger_instance, ConversationCreate
             if logger_instance:
@@ -176,10 +158,12 @@ class IntegrationsManager:
                 logger.info("✅ [Integrations] Système de logging intégré")
             else:
                 self.logging_available = False
-                logger.warning("⚠️ [Integrations] Logger instance is None")
         except ImportError as e:
             self.logging_available = False
             logger.warning(f"⚠️ [Integrations] Système de logging non disponible: {e}")
+        
+        # 🆕 TOUJOURS: Initialisation fonctions mode sémantique dynamique (même si partiellement disponible)
+        self._init_semantic_dynamic_functions()
     
     def _init_semantic_dynamic_functions(self):
         """🆕 NOUVEAU: Initialise les fonctions spécifiques au mode sémantique dynamique (TOUJOURS)"""
@@ -220,7 +204,7 @@ class IntegrationsManager:
         else:
             return f"Contexto de la pregunta agrícola: {question}\nPor favor, especifique su pregunta para una respuesta óptima."
     
-    def _fallback_get_examples(self, language: str = "fr") -> List[str]:
+    def _fallback_get_examples(self, language: str = "fr") -> list:
         """Fallback pour exemples de questions dynamiques"""
         if language == "fr":
             return [
@@ -244,20 +228,11 @@ class IntegrationsManager:
                 "¿Puede describir los síntomas con más precisión?"
             ]
     
-    def _fallback_validate_questions(self, questions: List[str], language: str = "fr") -> Dict[str, Any]:
+    def _fallback_validate_questions(self, questions: list, language: str = "fr") -> Dict[str, Any]:
         """Fallback pour validation des questions"""
-        if not isinstance(questions, list):
-            return {
-                "valid_questions": [],
-                "invalid_questions": [],
-                "quality_score": 0.0,
-                "fallback_validation": True,
-                "error": "Questions must be a list"
-            }
-        
         # Validation basique : questions non vides et pas trop courtes
-        valid_questions = [q for q in questions if isinstance(q, str) and len(q.strip()) > 10]
-        invalid_questions = [q for q in questions if not isinstance(q, str) or len(q.strip()) <= 10]
+        valid_questions = [q for q in questions if len(q.strip()) > 10]
+        invalid_questions = [q for q in questions if len(q.strip()) <= 10]
         
         quality_score = len(valid_questions) / len(questions) if questions else 0.0
         
@@ -285,11 +260,7 @@ class IntegrationsManager:
         
         func = self._clarification_functions.get('is_enhanced_clarification_system_enabled')
         if func:
-            try:
-                return func()
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur is_enhanced_clarification_enabled: {e}")
-                return False
+            return func()
         return False
     
     # 🆕 TOUJOURS TRUE: Vérification disponibilité mode sémantique dynamique
@@ -303,22 +274,11 @@ class IntegrationsManager:
         🎯 MÉTHODE PRINCIPALE: Analyse systématique d'une question AVANT le RAG
         ✅ Utilise TOUJOURS le mode sémantique dynamique
         """
-        if not isinstance(question, str) or not question.strip():
-            return {
-                "needs_clarification": False,
-                "clarification_questions": [],
-                "analysis_method": "invalid_input",
-                "question_processed": "",
-                "confidence_score": 0.0,
-                "fallback_used": False,
-                "error": "Question invalide ou vide"
-            }
-        
         analysis_result = {
             "needs_clarification": False,
             "clarification_questions": [],
             "analysis_method": "semantic_dynamic_forced",
-            "question_processed": question.strip(),
+            "question_processed": question,
             "confidence_score": 1.0,
             "fallback_used": False
         }
@@ -331,7 +291,7 @@ class IntegrationsManager:
                     logger.info(f"🎭 [Integrations] Analyse sémantique dynamique pour: '{question[:50]}...'")
                     result = await func(question=question, language=language, **kwargs)
                     
-                    if result and isinstance(result, dict):
+                    if result:
                         analysis_result.update(result)
                         analysis_result["analysis_method"] = "semantic_dynamic_full"
                         logger.info("✅ [Integrations] Analyse sémantique dynamique complète réussie")
@@ -384,11 +344,8 @@ class IntegrationsManager:
             logger.info(f"✅ [Integrations] Fallback final activé: {len(basic_questions)} questions de base")
             return analysis_result
     
-    def _generate_intelligent_generic_questions(self, question: str, language: str = "fr") -> List[str]:
+    def _generate_intelligent_generic_questions(self, question: str, language: str = "fr") -> list:
         """Génère des questions génériques mais intelligentes basées sur l'analyse de la question"""
-        if not isinstance(question, str):
-            return []
-            
         question_lower = question.lower()
         questions = []
         
@@ -474,7 +431,7 @@ class IntegrationsManager:
         # Limiter à 4 questions max et éviter duplicatas
         return list(set(all_questions))[:4]
     
-    def _generate_basic_clarification_questions(self, question: str, language: str = "fr") -> List[str]:
+    def _generate_basic_clarification_questions(self, question: str, language: str = "fr") -> list:
         """Génère des questions de clarification de base (fallback final)"""
         if language == "fr":
             return [
@@ -508,7 +465,7 @@ class IntegrationsManager:
             return await func(**kwargs)
         raise RuntimeError("Fonction analyze_question_for_clarification_enhanced non trouvée")
     
-    # 🆕 NOUVEAU: Analyse avec mode sémantique dynamique (métho de héritée)
+    # 🆕 NOUVEAU: Analyse avec mode sémantique dynamique (méthode héritée)
     async def analyze_question_for_clarification_semantic_dynamic(self, **kwargs):
         """Analyse une question avec le mode sémantique dynamique"""
         if not self.enhanced_clarification_available:
@@ -525,14 +482,14 @@ class IntegrationsManager:
         return await self.analyze_question_before_rag(**kwargs)
     
     # 🆕 PRIORITAIRE: Génération directe de questions dynamiques
-    def generate_dynamic_clarification_questions(self, question: str, language: str = "fr") -> List[str]:
+    def generate_dynamic_clarification_questions(self, question: str, language: str = "fr") -> list:
         """Génère des questions de clarification dynamiques (TOUJOURS DISPONIBLE)"""
         try:
             # ✅ Tentative avec fonction importée
             func = self._clarification_functions.get('generate_dynamic_clarification_questions')
             if func:
                 result = func(question, language)
-                if result and isinstance(result, list):
+                if result:
                     logger.info(f"✅ [Integrations] Questions dynamiques générées via fonction importée: {len(result)}")
                     return result
         
@@ -560,11 +517,7 @@ class IntegrationsManager:
         
         func = self._clarification_functions.get('check_for_reprocessing_after_clarification')
         if func:
-            try:
-                return await func(**kwargs)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur check_for_reprocessing: {e}")
-                return None
+            return await func(**kwargs)
         return None
     
     def get_enhanced_clarification_system_stats(self):
@@ -573,12 +526,7 @@ class IntegrationsManager:
         
         if self.enhanced_clarification_available:
             func = self._clarification_functions.get('get_enhanced_clarification_system_stats')
-            if func:
-                try:
-                    base_stats = func()
-                except Exception as e:
-                    logger.error(f"❌ [Integrations] Erreur récupération stats: {e}")
-                    base_stats = {}
+            base_stats = func() if func else {}
         
         # ✅ TOUJOURS: Ajouter stats mode sémantique dynamique
         base_stats.update({
@@ -601,11 +549,7 @@ class IntegrationsManager:
         
         func = self._memory_functions.get('add_message_to_conversation')
         if func:
-            try:
-                return func(**kwargs)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur add_message_to_conversation: {e}")
-                return None
+            return func(**kwargs)
         return None
     
     def get_conversation_context(self, conversation_id: str):
@@ -615,11 +559,7 @@ class IntegrationsManager:
         
         func = self._memory_functions.get('get_conversation_context')
         if func:
-            try:
-                return func(conversation_id)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_conversation_context: {e}")
-                return None
+            return func(conversation_id)
         return None
     
     def get_context_for_clarification(self, conversation_id: str):
@@ -629,11 +569,7 @@ class IntegrationsManager:
         
         func = self._memory_functions.get('get_context_for_clarification')
         if func:
-            try:
-                return func(conversation_id)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_context_for_clarification: {e}")
-                return {}
+            return func(conversation_id)
         return {}
     
     def get_context_for_rag(self, conversation_id: str, max_chars: int = 800):
@@ -643,11 +579,7 @@ class IntegrationsManager:
         
         func = self._memory_functions.get('get_context_for_rag')
         if func:
-            try:
-                return func(conversation_id, max_chars)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_context_for_rag: {e}")
-                return ""
+            return func(conversation_id, max_chars)
         return ""
     
     def get_conversation_memory_stats(self):
@@ -657,11 +589,7 @@ class IntegrationsManager:
         
         func = self._memory_functions.get('get_conversation_memory_stats')
         if func:
-            try:
-                return func()
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_conversation_memory_stats: {e}")
-                return {}
+            return func()
         return {}
     
     # === MÉTHODES VALIDATION AGRICOLE ===
@@ -673,11 +601,7 @@ class IntegrationsManager:
         
         func = self._validator_functions.get('is_agricultural_validation_enabled')
         if func:
-            try:
-                return func()
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur is_agricultural_validation_enabled: {e}")
-                return False
+            return func()
         return False
     
     def validate_agricultural_question(self, **kwargs):
@@ -697,11 +621,7 @@ class IntegrationsManager:
         
         func = self._validator_functions.get('get_agricultural_validator_stats')
         if func:
-            try:
-                return func()
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_agricultural_validator_stats: {e}")
-                return {}
+            return func()
         return {}
     
     # === MÉTHODES LOGGING ===
@@ -720,20 +640,16 @@ class IntegrationsManager:
             if hasattr(logger_instance, 'update_feedback'):
                 return logger_instance.update_feedback(conversation_id, rating_numeric)
             
-            # Fallback vers SQL direct si sqlite3 disponible
-            try:
-                import sqlite3
-                with sqlite3.connect(logger_instance.db_path) as conn:
-                    cursor = conn.execute("""
-                        UPDATE conversations 
-                        SET feedback = ?, updated_at = CURRENT_TIMESTAMP 
-                        WHERE conversation_id = ?
-                    """, (rating_numeric, conversation_id))
-                    
-                    return cursor.rowcount > 0
-            except (ImportError, AttributeError) as e:
-                logger.error(f"❌ [Integrations] Erreur fallback SQL: {e}")
-                return False
+            # Fallback vers SQL direct
+            import sqlite3
+            with sqlite3.connect(logger_instance.db_path) as conn:
+                cursor = conn.execute("""
+                    UPDATE conversations 
+                    SET feedback = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE conversation_id = ?
+                """, (rating_numeric, conversation_id))
+                
+                return cursor.rowcount > 0
         
         except Exception as e:
             logger.error(f"❌ [Integrations] Erreur update_feedback: {e}")
@@ -745,34 +661,25 @@ class IntegrationsManager:
         """Construit un prompt de contextualisation pour le mode sémantique dynamique"""
         func = self._semantic_dynamic_functions.get('build_contextualization_prompt')
         if func:
-            try:
-                return func(question, language)
-            except Exception as e:
-                logger.warning(f"⚠️ [Integrations] Erreur build_contextualization_prompt: {e}")
+            return func(question, language)
         
         # ✅ Fallback toujours disponible
         return self._fallback_build_contextualization_prompt(question, language)
     
-    def get_dynamic_clarification_examples(self, language: str = "fr") -> List[str]:
+    def get_dynamic_clarification_examples(self, language: str = "fr") -> list:
         """Récupère des exemples de questions dynamiques"""
         func = self._semantic_dynamic_functions.get('get_dynamic_clarification_examples')
         if func:
-            try:
-                return func(language)
-            except Exception as e:
-                logger.warning(f"⚠️ [Integrations] Erreur get_dynamic_clarification_examples: {e}")
+            return func(language)
         
         # ✅ Fallback toujours disponible
         return self._fallback_get_examples(language)
     
-    def validate_dynamic_questions(self, questions: List[str], language: str = "fr") -> Dict[str, Any]:
+    def validate_dynamic_questions(self, questions: list, language: str = "fr") -> Dict[str, Any]:
         """Valide la qualité des questions générées dynamiquement"""
         func = self._semantic_dynamic_functions.get('validate_dynamic_questions')
         if func:
-            try:
-                return func(questions, language)
-            except Exception as e:
-                logger.warning(f"⚠️ [Integrations] Erreur validate_dynamic_questions: {e}")
+            return func(questions, language)
         
         # ✅ Fallback toujours disponible
         return self._fallback_validate_questions(questions, language)
@@ -793,7 +700,7 @@ class IntegrationsManager:
             "semantic_dynamic_forced": True
         }
     
-    def get_available_enhancements(self) -> List[str]:
+    def get_available_enhancements(self) -> list:
         """Retourne la liste des améliorations disponibles + semantic dynamic FORCÉ"""
         enhancements = []
         

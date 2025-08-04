@@ -13,9 +13,9 @@ Agent RAG Enhancer - Amélioration des réponses après RAG
 import os
 import logging
 import json
-import re  # ✅ FIX: Import ajouté en haut du fichier
+import re
 from typing import Dict, List, Any, Optional
-from datetime import datetime  # ✅ FIX: Import ajouté en haut du fichier
+from datetime import datetime
 
 # Import OpenAI sécurisé
 try:
@@ -118,15 +118,8 @@ class AgentRAGEnhancer:
             
             return result
             
-        # ✅ FIX: Gestion d'exceptions plus spécifique
-        except (openai.APIError, openai.RateLimitError, openai.APITimeoutError) as e:
-            logger.error(f"❌ [AgentRAGEnhancer] Erreur OpenAI API: {e}")
-            return self._enhance_fallback(rag_answer, entities, missing_entities, original_question, enriched_question, language)
-        except (ConnectionError, TimeoutError) as e:
-            logger.error(f"❌ [AgentRAGEnhancer] Erreur réseau: {e}")
-            return self._enhance_fallback(rag_answer, entities, missing_entities, original_question, enriched_question, language)
         except Exception as e:
-            logger.error(f"❌ [AgentRAGEnhancer] Erreur critique inattendue: {e}")
+            logger.error(f"❌ [AgentRAGEnhancer] Erreur critique: {e}")
             return {
                 "enhanced_answer": rag_answer,
                 "optional_clarifications": [],
@@ -468,19 +461,19 @@ Responde en JSON:
         """Parse la réponse JSON de GPT avec vérification de cohérence"""
         
         try:
-            # ✅ FIX: Regex améliorée pour extraction JSON
+            # Extraire le JSON de la réponse
             json_match = None
             
-            # Patterns améliorés pour extraction JSON robuste
+            # Chercher JSON dans des blocs code
+            import re
             json_patterns = [
-                r'```json\s*({.*?})\s*```',
-                r'```\s*({.*?})\s*```',
-                r'({(?:[^{}]|{[^{}]*})*})'  # ✅ FIX: Regex plus robuste pour JSON imbriqué
+                r'```json\s*(\{.*?\})\s*```',
+                r'```\s*(\{.*?\})\s*```',
+                r'(\{.*?\})'
             ]
             
             for pattern in json_patterns:
-                # ✅ FIX: Utilisation explicite de re.DOTALL et re.MULTILINE
-                match = re.search(pattern, response, re.DOTALL | re.MULTILINE)
+                match = re.search(pattern, response, re.DOTALL)
                 if match:
                     json_match = match.group(1)
                     break
@@ -585,42 +578,28 @@ Responde en JSON:
         warnings = []
         clarifications = []
         
-        # 🆕 Vérification basique de cohérence - AMÉLIORÉE
+        # 🆕 Vérification basique de cohérence
         coherence_check = "unknown"
         coherence_notes = "Vérification automatique basique"
         
         if enriched_question and original_question:
-            # ✅ FIX: Vérification de cohérence améliorée
-            enriched_words = set(word.lower() for word in enriched_question.split() if len(word) > 2)
-            answer_words = set(word.lower() for word in rag_answer.split() if len(word) > 2)
-            
-            # Mots de stop à ignorer
-            stop_words = {'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'est', 'sont', 'the', 'and', 'or', 'is', 'are', 'a', 'an', 'of', 'to', 'in', 'for'}
-            enriched_words -= stop_words
-            answer_words -= stop_words
+            # Vérification très basique par mots-clés
+            enriched_words = set(enriched_question.lower().split())
+            answer_words = set(rag_answer.lower().split())
             
             # Mots-clés importants communs
             important_words = enriched_words.intersection(answer_words)
-            # ✅ FIX: Filtrer les mots trop courts de manière plus intelligente
-            important_words = {w for w in important_words if len(w) > 3 or w in ['âge', 'age', 'sex', 'sexe', 'kg', 'gr']}
+            important_words = {w for w in important_words if len(w) > 3}  # Ignorer mots courts
             
-            total_important_words = len(enriched_words.union(answer_words))
-            
-            if total_important_words > 0:
-                similarity_ratio = len(important_words) / total_important_words
-                
-                if similarity_ratio >= 0.3:
-                    coherence_check = "good"
-                    coherence_notes = f"Réponse cohérente (similarité: {similarity_ratio:.1f}, mots-clés: {', '.join(list(important_words)[:3])})"
-                elif similarity_ratio >= 0.15:
-                    coherence_check = "partial"
-                    coherence_notes = f"Cohérence partielle (similarité: {similarity_ratio:.1f}, mots-clés: {', '.join(important_words)})"
-                else:
-                    coherence_check = "poor"
-                    coherence_notes = f"Faible cohérence (similarité: {similarity_ratio:.1f})"
+            if len(important_words) >= 3:
+                coherence_check = "good"
+                coherence_notes = f"Réponse semble cohérente (mots-clés communs: {', '.join(list(important_words)[:3])})"
+            elif len(important_words) >= 1:
+                coherence_check = "partial"
+                coherence_notes = f"Cohérence partielle (quelques mots-clés communs: {', '.join(important_words)})"
             else:
                 coherence_check = "poor"
-                coherence_notes = "Aucun mot-clé significatif en commun"
+                coherence_notes = "Peu de mots-clés communs entre question enrichie et réponse"
         
         # Ajouter des avertissements selon les entités manquantes
         if "breed" in missing_entities:
@@ -696,7 +675,6 @@ Responde en JSON:
         """Retourne les statistiques de l'agent"""
         
         total = self.stats["total_requests"]
-        # ✅ FIX: Protection contre division par zéro déjà présente, mais améliorée
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
         enhancement_rate = (self.stats["answers_enhanced"] / total * 100) if total > 0 else 0
         clarification_rate = (self.stats["clarifications_generated"] / total * 100) if total > 0 else 0

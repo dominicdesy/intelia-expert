@@ -1,17 +1,11 @@
 """
-app/api/v1/clarification_generators.py - GÉNÉRATION DES QUESTIONS - VERSION CORRIGÉE
+app/api/v1/clarification_generators.py - GÉNÉRATION DES QUESTIONS
 
 Contient:
 - Génération dynamique avec GPT + validation
 - Questions adaptatives par règles
 - Extraction texte libre
 - Fallbacks intelligents
-
-CORRECTIONS APPLIQUÉES:
-1. Configuration OpenAI moderne (client-based)
-2. Gestion d'erreurs complète (rate limits, timeouts)
-3. Parsing JSON plus robuste
-4. Validation renforcée
 """
 
 import os
@@ -22,15 +16,13 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from .clarification_entities import ClarificationMode
 
-# Import OpenAI moderne avec fallback
+# Import OpenAI sécurisé
 try:
-    from openai import OpenAI
     import openai
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
     openai = None
-    OpenAI = None
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +36,6 @@ class QuestionGenerator:
         self.validation_threshold = 0.5
         self.enable_validation = True
         self.enable_fallback = True
-        self.client = None  # ✅ AJOUT: Client OpenAI moderne
         
         # Templates de questions adaptatives
         self.adaptive_templates = {
@@ -96,23 +87,6 @@ class QuestionGenerator:
             ]
         }
 
-    def _initialize_openai_client(self) -> bool:
-        """✅ NOUVEAU: Initialise le client OpenAI moderne"""
-        try:
-            if not OPENAI_AVAILABLE or not OpenAI:
-                return False
-                
-            api_key = os.getenv('OPENAI_API_KEY')
-            if not api_key:
-                return False
-                
-            self.client = OpenAI(api_key=api_key)
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ [OpenAI Client] Erreur initialisation: {e}")
-            return False
-
     def generate_dynamic_questions_with_validation(self, user_question: str, language: str = "fr") -> Tuple[List[str], Dict[str, Any]]:
         """
         🆕 Génère jusqu'à 4 questions de clarification via GPT avec validation robuste automatique
@@ -126,67 +100,51 @@ class QuestionGenerator:
             "fallback_used": False,
             "fallback_reason": None,
             "questions_generated": 0,
-            "questions_validated": 0,
-            "error_type": None  # ✅ AJOUT: Type d'erreur pour debug
+            "questions_validated": 0
         }
         
         try:
-            # ✅ CORRECTION: Vérifier et initialiser le client OpenAI
-            if not self._initialize_openai_client():
+            # Vérifier disponibilité OpenAI
+            if not OPENAI_AVAILABLE or not openai:
                 logger.warning("⚠️ [Dynamic Generator] OpenAI non disponible - fallback intelligent")
                 validation_metadata["fallback_used"] = True
                 validation_metadata["fallback_reason"] = "openai_unavailable"
                 fallback_questions = self._get_intelligent_fallback(user_question, language)
                 return fallback_questions, validation_metadata
 
+            # Configuration OpenAI
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                logger.warning("⚠️ [Dynamic Generator] Clé API OpenAI manquante - fallback intelligent")
+                validation_metadata["fallback_used"] = True
+                validation_metadata["fallback_reason"] = "api_key_missing"
+                fallback_questions = self._get_intelligent_fallback(user_question, language)
+                return fallback_questions, validation_metadata
+            
+            openai.api_key = api_key
+
             # Construire le prompt contextualisé
             prompt = self._build_dynamic_prompt(user_question, language)
             logger.info(f"🤖 [Dynamic Generator] Prompt généré pour: '{user_question[:50]}...'")
 
-            # ✅ CORRECTION: Appel GPT avec gestion d'erreurs complète
+            # Appel GPT pour génération dynamique
             validation_metadata["gpt_called"] = True
             
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "Tu es un expert en aviculture spécialisé dans la génération de questions pertinentes et précises."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=300,
-                    timeout=self.timeout
-                )
-                
-                content = response.choices[0].message.content.strip()
-                validation_metadata["gpt_success"] = True
-                
-                logger.info(f"🤖 [Dynamic Generator] Réponse reçue ({len(content)} chars)")
-                
-            # ✅ NOUVEAU: Gestion spécifique des erreurs OpenAI
-            except openai.RateLimitError as e:
-                logger.error(f"❌ [OpenAI] Rate limit atteint: {e}")
-                validation_metadata["error_type"] = "rate_limit"
-                validation_metadata["fallback_used"] = True
-                validation_metadata["fallback_reason"] = "rate_limit_exceeded"
-                fallback_questions = self._get_intelligent_fallback(user_question, language)
-                return fallback_questions, validation_metadata
-                
-            except openai.APITimeoutError as e:
-                logger.error(f"❌ [OpenAI] Timeout API: {e}")
-                validation_metadata["error_type"] = "timeout"
-                validation_metadata["fallback_used"] = True
-                validation_metadata["fallback_reason"] = "api_timeout"
-                fallback_questions = self._get_intelligent_fallback(user_question, language)
-                return fallback_questions, validation_metadata
-                
-            except openai.APIError as e:
-                logger.error(f"❌ [OpenAI] Erreur API: {e}")
-                validation_metadata["error_type"] = "api_error"
-                validation_metadata["fallback_used"] = True
-                validation_metadata["fallback_reason"] = f"api_error: {str(e)}"
-                fallback_questions = self._get_intelligent_fallback(user_question, language)
-                return fallback_questions, validation_metadata
+            response = openai.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "Tu es un expert en aviculture spécialisé dans la génération de questions pertinentes et précises."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=300,
+                timeout=self.timeout
+            )
+            
+            content = response.choices[0].message.content.strip()
+            validation_metadata["gpt_success"] = True
+            
+            logger.info(f"🤖 [Dynamic Generator] Réponse reçue ({len(content)} chars)")
             
             # Parser la réponse JSON avec fallback
             questions = self._parse_gpt_response(content, language)
@@ -242,7 +200,6 @@ class QuestionGenerator:
             
         except Exception as e:
             logger.error(f"❌ [Dynamic Generator] Erreur génération: {e}")
-            validation_metadata["error_type"] = "general_exception"
             validation_metadata["fallback_used"] = True
             validation_metadata["fallback_reason"] = f"exception: {str(e)}"
             
@@ -355,43 +312,24 @@ Responde SOLO con este formato JSON:
         return prompt_templates.get(language, prompt_templates["fr"])
 
     def _parse_gpt_response(self, content: str, language: str) -> List[str]:
-        """✅ AMÉLIORÉ: Parse la réponse GPT pour extraire les questions"""
+        """Parse la réponse GPT pour extraire les questions"""
         
         questions = []
         
         try:
-            # ✅ CORRECTION: Regex plus robuste pour JSON
-            # Cherche spécifiquement les structures avec clarification_questions
-            json_patterns = [
-                r'\{[^{}]*"clarification_questions"[^{}]*\[[^\]]*\][^{}]*\}',  # Pattern principal
-                r'\{.*?"clarification_questions".*?\[.*?\].*?\}',  # Pattern alternatif
-                r'\{.*?\}',  # Fallback original
-            ]
-            
-            json_data = None
-            for pattern in json_patterns:
-                json_match = re.search(pattern, content, re.DOTALL)
-                if json_match:
-                    try:
-                        json_str = json_match.group(0)
-                        json_data = json.loads(json_str)
-                        if "clarification_questions" in json_data:
-                            break  # Succès avec ce pattern
-                    except json.JSONDecodeError:
-                        continue  # Essayer le pattern suivant
-            
-            if json_data and "clarification_questions" in json_data:
-                questions = json_data.get("clarification_questions", [])
-                # ✅ AJOUT: Validation que c'est bien une liste
-                if not isinstance(questions, list):
-                    questions = []
+            # Chercher JSON
+            json_match = re.search(r'\{.*?\}', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                data = json.loads(json_str)
+                questions = data.get("clarification_questions", [])
                 logger.info(f"🤖 [Parser] {len(questions)} questions extraites du JSON")
             else:
-                logger.warning("⚠️ [Parser] Pas de JSON valide - extraction texte libre")
+                logger.warning("⚠️ [Parser] Pas de JSON - extraction texte libre")
                 questions = self._extract_questions_from_text(content, language)
                 
-        except Exception as e:
-            logger.error(f"❌ [Parser] Erreur parsing: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ [Parser] Erreur JSON: {e}")
             questions = self._extract_questions_from_text(content, language)
         
         return questions
@@ -429,7 +367,7 @@ Responde SOLO con este formato JSON:
         return questions
 
     def _validate_questions(self, questions: List[str], user_question: str, language: str) -> Dict[str, Any]:
-        """✅ RENFORCÉ: Validation robuste des questions générées"""
+        """Validation robuste des questions générées"""
         
         valid_questions = []
         quality_scores = []
@@ -450,18 +388,12 @@ Responde SOLO con este formato JSON:
             q = question.strip()
             score = 0.0
             
-            # ✅ AJOUT: Validation basique de structure
-            if not q:
-                continue
-                
             # Critères de validation
             if len(q) >= 20 and len(q) <= 150:
                 score += 0.3
             
             if '?' in q:
                 score += 0.2
-            else:
-                score -= 0.1  # ✅ AMÉLIORATION: Pénalité si pas de point d'interrogation
                 
             if not any(phrase in q.lower() for phrase in forbidden):
                 score += 0.2
@@ -473,12 +405,6 @@ Responde SOLO con este formato JSON:
             if any(term in q.lower() for term in tech_terms):
                 score += 0.3
             
-            # ✅ NOUVEAU: Bonus pour questions contextuelles
-            user_words = set(user_question.lower().split())
-            question_words = set(q.lower().split())
-            if len(user_words.intersection(question_words)) >= 2:
-                score += 0.2
-            
             quality_scores.append(score)
             
             if score >= 0.5:  # Seuil de qualité
@@ -489,35 +415,19 @@ Responde SOLO con este formato JSON:
         return {
             "valid_questions": valid_questions,
             "quality_score": avg_score,
-            "individual_scores": quality_scores,
-            "total_processed": len(questions)  # ✅ AJOUT: Métrique debug
+            "individual_scores": quality_scores
         }
 
     def _clean_questions(self, questions: List[str]) -> List[str]:
-        """✅ AMÉLIORÉ: Nettoyage basique des questions"""
+        """Nettoyage basique des questions"""
         
         cleaned = []
-        seen_questions = set()  # ✅ AJOUT: Éviter les doublons
-        
         for q in questions[:self.max_questions]:
-            if not isinstance(q, str):
-                continue
-                
-            q_cleaned = q.strip()
-            if len(q_cleaned) < 10:
-                continue
-                
-            # ✅ NOUVEAU: Éviter les doublons (comparaison normalisée)
-            q_normalized = re.sub(r'\s+', ' ', q_cleaned.lower())
-            if q_normalized in seen_questions:
-                continue
-            seen_questions.add(q_normalized)
-                
-            if not q_cleaned.endswith('?'):
-                q_cleaned += ' ?'
-                
-            cleaned.append(q_cleaned)
-            
+            if isinstance(q, str) and len(q.strip()) > 10:
+                cleaned_q = q.strip()
+                if not cleaned_q.endswith('?'):
+                    cleaned_q += ' ?'
+                cleaned.append(cleaned_q)
         return cleaned
 
     def _get_intelligent_fallback(self, user_question: str, language: str) -> List[str]:
