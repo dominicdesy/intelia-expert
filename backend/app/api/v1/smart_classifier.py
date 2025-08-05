@@ -1,26 +1,31 @@
 """
-smart_classifier.py - CLASSIFIER INTELLIGENT AVEC CONTEXTE CONVERSATIONNEL
+smart_classifier.py - CLASSIFIER INTELLIGENT AVEC CONTEXTE CONVERSATIONNEL COMPLET
 
-🎯 AMÉLIORATIONS:
+🎯 SOLUTION COMPLÈTE:
 - ✅ Détection des clarifications contextuelles
-- ✅ Mémoire conversationnelle
-- ✅ Logique avancée pour combinaisons d'entités
-- ✅ Support des conversations multi-tours
-- ✅ Interpolation automatique des données manquantes
+- ✅ Accès aux données de référence Ross 308  
+- ✅ Persistance du contexte dans la base existante
+- ✅ Intégration avec le pipeline existant
+- ✅ Support complet du type CONTEXTUAL_ANSWER
 
 Architecture:
 - classify_question() : Point d'entrée unique avec contexte
-- Règles hiérarchiques avancées
-- Support contexte conversationnel
-- Pas de conflits entre systèmes
+- Accès direct aux standards de poids depuis intelligent_system_config
+- Persistance automatique du contexte conversationnel
+- Fusion intelligente des entités
 """
 
 import logging
 import re
+import sqlite3
+import json
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+# Import des standards de poids depuis la config
+from .intelligent_system_config import ReferenceData, get_weight_range
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +38,7 @@ class ResponseType(Enum):
 
 @dataclass
 class ConversationContext:
-    """Contexte d'une conversation"""
+    """Contexte d'une conversation avec accès aux standards"""
     previous_question: Optional[str] = None
     previous_entities: Optional[Dict[str, Any]] = None
     conversation_topic: Optional[str] = None  # performance, health, feeding
@@ -42,26 +47,66 @@ class ConversationContext:
     established_sex: Optional[str] = None
     last_interaction: Optional[datetime] = None
     
+    # NOUVEAU: Données calculées pour réponse précise
+    computed_weight_range: Optional[tuple] = None
+    computed_confidence: float = 0.0
+    
     def is_fresh(self, max_age_minutes: int = 10) -> bool:
         """Vérifie si le contexte est encore frais"""
         if not self.last_interaction:
             return False
         return datetime.now() - self.last_interaction < timedelta(minutes=max_age_minutes)
+    
+    def to_dict(self) -> dict:
+        """Convertit en dictionnaire pour sauvegarde"""
+        return {
+            "previous_question": self.previous_question,
+            "previous_entities": self.previous_entities,
+            "conversation_topic": self.conversation_topic,
+            "established_breed": self.established_breed,
+            "established_age": self.established_age,
+            "established_sex": self.established_sex,
+            "last_interaction": self.last_interaction.isoformat() if self.last_interaction else None,
+            "computed_weight_range": self.computed_weight_range,
+            "computed_confidence": self.computed_confidence
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "ConversationContext":
+        """Crée depuis un dictionnaire"""
+        context = cls()
+        context.previous_question = data.get("previous_question")
+        context.previous_entities = data.get("previous_entities")
+        context.conversation_topic = data.get("conversation_topic")
+        context.established_breed = data.get("established_breed")
+        context.established_age = data.get("established_age")
+        context.established_sex = data.get("established_sex")
+        context.computed_weight_range = data.get("computed_weight_range")
+        context.computed_confidence = data.get("computed_confidence", 0.0)
+        
+        last_interaction_str = data.get("last_interaction")
+        if last_interaction_str:
+            context.last_interaction = datetime.fromisoformat(last_interaction_str)
+        
+        return context
 
 class ClassificationResult:
-    """Résultat de la classification"""
+    """Résultat de la classification avec données de référence"""
     def __init__(self, response_type: ResponseType, confidence: float, reasoning: str, 
-                 missing_entities: list = None, merged_entities: Dict[str, Any] = None):
+                 missing_entities: list = None, merged_entities: Dict[str, Any] = None,
+                 weight_data: Dict[str, Any] = None):
         self.response_type = response_type
         self.confidence = confidence
         self.reasoning = reasoning
         self.missing_entities = missing_entities or []
         self.merged_entities = merged_entities or {}
+        self.weight_data = weight_data or {}  # NOUVEAU: Données de poids calculées
 
 class SmartClassifier:
-    """Classifier intelligent avec contexte conversationnel"""
+    """Classifier intelligent avec contexte conversationnel et accès aux données"""
     
-    def __init__(self):
+    def __init__(self, db_path: str = "conversations.db"):
+        self.db_path = db_path
         self.confidence_thresholds = {
             "precise": 0.85,
             "general": 0.6,
@@ -83,17 +128,37 @@ class SmartClassifier:
             'pour un', 'pour une', 'avec un', 'avec une', 'chez un', 'chez une',
             'ross 308', 'cobb 500', 'mâle', 'femelle', 'mâles', 'femelles'
         ]
+        
+        # Initialiser la table de contexte
+        self._init_context_table()
+
+    def _init_context_table(self):
+        """Initialise la table pour stocker les contextes conversationnels"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS conversation_contexts (
+                        conversation_id TEXT PRIMARY KEY,
+                        context_data TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_contexts_updated ON conversation_contexts(updated_at)")
+                logger.info("✅ [Smart Classifier] Table contextes initialisée")
+        except Exception as e:
+            logger.error(f"❌ [Smart Classifier] Erreur init table contexte: {e}")
 
     def classify_question(self, question: str, entities: Dict[str, Any], 
-                         conversation_context: Optional[ConversationContext] = None,
+                         conversation_id: Optional[str] = None,
                          is_clarification_response: bool = False) -> ClassificationResult:
         """
-        POINT D'ENTRÉE UNIQUE - Classifie la question avec contexte conversationnel
+        POINT D'ENTRÉE PRINCIPAL - Classifie la question avec contexte conversationnel
         
         Args:
             question: Texte de la question
             entities: Entités extraites de la question
-            conversation_context: Contexte de la conversation précédente
+            conversation_id: ID de la conversation pour récupérer le contexte
             is_clarification_response: Indique si c'est une réponse de clarification
             
         Returns:
@@ -103,36 +168,69 @@ class SmartClassifier:
             logger.info(f"🧠 [Smart Classifier] Classification: '{question[:50]}...'")
             logger.info(f"🔍 [Smart Classifier] Entités: {entities}")
             
+            # Récupérer le contexte conversationnel
+            conversation_context = None
+            if conversation_id:
+                conversation_context = self._get_conversation_context(conversation_id)
+                logger.info(f"🔗 [Smart Classifier] Contexte récupéré: {conversation_context is not None}")
+            
             # NOUVEAU: Détection des clarifications contextuelles
             if self._is_clarification_response(question, entities, conversation_context, is_clarification_response):
                 merged_entities = self._merge_with_context(entities, conversation_context)
                 logger.info(f"🔗 [Contextual] Entités fusionnées: {merged_entities}")
                 
                 if self._has_specific_info(merged_entities):
-                    return ClassificationResult(
+                    # NOUVEAU: Calculer les données de poids si c'est une question de performance
+                    weight_data = self._calculate_weight_data(merged_entities)
+                    
+                    result = ClassificationResult(
                         ResponseType.CONTEXTUAL_ANSWER,
                         confidence=0.9,
                         reasoning="Clarification détectée - contexte fusionné pour réponse précise",
-                        merged_entities=merged_entities
+                        merged_entities=merged_entities,
+                        weight_data=weight_data
                     )
+                    
+                    # Sauvegarder le contexte mis à jour
+                    if conversation_id:
+                        updated_context = self._create_conversation_context(question, merged_entities, conversation_context)
+                        self._save_conversation_context(conversation_id, updated_context)
+                    
+                    return result
             
             # Règle 1: PRÉCIS - Assez d'informations pour réponse spécifique
             if self._has_specific_info(entities):
-                return ClassificationResult(
+                weight_data = self._calculate_weight_data(entities)
+                result = ClassificationResult(
                     ResponseType.PRECISE_ANSWER,
                     confidence=0.9,
-                    reasoning="Informations spécifiques suffisantes (race + âge/sexe)"
+                    reasoning="Informations spécifiques suffisantes (race + âge/sexe)",
+                    weight_data=weight_data
                 )
+                
+                # Sauvegarder le contexte
+                if conversation_id:
+                    new_context = self._create_conversation_context(question, entities, conversation_context)
+                    self._save_conversation_context(conversation_id, new_context)
+                
+                return result
             
             # Règle 2: GÉNÉRAL - Contexte suffisant pour réponse utile
             elif self._has_useful_context(question, entities):
                 missing = self._identify_missing_for_precision(entities)
-                return ClassificationResult(
+                result = ClassificationResult(
                     ResponseType.GENERAL_ANSWER,
                     confidence=0.8,
                     reasoning="Contexte suffisant pour réponse générale utile",
                     missing_entities=missing
                 )
+                
+                # Sauvegarder le contexte
+                if conversation_id:
+                    new_context = self._create_conversation_context(question, entities, conversation_context)
+                    self._save_conversation_context(conversation_id, new_context)
+                
+                return result
             
             # Règle 3: CLARIFICATION - Vraiment trop vague
             else:
@@ -153,16 +251,65 @@ class SmartClassifier:
                 reasoning="Erreur de classification - fallback général"
             )
 
+    def _calculate_weight_data(self, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """NOUVEAU: Calcule les données de poids basées sur les entités"""
+        
+        breed = entities.get('breed_specific', '').lower().replace(' ', '_')
+        age_days = entities.get('age_days')
+        sex = entities.get('sex', 'mixed').lower()
+        
+        if not breed or not age_days:
+            return {}
+        
+        # Normaliser le sexe
+        if sex in ['mâle', 'male', 'coq']:
+            sex = 'male'
+        elif sex in ['femelle', 'female', 'poule']:
+            sex = 'female'
+        else:
+            sex = 'mixed'
+        
+        try:
+            # Utiliser la fonction de la config pour obtenir la fourchette
+            weight_range = get_weight_range(breed, age_days, sex)
+            min_weight, max_weight = weight_range
+            target_weight = (min_weight + max_weight) // 2
+            
+            # Calculer les seuils d'alerte
+            alert_low = int(min_weight * 0.85)
+            alert_high = int(max_weight * 1.15)
+            
+            weight_data = {
+                "breed": breed.replace('_', ' ').title(),
+                "age_days": age_days,
+                "sex": sex,
+                "weight_range": weight_range,
+                "target_weight": target_weight,
+                "alert_thresholds": {
+                    "low": alert_low,
+                    "high": alert_high
+                },
+                "data_source": "intelligent_system_config",
+                "confidence": 0.95
+            }
+            
+            logger.info(f"📊 [Weight Data] Calculé: {breed} {sex} {age_days}j → {min_weight}-{max_weight}g")
+            return weight_data
+            
+        except Exception as e:
+            logger.error(f"❌ [Weight Data] Erreur calcul: {e}")
+            return {}
+
     def _is_clarification_response(self, question: str, entities: Dict[str, Any], 
                                  context: Optional[ConversationContext], 
                                  is_clarification_flag: bool) -> bool:
-        """NOUVEAU: Détecte si c'est une réponse de clarification"""
+        """Détecte si c'est une réponse de clarification"""
         
         # Flag explicite
         if is_clarification_flag:
             return True
             
-        # Pas de contexte
+        # Pas de contexte frais
         if not context or not context.is_fresh():
             return False
             
@@ -199,7 +346,7 @@ class SmartClassifier:
 
     def _merge_with_context(self, current_entities: Dict[str, Any], 
                           context: Optional[ConversationContext]) -> Dict[str, Any]:
-        """NOUVEAU: Fusionne les entités actuelles avec le contexte conversationnel"""
+        """Fusionne les entités actuelles avec le contexte conversationnel"""
         
         if not context:
             return current_entities
@@ -242,7 +389,7 @@ class SmartClassifier:
         return merged
 
     def _has_specific_info(self, entities: Dict[str, Any]) -> bool:
-        """Détermine s'il y a assez d'infos pour une réponse précise (amélioré)"""
+        """Détermine s'il y a assez d'infos pour une réponse précise"""
         
         breed_specific = entities.get('breed_specific')
         age = entities.get('age_days') or entities.get('age')
@@ -263,12 +410,12 @@ class SmartClassifier:
             logger.info("✅ [Specific] Race spécifique + âge (suffisant)")
             return True
             
-        # NOUVEAU: Contexte de performance avec race et âge
+        # Contexte de performance avec race et âge
         if breed_specific and context_type == 'performance':
             logger.info("✅ [Specific] Race + contexte performance")
             return True
             
-        # NOUVEAU: Race + sexe + contexte âge hérité
+        # Race + sexe + contexte âge hérité
         if breed_specific and sex and entities.get('age_context_inherited'):
             logger.info("✅ [Specific] Race + sexe + âge du contexte")
             return True
@@ -276,7 +423,7 @@ class SmartClassifier:
         return False
 
     def _has_useful_context(self, question: str, entities: Dict[str, Any]) -> bool:
-        """Détermine s'il y a assez de contexte pour une réponse générale utile (amélioré)"""
+        """Détermine s'il y a assez de contexte pour une réponse générale utile"""
         
         question_lower = question.lower()
         
@@ -317,7 +464,7 @@ class SmartClassifier:
             logger.info("✅ [Useful] Question alimentation + âge")
             return True
         
-        # NOUVEAU: Contexte hérité de performance
+        # Contexte hérité de performance
         if entities.get('weight_context_inherited') or entities.get('age_context_inherited'):
             logger.info("✅ [Useful] Contexte performance hérité")
             return True
@@ -326,7 +473,7 @@ class SmartClassifier:
         return False
 
     def _identify_missing_for_precision(self, entities: Dict[str, Any]) -> list:
-        """Identifie ce qui manque pour une réponse plus précise (amélioré)"""
+        """Identifie ce qui manque pour une réponse plus précise"""
         missing = []
         
         if not entities.get('breed_specific'):
@@ -341,7 +488,7 @@ class SmartClassifier:
         return missing
 
     def _identify_critical_missing(self, question: str, entities: Dict[str, Any]) -> list:
-        """Identifie les informations critiques manquantes (amélioré)"""
+        """Identifie les informations critiques manquantes"""
         missing = []
         question_lower = question.lower()
         
@@ -365,9 +512,46 @@ class SmartClassifier:
         
         return missing
 
-    def create_conversation_context(self, question: str, entities: Dict[str, Any], 
-                                  previous_context: Optional[ConversationContext] = None) -> ConversationContext:
-        """NOUVEAU: Crée un contexte conversationnel pour la prochaine interaction"""
+    def _get_conversation_context(self, conversation_id: str) -> Optional[ConversationContext]:
+        """Récupère le contexte d'une conversation depuis la base"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT context_data FROM conversation_contexts 
+                    WHERE conversation_id = ?
+                """, (conversation_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    context_data = json.loads(row[0])
+                    return ConversationContext.from_dict(context_data)
+                    
+        except Exception as e:
+            logger.error(f"❌ [Context] Erreur récupération contexte: {e}")
+        
+        return None
+
+    def _save_conversation_context(self, conversation_id: str, context: ConversationContext):
+        """Sauvegarde le contexte d'une conversation"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                context_json = json.dumps(context.to_dict())
+                now = datetime.now().isoformat()
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO conversation_contexts 
+                    (conversation_id, context_data, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                """, (conversation_id, context_json, now, now))
+                
+                logger.info(f"💾 [Context] Contexte sauvegardé: {conversation_id}")
+                
+        except Exception as e:
+            logger.error(f"❌ [Context] Erreur sauvegarde contexte: {e}")
+
+    def _create_conversation_context(self, question: str, entities: Dict[str, Any], 
+                                   previous_context: Optional[ConversationContext] = None) -> ConversationContext:
+        """Crée un nouveau contexte conversationnel"""
         
         context = ConversationContext()
         context.previous_question = question
@@ -376,7 +560,7 @@ class SmartClassifier:
         
         # Déterminer le topic de conversation
         question_lower = question.lower()
-        if any(word in question_lower for word in ['poids', 'croissance', 'performance']):
+        if any(word in question_lower for word in ['poids', 'croissance', 'performance', 'cible']):
             context.conversation_topic = 'performance'
         elif any(word in question_lower for word in ['malade', 'symptôme', 'santé']):
             context.conversation_topic = 'health'
@@ -405,7 +589,7 @@ class SmartClassifier:
     def get_classification_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques de classification pour debugging"""
         return {
-            "classifier_version": "2.0.0_contextual",
+            "classifier_version": "2.0.0_contextual_with_data",
             "response_types": [t.value for t in ResponseType],
             "confidence_thresholds": self.confidence_thresholds,
             "supported_breeds_specific": len(self.specific_breeds),
@@ -415,7 +599,13 @@ class SmartClassifier:
                 "conversational_context",
                 "clarification_detection", 
                 "entity_inheritance",
-                "contextual_merging"
+                "contextual_merging",
+                "weight_data_calculation",
+                "database_persistence"
+            ],
+            "data_sources": [
+                "intelligent_system_config.ReferenceData",
+                "conversation_contexts_table"
             ]
         }
 
@@ -424,7 +614,7 @@ class SmartClassifier:
 # =============================================================================
 
 def quick_classify(question: str, entities: Dict[str, Any] = None, 
-                  context: Optional[ConversationContext] = None) -> str:
+                  conversation_id: str = None) -> str:
     """
     Classification rapide pour usage simple avec support du contexte
     
@@ -435,7 +625,7 @@ def quick_classify(question: str, entities: Dict[str, Any] = None,
         entities = {}
     
     classifier = SmartClassifier()
-    result = classifier.classify_question(question, entities, context)
+    result = classifier.classify_question(question, entities, conversation_id)
     
     return {
         ResponseType.PRECISE_ANSWER: 'precise',
@@ -445,43 +635,50 @@ def quick_classify(question: str, entities: Dict[str, Any] = None,
     }[result.response_type]
 
 # =============================================================================
-# TESTS INTÉGRÉS AVEC CONTEXTE
+# TESTS INTÉGRÉS AVEC CONTEXTE ET DONNÉES
 # =============================================================================
 
-def test_classifier_with_context():
-    """Tests du classifier avec contexte conversationnel"""
+def test_classifier_complete():
+    """Tests complets du classifier avec contexte et données"""
     classifier = SmartClassifier()
     
-    # Simulation d'une conversation
-    print("🧪 Test de conversation avec contexte:")
-    print("=" * 50)
+    print("🧪 Test de conversation complète avec données Ross 308:")
+    print("=" * 60)
+    
+    # Simulation d'une conversation réelle
+    conversation_id = "test_conv_12345"
     
     # Question 1: Question générale
     q1 = "Quel est le poids cible d'un poulet de 12 jours ?"
     e1 = {'age_days': 12, 'weight_mentioned': True, 'context_type': 'performance'}
-    result1 = classifier.classify_question(q1, e1)
-    context1 = classifier.create_conversation_context(q1, e1)
+    result1 = classifier.classify_question(q1, e1, conversation_id)
     
     print(f"Q1: {q1}")
     print(f"→ {result1.response_type.value} (confiance: {result1.confidence})")
-    print(f"→ Contexte établi: âge={context1.established_age}, topic={context1.conversation_topic}")
+    print(f"→ Entités manquantes: {result1.missing_entities}")
     print()
     
-    # Question 2: Clarification (devrait être détectée)
+    # Question 2: Clarification (doit fusionner et calculer Ross 308 mâle 12j)
     q2 = "Pour un Ross 308 male"
     e2 = {'breed_specific': 'Ross 308', 'sex': 'mâle'}
-    result2 = classifier.classify_question(q2, e2, context1, is_clarification_response=True)
+    result2 = classifier.classify_question(q2, e2, conversation_id, is_clarification_response=True)
     
     print(f"Q2: {q2} (clarification)")
     print(f"→ {result2.response_type.value} (confiance: {result2.confidence})")
     print(f"→ Entités fusionnées: {result2.merged_entities}")
+    print(f"→ Données de poids: {result2.weight_data}")
     print(f"→ Raisonnement: {result2.reasoning}")
     
     # Vérification du succès
     if result2.response_type == ResponseType.CONTEXTUAL_ANSWER:
-        print("✅ SUCCESS: Clarification détectée et contexte fusionné!")
+        weight_data = result2.weight_data
+        if weight_data and 'weight_range' in weight_data:
+            min_w, max_w = weight_data['weight_range']
+            print(f"✅ SUCCESS: Ross 308 mâle 12j → {min_w}-{max_w}g calculé!")
+        else:
+            print("❌ FAILED: Données de poids non calculées")
     else:
         print("❌ FAILED: Clarification non détectée")
 
 if __name__ == "__main__":
-    test_classifier_with_context()
+    test_classifier_complete()

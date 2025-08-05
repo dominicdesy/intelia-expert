@@ -1,17 +1,19 @@
 """
-expert_services.py - SERVICE PRINCIPAL SIMPLIFIÉ
+expert_services.py - SERVICE PRINCIPAL AVEC CONTEXTE CONVERSATIONNEL COMPLET
 
-🎯 REMPLACE: Tous les services complexes et contradictoires
-🚀 PRINCIPE: Un seul point d'entrée, logique claire et unifiée
-✨ SIMPLE: Flux linéaire sans conflits
+🎯 AMÉLIORATIONS INTÉGRÉES:
+- ✅ Gestion complète du contexte conversationnel
+- ✅ Support du type CONTEXTUAL_ANSWER
+- ✅ Passage du conversation_id au classifier
+- ✅ Intégration avec la base de données existante
+- ✅ Compatibilité totale avec l'ancien système
 
-Architecture:
-1. EntitiesExtractor -> Extraction des informations
-2. SmartClassifier -> Décision du type de réponse  
-3. UnifiedResponseGenerator -> Génération de la réponse
-4. Formatage final -> Réponse standardisée
-
-Fini les imports circulaires, les conflits de règles, et la complexité excessive !
+NOUVEAU FLUX:
+1. Récupération du conversation_id depuis la requête
+2. Passage du conversation_id au classifier intelligent
+3. Classifier détecte les clarifications et fusionne le contexte
+4. Response Generator utilise les weight_data pour réponse précise
+5. Résultat: "Ross 308 mâle à 12 jours : 380-420g" 🎯
 """
 
 import logging
@@ -20,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-# Imports des nouveaux modules simplifiés
+# Imports des nouveaux modules avec contexte
 from .entities_extractor import EntitiesExtractor, ExtractedEntities
 from .smart_classifier import SmartClassifier, ClassificationResult, ResponseType
 from .unified_response_generator import UnifiedResponseGenerator, ResponseData
@@ -45,10 +47,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class ProcessingResult:
-    """Résultat du traitement d'une question"""
+    """Résultat du traitement d'une question avec contexte"""
     def __init__(self, success: bool, response: str, response_type: str, 
                  confidence: float, entities: ExtractedEntities, 
-                 processing_time_ms: int, error: str = None):
+                 processing_time_ms: int, error: str = None,
+                 context_used: bool = False, weight_data: Dict[str, Any] = None):
         self.success = success
         self.response = response
         self.response_type = response_type
@@ -56,56 +59,72 @@ class ProcessingResult:
         self.entities = entities
         self.processing_time_ms = processing_time_ms
         self.error = error
+        self.context_used = context_used  # NOUVEAU: Indique si le contexte a été utilisé
+        self.weight_data = weight_data or {}  # NOUVEAU: Données de poids calculées
         self.timestamp = datetime.now().isoformat()
 
 class ExpertService:
-    """Service expert unifié - Point d'entrée unique pour toutes les questions"""
+    """Service expert unifié avec support du contexte conversationnel"""
     
-    def __init__(self):
-        """Initialisation du service avec les 3 composants principaux"""
+    def __init__(self, db_path: str = "conversations.db"):
+        """Initialisation du service avec les composants contextuels"""
         self.entities_extractor = EntitiesExtractor()
-        self.smart_classifier = SmartClassifier()
+        self.smart_classifier = SmartClassifier(db_path=db_path)  # NOUVEAU: Passer db_path
         self.response_generator = UnifiedResponseGenerator()
         
-        # Statistiques pour monitoring
+        # Statistiques pour monitoring (améliorées)
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
             "general_answers": 0,
             "clarifications": 0,
+            "contextual_answers": 0,  # NOUVEAU: Compteur pour réponses contextuelles
             "errors": 0,
-            "average_processing_time_ms": 0
+            "average_processing_time_ms": 0,
+            "context_usage_rate": 0.0  # NOUVEAU: Taux d'utilisation du contexte
         }
         
         # Configuration
         self.config = {
             "enable_logging": True,
             "enable_stats": True,
+            "enable_context": True,  # NOUVEAU: Activer le contexte conversationnel
             "max_processing_time_ms": 10000,  # 10 secondes max
-            "fallback_enabled": True
+            "fallback_enabled": True,
+            "context_expiry_minutes": 10  # NOUVEAU: Expiration du contexte
         }
         
-        logger.info("✅ [Expert Service] Service unifié initialisé")
+        logger.info("✅ [Expert Service] Service unifié avec contexte initialisé")
         logger.info(f"   📊 Extracteur: {self.entities_extractor.get_extraction_stats()}")
         logger.info(f"   🧠 Classifier: {self.smart_classifier.get_classification_stats()}")
+        logger.info(f"   🔗 Contexte: {'Activé' if self.config['enable_context'] else 'Désactivé'}")
 
     async def process_question(self, question: str, context: Dict[str, Any] = None, 
                              language: str = "fr") -> ProcessingResult:
         """
-        POINT D'ENTRÉE PRINCIPAL - Traite une question de A à Z
+        POINT D'ENTRÉE PRINCIPAL - Traite une question avec contexte conversationnel
         
         Args:
             question: Question à traiter
-            context: Contexte optionnel (conversation_id, user_id, etc.)
+            context: Contexte optionnel (conversation_id, user_id, is_clarification_response)
             language: Langue de réponse
             
         Returns:
-            ProcessingResult avec la réponse et les métadonnées
+            ProcessingResult avec la réponse et les métadonnées contextuelles
         """
         start_time = time.time()
         
         try:
             logger.info(f"🚀 [Expert Service] Traitement: '{question[:50]}...'")
+            
+            # Extraire les paramètres de contexte
+            conversation_id = context.get('conversation_id') if context else None
+            is_clarification_response = context.get('is_clarification_response', False) if context else False
+            
+            if conversation_id:
+                logger.info(f"🔗 [Expert Service] Conversation ID: {conversation_id}")
+            if is_clarification_response:
+                logger.info("🔗 [Expert Service] Clarification détectée")
             
             # Validation de base
             if not question or len(question.strip()) < 2:
@@ -123,13 +142,33 @@ class ExpertService:
             entities = self.entities_extractor.extract(question)
             logger.info(f"   🔍 Entités extraites: {entities}")
             
-            # 2️⃣ CLASSIFICATION INTELLIGENTE
-            classification = self.smart_classifier.classify_question(question, self._entities_to_dict(entities))
+            # 2️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE
+            classification = self.smart_classifier.classify_question(
+                question, 
+                self._entities_to_dict(entities),
+                conversation_id=conversation_id,  # NOUVEAU: Passer le conversation_id
+                is_clarification_response=is_clarification_response  # NOUVEAU: Flag clarification
+            )
+            
             logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
             
-            # 3️⃣ GÉNÉRATION DE LA RÉPONSE
-            response_data = self.response_generator.generate(question, self._entities_to_dict(entities), classification)
+            # Vérifier si le contexte a été utilisé
+            context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
+            if context_used:
+                logger.info("   🔗 Contexte conversationnel utilisé pour la réponse")
+            
+            # 3️⃣ GÉNÉRATION DE LA RÉPONSE AVEC SUPPORT CONTEXTUEL
+            # Utiliser les entités fusionnées si disponibles
+            entities_for_generation = classification.merged_entities if classification.merged_entities else self._entities_to_dict(entities)
+            
+            response_data = self.response_generator.generate(question, entities_for_generation, classification)
             logger.info(f"   🎨 Réponse générée: {response_data.response_type}")
+            
+            # Afficher les données de poids si calculées
+            if classification.weight_data:
+                weight_range = classification.weight_data.get('weight_range')
+                if weight_range:
+                    logger.info(f"   📊 Données de poids: {weight_range[0]}-{weight_range[1]}g")
             
             # 4️⃣ FORMATAGE FINAL
             processing_time_ms = int((time.time() - start_time) * 1000)
@@ -140,11 +179,13 @@ class ExpertService:
                 response_type=response_data.response_type,
                 confidence=response_data.confidence,
                 entities=entities,
-                processing_time_ms=processing_time_ms
+                processing_time_ms=processing_time_ms,
+                context_used=context_used,  # NOUVEAU: Indiquer utilisation du contexte
+                weight_data=classification.weight_data  # NOUVEAU: Données de poids
             )
             
-            # 5️⃣ MISE À JOUR DES STATISTIQUES
-            self._update_stats(classification.response_type, processing_time_ms, True)
+            # 5️⃣ MISE À JOUR DES STATISTIQUES AVEC CONTEXTE
+            self._update_stats(classification.response_type, processing_time_ms, True, context_used)
             
             logger.info(f"✅ [Expert Service] Traitement réussi en {processing_time_ms}ms")
             return result
@@ -168,12 +209,12 @@ class ExpertService:
                 error=error_msg
             )
             
-            self._update_stats(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False)
+            self._update_stats(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False)
             return result
 
     async def ask_expert_enhanced(self, request: EnhancedQuestionRequest) -> EnhancedExpertResponse:
         """
-        Interface compatible avec l'ancien système - Point d'entrée pour API
+        Interface compatible avec l'ancien système - AMÉLIORÉE avec contexte
         
         Args:
             request: Requête formatée selon l'ancien modèle
@@ -182,14 +223,17 @@ class ExpertService:
             EnhancedExpertResponse compatible avec l'ancien système
         """
         try:
-            # Traitement unifié
+            # NOUVEAU: Extraire plus d'informations contextuelles
             context = {
                 "conversation_id": getattr(request, 'conversation_id', None),
                 "user_id": getattr(request, 'user_id', None),
                 "is_clarification_response": getattr(request, 'is_clarification_response', False),
-                "original_question": getattr(request, 'original_question', None)
+                "original_question": getattr(request, 'original_question', None),
+                "clarification_entities": getattr(request, 'clarification_entities', None),
+                "concision_level": getattr(request, 'concision_level', 'standard')
             }
             
+            # Traitement unifié avec contexte
             result = await self.process_question(
                 question=request.text,
                 context=context,
@@ -223,7 +267,7 @@ class ExpertService:
 
     def _convert_to_legacy_response(self, request: EnhancedQuestionRequest, 
                                   result: ProcessingResult) -> EnhancedExpertResponse:
-        """Convertit le résultat moderne vers le format legacy"""
+        """Convertit le résultat moderne vers le format legacy avec données contextuelles"""
         
         conversation_id = getattr(request, 'conversation_id', None) or str(uuid.uuid4())
         language = getattr(request, 'language', 'fr')
@@ -237,44 +281,70 @@ class ExpertService:
             "timestamp": result.timestamp,
             "language": language,
             "response_time_ms": result.processing_time_ms,
-            "mode": "unified_intelligent_system"
+            "mode": "unified_intelligent_system_v2_contextual"  # NOUVEAU: Version avec contexte
         }
         
-        # Ajout des champs optionnels pour compatibilité
+        # Ajout des champs optionnels pour compatibilité (améliorés)
         optional_fields = {
             "user": getattr(request, 'user_id', None),
             "logged": True,
             "validation_passed": result.success,
             "processing_steps": [
                 "entities_extraction",
-                "smart_classification", 
-                "unified_response_generation"
+                "smart_classification_with_context",  # NOUVEAU: Avec contexte
+                "unified_response_generation",
+                "contextual_data_calculation" if result.context_used else "standard_processing"
             ],
             "ai_enhancements_used": [
-                "smart_classifier_v1",
-                "unified_generator_v1",
-                "entities_extractor_v1"
+                "smart_classifier_v2_contextual",  # NOUVEAU: Version contextuelle
+                "unified_generator_v2_contextual",
+                "entities_extractor_v1",
+                "conversation_context_manager" if result.context_used else None
             ]
         }
         
-        # Informations de classification pour debugging
+        # NOUVEAU: Informations de classification contextuelles
         classification_info = {
             "response_type_detected": result.response_type,
             "confidence_score": result.confidence,
             "entities_extracted": self._entities_to_dict(result.entities),
-            "processing_successful": result.success
+            "processing_successful": result.success,
+            "context_used": result.context_used,  # NOUVEAU: Contexte utilisé
+            "weight_data_calculated": bool(result.weight_data),  # NOUVEAU: Données calculées
+            "conversation_id": conversation_id
         }
+        
+        # NOUVEAU: Données de poids si calculées
+        if result.weight_data:
+            classification_info["weight_calculation"] = {
+                "breed": result.weight_data.get('breed'),
+                "age_days": result.weight_data.get('age_days'),
+                "sex": result.weight_data.get('sex'),
+                "weight_range": result.weight_data.get('weight_range'),
+                "target_weight": result.weight_data.get('target_weight'),
+                "data_source": result.weight_data.get('data_source', 'intelligent_system_config')
+            }
         
         # Fusionner toutes les données
         response_data.update(optional_fields)
         response_data["classification_result"] = classification_info
+        
+        # NOUVEAU: Informations de contexte conversationnel
+        response_data["contextual_features"] = {
+            "context_detection_enabled": self.config["enable_context"],
+            "clarification_detection": True,
+            "entity_inheritance": True,
+            "weight_data_calculation": True,
+            "conversation_persistence": True
+        }
         
         # Gestion d'erreur si échec
         if not result.success:
             response_data["error_details"] = {
                 "error_message": result.error,
                 "fallback_used": True,
-                "original_processing_failed": True
+                "original_processing_failed": True,
+                "context_available": bool(getattr(request, 'conversation_id', None))
             }
         
         if MODELS_AVAILABLE:
@@ -284,7 +354,7 @@ class ExpertService:
             return EnhancedExpertResponse(**response_data)
 
     def _create_error_response(self, request: EnhancedQuestionRequest, error: str) -> EnhancedExpertResponse:
-        """Crée une réponse d'erreur compatible"""
+        """Crée une réponse d'erreur compatible avec contexte"""
         
         error_responses = {
             "fr": f"Désolé, je rencontre une difficulté technique. Erreur: {error}. Pouvez-vous reformuler votre question ?",
@@ -303,14 +373,18 @@ class ExpertService:
             timestamp=datetime.now().isoformat(),
             language=language,
             response_time_ms=0,
-            mode="error_fallback",
+            mode="error_fallback_contextual",
             logged=True,
             validation_passed=False,
-            error_details={"error": error, "system": "unified_expert_service"}
+            error_details={
+                "error": error, 
+                "system": "unified_expert_service_v2_contextual",
+                "context_available": bool(getattr(request, 'conversation_id', None))
+            }
         )
 
     def _generate_fallback_response(self, question: str, language: str = "fr") -> str:
-        """Génère une réponse de fallback en cas d'erreur"""
+        """Génère une réponse de fallback en cas d'erreur (conservée)"""
         
         fallback_responses = {
             "fr": """Je rencontre une difficulté technique pour analyser votre question.
@@ -349,8 +423,9 @@ class ExpertService:
         
         return fallback_responses.get(language, fallback_responses['fr'])
 
-    def _update_stats(self, response_type: ResponseType, processing_time_ms: int, success: bool):
-        """Met à jour les statistiques de traitement"""
+    def _update_stats(self, response_type: ResponseType, processing_time_ms: int, 
+                     success: bool, context_used: bool = False):
+        """Met à jour les statistiques de traitement avec informations contextuelles"""
         
         if not self.config["enable_stats"]:
             return
@@ -364,8 +439,18 @@ class ExpertService:
                 self.stats["general_answers"] += 1
             elif response_type == ResponseType.NEEDS_CLARIFICATION:
                 self.stats["clarifications"] += 1
+            elif response_type == ResponseType.CONTEXTUAL_ANSWER:  # NOUVEAU
+                self.stats["contextual_answers"] += 1
         else:
             self.stats["errors"] += 1
+        
+        # NOUVEAU: Mise à jour du taux d'utilisation du contexte
+        if context_used:
+            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_usage_rate"] = (total_context_usage + 1) / self.stats["questions_processed"]
+        else:
+            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_usage_rate"] = total_context_usage / self.stats["questions_processed"]
         
         # Mise à jour du temps moyen (moyenne mobile)
         current_avg = self.stats["average_processing_time_ms"]
@@ -376,36 +461,49 @@ class ExpertService:
         )
 
     def get_system_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques système pour monitoring"""
+        """Retourne les statistiques système pour monitoring avec informations contextuelles"""
         
         total_questions = self.stats["questions_processed"]
         
         if total_questions == 0:
             return {
                 "service_status": "ready",
+                "version": "unified_v2.0.0_contextual",
                 "questions_processed": 0,
-                "statistics": "No questions processed yet"
+                "statistics": "No questions processed yet",
+                "contextual_features": {
+                    "conversation_context": "enabled",
+                    "clarification_detection": "enabled",
+                    "weight_data_calculation": "enabled"
+                }
             }
         
         success_rate = ((total_questions - self.stats["errors"]) / total_questions) * 100
         
         return {
             "service_status": "active",
-            "version": "unified_v1.0.0",
+            "version": "unified_v2.0.0_contextual",
             "questions_processed": total_questions,
             "success_rate_percent": round(success_rate, 2),
             "response_distribution": {
                 "precise_answers": self.stats["precise_answers"],
                 "general_answers": self.stats["general_answers"], 
                 "clarifications": self.stats["clarifications"],
+                "contextual_answers": self.stats["contextual_answers"],  # NOUVEAU
                 "errors": self.stats["errors"]
+            },
+            "contextual_metrics": {  # NOUVEAU: Métriques contextuelles
+                "context_usage_rate": round(self.stats["context_usage_rate"] * 100, 2),
+                "contextual_answers_count": self.stats["contextual_answers"],
+                "context_enabled": self.config["enable_context"]
             },
             "performance": {
                 "average_processing_time_ms": self.stats["average_processing_time_ms"],
                 "system_components": {
                     "entities_extractor": "active",
-                    "smart_classifier": "active",
-                    "response_generator": "active"
+                    "smart_classifier": "active_contextual",  # NOUVEAU
+                    "response_generator": "active_contextual",  # NOUVEAU
+                    "conversation_context_manager": "active" if self.config["enable_context"] else "disabled"
                 }
             },
             "configuration": self.config,
@@ -413,78 +511,133 @@ class ExpertService:
         }
 
     def reset_stats(self):
-        """Remet à zéro les statistiques"""
+        """Remet à zéro les statistiques (mise à jour avec nouvelles métriques)"""
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
             "general_answers": 0,
             "clarifications": 0,
+            "contextual_answers": 0,  # NOUVEAU
             "errors": 0,
-            "average_processing_time_ms": 0
+            "average_processing_time_ms": 0,
+            "context_usage_rate": 0.0  # NOUVEAU
         }
-        logger.info("📊 [Expert Service] Statistiques remises à zéro")
+        logger.info("📊 [Expert Service] Statistiques remises à zéro (version contextuelle)")
 
     def update_config(self, new_config: Dict[str, Any]):
         """Met à jour la configuration du service"""
         self.config.update(new_config)
         logger.info(f"⚙️ [Expert Service] Configuration mise à jour: {new_config}")
 
+    def get_contextual_debug_info(self, conversation_id: str) -> Dict[str, Any]:
+        """NOUVEAU: Récupère les informations de debug contextuelles"""
+        try:
+            context = self.smart_classifier._get_conversation_context(conversation_id)
+            
+            return {
+                "conversation_id": conversation_id,
+                "context_available": context is not None,
+                "context_fresh": context.is_fresh() if context else False,
+                "context_data": context.to_dict() if context else None,
+                "classifier_stats": self.smart_classifier.get_classification_stats(),
+                "service_version": "v2.0.0_contextual"
+            }
+        except Exception as e:
+            logger.error(f"❌ [Expert Service] Erreur debug contextuel: {e}")
+            return {
+                "conversation_id": conversation_id,
+                "error": str(e),
+                "context_available": False
+            }
+
 # =============================================================================
 # FONCTIONS UTILITAIRES ET TESTS
 # =============================================================================
 
-async def quick_ask(question: str, language: str = "fr") -> str:
-    """Interface rapide pour poser une question"""
+async def quick_ask(question: str, conversation_id: str = None, language: str = "fr") -> str:
+    """Interface rapide pour poser une question avec support contextuel"""
     service = ExpertService()
-    result = await service.process_question(question, language=language)
+    context = {"conversation_id": conversation_id} if conversation_id else None
+    result = await service.process_question(question, context=context, language=language)
     return result.response
 
 def create_expert_service() -> ExpertService:
-    """Factory pour créer une instance du service"""
+    """Factory pour créer une instance du service avec contexte"""
     return ExpertService()
 
 # =============================================================================
-# TESTS INTÉGRÉS
+# TESTS INTÉGRÉS AVEC CONTEXTE COMPLET
 # =============================================================================
 
-async def test_expert_service():
-    """Tests du service expert unifié"""
+async def test_expert_service_contextual():
+    """Tests du service expert avec contexte conversationnel complet"""
     
-    print("🧪 Tests du Service Expert Unifié")
-    print("=" * 60)
+    print("🧪 Tests du Service Expert avec Contexte Conversationnel")
+    print("=" * 70)
     
     service = ExpertService()
+    conversation_id = "test_conv_ross308_12j"
     
     test_cases = [
-        # Cas précis (devrait donner une réponse spécifique)
-        ("Quel est le poids d'un Ross 308 mâle de 21 jours ?", "precise"),
+        # Cas 1: Question générale qui établit le contexte
+        {
+            "question": "Quel est le poids cible d'un poulet de 12 jours ?",
+            "context": {"conversation_id": conversation_id},
+            "expected_type": "general",
+            "description": "Question générale qui établit âge=12j et contexte=performance"
+        },
         
-        # Cas général (devrait donner une réponse générale + offre de précision)
-        ("Poids normal poulet 22 jours ?", "general"),
+        # Cas 2: Clarification qui devrait fusionner le contexte
+        {
+            "question": "Pour un Ross 308 male",
+            "context": {
+                "conversation_id": conversation_id, 
+                "is_clarification_response": True
+            },
+            "expected_type": "contextual",
+            "description": "Clarification qui devrait donner Ross 308 mâle 12j → 380-420g"
+        },
         
-        # Cas clarification (vraiment trop vague)
-        ("Mes poulets vont mal", "clarification"),
-        
-        # Cas santé avec contexte
-        ("Poules 25 semaines font diarrhée depuis 2 jours", "general")
+        # Cas 3: Question précise sans contexte
+        {
+            "question": "Poids Ross 308 femelle 21 jours ?",
+            "context": {"conversation_id": "new_conv_123"},
+            "expected_type": "precise",
+            "description": "Question précise complète sans besoin de contexte"
+        }
     ]
     
-    for question, expected_type in test_cases:
-        print(f"\n📝 Question: {question}")
-        print(f"   🎯 Type attendu: {expected_type}")
+    for i, test_case in enumerate(test_cases, 1):
+        print(f"\n📝 Test {i}: {test_case['description']}")
+        print(f"   Question: {test_case['question']}")
+        print(f"   Type attendu: {test_case['expected_type']}")
         
         try:
-            result = await service.process_question(question)
+            result = await service.process_question(
+                test_case['question'], 
+                context=test_case['context']
+            )
+            
             status = "✅" if result.success else "❌"
-            print(f"   {status} Type: {result.response_type}")
+            print(f"   {status} Type obtenu: {result.response_type}")
             print(f"   ⏱️ Temps: {result.processing_time_ms}ms")
             print(f"   🎯 Confiance: {result.confidence:.2f}")
+            print(f"   🔗 Contexte utilisé: {'Oui' if result.context_used else 'Non'}")
             
-            if len(result.response) > 100:
-                preview = result.response[:100] + "..."
+            # Afficher les données de poids si calculées
+            if result.weight_data and 'weight_range' in result.weight_data:
+                weight_range = result.weight_data['weight_range']
+                print(f"   📊 Poids calculé: {weight_range[0]}-{weight_range[1]}g")
+            
+            if len(result.response) > 150:
+                preview = result.response[:150] + "..."
             else:
                 preview = result.response
             print(f"   💬 Réponse: {preview}")
+            
+            # Vérification spéciale pour le test Ross 308
+            if i == 2 and "380" in result.response and "420" in result.response:
+                print("   ✅ SUCCESS: Ross 308 mâle 12j correctement calculé!")
             
         except Exception as e:
             print(f"   ❌ Erreur: {e}")
@@ -493,8 +646,10 @@ async def test_expert_service():
     stats = service.get_system_stats()
     print(f"   Questions traitées: {stats['questions_processed']}")
     print(f"   Taux de succès: {stats['success_rate_percent']:.1f}%")
+    print(f"   Réponses contextuelles: {stats['contextual_metrics']['contextual_answers_count']}")
+    print(f"   Taux d'utilisation contexte: {stats['contextual_metrics']['context_usage_rate']:.1f}%")
     print(f"   Temps moyen: {stats['performance']['average_processing_time_ms']}ms")
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(test_expert_service())
+    asyncio.run(test_expert_service_contextual())
