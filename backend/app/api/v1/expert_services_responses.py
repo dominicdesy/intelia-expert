@@ -1,12 +1,13 @@
 """
 app/api/v1/expert_services_responses.py - GESTIONNAIRE DE RÉPONSES EXPERT SYSTEM
 
-🚀 CRÉATION ET GESTION DES RÉPONSES v4.1.0:
+🚀 CRÉATION ET GESTION DES RÉPONSES v4.1.1:
 1. ✅ Création de réponses d'erreur
 2. ✅ Création de réponses de clarification critique  
 3. ✅ Création de réponses enrichies alignées
 4. ✅ Création de réponses basiques de fallback
 5. 🆕 CORRECTION: Utilisation de allow_creation=True pour enriched_question
+6. 🔧 CORRECTION v4.1.1: Assignations sécurisées avec try/catch
 """
 
 import logging
@@ -36,7 +37,7 @@ except (ImportError, ModuleNotFoundError):
     MODELS_AVAILABLE = False
 
 class ExpertResponseCreator:
-    """Créateur de réponses pour le système expert avec ALIGNMENT COMPLET et CHAMPS DYNAMIQUES v4.1.0"""
+    """Créateur de réponses pour le système expert avec ALIGNMENT COMPLET et CHAMPS DYNAMIQUES v4.1.1"""
     
     def __init__(self, concision_service):
         self.concision_service = concision_service
@@ -46,7 +47,8 @@ class ExpertResponseCreator:
             "alignment_expert_models": True,
             "safe_weight_access": True,
             "safe_missing_entities_access": True,
-            "dynamic_field_creation": True  # 🆕 Nouveau flag v4.1.0
+            "dynamic_field_creation": True,  # 🆕 Nouveau flag v4.1.0
+            "secure_field_assignment": True  # 🔧 Nouveau flag v4.1.1
         }
     
     def create_error_response(self, error_message, question_text, conversation_id, language, start_time):
@@ -97,16 +99,16 @@ class ExpertResponseCreator:
                     if self.config["dynamic_field_creation"]:
                         # 🧠 Utilisation de l'assignation intelligente
                         safe_set_field_smart(response, "response_versions", response_versions, "Error Response")
-                        safe_set_field_smart(response, "pipeline_version", "error_response_aligned_v4.1.0", "Error Response")
+                        safe_set_field_smart(response, "pipeline_version", "error_response_aligned_v4.1.1", "Error Response")
                     else:
                         # Mode legacy
                         safe_set_field_if_exists(response, "response_versions", response_versions, "Error Response")
-                        safe_set_field_if_exists(response, "pipeline_version", "error_response_aligned_v4.1.0", "Error Response")
+                        safe_set_field_if_exists(response, "pipeline_version", "error_response_aligned_v4.1.1", "Error Response")
                 else:
                     if hasattr(response, 'response_versions'):
                         response.response_versions = response_versions
                     if hasattr(response, 'pipeline_version'):
-                        response.pipeline_version = "error_response_aligned_v4.1.0"
+                        response.pipeline_version = "error_response_aligned_v4.1.1"
                 
                 return response
             else:
@@ -124,11 +126,12 @@ class ExpertResponseCreator:
                     "safe_missing_entities_access": True,
                     "robust_memory_error_handling": True,
                     "alignment_expert_models": False,
-                    "dynamic_field_creation": True  # 🆕 Nouveau flag v4.1.0
+                    "dynamic_field_creation": True,  # 🆕 Nouveau flag v4.1.0
+                    "secure_field_assignment": True  # 🔧 Nouveau flag v4.1.1
                 }
                 
         except Exception as e:
-            logger.error(f"❌ [Create Error Response v4.1.0] Erreur critique: {e}")
+            logger.error(f"❌ [Create Error Response v4.1.1] Erreur critique: {e}")
             return {
                 "question": "Erreur critique",
                 "response": "Une erreur critique s'est produite",
@@ -143,7 +146,8 @@ class ExpertResponseCreator:
                 "safe_missing_entities_access": True,
                 "robust_memory_error_handling": True,
                 "alignment_expert_models": False,
-                "dynamic_field_creation": True  # 🆕 Nouveau flag v4.1.0
+                "dynamic_field_creation": True,  # 🆕 Nouveau flag v4.1.0
+                "secure_field_assignment": True  # 🔧 Nouveau flag v4.1.1
             }
 
     def create_critical_clarification_response(
@@ -158,7 +162,7 @@ class ExpertResponseCreator:
             try:
                 response_versions = self.concision_service.generate_all_versions(critical_message, language)
             except Exception as e:
-                logger.error(f"❌ [Critical Clarification v4.1.0] Erreur response_versions: {e}")
+                logger.error(f"❌ [Critical Clarification v4.1.1] Erreur response_versions: {e}")
                 response_versions = {
                     "ultra_concise": "Clarification requise",
                     "concise": "Plus d'informations nécessaires",
@@ -212,7 +216,7 @@ class ExpertResponseCreator:
                             
                             safe_set_field_smart(response, "clarification_details", clarification_details, "Critical Clarification")
                         
-                        safe_set_field_smart(response, "pipeline_version", "critical_clarification_aligned_v4.1.0", "Critical Clarification")
+                        safe_set_field_smart(response, "pipeline_version", "critical_clarification_aligned_v4.1.1", "Critical Clarification")
                     else:
                         # Mode legacy avec safe_set_field_if_exists standard
                         safe_set_field_if_exists(response, "response_versions", response_versions, "Critical Clarification")
@@ -243,11 +247,12 @@ class ExpertResponseCreator:
                     "safe_missing_entities_access": True,
                     "robust_memory_error_handling": True,
                     "alignment_expert_models": False,
-                    "dynamic_field_creation": True  # 🆕 Nouveau flag v4.1.0
+                    "dynamic_field_creation": True,  # 🆕 Nouveau flag v4.1.0
+                    "secure_field_assignment": True  # 🔧 Nouveau flag v4.1.1
                 }
                 
         except Exception as e:
-            logger.error(f"❌ [Create Critical Clarification Response v4.1.0] Erreur: {e}")
+            logger.error(f"❌ [Create Critical Clarification Response v4.1.1] Erreur: {e}")
             return self.create_error_response(
                 "Erreur création réponse clarification", question_text, 
                 conversation_id, language, time.time() - (response_time_ms / 1000) if response_time_ms else time.time()
@@ -259,7 +264,7 @@ class ExpertResponseCreator:
         contextualization_info, enhancement_info, optional_clarifications,
         conversation_context, entities, missing_entities, question_for_rag, response_versions
     ):
-        """CORRECTION v4.1.0: Création sécurisée réponse enrichie avec CHAMPS DYNAMIQUES et ALIGNMENT COMPLET"""
+        """🔧 CORRECTION v4.1.1: Création sécurisée réponse enrichie avec ASSIGNATIONS SÉCURISÉES"""
         try:
             if MODELS_AVAILABLE:
                 # Création avec vérification champs selon expert_models.py
@@ -287,191 +292,159 @@ class ExpertResponseCreator:
                 # Créer objet avec alignment expert_models
                 response = EnhancedExpertResponse(**response_data)
                 
-                # Ajout champs avec vérification existence - AMÉLIORATION MAJEURE v4.1.0
-                if self.config["field_existence_verification"]:
-                    
-                    # 🆕 CORRECTION PRINCIPALE: enriched_question avec création dynamique
+                # 🔧 CORRECTION PRINCIPALE v4.1.1: Assignations sécurisées avec try/catch individuel
+                
+                # enriched_question - SÉCURISÉ
+                try:
                     if question_for_rag != question_text:
-                        if self.config["dynamic_field_creation"]:
-                            # ✅ SOLUTION: Utilisation de safe_set_field_with_creation pour enriched_question
-                            creation_success = safe_set_field_with_creation(
-                                response, "enriched_question", str(question_for_rag), "Enhanced Response"
-                            )
-                            if creation_success:
-                                logger.info(f"✅ [Enhanced Response v4.1.0] enriched_question créé dynamiquement: '{question_for_rag[:50]}...'")
-                            else:
-                                logger.warning(f"⚠️ [Enhanced Response v4.1.0] Échec création enriched_question")
-                        else:
-                            # Mode legacy - tentative assignation sans création
-                            safe_set_field_if_exists(response, "enriched_question", str(question_for_rag), "Enhanced Response")
-                    
-                    # response_versions avec garantie - ASSIGNATION INTELLIGENTE
+                        response.enriched_question = str(question_for_rag)
+                        logger.info(f"✅ [Enhanced Response v4.1.1] enriched_question ajouté: '{question_for_rag[:50]}...'")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur enriched_question: {e}")
+                
+                # response_versions - SÉCURISÉ
+                try:
+                    if response_versions and isinstance(response_versions, dict):
+                        response.response_versions = response_versions
+                        logger.info(f"✅ [Enhanced Response v4.1.1] response_versions ajouté avec {len(response_versions)} versions")
+                    else:
+                        # Fallback si versions non générées
+                        logger.warning("⚠️ [Enhanced Response v4.1.1] Génération fallback response_versions")
+                        fallback_versions = self.concision_service.generate_all_versions(final_answer, language)
+                        response.response_versions = fallback_versions
+                        logger.info(f"✅ [Enhanced Response v4.1.1] response_versions fallback créées")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur response_versions: {e}")
+                    # Fallback minimal sécurisé
                     try:
-                        if response_versions and isinstance(response_versions, dict):
-                            if self.config["dynamic_field_creation"]:
-                                safe_set_field_smart(response, "response_versions", response_versions, "Enhanced Response")
-                            else:
-                                safe_set_field_if_exists(response, "response_versions", response_versions, "Enhanced Response")
-                            logger.info("✅ [Enhanced Response v4.1.0] response_versions ajoutées avec vérification")
-                        else:
-                            # Fallback si versions non générées
-                            logger.warning("⚠️ [Enhanced Response v4.1.0] Génération fallback response_versions")
-                            fallback_versions = self.concision_service.generate_all_versions(final_answer, language)
-                            if self.config["dynamic_field_creation"]:
-                                safe_set_field_smart(response, "response_versions", fallback_versions, "Enhanced Response")
-                            else:
-                                safe_set_field_if_exists(response, "response_versions", fallback_versions, "Enhanced Response")
-                    except Exception as e:
-                        logger.error(f"❌ [Enhanced Response v4.1.0] Erreur response_versions: {e}")
-                        # Fallback minimal avec vérification
                         minimal_versions = {
                             "ultra_concise": final_answer[:50] + "..." if len(final_answer) > 50 else final_answer,
                             "concise": final_answer[:150] + "..." if len(final_answer) > 150 else final_answer,
                             "standard": final_answer[:300] + "..." if len(final_answer) > 300 else final_answer,
                             "detailed": final_answer
                         }
-                        if self.config["dynamic_field_creation"]:
-                            safe_set_field_smart(response, "response_versions", minimal_versions, "Enhanced Response")
-                        else:
-                            safe_set_field_if_exists(response, "response_versions", minimal_versions, "Enhanced Response")
-                    
-                    # Informations contextuelles avec assignation intelligente
+                        response.response_versions = minimal_versions
+                        logger.info(f"✅ [Enhanced Response v4.1.1] response_versions minimal créées")
+                    except Exception as fallback_e:
+                        logger.error(f"❌ [Enhanced Response v4.1.1] Erreur critique response_versions: {fallback_e}")
+                
+                # enhancement_info (nouveau) - SÉCURISÉ
+                try:
+                    if enhancement_info and isinstance(enhancement_info, dict):
+                        response.enhancement_info = enhancement_info
+                        logger.info(f"✅ [Enhanced Response v4.1.1] enhancement_info ajouté")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur enhancement_info: {e}")
+                
+                # clarification_details (nouveau) - SÉCURISÉ
+                try:
+                    if optional_clarifications and isinstance(optional_clarifications, list):
+                        safe_missing_entities_list = safe_get_missing_entities({"missing_entities": missing_entities or []})
+                        response.clarification_details = {
+                            "optional_clarifications": optional_clarifications,
+                            "missing_entities": safe_missing_entities_list
+                        }
+                        logger.info(f"✅ [Enhanced Response v4.1.1] clarification_details ajouté avec {len(optional_clarifications)} clarifications")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur clarification_details: {e}")
+                
+                # contextualization_info - SÉCURISÉ
+                try:
                     if isinstance(contextualization_info, dict) and contextualization_info:
-                        if self.config["dynamic_field_creation"]:
-                            safe_set_field_smart(response, "contextualization_info", contextualization_info, "Enhanced Response")
-                        else:
-                            safe_set_field_if_exists(response, "contextualization_info", contextualization_info, "Enhanced Response")
-                    
-                    if isinstance(enhancement_info, dict) and enhancement_info:
-                        if self.config["dynamic_field_creation"]:
-                            safe_set_field_smart(response, "enhancement_info", enhancement_info, "Enhanced Response")
-                        else:
-                            safe_set_field_if_exists(response, "enhancement_info", enhancement_info, "Enhanced Response")
-                    
-                    # Clarifications optionnelles - ASSIGNATION INTELLIGENTE
-                    if isinstance(optional_clarifications, list) and optional_clarifications:
-                        if self.config["dynamic_field_creation"]:
-                            safe_set_field_smart(response, "optional_clarifications", optional_clarifications, "Enhanced Response")
-                            safe_set_field_smart(response, "clarification_mode", "optional_non_blocking", "Enhanced Response")
-                        else:
-                            safe_set_field_if_exists(response, "optional_clarifications", optional_clarifications, "Enhanced Response")
-                            safe_set_field_if_exists(response, "clarification_mode", "optional_non_blocking", "Enhanced Response")
-                    
-                    # Contexte conversationnel avec gestion robuste - ASSIGNATION INTELLIGENTE
+                        response.contextualization_info = contextualization_info
+                        logger.info(f"✅ [Enhanced Response v4.1.1] contextualization_info ajouté")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur contextualization_info: {e}")
+                
+                # conversation_context - SÉCURISÉ avec gestion robuste
+                try:
                     if conversation_context:
-                        try:
-                            entities_count = 0
-                            if isinstance(entities, dict):
-                                entities_count = len([k for k, v in entities.items() if v is not None])
-                                
-                                # Information weight dans contexte si disponible
-                                weight_info = {}
-                                if self.config["safe_weight_access"]:
-                                    weight_value = safe_get_weight(entities)
-                                    weight_unit = safe_get_weight_unit(entities)
-                                    if weight_value is not None:
-                                        weight_result = validate_and_normalize_weight(weight_value, weight_unit)
-                                        if weight_result["is_valid"]:
-                                            weight_info = {
-                                                "value": weight_result["value"],
-                                                "unit": weight_result["unit"],
-                                                "validated": True
-                                            }
-                            
-                            # Accès sécurisé missing_entities pour conversation_context_info
-                            safe_missing_entities = safe_get_missing_entities({"missing_entities": missing_entities})
-                            
-                            conversation_context_info = {
-                                "total_exchanges": safe_get_field_if_exists(conversation_context, 'total_exchanges', 0),
-                                "conversation_urgency": safe_get_field_if_exists(conversation_context, 'conversation_urgency', 'normal'),
-                                "entities_count": entities_count,
-                                "missing_entities": safe_missing_entities,
-                                "missing_entities_count": len(safe_missing_entities),
-                                "overall_confidence": safe_get_field_if_exists(
-                                    safe_get_field_if_exists(conversation_context, 'consolidated_entities'), 
-                                    'confidence_overall', 0.5
-                                )
-                            }
-                            
-                            # Ajouter weight_info si disponible
-                            if weight_info:
-                                conversation_context_info["weight_info"] = weight_info
-                            
-                            # ASSIGNATION INTELLIGENTE pour conversation_context
-                            if self.config["dynamic_field_creation"]:
-                                safe_set_field_smart(response, "conversation_context", conversation_context_info, "Enhanced Response")
-                            else:
-                                safe_set_field_if_exists(response, "conversation_context", conversation_context_info, "Enhanced Response")
-                            
-                        except Exception as e:
-                            logger.warning(f"⚠️ [Enhanced Response v4.1.0] Erreur conversation_context: {e}")
-                    
-                    # Métadonnées pipeline - ASSIGNATION INTELLIGENTE
-                    if self.config["dynamic_field_creation"]:
-                        safe_set_field_smart(response, "pipeline_version", "expert_models_aligned_v4.1.0", "Enhanced Response")
-                        safe_set_field_smart(response, "pipeline_improvements", [
-                            "agents_always_active",
-                            "critical_clarification_blocking",
-                            "optional_clarification_non_blocking", 
-                            "enriched_question_to_rag",
-                            "intelligent_fallback",
-                            "robust_error_handling",
-                            "response_versions_guaranteed",
-                            "safe_weight_access",
-                            "safe_missing_entities_access",
-                            "robust_memory_error_handling",
-                            "field_existence_verification",
-                            "expert_models_alignment",
-                            "dynamic_field_creation"  # 🆕 Nouveau flag v4.1.0
-                        ], "Enhanced Response")
-                    else:
-                        safe_set_field_if_exists(response, "pipeline_version", "expert_models_aligned_v4.1.0", "Enhanced Response")
-                        safe_set_field_if_exists(response, "pipeline_improvements", [
-                            "agents_always_active",
-                            "critical_clarification_blocking",
-                            "optional_clarification_non_blocking", 
-                            "enriched_question_to_rag",
-                            "intelligent_fallback",
-                            "robust_error_handling",
-                            "response_versions_guaranteed",
-                            "safe_weight_access",
-                            "safe_missing_entities_access",
-                            "robust_memory_error_handling",
-                            "field_existence_verification",
-                            "expert_models_alignment"
-                        ], "Enhanced Response")
-                    
-                else:
-                    # Mode legacy sans vérification champs
-                    logger.warning("⚠️ [Enhanced Response v4.1.0] Mode legacy sans vérification champs")
-                    if hasattr(response, 'enriched_question') and question_for_rag != question_text:
-                        response.enriched_question = str(question_for_rag)
-                    elif question_for_rag != question_text:
-                        # 🆕 CORRECTION: Création dynamique même en mode legacy si nécessaire
-                        setattr(response, 'enriched_question', str(question_for_rag))
-                        logger.info(f"🆕 [Enhanced Response v4.1.0] enriched_question créé en mode legacy: '{question_for_rag[:50]}...'")
+                        entities_count = 0
+                        weight_info = {}
                         
-                    if response_versions and hasattr(response, 'response_versions'):
-                        response.response_versions = response_versions
-                    elif response_versions:
-                        # Création dynamique pour response_versions
-                        setattr(response, 'response_versions', response_versions)
+                        if isinstance(entities, dict):
+                            entities_count = len([k for k, v in entities.items() if v is not None])
+                            
+                            # Information weight dans contexte si disponible
+                            if self.config["safe_weight_access"]:
+                                weight_value = safe_get_weight(entities)
+                                weight_unit = safe_get_weight_unit(entities)
+                                if weight_value is not None:
+                                    weight_result = validate_and_normalize_weight(weight_value, weight_unit)
+                                    if weight_result["is_valid"]:
+                                        weight_info = {
+                                            "value": weight_result["value"],
+                                            "unit": weight_result["unit"],
+                                            "validated": True
+                                        }
+                        
+                        # Accès sécurisé missing_entities pour conversation_context_info
+                        safe_missing_entities_list = safe_get_missing_entities({"missing_entities": missing_entities or []})
+                        
+                        conversation_context_info = {
+                            "total_exchanges": safe_get_field_if_exists(conversation_context, 'total_exchanges', 0),
+                            "conversation_urgency": safe_get_field_if_exists(conversation_context, 'conversation_urgency', 'normal'),
+                            "entities_count": entities_count,
+                            "missing_entities": safe_missing_entities_list,
+                            "missing_entities_count": len(safe_missing_entities_list),
+                            "overall_confidence": safe_get_field_if_exists(
+                                safe_get_field_if_exists(conversation_context, 'consolidated_entities'), 
+                                'confidence_overall', 0.5
+                            )
+                        }
+                        
+                        # Ajouter weight_info si disponible
+                        if weight_info:
+                            conversation_context_info["weight_info"] = weight_info
+                        
+                        response.conversation_context = conversation_context_info
+                        logger.info(f"✅ [Enhanced Response v4.1.1] conversation_context ajouté")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur conversation_context: {e}")
+                
+                # Métadonnées pipeline - SÉCURISÉ
+                try:
+                    response.pipeline_version = "expert_models_aligned_v4.1.1"
+                    response.pipeline_improvements = [
+                        "agents_always_active",
+                        "critical_clarification_blocking",
+                        "optional_clarification_non_blocking", 
+                        "enriched_question_to_rag",
+                        "intelligent_fallback",
+                        "robust_error_handling",
+                        "response_versions_guaranteed",
+                        "safe_weight_access",
+                        "safe_missing_entities_access",
+                        "robust_memory_error_handling",
+                        "field_existence_verification",
+                        "expert_models_alignment",
+                        "dynamic_field_creation",  # 🆕 v4.1.0
+                        "secure_field_assignment"  # 🔧 v4.1.1
+                    ]
+                    logger.info(f"✅ [Enhanced Response v4.1.1] Métadonnées pipeline ajoutées")
+                except Exception as e:
+                    logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur métadonnées pipeline: {e}")
                 
                 # Validation finale objet réponse
                 if self.config["response_object_validation"]:
-                    is_valid = validate_response_object_compatibility(response)
-                    if not is_valid:
-                        logger.warning("⚠️ [Enhanced Response v4.1.0] Objet réponse non compatible, utilisation fallback")
-                        return self.create_basic_response_safe_aligned(
-                            question_text, final_answer, conversation_id, 
-                            language, response_time_ms, processing_steps, response_versions
-                        )
+                    try:
+                        is_valid = validate_response_object_compatibility(response)
+                        if not is_valid:
+                            logger.warning("⚠️ [Enhanced Response v4.1.1] Objet réponse non compatible, utilisation fallback")
+                            return self.create_basic_response_safe_aligned(
+                                question_text, final_answer, conversation_id, 
+                                language, response_time_ms, processing_steps, response_versions
+                            )
+                    except Exception as e:
+                        logger.warning(f"⚠️ [Enhanced Response v4.1.1] Erreur validation finale: {e}")
                 
-                logger.info("✅ [Enhanced Response v4.1.0] Réponse enrichie créée avec champs dynamiques et alignment complet")
+                logger.info("✅ [Enhanced Response v4.1.1] Réponse enrichie créée avec assignations sécurisées")
                 return response
                 
             else:
                 # Fallback avec response_versions garanties
+                logger.info("📦 [Enhanced Response v4.1.1] MODELS_AVAILABLE=False, utilisation fallback")
                 basic_response = self.create_basic_response_safe_aligned(
                     question_text, final_answer, conversation_id, 
                     language, response_time_ms, processing_steps, response_versions
@@ -479,7 +452,7 @@ class ExpertResponseCreator:
                 return basic_response
                 
         except Exception as e:
-            logger.error(f"❌ [Create Enhanced Response v4.1.0] Erreur: {e}")
+            logger.error(f"❌ [Create Enhanced Response v4.1.1] Erreur création: {e}")
             fallback = self.create_basic_response_safe_aligned(
                 question_text, final_answer, conversation_id, 
                 language, response_time_ms, processing_steps, response_versions
@@ -487,7 +460,7 @@ class ExpertResponseCreator:
             return fallback
 
     def create_basic_response_safe_aligned(self, question_text, final_answer, conversation_id, language, response_time_ms, processing_steps, response_versions=None):
-        """CORRECTION v4.1.0: Création de réponse basique avec alignment et champs dynamiques"""
+        """CORRECTION v4.1.1: Création de réponse basique avec alignment et champs dynamiques"""
         try:
             basic_response = {
                 "question": str(question_text),
@@ -498,7 +471,7 @@ class ExpertResponseCreator:
                 "response_time_ms": int(response_time_ms),
                 "mode": "fallback_basic_aligned",
                 "processing_steps": list(processing_steps) if isinstance(processing_steps, list) else [],
-                "pipeline_version": "basic_fallback_aligned_v4.1.0"
+                "pipeline_version": "basic_fallback_aligned_v4.1.1"
             }
             
             # Garantir response_versions même en fallback
@@ -508,20 +481,21 @@ class ExpertResponseCreator:
                 else:
                     basic_response["response_versions"] = self.concision_service.generate_all_versions(final_answer, language)
             except Exception as e:
-                logger.error(f"❌ [Basic Response v4.1.0] Erreur response_versions: {e}")
+                logger.error(f"❌ [Basic Response v4.1.1] Erreur response_versions: {e}")
                 basic_response["response_versions"] = {"detailed": final_answer}
             
-            # Flags nouveaux features v4.1.0
+            # Flags nouveaux features v4.1.1
             basic_response["safe_weight_access"] = self.config["safe_weight_access"]
             basic_response["safe_missing_entities_access"] = self.config["safe_missing_entities_access"]
             basic_response["robust_memory_error_handling"] = True
             basic_response["alignment_expert_models"] = self.config["alignment_expert_models"]
-            basic_response["dynamic_field_creation"] = self.config["dynamic_field_creation"]  # 🆕 Nouveau flag v4.1.0
+            basic_response["dynamic_field_creation"] = self.config["dynamic_field_creation"]  # 🆕 v4.1.0
+            basic_response["secure_field_assignment"] = self.config["secure_field_assignment"]  # 🔧 v4.1.1
             
             return basic_response
             
         except Exception as e:
-            logger.error(f"❌ [Create Basic Response v4.1.0] Erreur: {e}")
+            logger.error(f"❌ [Create Basic Response v4.1.1] Erreur: {e}")
             return {
                 "question": "Erreur",
                 "response": "Une erreur s'est produite",
@@ -531,11 +505,12 @@ class ExpertResponseCreator:
                 "response_time_ms": 0,
                 "mode": "error_fallback_aligned",
                 "processing_steps": ["error"],
-                "pipeline_version": "error_fallback_aligned_v4.1.0",
+                "pipeline_version": "error_fallback_aligned_v4.1.1",
                 "response_versions": {"detailed": "Erreur"},
                 "safe_weight_access": True,
                 "safe_missing_entities_access": True,
                 "robust_memory_error_handling": True,
                 "alignment_expert_models": False,
-                "dynamic_field_creation": True  # 🆕 Nouveau flag v4.1.0
+                "dynamic_field_creation": True,  # 🆕 v4.1.0
+                "secure_field_assignment": True  # 🔧 v4.1.1
             }
