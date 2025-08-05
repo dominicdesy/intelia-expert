@@ -1,19 +1,41 @@
 """
 app/api/v1/expert_services_clarification.py - SYSTÈME DE CLARIFICATION CRITIQUE
 
-🚀 SYSTÈME CLARIFICATION CRITIQUE VS NON CRITIQUE v4.0.0:
+🚀 SYSTÈME CLARIFICATION CRITIQUE VS NON CRITIQUE v4.1.0 - VERSION IA INTÉGRÉE:
 1. ✅ Analyse clarification critique vs optionnelle
 2. ✅ Détection type volaille (pondeuses/broilers)
 3. ✅ Génération messages clarification sécurisés
 4. ✅ Gestion entités manquantes critiques
 5. ✅ VERSION PERMISSIVE pour poulets de chair appliquée
+6. 🧠 NOUVEAU: Classification IA au lieu de règles hardcodées
+7. 🧠 NOUVEAU: Analyse intelligente des besoins de clarification
+8. 🔄 CONSERVATION: Code original préservé avec fallbacks
 """
 
 import logging
 import re
-from typing import List
+from typing import List, Dict, Any
 
 from .expert_services_utils import validate_missing_entities_list
+
+# AJOUTER ces imports en haut du fichier pour le système IA
+try:
+    from .intelligent_clarification_classifier import IntelligentClarificationClassifier
+    from .general_response_generator import GeneralResponseGenerator
+    AI_MODULES_AVAILABLE = True
+    logger.info("✅ [Clarification v4.1.0] Modules IA chargés avec succès")
+except (ImportError, ModuleNotFoundError) as e:
+    logger.warning(f"⚠️ [Clarification v4.1.0] Modules IA non disponibles: {e}")
+    AI_MODULES_AVAILABLE = False
+    
+    # Classes de fallback pour compatibilité
+    class IntelligentClarificationClassifier:
+        async def classify_question(self, question, entities):
+            return {"decision": "needs_clarification", "confidence": 0.5, "reasoning": "IA non disponible"}
+    
+    class GeneralResponseGenerator:
+        async def generate_direct_response(self, question, entities, poultry_type, language):
+            return {"response": "Réponse non disponible", "response_type": "fallback"}
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +74,288 @@ except (ImportError, ModuleNotFoundError):
     
     CLARIFICATION_ENTITIES_AVAILABLE = False
 
+def extract_basic_entities(question: str) -> Dict[str, Any]:
+    """🔍 Extrait les entités basiques de la question pour l'IA"""
+    
+    if not question or not isinstance(question, str):
+        return {}
+    
+    try:
+        question_lower = question.lower().strip()
+        entities = {}
+        
+        # Extraction des races
+        breed_patterns = [
+            r'\b(ross\s*308|cobb\s*500|hubbard)\b',
+            r'\b(isa\s*brown|lohmann\s*brown|hy[-\s]*line)\b',
+            r'\b(bovans|shaver|hissex|novogen)\b'
+        ]
+        
+        for pattern in breed_patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                entities['breed'] = match.group(0).strip()
+                break
+        
+        # Extraction de l'âge
+        age_patterns = [
+            r'(\d+)\s*(jour|jours|day|days)',
+            r'(\d+)\s*(semaine|semaines|week|weeks)',
+            r'(\d+)\s*(mois|month|months)',
+            r'âge[é]?\s*[:\-]?\s*(\d+)',
+            r'age[d]?\s*[:\-]?\s*(\d+)'
+        ]
+        
+        for pattern in age_patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                entities['age'] = match.group(1)
+                break
+        
+        # Extraction du sexe
+        sex_patterns = [
+            r'\b(mâle|male|coq|rooster)\b',
+            r'\b(femelle|female|poule|hen)\b',
+            r'\b(mixte|mixed|both)\b'
+        ]
+        
+        for pattern in sex_patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                entities['sex'] = match.group(0).strip()
+                break
+        
+        # Extraction du poids
+        weight_patterns = [
+            r'(\d+(?:\.\d+)?)\s*(g|gr|gram|gramme)',
+            r'(\d+(?:\.\d+)?)\s*(kg|kilo|kilogram)',
+            r'poids[:\-]?\s*(\d+(?:\.\d+)?)',
+            r'weight[:\-]?\s*(\d+(?:\.\d+)?)'
+        ]
+        
+        for pattern in weight_patterns:
+            match = re.search(pattern, question_lower, re.IGNORECASE)
+            if match:
+                entities['weight'] = match.group(1)
+                break
+        
+        return entities
+        
+    except Exception as e:
+        logger.error(f"❌ [Extract Basic Entities] Erreur: {e}")
+        return {}
+
+async def analyze_clarification_with_ai(question_lower: str, entities: Dict[str, Any], language: str) -> dict:
+    """🧠 NOUVELLE FONCTION: Analyse clarification avec IA au lieu de règles hardcodées"""
+    
+    if not AI_MODULES_AVAILABLE:
+        logger.warning("⚠️ [AI Classification] Modules IA non disponibles - fallback règles")
+        return analyze_broiler_clarification_critical_safe_fallback(question_lower, language)
+    
+    try:
+        # Utiliser l'IA pour classifier
+        classifier = IntelligentClarificationClassifier()
+        classification = await classifier.classify_question(question_lower, entities)
+        
+        logger.info(f"🧠 [AI Decision] {classification['decision']} - Confiance: {classification['confidence']}")
+        
+        # Convertir décision IA vers format attendu par le pipeline
+        if classification["decision"] == "needs_clarification":
+            return {
+                "clarification_required_critical": True,
+                "clarification_required_optional": False,
+                "missing_critical_entities": classification.get("missing_for_precision", []),
+                "missing_optional_entities": [],
+                "confidence": classification["confidence"],
+                "reasoning": f"IA: {classification['reasoning']}",
+                "poultry_type": classification.get("poultry_type", "unknown"),
+                "ai_decision": True,
+                "ai_classification": classification
+            }
+        else:
+            # direct_answer ou general_answer → pas de clarification
+            return {
+                "clarification_required_critical": False,
+                "clarification_required_optional": False,
+                "missing_critical_entities": [],
+                "missing_optional_entities": [],
+                "confidence": classification["confidence"],
+                "reasoning": f"IA: {classification['reasoning']}",
+                "poultry_type": classification.get("poultry_type", "unknown"),
+                "ai_decision": True,
+                "ai_classification": classification,
+                "suggested_response_type": classification["decision"]
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ [AI Classification] Erreur: {e}")
+        # Fallback vers ancienne logique en cas d'erreur IA
+        return analyze_broiler_clarification_critical_safe_fallback(question_lower, language)
+
+def analyze_broiler_clarification_critical_safe_fallback(question_lower: str, language: str) -> dict:
+    """🍗 FALLBACK IA: Version simplifiée pour cas d'erreur du système IA"""
+    
+    try:
+        # Version ultra-simplifiée pour fallback IA uniquement
+        has_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard", "race", "souche"])
+        has_age = any(age in question_lower for age in ["jour", "semaine", "âge", "age"])
+        
+        missing_entities = []
+        if not has_breed:
+            missing_entities.append("breed")
+        if not has_age:
+            missing_entities.append("age")
+        
+        is_critical = len(missing_entities) >= 1
+        confidence = 0.4 if is_critical else 0.6
+        
+        return {
+            "clarification_required_critical": is_critical,
+            "clarification_required_optional": False,
+            "missing_critical_entities": missing_entities,
+            "missing_optional_entities": [],
+            "confidence": confidence,
+            "reasoning": f"Fallback IA - Entités manquantes: {missing_entities}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
+
+def analyze_broiler_clarification_critical_safe_fallback(question_lower: str, language: str) -> dict:
+    """🍗 FALLBACK IA: Version simplifiée pour cas d'erreur du système IA"""
+    
+    try:
+        # Version ultra-simplifiée pour fallback IA uniquement
+        has_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard", "race", "souche"])
+        has_age = any(age in question_lower for age in ["jour", "semaine", "âge", "age"])
+        
+        missing_entities = []
+        if not has_breed:
+            missing_entities.append("breed")
+        if not has_age:
+            missing_entities.append("age")
+        
+        is_critical = len(missing_entities) >= 1
+        confidence = 0.4 if is_critical else 0.6
+        
+        return {
+            "clarification_required_critical": is_critical,
+            "clarification_required_optional": False,
+            "missing_critical_entities": missing_entities,
+            "missing_optional_entities": [],
+            "confidence": confidence,
+            "reasoning": f"Fallback IA - Entités manquantes: {missing_entities}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [AI Fallback] Erreur: {e}")
+        return {
+            "clarification_required_critical": True,
+            "clarification_required_optional": False,
+            "missing_critical_entities": ["information"],
+            "missing_optional_entities": [],
+            "confidence": 0.3,
+            "reasoning": f"Erreur fallback IA: {str(e)}",
+            "poultry_type": "broilers",
+        
+    except Exception as e:
+        logger.error(f"❌ [AI Fallback] Erreur: {e}")
+        return {
+            "clarification_required_critical": True,
+            "clarification_required_optional": False,
+            "missing_critical_entities": ["information"],
+            "missing_optional_entities": [],
+            "confidence": 0.3,
+            "reasoning": f"Erreur fallback IA: {str(e)}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
+    """🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR - VERSION PERMISSIVE (CODE ORIGINAL CONSERVÉ)"""
+    
+    try:
+        critical_missing = []
+        optional_missing = []
+        confidence = 0.0
+        
+        # ✅ LOGIQUE ORIGINALE : Plus permissive pour les questions générales
+        critical_broiler_info = {
+            "breed": ["ross", "cobb", "hubbard", "race", "souche", "breed", "strain"],
+            # ❌ RETIRER age et sex de critical pour questions générales (CODE ORIGINAL)
+            # "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
+            # "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
+        }
+        
+        # ✅ DÉPLACER age et sex vers optionnel (CODE ORIGINAL)
+        optional_broiler_info = {
+            "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
+            "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"],
+            "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],
+            "housing": ["température", "temperature", "ventilation", "density", "densité"],
+            "feeding": ["alimentation", "feed", "fcr", "conversion", "nutrition"]
+        }
+        
+        # Vérifier entités CRITIQUES (maintenant seulement breed)
+        for info_type, keywords in critical_broiler_info.items():
+            try:
+                if not any(keyword in question_lower for keyword in keywords if keyword):
+                    critical_missing.append(info_type)
+                    confidence += 0.5  # Plus de poids sur breed
+            except Exception as e:
+                logger.warning(f"⚠️ [Broiler Critical v4.1.0] Erreur vérification {info_type}: {e}")
+        
+        # Vérifier entités OPTIONNELLES
+        for info_type, keywords in optional_broiler_info.items():
+            try:
+                if not any(keyword in question_lower for keyword in keywords if keyword):
+                    optional_missing.append(info_type)
+                    confidence += 0.1
+            except Exception as e:
+                logger.warning(f"⚠️ [Broiler Optional v4.1.0] Erreur vérification {info_type}: {e}")
+        
+        # ✅ DÉCISION ORIGINALE : Plus permissive
+        # Critique seulement si breed générique/manquant ET aucune info spécifique
+        has_specific_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard"])
+        has_sex_info = any(sex in question_lower for sex in ["mâle", "male", "femelle", "female"])
+        
+        # Critique seulement si vraiment pas assez d'info
+        is_critical = len(critical_missing) >= 1 and not has_specific_breed
+        is_optional = len(optional_missing) >= 3  # Plus permissif
+        
+        logger.info(f"🍗 [Broiler Critical Safe v4.1.0] Critique: {critical_missing}, Optionnel: {optional_missing}")
+        logger.info(f"🍗 [Broiler Permissive] has_specific_breed: {has_specific_breed}, has_sex_info: {has_sex_info}")
+        
+        return {
+            "clarification_required_critical": is_critical,
+            "clarification_required_optional": is_optional, 
+            "missing_critical_entities": critical_missing,
+            "missing_optional_entities": optional_missing,
+            "confidence": confidence,
+            "reasoning": f"Poulets de chair - Entités critiques manquantes: {critical_missing}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [Broiler Critical Safe v4.1.0] Erreur: {e}")
+        return {
+            "clarification_required_critical": False,
+            "clarification_required_optional": False,
+            "missing_critical_entities": [],
+            "missing_optional_entities": [],
+            "confidence": 0.0,
+            "reasoning": f"Erreur analyse poulets de chair: {str(e)}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
+
+# MODIFIER la fonction principale pour utiliser l'IA tout en conservant l'ancienne logique
 async def analyze_question_for_clarification_enhanced(question: str, language: str = "fr") -> dict:
-    """🛑 ANALYSE CLARIFICATION CRITIQUE vs NON CRITIQUE"""
+    """🛑 ANALYSE CLARIFICATION CRITIQUE vs NON CRITIQUE - VERSION IA AMÉLIORÉE avec CONSERVATION"""
     
     # Validation des paramètres d'entrée
     if not question or not isinstance(question, str):
-        logger.warning("⚠️ [Critical Clarification v4.0.0] Question invalide")
+        logger.warning("⚠️ [Critical Clarification v4.1.0] Question invalide")
         return {
             "clarification_required_critical": False,
             "clarification_required_optional": False,
@@ -65,7 +363,8 @@ async def analyze_question_for_clarification_enhanced(question: str, language: s
             "missing_optional_entities": [],
             "confidence": 0.0,
             "reasoning": "Question invalide ou vide",
-            "poultry_type": "unknown"
+            "poultry_type": "unknown",
+            "ai_decision": False
         }
     
     if not language or not isinstance(language, str):
@@ -74,21 +373,38 @@ async def analyze_question_for_clarification_enhanced(question: str, language: s
     try:
         question_lower = question.lower().strip()
         
-        # Détection type volaille avec gestion d'erreurs
+        # Détection type volaille avec gestion d'erreurs (CODE ORIGINAL CONSERVÉ)
         poultry_type = detect_poultry_type_safe(question_lower)
         
-        logger.info(f"🔍 [Critical Clarification v4.0.0] Type volaille détecté: {poultry_type}")
+        logger.info(f"🔍 [Critical Clarification v4.1.0] Type volaille détecté: {poultry_type}")
         
-        # Analyse selon le type avec gestion d'erreurs
-        if poultry_type == "layers":
-            return analyze_layer_clarification_critical_safe(question_lower, language)
-        elif poultry_type == "broilers":
-            return analyze_broiler_clarification_critical_safe(question_lower, language)
+        # 🧠 NOUVEAU: Extraire entités basiques pour l'IA
+        entities = extract_basic_entities(question)
+        entities['poultry_type'] = poultry_type
+        
+        logger.info(f"🔍 [Critical Clarification v4.1.0] Entités extraites: {entities}")
+        
+        # 🧠 DÉCISION: Utiliser IA si disponible, sinon fallback vers logique originale
+        if AI_MODULES_AVAILABLE:
+            logger.info("🧠 [Critical Clarification v4.1.0] Utilisation du système IA")
+            result = await analyze_clarification_with_ai(question_lower, entities, language)
         else:
-            return analyze_general_clarification_critical_safe(question_lower, language)
-            
+            logger.info("🔄 [Critical Clarification v4.1.0] Utilisation de la logique originale")
+            # Utiliser l'ancienne logique selon le type avec gestion d'erreurs (CODE ORIGINAL CONSERVÉ)
+            if poultry_type == "layers":
+                result = analyze_layer_clarification_critical_safe(question_lower, language)
+            elif poultry_type == "broilers":
+                result = analyze_broiler_clarification_critical_safe(question_lower, language)
+            else:
+                result = analyze_general_clarification_critical_safe(question_lower, language)
+        
+        # Ajouter des informations supplémentaires
+        result['poultry_type'] = poultry_type
+        
+        return result
+        
     except Exception as e:
-        logger.error(f"❌ [Critical Clarification v4.0.0] Erreur analyse: {e}")
+        logger.error(f"❌ [Critical Clarification v4.1.0] Erreur analyse: {e}")
         return {
             "clarification_required_critical": False,
             "clarification_required_optional": False,
@@ -96,7 +412,8 @@ async def analyze_question_for_clarification_enhanced(question: str, language: s
             "missing_optional_entities": [],
             "confidence": 0.0,
             "reasoning": f"Erreur analyse: {str(e)}",
-            "poultry_type": "unknown"
+            "poultry_type": "unknown",
+            "ai_decision": False
         }
 
 def detect_poultry_type_safe(question_lower: str) -> str:
@@ -133,21 +450,21 @@ def detect_poultry_type_safe(question_lower: str) -> str:
             if keyword in question_lower:
                 broiler_score += 1
         
-        logger.info(f"🔍 [Safe Detection v4.0.0] Layer score: {layer_score}, Broiler score: {broiler_score}")
+        logger.info(f"🔍 [Safe Detection v4.1.0] Layer score: {layer_score}, Broiler score: {broiler_score}")
         
         # Décision basée sur les scores
         if layer_score > broiler_score:
-            logger.info("🔍 [Safe Detection v4.0.0] Type déterminé par mots-clés: layers")
+            logger.info("🔍 [Safe Detection v4.1.0] Type déterminé par mots-clés: layers")
             return "layers"
         elif broiler_score > layer_score:
-            logger.info("🔍 [Safe Detection v4.0.0] Type déterminé par mots-clés: broilers")
+            logger.info("🔍 [Safe Detection v4.1.0] Type déterminé par mots-clés: broilers")
             return "broilers"
         
         # Analyse des races si scores égaux
-        logger.info("🔍 [Safe Detection v4.0.0] Scores égaux, analyse des races...")
+        logger.info("🔍 [Safe Detection v4.1.0] Scores égaux, analyse des races...")
         
         potential_breeds = extract_breeds_from_question_safe(question_lower)
-        logger.info(f"🔍 [Safe Detection v4.0.0] Races détectées: {potential_breeds}")
+        logger.info(f"🔍 [Safe Detection v4.1.0] Races détectées: {potential_breeds}")
         
         if potential_breeds:
             for breed in potential_breeds:
@@ -156,21 +473,21 @@ def detect_poultry_type_safe(question_lower: str) -> str:
                     breed_type = get_breed_type(normalized_breed)
                     
                     if breed_type == "layers":
-                        logger.info(f"🔍 [Safe Detection v4.0.0] Race {breed} → layers")
+                        logger.info(f"🔍 [Safe Detection v4.1.0] Race {breed} → layers")
                         return "layers"
                     elif breed_type == "broilers":
-                        logger.info(f"🔍 [Safe Detection v4.0.0] Race {breed} → broilers")
+                        logger.info(f"🔍 [Safe Detection v4.1.0] Race {breed} → broilers")
                         return "broilers"
                 except Exception as e:
-                    logger.warning(f"⚠️ [Safe Detection v4.0.0] Erreur analyse race {breed}: {e}")
+                    logger.warning(f"⚠️ [Safe Detection v4.1.0] Erreur analyse race {breed}: {e}")
                     continue
         
         # Fallback final
-        logger.info("🔍 [Safe Detection v4.0.0] Type indéterminé après analyse complète")
+        logger.info("🔍 [Safe Detection v4.1.0] Type indéterminé après analyse complète")
         return "unknown"
         
     except Exception as e:
-        logger.error(f"❌ [Safe Detection v4.0.0] Erreur détection: {e}")
+        logger.error(f"❌ [Safe Detection v4.1.0] Erreur détection: {e}")
         return "unknown"
 
 def extract_breeds_from_question_safe(question_lower: str) -> List[str]:
@@ -206,10 +523,10 @@ def extract_breeds_from_question_safe(question_lower: str) -> List[str]:
                             if breed and 2 <= len(breed) <= 25:
                                 found_breeds.append(breed)
                         except Exception as e:
-                            logger.warning(f"⚠️ [Extract Breeds v4.0.0] Erreur traitement match: {e}")
+                            logger.warning(f"⚠️ [Extract Breeds v4.1.0] Erreur traitement match: {e}")
                             continue
             except Exception as e:
-                logger.warning(f"⚠️ [Extract Breeds v4.0.0] Erreur pattern {pattern}: {e}")
+                logger.warning(f"⚠️ [Extract Breeds v4.1.0] Erreur pattern {pattern}: {e}")
                 continue
         
         # Déduplication sécurisée
@@ -223,13 +540,13 @@ def extract_breeds_from_question_safe(question_lower: str) -> List[str]:
                     unique_breeds.append(breed)
                     seen.add(breed_clean)
             except Exception as e:
-                logger.warning(f"⚠️ [Extract Breeds v4.0.0] Erreur déduplication: {e}")
+                logger.warning(f"⚠️ [Extract Breeds v4.1.0] Erreur déduplication: {e}")
                 continue
         
         return unique_breeds
         
     except Exception as e:
-        logger.error(f"❌ [Extract Breeds v4.0.0] Erreur extraction: {e}")
+        logger.error(f"❌ [Extract Breeds v4.1.0] Erreur extraction: {e}")
         return []
 
 def analyze_layer_clarification_critical_safe(question_lower: str, language: str) -> dict:
@@ -262,7 +579,7 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
                     critical_missing.append(info_type)
                     confidence += 0.4
             except Exception as e:
-                logger.warning(f"⚠️ [Layer Critical v4.0.0] Erreur vérification {info_type}: {e}")
+                logger.warning(f"⚠️ [Layer Critical v4.1.0] Erreur vérification {info_type}: {e}")
         
         # Vérifier entités NON CRITIQUES de façon sécurisée
         for info_type, keywords in optional_layer_info.items():
@@ -271,13 +588,13 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
                     optional_missing.append(info_type)
                     confidence += 0.1
             except Exception as e:
-                logger.warning(f"⚠️ [Layer Optional v4.0.0] Erreur vérification {info_type}: {e}")
+                logger.warning(f"⚠️ [Layer Optional v4.1.0] Erreur vérification {info_type}: {e}")
         
         # Décision critique sécurisée
         is_critical = len(critical_missing) >= 1
         is_optional = len(optional_missing) >= 2
         
-        logger.info(f"🥚 [Layer Critical Safe v4.0.0] Critique: {critical_missing}, Optionnel: {optional_missing}")
+        logger.info(f"🥚 [Layer Critical Safe v4.1.0] Critique: {critical_missing}, Optionnel: {optional_missing}")
         
         return {
             "clarification_required_critical": is_critical,
@@ -286,11 +603,12 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
             "missing_optional_entities": optional_missing,
             "confidence": min(confidence, 0.9),
             "reasoning": f"Pondeuses - Entités critiques manquantes: {critical_missing}",
-            "poultry_type": "layers"
+            "poultry_type": "layers",
+            "ai_decision": False
         }
         
     except Exception as e:
-        logger.error(f"❌ [Layer Critical Safe v4.0.0] Erreur: {e}")
+        logger.error(f"❌ [Layer Critical Safe v4.1.0] Erreur: {e}")
         return {
             "clarification_required_critical": False,
             "clarification_required_optional": False,
@@ -298,91 +616,15 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
             "missing_optional_entities": [],
             "confidence": 0.0,
             "reasoning": f"Erreur analyse pondeuses: {str(e)}",
-            "poultry_type": "layers"
-        }
-
-def analyze_broiler_clarification_critical_safe(question_lower: str, language: str) -> dict:
-    """🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR - VERSION PERMISSIVE"""
-    
-    try:
-        critical_missing = []
-        optional_missing = []
-        confidence = 0.0
-        
-        # ✅ NOUVELLE LOGIQUE : Plus permissive pour les questions générales
-        critical_broiler_info = {
-            "breed": ["ross", "cobb", "hubbard", "race", "souche", "breed", "strain"],
-            # ❌ RETIRER age et sex de critical pour questions générales
-            # "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
-            # "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
-        }
-        
-        # ✅ DÉPLACER age et sex vers optionnel
-        optional_broiler_info = {
-            "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
-            "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"],
-            "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],
-            "housing": ["température", "temperature", "ventilation", "density", "densité"],
-            "feeding": ["alimentation", "feed", "fcr", "conversion", "nutrition"]
-        }
-        
-        # Vérifier entités CRITIQUES (maintenant seulement breed)
-        for info_type, keywords in critical_broiler_info.items():
-            try:
-                if not any(keyword in question_lower for keyword in keywords if keyword):
-                    critical_missing.append(info_type)
-                    confidence += 0.5  # Plus de poids sur breed
-            except Exception as e:
-                logger.warning(f"⚠️ [Broiler Critical v4.0.0] Erreur vérification {info_type}: {e}")
-        
-        # Vérifier entités OPTIONNELLES
-        for info_type, keywords in optional_broiler_info.items():
-            try:
-                if not any(keyword in question_lower for keyword in keywords if keyword):
-                    optional_missing.append(info_type)
-                    confidence += 0.1
-            except Exception as e:
-                logger.warning(f"⚠️ [Broiler Optional v4.0.0] Erreur vérification {info_type}: {e}")
-        
-        # ✅ NOUVELLE DÉCISION : Plus permissive
-        # Critique seulement si breed générique/manquant ET aucune info spécifique
-        has_specific_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard"])
-        has_sex_info = any(sex in question_lower for sex in ["mâle", "male", "femelle", "female"])
-        
-        # Critique seulement si vraiment pas assez d'info
-        is_critical = len(critical_missing) >= 1 and not has_specific_breed
-        is_optional = len(optional_missing) >= 3  # Plus permissif
-        
-        logger.info(f"🍗 [Broiler Critical Safe v4.0.0] Critique: {critical_missing}, Optionnel: {optional_missing}")
-        logger.info(f"🍗 [Broiler Permissive] has_specific_breed: {has_specific_breed}, has_sex_info: {has_sex_info}")
-        
-        return {
-            "clarification_required_critical": is_critical,
-            "clarification_required_optional": is_optional, 
-            "missing_critical_entities": critical_missing,
-            "missing_optional_entities": optional_missing,
-            "confidence": confidence,
-            "reasoning": f"Poulets de chair - Entités critiques manquantes: {critical_missing}",
-            "poultry_type": "broilers"
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ [Broiler Critical Safe v4.0.0] Erreur: {e}")
-        return {
-            "clarification_required_critical": False,
-            "clarification_required_optional": False,
-            "missing_critical_entities": [],
-            "missing_optional_entities": [],
-            "confidence": 0.0,
-            "reasoning": f"Erreur analyse poulets de chair: {str(e)}",
-            "poultry_type": "broilers"
+            "poultry_type": "layers",
+            "ai_decision": False
         }
 
 def analyze_general_clarification_critical_safe(question_lower: str, language: str) -> dict:
     """❓ ANALYSE CLARIFICATION GÉNÉRALE"""
     
     try:
-        logger.info("❓ [General Critical Safe v4.0.0] Type volaille indéterminé - clarification critique requise")
+        logger.info("❓ [General Critical Safe v4.1.0] Type volaille indéterminé - clarification critique requise")
         
         return {
             "clarification_required_critical": True,
@@ -391,11 +633,12 @@ def analyze_general_clarification_critical_safe(question_lower: str, language: s
             "missing_optional_entities": ["breed", "age", "purpose", "weight"],
             "confidence": 0.8,
             "reasoning": "Type de volaille indéterminé - clarification critique nécessaire",
-            "poultry_type": "unknown"
+            "poultry_type": "unknown",
+            "ai_decision": False
         }
         
     except Exception as e:
-        logger.error(f"❌ [General Critical Safe v4.0.0] Erreur: {e}")
+        logger.error(f"❌ [General Critical Safe v4.1.0] Erreur: {e}")
         return {
             "clarification_required_critical": False,
             "clarification_required_optional": False,
@@ -403,7 +646,8 @@ def analyze_general_clarification_critical_safe(question_lower: str, language: s
             "missing_optional_entities": [],
             "confidence": 0.0,
             "reasoning": f"Erreur analyse générale: {str(e)}",
-            "poultry_type": "unknown"
+            "poultry_type": "unknown",
+            "ai_decision": False
         }
 
 def generate_critical_clarification_message_safe(missing_entities: List[str], poultry_type: str, language: str) -> str:
@@ -505,7 +749,7 @@ def generate_critical_clarification_message_safe(missing_entities: List[str], po
             return general_msg
             
     except Exception as e:
-        logger.error(f"❌ [Generate Critical Message v4.0.0] Erreur: {e}")
+        logger.error(f"❌ [Generate Critical Message v4.1.0] Erreur: {e}")
         # Fallback sécurisé
         fallback_messages = {
             "fr": "Pour vous donner une réponse précise, j'ai besoin de plus d'informations sur vos animaux.",

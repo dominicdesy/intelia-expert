@@ -10,6 +10,7 @@ app/api/v1/expert_services_clarification.py - SYSTÈME DE CLARIFICATION CRITIQUE
 6. 🧠 NOUVEAU: Classification IA au lieu de règles hardcodées
 7. 🧠 NOUVEAU: Analyse intelligente des besoins de clarification
 8. 🔄 CONSERVATION: Code original préservé avec fallbacks
+9. 🔧 CORRIGÉ: Problèmes de syntaxe et fonctions dupliquées
 """
 
 import logging
@@ -23,8 +24,10 @@ try:
     from .intelligent_clarification_classifier import IntelligentClarificationClassifier
     from .general_response_generator import GeneralResponseGenerator
     AI_MODULES_AVAILABLE = True
+    logger = logging.getLogger(__name__)
     logger.info("✅ [Clarification v4.1.0] Modules IA chargés avec succès")
 except (ImportError, ModuleNotFoundError) as e:
+    logger = logging.getLogger(__name__)
     logger.warning(f"⚠️ [Clarification v4.1.0] Modules IA non disponibles: {e}")
     AI_MODULES_AVAILABLE = False
     
@@ -36,8 +39,6 @@ except (ImportError, ModuleNotFoundError) as e:
     class GeneralResponseGenerator:
         async def generate_direct_response(self, question, entities, poultry_type, language):
             return {"response": "Réponse non disponible", "response_type": "fallback"}
-
-logger = logging.getLogger(__name__)
 
 # Import conditionnel des fonctions de clarification
 try:
@@ -219,58 +220,21 @@ def analyze_broiler_clarification_critical_safe_fallback(question_lower: str, la
             "poultry_type": "broilers",
             "ai_decision": False
         }
+        
+    except Exception as e:
+        logger.error(f"❌ [AI Fallback] Erreur: {e}")
+        return {
+            "clarification_required_critical": True,
+            "clarification_required_optional": False,
+            "missing_critical_entities": ["information"],
+            "missing_optional_entities": [],
+            "confidence": 0.3,
+            "reasoning": f"Erreur fallback IA: {str(e)}",
+            "poultry_type": "broilers",
+            "ai_decision": False
+        }
 
-def analyze_broiler_clarification_critical_safe_fallback(question_lower: str, language: str) -> dict:
-    """🍗 FALLBACK IA: Version simplifiée pour cas d'erreur du système IA"""
-    
-    try:
-        # Version ultra-simplifiée pour fallback IA uniquement
-        has_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard", "race", "souche"])
-        has_age = any(age in question_lower for age in ["jour", "semaine", "âge", "age"])
-        
-        missing_entities = []
-        if not has_breed:
-            missing_entities.append("breed")
-        if not has_age:
-            missing_entities.append("age")
-        
-        is_critical = len(missing_entities) >= 1
-        confidence = 0.4 if is_critical else 0.6
-        
-        return {
-            "clarification_required_critical": is_critical,
-            "clarification_required_optional": False,
-            "missing_critical_entities": missing_entities,
-            "missing_optional_entities": [],
-            "confidence": confidence,
-            "reasoning": f"Fallback IA - Entités manquantes: {missing_entities}",
-            "poultry_type": "broilers",
-            "ai_decision": False
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ [AI Fallback] Erreur: {e}")
-        return {
-            "clarification_required_critical": True,
-            "clarification_required_optional": False,
-            "missing_critical_entities": ["information"],
-            "missing_optional_entities": [],
-            "confidence": 0.3,
-            "reasoning": f"Erreur fallback IA: {str(e)}",
-            "poultry_type": "broilers",
-        
-    except Exception as e:
-        logger.error(f"❌ [AI Fallback] Erreur: {e}")
-        return {
-            "clarification_required_critical": True,
-            "clarification_required_optional": False,
-            "missing_critical_entities": ["information"],
-            "missing_optional_entities": [],
-            "confidence": 0.3,
-            "reasoning": f"Erreur fallback IA: {str(e)}",
-            "poultry_type": "broilers",
-            "ai_decision": False
-        }
+def analyze_broiler_clarification_critical_safe(question_lower: str, language: str) -> dict:
     """🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR - VERSION PERMISSIVE (CODE ORIGINAL CONSERVÉ)"""
     
     try:
