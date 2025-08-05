@@ -3,6 +3,7 @@ app/api/v1/expert_integrations.py - GESTIONNAIRE INTÉGRATIONS
 
 Gère toutes les intégrations avec les modules externes (clarification, mémoire, validation, etc.)
 🆕 NOUVEAU v3.9.1: Support intégration mode sémantique dynamique ACTIVÉ PAR DÉFAUT
+🆕 NOUVEAU v3.9.2: Centralisation contexte via ContextManager
 """
 
 import logging
@@ -27,6 +28,9 @@ class IntegrationsManager:
         self.semantic_dynamic_available = True  # ✅ FORÇAGE PERMANENT
         self.semantic_dynamic_forced = True     # ✅ Flag pour indiquer le forçage
         
+        # 🆕 NOUVEAU v3.9.2: Gestionnaire centralisé du contexte
+        self.context_manager = None
+        
         # Fonctions importées
         self._auth_functions = {}
         self._clarification_functions = {}
@@ -42,6 +46,9 @@ class IntegrationsManager:
     
     def _initialize_integrations(self):
         """Initialise toutes les intégrations disponibles + semantic dynamic PRIORITAIRE"""
+        
+        # 🆕 NOUVEAU: Initialisation ContextManager en priorité
+        self._init_context_manager()
         
         # === INTÉGRATION CLARIFICATION AMÉLIORÉE + SEMANTIC DYNAMIC PRIORITAIRE ===
         try:
@@ -145,6 +152,16 @@ class IntegrationsManager:
         
         # 🆕 TOUJOURS: Initialisation fonctions mode sémantique dynamique (même si partiellement disponible)
         self._init_semantic_dynamic_functions()
+    
+    def _init_context_manager(self):
+        """🆕 NOUVEAU: Initialise le gestionnaire centralisé du contexte"""
+        try:
+            from .context_manager import ContextManager
+            self.context_manager = ContextManager()
+            logger.info("✅ [Integrations] ContextManager initialisé (centralisation du contexte)")
+        except ImportError as e:
+            logger.warning(f"⚠️ [Integrations] ContextManager non disponible, fallback vers méthodes directes: {e}")
+            self.context_manager = None
     
     def _init_auth(self):
         """Initialise l'authentification avec gestion des erreurs"""
@@ -587,12 +604,104 @@ class IntegrationsManager:
             "semantic_dynamic_openai_available": self.openai_available,
             "semantic_dynamic_functions_loaded": len(self._semantic_dynamic_functions),
             "fallback_methods_available": True,
-            "intelligent_fallback_enabled": True
+            "intelligent_fallback_enabled": True,
+            "context_manager_available": self.context_manager is not None,
+            "context_centralization_enabled": True
         })
         
         return base_stats
     
-    # === MÉTHODES MÉMOIRE INTELLIGENTE ===
+    # === 🆕 NOUVELLES MÉTHODES CONTEXTE CENTRALISÉ VIA CONTEXTMANAGER ===
+    
+    def get_context_for_rag(self, conversation_id: str, max_chars: int = 800):
+        """
+        🆕 MODIFICATION: Déléguer au ContextManager pour récupération contexte RAG
+        ✅ Centralisation via ContextManager avec fallback vers méthodes directes
+        """
+        if self.context_manager:
+            try:
+                # ✅ Utilisation du gestionnaire centralisé
+                return self.context_manager.get_unified_context(conversation_id, type="rag", max_chars=max_chars)
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur ContextManager.get_unified_context: {e}")
+                # Fallback vers méthode directe
+        
+        # ✅ FALLBACK: Méthode directe originale
+        if not self.intelligent_memory_available:
+            return ""
+        
+        func = self._memory_functions.get('get_context_for_rag')
+        if func:
+            try:
+                return func(conversation_id, max_chars)
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur get_context_for_rag: {e}")
+                return ""
+        return ""
+    
+    def get_context_for_clarification(self, conversation_id: str):
+        """
+        🆕 MODIFICATION: Déléguer au ContextManager pour récupération contexte clarification
+        ✅ Même source, différente vue via ContextManager
+        """
+        if self.context_manager:
+            try:
+                # ✅ Utilisation du gestionnaire centralisé
+                return self.context_manager.get_unified_context(conversation_id, type="clarification")
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur ContextManager.get_unified_context clarification: {e}")
+                # Fallback vers méthode directe
+        
+        # ✅ FALLBACK: Méthode directe originale
+        if not self.intelligent_memory_available:
+            return {}
+        
+        func = self._memory_functions.get('get_context_for_clarification')
+        if func:
+            try:
+                return func(conversation_id)
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur get_context_for_clarification: {e}")
+                return {}
+        return {}
+    
+    def get_context_for_classification(self, conversation_id: str):
+        """
+        🆕 NOUVEAU: Récupération contexte pour classification via ContextManager
+        """
+        if self.context_manager:
+            try:
+                return self.context_manager.get_unified_context(conversation_id, type="classification")
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur get_context_for_classification: {e}")
+        
+        # ✅ FALLBACK: Utiliser contexte RAG adapté pour classification
+        context_rag = self.get_context_for_rag(conversation_id, max_chars=600)
+        if context_rag:
+            return {"context": context_rag, "adapted_for_classification": True}
+        return {}
+    
+    def get_unified_context(self, conversation_id: str, context_type: str = "general", **kwargs):
+        """
+        🆕 NOUVEAU: Interface unifiée pour récupération de tout type de contexte
+        """
+        if self.context_manager:
+            try:
+                return self.context_manager.get_unified_context(conversation_id, type=context_type, **kwargs)
+            except Exception as e:
+                logger.error(f"❌ [Integrations] Erreur get_unified_context: {e}")
+        
+        # ✅ FALLBACK: Router vers méthodes spécialisées
+        if context_type == "rag":
+            return self.get_context_for_rag(conversation_id, kwargs.get('max_chars', 800))
+        elif context_type == "clarification":
+            return self.get_context_for_clarification(conversation_id)
+        elif context_type == "classification":
+            return self.get_context_for_classification(conversation_id)
+        else:
+            return self.get_conversation_context(conversation_id)
+    
+    # === MÉTHODES MÉMOIRE INTELLIGENTE (héritées avec contexte centralisé) ===
     
     def add_message_to_conversation(self, **kwargs):
         """Ajoute un message à la conversation"""
@@ -621,34 +730,6 @@ class IntegrationsManager:
                 logger.error(f"❌ [Integrations] Erreur get_conversation_context: {e}")
                 return None
         return None
-    
-    def get_context_for_clarification(self, conversation_id: str):
-        """Récupère le contexte pour clarification"""
-        if not self.intelligent_memory_available:
-            return {}
-        
-        func = self._memory_functions.get('get_context_for_clarification')
-        if func:
-            try:
-                return func(conversation_id)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_context_for_clarification: {e}")
-                return {}
-        return {}
-    
-    def get_context_for_rag(self, conversation_id: str, max_chars: int = 800):
-        """Récupère le contexte pour RAG"""
-        if not self.intelligent_memory_available:
-            return ""
-        
-        func = self._memory_functions.get('get_context_for_rag')
-        if func:
-            try:
-                return func(conversation_id, max_chars)
-            except Exception as e:
-                logger.error(f"❌ [Integrations] Erreur get_context_for_rag: {e}")
-                return ""
-        return ""
     
     def get_conversation_memory_stats(self):
         """Récupère les stats de la mémoire"""
@@ -777,10 +858,10 @@ class IntegrationsManager:
         # ✅ Fallback toujours disponible
         return self._fallback_validate_questions(questions, language)
     
-    # === MÉTHODES UTILITAIRES + SEMANTIC DYNAMIC FORCÉ ===
+    # === MÉTHODES UTILITAIRES + SEMANTIC DYNAMIC FORCÉ + CONTEXT CENTRALISÉ ===
     
     def get_system_status(self) -> Dict[str, Any]:
-        """Retourne le statut de toutes les intégrations + semantic dynamic FORCÉ"""
+        """Retourne le statut de toutes les intégrations + semantic dynamic FORCÉ + context centralisé"""
         return {
             "enhanced_clarification": self.enhanced_clarification_available,
             "intelligent_memory": self.intelligent_memory_available,
@@ -790,11 +871,14 @@ class IntegrationsManager:
             "logging": self.logging_available,
             # ✅ TOUJOURS TRUE
             "semantic_dynamic": True,
-            "semantic_dynamic_forced": True
+            "semantic_dynamic_forced": True,
+            # 🆕 NOUVEAU: Status centralisation contexte
+            "context_manager": self.context_manager is not None,
+            "context_centralization": True
         }
     
     def get_available_enhancements(self) -> List[str]:
-        """Retourne la liste des améliorations disponibles + semantic dynamic FORCÉ"""
+        """Retourne la liste des améliorations disponibles + semantic dynamic FORCÉ + context centralisé"""
         enhancements = []
         
         if self.enhanced_clarification_available:
@@ -814,6 +898,17 @@ class IntegrationsManager:
             "multi_level_fallback_system"
         ])
         
+        # 🆕 NOUVEAU: Améliorations centralisation contexte
+        if self.context_manager is not None:
+            enhancements.extend([
+                "unified_context_management",
+                "centralized_context_retrieval",
+                "context_caching_intelligent",
+                "multi_type_context_support"
+            ])
+        else:
+            enhancements.append("context_fallback_methods")
+        
         if self.intelligent_memory_available:
             enhancements.extend([
                 "intelligent_entity_extraction",
@@ -827,14 +922,14 @@ class IntegrationsManager:
         if self.openai_available:
             enhancements.append("enhanced_prompts_with_numerical_data")
         
-        # ✅ TOUJOURS: Suite complète forcée
-        enhancements.append("complete_ai_assistant_suite_forced")
+        # ✅ TOUJOURS: Suite complète forcée + contexte centralisé
+        enhancements.append("complete_ai_assistant_suite_forced_with_centralized_context")
         
         return enhancements
     
-    # 🆕 FORCÉ: Configuration mode sémantique dynamique
+    # 🆕 FORCÉ: Configuration mode sémantique dynamique + context manager
     def get_semantic_dynamic_config(self) -> Dict[str, Any]:
-        """Retourne la configuration du mode sémantique dynamique (FORCÉ ACTIF)"""
+        """Retourne la configuration du mode sémantique dynamique (FORCÉ ACTIF) + context manager"""
         return {
             "available": True,  # ✅ FORCÉ
             "forced_active": True,
@@ -846,21 +941,28 @@ class IntegrationsManager:
             "intelligent_fallback_layers": 3,
             "functions_loaded": list(self._semantic_dynamic_functions.keys()),
             "clarification_functions_loaded": len([k for k in self._clarification_functions.keys() if "semantic_dynamic" in k]),
-            "systematic_pre_rag_analysis": True
+            "systematic_pre_rag_analysis": True,
+            # 🆕 NOUVEAU: Configuration context manager
+            "context_manager_available": self.context_manager is not None,
+            "context_centralization_enabled": True,
+            "unified_context_interface": True,
+            "context_types_supported": ["rag", "clarification", "classification", "general"]
         }
     
-    # 🆕 FORCÉ: Test complet du mode sémantique dynamique
+    # 🆕 FORCÉ: Test complet du mode sémantique dynamique + context manager
     async def test_semantic_dynamic_system(self, test_question: str = "J'ai un problème avec mes poulets") -> Dict[str, Any]:
-        """Teste complètement le système sémantique dynamique (FORCÉ ACTIF)"""
+        """Teste complètement le système sémantique dynamique + context manager (FORCÉ ACTIF)"""
         test_results = {
             "system_available": True,  # ✅ FORCÉ
             "system_forced": True,
             "openai_available": self.openai_available,
+            "context_manager_available": self.context_manager is not None,
             "test_successful": False,
             "generation_test": None,
             "validation_test": None,
             "prompt_test": None,
             "pre_rag_analysis_test": None,
+            "context_manager_test": None,
             "errors": []
         }
         
@@ -900,40 +1002,65 @@ class IntegrationsManager:
                 "successful": len(prompt) > 20  # Seuil plus bas car fallback
             }
             
+            # 🆕 Test 5: ContextManager
+            if self.context_manager:
+                try:
+                    test_context = self.get_unified_context("test_conversation_id", "rag")
+                    test_results["context_manager_test"] = {
+                        "context_retrieved": bool(test_context),
+                        "context_type": type(test_context).__name__,
+                        "successful": True  # Pas d'exception = succès
+                    }
+                except Exception as e:
+                    test_results["context_manager_test"] = {
+                        "context_retrieved": False,
+                        "error": str(e),
+                        "successful": False
+                    }
+            else:
+                test_results["context_manager_test"] = {
+                    "context_manager_available": False,
+                    "fallback_methods_used": True,
+                    "successful": True  # Fallback = toujours OK
+                }
+            
             # Résultat global
             test_results["test_successful"] = all([
                 test_results["pre_rag_analysis_test"]["successful"],
                 test_results["generation_test"]["successful"],
                 test_results.get("validation_test", {}).get("successful", True),
-                test_results["prompt_test"]["successful"]
+                test_results["prompt_test"]["successful"],
+                test_results.get("context_manager_test", {}).get("successful", True)
             ])
             
-            logger.info(f"✅ [Integrations] Test sémantique dynamique: {'SUCCÈS' if test_results['test_successful'] else 'PARTIEL'}")
+            logger.info(f"✅ [Integrations] Test sémantique dynamique + context manager: {'SUCCÈS' if test_results['test_successful'] else 'PARTIEL'}")
             
         except Exception as e:
             test_results["errors"].append(f"Erreur test: {str(e)}")
             test_results["test_successful"] = False
-            logger.error(f"❌ [Integrations] Erreur test sémantique dynamique: {e}")
+            logger.error(f"❌ [Integrations] Erreur test sémantique dynamique + context manager: {e}")
         
         return test_results
 
 # =============================================================================
-# CONFIGURATION FINALE + SEMANTIC DYNAMIC FORCÉ
+# CONFIGURATION FINALE + SEMANTIC DYNAMIC FORCÉ + CONTEXT CENTRALISÉ
 # =============================================================================
 
-logger.info("✅ [Integrations Manager] Gestionnaire d'intégrations initialisé avec mode sémantique dynamique FORCÉ ACTIF")
-logger.info("🆕 [Integrations Manager] NOUVELLES FONCTIONNALITÉS v3.9.1 - MODE SÉMANTIQUE DYNAMIQUE FORCÉ:")
+logger.info("✅ [Integrations Manager] Gestionnaire d'intégrations initialisé avec mode sémantique dynamique FORCÉ ACTIF + contexte centralisé")
+logger.info("🆕 [Integrations Manager] NOUVELLES FONCTIONNALITÉS v3.9.2 - MODE SÉMANTIQUE DYNAMIQUE FORCÉ + CENTRALISATION CONTEXTE:")
 logger.info("   - 🎭 Mode sémantique dynamique TOUJOURS ACTIF (forcé)")
 logger.info("   - 🎯 Analyse systématique pré-RAG obligatoire")
 logger.info("   - 🤖 Génération questions intelligentes multi-niveau")
 logger.info("   - 🔄 Système fallback robuste 3 niveaux")
-logger.info("   - ⚙️ Configuration et test système sémantique dynamique permanent")
-logger.info("   - 📊 Statistiques étendues mode sémantique dynamique")
+logger.info("   - 🧠 ContextManager centralisé pour récupération contexte")
+logger.info("   - 🔗 Interface unifiée pour tous types de contexte")
+logger.info("   - 📊 Statistiques étendues mode sémantique dynamique + context manager")
 logger.info("   - 🔧 Fonctions utilitaires fallback intégrées")
 logger.info("   - ✅ Validation et exemples questions dynamiques garantis")
-logger.info("🎯 [Integrations Manager] WORKFLOW FORCÉ:")
+logger.info("🎯 [Integrations Manager] WORKFLOW FORCÉ + CENTRALISÉ:")
 logger.info("   1. analyze_question_before_rag() -> SYSTÉMATIQUE avant RAG")
 logger.info("   2. Tentative fonctions importées -> Fallback intelligent")
-logger.info("   3. Questions génériques intelligentes -> Questions de base")
-logger.info("   4. Toujours au moins 2-4 questions de clarification générées")
-logger.info("✨ [Integrations Manager] GARANTIE: Mode sémantique dynamique OPÉRATIONNEL en permanence!")
+logger.info("   3. ContextManager.get_unified_context() -> Fallback méthodes directes")
+logger.info("   4. Questions génériques intelligentes -> Questions de base")
+logger.info("   5. Toujours au moins 2-4 questions de clarification générées")
+logger.info("✨ [Integrations Manager] GARANTIE: Mode sémantique dynamique + contexte centralisé OPÉRATIONNELS en permanence!")

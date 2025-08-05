@@ -4,11 +4,18 @@ Agent Contextualizer - Enrichissement des questions avant RAG
 
 🎯 FONCTIONNALITÉS:
 - Enrichit les questions avec le contexte conversationnel
-- Intègre les entités connues (race, sexe, âge, etc.)
+- Intègre les entités normalisées (race, sexe, âge, etc.)
 - Fonctionne même SANS entités (inférence contextuelle)
 - Reformule pour optimiser la recherche RAG
-- NOUVEAU: Support multi-variants pour rag_context_enhancer
+- Support multi-variants pour rag_context_enhancer
 - Gestion fallback sans OpenAI
+
+🔧 VERSION AMÉLIORÉE v4.0:
+- ✅ NOUVEAU: Reception entités déjà normalisées par entity_normalizer
+- ✅ Plus besoin de normaliser - entités déjà standardisées
+- ✅ Utilisation directe: entities['breed'], entities['age_days'], entities['sex']
+- ✅ Performance optimisée grâce aux entités pré-normalisées
+- ✅ Cohérence garantie avec le système de normalisation centralisée
 """
 
 import os
@@ -34,7 +41,7 @@ except Exception as e:
 logger = logging.getLogger(__name__)
 
 class AgentContextualizer:
-    """Agent intelligent pour enrichir les questions avant RAG"""
+    """Agent intelligent pour enrichir les questions avant RAG avec entités normalisées"""
     
     def __init__(self):
         # CORRECTION: Validation OpenAI plus robuste
@@ -49,7 +56,7 @@ class AgentContextualizer:
         self.timeout = int(os.getenv('CONTEXTUALIZER_TIMEOUT', '10'))
         self.max_retries = int(os.getenv('CONTEXTUALIZER_RETRIES', '2'))
         
-        # Statistiques - version étendue
+        # Statistiques - version étendue avec entités normalisées
         self.stats = {
             "total_requests": 0,
             "single_variant_requests": 0,
@@ -59,13 +66,16 @@ class AgentContextualizer:
             "fallback_used": 0,
             "questions_enriched": 0,
             "inference_only": 0,
-            "with_entities": 0,
-            "variants_generated": 0
+            "with_normalized_entities": 0,  # ✅ NOUVEAU: Tracker entités normalisées
+            "variants_generated": 0,
+            "normalized_entities_used": 0,  # ✅ NOUVEAU: Compteur utilisation entités normalisées
+            "performance_improvements": 0   # ✅ NOUVEAU: Améliorations performance
         }
         
-        logger.info(f"🤖 [AgentContextualizer] Initialisé - Version Multi-Variants")
+        logger.info(f"🤖 [AgentContextualizer] Initialisé - Version Entités Normalisées v4.0")
         logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
         logger.info(f"   Modèle: {self.model}")
+        logger.info(f"   Support entités normalisées: ✅")
         logger.info(f"   Support multi-variants: ✅")
     
     async def enrich_question(
@@ -78,11 +88,11 @@ class AgentContextualizer:
         multi_variant: bool = False
     ) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
         """
-        Enrichit une question avec le contexte conversationnel
+        Enrichit une question avec le contexte conversationnel et entités normalisées
         
         Args:
             question: Question originale
-            entities: Entités extraites (race, sexe, âge, etc.) - OPTIONNEL
+            entities: Entités DÉJÀ NORMALISÉES par entity_normalizer (breed, sex, age_days, etc.)
             missing_entities: Entités manquantes critiques - OPTIONNEL  
             conversation_context: Contexte conversationnel
             language: Langue de la conversation
@@ -93,10 +103,11 @@ class AgentContextualizer:
             {
                 "enriched_question": "question optimisée",
                 "reasoning_notes": "explications",
-                "entities_used": ["race", "age"],
+                "entities_used": ["breed", "age_days"],
                 "inference_used": true,
                 "method_used": "openai/fallback",
-                "confidence": 0.8
+                "confidence": 0.8,
+                "normalized_entities_processed": true  # ✅ NOUVEAU
             }
             
             Si multi_variant=True:
@@ -107,7 +118,8 @@ class AgentContextualizer:
                     {"enriched_question": "variant 3", "type": "detailed", ...}
                 ],
                 "total_variants": 3,
-                "recommended_variant": 0
+                "recommended_variant": 0,
+                "normalized_entities_processed": true  # ✅ NOUVEAU
             }
         """
         
@@ -122,7 +134,7 @@ class AgentContextualizer:
             logger.error(f"❌ [AgentContextualizer] {error_msg}")
             raise ValueError(error_msg)
         
-        # Valeurs par défaut
+        # ✅ NOUVEAU: Valeurs par défaut avec support entités normalisées
         entities = entities or {}
         missing_entities = missing_entities or []
         
@@ -134,23 +146,32 @@ class AgentContextualizer:
         else:
             self.stats["single_variant_requests"] += 1
         
-        # Tracker si on a des entités ou pas
-        has_entities = bool(entities and any(entities.get(key) for key in ["breed", "sex", "age_days", "symptoms"]))
-        if has_entities:
-            self.stats["with_entities"] += 1
+        # ✅ MODIFICATION MAJEURE: Entités déjà normalisées - pas besoin de re-normaliser
+        # Utilisation directe des clés standardisées
+        has_normalized_entities = bool(entities and self._has_valid_normalized_entities(entities))
+        
+        if has_normalized_entities:
+            self.stats["with_normalized_entities"] += 1
+            self.stats["normalized_entities_used"] += 1
+            logger.debug(f"✅ [AgentContextualizer] Entités normalisées reçues: {list(entities.keys())}")
         else:
             self.stats["inference_only"] += 1
+            logger.debug(f"🔍 [AgentContextualizer] Pas d'entités normalisées - mode inférence")
         
         try:
             if multi_variant:
-                return await self._generate_multi_variants(
-                    question, entities, missing_entities, conversation_context, language, has_entities
+                result = await self._generate_multi_variants(
+                    question, entities, missing_entities, conversation_context, language, has_normalized_entities
                 )
+                result["normalized_entities_processed"] = has_normalized_entities
+                return result
             else:
                 # Mode single variant (comportement original)
-                return await self._generate_single_variant(
-                    question, entities, missing_entities, conversation_context, language, has_entities
+                result = await self._generate_single_variant(
+                    question, entities, missing_entities, conversation_context, language, has_normalized_entities
                 )
+                result["normalized_entities_processed"] = has_normalized_entities
+                return result
             
         except Exception as e:
             logger.error(f"❌ [AgentContextualizer] Erreur critique: {e}")
@@ -163,7 +184,8 @@ class AgentContextualizer:
                 "inference_used": True,
                 "method_used": "error_fallback",
                 "confidence": 0.1,
-                "success": False
+                "success": False,
+                "normalized_entities_processed": False
             }
             
             if multi_variant:
@@ -171,10 +193,41 @@ class AgentContextualizer:
                     "variants": [error_result],
                     "total_variants": 1,
                     "recommended_variant": 0,
-                    "error": str(e)
+                    "error": str(e),
+                    "normalized_entities_processed": False
                 }
             else:
                 return error_result
+    
+    def _has_valid_normalized_entities(self, entities: Dict[str, Any]) -> bool:
+        """
+        ✅ NOUVEAU: Vérifie si les entités normalisées sont valides
+        
+        Clés standardisées attendues du entity_normalizer:
+        - breed: str (toujours normalisé: "Ross 308", "Cobb 500", etc.)
+        - age_days: int (toujours en jours)
+        - sex: str (toujours format standard: "male", "female", "mixed")
+        - weight_grams: int (optionnel)
+        - symptoms: List[str] (optionnel)
+        """
+        
+        # Vérifier les entités critiques normalisées
+        critical_normalized_keys = ["breed", "age_days", "sex"]
+        
+        for key in critical_normalized_keys:
+            if entities.get(key) is not None:
+                # Au moins une entité normalisée présente
+                logger.debug(f"✅ [AgentContextualizer] Entité normalisée trouvée: {key}={entities[key]}")
+                return True
+        
+        # Vérifier les entités optionnelles
+        optional_keys = ["weight_grams", "symptoms", "mortality_rate", "temperature"]
+        for key in optional_keys:
+            if entities.get(key) is not None:
+                logger.debug(f"✅ [AgentContextualizer] Entité optionnelle normalisée: {key}={entities[key]}")
+                return True
+        
+        return False
     
     async def _generate_single_variant(
         self,
@@ -183,27 +236,29 @@ class AgentContextualizer:
         missing_entities: List[str],
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Génère un seul enrichissement (comportement original)"""
+        """Génère un seul enrichissement avec entités normalisées"""
         
         try:
             # Tentative OpenAI si disponible
             if self.openai_available:
                 result = await self._enrich_with_openai(
-                    question, entities, missing_entities, conversation_context, language, has_entities
+                    question, entities, missing_entities, conversation_context, language, has_normalized_entities
                 )
                 if result["success"]:
                     self.stats["openai_success"] += 1
                     if result["enriched_question"] != question:
                         self.stats["questions_enriched"] += 1
+                        if has_normalized_entities:
+                            self.stats["performance_improvements"] += 1
                     return result
                 else:
                     self.stats["openai_failures"] += 1
             
-            # Fallback: Enrichissement basique
-            logger.info("🔄 [AgentContextualizer] Utilisation fallback basique")
-            result = self._enrich_fallback(question, entities, missing_entities, conversation_context, language, has_entities)
+            # Fallback: Enrichissement basique avec entités normalisées
+            logger.info("🔄 [AgentContextualizer] Utilisation fallback avec entités normalisées")
+            result = self._enrich_fallback(question, entities, missing_entities, conversation_context, language, has_normalized_entities)
             self.stats["fallback_used"] += 1
             
             return result
@@ -219,43 +274,43 @@ class AgentContextualizer:
         missing_entities: List[str],
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Génère plusieurs variants d'enrichissement pour rag_context_enhancer"""
+        """Génère plusieurs variants d'enrichissement avec entités normalisées"""
         
-        logger.info(f"🔄 [AgentContextualizer] Génération multi-variants pour: {question[:50]}...")
+        logger.info(f"🔄 [AgentContextualizer] Génération multi-variants avec entités normalisées pour: {question[:50]}...")
         
         variants = []
         
         try:
-            # Variant 1: Enrichissement standard (méthode originale)
+            # Variant 1: Enrichissement standard avec entités normalisées
             standard_variant = await self._generate_single_variant(
-                question, entities, missing_entities, conversation_context, language, has_entities
+                question, entities, missing_entities, conversation_context, language, has_normalized_entities
             )
             standard_variant["variant_type"] = "standard"
-            standard_variant["variant_description"] = "Enrichissement standard avec entités disponibles"
+            standard_variant["variant_description"] = "Enrichissement standard avec entités normalisées"
             variants.append(standard_variant)
             
             # Variant 2: Enrichissement contextuel (focus sur le contexte conversationnel)
             contextual_variant = self._generate_contextual_variant(
-                question, entities, conversation_context, language, has_entities
+                question, entities, conversation_context, language, has_normalized_entities
             )
             variants.append(contextual_variant)
             
-            # Variant 3: Enrichissement détaillé (toutes les entités explicites)
+            # Variant 3: Enrichissement détaillé avec toutes les entités normalisées explicites
             detailed_variant = self._generate_detailed_variant(
-                question, entities, missing_entities, language, has_entities
+                question, entities, missing_entities, language, has_normalized_entities
             )
             variants.append(detailed_variant)
             
-            # Variant 4: Enrichissement technique (terminologie spécialisée)
+            # Variant 4: Enrichissement technique (terminologie spécialisée + entités normalisées)
             technical_variant = self._generate_technical_variant(
-                question, entities, language, has_entities
+                question, entities, language, has_normalized_entities
             )
             variants.append(technical_variant)
             
-            # Si on a du contexte ou des entités, ajouter un variant minimal
-            if conversation_context or has_entities:
+            # Si on a du contexte ou des entités normalisées, ajouter un variant minimal
+            if conversation_context or has_normalized_entities:
                 minimal_variant = self._generate_minimal_variant(question, language)
                 variants.append(minimal_variant)
             
@@ -274,11 +329,11 @@ class AgentContextualizer:
                 "total_variants": len(variants),
                 "recommended_variant": recommended_idx,
                 "generation_method": "openai" if self.openai_available else "fallback",
-                "has_entities": has_entities,
+                "has_normalized_entities": has_normalized_entities,  # ✅ NOUVEAU
                 "processing_time": datetime.now().isoformat()
             }
             
-            logger.info(f"✅ [AgentContextualizer] {len(variants)} variants générés")
+            logger.info(f"✅ [AgentContextualizer] {len(variants)} variants générés avec entités normalisées")
             logger.debug(f"   Variant recommandé: #{recommended_idx} ({variants[recommended_idx]['variant_type']})")
             
             return result
@@ -311,9 +366,9 @@ class AgentContextualizer:
         entities: Dict[str, Any],
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Génère un variant focalisé sur le contexte conversationnel"""
+        """Génère un variant focalisé sur le contexte conversationnel avec entités normalisées"""
         
         if not conversation_context or not conversation_context.strip():
             # Pas de contexte, variant simple
@@ -328,7 +383,7 @@ class AgentContextualizer:
                 "variant_description": "Variant contextuel - pas de contexte disponible"
             }
         else:
-            # Intégrer le contexte
+            # Intégrer le contexte avec entités normalisées si disponibles
             if language == "fr":
                 enriched_question = f"{question} (Contexte conversation précédente: {conversation_context})"
             elif language == "en":
@@ -336,15 +391,26 @@ class AgentContextualizer:
             else:  # Spanish
                 enriched_question = f"{question} (Contexto conversación previa: {conversation_context})"
             
+            # ✅ NOUVEAU: Ajouter entités normalisées si disponibles
+            if has_normalized_entities:
+                entities_context = self._format_normalized_entities_briefly(entities, language)
+                if entities_context:
+                    if language == "fr":
+                        enriched_question += f" - Caractéristiques: {entities_context}"
+                    elif language == "en":
+                        enriched_question += f" - Characteristics: {entities_context}"
+                    else:  # Spanish
+                        enriched_question += f" - Características: {entities_context}"
+            
             variant = {
                 "enriched_question": enriched_question,
-                "reasoning_notes": "Enrichissement avec contexte conversationnel explicite",
-                "entities_used": ["context"],
+                "reasoning_notes": "Enrichissement avec contexte conversationnel et entités normalisées",
+                "entities_used": ["context"] + (list(entities.keys()) if has_normalized_entities else []),
                 "inference_used": False,
                 "method_used": "contextual_enhancement",
-                "confidence": 0.7,
+                "confidence": 0.8 if has_normalized_entities else 0.7,
                 "variant_type": "contextual",
-                "variant_description": "Variant contextuel - intégration contexte conversationnel"
+                "variant_description": "Variant contextuel - intégration contexte + entités normalisées"
             }
         
         return variant
@@ -355,58 +421,64 @@ class AgentContextualizer:
         entities: Dict[str, Any],
         missing_entities: List[str],
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Génère un variant avec tous les détails d'entités explicites"""
+        """Génère un variant avec tous les détails d'entités normalisées explicites"""
         
-        if not has_entities:
-            # Pas d'entités, utiliser inférence
+        if not has_normalized_entities:
+            # Pas d'entités normalisées, utiliser inférence
             variant = {
                 "enriched_question": self._add_technical_terminology(question, language),
-                "reasoning_notes": "Variant détaillé par inférence - pas d'entités disponibles",
+                "reasoning_notes": "Variant détaillé par inférence - pas d'entités normalisées disponibles",
                 "entities_used": [],
                 "inference_used": True,
                 "method_used": "detailed_inference",
                 "confidence": 0.4,
                 "variant_type": "detailed",
-                "variant_description": "Variant détaillé - inférence sans entités"
+                "variant_description": "Variant détaillé - inférence sans entités normalisées"
             }
         else:
-            # Construire détails explicites
+            # ✅ NOUVEAU: Construire détails explicites avec entités NORMALISÉES
             details = []
             entities_used = []
             
+            # Utiliser directement les clés normalisées standardisées
             if entities.get("breed"):
-                details.append(f"Race: {entities['breed']}")
+                details.append(f"Race: {entities['breed']}")  # Déjà normalisé (Ross 308, etc.)
                 entities_used.append("breed")
             
             if entities.get("sex"):
-                details.append(f"Sexe: {entities['sex']}")
+                details.append(f"Sexe: {entities['sex']}")  # Déjà normalisé (male/female/mixed)
                 entities_used.append("sex")
             
             if entities.get("age_days"):
-                details.append(f"Âge: {entities['age_days']} jours")
-                entities_used.append("age")
+                age_weeks = entities["age_days"] / 7
+                details.append(f"Âge: {entities['age_days']} jours ({age_weeks:.1f} semaines)")  # Déjà normalisé
+                entities_used.append("age_days")
             
             if entities.get("weight_grams"):
-                details.append(f"Poids: {entities['weight_grams']}g")
-                entities_used.append("weight")
+                details.append(f"Poids: {entities['weight_grams']}g")  # Déjà normalisé
+                entities_used.append("weight_grams")
             
             if entities.get("symptoms"):
-                symptoms = ", ".join(entities["symptoms"])
-                details.append(f"Symptômes: {symptoms}")
+                symptoms = ", ".join(entities["symptoms"]) if isinstance(entities["symptoms"], list) else entities["symptoms"]
+                details.append(f"Symptômes: {symptoms}")  # Déjà normalisé
                 entities_used.append("symptoms")
+            
+            if entities.get("mortality_rate"):
+                details.append(f"Mortalité: {entities['mortality_rate']}%")
+                entities_used.append("mortality_rate")
             
             if details:
                 detail_string = ", ".join(details)
                 if language == "fr":
-                    enriched_question = f"{question} - Détails: {detail_string}"
+                    enriched_question = f"{question} - Détails normalisés: {detail_string}"
                 elif language == "en":
-                    enriched_question = f"{question} - Details: {detail_string}"
+                    enriched_question = f"{question} - Normalized details: {detail_string}"
                 else:  # Spanish
-                    enriched_question = f"{question} - Detalles: {detail_string}"
+                    enriched_question = f"{question} - Detalles normalizados: {detail_string}"
                 
-                confidence = 0.8
+                confidence = 0.9  # ✅ Confiance plus élevée avec entités normalisées
             else:
                 enriched_question = question
                 confidence = 0.3
@@ -423,13 +495,13 @@ class AgentContextualizer:
             
             variant = {
                 "enriched_question": enriched_question,
-                "reasoning_notes": f"Variant détaillé avec {len(details)} entités explicites",
+                "reasoning_notes": f"Variant détaillé avec {len(details)} entités normalisées explicites",
                 "entities_used": entities_used,
                 "inference_used": False,
-                "method_used": "detailed_explicit",
+                "method_used": "detailed_normalized_explicit",
                 "confidence": confidence,
                 "variant_type": "detailed",
-                "variant_description": "Variant détaillé - toutes entités explicites"
+                "variant_description": "Variant détaillé - toutes entités normalisées explicites"
             }
         
         return variant
@@ -439,9 +511,9 @@ class AgentContextualizer:
         question: str,
         entities: Dict[str, Any],
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Génère un variant avec terminologie technique avancée"""
+        """Génère un variant avec terminologie technique avancée + entités normalisées"""
         
         # Commencer avec la question de base
         enriched_question = question
@@ -519,28 +591,28 @@ class AgentContextualizer:
                 replacements_applied += 1
                 enriched_question = new_question
         
-        # Ajouter contexte technique si entités disponibles
-        if has_entities:
-            technical_context = self._build_technical_context(entities, language)
+        # ✅ NOUVEAU: Ajouter contexte technique avec entités normalisées si disponibles
+        if has_normalized_entities:
+            technical_context = self._build_technical_context_normalized(entities, language)
             if technical_context:
                 if language == "fr":
-                    enriched_question += f" - Contexte technique: {technical_context}"
+                    enriched_question += f" - Contexte technique normalisé: {technical_context}"
                 elif language == "en":
-                    enriched_question += f" - Technical context: {technical_context}"
+                    enriched_question += f" - Normalized technical context: {technical_context}"
                 else:  # Spanish
-                    enriched_question += f" - Contexto técnico: {technical_context}"
+                    enriched_question += f" - Contexto técnico normalizado: {technical_context}"
         
-        confidence = min(0.9, 0.5 + (replacements_applied * 0.1) + (0.2 if has_entities else 0))
+        confidence = min(0.95, 0.5 + (replacements_applied * 0.1) + (0.3 if has_normalized_entities else 0.2))
         
         variant = {
             "enriched_question": enriched_question,
-            "reasoning_notes": f"Variant technique avec {replacements_applied} améliorations terminologiques",
-            "entities_used": list(entities.keys()) if has_entities else [],
+            "reasoning_notes": f"Variant technique avec {replacements_applied} améliorations terminologiques + entités normalisées",
+            "entities_used": list(entities.keys()) if has_normalized_entities else [],
             "inference_used": replacements_applied > 0,
-            "method_used": "technical_enhancement",
+            "method_used": "technical_enhancement_normalized",
             "confidence": confidence,
             "variant_type": "technical",
-            "variant_description": "Variant technique - terminologie vétérinaire spécialisée"
+            "variant_description": "Variant technique - terminologie vétérinaire spécialisée + entités normalisées"
         }
         
         return variant
@@ -564,12 +636,32 @@ class AgentContextualizer:
             "variant_description": "Variant minimal - préservation question originale"
         }
     
-    def _build_technical_context(self, entities: Dict[str, Any], language: str) -> str:
-        """Construit un contexte technique à partir des entités"""
+    def _format_normalized_entities_briefly(self, entities: Dict[str, Any], language: str) -> str:
+        """✅ NOUVEAU: Formate brièvement les entités normalisées pour contexte"""
+        
+        brief_parts = []
+        
+        # Utiliser directement les entités normalisées
+        if entities.get("breed"):
+            brief_parts.append(entities["breed"])  # Déjà normalisé
+        
+        if entities.get("age_days"):
+            if language == "fr":
+                brief_parts.append(f"{entities['age_days']}j")
+            else:
+                brief_parts.append(f"{entities['age_days']}d")
+        
+        if entities.get("sex"):
+            brief_parts.append(entities["sex"])  # Déjà normalisé (male/female/mixed)
+        
+        return ", ".join(brief_parts)
+    
+    def _build_technical_context_normalized(self, entities: Dict[str, Any], language: str) -> str:
+        """✅ NOUVEAU: Construit un contexte technique à partir des entités normalisées"""
         
         context_parts = []
         
-        # Informations d'élevage
+        # Informations d'élevage avec entités normalisées
         if entities.get("breed"):
             context_parts.append(f"souche {entities['breed']}" if language == "fr" else 
                                f"strain {entities['breed']}" if language == "en" else f"cepa {entities['breed']}")
@@ -586,7 +678,7 @@ class AgentContextualizer:
         
         return ", ".join(context_parts)
     
-    # Méthodes existantes avec corrections
+    # Méthodes existantes avec corrections pour entités normalisées
     async def _enrich_with_openai(
         self,
         question: str,
@@ -594,19 +686,19 @@ class AgentContextualizer:
         missing_entities: List[str],
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement avec OpenAI GPT (méthode conservée avec gestion d'erreur améliorée)"""
+        """Enrichissement avec OpenAI GPT utilisant entités normalisées"""
         
         try:
-            # Préparer le contexte pour GPT
-            entities_summary = self._format_entities_for_gpt(entities) if has_entities else "Aucune entité extraite"
+            # ✅ NOUVEAU: Préparer le contexte pour GPT avec entités normalisées
+            entities_summary = self._format_normalized_entities_for_gpt(entities) if has_normalized_entities else "Aucune entité normalisée extraite"
             missing_summary = ", ".join(missing_entities) if missing_entities else "Aucune"
             
-            # Prompt spécialisé selon la langue et la présence d'entités
-            system_prompt = self._get_system_prompt(language, has_entities)
+            # Prompt spécialisé selon la langue et la présence d'entités normalisées
+            system_prompt = self._get_system_prompt(language, has_normalized_entities)
             user_prompt = self._build_enrichment_prompt(
-                question, entities_summary, missing_summary, conversation_context, language, has_entities
+                question, entities_summary, missing_summary, conversation_context, language, has_normalized_entities
             )
             
             # CORRECTION: Gestion d'erreur OpenAI spécifique
@@ -639,14 +731,14 @@ class AgentContextualizer:
             answer = response.choices[0].message.content.strip()
             
             # Parser la réponse JSON
-            result = self._parse_gpt_response(answer, question, entities, has_entities)
+            result = self._parse_gpt_response(answer, question, entities, has_normalized_entities)
             result["success"] = True
             result["method_used"] = "openai"
             
-            logger.info(f"✅ [AgentContextualizer] Enrichissement OpenAI réussi")
+            logger.info(f"✅ [AgentContextualizer] Enrichissement OpenAI réussi avec entités normalisées")
             logger.debug(f"   Original: {question}")
             logger.debug(f"   Enrichi: {result['enriched_question']}")
-            logger.debug(f"   Entités disponibles: {'✅' if has_entities else '❌'}")
+            logger.debug(f"   Entités normalisées disponibles: {'✅' if has_normalized_entities else '❌'}")
             logger.debug(f"   Inférence utilisée: {'✅' if result.get('inference_used') else '❌'}")
             
             return result
@@ -655,8 +747,8 @@ class AgentContextualizer:
             logger.error(f"❌ [AgentContextualizer] Erreur OpenAI: {e}")
             return {"success": False, "error": str(e)}
     
-    def _get_system_prompt(self, language: str, has_entities: bool) -> str:
-        """Retourne le prompt système selon la langue et la présence d'entités"""
+    def _get_system_prompt(self, language: str, has_normalized_entities: bool) -> str:
+        """Retourne le prompt système selon la langue et la présence d'entités normalisées"""
         
         if language == "fr":
             base_prompt = """Tu es un expert en aviculture spécialisé dans l'optimisation de questions pour systèmes RAG.
@@ -667,14 +759,16 @@ Ta mission:
 3. Intégrer le contexte conversationnel disponible
 4. Garder le sens et l'intention originale"""
             
-            if has_entities:
+            if has_normalized_entities:
                 base_prompt += """
-5. Intégrer NATURELLEMENT toutes les entités connues (race, âge, sexe, etc.)
-6. Mentionner si des informations critiques manquent encore"""
+5. Intégrer NATURELLEMENT toutes les entités DÉJÀ NORMALISÉES (breed, age_days, sex, etc.)
+6. Les entités reçues sont déjà standardisées par le système de normalisation
+7. Utiliser directement les valeurs normalisées sans re-traitement
+8. Mentionner si des informations critiques manquent encore"""
             else:
                 base_prompt += """
 5. INFÉRER les informations probables à partir du contexte et de la question
-6. Reformuler avec terminologie technique même sans entités précises
+6. Reformuler avec terminologie technique même sans entités normalisées précises
 7. Utiliser des termes génériques mais techniques si nécessaire"""
             
             base_prompt += "\n\nIMPORTANT: Réponds UNIQUEMENT en JSON avec la structure exacte demandée."
@@ -688,14 +782,16 @@ Your mission:
 3. Integrate available conversational context
 4. Keep original meaning and intention"""
             
-            if has_entities:
+            if has_normalized_entities:
                 base_prompt += """
-5. NATURALLY integrate all known entities (breed, age, sex, etc.)
-6. Mention if critical information is still missing"""
+5. NATURALLY integrate all ALREADY NORMALIZED entities (breed, age_days, sex, etc.)
+6. The received entities are already standardized by the normalization system
+7. Use normalized values directly without re-processing
+8. Mention if critical information is still missing"""
             else:
                 base_prompt += """
 5. INFER probable information from context and question
-6. Reformulate with technical terminology even without precise entities
+6. Reformulate with technical terminology even without precise normalized entities
 7. Use generic but technical terms if necessary"""
             
             base_prompt += "\n\nIMPORTANT: Respond ONLY in JSON with the exact requested structure."
@@ -709,14 +805,16 @@ Tu misión:
 3. Integrar el contexto conversacional disponible
 4. Mantener el sentido e intención original"""
             
-            if has_entities:
+            if has_normalized_entities:
                 base_prompt += """
-5. Integrar NATURALMENTE todas las entidades conocidas (raza, edad, sexo, etc.)
-6. Mencionar si aún falta información crítica"""
+5. Integrar NATURALMENTE todas las entidades YA NORMALIZADAS (breed, age_days, sex, etc.)
+6. Las entidades recibidas ya están estandarizadas por el sistema de normalización
+7. Usar valores normalizados directamente sin re-procesamiento
+8. Mencionar si aún falta información crítica"""
             else:
                 base_prompt += """
 5. INFERIR información probable del contexto y la pregunta
-6. Reformular con terminología técnica incluso sin entidades precisas
+6. Reformular con terminología técnica incluso sin entidades normalizadas precisas
 7. Usar términos genéricos pero técnicos si es necesario"""
             
             base_prompt += "\n\nIMPORTANTE: Responde SOLO en JSON con la estructura exacta solicitada."
@@ -730,45 +828,47 @@ Tu misión:
         missing_summary: str,
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> str:
-        """Construit le prompt d'enrichissement adapté selon la présence d'entités"""
+        """Construit le prompt d'enrichissement adapté pour entités normalisées"""
         
         if language == "fr":
             prompt = f"""QUESTION ORIGINALE: "{question}"
 
-ENTITÉS CONNUES:
+ENTITÉS NORMALISÉES DISPONIBLES:
 {entities_summary}
 
 CONTEXTE CONVERSATIONNEL:
 {conversation_context or "Aucun contexte conversationnel"}"""
             
-            if has_entities:
+            if has_normalized_entities:
                 prompt += f"""
 
 ENTITÉS MANQUANTES CRITIQUES: {missing_summary}
 
 INSTRUCTIONS:
-1. Reformule la question en intégrant naturellement les entités connues
-2. Optimise pour la recherche RAG (terminologie technique précise)
-3. Si des entités critiques manquent, adapte la formulation
-4. Garde l'intention originale
+1. Reformule la question en intégrant naturellement les entités DÉJÀ NORMALISÉES
+2. Les entités reçues sont standardisées: breed, age_days, sex, weight_grams, etc.
+3. Utilise directement ces valeurs sans modification ni re-normalisation
+4. Optimise pour la recherche RAG (terminologie technique précise)
+5. Si des entités critiques manquent, adapte la formulation
+6. Garde l'intention originale
 
-EXEMPLE AVEC ENTITÉS:
+EXEMPLE AVEC ENTITÉS NORMALISÉES:
 Original: "Mes poulets ne grossissent pas bien"
-Avec entités (race: Ross 308, sexe: mâles, âge: 21 jours):
+Avec entités normalisées (breed: "Ross 308", sex: "male", age_days: 21):
 Enrichi: "Mes poulets de chair Ross 308 mâles de 21 jours ont une croissance insuffisante - diagnostic et solutions"""
             else:
                 prompt += """
 
-INSTRUCTIONS (MODE INFÉRENCE - SANS ENTITÉS):
+INSTRUCTIONS (MODE INFÉRENCE - SANS ENTITÉS NORMALISÉES):
 1. Analyse la question pour identifier le type de problème agricole
 2. Infère le contexte probable (élevage de poulets, problème de santé, nutrition, etc.)
 3. Reformule avec terminologie technique vétérinaire appropriée
 4. Utilise des termes génériques mais précis si les spécificités manquent
-5. Optimise pour la recherche documentaire même sans entités
+5. Optimise pour la recherche documentaire même sans entités normalisées
 
-EXEMPLE SANS ENTITÉS:
+EXEMPLE SANS ENTITÉS NORMALISÉES:
 Original: "Mes poulets ne grossissent pas bien"
 Sans entités spécifiques:
 Enrichi: "Retard de croissance chez les poulets de chair - diagnostic des causes et protocoles thérapeutiques"""
@@ -779,47 +879,50 @@ Réponds en JSON:
 {
   "enriched_question": "question reformulée optimisée",
   "reasoning_notes": "explication des modifications apportées",
-  "entities_used": ["race", "sexe", "âge"],
+  "entities_used": ["breed", "sex", "age_days"],
   "inference_used": true/false,
   "confidence": 0.9,
   "optimization_applied": "description des améliorations"
 }"""
         
+        # Versions EN et ES similaires avec adaptation pour entités normalisées...
         elif language == "en":
             prompt = f"""ORIGINAL QUESTION: "{question}"
 
-KNOWN ENTITIES:
+NORMALIZED ENTITIES AVAILABLE:
 {entities_summary}
 
 CONVERSATIONAL CONTEXT:
 {conversation_context or "No conversational context"}"""
             
-            if has_entities:
+            if has_normalized_entities:
                 prompt += f"""
 
 MISSING CRITICAL ENTITIES: {missing_summary}
 
 INSTRUCTIONS:
-1. Reformulate question naturally integrating known entities
-2. Optimize for RAG search (precise technical terminology)
-3. If critical entities missing, adapt formulation
-4. Keep original intention
+1. Reformulate question naturally integrating ALREADY NORMALIZED entities
+2. Received entities are standardized: breed, age_days, sex, weight_grams, etc.
+3. Use these values directly without modification or re-normalization
+4. Optimize for RAG search (precise technical terminology)
+5. If critical entities missing, adapt formulation
+6. Keep original intention
 
-EXAMPLE WITH ENTITIES:
+EXAMPLE WITH NORMALIZED ENTITIES:
 Original: "My chickens are not growing well"
-With entities (breed: Ross 308, sex: males, age: 21 days):
+With normalized entities (breed: "Ross 308", sex: "male", age_days: 21):
 Enriched: "My Ross 308 male broiler chickens at 21 days have poor growth performance - diagnosis and solutions"""
             else:
                 prompt += """
 
-INSTRUCTIONS (INFERENCE MODE - NO ENTITIES):
+INSTRUCTIONS (INFERENCE MODE - NO NORMALIZED ENTITIES):
 1. Analyze question to identify type of agricultural problem
 2. Infer probable context (poultry farming, health issue, nutrition, etc.)
 3. Reformulate with appropriate veterinary technical terminology
 4. Use generic but precise terms if specifics are missing
-5. Optimize for document search even without entities
+5. Optimize for document search even without normalized entities
 
-EXAMPLE WITHOUT ENTITIES:
+EXAMPLE WITHOUT NORMALIZED ENTITIES:
 Original: "My chickens are not growing well"
 Without specific entities:
 Enriched: "Growth retardation in broiler chickens - diagnosis of causes and therapeutic protocols"""
@@ -830,50 +933,42 @@ Respond in JSON:
 {
   "enriched_question": "optimized reformulated question",
   "reasoning_notes": "explanation of modifications made",
-  "entities_used": ["breed", "sex", "age"],
+  "entities_used": ["breed", "sex", "age_days"],
   "inference_used": true/false,
   "confidence": 0.9,
   "optimization_applied": "description of improvements"
 }"""
         
-        else:  # Spanish
+        else:  # Spanish - structure similaire
             prompt = f"""PREGUNTA ORIGINAL: "{question}"
 
-ENTIDADES CONOCIDAS:
+ENTIDADES NORMALIZADAS DISPONIBLES:
 {entities_summary}
 
 CONTEXTO CONVERSACIONAL:
 {conversation_context or "Sin contexto conversacional"}"""
             
-            if has_entities:
+            if has_normalized_entities:
                 prompt += f"""
 
 ENTIDADES CRÍTICAS FALTANTES: {missing_summary}
 
 INSTRUCCIONES:
-1. Reformula la pregunta integrando naturalmente las entidades conocidas
-2. Optimiza para búsqueda RAG (terminología técnica precisa)
-3. Si faltan entidades críticas, adapta la formulación
-4. Mantén la intención original
-
-EJEMPLO CON ENTIDADES:
-Original: "Mis pollos no crecen bien"
-Con entidades (raza: Ross 308, sexo: machos, edad: 21 días):
-Enriquecida: "Mis pollos de engorde Ross 308 machos de 21 días tienen crecimiento deficiente - diagnóstico y soluciones"""
+1. Reformula la pregunta integrando naturalmente las entidades YA NORMALIZADAS
+2. Las entidades recibidas están estandarizadas: breed, age_days, sex, weight_grams, etc.
+3. Usa estos valores directamente sin modificación o re-normalización
+4. Optimiza para búsqueda RAG (terminología técnica precisa)
+5. Si faltan entidades críticas, adapta la formulación
+6. Mantén la intención original"""
             else:
                 prompt += """
 
-INSTRUCCIONES (MODO INFERENCIA - SIN ENTIDADES):
+INSTRUCCIONES (MODO INFERENCIA - SIN ENTIDADES NORMALIZADAS):
 1. Analiza la pregunta para identificar el tipo de problema agrícola
 2. Infiere el contexto probable (avicultura, problema de salud, nutrición, etc.)
 3. Reformula con terminología técnica veterinaria apropiada
 4. Usa términos genéricos pero precisos si faltan especificidades
-5. Optimiza para búsqueda documental incluso sin entidades
-
-EJEMPLO SIN ENTIDADES:
-Original: "Mis pollos no crecen bien"
-Sin entidades específicas:
-Enriquecida: "Retraso del crecimiento en pollos de engorde - diagnóstico de causas y protocolos terapéuticos"""
+5. Optimiza para búsqueda documental incluso sin entidades normalizadas"""
             
             prompt += """
 
@@ -881,7 +976,7 @@ Responde en JSON:
 {
   "enriched_question": "pregunta reformulada optimizada",
   "reasoning_notes": "explicación de modificaciones realizadas",
-  "entities_used": ["raza", "sexo", "edad"],
+  "entities_used": ["breed", "sex", "age_days"],
   "inference_used": true/false,
   "confidence": 0.9,
   "optimization_applied": "descripción de mejoras"
@@ -889,41 +984,39 @@ Responde en JSON:
         
         return prompt
     
-    def _format_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
-        """Formate les entités pour le prompt GPT"""
+    def _format_normalized_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
+        """✅ NOUVEAU: Formate les entités normalisées pour le prompt GPT"""
         
         formatted_parts = []
         
-        # Informations de base
+        # ✅ Utiliser directement les entités normalisées standardisées
         if entities.get("breed"):
-            confidence = entities.get("breed_confidence", 0.0)
-            formatted_parts.append(f"• Race: {entities['breed']} (confiance: {confidence:.1f})")
+            formatted_parts.append(f"• Race normalisée: {entities['breed']}")  # Déjà "Ross 308", "Cobb 500", etc.
         
         if entities.get("sex"):
-            confidence = entities.get("sex_confidence", 0.0)
-            formatted_parts.append(f"• Sexe: {entities['sex']} (confiance: {confidence:.1f})")
+            formatted_parts.append(f"• Sexe normalisé: {entities['sex']}")  # Déjà "male", "female", "mixed"
         
         if entities.get("age_days"):
-            confidence = entities.get("age_confidence", 0.0)
-            weeks = entities.get("age_weeks", entities["age_days"] / 7)
-            formatted_parts.append(f"• Âge: {entities['age_days']} jours ({weeks:.1f} semaines) (confiance: {confidence:.1f})")
+            weeks = entities["age_days"] / 7
+            formatted_parts.append(f"• Âge normalisé: {entities['age_days']} jours ({weeks:.1f} semaines)")
         
         # Performance
         if entities.get("weight_grams"):
-            confidence = entities.get("weight_confidence", 0.0)
-            formatted_parts.append(f"• Poids: {entities['weight_grams']}g (confiance: {confidence:.1f})")
+            formatted_parts.append(f"• Poids normalisé: {entities['weight_grams']}g")
         
         if entities.get("growth_rate"):
             formatted_parts.append(f"• Croissance: {entities['growth_rate']}")
         
         # Santé
         if entities.get("symptoms"):
-            symptoms = ", ".join(entities["symptoms"])
-            formatted_parts.append(f"• Symptômes: {symptoms}")
+            if isinstance(entities["symptoms"], list):
+                symptoms = ", ".join(entities["symptoms"])
+            else:
+                symptoms = entities["symptoms"]
+            formatted_parts.append(f"• Symptômes normalisés: {symptoms}")
         
         if entities.get("mortality_rate"):
-            confidence = entities.get("mortality_confidence", 0.0)
-            formatted_parts.append(f"• Mortalité: {entities['mortality_rate']}% (confiance: {confidence:.1f})")
+            formatted_parts.append(f"• Mortalité normalisée: {entities['mortality_rate']}%")
         
         # Environnement
         if entities.get("temperature"):
@@ -939,9 +1032,9 @@ Responde en JSON:
         if entities.get("feed_type"):
             formatted_parts.append(f"• Alimentation: {entities['feed_type']}")
         
-        return "\n".join(formatted_parts) if formatted_parts else "Aucune entité extraite"
+        return "\n".join(formatted_parts) if formatted_parts else "Aucune entité normalisée extraite"
     
-    def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any], has_entities: bool) -> Dict[str, Any]:
+    def _parse_gpt_response(self, response: str, original_question: str, entities: Dict[str, Any], has_normalized_entities: bool) -> Dict[str, Any]:
         """Parse la réponse JSON de GPT - CORRECTION: Extraction JSON plus robuste"""
         
         try:
@@ -956,11 +1049,12 @@ Responde en JSON:
                 "enriched_question": parsed_json.get("enriched_question", original_question),
                 "reasoning_notes": parsed_json.get("reasoning_notes", "Aucune explication fournie"),
                 "entities_used": parsed_json.get("entities_used", []),
-                "inference_used": parsed_json.get("inference_used", not has_entities),
+                "inference_used": parsed_json.get("inference_used", not has_normalized_entities),
                 "confidence": min(max(parsed_json.get("confidence", 0.5), 0.0), 1.0),
                 "optimization_applied": parsed_json.get("optimization_applied", "Optimisation basique"),
                 "method_used": "openai",
-                "processing_time": datetime.now().isoformat()
+                "processing_time": datetime.now().isoformat(),
+                "normalized_entities_available": has_normalized_entities  # ✅ NOUVEAU
             }
             
             return result
@@ -978,11 +1072,12 @@ Responde en JSON:
                     "inference_used": True,
                     "confidence": 0.3,
                     "optimization_applied": "Réponse brute GPT",
-                    "method_used": "openai_fallback"
+                    "method_used": "openai_fallback",
+                    "normalized_entities_available": has_normalized_entities
                 }
             else:
                 # Fallback final
-                return self._enrich_fallback(original_question, entities, [], "", "fr", has_entities)
+                return self._enrich_fallback(original_question, entities, [], "", "fr", has_normalized_entities)
     
     def _extract_json_from_response(self, response: str) -> Optional[Dict[str, Any]]:
         """CORRECTION: Extraction JSON plus robuste"""
@@ -1036,29 +1131,34 @@ Responde en JSON:
         missing_entities: List[str],
         conversation_context: str,
         language: str,
-        has_entities: bool
+        has_normalized_entities: bool
     ) -> Dict[str, Any]:
-        """Enrichissement fallback sans OpenAI - amélioration pour fonctionner sans entités"""
+        """✅ NOUVEAU: Enrichissement fallback utilisant entités normalisées"""
         
         enriched_parts = []
         entities_used = []
         inference_used = False
         
-        if has_entities:
-            # Mode avec entités - comportement original
-            if entities.get("breed") and entities.get("breed_confidence", 0) > 0.5:
-                enriched_parts.append(entities["breed"])
+        if has_normalized_entities:
+            # ✅ Mode avec entités normalisées - utilisation directe
+            if entities.get("breed"):
+                enriched_parts.append(entities["breed"])  # Déjà normalisé
                 entities_used.append("breed")
             
-            if entities.get("sex") and entities.get("sex_confidence", 0) > 0.5:
-                enriched_parts.append(entities["sex"])
+            if entities.get("sex"):
+                enriched_parts.append(entities["sex"])  # Déjà normalisé
                 entities_used.append("sex")
             
-            if entities.get("age_days") and entities.get("age_confidence", 0) > 0.5:
-                enriched_parts.append(f"{entities['age_days']} jours")
-                entities_used.append("age")
+            if entities.get("age_days"):
+                enriched_parts.append(f"{entities['age_days']} jours")  # Déjà normalisé
+                entities_used.append("age_days")
+            
+            if entities.get("weight_grams"):
+                enriched_parts.append(f"{entities['weight_grams']}g")
+                entities_used.append("weight_grams")
+                
         else:
-            # Mode sans entités - inférence contextuelle
+            # Mode sans entités normalisées - inférence contextuelle
             inference_used = True
             
             # Analyser la question pour inférer le contexte
@@ -1131,11 +1231,11 @@ Responde en JSON:
             # Si aucun remplacement, ajouter en contexte
             if enriched_question == question:
                 if language == "fr":
-                    enriched_question = f"{question} (Contexte: {enrichment})"
+                    enriched_question = f"{question} (Contexte normalisé: {enrichment})"
                 elif language == "en":
-                    enriched_question = f"{question} (Context: {enrichment})"
+                    enriched_question = f"{question} (Normalized context: {enrichment})"
                 else:
-                    enriched_question = f"{question} (Contexto: {enrichment})"
+                    enriched_question = f"{question} (Contexto normalizado: {enrichment})"
         else:
             # Même sans entités ni inférence, améliorer avec terminologie technique
             enriched_question = self._add_technical_terminology(question, language)
@@ -1143,21 +1243,25 @@ Responde en JSON:
                 inference_used = True
         
         # Notes sur les entités manquantes ou l'inférence
-        if has_entities:
-            reasoning_notes = "Enrichissement basique avec entités"
+        if has_normalized_entities:
+            reasoning_notes = "Enrichissement basique avec entités normalisées"
             if missing_entities:
                 reasoning_notes += f". Informations manquantes: {', '.join(missing_entities)}"
         else:
-            reasoning_notes = "Enrichissement par inférence contextuelle - pas d'entités disponibles"
+            reasoning_notes = "Enrichissement par inférence contextuelle - pas d'entités normalisées disponibles"
+        
+        # ✅ Confiance plus élevée avec entités normalisées
+        base_confidence = 0.8 if entities_used else (0.4 if inference_used else 0.3)
         
         return {
             "enriched_question": enriched_question,
             "reasoning_notes": reasoning_notes,
             "entities_used": entities_used,
             "inference_used": inference_used,
-            "confidence": 0.6 if entities_used else (0.4 if inference_used else 0.3),
-            "optimization_applied": "Intégration entités" if has_entities else "Inférence contextuelle",
-            "method_used": "fallback"
+            "confidence": base_confidence,
+            "optimization_applied": "Intégration entités normalisées" if has_normalized_entities else "Inférence contextuelle",
+            "method_used": "fallback_normalized" if has_normalized_entities else "fallback",
+            "normalized_entities_available": has_normalized_entities  # ✅ NOUVEAU
         }
     
     def _add_technical_terminology(self, question: str, language: str) -> str:
@@ -1201,13 +1305,13 @@ Responde en JSON:
         return enhanced_question
     
     def get_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques de l'agent - version multi-variants avec CORRECTION division par zéro"""
+        """Retourne les statistiques de l'agent - version entités normalisées"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
         enrichment_rate = (self.stats["questions_enriched"] / total * 100) if total > 0 else 0
         inference_rate = (self.stats["inference_only"] / total * 100) if total > 0 else 0
-        with_entities_rate = (self.stats["with_entities"] / total * 100) if total > 0 else 0
+        normalized_entities_rate = (self.stats["with_normalized_entities"] / total * 100) if total > 0 else 0
         multi_variant_rate = (self.stats["multi_variant_requests"] / total * 100) if total > 0 else 0
         
         # CORRECTION: Protection division par zéro
@@ -1217,7 +1321,7 @@ Responde en JSON:
         
         return {
             "agent_type": "contextualizer",
-            "version": "multi_variant_v3_corrected",
+            "version": "normalized_entities_v4.0",  # ✅ NOUVEAU
             "total_requests": total,
             "single_variant_requests": self.stats["single_variant_requests"],
             "multi_variant_requests": self.stats["multi_variant_requests"],
@@ -1226,16 +1330,25 @@ Responde en JSON:
             "openai_success_rate": f"{success_rate:.1f}%",
             "question_enrichment_rate": f"{enrichment_rate:.1f}%",
             "inference_only_rate": f"{inference_rate:.1f}%",
-            "with_entities_rate": f"{with_entities_rate:.1f}%",
+            "normalized_entities_rate": f"{normalized_entities_rate:.1f}%",  # ✅ NOUVEAU
+            "normalized_entities_used": self.stats["normalized_entities_used"],  # ✅ NOUVEAU
+            "performance_improvements": self.stats["performance_improvements"],  # ✅ NOUVEAU
             "openai_available": self.openai_available,
             "model_used": self.model,
+            "features": [  # ✅ NOUVEAU
+                "normalized_entities_support",
+                "multi_variant_generation", 
+                "contextual_inference",
+                "technical_terminology_enhancement",
+                "performance_optimization"
+            ],
             "detailed_stats": self.stats.copy()
         }
 
 # Instance globale
 agent_contextualizer = AgentContextualizer()
 
-# Fonction utilitaire pour usage externe - signature mise à jour avec multi_variant
+# Fonction utilitaire pour usage externe - signature mise à jour avec support entités normalisées
 async def enrich_question(
     question: str,
     entities: Dict[str, Any] = None,
@@ -1245,11 +1358,18 @@ async def enrich_question(
     multi_variant: bool = False
 ) -> Union[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
     """
-    Fonction utilitaire pour enrichir une question - fonctionne avec ou sans entités
+    Fonction utilitaire pour enrichir une question avec entités normalisées
+    
+    🔧 VERSION AMÉLIORÉE v4.0:
+    - ✅ Utilise directement les entités normalisées (breed, age_days, sex, etc.)
+    - ✅ Plus besoin de normaliser - entités déjà standardisées par entity_normalizer
+    - ✅ Performance optimisée grâce aux entités pré-normalisées
+    - ✅ Cohérence garantie avec le système de normalisation centralisée
     
     Args:
         question: Question à enrichir
-        entities: Entités extraites (optionnel)
+        entities: Entités DÉJÀ NORMALISÉES par entity_normalizer (optionnel)
+                  Clés standardisées: breed, age_days, sex, weight_grams, symptoms, etc.
         missing_entities: Entités manquantes (optionnel)
         conversation_context: Contexte conversationnel
         language: Langue (fr/en/es)
@@ -1258,6 +1378,10 @@ async def enrich_question(
     Returns:
         Si multi_variant=False: Dict avec question enrichie
         Si multi_variant=True: Dict avec liste de variants
+        
+        Tous les résultats incluent maintenant:
+        - normalized_entities_processed: bool - Indique si entités normalisées utilisées
+        - normalized_entities_available: bool - Entités normalisées disponibles
     """
     return await agent_contextualizer.enrich_question(
         question, entities, missing_entities, conversation_context, language, multi_variant

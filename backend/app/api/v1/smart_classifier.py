@@ -7,12 +7,14 @@ smart_classifier.py - CLASSIFIER INTELLIGENT AVEC CONTEXTE CONVERSATIONNEL COMPL
 - ✅ Persistance du contexte dans la base existante
 - ✅ Intégration avec le pipeline existant
 - ✅ Support complet du type CONTEXTUAL_ANSWER
+- 🆕 MODIFICATION: Intégration ContextManager centralisé
 
 Architecture:
 - classify_question() : Point d'entrée unique avec contexte
 - Accès direct aux standards de poids depuis intelligent_system_config
 - Persistance automatique du contexte conversationnel
 - Fusion intelligente des entités
+- 🆕 ContextManager pour gestion centralisée du contexte
 """
 
 import logging
@@ -26,6 +28,15 @@ from datetime import datetime, timedelta
 
 # Import des standards de poids depuis la config
 from .intelligent_system_config import ReferenceData, get_weight_range
+
+# 🆕 MODIFICATION: Import du ContextManager centralisé
+try:
+    from .context_manager import ContextManager
+    CONTEXT_MANAGER_AVAILABLE = True
+except ImportError:
+    CONTEXT_MANAGER_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("⚠️ [Smart Classifier] ContextManager non disponible - utilisation du système local")
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +124,20 @@ class SmartClassifier:
             "clarification": 0.4
         }
         
+        # 🆕 MODIFICATION: Initialisation du ContextManager si disponible
+        if CONTEXT_MANAGER_AVAILABLE:
+            try:
+                self.context_manager = ContextManager(db_path)
+                self.use_context_manager = True
+                logger.info("✅ [Smart Classifier] ContextManager initialisé avec succès")
+            except Exception as e:
+                logger.warning(f"⚠️ [Smart Classifier] Erreur init ContextManager: {e}")
+                self.context_manager = None
+                self.use_context_manager = False
+        else:
+            self.context_manager = None
+            self.use_context_manager = False
+        
         # Races spécifiques reconnues
         self.specific_breeds = [
             'ross 308', 'cobb 500', 'hubbard', 'arbor acres',
@@ -129,11 +154,12 @@ class SmartClassifier:
             'ross 308', 'cobb 500', 'mâle', 'femelle', 'mâles', 'femelles'
         ]
         
-        # Initialiser la table de contexte
-        self._init_context_table()
+        # Initialiser la table de contexte (fallback si pas de ContextManager)
+        if not self.use_context_manager:
+            self._init_context_table()
 
     def _init_context_table(self):
-        """Initialise la table pour stocker les contextes conversationnels"""
+        """Initialise la table pour stocker les contextes conversationnels (fallback)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("""
@@ -145,7 +171,7 @@ class SmartClassifier:
                     )
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contexts_updated ON conversation_contexts(updated_at)")
-                logger.info("✅ [Smart Classifier] Table contextes initialisée")
+                logger.info("✅ [Smart Classifier] Table contextes initialisée (fallback)")
         except Exception as e:
             logger.error(f"❌ [Smart Classifier] Erreur init table contexte: {e}")
 
@@ -168,10 +194,10 @@ class SmartClassifier:
             logger.info(f"🧠 [Smart Classifier] Classification: '{question[:50]}...'")
             logger.info(f"🔍 [Smart Classifier] Entités: {entities}")
             
-            # Récupérer le contexte conversationnel
+            # 🆕 MODIFICATION: Récupérer le contexte via ContextManager ou système local
             conversation_context = None
             if conversation_id:
-                conversation_context = self._get_conversation_context(conversation_id)
+                conversation_context = self._get_conversation_context_unified(conversation_id)
                 logger.info(f"🔗 [Smart Classifier] Contexte récupéré: {conversation_context is not None}")
             
             # NOUVEAU: Détection des clarifications contextuelles
@@ -191,10 +217,10 @@ class SmartClassifier:
                         weight_data=weight_data
                     )
                     
-                    # Sauvegarder le contexte mis à jour
+                    # 🆕 MODIFICATION: Sauvegarder le contexte via ContextManager ou système local
                     if conversation_id:
                         updated_context = self._create_conversation_context(question, merged_entities, conversation_context)
-                        self._save_conversation_context(conversation_id, updated_context)
+                        self._save_conversation_context_unified(conversation_id, updated_context)
                     
                     return result
             
@@ -208,10 +234,10 @@ class SmartClassifier:
                     weight_data=weight_data
                 )
                 
-                # Sauvegarder le contexte
+                # 🆕 MODIFICATION: Sauvegarder le contexte via ContextManager ou système local
                 if conversation_id:
                     new_context = self._create_conversation_context(question, entities, conversation_context)
-                    self._save_conversation_context(conversation_id, new_context)
+                    self._save_conversation_context_unified(conversation_id, new_context)
                 
                 return result
             
@@ -225,10 +251,10 @@ class SmartClassifier:
                     missing_entities=missing
                 )
                 
-                # Sauvegarder le contexte
+                # 🆕 MODIFICATION: Sauvegarder le contexte via ContextManager ou système local
                 if conversation_id:
                     new_context = self._create_conversation_context(question, entities, conversation_context)
-                    self._save_conversation_context(conversation_id, new_context)
+                    self._save_conversation_context_unified(conversation_id, new_context)
                 
                 return result
             
@@ -250,6 +276,79 @@ class SmartClassifier:
                 confidence=0.5,
                 reasoning="Erreur de classification - fallback général"
             )
+
+    # 🆕 NOUVELLE MÉTHODE: Récupération de contexte unifiée
+    def _get_conversation_context_unified(self, conversation_id: str) -> Optional[ConversationContext]:
+        """Récupère le contexte via ContextManager ou système local"""
+        if self.use_context_manager and self.context_manager:
+            try:
+                # Utiliser le ContextManager centralisé
+                context_data = self.context_manager.get_unified_context(
+                    conversation_id, context_type="classification"
+                )
+                if context_data:
+                    # Convertir les données du ContextManager vers ConversationContext
+                    return self._convert_context_manager_data(context_data)
+            except Exception as e:
+                logger.warning(f"⚠️ [Context] Erreur ContextManager, fallback local: {e}")
+        
+        # Fallback vers le système local
+        return self._get_conversation_context(conversation_id)
+
+    # 🆕 NOUVELLE MÉTHODE: Sauvegarde de contexte unifiée
+    def _save_conversation_context_unified(self, conversation_id: str, context: ConversationContext):
+        """Sauvegarde le contexte via ContextManager ou système local"""
+        if self.use_context_manager and self.context_manager:
+            try:
+                # Convertir ConversationContext vers format ContextManager
+                context_data = self._convert_to_context_manager_format(context)
+                self.context_manager.save_unified_context(
+                    conversation_id, context_data, context_type="classification"
+                )
+                logger.info(f"💾 [Context] Contexte sauvegardé via ContextManager: {conversation_id}")
+                return
+            except Exception as e:
+                logger.warning(f"⚠️ [Context] Erreur sauvegarde ContextManager, fallback local: {e}")
+        
+        # Fallback vers le système local
+        self._save_conversation_context(conversation_id, context)
+
+    # 🆕 NOUVELLE MÉTHODE: Conversion depuis ContextManager
+    def _convert_context_manager_data(self, context_data: Dict[str, Any]) -> ConversationContext:
+        """Convertit les données du ContextManager vers ConversationContext"""
+        context = ConversationContext()
+        
+        # Mapping des champs
+        context.previous_question = context_data.get("last_question")
+        context.previous_entities = context_data.get("last_entities")
+        context.conversation_topic = context_data.get("topic")
+        context.established_breed = context_data.get("established_breed")
+        context.established_age = context_data.get("established_age_days")
+        context.established_sex = context_data.get("established_sex")
+        
+        # Gestion de la date
+        last_interaction_str = context_data.get("last_interaction")
+        if last_interaction_str:
+            try:
+                context.last_interaction = datetime.fromisoformat(last_interaction_str)
+            except:
+                context.last_interaction = datetime.now()
+        
+        return context
+
+    # 🆕 NOUVELLE MÉTHODE: Conversion vers ContextManager
+    def _convert_to_context_manager_format(self, context: ConversationContext) -> Dict[str, Any]:
+        """Convertit ConversationContext vers format ContextManager"""
+        return {
+            "last_question": context.previous_question,
+            "last_entities": context.previous_entities,
+            "topic": context.conversation_topic,
+            "established_breed": context.established_breed,
+            "established_age_days": context.established_age,
+            "established_sex": context.established_sex,
+            "last_interaction": context.last_interaction.isoformat() if context.last_interaction else None,
+            "classifier_version": "2.0.0_with_context_manager"
+        }
 
     def _calculate_weight_data(self, entities: Dict[str, Any]) -> Dict[str, Any]:
         """NOUVEAU: Calcule les données de poids basées sur les entités"""
@@ -512,8 +611,12 @@ class SmartClassifier:
         
         return missing
 
+    # ===============================
+    # MÉTHODES LOCALES (FALLBACK)
+    # ===============================
+
     def _get_conversation_context(self, conversation_id: str) -> Optional[ConversationContext]:
-        """Récupère le contexte d'une conversation depuis la base"""
+        """Récupère le contexte d'une conversation depuis la base locale (fallback)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute("""
@@ -527,12 +630,12 @@ class SmartClassifier:
                     return ConversationContext.from_dict(context_data)
                     
         except Exception as e:
-            logger.error(f"❌ [Context] Erreur récupération contexte: {e}")
+            logger.error(f"❌ [Context] Erreur récupération contexte local: {e}")
         
         return None
 
     def _save_conversation_context(self, conversation_id: str, context: ConversationContext):
-        """Sauvegarde le contexte d'une conversation"""
+        """Sauvegarde le contexte d'une conversation dans la base locale (fallback)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 context_json = json.dumps(context.to_dict())
@@ -544,10 +647,10 @@ class SmartClassifier:
                     VALUES (?, ?, ?, ?)
                 """, (conversation_id, context_json, now, now))
                 
-                logger.info(f"💾 [Context] Contexte sauvegardé: {conversation_id}")
+                logger.info(f"💾 [Context] Contexte sauvegardé localement: {conversation_id}")
                 
         except Exception as e:
-            logger.error(f"❌ [Context] Erreur sauvegarde contexte: {e}")
+            logger.error(f"❌ [Context] Erreur sauvegarde contexte local: {e}")
 
     def _create_conversation_context(self, question: str, entities: Dict[str, Any], 
                                    previous_context: Optional[ConversationContext] = None) -> ConversationContext:
@@ -589,7 +692,9 @@ class SmartClassifier:
     def get_classification_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques de classification pour debugging"""
         return {
-            "classifier_version": "2.0.0_contextual_with_data",
+            "classifier_version": "2.0.0_contextual_with_data_and_context_manager",
+            "context_manager_active": self.use_context_manager,
+            "context_manager_available": CONTEXT_MANAGER_AVAILABLE,
             "response_types": [t.value for t in ResponseType],
             "confidence_thresholds": self.confidence_thresholds,
             "supported_breeds_specific": len(self.specific_breeds),
@@ -601,11 +706,13 @@ class SmartClassifier:
                 "entity_inheritance",
                 "contextual_merging",
                 "weight_data_calculation",
-                "database_persistence"
+                "database_persistence",
+                "context_manager_integration"  # 🆕 NOUVEAU
             ],
             "data_sources": [
                 "intelligent_system_config.ReferenceData",
-                "conversation_contexts_table"
+                "conversation_contexts_table",
+                "context_manager" if self.use_context_manager else "local_database"  # 🆕 NOUVEAU
             ]
         }
 
@@ -679,6 +786,14 @@ def test_classifier_complete():
             print("❌ FAILED: Données de poids non calculées")
     else:
         print("❌ FAILED: Clarification non détectée")
+    
+    # 🆕 NOUVEAU: Test du ContextManager
+    print("\n🔧 Test du ContextManager:")
+    print(f"→ ContextManager disponible: {CONTEXT_MANAGER_AVAILABLE}")
+    print(f"→ ContextManager actif: {classifier.use_context_manager}")
+    stats = classifier.get_classification_stats()
+    print(f"→ Version du classifier: {stats['classifier_version']}")
+    print(f"→ Sources de données: {stats['data_sources']}")
 
 if __name__ == "__main__":
     test_classifier_complete()

@@ -12,7 +12,6 @@ Agent RAG Enhancer - Amélioration des réponses après RAG
 - ✅ CORRECTION: Gestion des champs absents avec valeurs par défaut
 - ✅ FIX: Validation défensive et standardisation nomenclature
 - ✅ NOUVEAU: Correction rag_used et injection enriched_question
-- 🆕 PHASE 1: Intégration normalisation des entités (CONSERVATION + AMÉLIORATIONS)
 """
 
 import os
@@ -30,14 +29,6 @@ except ImportError:
     OPENAI_AVAILABLE = False
     openai = None
 
-# 🆕 PHASE 1: Import du normalisateur d'entités (si disponible)
-try:
-    from .entity_normalizer import EntityNormalizer
-    ENTITY_NORMALIZER_AVAILABLE = True
-except ImportError:
-    ENTITY_NORMALIZER_AVAILABLE = False
-    EntityNormalizer = None
-
 logger = logging.getLogger(__name__)
 
 class AgentRAGEnhancer:
@@ -49,17 +40,7 @@ class AgentRAGEnhancer:
         self.timeout = int(os.getenv('RAG_ENHANCER_TIMEOUT', '15'))
         self.max_retries = int(os.getenv('RAG_ENHANCER_RETRIES', '2'))
         
-        # 🆕 PHASE 1: Initialisation du normalisateur d'entités (optionnel)
-        self.entity_normalizer = None
-        if ENTITY_NORMALIZER_AVAILABLE:
-            try:
-                self.entity_normalizer = EntityNormalizer()
-                logger.info("🔧 [AgentRAGEnhancer] EntityNormalizer initialisé avec succès")
-            except Exception as e:
-                logger.warning(f"⚠️ [AgentRAGEnhancer] Erreur init EntityNormalizer: {e}")
-                self.entity_normalizer = None
-        
-        # Statistiques (CONSERVÉ + AJOUTS)
+        # Statistiques
         self.stats = {
             "total_requests": 0,
             "openai_success": 0,
@@ -72,125 +53,13 @@ class AgentRAGEnhancer:
             "field_propagation_success": 0,
             "field_propagation_fallback": 0,
             "input_validation_fixes": 0,
-            "rag_used_corrections": 0,
-            "enriched_question_injections": 0,
-            # 🆕 PHASE 1: Nouvelles statistiques de normalisation
-            "entity_normalizations": 0,
-            "entity_normalizer_success": 0,
-            "entity_normalizer_fallback": 0,
-            "legacy_entity_conversions": 0
+            "rag_used_corrections": 0,  # ✅ NOUVEAU: Tracking corrections rag_used
+            "enriched_question_injections": 0  # ✅ NOUVEAU: Tracking injections enriched_question
         }
         
         logger.info(f"🔧 [AgentRAGEnhancer] Initialisé")
         logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
-        logger.info(f"   EntityNormalizer: {'✅' if self.entity_normalizer else '❌'}")
         logger.info(f"   Modèle: {self.model}")
-    
-    # 🆕 PHASE 1: Méthode de normalisation des entités (NOUVEAU)
-    def _normalize_entities_if_needed(self, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        🆕 PHASE 1: Normalise les entités si le normalisateur est disponible
-        Sinon applique une normalisation basique pour la compatibilité
-        
-        Args:
-            entities: Entités à normaliser
-            
-        Returns:
-            Entités normalisées selon les standards
-        """
-        
-        if not entities:
-            return {}
-        
-        self.stats["entity_normalizations"] += 1
-        
-        # Cas 1: Normalisateur complet disponible
-        if self.entity_normalizer:
-            try:
-                normalized = self.entity_normalizer.normalize(entities)
-                self.stats["entity_normalizer_success"] += 1
-                logger.debug("✅ [AgentRAGEnhancer] Entités normalisées avec EntityNormalizer")
-                return normalized
-            except Exception as e:
-                logger.warning(f"⚠️ [AgentRAGEnhancer] Erreur EntityNormalizer: {e}")
-                self.stats["entity_normalizer_fallback"] += 1
-                # Continuer avec normalisation basique
-        
-        # Cas 2: Normalisation basique de compatibilité (FALLBACK)
-        normalized = self._basic_entity_normalization(entities)
-        logger.debug("🔄 [AgentRAGEnhancer] Normalisation basique appliquée")
-        return normalized
-    
-    # 🆕 PHASE 1: Normalisation basique de compatibilité (NOUVEAU)
-    def _basic_entity_normalization(self, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        🆕 PHASE 1: Normalisation basique pour compatibilité sans EntityNormalizer
-        Applique les standards minimum de nomenclature
-        """
-        
-        normalized = entities.copy()
-        
-        try:
-            # 1. Standardisation du poids (weight -> weight_grams)
-            if "weight" in normalized and "weight_grams" not in normalized:
-                weight_value = normalized.get("weight")
-                if weight_value is not None:
-                    # Assumer que c'est en grammes si < 10, sinon convertir kg -> g
-                    if isinstance(weight_value, (int, float)):
-                        if weight_value < 10:  # Probablement en kg
-                            normalized["weight_grams"] = int(weight_value * 1000)
-                        else:  # Probablement en grammes
-                            normalized["weight_grams"] = int(weight_value)
-                    normalized.pop("weight", None)  # Supprimer l'ancienne clé
-                    self.stats["legacy_entity_conversions"] += 1
-            
-            # 2. Standardisation de l'âge (assurer age_days présent)
-            if normalized.get("age_weeks") and not normalized.get("age_days"):
-                weeks = normalized.get("age_weeks")
-                if isinstance(weeks, (int, float)) and weeks > 0:
-                    normalized["age_days"] = int(weeks * 7)
-            
-            # 3. Standardisation des races (cas basiques)
-            if "breed" in normalized:
-                breed = normalized.get("breed", "").strip()
-                if breed:
-                    # Normalisation basique des races courantes
-                    breed_lower = breed.lower()
-                    if "ross" in breed_lower:
-                        if "308" in breed_lower:
-                            normalized["breed"] = "Ross 308"
-                        elif "708" in breed_lower:
-                            normalized["breed"] = "Ross 708"
-                        else:
-                            normalized["breed"] = "Ross"
-                    elif "cobb" in breed_lower:
-                        if "500" in breed_lower:
-                            normalized["breed"] = "Cobb 500"
-                        else:
-                            normalized["breed"] = "Cobb"
-                    elif "hubbard" in breed_lower:
-                        normalized["breed"] = "Hubbard"
-                    elif "arbor" in breed_lower:
-                        normalized["breed"] = "Arbor Acres"
-            
-            # 4. Standardisation du sexe
-            if "sex" in normalized:
-                sex = normalized.get("sex", "").strip().lower()
-                if sex in ["m", "male", "mâle", "masculin"]:
-                    normalized["sex"] = "male"
-                elif sex in ["f", "female", "femelle", "féminin"]:
-                    normalized["sex"] = "female"
-                elif sex in ["mixed", "mixte", "mix"]:
-                    normalized["sex"] = "mixed"
-            
-            logger.debug(f"🔧 [AgentRAGEnhancer] Normalisation basique: {len(normalized)} champs traités")
-            
-        except Exception as e:
-            logger.error(f"❌ [AgentRAGEnhancer] Erreur normalisation basique: {e}")
-            # En cas d'erreur, retourner les entités originales
-            return entities
-        
-        return normalized
     
     def _validate_and_sanitize_inputs(
         self,
@@ -202,7 +71,6 @@ class AgentRAGEnhancer:
     ) -> tuple:
         """
         ✅ FIX: Validation défensive des inputs pour éviter les erreurs
-        🆕 PHASE 1: Intégration de la normalisation des entités
         """
         
         validation_fixes = 0
@@ -217,11 +85,7 @@ class AgentRAGEnhancer:
             validation_fixes += 1
             logger.warning(f"⚠️ [AgentRAGEnhancer] entities n'était pas un dict: {type(entities)}")
         
-        # 🆕 PHASE 1: Normalisation des entités après validation
-        if entities:
-            entities = self._normalize_entities_if_needed(entities)
-        
-        # Validation missing_entities (CONSERVÉ)
+        # Validation missing_entities
         if missing_entities is None:
             missing_entities = []
             validation_fixes += 1
@@ -231,7 +95,7 @@ class AgentRAGEnhancer:
             validation_fixes += 1
             logger.warning(f"⚠️ [AgentRAGEnhancer] missing_entities n'était pas une liste: {type(missing_entities)}")
         
-        # Validation strings (CONSERVÉ)
+        # Validation strings
         if not isinstance(original_question, str):
             original_question = str(original_question) if original_question is not None else ""
             validation_fixes += 1
@@ -258,7 +122,14 @@ class AgentRAGEnhancer:
     ) -> Dict[str, Any]:
         """
         ✅ NOUVEAU: Vérifie et corrige le flag rag_used selon les résultats RAG
-        (CONSERVÉ - Code original fonctionnel)
+        
+        Args:
+            response_data: Données de réponse à corriger
+            rag_results: Résultats du système RAG (FAISS/Pinecone)
+            has_rag_context: Indicateur si contexte RAG présent
+            
+        Returns:
+            response_data corrigé avec rag_used approprié
         """
         
         original_rag_used = response_data.get("rag_used", False)
@@ -323,7 +194,14 @@ class AgentRAGEnhancer:
     ) -> Dict[str, Any]:
         """
         ✅ NOUVEAU: Génère et injecte enriched_question si manquant
-        (CONSERVÉ - Code original fonctionnel)
+        
+        Args:          response_data: Données de réponse
+            original_question: Question originale utilisateur
+            context_entities: Entités extraites du contexte
+            rag_results: Résultats RAG pour enrichissement
+            
+        Returns:
+            response_data avec enriched_question injecté
         """
         
         # Vérifier si enriched_question existe déjà
@@ -361,7 +239,14 @@ class AgentRAGEnhancer:
     ) -> str:
         """
         ✅ NOUVEAU: Enrichit une question avec le contexte disponible
-        🆕 PHASE 1: Utilise les entités normalisées
+        
+        Args:
+            original_question: Question originale
+            entities: Entités extraites du contexte
+            rag_results: Résultats RAG pour contexte supplémentaire
+            
+        Returns:
+            Question enrichie avec contexte
         """
         
         if not original_question:
@@ -370,39 +255,39 @@ class AgentRAGEnhancer:
         enriched_parts = [original_question]
         context_additions = []
         
-        # Enrichissement via entités (AMÉLIORÉ avec entités normalisées)
+        # Enrichissement via entités
         if entities:
             # Race/souche
             if entities.get("breed") and entities.get("breed_confidence", 0) > 0.6:
                 context_additions.append(f"race {entities['breed']}")
             
-            # Âge (utilisation des entités normalisées)
+            # Âge
             if entities.get("age_days") and entities.get("age_confidence", 0) > 0.6:
                 weeks = entities.get("age_weeks", entities["age_days"] / 7)
                 context_additions.append(f"âge {entities['age_days']} jours ({weeks:.1f} semaines)")
             
-            # 🆕 PHASE 1: Poids avec nomenclature normalisée (weight_grams)
-            weight_grams = entities.get("weight_grams")  # Utilise directement la clé normalisée
+            # Poids (nomenclature standardisée)
+            weight_grams = entities.get("weight_grams") or entities.get("weight")
             if weight_grams and entities.get("weight_confidence", 0) > 0.5:
                 context_additions.append(f"poids {weight_grams}g")
             
-            # Sexe (CONSERVÉ mais avec valeurs normalisées)
+            # Sexe
             if entities.get("sex") and entities.get("sex_confidence", 0) > 0.6:
                 context_additions.append(f"sexe {entities['sex']}")
             
-            # Symptômes (CONSERVÉ)
+            # Symptômes
             if entities.get("symptoms"):
                 symptoms = ", ".join(entities["symptoms"]) if isinstance(entities["symptoms"], list) else str(entities["symptoms"])
                 context_additions.append(f"symptômes: {symptoms}")
             
-            # Environnement critique (CONSERVÉ)
+            # Environnement critique
             if entities.get("temperature") and (entities["temperature"] < 18 or entities["temperature"] > 30):
                 context_additions.append(f"température {entities['temperature']}°C")
             
             if entities.get("mortality_rate") and entities["mortality_rate"] > 2:
                 context_additions.append(f"mortalité {entities['mortality_rate']}%")
         
-        # Enrichissement via résultats RAG (CONSERVÉ)
+        # Enrichissement via résultats RAG
         if rag_results and len(rag_results) > 0:
             # Extraire thèmes principaux des résultats RAG
             rag_themes = set()
@@ -426,7 +311,7 @@ class AgentRAGEnhancer:
                 themes_text = ", ".join(list(rag_themes)[:2])  # Max 2 thèmes
                 context_additions.append(f"contexte: {themes_text}")
         
-        # Construire question enrichie (CONSERVÉ)
+        # Construire question enrichie
         if context_additions:
             context_text = " - " + " - ".join(context_additions)
             enriched_question = original_question + context_text
@@ -455,28 +340,39 @@ class AgentRAGEnhancer:
         original_question: str = "",
         enriched_question: str = "",
         language: str = "fr",
-        rag_results: List[Dict] = None,
-        **additional_fields
+        rag_results: List[Dict] = None,  # ✅ NOUVEAU: Paramètre rag_results
+        **additional_fields  # ✅ Capture tous les champs supplémentaires
     ) -> Dict[str, Any]:
         """
         Améliore une réponse RAG avec le contexte utilisateur et vérifie la cohérence
         ✅ NOUVEAU: Corrections automatiques rag_used et enriched_question
-        🆕 PHASE 1: Intégration normalisation des entités
         
-        (CONSERVÉ - Signature et logique principales inchangées)
+        Args:
+            rag_answer: Réponse brute du système RAG
+            entities: Entités extraites du contexte
+            missing_entities: Entités manquantes critiques
+            conversation_context: Contexte conversationnel
+            original_question: Question originale posée
+            enriched_question: Question enrichie par le pré-RAG
+            language: Langue de la conversation
+            rag_results: Résultats du système RAG (NOUVEAU)
+            **additional_fields: Tous les champs supplémentaires à propager
+            
+        Returns:
+            Dict avec tous les champs requis garantis, corrections rag_used/enriched_question
         """
         
         self.stats["total_requests"] += 1
         self.stats["coherence_checks"] += 1
         
-        # ✅ FIX: Validation défensive des inputs dès le début (AMÉLIORÉ avec normalisation)
+        # ✅ FIX: Validation défensive des inputs dès le début
         entities, missing_entities, original_question, enriched_question, language = (
             self._validate_and_sanitize_inputs(
                 entities, missing_entities, original_question, enriched_question, language
             )
         )
         
-        # ✅ FIX: Validation rag_answer et rag_results (CONSERVÉ)
+        # ✅ FIX: Validation rag_answer et rag_results
         if not isinstance(rag_answer, str):
             rag_answer = str(rag_answer) if rag_answer is not None else ""
         
@@ -495,7 +391,7 @@ class AgentRAGEnhancer:
                 enriched_question, language, additional_fields
             )
             
-            # ✅ NOUVEAU: Corrections automatiques AVANT traitement OpenAI (CONSERVÉ)
+            # ✅ NOUVEAU: Corrections automatiques AVANT traitement OpenAI
             # 1. Corriger rag_used selon les résultats RAG
             base_result = self._check_and_fix_rag_used(
                 base_result, rag_results, bool(conversation_context or rag_answer)
@@ -506,7 +402,7 @@ class AgentRAGEnhancer:
                 base_result, original_question, entities, rag_results
             )
             
-            # Tentative OpenAI si disponible (CONSERVÉ)
+            # Tentative OpenAI si disponible
             if self.openai_available:
                 enhancement_result = await self._enhance_with_openai(
                     rag_answer, entities, missing_entities, conversation_context, 
@@ -534,7 +430,7 @@ class AgentRAGEnhancer:
                 else:
                     self.stats["openai_failures"] += 1
             
-            # Fallback: Amélioration basique avec tous les champs (CONSERVÉ)
+            # Fallback: Amélioration basique avec tous les champs
             logger.info("🔄 [AgentRAGEnhancer] Utilisation fallback basique")
             fallback_result = self._enhance_fallback(
                 rag_answer, entities, missing_entities, 
@@ -588,10 +484,10 @@ class AgentRAGEnhancer:
     ) -> Dict[str, Any]:
         """
         ✅ FIX: Initialise un résultat complet avec TOUS les champs requis
-        🆕 PHASE 1: Nomenclature standardisée sur weight_grams (entités normalisées)
+        Nomenclature standardisée sur weight_grams
         """
         
-        # Champs de base toujours présents (CONSERVÉ)
+        # Champs de base toujours présents
         base_result = {
             # Champs de réponse principaux
             "enhanced_answer": rag_answer,
@@ -606,7 +502,7 @@ class AgentRAGEnhancer:
             
             # Champs d'entrée propagés
             "original_question": original_question,
-            "enriched_question": enriched_question,
+            "enriched_question": enriched_question,  # Sera corrigé si nécessaire
             "language": language,
             
             # Champs contextuels
@@ -614,15 +510,15 @@ class AgentRAGEnhancer:
             "missing_entities": missing_entities,
             
             # ✅ NOUVEAU: Champ rag_used (sera corrigé par _check_and_fix_rag_used)
-            "rag_used": False,
+            "rag_used": False,  # Valeur par défaut, sera corrigée
             
             # Champs techniques
             "processing_time": datetime.now().isoformat(),
             "entities_considered": len([k for k, v in entities.items() if v is not None]),
             "missing_entities_count": len(missing_entities),
             
-            # 🆕 PHASE 1: Champs entités avec nomenclature normalisée
-            "weight_grams": None,  # ✅ Nomenclature normalisée (plus de "weight")
+            # ✅ FIX: Standardisation nomenclature weight_grams
+            "weight_grams": None,  # ✅ CHANGÉ: weight -> weight_grams
             "weight_confidence": None,
             "age_days": None,
             "age_weeks": None,
@@ -643,22 +539,22 @@ class AgentRAGEnhancer:
             "practical_applicability": "unknown",
             
             # ✅ NOUVEAU: Champs d'extraction automatique
-            "detected_weight_grams": None,
-            "detected_age_days": None,
-            "detected_breed": None,
-            "extraction_confidence": 0.0
+            "detected_weight_grams": None,  # ✅ Poids détecté dans la réponse
+            "detected_age_days": None,      # ✅ Âge détecté dans la réponse
+            "detected_breed": None,         # ✅ Race détectée dans la réponse
+            "extraction_confidence": 0.0    # ✅ Confiance dans l'extraction
         }
         
         # ✅ CORRECTION: Propager les valeurs des entités si disponibles
-        # 🆕 PHASE 1: Utilisation des entités déjà normalisées
         if entities:
-            # 🆕 PHASE 1: Mapping avec nomenclature normalisée (entités déjà normalisées)
+            # ✅ FIX: Mapping standardisé weight_grams
             entity_mapping = {
-                "weight_grams": "weight_grams",  # ✅ Déjà normalisé
+                "weight_grams": "weight_grams",  # ✅ Standardisé
+                "weight": "weight_grams",        # ✅ Compatibilité ancienne nomenclature
                 "age_days": "age_days",
                 "age_weeks": "age_weeks", 
-                "breed": "breed",  # ✅ Déjà normalisé
-                "sex": "sex",  # ✅ Déjà normalisé
+                "breed": "breed",
+                "sex": "sex",
                 "symptoms": "symptoms",
                 "mortality_rate": "mortality_rate",
                 "temperature": "temperature",
@@ -676,15 +572,15 @@ class AgentRAGEnhancer:
                 if field in entities and entities[field] is not None:
                     base_result[field] = entities[field]
         
-        # ✅ CORRECTION: Propager tous les champs supplémentaires fournis (CONSERVÉ)
+        # ✅ CORRECTION: Propager tous les champs supplémentaires fournis
         if additional_fields:
             for key, value in additional_fields.items():
-                if key not in base_result:
+                if key not in base_result:  # Éviter d'écraser les champs de base
                     base_result[key] = value
-                elif value is not None:
+                elif value is not None:  # Remplacer les None par des valeurs réelles
                     base_result[key] = value
         
-        # ✅ NOUVEAU: Extraction automatique de données implicites (CONSERVÉ mais amélioré)
+        # ✅ NOUVEAU: Extraction automatique de données implicites
         base_result.update(self._extract_implicit_data(rag_answer, entities))
         
         logger.debug(f"🔧 [AgentRAGEnhancer] Résultat initialisé avec {len(base_result)} champs")
@@ -694,8 +590,6 @@ class AgentRAGEnhancer:
     def _extract_implicit_data(self, text: str, entities: Dict[str, Any]) -> Dict[str, Any]:
         """
         ✅ NOUVEAU: Extrait des données implicites du texte (poids, âge, race)
-        🆕 PHASE 1: Compatibilité avec entités normalisées
-        (CONSERVÉ - Code original fonctionnel)
         """
         
         implicit_data = {
@@ -708,7 +602,7 @@ class AgentRAGEnhancer:
         extractions_count = 0
         
         try:
-            # Extraction poids (grammes/kg) - CONSERVÉ
+            # Extraction poids (grammes/kg)
             weight_patterns = [
                 r'(\d+(?:\.\d+)?)\s*(?:g|gr|grammes?|grams?)\b',
                 r'(\d+(?:\.\d+)?)\s*(?:kg|kilogrammes?|kilograms?)\b',
@@ -727,7 +621,7 @@ class AgentRAGEnhancer:
                     extractions_count += 1
                     break
             
-            # Extraction âge (jours/semaines) - CONSERVÉ
+            # Extraction âge (jours/semaines)
             age_patterns = [
                 r'(\d+)\s*(?:jours?|days?)\b',
                 r'(\d+)\s*(?:semaines?|weeks?)\b',
@@ -746,11 +640,10 @@ class AgentRAGEnhancer:
                     extractions_count += 1
                     break
             
-            # 🆕 PHASE 1: Extraction race avec patterns normalisés
+            # Extraction race
             breed_patterns = [
-                r'\b(Ross\s*308)\b',  # ✅ Forme normalisée
-                r'\b(Ross\s*708)\b',
-                r'\b(Cobb\s*500)\b',  # ✅ Forme normalisée
+                r'\b(Ross\s*\d+)\b',
+                r'\b(Cobb\s*\d+)\b',
                 r'\b(Hubbard)\b',
                 r'\b(Arbor\s*Acres?)\b'
             ]
@@ -758,25 +651,11 @@ class AgentRAGEnhancer:
             for pattern in breed_patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
-                    breed_raw = match.group(1).strip()
-                    # 🆕 PHASE 1: Normaliser le format détecté
-                    if "ross" in breed_raw.lower() and "308" in breed_raw:
-                        implicit_data["detected_breed"] = "Ross 308"
-                    elif "ross" in breed_raw.lower() and "708" in breed_raw:
-                        implicit_data["detected_breed"] = "Ross 708"
-                    elif "cobb" in breed_raw.lower() and "500" in breed_raw:
-                        implicit_data["detected_breed"] = "Cobb 500"
-                    elif "hubbard" in breed_raw.lower():
-                        implicit_data["detected_breed"] = "Hubbard"
-                    elif "arbor" in breed_raw.lower():
-                        implicit_data["detected_breed"] = "Arbor Acres"
-                    else:
-                        implicit_data["detected_breed"] = breed_raw
-                    
+                    implicit_data["detected_breed"] = match.group(1).strip()
                     extractions_count += 1
                     break
             
-            # Calculer confiance d'extraction (CONSERVÉ)
+            # Calculer confiance d'extraction
             if extractions_count > 0:
                 implicit_data["extraction_confidence"] = min(extractions_count / 3.0, 1.0)
                 logger.debug(f"🔍 [AgentRAGEnhancer] {extractions_count} données extraites automatiquement")
@@ -786,26 +665,26 @@ class AgentRAGEnhancer:
         
         return implicit_data
     
-    # === MÉTHODES CONSERVÉES (Code original fonctionnel) ===
-    
     def _merge_results(self, base_result: Dict[str, Any], enhancement_result: Dict[str, Any]) -> Dict[str, Any]:
-        """✅ Fusionne les résultats en préservant tous les champs (CONSERVÉ)"""
+        """
+        ✅ Fusionne les résultats en préservant tous les champs
+        """
         
         # Commencer avec le résultat de base complet
         merged = base_result.copy()
         
         # Mettre à jour avec les améliorations, en préservant les valeurs non-None existantes
         for key, value in enhancement_result.items():
-            if value is not None:
+            if value is not None:  # Seulement écraser si la nouvelle valeur n'est pas None
                 merged[key] = value
-            elif key not in merged:
+            elif key not in merged:  # Ajouter les nouveaux champs même s'ils sont None
                 merged[key] = value
         
         # S'assurer que certains champs critiques sont présents
         required_fields = [
             "enhanced_answer", "optional_clarifications", "warnings", 
             "confidence_impact", "coherence_check", "coherence_notes", 
-            "method_used", "success", "rag_used", "enriched_question"
+            "method_used", "success", "rag_used", "enriched_question"  # ✅ AJOUTÉ: rag_used, enriched_question
         ]
         
         for field in required_fields:
@@ -824,7 +703,7 @@ class AgentRAGEnhancer:
         enriched_question: str,
         language: str
     ) -> Dict[str, Any]:
-        """Amélioration avec OpenAI GPT (CONSERVÉ)"""
+        """Amélioration avec OpenAI GPT"""
         
         try:
             # Préparer le contexte pour GPT
@@ -870,7 +749,7 @@ class AgentRAGEnhancer:
             return {"success": False, "error": str(e)}
     
     def _get_system_prompt(self, language: str) -> str:
-        """Retourne le prompt système selon la langue (CONSERVÉ)"""
+        """Retourne le prompt système selon la langue"""
         
         system_prompts = {
             "fr": """Tu es un expert vétérinaire en aviculture spécialisé dans l'adaptation de réponses techniques.
@@ -952,7 +831,7 @@ IMPORTANTE:
         enriched_question: str,
         language: str
     ) -> str:
-        """Construit le prompt d'amélioration avec vérification de cohérence (CONSERVÉ)"""
+        """Construit le prompt d'amélioration avec vérification de cohérence"""
         
         if language == "fr":
             return f"""QUESTION ORIGINALE: "{original_question}"
@@ -1078,9 +957,7 @@ Responde en JSON:
 }}"""
     
     def _format_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
-        """
-        🆕 PHASE 1: Formate les entités pour le prompt GPT - nomenclature normalisée
-        """
+        """✅ FIX: Formate les entités pour le prompt GPT - nomenclature standardisée"""
         
         formatted_parts = []
         
@@ -1107,8 +984,8 @@ Responde en JSON:
         else:
             formatted_parts.append("❌ Âge: inconnu")
         
-        # 🆕 PHASE 1: Poids avec nomenclature normalisée (weight_grams seulement)
-        weight_grams = entities.get("weight_grams")  # ✅ Plus de fallback sur "weight"
+        # ✅ FIX: Poids standardisé sur weight_grams
+        weight_grams = entities.get("weight_grams") or entities.get("weight")  # Compatibilité
         if weight_grams:
             confidence = entities.get("weight_confidence", 0.0)
             status = "✅" if confidence > 0.6 else "⚠️"
@@ -1116,7 +993,7 @@ Responde en JSON:
         else:
             formatted_parts.append("❌ Poids: inconnu")
         
-        # Performance et santé (CONSERVÉ)
+        # Performance et santé
         if entities.get("symptoms"):
             symptoms = ", ".join(entities["symptoms"]) if isinstance(entities["symptoms"], list) else str(entities["symptoms"])
             formatted_parts.append(f"🚨 Symptômes observés: {symptoms}")
@@ -1126,7 +1003,7 @@ Responde en JSON:
             status = "🚨" if rate > 5 else "⚠️" if rate > 2 else "✅"
             formatted_parts.append(f"{status} Mortalité: {rate}%")
         
-        # Environnement (CONSERVÉ)
+        # Environnement
         if entities.get("temperature"):
             temp = entities["temperature"]
             status = "🚨" if temp < 18 or temp > 30 else "✅"
@@ -1147,7 +1024,7 @@ Responde en JSON:
         entities: Dict[str, Any], 
         missing_entities: List[str]
     ) -> Dict[str, Any]:
-        """Parse la réponse JSON de GPT avec vérification de cohérence (CONSERVÉ)"""
+        """Parse la réponse JSON de GPT avec vérification de cohérence"""
         
         try:
             # Extraction JSON robuste
@@ -1260,16 +1137,13 @@ Responde en JSON:
         enriched_question: str,
         language: str
     ) -> Dict[str, Any]:
-        """
-        Amélioration fallback sans OpenAI avec vérification basique de cohérence
-        🆕 PHASE 1: Utilise les entités normalisées
-        """
+        """Amélioration fallback sans OpenAI avec vérification basique de cohérence"""
         
         enhanced_answer = rag_answer
         warnings = []
         clarifications = []
         
-        # Vérification basique de cohérence améliorée (CONSERVÉ)
+        # Vérification basique de cohérence améliorée
         coherence_check = "unknown"
         coherence_notes = "Vérification automatique basique"
         
@@ -1305,7 +1179,7 @@ Responde en JSON:
                 coherence_check = "poor"
                 coherence_notes = "Aucun mot-clé significatif en commun"
         
-        # Ajouter des avertissements selon les entités manquantes (AMÉLIORÉ avec entités normalisées)
+        # Ajouter des avertissements selon les entités manquantes
         if "breed" in missing_entities:
             if language == "fr":
                 warnings.append("⚠️ Sans connaître la race exacte, cette réponse est générale. Les performances varient selon la souche.")
@@ -1336,24 +1210,20 @@ Responde en JSON:
             else:  # Spanish
                 clarifications.append("¿Son machos, hembras, o un lote mixto?")
         
-        # Déterminer l'impact sur la confiance (CONSERVÉ)
+        # Déterminer l'impact sur la confiance
         confidence_impact = "low"
         if len(missing_entities) >= 2:
             confidence_impact = "high"
         elif len(missing_entities) == 1:
             confidence_impact = "medium"
         
-        # 🆕 PHASE 1: Ajouter un contexte avec entités normalisées
+        # Ajouter un contexte si des entités sont connues
         context_additions = []
         if entities.get("breed") and entities.get("breed_confidence", 0) > 0.6:
             context_additions.append(f"race {entities['breed']}")
         
         if entities.get("age_days") and entities.get("age_confidence", 0) > 0.6:
             context_additions.append(f"âge {entities['age_days']} jours")
-        
-        # 🆕 PHASE 1: Utiliser weight_grams normalisé
-        if entities.get("weight_grams") and entities.get("weight_confidence", 0) > 0.6:
-            context_additions.append(f"poids {entities['weight_grams']}g")
         
         if context_additions:
             context_text = " et ".join(context_additions)
@@ -1364,7 +1234,7 @@ Responde en JSON:
             else:  # Spanish
                 enhanced_answer += f"\n\n💡 Esta respuesta considera su contexto: {context_text}."
         
-        # Ajouter les avertissements à la réponse si critiques (CONSERVÉ)
+        # Ajouter les avertissements à la réponse si critiques
         if warnings and confidence_impact in ["medium", "high"]:
             enhanced_answer += f"\n\n{' '.join(warnings)}"
         
@@ -1375,14 +1245,12 @@ Responde en JSON:
             "confidence_impact": confidence_impact,
             "coherence_check": coherence_check,
             "coherence_notes": coherence_notes,
-            "improvement_notes": "Amélioration basique appliquée avec entités normalisées",
+            "improvement_notes": "Amélioration basique appliquée",
             "method_used": "fallback"
         }
     
     def get_stats(self) -> Dict[str, Any]:
-        """
-        🆕 PHASE 1: Retourne les statistiques enrichies de l'agent (avec stats normalisation)
-        """
+        """✅ FIX: Retourne les statistiques enrichies de l'agent"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
@@ -1391,17 +1259,11 @@ Responde en JSON:
         coherence_issue_rate = (self.stats["coherence_issues_detected"] / total * 100) if total > 0 else 0
         field_propagation_success_rate = (self.stats["field_propagation_success"] / total * 100) if total > 0 else 0
         input_validation_rate = (self.stats["input_validation_fixes"] / total * 100) if total > 0 else 0
-        rag_used_correction_rate = (self.stats["rag_used_corrections"] / total * 100) if total > 0 else 0
-        enriched_question_injection_rate = (self.stats["enriched_question_injections"] / total * 100) if total > 0 else 0
-        
-        # 🆕 PHASE 1: Nouvelles statistiques de normalisation
-        entity_normalization_rate = (self.stats["entity_normalizations"] / total * 100) if total > 0 else 0
-        entity_normalizer_success_rate = (self.stats["entity_normalizer_success"] / self.stats["entity_normalizations"] * 100) if self.stats["entity_normalizations"] > 0 else 0
-        legacy_conversion_rate = (self.stats["legacy_entity_conversions"] / total * 100) if total > 0 else 0
+        rag_used_correction_rate = (self.stats["rag_used_corrections"] / total * 100) if total > 0 else 0  # ✅ NOUVEAU
+        enriched_question_injection_rate = (self.stats["enriched_question_injections"] / total * 100) if total > 0 else 0  # ✅ NOUVEAU
         
         return {
             "agent_type": "rag_enhancer",
-            "version": "phase1_with_normalization",  # 🆕 PHASE 1
             "total_requests": total,
             "openai_success_rate": f"{success_rate:.1f}%",
             "answer_enhancement_rate": f"{enhancement_rate:.1f}%",
@@ -1409,53 +1271,33 @@ Responde en JSON:
             "coherence_issue_detection_rate": f"{coherence_issue_rate:.1f}%",
             "field_propagation_success_rate": f"{field_propagation_success_rate:.1f}%",
             "input_validation_fixes_rate": f"{input_validation_rate:.1f}%",
-            "rag_used_correction_rate": f"{rag_used_correction_rate:.1f}%",
-            "enriched_question_injection_rate": f"{enriched_question_injection_rate:.1f}%",
-            # 🆕 PHASE 1: Statistiques de normalisation
-            "entity_normalization_rate": f"{entity_normalization_rate:.1f}%",
-            "entity_normalizer_success_rate": f"{entity_normalizer_success_rate:.1f}%",
-            "entity_normalizer_fallback_rate": f"{100 - entity_normalizer_success_rate:.1f}%",
-            "legacy_entity_conversion_rate": f"{legacy_conversion_rate:.1f}%",
-            "normalization_features": {
-                "entity_normalizer_available": ENTITY_NORMALIZER_AVAILABLE,
-                "basic_normalization_active": True,
-                "weight_grams_standardization": True,
-                "breed_normalization": True,
-                "sex_standardization": True
-            },
+            "rag_used_correction_rate": f"{rag_used_correction_rate:.1f}%",  # ✅ NOUVEAU
+            "enriched_question_injection_rate": f"{enriched_question_injection_rate:.1f}%",  # ✅ NOUVEAU
             "openai_available": self.openai_available,
             "model_used": self.model,
             "detailed_stats": self.stats.copy()
         }
 
-# Instance globale (CONSERVÉ)
+# Instance globale
 agent_rag_enhancer = AgentRAGEnhancer()
 
 # ✅ FIX: Fonction utilitaire avec validation défensive et nouvelles corrections
-# 🆕 PHASE 1: Support automatique de la normalisation des entités
 async def enhance_rag_answer(
     rag_answer: str,
-    entities: Dict[str, Any] = None,
-    missing_entities: List[str] = None,
+    entities: Dict[str, Any] = None,  # ✅ FIX: Valeur par défaut None
+    missing_entities: List[str] = None,  # ✅ FIX: Valeur par défaut None
     conversation_context: str = "",
     original_question: str = "",
     enriched_question: str = "",
     language: str = "fr",
-    rag_results: List[Dict] = None,
+    rag_results: List[Dict] = None,  # ✅ NOUVEAU: Paramètre rag_results
     **additional_fields
 ) -> Dict[str, Any]:
     """
     ✅ FIX: Fonction utilitaire avec validation défensive, propagation complète 
     et corrections automatiques rag_used/enriched_question
-    🆕 PHASE 1: Normalisation automatique des entités si disponible
     
-    NOUVELLES FONCTIONNALITÉS PHASE 1:
-    - Normalisation automatique des entités (weight -> weight_grams, races standardisées)
-    - Utilisation du EntityNormalizer si disponible, sinon normalisation basique
-    - Conservation de toutes les fonctionnalités existantes
-    - Compatibilité 100% avec le code existant
-    
-    FONCTIONNALITÉS CONSERVÉES:
+    NOUVELLES FONCTIONNALITÉS:
     - Détection et correction automatique du flag rag_used
     - Génération et injection automatique d'enriched_question
     - Propagation systématique de tous les champs
@@ -1463,17 +1305,17 @@ async def enhance_rag_answer(
     
     Args:
         rag_answer: Réponse brute du système RAG
-        entities: Entités extraites (seront normalisées automatiquement)
+        entities: Entités extraites (défaut: {})
         missing_entities: Entités manquantes (défaut: [])
         conversation_context: Contexte conversationnel
         original_question: Question originale utilisateur
         enriched_question: Question enrichie (sera générée si manquante)
         language: Langue de conversation
-        rag_results: Résultats FAISS/Pinecone
+        rag_results: Résultats FAISS/Pinecone (NOUVEAU)
         **additional_fields: Champs supplémentaires à propager
         
     Returns:
-        Dict complet avec corrections rag_used/enriched_question et entités normalisées garanties
+        Dict complet avec corrections rag_used et enriched_question garanties
     """
     return await agent_rag_enhancer.enhance_rag_answer(
         rag_answer, 
@@ -1483,11 +1325,11 @@ async def enhance_rag_answer(
         original_question, 
         enriched_question, 
         language,
-        rag_results or [],
+        rag_results or [],  # ✅ NOUVEAU: Passer rag_results
         **additional_fields
     )
 
-# ✅ NOUVEAU: Fonction utilitaire pour corriger response_data existant (CONSERVÉ)
+# ✅ NOUVEAU: Fonction utilitaire pour corriger response_data existant
 def fix_rag_response_data(
     response_data: Dict[str, Any],
     rag_results: List[Dict] = None,
@@ -1496,126 +1338,106 @@ def fix_rag_response_data(
 ) -> Dict[str, Any]:
     """
     ✅ NOUVEAU: Corrige un response_data existant avec rag_used et enriched_question
-    🆕 PHASE 1: Entités sont normalisées automatiquement
     
-    (CONSERVÉ - Fonctionnalité existante + normalisation automatique)
+    Usage dans les endpoints existants:
+    ```python
+    # Après avoir généré la réponse RAG
+    response_data = fix_rag_response_data(
+        response_data=response_data,
+        rag_results=rag_results,
+        original_question=query,
+        entities=context_entities
+    )
+    ```
+    
+    Args:
+        response_data: Données de réponse à corriger
+        rag_results: Résultats du système RAG
+        original_question: Question originale
+        entities: Entités du contexte
+        
+    Returns:
+        response_data corrigé avec rag_used et enriched_question
     """
     
     if not isinstance(response_data, dict):
         logger.warning("⚠️ [fix_rag_response_data] response_data n'est pas un dict")
         return response_data
     
-    # 🆕 PHASE 1: Normaliser les entités avant corrections
-    if entities:
-        entities = agent_rag_enhancer._normalize_entities_if_needed(entities)
-    
-    # 1. Corriger rag_used (CONSERVÉ)
+    # 1. Corriger rag_used
     corrected_data = agent_rag_enhancer._check_and_fix_rag_used(
         response_data, rag_results, bool(response_data.get("answer") or response_data.get("enhanced_answer"))
     )
     
-    # 2. Injecter enriched_question si nécessaire (CONSERVÉ)
+    # 2. Injecter enriched_question si nécessaire
     corrected_data = agent_rag_enhancer._inject_enriched_question(
         corrected_data, original_question, entities, rag_results
     )
     
-    logger.debug("✅ [fix_rag_response_data] Corrections appliquées (avec normalisation)")
+    logger.debug("✅ [fix_rag_response_data] Corrections appliquées")
     return corrected_data
 
-# 🆕 PHASE 1: Nouvelle fonction utilitaire pour normaliser des entités séparément
-def normalize_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    🆕 PHASE 1: Normalise des entités de façon autonome
-    
-    Utilise le EntityNormalizer si disponible, sinon applique une normalisation basique.
-    Utile pour normaliser les entités avant d'autres traitements.
-    
-    Args:
-        entities: Entités à normaliser
-        
-    Returns:
-        Entités normalisées selon les standards
-        
-    Example:
-        ```python
-        raw_entities = {"weight": 1.5, "breed": "ross 308", "sex": "m"}
-        normalized = normalize_entities(raw_entities)
-        # Result: {"weight_grams": 1500, "breed": "Ross 308", "sex": "male"}
-        ```
-    """
-    
-    if not entities:
-        return {}
-    
-    return agent_rag_enhancer._normalize_entities_if_needed(entities)
-
-# 🆕 PHASE 1: Fonction utilitaire pour vérifier la disponibilité du normalisateur
-def is_entity_normalizer_available() -> bool:
-    """
-    🆕 PHASE 1: Vérifie si le EntityNormalizer est disponible et fonctionnel
-    
-    Returns:
-        True si EntityNormalizer est disponible, False sinon
-    """
-    
-    return ENTITY_NORMALIZER_AVAILABLE and agent_rag_enhancer.entity_normalizer is not None
-
-# 🆕 PHASE 1: Fonction de diagnostic pour la normalisation
-def get_normalization_status() -> Dict[str, Any]:
-    """
-    🆕 PHASE 1: Retourne le statut de la normalisation des entités
-    
-    Returns:
-        Dict avec les informations sur la normalisation disponible
-    """
-    
-    return {
-        "entity_normalizer_imported": ENTITY_NORMALIZER_AVAILABLE,
-        "entity_normalizer_initialized": agent_rag_enhancer.entity_normalizer is not None,
-        "basic_normalization_available": True,
-        "supported_normalizations": [
-            "weight -> weight_grams conversion",
-            "breed standardization (Ross 308, Cobb 500, etc.)",
-            "sex standardization (male, female, mixed)",
-            "age_weeks -> age_days conversion"
-        ],
-        "normalization_stats": {
-            "total_normalizations": agent_rag_enhancer.stats.get("entity_normalizations", 0),
-            "normalizer_successes": agent_rag_enhancer.stats.get("entity_normalizer_success", 0),
-            "fallback_normalizations": agent_rag_enhancer.stats.get("entity_normalizer_fallback", 0),
-            "legacy_conversions": agent_rag_enhancer.stats.get("legacy_entity_conversions", 0)
-        }
-    }
-
-# ✅ NOUVEAU: Exemple d'intégration dans un endpoint (CONSERVÉ + améliorations PHASE 1)
+# ✅ NOUVEAU: Exemple d'intégration dans un endpoint
 """
-🆕 PHASE 1: EXEMPLE D'UTILISATION AVEC NORMALISATION AUTOMATIQUE:
+EXEMPLE D'UTILISATION DANS UN ENDPOINT:
 
 ```python
 @app.post("/api/v1/expert/ask")
 async def ask_expert_question(request: QuestionRequest):
     # ... logique existante ...
     
-    # Extraction des entités (comme avant)
-    raw_entities = entities_extractor.extract(request.question)
+    # Recherche RAG
+    rag_results = await rag_system.search(enriched_query)
     
-    # 🆕 PHASE 1: Les entités seront automatiquement normalisées dans enhance_rag_answer
-    # Plus besoin de normalisation manuelle !
+    # Génération réponse
+    rag_answer = await llm.generate_answer(enriched_query, rag_results)
+    
+    # Construction response_data initial
+    response_data = {
+        "answer": rag_answer,
+        "rag_used": False,  # ❌ Incorrect - sera corrigé
+        "original_question": request.question,
+        # enriched_question manquant - sera injecté
+        **other_fields
+    }
+    
+    # ✅ CORRECTION AUTOMATIQUE
+    response_data = fix_rag_response_data(
+        response_data=response_data,
+        rag_results=rag_results,
+        original_question=request.question,
+        entities=extracted_entities
+    )
+    
+    # Maintenant response_data a:
+    # - rag_used: True (si rag_results non vide)
+    # - enriched_question: question enrichie générée
+    # - tous les autres champs préservés
+    
+    return response_data
+```
+
+ALTERNATIVE - Utilisation complète de enhance_rag_answer:
+
+```python
+@app.post("/api/v1/expert/ask")  
+async def ask_expert_question(request: QuestionRequest):
+    # ... logique existante ...
     
     # Recherche RAG
     rag_results = await rag_system.search(enriched_query)
     rag_answer = await llm.generate_answer(enriched_query, rag_results)
     
-    # ✅ AMÉLIORATION COMPLÈTE avec normalisation automatique
+    # ✅ AMÉLIORATION COMPLÈTE avec toutes les corrections
     enhanced_response = await enhance_rag_answer(
         rag_answer=rag_answer,
-        entities=raw_entities,  # 🆕 Seront normalisées automatiquement
+        entities=extracted_entities,
         missing_entities=missing_entities,
         conversation_context=conversation_context,
         original_question=request.question,
         enriched_question="",  # Sera généré automatiquement
         language=request.language,
-        rag_results=rag_results,
+        rag_results=rag_results,  # ✅ IMPORTANT: Passer les résultats RAG
         # Tous les champs supplémentaires
         user_id=request.user_id,
         session_id=request.session_id,
@@ -1623,40 +1445,7 @@ async def ask_expert_question(request: QuestionRequest):
         **other_fields
     )
     
-    # enhanced_response contient maintenant:
-    # - Entités normalisées (weight_grams, breed standardisé, etc.)
-    # - rag_used corrigé
-    # - enriched_question générée
-    # - Tous les autres champs préservés
-    
+    # enhanced_response contient TOUT avec corrections garanties
     return enhanced_response
 ```
-
-🆕 PHASE 1: NORMALISATION SÉPARÉE (optionnelle):
-
-```python
-# Si vous voulez normaliser les entités avant d'autres traitements
-raw_entities = {"weight": 1.5, "breed": "ross 308", "sex": "m"}
-normalized_entities = normalize_entities(raw_entities)
-# Result: {"weight_grams": 1500, "breed": "Ross 308", "sex": "male"}
-
-# Vérifier la disponibilité du normalisateur
-if is_entity_normalizer_available():
-    print("EntityNormalizer complet disponible")
-else:
-    print("Utilisation de la normalisation basique de compatibilité")
-    
-# Obtenir le statut de normalisation
-status = get_normalization_status()
-print(f"Normalisations effectuées: {status['normalization_stats']['total_normalizations']}")
-```
-
-🆕 PHASE 1: AVANTAGES:
-✅ Conservation de tout le code existant (100% compatible)
-✅ Normalisation automatique des entités
-✅ EntityNormalizer utilisé si disponible, sinon fallback basique
-✅ Nomenclature standardisée (weight_grams, races normalisées)
-✅ Statistiques enrichies pour monitoring
-✅ Fonctions utilitaires pour usage avancé
-✅ Performance optimisée (normalisation en une seule passe)
 """

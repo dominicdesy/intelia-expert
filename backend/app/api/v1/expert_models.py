@@ -2,8 +2,9 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.7: Ajout champs traçage décisions IA
-🔧 CORRECTION v3.9.7: Ajout ai_classification_used, ai_decision, ai_confidence, ai_reasoning, response_generation_method
+VERSION CORRIGÉE v3.9.8: Ajout normalisation entités + support améliorations
+🔧 CORRECTION v3.9.8: Ajout NormalizedEntities + modèles pour unified_context_enhancer
+🔧 CORRECTION v3.9.7: Ajout champs traçage décisions IA
 🔧 CORRECTION v3.9.6: Ajout clarification_details, enhancement_info, conversation_context, pipeline_version, pipeline_improvements
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
@@ -76,6 +77,110 @@ class ResponseGenerationMethod(str, Enum):
     HYBRID = "hybrid"                          # Méthode hybride
     TEMPLATE_BASED = "template_based"          # Basé sur template
     FALLBACK = "fallback"                      # Méthode de fallback
+
+# =============================================================================
+# 🆕 NOUVEAUX MODÈLES POUR NORMALISATION ENTITÉS - v3.9.8
+# =============================================================================
+
+class NormalizedEntities(BaseModel):
+    """
+    Entités normalisées selon les standards du système
+    
+    Ce modèle assure une cohérence entre tous les modules du système expert.
+    Toutes les entités passent par la normalisation avant utilisation.
+    
+    🎯 NORMALISATION APPLIQUÉE:
+    - breed: Toujours format standard (ex: "Ross 308", "Cobb 500")
+    - age_days: Toujours en jours (conversion automatique)
+    - age_weeks: Calculé automatiquement depuis age_days
+    - sex: Format standard ("male", "female", "mixed")
+    - species: Normalisé selon taxonomie
+    """
+    # Entités principales normalisées
+    breed: Optional[str] = Field(default=None, description="Race normalisée (ex: Ross 308, Cobb 500)")
+    age_days: Optional[int] = Field(default=None, ge=0, le=365, description="Âge en jours (normalisé)")
+    age_weeks: Optional[float] = Field(default=None, ge=0.0, le=52.0, description="Âge en semaines (calculé)")
+    sex: Optional[str] = Field(default=None, description="Sexe normalisé (male/female/mixed)")
+    species: Optional[str] = Field(default=None, description="Espèce normalisée")
+    
+    # Informations de production
+    production_type: Optional[str] = Field(default=None, description="Type de production normalisé")
+    housing_system: Optional[str] = Field(default=None, description="Système d'élevage normalisé")
+    feed_type: Optional[str] = Field(default=None, description="Type d'alimentation normalisé")
+    
+    # Paramètres zootechniques
+    weight: Optional[float] = Field(default=None, ge=0.0, description="Poids en grammes")
+    density: Optional[float] = Field(default=None, ge=0.0, description="Densité d'élevage")
+    temperature: Optional[float] = Field(default=None, description="Température ambiante")
+    humidity: Optional[float] = Field(default=None, ge=0.0, le=100.0, description="Humidité relative %")
+    
+    # Indicateurs de performance
+    mortality_rate: Optional[float] = Field(default=None, ge=0.0, le=100.0, description="Taux de mortalité %")
+    growth_rate: Optional[float] = Field(default=None, description="Taux de croissance")
+    feed_conversion_ratio: Optional[float] = Field(default=None, ge=0.0, description="Indice de consommation")
+    
+    # Métadonnées de normalisation
+    normalization_applied: bool = Field(default=True, description="Normalisation appliquée")
+    normalization_confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Confiance normalisation")
+    original_values: Optional[Dict[str, Any]] = Field(default=None, description="Valeurs originales avant normalisation")
+    
+    @field_validator('sex')
+    @classmethod
+    def validate_sex(cls, v):
+        if v is not None and v not in ['male', 'female', 'mixed']:
+            raise ValueError('sex must be "male", "female", or "mixed"')
+        return v
+    
+    @field_validator('breed')
+    @classmethod
+    def validate_breed(cls, v):
+        if v is not None:
+            # Normaliser les races communes
+            breed_mapping = {
+                'ross308': 'Ross 308',
+                'ross 308': 'Ross 308', 
+                'cobb500': 'Cobb 500',
+                'cobb 500': 'Cobb 500',
+                'hubbard': 'Hubbard',
+                'arbor acres': 'Arbor Acres'
+            }
+            return breed_mapping.get(v.lower(), v)
+        return v
+
+    model_config = ConfigDict(extra="ignore")
+
+class ContextEnhancementResult(BaseModel):
+    """
+    Résultat du processus d'enrichissement contexte unifié
+    
+    Support pour le nouveau unified_context_enhancer.py
+    """
+    original_question: str = Field(..., description="Question originale")
+    enhanced_question: Optional[str] = Field(default=None, description="Question enrichie")
+    context_applied: Dict[str, Any] = Field(default_factory=dict, description="Contexte appliqué")
+    rag_enhancement_applied: bool = Field(default=False, description="Amélioration RAG appliquée")
+    enhancement_confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confiance enrichissement")
+    enhancement_method: str = Field(default="unified", description="Méthode d'enrichissement utilisée")
+    processing_time_ms: Optional[int] = Field(default=None, ge=0, description="Temps de traitement en ms")
+    fallback_used: bool = Field(default=False, description="Fallback utilisé")
+    
+    model_config = ConfigDict(extra="ignore")
+
+class UnifiedContextInfo(BaseModel):
+    """
+    Informations contextuelles unifiées
+    
+    Support pour le context_manager.py centralisé
+    """
+    conversation_id: str = Field(..., description="ID de conversation")
+    context_type: str = Field(..., description="Type de contexte (rag/clarification/classification)")
+    context_data: Dict[str, Any] = Field(default_factory=dict, description="Données contextuelles")
+    cache_hit: bool = Field(default=False, description="Récupéré depuis le cache")
+    context_confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confiance dans le contexte")
+    last_updated: Optional[str] = Field(default=None, description="Dernière mise à jour")
+    source_modules: List[str] = Field(default_factory=list, description="Modules sources du contexte")
+    
+    model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
 # MODÈLES POUR LES AMÉLIORATIONS (CONSERVÉS AVEC CORRECTIONS)
@@ -451,6 +556,11 @@ class EnhancedExpertResponse(BaseModel):
     missing_critical_entities: Optional[List[str]] = Field(default=None, description="Entités critiques manquantes")
     variants_tested: Optional[List[str]] = Field(default=None, description="Variantes testées par le système")
     
+    # 🆕 NOUVEAUX CHAMPS v3.9.8: Support normalisation et améliorations
+    normalized_entities: Optional[NormalizedEntities] = Field(default=None, description="Entités normalisées utilisées")
+    enhancement_result: Optional[ContextEnhancementResult] = Field(default=None, description="Résultat enrichissement unifié")
+    unified_context_info: Optional[UnifiedContextInfo] = Field(default=None, description="Informations contexte unifié")
+    
     # Champs optionnels avec valeurs par défaut
     rag_score: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Score de pertinence RAG")
     user: Optional[str] = Field(default=None, description="Utilisateur ayant posé la question")
@@ -546,13 +656,14 @@ class ProcessingContext(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
-# MODÈLES POUR AMÉLIORER LA MÉMOIRE CONVERSATIONNELLE - CORRECTIONS v3.9.5
+# MODÈLES POUR AMÉLIORER LA MÉMOIRE CONVERSATIONNELLE - CORRECTIONS v3.9.5 + NORMALISATION v3.9.8
 # =============================================================================
 
 class IntelligentEntities(BaseModel):
     """
     Entités intelligentes pour améliorer la mémoire conversationnelle
     🔧 CORRECTION v3.9.5: Ajout des champs weight et mortality demandés
+    🆕 NOUVEAU v3.9.8: Intégration avec normalisation
     """
     # Attributs existants conservés
     age: Optional[str] = Field(default=None, description="Age de l'animal")
@@ -579,10 +690,36 @@ class IntelligentEntities(BaseModel):
     growth_rate: Optional[float] = Field(default=None, description="Taux de croissance")
     feed_conversion_ratio: Optional[float] = Field(default=None, description="Indice de consommation")
     
+    # 🆕 NOUVEAU v3.9.8: Support normalisation
+    is_normalized: bool = Field(default=False, description="Entités déjà normalisées")
+    normalization_source: Optional[str] = Field(default=None, description="Source de normalisation")
+    
     # Métadonnées de confiance
     confidence_scores: Dict[str, float] = Field(default_factory=dict, description="Scores de confiance par entité")
     extraction_method: str = Field(default="nlp", description="Méthode d'extraction utilisée")
     last_updated: Optional[str] = Field(default=None, description="Dernière mise à jour")
+    
+    def to_normalized_entities(self) -> NormalizedEntities:
+        """Convertit vers le format NormalizedEntities"""
+        return NormalizedEntities(
+            breed=self.breed,
+            age_days=self.age_in_days,
+            age_weeks=self.age_in_weeks,
+            sex=self.sex,
+            species=self.species,
+            production_type=self.production_type,
+            housing_system=self.housing_system,
+            feed_type=self.feed_type,
+            weight=self.weight,
+            density=self.density,
+            temperature=self.temperature,
+            humidity=self.humidity,
+            mortality_rate=self.mortality or self.mortality_rate,
+            growth_rate=self.growth_rate,
+            feed_conversion_ratio=self.feed_conversion_ratio,
+            normalization_applied=self.is_normalized,
+            normalization_confidence=self.confidence_scores.get('overall', 1.0)
+        )
     
     model_config = ConfigDict(extra="ignore")
 
@@ -603,6 +740,9 @@ class SystemStats(BaseModel):
     semantic_dynamic_enabled: bool = Field(default=True, description="Mode sémantique dynamique activé")
     # 🧠 NOUVEAU v3.9.7
     ai_tracing_enabled: bool = Field(default=True, description="Traçage IA activé")
+    # 🆕 NOUVEAU v3.9.8
+    entity_normalization_enabled: bool = Field(default=True, description="Normalisation entités activée")
+    unified_enhancement_enabled: bool = Field(default=True, description="Enrichissement unifié activé")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -620,6 +760,9 @@ class TestResult(BaseModel):
     semantic_dynamic_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test mode sémantique dynamique")
     # 🧠 NOUVEAU v3.9.7
     ai_tracing_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test traçage IA")
+    # 🆕 NOUVEAU v3.9.8
+    normalization_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test normalisation")
+    unified_enhancement_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test enrichissement unifié")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -731,6 +874,41 @@ class AiTracingConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+# =============================================================================
+# 🆕 NOUVELLES CONFIGURATIONS v3.9.8
+# =============================================================================
+
+class EntityNormalizationConfig(BaseModel):
+    """Configuration du système de normalisation des entités"""
+    enabled: bool = Field(default=True, description="Normalisation activée")
+    auto_breed_mapping: bool = Field(default=True, description="Mapping automatique des races")
+    auto_age_conversion: bool = Field(default=True, description="Conversion automatique âge")
+    auto_sex_standardization: bool = Field(default=True, description="Standardisation automatique sexe")
+    confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Seuil de confiance")
+    fallback_to_original: bool = Field(default=True, description="Fallback vers valeurs originales")
+    
+    model_config = ConfigDict(extra="ignore")
+
+class UnifiedEnhancementConfig(BaseModel):
+    """Configuration du système d'enrichissement unifié"""
+    enabled: bool = Field(default=True, description="Enrichissement unifié activé")
+    combine_contextualizer_and_rag: bool = Field(default=True, description="Combiner contextualizer et RAG")
+    cache_enhancement_results: bool = Field(default=True, description="Mettre en cache les résultats")
+    enhancement_timeout_ms: int = Field(default=5000, ge=1000, le=30000, description="Timeout enrichissement")
+    fallback_to_separate_agents: bool = Field(default=True, description="Fallback vers agents séparés")
+    
+    model_config = ConfigDict(extra="ignore")
+
+class ContextManagerConfig(BaseModel):
+    """Configuration du gestionnaire de contexte centralisé"""
+    enabled: bool = Field(default=True, description="Gestionnaire de contexte activé")
+    cache_context_results: bool = Field(default=True, description="Mettre en cache le contexte")
+    context_cache_ttl_minutes: int = Field(default=30, ge=1, le=1440, description="TTL du cache en minutes")
+    unified_context_retrieval: bool = Field(default=True, description="Récupération contexte unifiée")
+    context_coherence_check: bool = Field(default=True, description="Vérification cohérence contexte")
+    
+    model_config = ConfigDict(extra="ignore")
+
 class EnhancedSystemConfig(BaseModel):
     """Configuration système complète avec tous les modules"""
     concision_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration concision")
@@ -738,6 +916,10 @@ class EnhancedSystemConfig(BaseModel):
     taxonomic_filtering_config: TaxonomicFilteringConfig = Field(default_factory=TaxonomicFilteringConfig, description="Config filtrage taxonomique")
     # 🧠 NOUVEAU v3.9.7
     ai_tracing_config: AiTracingConfig = Field(default_factory=AiTracingConfig, description="Config traçage IA")
+    # 🆕 NOUVEAU v3.9.8
+    entity_normalization_config: EntityNormalizationConfig = Field(default_factory=EntityNormalizationConfig, description="Config normalisation entités")
+    unified_enhancement_config: UnifiedEnhancementConfig = Field(default_factory=UnifiedEnhancementConfig, description="Config enrichissement unifié")
+    context_manager_config: ContextManagerConfig = Field(default_factory=ContextManagerConfig, description="Config gestionnaire contexte")
     
     response_versions_enabled: bool = Field(default=True, description="Versions de réponses activées")
     advanced_clarification_enabled: bool = Field(default=True, description="Clarification avancée activée")
@@ -745,65 +927,157 @@ class EnhancedSystemConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
+# FONCTIONS UTILITAIRES v3.9.8
+# =============================================================================
+
+def convert_legacy_entities(old_entities: Dict) -> NormalizedEntities:
+    """
+    Convertit les anciennes entités vers le format normalisé
+    
+    Fonction utilitaire pour la migration progressive des données
+    """
+    # Extraction et normalisation des champs principaux
+    breed = old_entities.get('breed') or old_entities.get('race')
+    age_days = old_entities.get('age_days') or old_entities.get('age_in_days')
+    age_weeks = old_entities.get('age_weeks') or old_entities.get('age_in_weeks')
+    sex = old_entities.get('sex') or old_entities.get('sexe')
+    
+    # Conversion âge si nécessaire
+    if age_days is None and age_weeks is not None:
+        age_days = int(float(age_weeks) * 7)
+    elif age_weeks is None and age_days is not None:
+        age_weeks = float(age_days) / 7.0
+    
+    # Normalisation du sexe
+    if sex:
+        sex_mapping = {
+            'mâle': 'male', 'male': 'male', 'm': 'male',
+            'femelle': 'female', 'female': 'female', 'f': 'female',
+            'mixte': 'mixed', 'mixed': 'mixed', 'mix': 'mixed'
+        }
+        sex = sex_mapping.get(sex.lower(), sex)
+    
+    return NormalizedEntities(
+        breed=breed,
+        age_days=age_days,
+        age_weeks=age_weeks,
+        sex=sex,
+        species=old_entities.get('species') or old_entities.get('espece'),
+        production_type=old_entities.get('production_type'),
+        housing_system=old_entities.get('housing_system'),
+        feed_type=old_entities.get('feed_type'),
+        weight=old_entities.get('weight') or old_entities.get('poids'),
+        density=old_entities.get('density') or old_entities.get('densite'),
+        temperature=old_entities.get('temperature'),
+        humidity=old_entities.get('humidity') or old_entities.get('humidite'),
+        mortality_rate=old_entities.get('mortality_rate') or old_entities.get('mortality') or old_entities.get('mortalite'),
+        growth_rate=old_entities.get('growth_rate'),
+        feed_conversion_ratio=old_entities.get('feed_conversion_ratio') or old_entities.get('ic'),
+        normalization_applied=True,
+        normalization_confidence=0.9,
+        original_values=old_entities.copy()
+    )
+
+def create_unified_context_from_legacy(conversation_id: str, legacy_context: Dict) -> UnifiedContextInfo:
+    """
+    Crée un contexte unifié depuis un contexte legacy
+    """
+    return UnifiedContextInfo(
+        conversation_id=conversation_id,
+        context_type="unified",
+        context_data=legacy_context,
+        cache_hit=False,
+        context_confidence=0.8,
+        source_modules=["legacy_migration"]
+    )
+
+def merge_enhancement_results(contextualizer_result: Dict, rag_enhancer_result: Dict) -> ContextEnhancementResult:
+    """
+    Fusionne les résultats du contextualizer et du rag_enhancer
+    
+    Fonction utilitaire pour la transition vers unified_context_enhancer
+    """
+    # Déterminer quelle question enrichie utiliser
+    enhanced_question = rag_enhancer_result.get('enhanced_question') or contextualizer_result.get('enhanced_question')
+    
+    # Fusionner les contextes appliqués
+    merged_context = {}
+    merged_context.update(contextualizer_result.get('context_applied', {}))
+    merged_context.update(rag_enhancer_result.get('context_applied', {}))
+    
+    # Calculer la confiance combinée
+    ctx_confidence = contextualizer_result.get('confidence', 0.0)
+    rag_confidence = rag_enhancer_result.get('confidence', 0.0)
+    combined_confidence = (ctx_confidence + rag_confidence) / 2.0
+    
+    return ContextEnhancementResult(
+        original_question=contextualizer_result.get('original_question', ''),
+        enhanced_question=enhanced_question,
+        context_applied=merged_context,
+        rag_enhancement_applied=bool(rag_enhancer_result.get('enhancement_applied')),
+        enhancement_confidence=combined_confidence,
+        enhancement_method="merged_legacy",
+        fallback_used=contextualizer_result.get('fallback_used', False) or rag_enhancer_result.get('fallback_used', False)
+    )
+
+# =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.7")
-logger.info("🧠 [Expert Models] NOUVEAUTÉS v3.9.7 - TRAÇAGE DÉCISIONS IA:")
-logger.info("   - ✅ ai_classification_used: Optional[bool] dans EnhancedExpertResponse")
-logger.info("   - ✅ ai_decision: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ ai_confidence: Optional[float] dans EnhancedExpertResponse")
-logger.info("   - ✅ ai_reasoning: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ response_generation_method: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ AiDecisionTrace: Nouveau modèle pour traçage détaillé")
-logger.info("   - ✅ ResponseGenerationTrace: Nouveau modèle pour traçage génération")
-logger.info("   - ✅ AiDecisionType: Enum pour types de décisions")
-logger.info("   - ✅ ResponseGenerationMethod: Enum pour méthodes de génération")
-logger.info("   - ✅ AiTracingConfig: Configuration du traçage IA")
-logger.info("   - ✅ enable_ai_tracing: Paramètre dans EnhancedQuestionRequest")
-logger.info("🔧 [Expert Models] CORRECTIONS v3.9.6 conservées (selon demande spécifique):")
-logger.info("   - ✅ clarification_details: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
-logger.info("   - ✅ enhancement_info: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
-logger.info("   - ✅ conversation_context: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
-logger.info("   - ✅ pipeline_version: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ pipeline_improvements: Optional[List[str]] dans EnhancedExpertResponse")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec améliorations complètes v3.9.8")
+logger.info("🆕 [Expert Models] NOUVELLES FONCTIONNALITÉS v3.9.8 - NORMALISATION ENTITÉS:")
+logger.info("   - ✅ NormalizedEntities: Modèle principal pour entités normalisées")
+logger.info("   - ✅ ContextEnhancementResult: Support unified_context_enhancer")
+logger.info("   - ✅ UnifiedContextInfo: Support context_manager centralisé")
+logger.info("   - ✅ EntityNormalizationConfig: Configuration normalisation")
+logger.info("   - ✅ UnifiedEnhancementConfig: Configuration enrichissement unifié")
+logger.info("   - ✅ ContextManagerConfig: Configuration gestionnaire contexte")
+logger.info("   - ✅ convert_legacy_entities(): Fonction migration données")
+logger.info("   - ✅ create_unified_context_from_legacy(): Migration contexte")
+logger.info("   - ✅ merge_enhancement_results(): Fusion résultats enrichissement")
+logger.info("🧠 [Expert Models] TRAÇAGE IA v3.9.7 conservé:")
+logger.info("   - ✅ ai_classification_used, ai_decision, ai_confidence, ai_reasoning")
+logger.info("   - ✅ response_generation_method dans EnhancedExpertResponse")
+logger.info("   - ✅ AiDecisionTrace, ResponseGenerationTrace")
+logger.info("   - ✅ AiTracingConfig pour configuration")
 logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
-logger.info("   - ✅ enriched_question: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ clarification_required_critical: Optional[bool] dans EnhancedExpertResponse")
-logger.info("   - ✅ missing_critical_entities: Optional[List[str]] dans EnhancedExpertResponse")
-logger.info("   - ✅ variants_tested: Optional[List[str]] dans EnhancedExpertResponse")
-logger.info("   - ✅ age_in_days, age_in_weeks, weight, mortality dans IntelligentEntities")
-logger.info("   - ✅ ClarificationResult avec missing_entities pour éviter l'erreur")
-logger.info("   - ✅ contextualization_info ajouté à EnhancedExpertResponse")
-logger.info("   - ✅ clarification_processing ajouté pour métadonnées")
-logger.info("   - ✅ Validation robuste pour tous les modèles")
-logger.info("🆕 [Expert Models] Fonctionnalités complètes:")
-logger.info("   - 📊 DocumentRelevance: Scoring RAG détaillé")
-logger.info("   - 🔍 ContextCoherence: Vérification de cohérence")
-logger.info("   - 🎯 VaguenessDetection: Détection de questions floues")
-logger.info("   - 🔧 EnhancedFallbackDetails: Fallback enrichi")
-logger.info("   - 📈 QualityMetrics: Métriques de qualité")
-logger.info("   - 🐛 Debug mode: Support pour développeurs")
-logger.info("🚀 [Expert Models] FONCTIONNALITÉS RESPONSE VERSIONS:")
-logger.info("   - 📝 ConcisionLevel: 4 niveaux validés")
-logger.info("   - 🎛️ response_versions: Toutes les versions dans la réponse")
-logger.info("   - 📊 ConcisionMetrics: Métriques génération validées")
-logger.info("🆕 [Expert Models] FONCTIONNALITÉS SEMANTIC DYNAMIC:")
-logger.info("   - 🎭 DynamicClarification: Modèle validé")
-logger.info("   - 🤖 semantic_dynamic_mode: Paramètre validé")
-logger.info("   - ⚙️ SemanticDynamicConfig: Configuration validée")
-logger.info("🧠 [Expert Models] AVANTAGES TRAÇAGE IA v3.9.7:")
-logger.info("   - 🔍 Auditabilité complète des décisions IA")
-logger.info("   - 📊 Métriques de confiance détaillées")
-logger.info("   - 🎯 Traçage des méthodes de génération")
-logger.info("   - 🔧 Debug avancé pour les développeurs")
-logger.info("   - 📋 Compatibilité ascendante 100%")
-logger.info("✨ [Expert Models] RÉSULTAT v3.9.7: Traçage IA complet ajouté avec succès!")
-logger.info("🎯 [Expert Models] UTILISATION TRAÇAGE IA:")
-logger.info("   → Activer: enable_ai_tracing=True dans la requête")
-logger.info("   → Niveau: trace_level='standard/detailed' pour plus de détails")
-logger.info("   → Accès: Champs ai_* dans EnhancedExpertResponse")
-logger.info("   → Debug: ai_decision_traces pour traçage complet")
-logger.info("🚀 [Expert Models] PRÊT POUR PRODUCTION AVEC TRAÇAGE IA COMPLET!")
+logger.info("   - ✅ clarification_details, enhancement_info, conversation_context")
+logger.info("   - ✅ pipeline_version, pipeline_improvements")
+logger.info("   - ✅ enriched_question, clarification_required_critical")
+logger.info("   - ✅ missing_critical_entities, variants_tested")
+logger.info("   - ✅ weight, mortality dans IntelligentEntities")
+logger.info("   - ✅ ClarificationResult avec missing_entities")
+logger.info("   - ✅ contextualization_info, clarification_processing")
+logger.info("🆕 [Expert Models] NOUVEAUX CHAMPS v3.9.8 dans EnhancedExpertResponse:")
+logger.info("   - ✅ normalized_entities: Optional[NormalizedEntities]")
+logger.info("   - ✅ enhancement_result: Optional[ContextEnhancementResult]")
+logger.info("   - ✅ unified_context_info: Optional[UnifiedContextInfo]")
+logger.info("🎯 [Expert Models] AVANTAGES NORMALISATION:")
+logger.info("   - 📊 Cohérence entre tous les modules")
+logger.info("   - 🔄 Migration progressive depuis legacy")
+logger.info("   - ✅ Validation automatique des entités")
+logger.info("   - 🎯 Standardisation races, âges, sexes")
+logger.info("🎯 [Expert Models] AVANTAGES ENRICHISSEMENT UNIFIÉ:")
+logger.info("   - 🔄 Fusion contextualizer + rag_enhancer")
+logger.info("   - ⚡ Performance améliorée")
+logger.info("   - 🧠 Contexte cohérent")
+logger.info("   - 📈 Moins de conflits")
+logger.info("🎯 [Expert Models] AVANTAGES CONTEXT MANAGER:")
+logger.info("   - 🏪 Centralisation récupération contexte")
+logger.info("   - 💾 Cache intelligent")
+logger.info("   - 🔄 Interface unifiée")
+logger.info("   - ✅ Cohérence garantie")
+logger.info("🆕 [Expert Models] MIGRATION PROGRESSIVE:")
+logger.info("   - 🔄 convert_legacy_entities() pour migration données")
+logger.info("   - 🔗 create_unified_context_from_legacy() pour contexte")
+logger.info("   - 🤝 merge_enhancement_results() pour fusion")
+logger.info("   - ⚡ to_normalized_entities() dans IntelligentEntities")
+logger.info("✨ [Expert Models] RÉSULTAT v3.9.8: Support complet améliorations Phase 1-3!")
+logger.info("🎯 [Expert Models] PRÊT POUR:")
+logger.info("   → entity_normalizer.py (utilise NormalizedEntities)")
+logger.info("   → unified_context_enhancer.py (utilise ContextEnhancementResult)")
+logger.info("   → context_manager.py (utilise UnifiedContextInfo)")
+logger.info("   → Modification expert_services.py (utilise nouveaux modèles)")
+logger.info("🚀 [Expert Models] ARCHITECTURE UNIFIÉE PRÊTE POUR PRODUCTION!")

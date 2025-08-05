@@ -9,6 +9,7 @@ Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 🚀 NOUVEAU: Auto-détection sexe pour races pondeuses (Bug Fix)
 🚀 INTÉGRÉ: Centralisation via clarification_entities
 🚀 AJOUTÉ: score_question_variant() pour scoring générique des variantes
+🚀 AJOUTÉ: convert_legacy_entities() pour normalisation des entités anciennes
 """
 
 import re
@@ -45,7 +46,284 @@ except ImportError as e:
     CLARIFICATION_ENTITIES_AVAILABLE = False
 
 # =============================================================================
-# UTILITAIRES D'AUTHENTIFICATION ET SESSION
+# NOUVELLES FONCTIONS POUR NORMALISATION DES ENTITÉS (PHASE 1)
+# =============================================================================
+
+def convert_legacy_entities(old_entities: Dict) -> Dict:
+    """
+    Convertit les anciennes entités vers le format normalisé
+    🚀 NOUVEAU: Support pour la normalisation des entités legacy
+    
+    Args:
+        old_entities: Anciennes entités au format variable
+        
+    Returns:
+        Dict: Entités normalisées avec clés standardisées
+    """
+    try:
+        if not old_entities or not isinstance(old_entities, dict):
+            return {}
+        
+        normalized = {}
+        
+        # Normalisation de la race
+        breed_keys = ['breed', 'race', 'souche', 'strain', 'raza']
+        for key in breed_keys:
+            if key in old_entities and old_entities[key]:
+                breed_value = str(old_entities[key]).strip()
+                if breed_value:
+                    normalized_breed, _ = normalize_breed_name(breed_value)
+                    normalized['breed'] = normalized_breed
+                    break
+        
+        # Normalisation de l'âge en jours
+        age_keys = ['age', 'age_days', 'age_weeks', 'âge', 'edad']
+        for key in age_keys:
+            if key in old_entities and old_entities[key] is not None:
+                try:
+                    age_value = old_entities[key]
+                    if isinstance(age_value, str):
+                        # Extraire les nombres de la chaîne
+                        numbers = re.findall(r'\d+', age_value)
+                        if numbers:
+                            age_value = int(numbers[0])
+                    
+                    age_int = int(age_value)
+                    
+                    # Conversion selon l'unité
+                    if 'week' in key.lower() or 'semaine' in key.lower():
+                        normalized['age_days'] = age_int * 7
+                    else:
+                        normalized['age_days'] = age_int
+                    break
+                except (ValueError, TypeError):
+                    logger.warning(f"⚠️ [Utils] Impossible de convertir l'âge: {old_entities[key]}")
+                    continue
+        
+        # Normalisation du sexe
+        sex_keys = ['sex', 'sexe', 'género', 'gender']
+        for key in sex_keys:
+            if key in old_entities and old_entities[key]:
+                sex_value = str(old_entities[key]).lower().strip()
+                
+                # Mapping vers format standard
+                if any(word in sex_value for word in ['mâle', 'male', 'macho', 'cock', 'rooster']):
+                    normalized['sex'] = 'males'
+                elif any(word in sex_value for word in ['femelle', 'female', 'hembra', 'hen']):
+                    normalized['sex'] = 'females'
+                elif any(word in sex_value for word in ['mixte', 'mixed', 'mixto', 'both']):
+                    normalized['sex'] = 'mixed'
+                else:
+                    normalized['sex'] = sex_value
+                break
+        
+        # Normalisation du poids (toujours en grammes)
+        weight_keys = ['weight', 'poids', 'peso', 'weight_g', 'weight_kg']
+        for key in weight_keys:
+            if key in old_entities and old_entities[key] is not None:
+                try:
+                    weight_value = old_entities[key]
+                    if isinstance(weight_value, str):
+                        # Extraire les nombres avec décimales
+                        numbers = re.findall(r'\d+(?:[.,]\d+)?', weight_value)
+                        if numbers:
+                            weight_value = float(numbers[0].replace(',', '.'))
+                    
+                    weight_float = float(weight_value)
+                    
+                    # Conversion en grammes si nécessaire
+                    if 'kg' in key.lower() or weight_float < 20:  # Probablement en kg si < 20
+                        normalized['weight_g'] = int(weight_float * 1000)
+                    else:
+                        normalized['weight_g'] = int(weight_float)
+                    break
+                except (ValueError, TypeError):
+                    logger.warning(f"⚠️ [Utils] Impossible de convertir le poids: {old_entities[key]}")
+                    continue
+        
+        # Préserver autres métadonnées utiles
+        metadata_keys = ['confidence', 'source', 'timestamp', 'language']
+        for key in metadata_keys:
+            if key in old_entities:
+                normalized[key] = old_entities[key]
+        
+        logger.info(f"🔄 [Utils] Entités converties: {len(old_entities)} → {len(normalized)}")
+        return normalized
+        
+    except Exception as e:
+        logger.error(f"❌ [Utils] Erreur conversion entités: {e}")
+        return old_entities or {}
+
+def validate_normalized_entities(entities: Dict) -> Dict[str, Any]:
+    """
+    Valide que les entités sont dans le format normalisé attendu
+    
+    Args:
+        entities: Entités à valider
+        
+    Returns:
+        Dict: Résultat de validation avec suggestions de correction
+    """
+    if not isinstance(entities, dict):
+        return {
+            "valid": False,
+            "errors": ["Entités doivent être un dictionnaire"],
+            "suggestions": ["Convertir vers format dictionnaire"]
+        }
+    
+    validation_result = {
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "suggestions": [],
+        "normalized_keys": 0,
+        "total_keys": len(entities)
+    }
+    
+    # Clés attendues dans le format normalisé
+    expected_formats = {
+        'breed': str,
+        'age_days': int,
+        'sex': str,
+        'weight_g': int
+    }
+    
+    # Clés obsolètes à convertir
+    legacy_mappings = {
+        'race': 'breed',
+        'âge': 'age_days',
+        'sexe': 'sex',
+        'poids': 'weight_g'
+    }
+    
+    try:
+        for key, value in entities.items():
+            if key in expected_formats:
+                # Vérifier le type attendu
+                expected_type = expected_formats[key]
+                if not isinstance(value, expected_type):
+                    validation_result["errors"].append(
+                        f"Clé '{key}': type {type(value).__name__} au lieu de {expected_type.__name__}"
+                    )
+                    validation_result["suggestions"].append(
+                        f"Convertir '{key}' vers {expected_type.__name__}"
+                    )
+                else:
+                    validation_result["normalized_keys"] += 1
+            
+            elif key in legacy_mappings:
+                validation_result["warnings"].append(
+                    f"Clé legacy '{key}' détectée"
+                )
+                validation_result["suggestions"].append(
+                    f"Remplacer '{key}' par '{legacy_mappings[key]}'"
+                )
+        
+        # Vérifications spécifiques
+        if 'age_days' in entities:
+            age = entities['age_days']
+            if age < 0 or age > 365:
+                validation_result["warnings"].append(
+                    f"Âge suspect: {age} jours (0-365 attendu)"
+                )
+        
+        if 'weight_g' in entities:
+            weight = entities['weight_g']
+            if weight < 10 or weight > 10000:
+                validation_result["warnings"].append(
+                    f"Poids suspect: {weight}g (10-10000g attendu)"
+                )
+        
+        if 'sex' in entities:
+            sex = entities['sex']
+            valid_sexes = ['males', 'females', 'mixed']
+            if sex not in valid_sexes:
+                validation_result["warnings"].append(
+                    f"Sexe non standard: '{sex}' (attendu: {valid_sexes})"
+                )
+        
+        # Déterminer si globalement valide
+        if validation_result["errors"]:
+            validation_result["valid"] = False
+        
+        normalization_ratio = validation_result["normalized_keys"] / max(validation_result["total_keys"], 1)
+        validation_result["normalization_score"] = normalization_ratio
+        
+        if normalization_ratio < 0.5:
+            validation_result["warnings"].append(
+                "Faible taux de normalisation - considérer convert_legacy_entities()"
+            )
+        
+    except Exception as e:
+        validation_result["valid"] = False
+        validation_result["errors"].append(f"Erreur durant validation: {str(e)}")
+    
+    return validation_result
+
+def merge_entities_intelligently(primary_entities: Dict, secondary_entities: Dict) -> Dict:
+    """
+    Fusionne intelligemment deux dictionnaires d'entités en priorisant les plus fiables
+    
+    Args:
+        primary_entities: Entités prioritaires (plus fiables)
+        secondary_entities: Entités secondaires (fallback)
+        
+    Returns:
+        Dict: Entités fusionnées
+    """
+    if not primary_entities and not secondary_entities:
+        return {}
+    
+    if not primary_entities:
+        return convert_legacy_entities(secondary_entities or {})
+    
+    if not secondary_entities:
+        return convert_legacy_entities(primary_entities or {})
+    
+    try:
+        # Normaliser les deux sources
+        primary_normalized = convert_legacy_entities(primary_entities)
+        secondary_normalized = convert_legacy_entities(secondary_entities)
+        
+        merged = {}
+        
+        # Priorités par type d'entité
+        entity_priorities = {
+            'breed': ['breed', 'race', 'souche'],
+            'age_days': ['age_days', 'age', 'âge'],
+            'sex': ['sex', 'sexe', 'género'],
+            'weight_g': ['weight_g', 'poids', 'weight']
+        }
+        
+        for normalized_key, possible_keys in entity_priorities.items():
+            value_found = False
+            
+            # Chercher d'abord dans les entités primaires
+            if normalized_key in primary_normalized and primary_normalized[normalized_key]:
+                merged[normalized_key] = primary_normalized[normalized_key]
+                value_found = True
+            
+            # Fallback vers entités secondaires si pas trouvé
+            if not value_found and normalized_key in secondary_normalized and secondary_normalized[normalized_key]:
+                merged[normalized_key] = secondary_normalized[normalized_key]
+        
+        # Ajouter métadonnées de fusion
+        merged['_merge_metadata'] = {
+            'primary_source': len(primary_normalized),
+            'secondary_source': len(secondary_normalized),
+            'merged_count': len(merged),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"🔀 [Utils] Fusion entités: {len(primary_normalized)}+{len(secondary_normalized)} → {len(merged)}")
+        return merged
+        
+    except Exception as e:
+        logger.error(f"❌ [Utils] Erreur fusion entités: {e}")
+        return primary_entities or secondary_entities or {}
+
+# =============================================================================
+# UTILITAIRES D'AUTHENTIFICATION ET SESSION (CONSERVÉS)
 # =============================================================================
 
 def get_user_id_from_request(request) -> str:
@@ -101,13 +379,14 @@ def extract_session_info(request) -> Dict[str, Any]:
         }
 
 # =============================================================================
-# EXTRACTION ENTITÉS POUR CLARIFICATION
+# EXTRACTION ENTITÉS POUR CLARIFICATION (AMÉLIORÉE)
 # =============================================================================
 
 def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") -> Dict[str, Optional[str]]:
     """
     Extrait race et sexe depuis une réponse de clarification
     🚀 CORRIGÉ: Auto-détection sexe pour races pondeuses
+    🚀 AMÉLIORÉ: Support normalisation avancée
     """
     
     if not text or not isinstance(text, str) or not text.strip():
@@ -190,6 +469,10 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
                 breed = breed.strip()
                 
                 if len(breed) >= 3:  # Garde seulement les races avec au moins 3 caractères
+                    # 🚀 NOUVEAU: Normalisation via convert_legacy_entities
+                    normalized = convert_legacy_entities({"breed": breed})
+                    if "breed" in normalized:
+                        breed = normalized["breed"]
                     break
                 else:
                     breed = None
@@ -210,30 +493,10 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
                 else:
                     matched_text = match.group(0)
                 
-                # Normalisation du sexe selon la langue
-                if language == "fr":
-                    if any(word in matched_text.lower() for word in ["mâle", "male"]):
-                        sex = "mâles"
-                    elif any(word in matched_text.lower() for word in ["femelle", "female"]):
-                        sex = "femelles"
-                    elif any(word in matched_text.lower() for word in ["mixte", "mixed", "mélangé"]):
-                        sex = "mixte"
-                elif language == "en":
-                    if any(word in matched_text.lower() for word in ["male", "rooster", "cock"]):
-                        sex = "males"
-                    elif any(word in matched_text.lower() for word in ["female", "hen"]):
-                        sex = "females"
-                    elif any(word in matched_text.lower() for word in ["mixed", "both"]):
-                        sex = "mixed"
-                elif language == "es":
-                    if any(word in matched_text.lower() for word in ["macho", "gallo"]):
-                        sex = "machos"
-                    elif any(word in matched_text.lower() for word in ["hembra", "gallina"]):
-                        sex = "hembras"
-                    elif any(word in matched_text.lower() for word in ["mixto", "mezclado", "ambos"]):
-                        sex = "mixto"
-                
-                if sex:
+                # Normalisation via convert_legacy_entities
+                normalized = convert_legacy_entities({"sex": matched_text})
+                if "sex" in normalized:
+                    sex = normalized["sex"]
                     break
         except re.error as e:
             logger.warning(f"⚠️ [Utils] Erreur regex pattern sex: {e}")
@@ -246,12 +509,9 @@ def extract_breed_and_sex_from_clarification(text: str, language: str = "fr") ->
             inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
             
             if was_inferred and inferred_sex:
-                sex_mapping = {
-                    "fr": "femelles",
-                    "en": "females", 
-                    "es": "hembras"
-                }
-                sex = sex_mapping.get(language, "femelles")
+                # Normaliser le sexe inféré
+                normalized = convert_legacy_entities({"sex": inferred_sex})
+                sex = normalized.get("sex", inferred_sex)
                 logger.info(f"🥚 [Auto-Fix Utils] Race détectée: {normalized_breed} → sexe='{sex}' (via clarification_entities)")
         except Exception as e:
             logger.warning(f"⚠️ [Utils] Erreur inférence sexe: {e}")
@@ -299,7 +559,7 @@ def validate_clarification_completeness(text: str, missing_info: List[str], lang
     }
 
 # =============================================================================
-# CONSTRUCTION QUESTIONS ENRICHIES
+# CONSTRUCTION QUESTIONS ENRICHIES (CONSERVÉ)
 # =============================================================================
 
 def build_enriched_question_from_clarification(
@@ -387,7 +647,7 @@ def build_enriched_question_with_breed_sex(
     return original_question
 
 # =============================================================================
-# UTILITAIRES TOPICS ET SUGGESTIONS
+# UTILITAIRES TOPICS ET SUGGESTIONS (CONSERVÉS)
 # =============================================================================
 
 def get_enhanced_topics_by_language() -> Dict[str, List[str]]:
@@ -481,7 +741,7 @@ def get_contextualized_suggestions(
     return unique_suggestions[:6]
 
 # =============================================================================
-# UTILITAIRES CONVERSATION ET MÉMOIRE
+# UTILITAIRES CONVERSATION ET MÉMOIRE (CONSERVÉS)
 # =============================================================================
 
 def save_conversation_auto_enhanced(
@@ -565,7 +825,7 @@ def extract_conversation_context(conversation_history: List[Dict[str, Any]], max
     return " | ".join(context_parts)
 
 # =============================================================================
-# UTILITAIRES VALIDATION ET FORMATS
+# UTILITAIRES VALIDATION ET FORMATS (CONSERVÉS + AMÉLIORÉS)
 # =============================================================================
 
 def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
@@ -590,12 +850,15 @@ def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
     if not entities or not isinstance(entities, dict):
         return 0.0
     
+    # 🚀 NOUVEAU: Normaliser les entités avant scoring
+    normalized_entities = convert_legacy_entities(entities)
+    
     variant_lower = variant.lower()
     matched_entities = 0
     total_entities = 0
     
-    for entity_key, entity_value in entities.items():
-        if entity_value:  # Ignore empty entities
+    for entity_key, entity_value in normalized_entities.items():
+        if entity_value and not entity_key.startswith('_'):  # Ignore metadata keys
             total_entities += 1
             entity_str = str(entity_value).lower()
             
@@ -612,11 +875,25 @@ def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
                     if entity_str in variant_lower:
                         matched_entities += 1
             elif entity_key == "sex":
-                # Pour le sexe, chercher le terme exact
-                if entity_str in variant_lower:
+                # Pour le sexe, chercher le terme exact ou variations
+                sex_variations = {
+                    "males": ["male", "mâle", "mâles", "macho", "machos"],
+                    "females": ["female", "femelle", "femelles", "hembra", "hembras"],
+                    "mixed": ["mixte", "mixed", "mixto", "mélangé"]
+                }
+                variations = sex_variations.get(entity_str, [entity_str])
+                if any(var in variant_lower for var in variations):
+                    matched_entities += 1
+            elif entity_key == "age_days":
+                # Pour l'âge, chercher la valeur ou équivalent en semaines
+                age_days = int(entity_value)
+                age_weeks = age_days // 7
+                if (str(age_days) in variant_lower or 
+                    f"{age_weeks} semaine" in variant_lower or
+                    f"{age_weeks} week" in variant_lower):
                     matched_entities += 1
             else:
-                # Pour les autres entités (age, poids, etc.), chercher la valeur
+                # Pour les autres entités (poids, etc.), chercher la valeur
                 if entity_str in variant_lower:
                     matched_entities += 1
     
@@ -711,7 +988,7 @@ def format_response_with_metadata(
     return formatted_response
 
 # =============================================================================
-# UTILITAIRES POUR GESTION D'ERREURS
+# UTILITAIRES POUR GESTION D'ERREURS (CONSERVÉS)
 # =============================================================================
 
 def safe_extract_field(data: Any, field_path: str, default: Any = None) -> Any:
@@ -833,7 +1110,7 @@ def validate_and_sanitize_input(
     }
 
 # =============================================================================
-# UTILITAIRES DEBUGGING ET MONITORING
+# UTILITAIRES DEBUGGING ET MONITORING (CONSERVÉS)
 # =============================================================================
 
 def create_debug_info(
@@ -909,7 +1186,7 @@ def _categorize_performance(duration_ms: int) -> str:
         return "very_slow"
 
 # =============================================================================
-# UTILITAIRES SPÉCIAUX POUR INTÉGRATIONS
+# UTILITAIRES SPÉCIAUX POUR INTÉGRATIONS (CONSERVÉS)
 # =============================================================================
 
 def create_fallback_response(
@@ -1035,14 +1312,21 @@ logger.info("   - extract_key_entities_simple: Extraction entités simple")
 logger.info("🚀 [Expert Utils] CORRIGÉ: Auto-détection sexe pondeuses activée!")
 logger.info("🚀 [Expert Utils] INTÉGRÉ: Centralisation via clarification_entities")
 logger.info("🚀 [Expert Utils] NOUVEAU: score_question_variant() - Scoring générique des variantes")
+logger.info("🚀 [Expert Utils] NOUVEAU: convert_legacy_entities() - Normalisation entités anciennes")
+logger.info("🚀 [Expert Utils] NOUVEAU: validate_normalized_entities() - Validation format normalisé")
+logger.info("🚀 [Expert Utils] NOUVEAU: merge_entities_intelligently() - Fusion intelligente entités")
 logger.info("✅ [Expert Utils] CORRECTIONS APPLIQUÉES:")
 logger.info("   - Type annotations améliorées")
 logger.info("   - Gestion des exceptions renforcée")
 logger.info("   - Validation des paramètres None-safe")
 logger.info("   - Gestion des erreurs regex")
 logger.info("   - Validation des types d'entrée")
+logger.info("   - Support normalisation entités legacy")
+logger.info("   - Validation format normalisé")
+logger.info("   - Fusion intelligente entités multiples")
 if CLARIFICATION_ENTITIES_AVAILABLE:
     logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
 else:
     logger.info("   ⚠️ clarification_entities: Mode fallback actif")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")
+logger.info("🎯 [Expert Utils] PHASE 1 NORMALISATION: Fonctions ajoutées selon spécifications améliorations!")
