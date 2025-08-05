@@ -1,6 +1,7 @@
 """
 RAG Embedder - VERSION OPTIMISÉE POUR MEILLEURS SCORES
 Améliorations pour scores de similarité et normalisation des requêtes
+MODIFICATION: Seuils adaptatifs pour éviter "aucun résultat trouvé"
 """
 
 import os
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 class FastRAGEmbedder:
     """
     RAG Embedder optimisé avec normalisation et meilleurs scores
+    NOUVEAU: Seuils adaptatifs pour éviter l'absence de résultats
     """
     
     def __init__(
@@ -26,11 +28,11 @@ class FastRAGEmbedder:
         cache_embeddings: bool = True,
         max_workers: int = 2,
         debug: bool = True,
-        similarity_threshold: float = 0.25,  # Seuil abaissé pour inclure plus de résultats
+        similarity_threshold: float = 0.15,  # ✅ MODIFIÉ: Abaissé de 0.25 à 0.15
         normalize_queries: bool = True       # Nouvelle option de normalisation
     ):
         """
-        Initialize FastRAGEmbedder with improved scoring
+        Initialize FastRAGEmbedder with improved scoring and adaptive thresholds
         """
         self.api_key = api_key
         self.model_name = model_name
@@ -39,6 +41,14 @@ class FastRAGEmbedder:
         self.debug = debug
         self.similarity_threshold = similarity_threshold
         self.normalize_queries = normalize_queries
+        
+        # ✅ NOUVEAU: Configuration des seuils adaptatifs
+        self.threshold_config = {
+            "strict": 0.25,      # Pour questions très spécifiques
+            "normal": 0.15,      # Seuil par défaut (modifié de 0.25 à 0.15)
+            "permissive": 0.10,  # Pour questions générales
+            "fallback": 0.05     # En dernier recours
+        }
         
         # Initialize storage
         self.embedding_cache = {} if cache_embeddings else None
@@ -54,13 +64,14 @@ class FastRAGEmbedder:
         self._init_dependencies()
         
         if self.debug:
-            logger.info("🚀 Initializing FastRAGEmbedder (Optimized)...")
+            logger.info("🚀 Initializing FastRAGEmbedder (Adaptive Thresholds)...")
             logger.info(f"   Model: {self.model_name}")
             logger.info(f"   Dimension: 384")
             logger.info(f"   Dependencies available: {self._check_dependencies()}")
             logger.info(f"   Cache enabled: {self.cache_embeddings}")
             logger.info(f"   Max workers: {self.max_workers}")
-            logger.info(f"   Similarity threshold: {self.similarity_threshold}")
+            logger.info(f"   Default similarity threshold: {self.similarity_threshold}")
+            logger.info(f"   Adaptive thresholds: {self.threshold_config}")
             logger.info(f"   Query normalization: {self.normalize_queries}")
             logger.info(f"   Debug enabled: {self.debug}")
     
@@ -329,80 +340,50 @@ class FastRAGEmbedder:
             
         return normalized
     
-    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    def _search_with_threshold(self, query: str, k: int, threshold: float) -> List[Dict[str, Any]]:
         """
-        Search for relevant documents - VERSION OPTIMISÉE POUR MEILLEURS SCORES
+        ✅ NOUVEAU: Recherche avec un seuil spécifique
+        Méthode interne pour la recherche adaptive
         """
         if not self.has_search_engine():
-            logger.error("❌ Search engine not available")
             return []
 
         try:
-            start_time = time.time()
-            
             # Normalize query for better matching
             normalized_query = self._normalize_query(query)
-            
-            logger.info(f"🔍 DEBUG: Starting optimized search")
-            logger.info(f"   Query: {query[:100]}...")
-            if normalized_query != query.lower():
-                logger.info(f"   Normalized: {normalized_query[:100]}...")
-            logger.info(f"   Requested k: {k}")
-            logger.info(f"   Available documents: {len(self.documents)}")
-            logger.info(f"   FAISS index total: {self.index.ntotal}")
-            logger.info(f"   Similarity threshold: {self.similarity_threshold}")
             
             # Generate query embedding (use normalized query)
             search_query = normalized_query
             
             if self.cache_embeddings and search_query in self.embedding_cache:
                 query_embedding = self.embedding_cache[search_query]
-                logger.info("🚀 Using cached query embedding")
             else:
-                logger.info("🔄 Generating new query embedding...")
                 query_embedding = self.sentence_model.encode([search_query])
                 if self.cache_embeddings:
                     self.embedding_cache[search_query] = query_embedding
-                logger.info(f"✅ Query embedding generated: shape={query_embedding.shape}")
             
             # Ensure proper shape for FAISS
             if query_embedding.ndim == 1:
                 query_embedding = query_embedding.reshape(1, -1)
             
             # Search with more candidates to get better results
-            k_search = min(k * 3, len(self.documents), self.index.ntotal)  # Chercher plus pour filtrer
-            logger.info(f"🔍 Searching with k_search={k_search} (will filter to top {k})")
+            k_search = min(k * 3, len(self.documents), self.index.ntotal)
             
             # Perform FAISS search
-            logger.info("🔄 Performing FAISS search...")
             distances, indices = self.index.search(
                 query_embedding.astype('float32'), 
                 k_search
             )
             
-            logger.info(f"✅ FAISS search completed")
-            logger.info(f"   Distances shape: {distances.shape}")
-            logger.info(f"   Indices shape: {indices.shape}")
-            logger.info(f"   Distances[0]: {distances[0][:5]}")  # Show first 5
-            logger.info(f"   Indices[0]: {indices[0][:5]}")
-            
-            # Process results with improved scoring
+            # Process results with specified threshold
             results = []
-            valid_results = 0
             
             for i in range(len(distances[0])):
                 distance = distances[0][i]
                 idx = indices[0][i]
                 
-                logger.info(f"🔍 Processing result {i}: distance={distance:.4f}, idx={idx}")
-                
                 # Validation
-                if idx < 0:
-                    logger.warning(f"   ⚠️ Skipping negative index: {idx}")
-                    continue
-                    
-                if idx >= len(self.documents):
-                    logger.warning(f"   ⚠️ Skipping out-of-range index: {idx} >= {len(self.documents)}")
+                if idx < 0 or idx >= len(self.documents):
                     continue
                 
                 # Calculate improved similarity score
@@ -416,11 +397,8 @@ class FastRAGEmbedder:
                     query, doc['text'], base_similarity
                 )
                 
-                logger.info(f"   ✅ Valid result: base_similarity={base_similarity:.4f}, final={final_similarity:.4f}")
-                
-                # Apply threshold filter
-                if final_similarity < self.similarity_threshold:
-                    logger.info(f"   ⚠️ Score below threshold {self.similarity_threshold}, skipping")
+                # Apply threshold filter (use provided threshold)
+                if final_similarity < threshold:
                     continue
                 
                 result = {
@@ -428,46 +406,86 @@ class FastRAGEmbedder:
                     'score': round(final_similarity, 4),
                     'index': int(idx),
                     'metadata': doc.get('metadata', {}),
-                    'rank': valid_results + 1,
+                    'rank': len(results) + 1,
                     'distance': float(distance),
-                    'base_score': round(base_similarity, 4)  # For debugging
+                    'base_score': round(base_similarity, 4),
+                    'threshold_used': threshold  # ✅ NOUVEAU: Track du seuil utilisé
                 }
                 
                 results.append(result)
-                valid_results += 1
-                
-                logger.info(f"   📄 Document preview: {doc['text'][:100]}...")
                 
                 # Stop when we have enough good results
                 if len(results) >= k:
                     break
             
-            # Sort by score (descending) and take top k
+            # Sort by score (descending)
             results.sort(key=lambda x: x['score'], reverse=True)
-            results = results[:k]
             
             # Update ranks
             for i, result in enumerate(results):
                 result['rank'] = i + 1
             
-            search_time = time.time() - start_time
-            
-            logger.info(f"🔍 Optimized search completed in {search_time:.3f}s")
-            logger.info(f"   Query: {query[:50]}...")
-            logger.info(f"   Results: {len(results)} (from {k_search} candidates)")
-            logger.info(f"   Score range: {results[0]['score']:.3f} - {results[-1]['score']:.3f}" if results else "No results")
-            
-            # Log top results with improved info
-            for i, result in enumerate(results[:3]):
-                logger.info(f"   #{i+1}: Score {result['score']:.3f} (base: {result['base_score']:.3f}, dist: {result['distance']:.3f}) - {result['text'][:80]}...")
-            
-            return results
+            return results[:k]
             
         except Exception as e:
-            logger.error(f"❌ Search error: {e}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Search error with threshold {threshold}: {e}")
             return []
+    
+    def search_with_adaptive_threshold(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+        """
+        ✅ NOUVEAU: Recherche avec seuil adaptatif
+        Essaie différents seuils jusqu'à obtenir des résultats
+        """
+        if not self.has_search_engine():
+            logger.error("❌ Search engine not available")
+            return []
+
+        start_time = time.time()
+        
+        logger.info(f"🔍 [Adaptive] Starting adaptive threshold search")
+        logger.info(f"   Query: {query[:100]}...")
+        logger.info(f"   Requested k: {k}")
+        
+        # Essayer d'abord avec le seuil normal
+        results = self._search_with_threshold(query, k, self.threshold_config["normal"])
+        threshold_used = "normal"
+        
+        if len(results) == 0:
+            logger.info("🔍 [Adaptive] Aucun résultat avec seuil normal, essai permissif")
+            results = self._search_with_threshold(query, k, self.threshold_config["permissive"])
+            threshold_used = "permissive"
+        
+        if len(results) == 0:
+            logger.info("🔍 [Adaptive] Aucun résultat avec seuil permissif, essai fallback")
+            results = self._search_with_threshold(query, k, self.threshold_config["fallback"])
+            threshold_used = "fallback"
+        
+        # Si toujours aucun résultat, essayer sans seuil (prendre les meilleurs scores)
+        if len(results) == 0:
+            logger.info("🔍 [Adaptive] Aucun résultat avec fallback, recherche sans seuil")
+            results = self._search_with_threshold(query, k, 0.0)
+            threshold_used = "no_threshold"
+        
+        search_time = time.time() - start_time
+        
+        logger.info(f"✅ [Adaptive] Search completed in {search_time:.3f}s")
+        logger.info(f"   Threshold used: {threshold_used} ({self.threshold_config.get(threshold_used, 0.0)})")
+        logger.info(f"   Results found: {len(results)}")
+        if results:
+            logger.info(f"   Score range: {results[0]['score']:.3f} - {results[-1]['score']:.3f}")
+            
+            # Log top results
+            for i, result in enumerate(results[:3]):
+                logger.info(f"   #{i+1}: Score {result['score']:.3f} - {result['text'][:80]}...")
+        
+        return results
+    
+    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+        """
+        ✅ MODIFIÉ: Search for relevant documents avec fallback adaptatif
+        Utilise maintenant la recherche adaptive par défaut
+        """
+        return self.search_with_adaptive_threshold(query, k)
     
     def has_search_engine(self) -> bool:
         """Check if search engine is available and ready"""
@@ -499,6 +517,7 @@ class FastRAGEmbedder:
             'dependencies_ok': self._check_dependencies(),
             'faiss_total': self.index.ntotal if self.index else 0,
             'similarity_threshold': self.similarity_threshold,
+            'threshold_config': self.threshold_config,  # ✅ NOUVEAU
             'normalize_queries': self.normalize_queries
         }
     
@@ -513,7 +532,21 @@ class FastRAGEmbedder:
         """Adjust similarity threshold dynamically"""
         old_threshold = self.similarity_threshold
         self.similarity_threshold = max(0.0, min(1.0, new_threshold))
+        # ✅ NOUVEAU: Mise à jour du seuil normal dans la config
+        self.threshold_config["normal"] = self.similarity_threshold
         logger.info(f"🎯 Similarity threshold adjusted: {old_threshold:.3f} → {self.similarity_threshold:.3f}")
+    
+    def update_threshold_config(self, **kwargs):
+        """
+        ✅ NOUVEAU: Mettre à jour la configuration des seuils
+        """
+        for threshold_name, value in kwargs.items():
+            if threshold_name in self.threshold_config:
+                old_value = self.threshold_config[threshold_name]
+                self.threshold_config[threshold_name] = max(0.0, min(1.0, value))
+                logger.info(f"🎯 {threshold_name} threshold: {old_value:.3f} → {self.threshold_config[threshold_name]:.3f}")
+            else:
+                logger.warning(f"⚠️ Unknown threshold config: {threshold_name}")
     
     def debug_search(self, query: str) -> Dict[str, Any]:
         """
@@ -528,6 +561,7 @@ class FastRAGEmbedder:
             'model_name': self.model_name,
             'cache_enabled': self.cache_embeddings,
             'similarity_threshold': self.similarity_threshold,
+            'threshold_config': self.threshold_config,  # ✅ NOUVEAU
             'normalize_queries': self.normalize_queries
         }
         
@@ -544,12 +578,24 @@ class FastRAGEmbedder:
                 if embedding.ndim == 1:
                     embedding = embedding.reshape(1, -1)
                 
-                distances, indices = self.index.search(embedding.astype('float32'), 3)
+                distances, indices = self.index.search(embedding.astype('float32'), 5)
                 debug_info['faiss_search_success'] = True
                 
-                # Analyze top 3 results
+                # ✅ NOUVEAU: Tester avec tous les seuils
+                threshold_results = {}
+                for threshold_name, threshold_value in self.threshold_config.items():
+                    results = self._search_with_threshold(query, 3, threshold_value)
+                    threshold_results[threshold_name] = {
+                        'threshold': threshold_value,
+                        'results_count': len(results),
+                        'top_scores': [r['score'] for r in results[:3]]
+                    }
+                
+                debug_info['threshold_results'] = threshold_results
+                
+                # Analyze top 5 results without threshold
                 top_results = []
-                for i in range(min(3, len(distances[0]))):
+                for i in range(min(5, len(distances[0]))):
                     distance = distances[0][i]
                     idx = indices[0][i]
                     
@@ -559,17 +605,21 @@ class FastRAGEmbedder:
                             query, self.documents[idx]['text'], base_score
                         )
                         
+                        # ✅ NOUVEAU: Check contre tous les seuils
+                        threshold_checks = {}
+                        for name, value in self.threshold_config.items():
+                            threshold_checks[name] = boosted_score >= value
+                        
                         top_results.append({
                             'index': int(idx),
                             'distance': float(distance),
                             'base_score': round(base_score, 4),
                             'boosted_score': round(boosted_score, 4),
-                            'above_threshold': boosted_score >= self.similarity_threshold,
+                            'threshold_checks': threshold_checks,
                             'text_preview': self.documents[idx]['text'][:100]
                         })
                 
                 debug_info['top_results'] = top_results
-                debug_info['results_above_threshold'] = sum(1 for r in top_results if r['above_threshold'])
                     
             except Exception as e:
                 debug_info['error'] = str(e)
@@ -581,13 +631,13 @@ class FastRAGEmbedder:
 # =============================================================================
 
 def create_optimized_embedder(**kwargs) -> FastRAGEmbedder:
-    """Create an optimized embedder instance with better scoring"""
+    """Create an optimized embedder instance with better scoring and adaptive thresholds"""
     return FastRAGEmbedder(
         cache_embeddings=True,
         max_workers=2,
         debug=kwargs.get('debug', True),
-        similarity_threshold=kwargs.get('similarity_threshold', 0.25),  # Seuil abaissé
-        normalize_queries=kwargs.get('normalize_queries', True),        # Normalisation activée
+        similarity_threshold=kwargs.get('similarity_threshold', 0.15),  # ✅ MODIFIÉ: 0.25 → 0.15
+        normalize_queries=kwargs.get('normalize_queries', True),
         **kwargs
     )
 
@@ -596,7 +646,7 @@ def FastRAGEmbedder_v1(*args, **kwargs):
     """Backward compatibility wrapper with improved defaults"""
     # Apply improved defaults if not specified
     if 'similarity_threshold' not in kwargs:
-        kwargs['similarity_threshold'] = 0.25
+        kwargs['similarity_threshold'] = 0.15  # ✅ MODIFIÉ: 0.25 → 0.15
     if 'normalize_queries' not in kwargs:
         kwargs['normalize_queries'] = True
     

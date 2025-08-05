@@ -7,6 +7,7 @@ app/api/v1/conversation_entities.py - Entités et structures de données pour la
 ✅ CORRECTION TYPAGE FORCÉ: Conversion str→int/float obligatoire
 ✅ Protection complète contre les erreurs de comparaison str/int
 ✅ Validation renforcée avec coercition de types
+✅ NOUVELLES MÉTHODES COMPATIBLES: safe_get_breed, safe_get_sex ajoutées
 """
 
 import os
@@ -266,6 +267,47 @@ class IntelligentEntities:
         """Setter de compatibilité pour .mortality → .mortality_rate avec TYPAGE FORCÉ"""
         self.mortality_rate = safe_float_conversion(value)
     
+    # 🔧 NOUVELLES MÉTHODES COMPATIBLES: safe_get_breed et safe_get_sex
+    def safe_get_breed(self) -> Optional[str]:
+        """🔧 ACCÈS SÉCURISÉ à la race avec VALIDATION de type STR (NOUVELLE MÉTHODE COMPATIBLE)"""
+        try:
+            # Essayer breed d'abord avec validation
+            if hasattr(self, 'breed') and self.breed is not None:
+                breed_val = str(self.breed).strip() if self.breed else None
+                if breed_val and len(breed_val) > 0:
+                    return breed_val
+            
+            # Fallback vers race_principale si existe
+            if hasattr(self, 'race_principale') and self.race_principale is not None:
+                race_val = str(self.race_principale).strip() if self.race_principale else None
+                if race_val and len(race_val) > 0:
+                    return race_val
+            
+            return None
+        except Exception as e:
+            logger.warning(f"⚠️ [Entities] Erreur safe_get_breed: {e}")
+            return None
+
+    def safe_get_sex(self) -> Optional[str]:
+        """🔧 ACCÈS SÉCURISÉ au sexe avec VALIDATION de type STR (NOUVELLE MÉTHODE COMPATIBLE)"""
+        try:
+            # Essayer sex d'abord avec validation
+            if hasattr(self, 'sex') and self.sex is not None:
+                sex_val = str(self.sex).strip() if self.sex else None
+                if sex_val and len(sex_val) > 0:
+                    return sex_val
+            
+            # Fallback vers sexe si existe
+            if hasattr(self, 'sexe') and self.sexe is not None:
+                sexe_val = str(self.sexe).strip() if self.sexe else None
+                if sexe_val and len(sexe_val) > 0:
+                    return sexe_val
+            
+            return None
+        except Exception as e:
+            logger.warning(f"⚠️ [Entities] Erreur safe_get_sex: {e}")
+            return None
+    
     # 🔧 SÉCURISATIONS RENFORCÉES: MÉTHODES D'ACCÈS avec TYPAGE VALIDÉ
     def safe_get_attribute(self, attr_name: str, default: Any = None) -> Any:
         """Accès sécurisé à un attribut avec fallback et validation de type"""
@@ -310,6 +352,12 @@ class IntelligentEntities:
                 self.weight_grams = weight_grams_val  # Corriger le type si nécessaire
                 return weight_grams_val
         
+        # Fallback sur weight_in_grams pour compatibilité avec anciens formats
+        elif hasattr(self, 'weight_in_grams') and self.weight_in_grams is not None:
+            weight_in_grams_val = safe_float_conversion(self.weight_in_grams)
+            if weight_in_grams_val is not None:
+                return weight_in_grams_val
+        
         return None
     
     def safe_get_mortality(self) -> Optional[float]:
@@ -330,7 +378,13 @@ class IntelligentEntities:
         return None
     
     def safe_get_age(self) -> Optional[int]:
-        """🔧 ACCÈS SÉCURISÉ à l'âge avec VALIDATION de type INT"""
+        """🔧 ACCÈS SÉCURISÉ à l'âge avec VALIDATION de type INT - VERSION COMPATIBLE"""
+        # Essayer age_in_days d'abord (nouveau format)
+        if hasattr(self, 'age_in_days') and self.age_in_days is not None:
+            age_val = safe_int_conversion(self.age_in_days)
+            if age_val is not None and age_val > 0:
+                return age_val
+        
         # Essayer age d'abord avec validation
         if hasattr(self, 'age') and self.age is not None:
             age_val = safe_int_conversion(self.age)
@@ -344,6 +398,17 @@ class IntelligentEntities:
             if age_days_val is not None:
                 self.age_days = age_days_val  # Corriger le type si nécessaire
                 return age_days_val
+        
+        # Fallback vers age textuel avec extraction
+        age_text = getattr(self, 'age', None)
+        if age_text and isinstance(age_text, str) and 'jour' in age_text.lower():
+            try:
+                # Extraire les chiffres de la chaîne
+                numbers = ''.join(filter(str.isdigit, age_text))
+                if numbers:
+                    return int(numbers)
+            except Exception:
+                pass
         
         # Conversion depuis age_weeks avec validation
         elif hasattr(self, 'age_weeks') and self.age_weeks is not None:
@@ -1393,6 +1458,10 @@ CLASSE IntelligentEntities - CORRECTIONS CRITIQUES:
 ✅ __post_init__() - Coercition OBLIGATOIRE de tous les types numériques
 ✅ _force_all_numeric_types() - NOUVELLE méthode de coercition forcée
 ✅ _sync_fields_safe() - Synchronisation avec types validés uniquement
+✅ safe_get_breed() - NOUVELLE méthode compatible pour accès sécurisé à la race
+✅ safe_get_sex() - NOUVELLE méthode compatible pour accès sécurisé au sexe
+✅ safe_get_age() - VERSION COMPATIBLE avec anciens noms de champs (age_in_days, etc.)
+✅ safe_get_weight() - VERSION COMPATIBLE avec anciens noms de champs (weight_in_grams, etc.)
 ✅ Toutes les propriétés safe_get_*() avec validation + correction à la volée
 ✅ validate_and_correct_safe() - Version avec coercition forcée préliminaire
 ✅ validate_and_correct() - Coercition forcée avant et après validation
@@ -1402,10 +1471,16 @@ CLASSE IntelligentEntities - CORRECTIONS CRITIQUES:
 
 CLASSE IntelligentConversationContext:
 ✅ add_message() - Validation et coercition des entités avant fusion
+✅ get_missing_entities_list() - Version simplifiée pour compatibilité
+✅ get_missing_entities_dict() - Version avec importance pour compatibilité
+✅ get_missing_entities() - Version dépréciée conservée pour compatibilité
 
 AVANTAGES DES CORRECTIONS:
 ❌ PLUS JAMAIS d'erreur "< not supported between instances of str and int"
+❌ PLUS JAMAIS d'erreur "'IntelligentEntities' object has no attribute 'safe_get_breed'"
 ✅ Conversion automatique str → int/float dans tous les contextes
+✅ Compatibilité totale avec anciens noms de champs (age_in_days, weight_in_grams, etc.)
+✅ Méthodes safe_get_breed() et safe_get_sex() ajoutées avec fallbacks multiples
 ✅ Nettoyage intelligent des chaînes (espaces, caractères non numériques)
 ✅ Validation + correction à la volée lors des accès aux attributs
 ✅ Fallbacks robustes si conversion impossible
@@ -1418,7 +1493,16 @@ TYPES FORCÉS AUTOMATIQUEMENT:
 - breed, sex, health_status, etc. → str
 - breed_confidence, sex_confidence, etc. → float
 
+NOUVELLES MÉTHODES COMPATIBLES:
+✅ safe_get_breed() - Avec fallback vers race_principale
+✅ safe_get_sex() - Avec fallback vers sexe
+✅ safe_get_age() - Avec fallback vers age_in_days, age textuel, etc.
+✅ safe_get_weight() - Avec fallback vers weight_in_grams
+
 EXEMPLE DE CORRECTION:
 Avant: entities.age = "25" (str) → ERREUR sur comparaison
 Après: entities.age = 25 (int) → ✅ Comparaison possible
+
+Avant: entities.safe_get_breed() → ERREUR AttributeError
+Après: entities.safe_get_breed() → ✅ Retourne la race de manière sécurisée
 """

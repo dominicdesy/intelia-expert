@@ -1,15 +1,15 @@
 """
 app/api/v1/conversation_extraction.py - Extraction d'entités JSON STRICT avec Pydantic + Améliorations Robustesse
 
-🔧 VERSION 3.1: JSON STRICT + Validation Pydantic + Schéma Forcé + AMÉLIORATIONS ROBUSTESSE
+🔧 VERSION 3.1 CORRIGÉE: JSON STRICT + Validation Pydantic + Schéma Forcé + AMÉLIORATIONS ROBUSTESSE
 ✅ Prompt GPT avec JSON strict obligatoire
 ✅ Validation Pydantic pour garantir les types
 ✅ Schéma d'extraction unifié et robuste
 ✅ Fallback intelligent avec types corrects
 ✅ Parsing sécurisé avec json.loads()
-✅ NOUVEAU: Validation post-extraction exhaustive
-✅ NOUVEAU: Détection JSON vide et fallback automatique
-✅ NOUVEAU: Métriques de qualité extraction
+✅ CORRIGÉ: Validation post-extraction exhaustive
+✅ CORRIGÉ: Détection JSON vide et fallback automatique
+✅ CORRIGÉ: Métriques de qualité extraction avec tous les champs
 """
 
 import os
@@ -100,22 +100,23 @@ class EntityExtractionSchema(BaseModel):
 
 
 class ExtractionQualityMetrics(BaseModel):
-    """🔧 NOUVEAU: Métriques de qualité d'extraction"""
+    """🔧 CORRIGÉE: Métriques de qualité d'extraction avec tous les champs obligatoires"""
     
+    # Champs de base TOUJOURS requis
     total_fields: int = Field(description="Nombre total de champs dans le schéma")
     populated_fields: int = Field(description="Nombre de champs avec des valeurs non-null")
     empty_fields: int = Field(description="Nombre de champs avec des valeurs null")
-    confidence_scores: List[float] = Field(description="Scores de confiance collectés")
+    confidence_scores: List[float] = Field(default_factory=list, description="Scores de confiance collectés")
     
-    # Métriques calculées
-    completion_rate: float = Field(description="Taux de completion (populated/total)")
-    average_confidence: float = Field(description="Confiance moyenne des champs peuplés")
-    quality_score: float = Field(description="Score qualité global (0.0-1.0)")
+    # Métriques calculées AVEC VALEURS PAR DÉFAUT
+    completion_rate: float = Field(default=0.0, description="Taux de completion (populated/total)")
+    average_confidence: float = Field(default=0.0, description="Confiance moyenne des champs peuplés")
+    quality_score: float = Field(default=0.0, description="Score qualité global (0.0-1.0)")
     
-    # Indicateurs de qualité
-    is_empty_extraction: bool = Field(description="True si extraction complètement vide")
-    is_high_quality: bool = Field(description="True si extraction de haute qualité")
-    needs_fallback: bool = Field(description="True si fallback recommandé")
+    # Indicateurs de qualité AVEC VALEURS PAR DÉFAUT
+    is_empty_extraction: bool = Field(default=True, description="True si extraction complètement vide")
+    is_high_quality: bool = Field(default=False, description="True si extraction de haute qualité")
+    needs_fallback: bool = Field(default=True, description="True si fallback recommandé")
     
     @validator('completion_rate', pre=True, always=True)
     def calculate_completion_rate(cls, v, values):
@@ -161,6 +162,13 @@ class ExtractionQualityMetrics(BaseModel):
         return is_empty or quality < 0.3
 
 
+class ValidationResult(BaseModel):
+    """🔧 NOUVEAU: Résultat de validation post-extraction"""
+    
+    is_valid: bool = Field(description="True si validation réussie")
+    issues: List[str] = Field(default_factory=list, description="Liste des problèmes détectés")
+
+
 class ConversationEntityExtractor:
     """Extracteur d'entités JSON STRICT avec validation Pydantic + Améliorations Robustesse"""
     
@@ -189,7 +197,7 @@ class ConversationEntityExtractor:
             try:
                 entities = await self._extract_entities_openai_json_strict_v31(message, language, conversation_context)
                 
-                # 🔧 NOUVEAU: Validation post-extraction avec métriques
+                # 🔧 CORRIGÉ: Validation post-extraction avec métriques
                 quality_metrics = self._analyze_extraction_quality(entities)
                 
                 logger.info(f"📊 [AI Quality] Métriques - Completion: {quality_metrics.completion_rate}, "
@@ -487,7 +495,7 @@ EXEMPLE RÉPONSE MINIMALE VALIDE (si peu d'infos):
             logger.warning(f"⚠️ [Empty JSON] Erreur détection JSON vide: {e}")
             return True  # En cas d'erreur, considérer comme vide par sécurité
 
-    def _validate_extraction_completeness(self, schema: EntityExtractionSchema, raw_data: dict) -> 'ValidationResult':
+    def _validate_extraction_completeness(self, schema: EntityExtractionSchema, raw_data: dict) -> ValidationResult:
         """🔧 NOUVEAU: Validation post-extraction exhaustive"""
         
         try:
@@ -538,7 +546,7 @@ EXEMPLE RÉPONSE MINIMALE VALIDE (si peu d'infos):
             return ValidationResult(is_valid=False, issues=[f"Erreur validation: {e}"])
 
     def _analyze_extraction_quality(self, entities: IntelligentEntities) -> ExtractionQualityMetrics:
-        """🔧 NOUVEAU: Analyse de la qualité d'extraction avec métriques détaillées"""
+        """🔧 CORRIGÉ: Analyse de la qualité d'extraction avec métriques détaillées"""
         
         try:
             # Collecte des champs et valeurs
@@ -571,12 +579,13 @@ EXEMPLE RÉPONSE MINIMALE VALIDE (si peu d'infos):
                 except (AttributeError, TypeError, ValueError):
                     continue
             
-            # Calcul métriques
+            # 🔧 CORRIGÉ: Création avec TOUS les champs obligatoires
             metrics = ExtractionQualityMetrics(
                 total_fields=total_fields,
                 populated_fields=populated_fields,
                 empty_fields=empty_fields,
-                confidence_scores=confidence_scores
+                confidence_scores=confidence_scores,
+                # Les champs calculés seront remplis par les validators
             )
             
             logger.debug(f"📊 [Quality Analysis] Métriques calculées - "
@@ -588,7 +597,7 @@ EXEMPLE RÉPONSE MINIMALE VALIDE (si peu d'infos):
             
         except Exception as e:
             logger.error(f"❌ [Quality Analysis] Erreur analyse qualité: {e}")
-            # Métriques par défaut en cas d'erreur
+            # 🔧 CORRIGÉ: Métriques par défaut avec TOUS les champs
             return ExtractionQualityMetrics(
                 total_fields=20,
                 populated_fields=0,
@@ -864,13 +873,6 @@ EXEMPLE RÉPONSE MINIMALE VALIDE (si peu d'infos):
             return IntelligentEntities()
 
 
-class ValidationResult(BaseModel):
-    """🔧 NOUVEAU: Résultat de validation post-extraction"""
-    
-    is_valid: bool = Field(description="True si validation réussie")
-    issues: List[str] = Field(default_factory=list, description="Liste des problèmes détectés")
-
-
 class ConversationClarificationHandler:
     """Gestionnaire de clarifications conversationnelles - VERSION JSON STRICT (conservée)"""
     
@@ -1140,70 +1142,58 @@ class ConversationClarificationHandler:
 
 
 # ===============================
-# 🔧 RÉSUMÉ DES AMÉLIORATIONS V3.1 APPLIQUÉES
+# 🔧 RÉSUMÉ DES CORRECTIONS V3.1 APPLIQUÉES
 # ===============================
 
 """
-🚀 NOUVELLES AMÉLIORATIONS V3.1 appliquées dans conversation_extraction.py:
+🚀 CORRECTIONS V3.1 appliquées dans conversation_extraction.py:
 
-1. VALIDATION POST-EXTRACTION EXHAUSTIVE (ValidationResult):
-   ✅ Vérification champs manquants vs schéma Pydantic
-   ✅ Détection champs supplémentaires non autorisés
-   ✅ Validation cohérence âge (jours ↔ semaines)
-   ✅ Validation plages de poids attendues
-   ✅ Vérification scores de confiance dans limites
+🔧 PROBLÈME RÉSOLU: "6 validation errors for ExtractionQualityMetrics"
 
-2. DÉTECTION JSON VIDE AUTOMATIQUE (_is_empty_or_minimal_json):
-   ✅ Détection JSON complètement vide {}
-   ✅ Détection JSON quasi-vide (pas de champs significatifs)
-   ✅ Seuils configurables pour détection
-   ✅ Fallback automatique vers extraction basique
+1. CLASSE ExtractionQualityMetrics CORRIGÉE:
+   ✅ Tous les champs avec Field() et valeurs par défaut appropriées
+   ✅ Champs calculés (completion_rate, average_confidence, quality_score) avec default=0.0
+   ✅ Indicateurs booléens (is_empty_extraction, is_high_quality, needs_fallback) avec valeurs par défaut
+   ✅ Validators conservés pour calculs automatiques
+   ✅ confidence_scores avec default_factory=list
 
-3. MÉTRIQUES QUALITÉ EXTRACTION (ExtractionQualityMetrics):
-   ✅ Taux de completion (champs peuplés/total)
-   ✅ Confiance moyenne des champs peuplés
-   ✅ Score qualité global pondéré
-   ✅ Indicateurs qualité (vide, haute qualité, besoin fallback)
-   ✅ Pydantic avec calculs automatiques
+2. FONCTION _analyze_extraction_quality CORRIGÉE:
+   ✅ Création ExtractionQualityMetrics avec tous les champs obligatoires fournis
+   ✅ Validators Pydantic se chargent des calculs automatiques  
+   ✅ Fallback d'erreur avec tous les champs explicites
+   ✅ Gestion d'exception robuste avec métriques complètes
 
-4. PROMPT AMÉLIORÉ ANTI-JSON-VIDE:
-   ✅ Instructions explicites "JAMAIS de JSON vide {}"
-   ✅ Tous les champs obligatoires (même avec null)
-   ✅ Confiance minimum 0.1 même sans info
-   ✅ Exemple JSON minimal valide fourni
+3. VALIDATION POST-EXTRACTION CONSERVÉE:
+   ✅ ValidationResult classe ajoutée avec is_valid et issues
+   ✅ _validate_extraction_completeness fonctionnelle
+   ✅ Vérifications cohérence âge, poids, et scores confiance
+   ✅ Détection champs manquants/supplémentaires
 
-5. SEUILS QUALITÉ CONFIGURABLES:
-   ✅ Variables d'environnement pour seuils
-   ✅ Décision automatique IA vs fallback basée sur métriques
-   ✅ Logging détaillé des décisions qualité
+4. DÉTECTION JSON VIDE CONSERVÉE:
+   ✅ _is_empty_or_minimal_json avec seuils configurables
+   ✅ Comptage champs significatifs et confiance totale
+   ✅ Fallback automatique si JSON quasi-vide détecté
 
-MÉCANISMES DE ROBUSTESSE AJOUTÉS:
+MÉCANISMES DE ROBUSTESSE CONSERVÉS:
 
-❌ PLUS de JSON vide {} accepté
-❌ PLUS d'extractions avec 0 champs peuplés
-❌ PLUS de décisions arbitraires IA vs fallback
-
-✅ Validation exhaustive post-Pydantic
+✅ Validation exhaustive post-Pydantic 
 ✅ Métriques quantifiables de qualité
 ✅ Fallback intelligent basé sur scores
-✅ Détection proactive des extractions inutiles
 ✅ Configuration flexible via variables environnement
+✅ Logging détaillé des décisions qualité
 
-EXEMPLE WORKFLOW AMÉLIORÉ:
+PROBLÈMES RÉSOLUS:
 
-1. OpenAI retourne JSON
-2. json.loads() + validation Pydantic ✅
-3. NOUVEAU: Détection JSON vide → fallback si détecté
-4. NOUVEAU: Validation post-extraction exhaustive
-5. NOUVEAU: Calcul métriques qualité (completion, confiance, score)
-6. NOUVEAU: Décision intelligente basée sur seuils configurables
-7. Si qualité insuffisante → fallback extraction basique
-8. Logging détaillé des métriques et décisions
+❌ Plus d'erreurs "validation errors for ExtractionQualityMetrics"
+❌ Plus de champs manquants dans la classe Pydantic
+❌ Plus d'échecs de création des métriques de qualité
+❌ Plus d'erreurs lors de l'analyse post-extraction
 
-IMPACT MESURABLE ATTENDU:
-✅ -95% extractions JSON vides
-✅ -70% extractions de faible qualité acceptées
-✅ +40% précision décision IA vs fallback
-✅ +25% qualité globale extraction
-✅ Debugging facilité avec métriques quantifiables
+✅ Tous les champs ExtractionQualityMetrics correctement définis
+✅ Validators Pydantic fonctionnels pour calculs automatiques
+✅ Gestion d'erreur robuste avec fallbacks complets
+✅ Métriques de qualité fiables pour décisions IA vs fallback
+
+Cette version corrigée devrait éliminer complètement les erreurs de validation
+Pydantic tout en conservant toutes les améliorations de robustesse v3.1.
 """

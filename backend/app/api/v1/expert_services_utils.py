@@ -7,6 +7,7 @@ app/api/v1/expert_services_utils.py - FONCTIONS UTILITAIRES EXPERT SYSTEM
 3. ✅ Fonctions de gestion robuste erreurs mémoire
 4. ✅ Fonctions de vérification champs avant ajout
 5. 🆕 CORRECTION: Ajout dynamique de champs pour enriched_question
+6. 🆕 NOUVELLE FONCTION: mark_pending_clarification
 """
 
 import logging
@@ -419,6 +420,34 @@ def safe_mark_pending_clarification(conversation_memory, conversation_id, questi
         
     except Exception as e:
         logger.error(f"❌ [Safe Mark v4.1.0] Erreur marquage clarification: {e}")
+        return False
+
+# =============================================================================
+# 🆕 NOUVELLE FONCTION mark_pending_clarification v4.1.0
+# =============================================================================
+
+def mark_pending_clarification(conversation_id: str, clarification_details: Dict[str, Any]) -> bool:
+    """
+    ✅ NOUVELLE FONCTION: Marque une conversation comme en attente de clarification
+    
+    Args:
+        conversation_id: ID de la conversation
+        clarification_details: Détails de la clarification requise
+        
+    Returns:
+        bool: True si succès, False sinon
+    """
+    try:
+        logger.info(f"📋 [Mark Pending] Conversation {conversation_id} marquée en attente")
+        logger.debug(f"📋 [Mark Pending] Détails: {clarification_details}")
+        
+        # TODO: Implémenter le stockage en base de données si nécessaire
+        # En attendant, logger l'information
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ [Mark Pending] Erreur: {e}")
         return False
 
 # =============================================================================
