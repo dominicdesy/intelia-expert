@@ -520,4 +520,28 @@ def test_extractor():
     
     test_cases = [
         "Quel est le poids d'un poulet Ross 308 mâle de 21 jours ?",
-        "Mes poules Cobb 500 de 3 semaines
+        "Mes poules Cobb 500 de 3 semaines ont des problèmes de diarrhée",
+        "Comment nourrir des poussins en démarrage ?",
+        "La température est trop élevée dans mon bâtiment d'élevage"
+    ]
+    
+    print("🧪 Tests de l'extracteur d'entités:")
+    print("=" * 50)
+    
+    for i, test_case in enumerate(test_cases, 1):
+        print(f"\n📝 Test {i}: {test_case}")
+        entities = extractor.extract(test_case)
+        
+        print(f"   ✅ Âge: {entities.age_days} jours ({entities.age_weeks} semaines)")
+        print(f"   ✅ Race spécifique: {entities.breed_specific}")
+        print(f"   ✅ Race générique: {entities.breed_generic}")
+        print(f"   ✅ Sexe: {entities.sex}")
+        print(f"   ✅ Poids mentionné: {entities.weight_mentioned}")
+        print(f"   ✅ Poids valeur: {entities.weight_grams}g")
+        print(f"   ✅ Symptômes: {entities.symptoms}")
+        print(f"   ✅ Contexte: {entities.context_type}")
+    
+    print("\n✅ Tests terminés!")
+
+if __name__ == "__main__":
+    test_extractor()
