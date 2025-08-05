@@ -4,7 +4,6 @@ entities_extractor.py - EXTRACTION D'ENTITÉS SIMPLIFIÉE
 🎯 REMPLACE: clarification_entities.py et tous les autres extracteurs complexes
 🚀 PRINCIPE: Extraction simple et efficace des informations clés
 ✨ SIMPLE: Patterns regex clairs et maintenables
-🔧 NOUVEAU: Intégration avec EntityNormalizer pour normalisation systématique
 
 Entités extraites:
 - age_days: Âge en jours (converti automatiquement)
@@ -21,14 +20,6 @@ import logging
 import re
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-
-# 🔧 NOUVEAU: Import du normalizer pour normalisation systématique
-try:
-    from .entity_normalizer import EntityNormalizer
-    NORMALIZER_AVAILABLE = True
-except ImportError:
-    NORMALIZER_AVAILABLE = False
-    logging.warning("EntityNormalizer non disponible - normalisation de base utilisée")
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +45,9 @@ class ExtractedEntities:
             self.symptoms = []
 
 class EntitiesExtractor:
-    """Extracteur d'entités simple et efficace avec normalisation intégrée"""
+    """Extracteur d'entités simple et efficace"""
     
     def __init__(self):
-        # 🔧 NOUVEAU: Intégration du normalizer
-        if NORMALIZER_AVAILABLE:
-            self.normalizer = EntityNormalizer()
-            logger.info("✅ [Entities Extractor] EntityNormalizer initialisé")
-        else:
-            self.normalizer = None
-            logger.warning("⚠️ [Entities Extractor] Fonctionnement sans EntityNormalizer")
-            
         # Races spécifiques reconnues (nom complet)
         self.specific_breeds = {
             # Poulets de chair
@@ -106,65 +89,47 @@ class EntitiesExtractor:
     def extract(self, question: str) -> ExtractedEntities:
         """
         POINT D'ENTRÉE PRINCIPAL - Extrait toutes les entités de la question
-        🔧 NOUVEAU: Avec normalisation systématique via EntityNormalizer
         
         Args:
             question: Texte de la question à analyser
             
         Returns:
-            ExtractedEntities avec toutes les informations extraites et normalisées
+            ExtractedEntities avec toutes les informations extraites
         """
         try:
             logger.info(f"🔍 [Entities Extractor] Analyse: '{question[:50]}...'")
             
             question_lower = question.lower().strip()
+            entities = ExtractedEntities()
             
-            # 🔧 NOUVEAU: Extraction brute puis normalisation
-            raw_entities = self._raw_extract(question_lower)
+            # Extraction par type d'information
+            entities.age_days = self._extract_age_days(question_lower)
+            entities.age_weeks = self._extract_age_weeks(question_lower)
+            entities.age = self._extract_age_text(question_lower)
             
-            # 🔧 NOUVEAU: Normalisation systématique si disponible
-            if self.normalizer:
-                logger.debug("🔄 [Entities Extractor] Application de la normalisation...")
-                normalized_entities = self.normalizer.normalize(raw_entities)
-                logger.info(f"✅ [Entities Extractor] Entités normalisées: {self._entities_summary(normalized_entities)}")
-                return normalized_entities
-            else:
-                # Fallback: normalisation de base
-                self._normalize_extracted_data(raw_entities)
-                logger.info(f"✅ [Entities Extractor] Entités extraites (normalisation de base): {self._entities_summary(raw_entities)}")
-                return raw_entities
+            entities.breed_specific = self._extract_breed_specific(question_lower)
+            entities.breed_generic = self._extract_breed_generic(question_lower)
+            
+            entities.sex = self._extract_sex(question_lower)
+            
+            entities.weight_mentioned = self._has_weight_mention(question_lower)
+            entities.weight_grams, entities.weight_unit = self._extract_weight_value(question_lower)
+            
+            entities.symptoms = self._extract_symptoms(question_lower)
+            entities.context_type = self._determine_context_type(question_lower)
+            
+            entities.housing_conditions = self._extract_housing_context(question_lower)
+            entities.feeding_context = self._extract_feeding_context(question_lower)
+            
+            # Conversions et normalisations
+            self._normalize_extracted_data(entities)
+            
+            logger.info(f"✅ [Entities Extractor] Entités extraites: {self._entities_summary(entities)}")
+            return entities
             
         except Exception as e:
             logger.error(f"❌ [Entities Extractor] Erreur extraction: {e}")
             return ExtractedEntities()  # Retourner entités vides en cas d'erreur
-
-    def _raw_extract(self, question: str) -> ExtractedEntities:
-        """
-        🔧 NOUVEAU: Extraction brute sans normalisation
-        Sépare l'extraction de la normalisation pour flexibilité
-        """
-        entities = ExtractedEntities()
-        
-        # Extraction par type d'information
-        entities.age_days = self._extract_age_days(question)
-        entities.age_weeks = self._extract_age_weeks(question)
-        entities.age = self._extract_age_text(question)
-        
-        entities.breed_specific = self._extract_breed_specific(question)
-        entities.breed_generic = self._extract_breed_generic(question)
-        
-        entities.sex = self._extract_sex(question)
-        
-        entities.weight_mentioned = self._has_weight_mention(question)
-        entities.weight_grams, entities.weight_unit = self._extract_weight_value(question)
-        
-        entities.symptoms = self._extract_symptoms(question)
-        entities.context_type = self._determine_context_type(question)
-        
-        entities.housing_conditions = self._extract_housing_context(question)
-        entities.feeding_context = self._extract_feeding_context(question)
-        
-        return entities
 
     def _extract_age_days(self, question: str) -> Optional[int]:
         """Extrait l'âge en jours"""
@@ -436,10 +401,7 @@ class EntitiesExtractor:
         return None
 
     def _normalize_extracted_data(self, entities: ExtractedEntities):
-        """
-        Normalise et enrichit les données extraites (version de base)
-        🔧 MODIFICATION: Fallback quand EntityNormalizer n'est pas disponible
-        """
+        """Normalise et enrichit les données extraites"""
         
         # Conversion semaines -> jours si manquant
         if entities.age_weeks and not entities.age_days:
@@ -499,32 +461,24 @@ class EntitiesExtractor:
 
     def get_extraction_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques de l'extracteur pour debugging"""
-        stats = {
-            "extractor_version": "1.1.0",  # 🔧 NOUVEAU: Version mise à jour
-            "normalizer_enabled": NORMALIZER_AVAILABLE,  # 🔧 NOUVEAU: Status normalizer
+        return {
+            "extractor_version": "1.0.0",
             "specific_breeds_count": len(self.specific_breeds),
             "generic_breeds_count": len(self.generic_breeds),
             "health_symptoms_categories": len(self.health_symptoms),
             "total_symptoms": sum(len(symptoms) for symptoms in self.health_symptoms.values())
         }
-        
-        # 🔧 NOUVEAU: Stats du normalizer si disponible
-        if self.normalizer:
-            stats["normalizer_stats"] = self.normalizer.get_normalization_stats()
-        
-        return stats
 
 # =============================================================================
-# FONCTIONS UTILITAIRES - MISES À JOUR
+# FONCTIONS UTILITAIRES
 # =============================================================================
 
 def quick_extract(question: str) -> Dict[str, Any]:
     """
     Extraction rapide pour usage simple
-    🔧 NOUVEAU: Retourne les entités normalisées
     
     Returns:
-        Dict avec les entités principales extraites et normalisées
+        Dict avec les entités principales extraites
     """
     extractor = EntitiesExtractor()
     entities = extractor.extract(question)
@@ -537,25 +491,18 @@ def quick_extract(question: str) -> Dict[str, Any]:
         'weight_mentioned': entities.weight_mentioned,
         'weight_grams': entities.weight_grams,
         'symptoms': entities.symptoms,
-        'context_type': entities.context_type,
-        # 🔧 NOUVEAU: Champs additionnels normalisés
-        'age_weeks': entities.age_weeks,
-        'weight_unit': entities.weight_unit,
-        'housing_conditions': entities.housing_conditions,
-        'feeding_context': entities.feeding_context
+        'context_type': entities.context_type
     }
 
 def extract_age_only(question: str) -> Optional[int]:
-    """Extrait seulement l'âge en jours (normalisé)"""
+    """Extrait seulement l'âge en jours"""
     extractor = EntitiesExtractor()
-    entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return entities.age_days
+    return extractor._extract_age_days(question.lower())
 
 def extract_breed_only(question: str) -> Optional[str]:
-    """Extrait seulement la race spécifique (normalisée)"""
+    """Extrait seulement la race spécifique"""
     extractor = EntitiesExtractor()
-    entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return entities.breed_specific
+    return extractor._extract_breed_specific(question.lower())
 
 def has_health_context(question: str) -> bool:
     """Détermine rapidement si c'est un contexte de santé"""
@@ -563,38 +510,12 @@ def has_health_context(question: str) -> bool:
     entities = extractor.extract(question)
     return entities.context_type == 'santé' or len(entities.symptoms) > 0
 
-# 🔧 NOUVELLES FONCTIONS UTILITAIRES
-
-def extract_normalized_entities(question: str) -> ExtractedEntities:
-    """
-    🔧 NOUVEAU: Extraction complète avec normalisation garantie
-    
-    Returns:
-        ExtractedEntities complètement normalisées
-    """
-    extractor = EntitiesExtractor()
-    return extractor.extract(question)
-
-def get_normalization_status() -> Dict[str, Any]:
-    """
-    🔧 NOUVEAU: Retourne le statut de la normalisation
-    
-    Returns:
-        Dict avec le statut du système de normalisation
-    """
-    return {
-        "normalizer_available": NORMALIZER_AVAILABLE,
-        "extractor_version": "1.1.0",
-        "normalization_enabled": True,
-        "fallback_normalization": not NORMALIZER_AVAILABLE
-    }
-
 # =============================================================================
-# TESTS INTÉGRÉS - MISE À JOUR
+# TESTS INTÉGRÉS
 # =============================================================================
 
 def test_extractor():
-    """Tests rapides de l'extracteur avec normalisation"""
+    """Tests rapides de l'extracteur"""
     extractor = EntitiesExtractor()
     
     test_cases = [
@@ -604,10 +525,8 @@ def test_extractor():
         "La température est trop élevée dans mon bâtiment d'élevage"
     ]
     
-    print("🧪 Tests de l'extracteur d'entités avec normalisation:")
-    print("=" * 60)
-    print(f"🔧 Normalizer disponible: {NORMALIZER_AVAILABLE}")
-    print("=" * 60)
+    print("🧪 Tests de l'extracteur d'entités:")
+    print("=" * 50)
     
     for i, test_case in enumerate(test_cases, 1):
         print(f"\n📝 Test {i}: {test_case}")
@@ -621,17 +540,6 @@ def test_extractor():
         print(f"   ✅ Poids valeur: {entities.weight_grams}g")
         print(f"   ✅ Symptômes: {entities.symptoms}")
         print(f"   ✅ Contexte: {entities.context_type}")
-        
-        # 🔧 NOUVEAU: Affichage statut normalisation
-        if extractor.normalizer:
-            print(f"   🔄 Normalisation: ✅ Appliquée")
-        else:
-            print(f"   🔄 Normalisation: ⚠️ Fallback de base")
-    
-    print(f"\n📊 Statistiques extracteur:")
-    stats = extractor.get_extraction_stats()
-    for key, value in stats.items():
-        print(f"   {key}: {value}")
     
     print("\n✅ Tests terminés!")
 
