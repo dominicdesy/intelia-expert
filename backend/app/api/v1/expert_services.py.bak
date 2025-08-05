@@ -6,7 +6,6 @@ app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (REFACTORISÉ v4
 2. ✅ CORRECTION complète des problèmes d'indentation
 3. ✅ CONSERVATION de tout le code original
 4. ✅ STRUCTURE modulaire maintenable
-5. 🆕 AJOUT: Intégration GeneralResponseGenerator dans pipeline clarification
 """
 
 import os
@@ -39,93 +38,6 @@ from .expert_services_clarification import (
 )
 
 logger = logging.getLogger(__name__)
-
-# 🆕 NOUVEAU: Import du générateur de réponse générale
-try:
-    from .general_response_generator import GeneralResponseGenerator
-    GENERAL_RESPONSE_GENERATOR_AVAILABLE = True
-    logger.info("✅ [Services] GeneralResponseGenerator importé avec succès")
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"⚠️ [Services] GeneralResponseGenerator non disponible: {e}")
-    
-    # Générateur fallback
-    class MockGeneralResponseGenerator:
-        async def generate_general_response(self, question, entities, ai_classification, **kwargs):
-            return f"Réponse générale générée pour: {question[:100]}..."
-    
-    GENERAL_RESPONSE_GENERATOR_AVAILABLE = False
-
-# 🆕 NOUVEAU: Fonction d'extraction d'entités basiques pour le générateur général
-def extract_basic_entities(question_text):
-    """Extraction basique d'entités pour le générateur de réponse générale"""
-    try:
-        entities = {}
-        question_lower = question_text.lower()
-        
-        # Extraction basique de race
-        breeds = {
-            'ross 308': 'ross_308',
-            'cobb 500': 'cobb_500', 
-            'hubbard': 'hubbard',
-            'isa brown': 'isa_brown',
-            'lohmann': 'lohmann_brown'
-        }
-        
-        for breed_name, breed_code in breeds.items():
-            if breed_name in question_lower:
-                entities['breed'] = breed_code
-                entities['breed_name'] = breed_name
-                break
-        
-        # Extraction basique d'âge
-        import re
-        age_patterns = [
-            r'(\d+)\s*semaines?',
-            r'(\d+)\s*jours?',
-            r'(\d+)\s*weeks?',
-            r'(\d+)\s*days?'
-        ]
-        
-        for pattern in age_patterns:
-            match = re.search(pattern, question_lower)
-            if match:
-                age_value = int(match.group(1))
-                if 'semaine' in pattern or 'week' in pattern:
-                    entities['age_weeks'] = age_value
-                    entities['age_days'] = age_value * 7
-                else:
-                    entities['age_days'] = age_value
-                    entities['age_weeks'] = age_value / 7
-                break
-        
-        # Extraction basique de poids
-        weight_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:kg|kilo)',
-            r'(\d+(?:\.\d+)?)\s*(?:g|gram)',
-            r'(\d+(?:\.\d+)?)\s*(?:lb|pound)'
-        ]
-        
-        for pattern in weight_patterns:
-            match = re.search(pattern, question_lower)
-            if match:
-                weight_value = float(match.group(1))
-                if 'kg' in pattern or 'kilo' in pattern:
-                    entities['weight'] = weight_value
-                    entities['weight_unit'] = 'kg'
-                elif 'g' in pattern or 'gram' in pattern:
-                    entities['weight'] = weight_value / 1000
-                    entities['weight_unit'] = 'kg'
-                else:  # pounds
-                    entities['weight'] = weight_value * 0.453592
-                    entities['weight_unit'] = 'kg'
-                break
-        
-        logger.debug(f"🔍 [Extract Basic] Entités extraites: {entities}")
-        return entities
-        
-    except Exception as e:
-        logger.error(f"❌ [Extract Basic] Erreur extraction entités: {e}")
-        return {}
 
 # 🚀 IMPORTS SÉCURISÉS AVEC FALLBACKS ROBUSTES
 try:
@@ -306,18 +218,6 @@ class ExpertService:
             else:
                 self.conversation_memory = MockConversationMemory()
             
-            # 🆕 NOUVEAU: Initialiser le générateur de réponse générale
-            if GENERAL_RESPONSE_GENERATOR_AVAILABLE:
-                try:
-                    self.general_response_generator = GeneralResponseGenerator()
-                    logger.info("✅ [Expert Service v4.0.0] GeneralResponseGenerator initialisé")
-                except Exception as e:
-                    logger.error(f"❌ [Expert Service v4.0.0] Erreur init GeneralResponseGenerator: {e}")
-                    self.general_response_generator = MockGeneralResponseGenerator()
-            else:
-                self.general_response_generator = MockGeneralResponseGenerator()
-                logger.warning("⚠️ [Expert Service v4.0.0] GeneralResponseGenerator mock utilisé")
-            
             # Initialiser le créateur de réponses
             self.response_creator = ExpertResponseCreator(self.concision_service)
             
@@ -331,7 +231,6 @@ class ExpertService:
                 "agents_enabled": AGENTS_AVAILABLE,
                 "conversation_memory_enabled": CONVERSATION_MEMORY_AVAILABLE,
                 "concision_service_enabled": CONCISION_SERVICE_AVAILABLE or True,
-                "general_response_generator_enabled": GENERAL_RESPONSE_GENERATOR_AVAILABLE,  # 🆕
                 "safe_weight_access": True,
                 "safe_missing_entities_access": True,
                 "robust_memory_error_handling": True,
@@ -340,7 +239,7 @@ class ExpertService:
                 "alignment_expert_models": True
             }
             
-            logger.info("🚀 [Expert Service v4.0.0] Service expert initialisé avec ALIGNMENT COMPLET + GeneralResponseGenerator")
+            logger.info("🚀 [Expert Service v4.0.0] Service expert initialisé avec ALIGNMENT COMPLET")
             
         except Exception as e:
             logger.error(f"❌ [Expert Service v4.0.0] Erreur critique lors de l'initialisation: {e}")
@@ -348,7 +247,6 @@ class ExpertService:
             self.integrations = IntegrationsManager()
             self.conversation_memory = MockConversationMemory()
             self.concision_service = MockConcisionService()
-            self.general_response_generator = MockGeneralResponseGenerator()  # 🆕
             self.response_creator = ExpertResponseCreator(self.concision_service)
             self.config = {
                 "enable_concise_responses": False,
@@ -356,7 +254,6 @@ class ExpertService:
                 "critical_clarification_blocking": False,
                 "agents_enabled": False,
                 "conversation_memory_enabled": False,
-                "general_response_generator_enabled": False,  # 🆕
                 "safe_weight_access": True,
                 "safe_missing_entities_access": True,
                 "robust_memory_error_handling": True,
@@ -548,72 +445,7 @@ class ExpertService:
         self, clarification_result, question_text, conversation_id, language, 
         start_time, current_user, processing_steps, ai_enhancements_used
     ):
-        """🆕 MODIFIÉ: Gestion clarification avec support réponse générale IA"""
-        
-        try:
-            # 🧠 NOUVEAU: Vérifier si IA suggère réponse générale
-            ai_classification = clarification_result.get("ai_classification", {})
-            
-            if ai_classification.get("decision") == "general_answer":
-                logger.info("🧠 [Pipeline] IA suggère réponse générale - génération...")
-                processing_steps.append("ai_general_response_suggested")
-                
-                # Générer réponse générale avec IA
-                entities = extract_basic_entities(question_text)
-                
-                try:
-                    general_response = await self.general_response_generator.generate_general_response(
-                        question_text, entities, ai_classification, language=language
-                    )
-                    
-                    logger.info(f"✅ [Pipeline] Réponse générale générée: {len(general_response)} caractères")
-                    processing_steps.append("ai_general_response_generated")
-                    ai_enhancements_used.extend(["intelligent_classification", "general_response_generator"])
-                    
-                    # Créer réponse avec contenu généré
-                    return self.response_creator.create_enhanced_response_safe_aligned(
-                        question_text=question_text,
-                        final_answer=general_response,
-                        conversation_id=conversation_id,
-                        language=language,
-                        response_time_ms=int((time.time() - start_time) * 1000),
-                        user_email=current_user.get("email") if current_user else None,
-                        processing_steps=processing_steps,
-                        ai_enhancements_used=ai_enhancements_used,
-                        rag_score=0.0,
-                        mode="ai_general_response",
-                        contextualization_info={"ai_classification": ai_classification},
-                        enhancement_info={"method": "ai_general_response"},
-                        optional_clarifications=[],
-                        conversation_context={},
-                        entities=entities,
-                        missing_entities=[],
-                        question_for_rag=question_text,
-                        response_versions=None
-                    )
-                    
-                except Exception as gen_error:
-                    logger.error(f"❌ [Pipeline] Erreur génération réponse générale: {gen_error}")
-                    processing_steps.append("ai_general_response_error_fallback_to_clarification")
-                    # Continue vers clarification traditionnelle en cas d'erreur
-            
-            # Sinon logique clarification existante
-            return await self._handle_traditional_clarification(
-                clarification_result, question_text, conversation_id, language,
-                start_time, current_user, processing_steps, ai_enhancements_used
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [AI Enhanced Clarification] Erreur: {e}")
-            return self.response_creator.create_error_response(
-                str(e), question_text, conversation_id, language, start_time
-            )
-    
-    async def _handle_traditional_clarification(
-        self, clarification_result, question_text, conversation_id, language, 
-        start_time, current_user, processing_steps, ai_enhancements_used
-    ):
-        """🔧 SÉPARÉE: Gestion clarification traditionnelle (code original conservé)"""
+        """Gestion sécurisée clarification critique avec GESTION ROBUSTE MÉMOIRE"""
         try:
             # Validation missing_entities sécurisée
             raw_missing_critical = clarification_result.get("missing_critical_entities", [])
@@ -652,7 +484,7 @@ class ExpertService:
             )
             
         except Exception as e:
-            logger.error(f"❌ [Traditional Clarification v4.0.0] Erreur: {e}")
+            logger.error(f"❌ [Handle Critical Clarification v4.0.0] Erreur: {e}")
             return self.response_creator.create_error_response(
                 "Erreur lors de la clarification critique", question_text, 
                 conversation_id, language, start_time
@@ -898,7 +730,7 @@ class ExpertService:
 # Instance globale du service expert
 try:
     expert_service = ExpertService()
-    logger.info("🎉 [Expert Services v4.0.0] Service expert global initialisé avec REFACTORISATION COMPLÈTE + GeneralResponseGenerator")
+    logger.info("🎉 [Expert Services v4.0.0] Service expert global initialisé avec REFACTORISATION COMPLÈTE")
 except Exception as e:
     logger.error(f"❌ [Expert Services v4.0.0] Erreur initialisation service global: {e}")
     expert_service = None
@@ -906,6 +738,5 @@ except Exception as e:
 # Export des fonctions principales
 __all__ = [
     'ExpertService',
-    'expert_service',
-    'extract_basic_entities'  # 🆕 Export de la fonction d'extraction basique
+    'expert_service'
 ]
