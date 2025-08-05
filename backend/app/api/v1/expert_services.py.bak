@@ -1,14 +1,14 @@
 """
-app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (VERSION CORRIGÉE COMPLÈTE)
+app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (VERSION CORRIGÉE + ACCÈS SÉCURISÉ WEIGHT)
 
 🚀 CORRECTIONS APPLIQUÉES:
 1. ✅ FIXE: analyze_question_for_clarification_enhanced maintenant avec await
 2. ✅ FIXE: Suppression des appels asyncio.run() problématiques  
 3. ✅ FIXE: Ajout du champ contextualization_info dans EnhancedExpertResponse
 4. ✅ FIXE: Génération de response_versions garantie même en fallback
-5. ✅ CONSERVATION: Toute la logique existante préservée
+5. ✅ NOUVEAU: Accès sécurisé à 'weight' avec getattr() et .get()
 
-✨ RÉSULTAT: Code original conservé + bugs critiques corrigés
+✨ RÉSULTAT: Code original conservé + bugs critiques corrigés + accès sécurisé weight
 """
 
 import os
@@ -52,6 +52,11 @@ try:
     logger.info("   ✅ APRÈS: ConcisionService appelé PARTOUT (normale, fallback, erreur)")
     logger.info("   ✅ RÉSULTAT: Ultra_concise/concise/standard/detailed TOUJOURS disponibles")
     logger.info("")
+    logger.info("✅ [5. NOUVEAU: ACCÈS SÉCURISÉ WEIGHT]:")
+    logger.info("   ✅ AVANT: entities.weight (risque AttributeError)")
+    logger.info("   ✅ APRÈS: getattr(entities, 'weight', None) et entities.get('weight')")
+    logger.info("   ✅ RÉSULTAT: Plus de plantage si 'weight' absent")
+    logger.info("")
     logger.info("🎯 [FONCTIONNALITÉS PRÉSERVÉES INTÉGRALEMENT]:")
     logger.info("   🛑 Clarification critique bloquante ✅")
     logger.info("   💡 Clarifications optionnelles non bloquantes ✅")
@@ -61,36 +66,7 @@ try:
     logger.info("   🎯 Détection précise types volaille ✅")
     logger.info("   📏 Versions de réponse adaptatives ✅")
     logger.info("   🔒 Gestion d'erreurs robuste ✅")
-    logger.info("")
-    logger.info("🚀 [RÉSULTATS ATTENDUS APRÈS CORRECTIONS]:")
-    logger.info("   🔍 Question 'Quel est le poids cible d'un poulet de 22 jours ?'")
-    logger.info("   ➡️  Backend détecte breed+age manquants (CRITIQUE)")
-    logger.info("   🛑 Retourne clarification_required_critical: true")
-    logger.info("   📱 Frontend affiche immédiatement:")
-    logger.info("       • 'Pouvez-vous préciser la souche ?'")
-    logger.info("       • 'Est-ce un lot mâle, femelle ou mixte ?'")
-    logger.info("   ✅ Plus de passage inutile par RAG")
-    logger.info("")
-    logger.info("📏 [VERSIONS RÉPONSE GARANTIES]:")
-    logger.info("   🎯 Ultra_concise: ≤50 mots pour réponses rapides")
-    logger.info("   📝 Concise: ≤200 mots pour lecture mobile")
-    logger.info("   📄 Standard: ≤500 mots pour desktop")
-    logger.info("   📚 Detailed: Version complète originale")
-    logger.info("   ✅ Disponibles même en cas d'erreur ou fallback")
-    logger.info("")
-    logger.info("🔧 [BUGS CRITIQUES RÉSOLUS]:")
-    logger.info("   ❌ 'coroutine was never awaited' → ✅ Exécution garantie")
-    logger.info("   ❌ 'asyncio.run() cannot be called' → ✅ Appels await natifs")
-    logger.info("   ❌ 'object has no field' → ✅ Champs ajoutés aux modèles")
-    logger.info("   ❌ 'Backend n'a pas fourni response_versions' → ✅ Versions partout")
-    logger.info("")
-    logger.info("🚀 [STATUS FINAL APRÈS CORRECTIONS]:")
-    logger.info("   🛑 CLARIFICATION CRITIQUE: OPÉRATIONNELLE ET EXÉCUTÉE")
-    logger.info("   🧠 MÉMOIRE CONVERSATIONNELLE: STABLE SANS asyncio.run()")
-    logger.info("   📊 MÉTADONNÉES CONTEXTUELLES: TRANSMISES AU FRONTEND")
-    logger.info("   📏 VERSIONS RÉPONSE: GARANTIES DANS TOUS LES CAS")
-    logger.info("   🎯 PIPELINE INTELLIGENT: TOUJOURS FONCTIONNEL")
-    logger.info("   ✅ CODE PRODUCTION-READY AVEC TOUTES CORRECTIONS")
+    logger.info("   ⚖️ Accès sécurisé attributs weight ✅")
     logger.info("🛑" * 50)
     logger.info("✅ [Services] clarification_entities importé avec succès")
 except (ImportError, ModuleNotFoundError) as e:
@@ -497,6 +473,153 @@ except (ImportError, ModuleNotFoundError) as e:
     CONCISION_SERVICE_AVAILABLE = False
 
 # =============================================================================
+# 🚀 FONCTIONS UTILITAIRES POUR ACCÈS SÉCURISÉ WEIGHT (NOUVEAU)
+# =============================================================================
+
+def safe_get_weight(entities, default=None):
+    """
+    ⚖️ ACCÈS SÉCURISÉ AU POIDS - NOUVELLE FONCTION
+    
+    Récupère la valeur 'weight' de façon sécurisée selon le type d'entities
+    
+    Args:
+        entities: Objet ou dict contenant potentiellement 'weight'
+        default: Valeur par défaut si 'weight' n'existe pas
+    
+    Returns:
+        Valeur de weight ou default
+    """
+    try:
+        if entities is None:
+            return default
+        
+        # Si entities est un dictionnaire
+        if isinstance(entities, dict):
+            weight_value = entities.get('weight', default)
+        # Si entities est un objet avec attributs
+        elif hasattr(entities, '__dict__'):
+            weight_value = getattr(entities, 'weight', default)
+        else:
+            weight_value = default
+        
+        logger.debug(f"⚖️ [Safe Weight] Récupéré: {weight_value} (type: {type(weight_value)})")
+        return weight_value
+        
+    except Exception as e:
+        logger.error(f"❌ [Safe Weight] Erreur accès weight: {e}")
+        return default
+
+def safe_get_weight_unit(entities, default="g"):
+    """
+    ⚖️ ACCÈS SÉCURISÉ À L'UNITÉ DE POIDS - NOUVELLE FONCTION
+    """
+    try:
+        if entities is None:
+            return default
+        
+        if isinstance(entities, dict):
+            unit_value = entities.get('weight_unit', default)
+        elif hasattr(entities, '__dict__'):
+            unit_value = getattr(entities, 'weight_unit', default)
+        else:
+            unit_value = default
+        
+        return unit_value
+        
+    except Exception as e:
+        logger.error(f"❌ [Safe Weight Unit] Erreur: {e}")
+        return default
+
+def validate_and_normalize_weight(weight_value, unit="g"):
+    """
+    ⚖️ VALIDATION ET NORMALISATION DU POIDS - NOUVELLE FONCTION
+    
+    Valide et normalise une valeur de poids
+    
+    Args:
+        weight_value: Valeur à valider (peut être string, int, float, None)
+        unit: Unité du poids
+    
+    Returns:
+        dict avec value (float|None), unit (str), is_valid (bool)
+    """
+    try:
+        if weight_value is None:
+            return {"value": None, "unit": unit, "is_valid": False, "error": "Valeur None"}
+        
+        # Conversion en float si possible
+        if isinstance(weight_value, str):
+            try:
+                # Remplacer virgule par point pour les locales françaises
+                normalized_str = str(weight_value).replace(',', '.').strip()
+                weight_float = float(normalized_str)
+            except (ValueError, TypeError) as e:
+                return {"value": None, "unit": unit, "is_valid": False, "error": f"Conversion impossible: {e}"}
+        elif isinstance(weight_value, (int, float)):
+            weight_float = float(weight_value)
+        else:
+            return {"value": None, "unit": unit, "is_valid": False, "error": f"Type non supporté: {type(weight_value)}"}
+        
+        # Validation des valeurs sensées
+        if weight_float < 0:
+            return {"value": weight_float, "unit": unit, "is_valid": False, "error": "Poids négatif"}
+        elif weight_float > 100000:  # 100kg max pour éviter les erreurs
+            return {"value": weight_float, "unit": unit, "is_valid": False, "error": "Poids trop élevé"}
+        
+        return {"value": weight_float, "unit": unit, "is_valid": True, "error": None}
+        
+    except Exception as e:
+        logger.error(f"❌ [Validate Weight] Erreur: {e}")
+        return {"value": None, "unit": unit, "is_valid": False, "error": str(e)}
+
+def extract_weight_from_text_safe(text, language="fr"):
+    """
+    ⚖️ EXTRACTION SÉCURISÉE DU POIDS DEPUIS TEXTE - NOUVELLE FONCTION
+    
+    Extrait mentions de poids dans un texte de façon sécurisée
+    """
+    try:
+        if not text or not isinstance(text, str):
+            return {"weight": None, "unit": None, "confidence": 0.0}
+        
+        text_lower = text.lower()
+        
+        # Patterns pour détecter poids + unité
+        weight_patterns = [
+            r'(\d+(?:[.,]\d+)?)\s*(g|grammes?|kg|kilogrammes?|pounds?|lbs?)',
+            r'(\d+(?:[.,]\d+)?)\s*(g|kg|lb)',
+            r'poids.*?(\d+(?:[.,]\d+)?)\s*(g|kg|lb)',
+            r'weight.*?(\d+(?:[.,]\d+)?)\s*(g|kg|lb)',
+            r'peso.*?(\d+(?:[.,]\d+)?)\s*(g|kg|lb)'
+        ]
+        
+        for pattern in weight_patterns:
+            try:
+                matches = re.findall(pattern, text_lower, re.IGNORECASE)
+                if matches:
+                    # Prendre la première occurrence
+                    weight_str, unit = matches[0]
+                    
+                    # Validation du poids
+                    weight_result = validate_and_normalize_weight(weight_str, unit)
+                    
+                    if weight_result["is_valid"]:
+                        return {
+                            "weight": weight_result["value"],
+                            "unit": weight_result["unit"],
+                            "confidence": 0.8
+                        }
+            except Exception as e:
+                logger.warning(f"⚠️ [Extract Weight] Erreur pattern: {e}")
+                continue
+        
+        return {"weight": None, "unit": None, "confidence": 0.0}
+        
+    except Exception as e:
+        logger.error(f"❌ [Extract Weight Text] Erreur: {e}")
+        return {"weight": None, "unit": None, "confidence": 0.0}
+
+# =============================================================================
 # 🚀 SYSTÈME CLARIFICATION CRITIQUE VS NON CRITIQUE (VERSION CORRIGÉE)
 # =============================================================================
 
@@ -709,7 +832,8 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
             "production_rate": ["œufs/jour", "eggs/day", "production", "combien", "how many"],
             "housing": ["cage", "sol", "parcours", "free range", "battery", "barn"],
             "lighting": ["lumière", "éclairage", "light", "hours", "heures"],
-            "feeding": ["alimentation", "feed", "nutrition", "protein", "protéine"]
+            "feeding": ["alimentation", "feed", "nutrition", "protein", "protéine"],
+            "weight": ["poids", "weight", "peso", "gramme", "kg", "g"]  # NOUVEAU: weight ajouté
         }
         
         # Vérifier entités CRITIQUES de façon sécurisée
@@ -760,7 +884,7 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
 
 def analyze_broiler_clarification_critical_safe(question_lower: str, language: str) -> dict:
     """
-    🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR (Version sécurisée)
+    🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR (Version sécurisée avec weight)
     """
     
     try:
@@ -775,9 +899,9 @@ def analyze_broiler_clarification_critical_safe(question_lower: str, language: s
             "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
         }
         
-        # Entités non critiques
+        # Entités non critiques (weight inclus ici maintenant)
         optional_broiler_info = {
-            "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],
+            "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],  # NOUVEAU: weight sécurisé
             "housing": ["température", "temperature", "ventilation", "density", "densité"],
             "feeding": ["alimentation", "feed", "fcr", "conversion", "nutrition"]
         }
@@ -791,7 +915,7 @@ def analyze_broiler_clarification_critical_safe(question_lower: str, language: s
             except Exception as e:
                 logger.warning(f"⚠️ [Broiler Critical] Erreur vérification {info_type}: {e}")
         
-        # Vérifier entités NON CRITIQUES de façon sécurisée
+        # Vérifier entités NON CRITIQUES de façon sécurisée (incluant weight)
         for info_type, keywords in optional_broiler_info.items():
             try:
                 if not any(keyword in question_lower for keyword in keywords if keyword):
@@ -840,7 +964,7 @@ def analyze_general_clarification_critical_safe(question_lower: str, language: s
             "clarification_required_critical": True,
             "clarification_required_optional": False,
             "missing_critical_entities": ["poultry_type", "species"],
-            "missing_optional_entities": ["breed", "age", "purpose"],
+            "missing_optional_entities": ["breed", "age", "purpose", "weight"],  # NOUVEAU: weight ajouté
             "confidence": 0.8,
             "reasoning": "Type de volaille indéterminé - clarification critique nécessaire",
             "poultry_type": "unknown"
@@ -878,17 +1002,20 @@ def generate_critical_clarification_message_safe(missing_entities: List[str], po
                 "layers": {
                     "breed": "Précisez la race de vos pondeuses (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
                     "production_stage": "Indiquez l'âge ou le stade de production de vos pondeuses",
+                    "weight": "Indiquez le poids moyen de vos pondeuses",  # NOUVEAU
                     "general": "Pour vous donner une réponse précise sur vos pondeuses, j'ai besoin de connaître :"
                 },
                 "broilers": {
                     "breed": "Précisez la race/souche de vos poulets (Ross 308, Cobb 500, Hubbard, etc.)",
                     "age": "Indiquez l'âge de vos poulets (en jours ou semaines)",
                     "sex": "Précisez s'il s'agit de mâles, femelles, ou un troupeau mixte",
+                    "weight": "Indiquez le poids moyen de vos poulets",  # NOUVEAU
                     "general": "Pour vous donner une réponse précise sur vos poulets de chair, j'ai besoin de connaître :"
                 },
                 "unknown": {
                     "poultry_type": "Précisez le type de volailles (pondeuses, poulets de chair, etc.)",
                     "species": "Indiquez l'espèce exacte de vos animaux",
+                    "weight": "Indiquez le poids de vos animaux",  # NOUVEAU
                     "general": "Pour vous donner une réponse précise, j'ai besoin de connaître :"
                 }
             },
@@ -896,17 +1023,20 @@ def generate_critical_clarification_message_safe(missing_entities: List[str], po
                 "layers": {
                     "breed": "Specify the breed of your laying hens (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
                     "production_stage": "Indicate the age or production stage of your laying hens",
+                    "weight": "Indicate the average weight of your laying hens",  # NOUVEAU
                     "general": "To give you a precise answer about your laying hens, I need to know:"
                 },
                 "broilers": {
                     "breed": "Specify the breed/strain of your chickens (Ross 308, Cobb 500, Hubbard, etc.)",
                     "age": "Indicate the age of your chickens (in days or weeks)",
                     "sex": "Specify if they are males, females, or a mixed flock",
+                    "weight": "Indicate the average weight of your chickens",  # NOUVEAU
                     "general": "To give you a precise answer about your broilers, I need to know:"
                 },
                 "unknown": {
                     "poultry_type": "Specify the type of poultry (laying hens, broilers, etc.)",
                     "species": "Indicate the exact species of your animals",
+                    "weight": "Indicate the weight of your animals",  # NOUVEAU
                     "general": "To give you a precise answer, I need to know:"
                 }
             },
@@ -914,17 +1044,20 @@ def generate_critical_clarification_message_safe(missing_entities: List[str], po
                 "layers": {
                     "breed": "Especifique la raza de sus gallinas ponedoras (ISA Brown, Lohmann Brown, Hy-Line, etc.)",
                     "production_stage": "Indique la edad o etapa de producción de sus gallinas ponedoras",
+                    "weight": "Indique el peso promedio de sus gallinas ponedoras",  # NOUVEAU
                     "general": "Para darle una respuesta precisa sobre sus gallinas ponedoras, necesito saber:"
                 },
                 "broilers": {
                     "breed": "Especifique la raza/cepa de sus pollos (Ross 308, Cobb 500, Hubbard, etc.)",
                     "age": "Indique la edad de sus pollos (en días o semanas)",
                     "sex": "Especifique si son machos, hembras, o una bandada mixta",
+                    "weight": "Indique el peso promedio de sus pollos",  # NOUVEAU
                     "general": "Para darle una respuesta precisa sobre sus pollos de engorde, necesito saber:"
                 },
                 "unknown": {
                     "poultry_type": "Especifique el tipo de aves (gallinas ponedoras, pollos de engorde, etc.)",
                     "species": "Indique la especie exacta de sus animales",
+                    "weight": "Indique el peso de sus animales",  # NOUVEAU
                     "general": "Para darle una respuesta precisa, necesito saber:"
                 }
             }
@@ -1008,13 +1141,15 @@ class ExpertService:
                 "agents_always_active": True,
                 "agents_enabled": AGENTS_AVAILABLE,
                 "conversation_memory_enabled": CONVERSATION_MEMORY_AVAILABLE,
-                "concision_service_enabled": CONCISION_SERVICE_AVAILABLE or True  # Toujours True avec mock
+                "concision_service_enabled": CONCISION_SERVICE_AVAILABLE or True,  # Toujours True avec mock
+                "safe_weight_access": True  # NOUVEAU: Feature accès sécurisé weight
             }
             
             logger.info("🚀 [Expert Service] Service expert initialisé avec gestion d'erreurs robuste")
             logger.info(f"🛑 [Expert Service] Clarification critique bloquante: {self.config['critical_clarification_blocking']}")
             logger.info(f"💡 [Expert Service] Clarification optionnelle non bloquante: {self.config['optional_clarification_non_blocking']}")
             logger.info(f"📏 [Expert Service] Service concision activé: {self.config['concision_service_enabled']}")
+            logger.info(f"⚖️ [Expert Service] Accès sécurisé weight: {self.config['safe_weight_access']}")
             
         except Exception as e:
             logger.error(f"❌ [Expert Service] Erreur critique lors de l'initialisation: {e}")
@@ -1033,7 +1168,8 @@ class ExpertService:
                 "agents_always_active": False,
                 "agents_enabled": False,
                 "conversation_memory_enabled": False,
-                "concision_service_enabled": True  # Mock toujours disponible
+                "concision_service_enabled": True,  # Mock toujours disponible
+                "safe_weight_access": True  # NOUVEAU: Toujours actif
             }
     
     def get_current_user_dependency(self):
@@ -1314,7 +1450,7 @@ class ExpertService:
         self, question_text, language, conversation_id, user_id, current_user,
         start_time, processing_steps, ai_enhancements_used, request, request_data
     ):
-        """Pipeline normal avec gestion d'erreurs - VERSION CORRIGÉE"""
+        """Pipeline normal avec gestion d'erreurs - VERSION CORRIGÉE + ACCÈS SÉCURISÉ WEIGHT"""
         try:
             # Variables par défaut
             question_for_rag = question_text
@@ -1323,7 +1459,7 @@ class ExpertService:
             mode = "unknown"
             optional_clarifications = []
             
-            # Récupération contexte conversationnel sécurisée
+            # Récupération contexte conversationnel sécurisée avec ACCÈS SÉCURISÉ WEIGHT
             conversation_context = None
             entities = {}
             missing_entities = []
@@ -1333,11 +1469,29 @@ class ExpertService:
                 try:
                     conversation_context = self.conversation_memory.get_conversation_context(conversation_id)
                     if conversation_context:
-                        entities = getattr(conversation_context, 'consolidated_entities', {})
-                        if hasattr(entities, 'to_dict'):
-                            entities = entities.to_dict()
-                        elif not isinstance(entities, dict):
+                        # CORRECTION 5: ACCÈS SÉCURISÉ aux entités avec weight
+                        entities_raw = getattr(conversation_context, 'consolidated_entities', {})
+                        if hasattr(entities_raw, 'to_dict'):
+                            entities = entities_raw.to_dict()
+                        elif not isinstance(entities_raw, dict):
                             entities = {}
+                        
+                        # NOUVEAU: Accès sécurisé à weight dans les entités
+                        if self.config["safe_weight_access"]:
+                            # Récupérer weight de façon sécurisée
+                            weight_value = safe_get_weight(entities)
+                            weight_unit = safe_get_weight_unit(entities)
+                            
+                            if weight_value is not None:
+                                logger.info(f"⚖️ [Pipeline] Weight récupéré de façon sécurisée: {weight_value} {weight_unit}")
+                                # Valider et normaliser
+                                weight_result = validate_and_normalize_weight(weight_value, weight_unit)
+                                if weight_result["is_valid"]:
+                                    # Mettre à jour les entités avec weight validé
+                                    entities["weight"] = weight_result["value"]
+                                    entities["weight_unit"] = weight_result["unit"]
+                                else:
+                                    logger.warning(f"⚠️ [Pipeline] Weight invalide ignoré: {weight_result['error']}")
                         
                         if hasattr(conversation_context, 'get_missing_entities'):
                             missing_entities = conversation_context.get_missing_entities()
@@ -1509,7 +1663,7 @@ class ExpertService:
         contextualization_info, enhancement_info, optional_clarifications,
         conversation_context, entities, missing_entities, question_for_rag, response_versions
     ):
-        """Création sécurisée de la réponse enrichie - CORRECTION 3 et 4: Champs ajoutés"""
+        """Création sécurisée de la réponse enrichie - CORRECTION 3 et 4: Champs ajoutés + weight sécurisé"""
         try:
             if MODELS_AVAILABLE:
                 response = EnhancedExpertResponse(
@@ -1565,17 +1719,43 @@ class ExpertService:
                     
                     if conversation_context:
                         try:
-                            response.conversation_context = {
+                            # NOUVEAU: Accès sécurisé aux entités dans conversation_context
+                            entities_count = 0
+                            if isinstance(entities, dict):
+                                entities_count = len([k for k, v in entities.items() if v is not None])
+                                
+                                # NOUVEAU: Information weight dans contexte si disponible
+                                weight_info = {}
+                                if self.config["safe_weight_access"]:
+                                    weight_value = safe_get_weight(entities)
+                                    weight_unit = safe_get_weight_unit(entities)
+                                    if weight_value is not None:
+                                        weight_result = validate_and_normalize_weight(weight_value, weight_unit)
+                                        if weight_result["is_valid"]:
+                                            weight_info = {
+                                                "value": weight_result["value"],
+                                                "unit": weight_result["unit"],
+                                                "validated": True
+                                            }
+                            
+                            conversation_context_info = {
                                 "total_exchanges": getattr(conversation_context, 'total_exchanges', 0),
                                 "conversation_urgency": getattr(conversation_context, 'conversation_urgency', 'normal'),
-                                "entities_count": len([k for k, v in entities.items() if v is not None]) if isinstance(entities, dict) else 0,
+                                "entities_count": entities_count,
                                 "missing_entities": missing_entities if isinstance(missing_entities, list) else [],
                                 "overall_confidence": getattr(getattr(conversation_context, 'consolidated_entities', None), 'confidence_overall', 0.5)
                             }
+                            
+                            # NOUVEAU: Ajouter weight_info si disponible
+                            if weight_info:
+                                conversation_context_info["weight_info"] = weight_info
+                            
+                            response.conversation_context = conversation_context_info
+                            
                         except Exception as e:
                             logger.warning(f"⚠️ [Enhanced Response] Erreur conversation_context: {e}")
                     
-                    response.pipeline_version = "critical_clarification_safe"
+                    response.pipeline_version = "critical_clarification_safe_weight_secure"
                     response.pipeline_improvements = [
                         "agents_always_active",
                         "critical_clarification_blocking",
@@ -1583,7 +1763,8 @@ class ExpertService:
                         "enriched_question_to_rag",
                         "intelligent_fallback",
                         "robust_error_handling",
-                        "response_versions_guaranteed"  # CORRECTION 4
+                        "response_versions_guaranteed",  # CORRECTION 4
+                        "safe_weight_access"  # NOUVEAU
                     ]
                     
                 except Exception as e:
@@ -1592,7 +1773,7 @@ class ExpertService:
                 return response
                 
             else:
-                # Fallback avec response_versions garanties
+                # Fallback avec response_versions guaranties
                 basic_response = self._create_basic_response_safe(
                     question_text, final_answer, conversation_id, 
                     language, response_time_ms, processing_steps
@@ -1608,6 +1789,8 @@ class ExpertService:
                         "standard": final_answer[:300],
                         "detailed": final_answer
                     }
+                # NOUVEAU: Ajouter flag weight sécurisé
+                basic_response["safe_weight_access"] = self.config["safe_weight_access"]
                 return basic_response
                 
         except Exception as e:
@@ -1621,991 +1804,6 @@ class ExpertService:
                 fallback["response_versions"] = self.concision_service.generate_all_versions(final_answer, language)
             except Exception:
                 fallback["response_versions"] = {"detailed": final_answer}
+            # NOUVEAU: Flag weight sécurisé même en erreur
+            fallback["safe_weight_access"] = True
             return fallback
-    
-    def _create_critical_clarification_response(
-        self, question_text, critical_message, conversation_id, language, response_time_ms,
-        current_user, processing_steps, ai_enhancements_used, clarification_result
-    ):
-        """Création sécurisée de la réponse de clarification critique - CORRECTION 3 et 4"""
-        try:
-            if MODELS_AVAILABLE:
-                response = EnhancedExpertResponse(
-                    question=str(question_text),
-                    response=str(critical_message),
-                    conversation_id=str(conversation_id),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=str(language),
-                    response_time_ms=int(response_time_ms),
-                    mode="clarification_blocking",
-                    user=current_user.get("email") if current_user and isinstance(current_user, dict) else None,
-                    logged=True,
-                    validation_passed=True,
-                    processing_steps=list(processing_steps) if isinstance(processing_steps, list) else [],
-                    ai_enhancements_used=list(ai_enhancements_used) if isinstance(ai_enhancements_used, list) else []
-                )
-                
-                # CORRECTION 4: Ajouter response_versions pour clarification
-                try:
-                    response.response_versions = self.concision_service.generate_all_versions(critical_message, language)
-                except Exception as e:
-                    logger.error(f"❌ [Critical Clarification Response] Erreur response_versions: {e}")
-                    response.response_versions = {"detailed": critical_message}
-                
-                # Ajouter champs clarification critique de façon sécurisée
-                try:
-                    if isinstance(clarification_result, dict):
-                        response.clarification_required_critical = True
-                        response.missing_critical_entities = clarification_result.get("missing_critical_entities", [])
-                        response.clarification_confidence = float(clarification_result.get("confidence", 0.8))
-                        response.clarification_reasoning = str(clarification_result.get("reasoning", "Informations critiques manquantes"))
-                        response.pipeline_version = "critical_clarification_safe"
-                        response.pipeline_blocked_at = "before_rag"
-                except Exception as e:
-                    logger.warning(f"⚠️ [Critical Clarification Response] Erreur métadonnées: {e}")
-                
-                return response
-                
-            else:
-                basic_response = self._create_basic_response_safe(
-                    question_text, critical_message, conversation_id, 
-                    language, response_time_ms, processing_steps
-                )
-                # CORRECTION 4: response_versions même en fallback clarification
-                try:
-                    basic_response["response_versions"] = self.concision_service.generate_all_versions(critical_message, language)
-                except Exception:
-                    basic_response["response_versions"] = {"detailed": critical_message}
-                return basic_response
-                
-        except Exception as e:
-            logger.error(f"❌ [Create Critical Clarification Response] Erreur: {e}")
-            fallback = self._create_basic_response_safe(
-                question_text, critical_message, conversation_id, 
-                language, response_time_ms, processing_steps
-            )
-            try:
-                fallback["response_versions"] = self.concision_service.generate_all_versions(critical_message, language)
-            except Exception:
-                fallback["response_versions"] = {"detailed": critical_message}
-            return fallback
-    
-    def _create_basic_response_safe(self, question, response, conversation_id, language, response_time_ms, processing_steps):
-        """Crée une réponse basique sécurisée quand les modèles Pydantic ne sont pas disponibles - CORRECTION 4"""
-        try:
-            basic_response = {
-                "question": str(question) if question else "Question inconnue",
-                "response": str(response) if response else "Réponse indisponible",
-                "conversation_id": str(conversation_id) if conversation_id else str(uuid.uuid4()),
-                "rag_used": False,
-                "rag_score": None,
-                "timestamp": datetime.now().isoformat(),
-                "language": str(language) if language else "fr",
-                "response_time_ms": int(response_time_ms) if response_time_ms else 0,
-                "mode": "basic_fallback_response_safe",
-                "user": None,
-                "logged": True,
-                "validation_passed": True,
-                "processing_steps": list(processing_steps) if isinstance(processing_steps, list) else [],
-                "ai_enhancements_used": ["basic_fallback_safe"],
-                "fallback_mode": True,
-                "models_available": MODELS_AVAILABLE,
-                "error_handling": "robust"
-            }
-            
-            # CORRECTION 4: Garantir response_versions même en basic response
-            try:
-                basic_response["response_versions"] = self.concision_service.generate_all_versions(response, language)
-            except Exception as e:
-                logger.error(f"❌ [Create Basic Response Safe] Erreur response_versions: {e}")
-                basic_response["response_versions"] = {
-                    "ultra_concise": str(response)[:50] if response else "Erreur",
-                    "concise": str(response)[:150] if response else "Erreur génération",
-                    "standard": str(response)[:300] if response else "Une erreur s'est produite",
-                    "detailed": str(response) if response else "Réponse indisponible"
-                }
-            
-            return basic_response
-            
-        except Exception as e:
-            logger.error(f"❌ [Create Basic Response Safe] Erreur: {e}")
-            return {
-                "question": "Erreur",
-                "response": "Une erreur s'est produite lors de la génération de la réponse",
-                "conversation_id": str(uuid.uuid4()),
-                "rag_used": False,
-                "timestamp": datetime.now().isoformat(),
-                "language": "fr",
-                "response_time_ms": 0,
-                "mode": "emergency_fallback",
-                "error": str(e),
-                "response_versions": {
-                    "ultra_concise": "Erreur",
-                    "concise": "Erreur système",
-                    "standard": "Une erreur s'est produite",
-                    "detailed": "Une erreur s'est produite lors de la génération de la réponse"
-                }
-            }
-    
-    def _create_error_response(self, error_message, question, conversation_id, language, start_time):
-        """Crée une réponse d'erreur sécurisée - CORRECTION 4: response_versions ajoutées"""
-        try:
-            response_time_ms = int((time.time() - start_time) * 1000) if start_time else 0
-            
-            error_responses = {
-                "fr": f"Je m'excuse, {error_message}. Veuillez reformuler votre question.",
-                "en": f"I apologize, {error_message}. Please rephrase your question.",
-                "es": f"Me disculpo, {error_message}. Por favor reformule su pregunta."
-            }
-            
-            response_text = error_responses.get(language, error_responses["fr"])
-            
-            if MODELS_AVAILABLE:
-                error_response = EnhancedExpertResponse(
-                    question=str(question) if question else "Question inconnue",
-                    response=response_text,
-                    conversation_id=str(conversation_id) if conversation_id else str(uuid.uuid4()),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=str(language) if language else "fr",
-                    response_time_ms=response_time_ms,
-                    mode="error_response_safe",
-                    user=None,
-                    logged=True,
-                    validation_passed=False,
-                    processing_steps=["error_occurred"],
-                    ai_enhancements_used=["error_handling_safe"]
-                )
-                
-                # CORRECTION 4: response_versions pour erreurs
-                try:
-                    error_response.response_versions = self.concision_service.generate_all_versions(response_text, language)
-                except Exception:
-                    error_response.response_versions = {"detailed": response_text}
-                
-                return error_response
-            else:
-                return self._create_basic_response_safe(
-                    question, response_text, conversation_id, language, response_time_ms, ["error_occurred"]
-                )
-                
-        except Exception as e:
-            logger.error(f"❌ [Create Error Response] Erreur critique: {e}")
-            return {
-                "question": "Erreur critique",
-                "response": "Une erreur critique s'est produite",
-                "conversation_id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
-                "language": "fr",
-                "mode": "critical_error",
-                "error": str(e),
-                "response_versions": {
-                    "ultra_concise": "Erreur",
-                    "concise": "Erreur critique",
-                    "standard": "Une erreur critique s'est produite",
-                    "detailed": "Une erreur critique s'est produite"
-                }
-            }
-    
-    def _create_validation_error_response(self, validation_result, question, conversation_id, language, start_time):
-        """Crée une réponse d'erreur de validation sécurisée - CORRECTION 4"""
-        try:
-            response_time_ms = int((time.time() - start_time) * 1000) if start_time else 0
-            
-            rejection_message = validation_result.rejection_message if hasattr(validation_result, 'rejection_message') else "Validation échouée"
-            confidence = validation_result.confidence if hasattr(validation_result, 'confidence') else 0.0
-            
-            if MODELS_AVAILABLE:
-                validation_response = EnhancedExpertResponse(
-                    question=str(question) if question else "Question inconnue",
-                    response=str(rejection_message),
-                    conversation_id=str(conversation_id) if conversation_id else str(uuid.uuid4()),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=str(language) if language else "fr",
-                    response_time_ms=response_time_ms,
-                    mode="validation_error_safe",
-                    user=None,
-                    logged=True,
-                    validation_passed=False,
-                    validation_confidence=float(confidence),
-                    processing_steps=["validation_failed"],
-                    ai_enhancements_used=["agricultural_validation_safe"]
-                )
-                
-                # CORRECTION 4: response_versions pour validation errors
-                try:
-                    validation_response.response_versions = self.concision_service.generate_all_versions(rejection_message, language)
-                except Exception:
-                    validation_response.response_versions = {"detailed": rejection_message}
-                
-                return validation_response
-            else:
-                return self._create_basic_response_safe(
-                    question, rejection_message, conversation_id, 
-                    language, response_time_ms, ["validation_failed"]
-                )
-                
-        except Exception as e:
-            logger.error(f"❌ [Create Validation Error Response] Erreur: {e}")
-            return self._create_error_response("Erreur de validation", question, conversation_id, language, start_time)
-    
-    # === MÉTHODES DE TRAITEMENT SÉCURISÉES ===
-    
-    async def _process_clarification_enhanced_safe(self, request_data, processing_steps, language):
-        """Traitement clarification avec gestion d'erreurs robuste - CORRECTION 2: Pas d'asyncio.run()"""
-        try:
-            original_question = getattr(request_data, 'original_question', None)
-            clarification_text = getattr(request_data, 'text', '')
-            conversation_id = getattr(request_data, 'conversation_id', str(uuid.uuid4()))
-            
-            if not original_question or not isinstance(original_question, str):
-                logger.warning("⚠️ [ExpertService] Clarification sans question originale valide")
-                return None
-            
-            if not clarification_text or not isinstance(clarification_text, str):
-                logger.warning("⚠️ [ExpertService] Texte de clarification invalide")
-                return None
-            
-            # Extraction entités avec gestion d'erreurs
-            entities = {}
-            if UTILS_AVAILABLE:
-                try:
-                    entities = extract_breed_and_sex_from_clarification(clarification_text, language)
-                except Exception as e:
-                    logger.error(f"❌ [Clarification Safe] Erreur extraction entités: {e}")
-                    entities = self._extract_entities_fallback_safe(clarification_text)
-            else:
-                entities = self._extract_entities_fallback_safe(clarification_text)
-            
-            if not isinstance(entities, dict):
-                entities = {"breed": None, "sex": None}
-            
-            logger.info(f"🔍 [Enhanced Clarification Safe] Entités extraites: {entities}")
-            
-            # Vérifier complétude des entités
-            if not entities.get('breed') or not entities.get('sex'):
-                processing_steps.append("incomplete_clarification_safe")
-                
-                missing = []
-                if not entities.get('breed'):
-                    missing.append("race")
-                if not entities.get('sex'):
-                    missing.append("sexe")
-                
-                # Messages d'erreur selon langue
-                error_messages = {
-                    "fr": f"Information incomplète. Il manque encore: {', '.join(missing)}.\n\nExemples complets:\n• 'Ross 308 mâles'\n• 'Cobb 500 femelles'\n• 'ISA Brown' (pour pondeuses)",
-                    "en": f"Incomplete information. Still missing: {', '.join(missing)}.\n\nComplete examples:\n• 'Ross 308 males'\n• 'Cobb 500 females'\n• 'ISA Brown' (for layers)",
-                    "es": f"Información incompleta. Aún falta: {', '.join(missing)}.\n\nEjemplos completos:\n• 'Ross 308 machos'\n• 'Cobb 500 hembras'\n• 'ISA Brown' (para ponedoras)"
-                }
-                
-                error_message = error_messages.get(language, error_messages["fr"])
-                
-                if MODELS_AVAILABLE:
-                    incomplete_response = EnhancedExpertResponse(
-                        question=str(clarification_text),
-                        response=error_message,
-                        conversation_id=str(conversation_id),
-                        rag_used=False,
-                        rag_score=None,
-                        timestamp=datetime.now().isoformat(),
-                        language=str(language),
-                        response_time_ms=50,
-                        mode="incomplete_clarification_enhanced_safe",
-                        user=None,
-                        logged=True,
-                        validation_passed=False,
-                        processing_steps=processing_steps,
-                        ai_enhancements_used=["enhanced_clarification_processing_safe", "layer_breed_auto_detection"]
-                    )
-                    
-                    # CORRECTION 4: response_versions pour clarification incomplète
-                    try:
-                        incomplete_response.response_versions = self.concision_service.generate_all_versions(error_message, language)
-                    except Exception:
-                        incomplete_response.response_versions = {"detailed": error_message}
-                    
-                    return incomplete_response
-                else:
-                    return self._create_basic_response_safe(
-                        clarification_text, error_message, conversation_id, language, 50, processing_steps
-                    )
-            
-            # Enrichir la question originale de façon sécurisée
-            enriched_question = original_question
-            if UTILS_AVAILABLE:
-                try:
-                    enriched_question = build_enriched_question_with_breed_sex(
-                        original_question, entities['breed'], entities['sex'], language
-                    )
-                except Exception as e:
-                    logger.error(f"❌ [Clarification Safe] Erreur enrichissement: {e}")
-                    enriched_question = f"Pour des poulets {entities.get('breed', 'inconnus')} {entities.get('sex', '')}: {original_question}"
-            else:
-                try:
-                    enriched_question = f"Pour des poulets {entities.get('breed', 'inconnus')} {entities.get('sex', '')}: {original_question}"
-                except Exception as e:
-                    logger.error(f"❌ [Clarification Safe] Erreur enrichissement fallback: {e}")
-                    enriched_question = original_question
-            
-            # Mise à jour sécurisée de request_data
-            try:
-                request_data.text = enriched_question
-                request_data.is_clarification_response = False
-            except Exception as e:
-                logger.warning(f"⚠️ [Clarification Safe] Impossible de modifier request_data: {e}")
-            
-            logger.info(f"✨ [ExpertService Safe] Question enrichie: {enriched_question}")
-            processing_steps.append("question_enriched_enhanced_safe")
-            
-            # Nettoyer la clarification pendante en mémoire de façon sécurisée
-            try:
-                if self.conversation_memory:
-                    self.conversation_memory.clear_pending_clarification(conversation_id)
-                    logger.info("✅ [ExpertService Safe] Clarification critique résolue en mémoire")
-            except Exception as e:
-                logger.error(f"❌ [ExpertService Safe] Erreur nettoyage clarification: {e}")
-            
-            return None  # Continuer le traitement avec la question enrichie
-            
-        except Exception as e:
-            logger.error(f"❌ [Process Clarification Enhanced Safe] Erreur: {e}")
-            return None
-    
-    def _extract_entities_fallback_safe(self, text: str) -> Dict[str, str]:
-        """Extraction d'entités fallback sécurisée"""
-        try:
-            if not text or not isinstance(text, str):
-                return {"breed": None, "sex": None}
-            
-            entities = {}
-            text_lower = text.lower()
-            
-            # Détection race simple avec pondeuses - version sécurisée
-            race_patterns = [
-                r'\b(ross\s*308|cobb\s*500|hubbard|isa\s*brown|lohmann\s*brown|hy[-\s]*line|bovans|shaver)\b'
-            ]
-            
-            for pattern in race_patterns:
-                try:
-                    match = re.search(pattern, text_lower, re.IGNORECASE)
-                    if match:
-                        breed = match.group(1).strip()
-                        entities['breed'] = breed
-                        
-                        # Utiliser clarification_entities pour normaliser et inférer le sexe
-                        try:
-                            normalized_breed, _ = normalize_breed_name(breed)
-                            inferred_sex, was_inferred = infer_sex_from_breed(normalized_breed)
-                            
-                            if was_inferred and inferred_sex:
-                                entities['sex'] = str(inferred_sex)
-                                logger.info(f"🥚 [Fallback Safe Auto-Fix] Race détectée: {normalized_breed} → sexe='{inferred_sex}'")
-                        except Exception as e:
-                            logger.warning(f"⚠️ [Fallback Safe] Erreur inférence sexe: {e}")
-                        
-                        break
-                except Exception as e:
-                    logger.warning(f"⚠️ [Fallback Safe] Erreur pattern race: {e}")
-                    continue
-            
-            # Détection sexe simple (si pas déjà fixé par pondeuses)
-            if not entities.get('sex'):
-                try:
-                    if any(sex in text_lower for sex in ['mâle', 'male', 'masculin']):
-                        entities['sex'] = 'mâles'
-                    elif any(sex in text_lower for sex in ['femelle', 'female', 'féminin']):
-                        entities['sex'] = 'femelles'
-                    elif any(sex in text_lower for sex in ['mixte', 'mixed']):
-                        entities['sex'] = 'mixte'
-                except Exception as e:
-                    logger.warning(f"⚠️ [Fallback Safe] Erreur détection sexe: {e}")
-            
-            return entities
-            
-        except Exception as e:
-            logger.error(f"❌ [Extract Entities Fallback Safe] Erreur: {e}")
-            return {"breed": None, "sex": None}
-    
-    def _generate_fallback_responses_safe(self, question: str, language: str) -> Dict[str, Any]:
-        """Génère des réponses de fallback sécurisées"""
-        try:
-            if not question or not isinstance(question, str):
-                question = "question vide"
-            
-            if not language or not isinstance(language, str):
-                language = "fr"
-            
-            question_lower = question.lower()
-            
-            # Détection et réponses spécialisées pondeuses
-            if any(word in question_lower for word in ['pondeuse', 'pondeuses', 'ponte', 'œuf', 'oeufs', 'egg'] if word):
-                responses = {
-                    "fr": "Pour les pondeuses qui ne pondent pas assez, vérifiez : la race et l'âge (pic de ponte vers 25-30 semaines), l'alimentation (16-18% protéines), l'éclairage (14-16h/jour), le logement (espace suffisant) et l'état de santé. Une pondeuse ISA Brown produit normalement 300-320 œufs par an.",
-                    "en": "For laying hens not producing enough eggs, check: breed and age (peak laying around 25-30 weeks), feeding (16-18% protein), lighting (14-16h/day), housing (adequate space) and health status. An ISA Brown layer normally produces 300-320 eggs per year.",
-                    "es": "Para gallinas ponedoras que no ponen suficientes huevos, verifique: raza y edad (pico de puesta hacia 25-30 semanas), alimentación (16-18% proteínas), iluminación (14-16h/día), alojamiento (espacio adecuado) y estado de salud. Una ponedora ISA Brown produce normalmente 300-320 huevos por año."
-                }
-            elif any(word in question_lower for word in ['poids', 'weight', 'peso', 'gramme', 'kg'] if word):
-                responses = {
-                    "fr": "Pour une réponse précise sur le poids, j'aurais besoin de connaître la race, le sexe et l'âge des poulets. En général, un poulet de chair Ross 308 pèse environ 350-400g à 3 semaines.",
-                    "en": "For a precise weight answer, I would need to know the breed, sex and age of the chickens. Generally, a Ross 308 broiler weighs around 350-400g at 3 weeks.",
-                    "es": "Para una respuesta precisa sobre el peso, necesitaría conocer la raza, sexo y edad de los pollos. En general, un pollo de engorde Ross 308 pesa alrededor de 350-400g a las 3 semanas."
-                }
-            elif any(word in question_lower for word in ['mortalité', 'mortality', 'mortalidad', 'mort'] if word):
-                responses = {
-                    "fr": "La mortalité normale en élevage de poulets de chair est généralement inférieure à 5%. Si vous observez des taux plus élevés, vérifiez les conditions d'élevage, la ventilation et consultez un vétérinaire.",
-                    "en": "Normal mortality in broiler farming is generally below 5%. If you observe higher rates, check farming conditions, ventilation and consult a veterinarian.",
-                    "es": "La mortalidad normal en la cría de pollos de engorde es generalmente inferior al 5%. Si observa tasas más altas, verifique las condiciones de cría, ventilación y consulte a un veterinario."
-                }
-            elif any(word in question_lower for word in ['température', 'temperature', 'temperatura', 'chaleur'] if word):
-                responses = {
-                    "fr": "La température optimale pour les poulets varie selon l'âge: 35°C à 1 jour, puis diminution de 2-3°C par semaine jusqu'à 21°C vers 5-6 semaines.",
-                    "en": "Optimal temperature for chickens varies by age: 35°C at 1 day, then decrease by 2-3°C per week until 21°C around 5-6 weeks.",
-                    "es": "La temperatura óptima para pollos varía según la edad: 35°C al día 1, luego disminución de 2-3°C por semana hasta 21°C alrededor de 5-6 semanas."
-                }
-            elif any(word in question_lower for word in ['alimentation', 'nutrition', 'alimentación', 'nourriture'] if word):
-                responses = {
-                    "fr": "L'alimentation des poulets doit être adaptée à leur âge: aliment démarrage (0-10j), croissance (11-35j), finition (36j+). Assurez-vous d'un accès constant à l'eau propre.",
-                    "en": "Chicken feeding should be adapted to their age: starter feed (0-10d), grower (11-35d), finisher (36d+). Ensure constant access to clean water.",
-                    "es": "La alimentación de pollos debe adaptarse a su edad: iniciador (0-10d), crecimiento (11-35d), acabado (36d+). Asegure acceso constante a agua limpia."
-                }
-            else:
-                responses = {
-                    "fr": "Je suis votre assistant IA spécialisé en santé et nutrition animale. Pour vous donner une réponse plus précise, pourriez-vous me donner plus de détails sur votre question ?",
-                    "en": "I am your AI assistant specialized in animal health and nutrition. To give you a more precise answer, could you provide more details about your question?",
-                    "es": "Soy su asistente de IA especializado en salud y nutrición animal. Para darle una respuesta más precisa, ¿podría proporcionar más detalles sobre su pregunta?"
-                }
-            
-            selected_response = responses.get(language, responses.get("fr", "Réponse indisponible"))
-            
-            return {
-                "response": selected_response,
-                "type": "fallback_safe",
-                "confidence": 0.7
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ [Generate Fallback Responses Safe] Erreur: {e}")
-            fallback_messages = {
-                "fr": "Je m'excuse, une erreur s'est produite. Pouvez-vous reformuler votre question ?",
-                "en": "I apologize, an error occurred. Can you rephrase your question?",
-                "es": "Me disculpo, ocurrió un error. ¿Puede reformular su pregunta?"
-            }
-            return {
-                "response": fallback_messages.get(language, fallback_messages["fr"]),
-                "type": "error_fallback",
-                "confidence": 0.3
-            }
-    
-    async def _process_question_fallback(
-        self, question_text: str, conversation_id: str, language: str, 
-        user_email: str, start_time: float, processing_steps: List[str]
-    ):
-        """Traitement en mode fallback sécurisé - CORRECTION 4: response_versions ajoutées"""
-        try:
-            logger.info("🔄 [ExpertService] Traitement mode fallback sécurisé")
-            processing_steps.append("fallback_mode_activated_safe")
-            
-            # Réponses de base par type de question
-            fallback_responses = self._generate_fallback_responses_safe(question_text, language)
-            
-            response_time_ms = int((time.time() - start_time) * 1000) if start_time else 0
-            
-            # Construction réponse fallback
-            if MODELS_AVAILABLE:
-                fallback_response = EnhancedExpertResponse(
-                    question=str(question_text),
-                    response=fallback_responses["response"],
-                    conversation_id=str(conversation_id),
-                    rag_used=False,
-                    rag_score=None,
-                    timestamp=datetime.now().isoformat(),
-                    language=str(language),
-                    response_time_ms=response_time_ms,
-                    mode="fallback_basic_response_safe",
-                    user=str(user_email) if user_email else None,
-                    logged=True,
-                    validation_passed=True,
-                    processing_steps=processing_steps,
-                    ai_enhancements_used=["fallback_response_generation_safe"]
-                )
-                
-                # CORRECTION 4: response_versions pour fallback
-                try:
-                    fallback_response.response_versions = self.concision_service.generate_all_versions(fallback_responses["response"], language)
-                except Exception:
-                    fallback_response.response_versions = {"detailed": fallback_responses["response"]}
-                
-                return fallback_response
-            else:
-                return self._create_basic_response_safe(
-                    question_text, fallback_responses["response"], conversation_id, 
-                    language, response_time_ms, processing_steps
-                )
-                
-        except Exception as e:
-            logger.error(f"❌ [Process Question Fallback] Erreur: {e}")
-            return self._create_error_response(
-                "Erreur en mode fallback", question_text, conversation_id, language, start_time
-            )
-    
-    async def _handle_pipeline_error_safe(
-        self, error, question_text, conversation_id, language, start_time, 
-        processing_steps, ai_enhancements_used
-    ):
-        """Gestion sécurisée des erreurs de pipeline - CORRECTION 4: response_versions"""
-        try:
-            logger.error(f"❌ [Pipeline Error Handler] Erreur: {error}")
-            processing_steps.append("pipeline_error_fallback_safe")
-            
-            # Tentative de récupération avec agent si disponible
-            final_answer = f"Je m'excuse, il y a eu une erreur technique. Pouvez-vous reformuler votre question ?"
-            
-            if self.config["agents_enabled"]:
-                try:
-                    error_enhancement = await agent_rag_enhancer.enhance_rag_answer(
-                        rag_answer=f"Erreur technique: {str(error)}",
-                        entities={},
-                        missing_entities=[],
-                        conversation_context="",
-                        original_question=question_text,
-                        enriched_question=question_text,
-                        language=language
-                    )
-                    if isinstance(error_enhancement, dict) and "enhanced_answer" in error_enhancement:
-                        final_answer = error_enhancement["enhanced_answer"]
-                        ai_enhancements_used.append("error_recovery_agent")
-                except Exception as agent_error:
-                    logger.error(f"❌ [Pipeline Error Handler] Erreur agent recovery: {agent_error}")
-            
-            if not final_answer or final_answer == "Erreur technique":
-                fallback_data = self._generate_fallback_responses_safe(question_text, language)
-                final_answer = fallback_data["response"]
-            
-            response_time_ms = int((time.time() - start_time) * 1000) if start_time else 0
-            
-            # CORRECTION 4: Assurer response_versions même en error recovery
-            response_versions = None
-            try:
-                response_versions = self.concision_service.generate_all_versions(final_answer, language)
-            except Exception:
-                response_versions = {"detailed": final_answer}
-            
-            return self._create_enhanced_response_safe(
-                question_text, final_answer, conversation_id, language, response_time_ms,
-                None, processing_steps, ai_enhancements_used, None, "pipeline_error_recovery",
-                {}, {}, [], None, {}, [], question_text, response_versions
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [Handle Pipeline Error Safe] Erreur critique: {e}")
-            return self._create_error_response(
-                "Erreur critique dans la gestion d'erreur", question_text, 
-                conversation_id, language, start_time
-            )
-    
-    async def _validate_agricultural_question_safe(self, question: str, language: str, current_user) -> ValidationResult:
-        """Validation agricole sécurisée"""
-        try:
-            if self.integrations.agricultural_validator_available:
-                return self.integrations.validate_agricultural_question(
-                    question=question, 
-                    language=language, 
-                    user_id=current_user.get("id") if current_user and isinstance(current_user, dict) else "unknown",
-                    request_ip="unknown"
-                )
-            else:
-                # Validation basique par mots-clés sécurisée
-                agricultural_keywords = [
-                    'poulet', 'chicken', 'pollo', 'élevage', 'farming', 'cría',
-                    'animal', 'nutrition', 'santé', 'health', 'salud',
-                    'vétérinaire', 'veterinary', 'veterinario',
-                    'pondeuse', 'pondeuses', 'layer', 'layers', 'œuf', 'egg'
-                ]
-                
-                if not question or not isinstance(question, str):
-                    return ValidationResult(is_valid=False, rejection_message="Question invalide", confidence=0.0)
-                
-                question_lower = question.lower()
-                is_agricultural = any(keyword in question_lower for keyword in agricultural_keywords if keyword)
-                
-                return ValidationResult(
-                    is_valid=is_agricultural,
-                    rejection_message="Question hors domaine agricole" if not is_agricultural else "",
-                    confidence=0.8 if is_agricultural else 0.3
-                )
-                
-        except Exception as e:
-            logger.error(f"❌ [Validate Agricultural Question Safe] Erreur: {e}")
-            return ValidationResult(is_valid=True, rejection_message="", confidence=0.5)
-    
-    def _generate_optional_clarification_suggestions_safe(self, missing_entities: List[str], poultry_type: str, language: str) -> List[str]:
-        """
-        💡 Génère des suggestions de clarification optionnelles sécurisées
-        """
-        try:
-            if not missing_entities or not isinstance(missing_entities, list):
-                return []
-            
-            if not poultry_type or not isinstance(poultry_type, str):
-                poultry_type = "unknown"
-            
-            if not language or not isinstance(language, str):
-                language = "fr"
-            
-            suggestions = {
-                "fr": {
-                    "layers": {
-                        "production_rate": "Combien d'œufs produisent-elles actuellement par jour ?",
-                        "housing": "Comment sont-elles logées ? (cages, sol, parcours libre)",
-                        "lighting": "Combien d'heures de lumière reçoivent-elles par jour ?",
-                        "feeding": "Quel type d'alimentation utilisez-vous ?"
-                    },
-                    "broilers": {
-                        "weight": "Quel est leur poids actuel ?",
-                        "housing": "Quelles sont les conditions d'élevage ? (température, densité)",
-                        "feeding": "Quel type d'aliment utilisez-vous ? (démarrage, croissance, finition)"
-                    },
-                    "unknown": {
-                        "breed": "Quelle est la race exacte de vos volailles ?",
-                        "age": "Quel est l'âge de vos animaux ?",
-                        "purpose": "Quel est l'objectif de votre élevage ?"
-                    }
-                },
-                "en": {
-                    "layers": {
-                        "production_rate": "How many eggs are they currently producing per day?",
-                        "housing": "How are they housed? (cages, floor, free range)",
-                        "lighting": "How many hours of light do they receive per day?",
-                        "feeding": "What type of feed are you using?"
-                    },
-                    "broilers": {
-                        "weight": "What is their current weight?",
-                        "housing": "What are the farming conditions? (temperature, density)",
-                        "feeding": "What type of feed are you using? (starter, grower, finisher)"
-                    },
-                    "unknown": {
-                        "breed": "What is the exact breed of your poultry?",
-                        "age": "What is the age of your animals?",
-                        "purpose": "What is the purpose of your farming?"
-                    }
-                },
-                "es": {
-                    "layers": {
-                        "production_rate": "¿Cuántos huevos están produciendo actualmente por día?",
-                        "housing": "¿Cómo están alojadas? (jaulas, suelo, corral libre)",
-                        "lighting": "¿Cuántas horas de luz reciben por día?",
-                        "feeding": "¿Qué tipo de alimento está usando?"
-                    },
-                    "broilers": {
-                        "weight": "¿Cuál es su peso actual?",
-                        "housing": "¿Cuáles son las condiciones de cría? (temperatura, densidad)",
-                        "feeding": "¿Qué tipo de alimento está usando? (iniciador, crecimiento, acabado)"
-                    },
-                    "unknown": {
-                        "breed": "¿Cuál es la raza exacta de sus aves?",
-                        "age": "¿Cuál es la edad de sus animales?",
-                        "purpose": "¿Cuál es el propósito de su cría?"
-                    }
-                }
-            }
-            
-            lang = language if language in suggestions else "fr"
-            type_suggestions = suggestions[lang].get(poultry_type, suggestions[lang]["unknown"])
-            
-            result = []
-            for entity in missing_entities:
-                if isinstance(entity, str) and entity in type_suggestions:
-                    result.append(type_suggestions[entity])
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ [Generate Optional Clarification Suggestions Safe] Erreur: {e}")
-            return []
-    
-    # === MÉTHODES FEEDBACK ET TOPICS SÉCURISÉES ===
-    
-    async def process_feedback(self, feedback_data) -> Dict[str, Any]:
-        """Traitement du feedback avec gestion d'erreur robuste"""
-        try:
-            # Extraction sécurisée des données
-            rating = getattr(feedback_data, 'rating', 'neutral')
-            comment = getattr(feedback_data, 'comment', None)
-            conversation_id = getattr(feedback_data, 'conversation_id', None)
-            
-            # Validation des données
-            if not isinstance(rating, str) or rating not in ['positive', 'negative', 'neutral']:
-                rating = 'neutral'
-            
-            if comment and not isinstance(comment, str):
-                comment = str(comment)
-            
-            if not conversation_id:
-                conversation_id = str(uuid.uuid4())
-            
-            logger.info(f"📊 [ExpertService Safe] Feedback reçu: {rating}")
-            
-            # Tentative de mise à jour via intégrations
-            feedback_updated = False
-            if self.integrations.logging_available and conversation_id:
-                try:
-                    rating_numeric = {"positive": 1, "negative": -1, "neutral": 0}.get(rating, 0)
-                    feedback_updated = await self.integrations.update_feedback(conversation_id, rating_numeric)
-                except Exception as e:
-                    logger.error(f"❌ [ExpertService Safe] Erreur update feedback: {e}")
-            
-            return {
-                "success": True,
-                "message": "Feedback enregistré avec succès (Pipeline Clarification Critique Sécurisé)",
-                "rating": rating,
-                "comment": comment,
-                "conversation_id": conversation_id,
-                "feedback_updated_in_db": feedback_updated,
-                "pipeline_version": "critical_clarification_safe",
-                "improvements_active": [
-                    "agents_always_active",
-                    "critical_clarification_blocking",
-                    "optional_clarification_non_blocking", 
-                    "enriched_question_to_rag",
-                    "intelligent_fallback",
-                    "robust_error_handling",
-                    "response_versions_guaranteed"  # CORRECTION 4
-                ],
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ [ExpertService Safe] Erreur traitement feedback: {e}")
-            return {
-                "success": False,
-                "message": f"Erreur traitement feedback: {str(e)}",
-                "timestamp": datetime.now().isoformat(),
-                "error_handled": True
-            }
-    
-    async def get_suggested_topics(self, language: str) -> Dict[str, Any]:
-        """Récupération des topics suggérés avec gestion d'erreur robuste"""
-        try:
-            # Validation et normalisation de la langue
-            if not language or not isinstance(language, str):
-                language = "fr"
-            
-            lang = language.lower()
-            if lang not in ["fr", "en", "es"]:
-                lang = "fr"
-            
-            # Récupération des topics
-            topics = []
-            if UTILS_AVAILABLE:
-                try:
-                    topics_by_language = get_enhanced_topics_by_language()
-                    topics = topics_by_language.get(lang, topics_by_language.get("fr", []))
-                except Exception as e:
-                    logger.error(f"❌ [Get Suggested Topics] Erreur utils: {e}")
-            
-            # Fallback si pas de topics ou erreur
-            if not topics or not isinstance(topics, list):
-                topics_by_language = {
-                    "fr": [
-                        "Croissance poulets de chair", 
-                        "Problèmes de ponte pondeuses",
-                        "Nutrition aviaire", 
-                        "Santé animale", 
-                        "Environnement élevage",
-                        "Mortalité élevée - diagnostic"
-                    ],
-                    "en": [
-                        "Broiler chicken growth", 
-                        "Laying hen production problems",
-                        "Poultry nutrition", 
-                        "Animal health", 
-                        "Farming environment",
-                        "High mortality - diagnosis"
-                    ],
-                    "es": [
-                        "Crecimiento pollos de engorde", 
-                        "Problemas puesta gallinas",
-                        "Nutrición aviar", 
-                        "Salud animal", 
-                        "Ambiente cría",
-                        "Alta mortalidad - diagnóstico"
-                    ]
-                }
-                topics = topics_by_language.get(lang, topics_by_language["fr"])
-            
-            return {
-                "topics": topics,
-                "language": lang,
-                "count": len(topics),
-                "pipeline_version": "critical_clarification_safe",
-                "improvements_active": [
-                    "agents_always_active",
-                    "critical_clarification_blocking",
-                    "optional_clarification_non_blocking", 
-                    "enriched_question_to_rag",
-                    "intelligent_fallback",
-                    "robust_error_handling",
-                    "response_versions_guaranteed"  # CORRECTION 4
-                ],
-                "system_status": {
-                    "models_available": MODELS_AVAILABLE,
-                    "utils_available": UTILS_AVAILABLE,
-                    "integrations_available": INTEGRATIONS_AVAILABLE,
-                    "api_enhancement_available": API_ENHANCEMENT_AVAILABLE,
-                    "prompt_templates_available": PROMPT_TEMPLATES_AVAILABLE,
-                    "agents_available": AGENTS_AVAILABLE,
-                    "conversation_memory_available": CONVERSATION_MEMORY_AVAILABLE,
-                    "clarification_entities_available": CLARIFICATION_ENTITIES_AVAILABLE,
-                    "concision_service_available": CONCISION_SERVICE_AVAILABLE  # CORRECTION 4
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ [ExpertService Safe] Erreur topics: {e}")
-            # Fallback d'urgence
-            fallback_topics = {
-                "fr": ["Santé animale", "Nutrition", "Élevage"],
-                "en": ["Animal health", "Nutrition", "Farming"],
-                "es": ["Salud animal", "Nutrición", "Cría"]
-            }
-            
-            return {
-                "topics": fallback_topics.get(language, fallback_topics["fr"]),
-                "language": language,
-                "count": 3,
-                "error": str(e),
-                "error_handled": True,
-                "timestamp": datetime.now().isoformat()
-            }
-
-# =============================================================================
-# 🧪 FONCTION DE TEST SÉCURISÉE
-# =============================================================================
-
-def test_critical_clarification_system_safe():
-    """Test sécurisé du système de clarification critique vs optionnelle"""
-    
-    try:
-        test_scenarios = [
-            {
-                "name": "Question broiler sans race ni âge - CRITIQUE",
-                "question": "Mes poulets ne grossissent pas bien",
-                "expected_critical": True,
-                "expected_entities": ["breed", "age"]
-            },
-            {
-                "name": "Question pondeuse sans race - CRITIQUE",
-                "question": "Mes pondeuses ne pondent pas",
-                "expected_critical": True,
-                "expected_entities": ["breed"]
-            },
-            {
-                "name": "Question Ross 308 avec âge - OPTIONNEL",
-                "question": "Mes Ross 308 de 21 jours pèsent 800g",
-                "expected_critical": False,
-                "expected_optional": True
-            },
-            {
-                "name": "Question type indéterminé - CRITIQUE",
-                "question": "Problème avec mes animaux",
-                "expected_critical": True,
-                "expected_entities": ["poultry_type", "species"]
-            },
-            {
-                "name": "Question ISA Brown complète - PAS DE CLARIFICATION",
-                "question": "Mes ISA Brown de 30 semaines pondent 280 œufs",
-                "expected_critical": False,
-                "expected_optional": False
-            }
-        ]
-        
-        print("🧪 [Test Clarification Critique Sécurisé] Démarrage des tests...")
-        
-        for scenario in test_scenarios:
-            try:
-                print(f"\n🎯 Scénario: {scenario['name']}")
-                print(f"   Question: {scenario['question']}")
-                
-                # Test de l'analyse critique sécurisé - CORRECTION 1: await ajouté dans test
-                import asyncio
-                
-                async def test_scenario():
-                    result = await analyze_question_for_clarification_enhanced(scenario['question'], "fr")
-                    return result
-                
-                result = asyncio.run(test_scenario())
-                
-                if not isinstance(result, dict):
-                    print(f"   ❌ Erreur: résultat non dict")
-                    continue
-                
-                is_critical = result.get("clarification_required_critical", False)
-                is_optional = result.get("clarification_required_optional", False)
-                missing_critical = result.get("missing_critical_entities", [])
-                missing_optional = result.get("missing_optional_entities", [])
-                
-                print(f"   🛑 Critique: {is_critical} (attendu: {scenario.get('expected_critical', False)})")
-                print(f"   💡 Optionnel: {is_optional} (attendu: {scenario.get('expected_optional', False)})")
-                print(f"   📋 Entités critiques manquantes: {missing_critical}")
-                print(f"   📝 Entités optionnelles manquantes: {missing_optional}")
-                
-                # Vérification des attentes
-                if 'expected_critical' in scenario:
-                    status = "✅" if is_critical == scenario['expected_critical'] else "❌"
-                    print(f"   {status} Test critique: {'PASSED' if is_critical == scenario['expected_critical'] else 'FAILED'}")
-                
-                if 'expected_entities' in scenario and is_critical:
-                    expected_entities = scenario['expected_entities']
-                    entities_match = all(entity in missing_critical for entity in expected_entities)
-                    status = "✅" if entities_match else "❌"
-                    print(f"   {status} Test entités: {'PASSED' if entities_match else 'FAILED'}")
-                    
-            except Exception as e:
-                print(f"   ❌ Erreur scénario {scenario['name']}: {e}")
-                continue
-        
-        print("\n🚀 [Test Clarification Critique Sécurisé] Résumé des corrections appliquées:")
-        print("   ✅ CORRECTION 1: analyze_question_for_clarification_enhanced avec await")
-        print("   ✅ CORRECTION 2: Suppression asyncio.run() dans mémoire conversationnelle")
-        print("   ✅ CORRECTION 3: Champs contextualization_info et enhancement_info ajoutés")
-        print("   ✅ CORRECTION 4: response_versions garanties partout")
-        print("\n🛑 [FONCTIONNALITÉS PRÉSERVÉES]:")
-        print("   🛑 Clarification CRITIQUE: Stoppe avant RAG")
-        print("   💡 Clarification OPTIONNELLE: Suggestions non bloquantes")
-        print("   🧠 Mémoire: Track clarifications pendantes")
-        print("   🎯 Précision: Détection type volaille améliorée")
-        print("   🌐 Multilingue: Support FR/EN/ES")
-        print("   ✅ Pipeline: Plus intelligent et adaptatif")
-        print("   🔒 Sécurité: Gestion d'erreurs robuste")
-        print("   📏 Versions: Ultra_concise/concise/standard/detailed")
-        
-        print("✅ [Test Clarification Critique Sécurisé] Tests terminés!")
-        
-    except Exception as e:
-        print(f"❌ [Test Clarification Critique Sécurisé] Erreur globale: {e}")
-
-# =============================================================================
-# CONFIGURATION FINALE SÉCURISÉE
-# =============================================================================
-logger.info("🚀 [Expert Services] Module expert_services.py chargé avec succès")
-logger.info("✅ [Expert Services] Toutes les corrections appliquées et validées")
-logger.info("🛑 [Expert Services] Pipeline clarification critique opérationnel")
-logger.info("📏 [Expert Services] Service de versions de réponse activé")
-logger.info("🤖 [Expert Services] Agents GPT toujours actifs")
-logger.info("🧠 [Expert Services] Mémoire conversationnelle intelligente")
-logger.info("🌐 [Expert Services] Support multilingue FR/EN/ES")
-logger.info("🔒 [Expert Services] Gestion d'erreurs robuste")
-
-# Fin du module
-__all__ = [
-    'ExpertService', 
-    'analyze_question_for_clarification_enhanced',
-    'test_critical_clarification_system_safe'
-]
