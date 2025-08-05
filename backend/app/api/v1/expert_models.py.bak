@@ -2,7 +2,8 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.5: Ajout des champs manquants + corrections demandées
+VERSION CORRIGÉE v3.9.6: Ajout des champs manquants pour correction demandée
+🔧 CORRECTION v3.9.6: Ajout clarification_details, enhancement_info, conversation_context, pipeline_version, pipeline_improvements
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
 🆕 NOUVEAU v3.9.0: Support mode sémantique dynamique avec DynamicClarification
@@ -285,12 +286,19 @@ class FeedbackRequest(BaseModel):
     )
 
 # =============================================================================
-# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS + CORRECTIONS DEMANDÉES
+# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS + CORRECTIONS DEMANDÉES v3.9.6
 # =============================================================================
 
 class EnhancedExpertResponse(BaseModel):
     """
     Response model complet avec toutes les fonctionnalités avancées
+    
+    🔧 CORRECTION v3.9.6: Ajout des champs manquants pour correction complète:
+    - clarification_details: Dict des détails de clarification
+    - enhancement_info: Dict des informations d'amélioration
+    - conversation_context: Dict du contexte conversationnel
+    - pipeline_version: Version du pipeline utilisé
+    - pipeline_improvements: Liste des améliorations appliquées
     
     Exemple d'utilisation:
     ```python
@@ -304,6 +312,11 @@ class EnhancedExpertResponse(BaseModel):
         response_time_ms=1500,
         mode="standard",
         enriched_question="Quel est le poids normal d'un poulet de race Ross 308 à 20 jours d'âge?",
+        clarification_details={"method": "dynamic_gpt", "confidence": 0.9},
+        enhancement_info={"rag_enhancer": "applied", "method_used": "contextual"},
+        conversation_context={"previous_topics": ["alimentation", "croissance"]},
+        pipeline_version="expert_models_aligned_v4.1.0",
+        pipeline_improvements=["agents_always_active", "critical_clarification_blocking"],
         response_versions={
             "ultra_concise": "350-400g",
             "concise": "Le poids normal est de 350-400g à cet âge.",
@@ -326,6 +339,15 @@ class EnhancedExpertResponse(BaseModel):
     
     # 🔧 CORRECTION v3.9.5: Ajout du champ enriched_question demandé
     enriched_question: Optional[str] = Field(default=None, description="Question enrichie par agent_rag_enhancer")
+    
+    # 🔧 CORRECTION v3.9.6: AJOUTS OBLIGATOIRES pour correction demandée
+    clarification_details: Optional[Dict[str, Any]] = Field(default=None, description="Détails de clarification")
+    enhancement_info: Optional[Dict[str, Any]] = Field(default=None, description="Informations d'amélioration")
+    
+    # 🔧 CORRECTION v3.9.6: CHAMPS OPTIONNELS SUPPLÉMENTAIRES pour correction demandée
+    conversation_context: Optional[Dict[str, Any]] = Field(default=None, description="Contexte de conversation")
+    pipeline_version: Optional[str] = Field(default=None, description="Version du pipeline")
+    pipeline_improvements: Optional[List[str]] = Field(default=None, description="Améliorations appliquées")
     
     # 🔧 CORRECTION v3.9.5: Ajout des champs demandés dans les spécifications
     clarification_required_critical: Optional[bool] = Field(default=None, description="Clarification critique requise")
@@ -601,17 +623,19 @@ class EnhancedSystemConfig(BaseModel):
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.5")
-logger.info("🔧 [Expert Models] CORRECTIONS v3.9.5 appliquées (selon spécifications):")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.6")
+logger.info("🔧 [Expert Models] CORRECTIONS v3.9.6 appliquées (selon demande spécifique):")
+logger.info("   - ✅ clarification_details: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
+logger.info("   - ✅ enhancement_info: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
+logger.info("   - ✅ conversation_context: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
+logger.info("   - ✅ pipeline_version: Optional[str] dans EnhancedExpertResponse")
+logger.info("   - ✅ pipeline_improvements: Optional[List[str]] dans EnhancedExpertResponse")
+logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
 logger.info("   - ✅ enriched_question: Optional[str] dans EnhancedExpertResponse")
 logger.info("   - ✅ clarification_required_critical: Optional[bool] dans EnhancedExpertResponse")
 logger.info("   - ✅ missing_critical_entities: Optional[List[str]] dans EnhancedExpertResponse")
 logger.info("   - ✅ variants_tested: Optional[List[str]] dans EnhancedExpertResponse")
-logger.info("   - ✅ age_in_days: Optional[int] dans IntelligentEntities")
-logger.info("   - ✅ age_in_weeks: Optional[int] dans IntelligentEntities")
-logger.info("   - ✅ weight: Optional[float] dans IntelligentEntities")
-logger.info("   - ✅ mortality: Optional[float] dans IntelligentEntities")
-logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
+logger.info("   - ✅ age_in_days, age_in_weeks, weight, mortality dans IntelligentEntities")
 logger.info("   - ✅ ClarificationResult avec missing_entities pour éviter l'erreur")
 logger.info("   - ✅ contextualization_info ajouté à EnhancedExpertResponse")
 logger.info("   - ✅ clarification_processing ajouté pour métadonnées")
@@ -631,4 +655,10 @@ logger.info("🆕 [Expert Models] FONCTIONNALITÉS SEMANTIC DYNAMIC:")
 logger.info("   - 🎭 DynamicClarification: Modèle validé")
 logger.info("   - 🤖 semantic_dynamic_mode: Paramètre validé")
 logger.info("   - ⚙️ SemanticDynamicConfig: Configuration validée")
-logger.info("✨ [Expert Models] RÉSULTAT v3.9.5: Tous les champs demandés ajoutés et synchronisés!")
+logger.info("✨ [Expert Models] RÉSULTAT v3.9.6: Tous les champs demandés ajoutés et synchronisés!")
+logger.info("🎯 [Expert Models] NOUVEAUX CHAMPS v3.9.6:")
+logger.info("   - clarification_details: Détails de clarification (Dict)")
+logger.info("   - enhancement_info: Informations d'amélioration (Dict)")
+logger.info("   - conversation_context: Contexte conversationnel (Dict)")
+logger.info("   - pipeline_version: Version du pipeline (str)")
+logger.info("   - pipeline_improvements: Liste des améliorations (List[str])")
