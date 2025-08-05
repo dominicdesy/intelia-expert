@@ -1234,9 +1234,106 @@ def _get_fallback_questions_by_type(question: str, language: str = "fr") -> List
                     "¿Cuáles son las condiciones actuales de alojamiento?",
                     "¿Cuál es su programa de alimentación actual?"
                 ],
-                "feeding": [
+                 "feeding": [
                     "¿Qué edad tienen sus aves?",
                     "¿Qué raza o cepa está criando?",
                     "¿Qué tipo de alimento está usando actualmente?",
                     "¿Cuáles son sus objetivos de rendimiento?"
                 ],
+                "general": [
+                    "¿Podría especificar la raza o cepa de sus aves?",
+                    "¿Qué edad tienen actualmente sus animales?",
+                    "¿En qué contexto de cría se encuentra?",
+                    "¿Cuál es su objetivo o problema principal?"
+                ]
+            }
+        }
+        
+        # Déterminer le type de question et retourner les questions appropriées
+        if is_weight:
+            return fallback_questions[language]["weight"]
+        elif is_health:
+            return fallback_questions[language]["health"]
+        elif is_growth:
+            return fallback_questions[language]["growth"]
+        elif is_feeding:
+            return fallback_questions[language]["feeding"]
+        else:
+            return fallback_questions[language]["general"]
+            
+    except Exception as e:
+        logger.error(f"❌ [Fallback Questions] Erreur: {e}")
+        return [
+            _get_clarification_intro_message(language),
+            "Pouvez-vous préciser votre question ?",
+            "Quel est le contexte exact ?",
+            "Quelles informations manquent ?"
+        ]
+
+def _get_clarification_intro_message(language: str = "fr") -> str:
+    """Messages d'introduction pour clarification selon la langue"""
+    
+    intro_messages = {
+        "fr": "Pour vous donner une réponse précise, j'ai besoin de quelques précisions :",
+        "en": "To give you a precise answer, I need some clarifications:",
+        "es": "Para darle una respuesta precisa, necesito algunas aclaraciones:"
+    }
+    
+    return intro_messages.get(language, intro_messages["fr"])
+
+# =============================================================================
+# FONCTION DE TEST ET VALIDATION
+# =============================================================================
+
+def test_clarification_system():
+    """Fonction de test pour vérifier le bon fonctionnement du système"""
+    try:
+        logger.info("🧪 [Test Clarification System] Début des tests")
+        
+        # Test détection sujet
+        test_questions = [
+            "Mes poulets Ross 308 de 21 jours perdent du poids",
+            "My laying hens stopped producing eggs",
+            "Mis pollos están enfermos"
+        ]
+        
+        for question in test_questions:
+            try:
+                topic = detect_topic_with_gpt(question, "fr")
+                logger.info(f"✅ [Test] Question: '{question}' → Sujet: {topic}")
+            except Exception as e:
+                logger.error(f"❌ [Test] Erreur: {e}")
+        
+        logger.info("🧪 [Test Clarification System] Tests terminés")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ [Test Clarification System] Erreur: {e}")
+        return False
+
+# =============================================================================
+# INITIALISATION ET EXPORT
+# =============================================================================
+
+# Test du système au chargement du module
+if __name__ == "__main__":
+    test_clarification_system()
+
+logger.info("✅ [Expert Clarification Service] Module chargé avec succès")
+logger.info("🔧 [Expert Clarification Service] Fonctions disponibles:")
+logger.info("   - detect_topic_with_gpt()")
+logger.info("   - detect_missing_entities()")
+logger.info("   - select_clarification_prompt()")
+logger.info("   - auto_clarify_if_needed()")
+logger.info("   - validate_dynamic_questions()")
+
+# Export des fonctions principales
+__all__ = [
+    'detect_topic_with_gpt',
+    'detect_missing_entities', 
+    'select_clarification_prompt',
+    'auto_clarify_if_needed',
+    'validate_dynamic_questions',
+    'TOPIC_DETECTION_PROMPT',
+    'CLARIFICATION_TEMPLATES'
+]
