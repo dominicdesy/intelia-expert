@@ -10,7 +10,6 @@ Agent RAG Enhancer - Amélioration des réponses après RAG
 - Améliore la lisibilité et la pertinence
 - ✅ CORRECTION: Propagation systématique de tous les champs
 - ✅ CORRECTION: Gestion des champs absents avec valeurs par défaut
-- ✅ FIX: Validation défensive et standardisation nomenclature
 """
 
 import os
@@ -50,66 +49,12 @@ class AgentRAGEnhancer:
             "coherence_checks": 0,
             "coherence_issues_detected": 0,
             "field_propagation_success": 0,
-            "field_propagation_fallback": 0,
-            "input_validation_fixes": 0  # ✅ NOUVEAU: Tracking des corrections d'input
+            "field_propagation_fallback": 0
         }
         
         logger.info(f"🔧 [AgentRAGEnhancer] Initialisé")
         logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
         logger.info(f"   Modèle: {self.model}")
-    
-    def _validate_and_sanitize_inputs(
-        self,
-        entities: Dict[str, Any],
-        missing_entities: List[str],
-        original_question: str,
-        enriched_question: str,
-        language: str
-    ) -> tuple:
-        """
-        ✅ FIX: Validation défensive des inputs pour éviter les erreurs
-        """
-        
-        validation_fixes = 0
-        
-        # Validation entities
-        if entities is None:
-            entities = {}
-            validation_fixes += 1
-            logger.debug("🔧 [AgentRAGEnhancer] entities était None, initialisé à {}")
-        elif not isinstance(entities, dict):
-            entities = {}
-            validation_fixes += 1
-            logger.warning(f"⚠️ [AgentRAGEnhancer] entities n'était pas un dict: {type(entities)}")
-        
-        # Validation missing_entities
-        if missing_entities is None:
-            missing_entities = []
-            validation_fixes += 1
-            logger.debug("🔧 [AgentRAGEnhancer] missing_entities était None, initialisé à []")
-        elif not isinstance(missing_entities, list):
-            missing_entities = []
-            validation_fixes += 1
-            logger.warning(f"⚠️ [AgentRAGEnhancer] missing_entities n'était pas une liste: {type(missing_entities)}")
-        
-        # Validation strings
-        if not isinstance(original_question, str):
-            original_question = str(original_question) if original_question is not None else ""
-            validation_fixes += 1
-        
-        if not isinstance(enriched_question, str):
-            enriched_question = str(enriched_question) if enriched_question is not None else ""
-            validation_fixes += 1
-        
-        if not isinstance(language, str) or language not in ["fr", "en", "es"]:
-            language = "fr"
-            validation_fixes += 1
-        
-        if validation_fixes > 0:
-            self.stats["input_validation_fixes"] += validation_fixes
-            logger.debug(f"🔧 [AgentRAGEnhancer] {validation_fixes} corrections d'input appliquées")
-        
-        return entities, missing_entities, original_question, enriched_question, language
     
     async def enhance_rag_answer(
         self,
@@ -120,7 +65,7 @@ class AgentRAGEnhancer:
         original_question: str = "",
         enriched_question: str = "",
         language: str = "fr",
-        **additional_fields  # ✅ Capture tous les champs supplémentaires
+        **additional_fields  # ✅ NOUVELLE: Capture tous les champs supplémentaires
     ) -> Dict[str, Any]:
         """
         Améliore une réponse RAG avec le contexte utilisateur et vérifie la cohérence
@@ -141,20 +86,6 @@ class AgentRAGEnhancer:
         
         self.stats["total_requests"] += 1
         self.stats["coherence_checks"] += 1
-        
-        # ✅ FIX: Validation défensive des inputs dès le début
-        entities, missing_entities, original_question, enriched_question, language = (
-            self._validate_and_sanitize_inputs(
-                entities, missing_entities, original_question, enriched_question, language
-            )
-        )
-        
-        # ✅ FIX: Validation rag_answer
-        if not isinstance(rag_answer, str):
-            rag_answer = str(rag_answer) if rag_answer is not None else ""
-        
-        if not isinstance(conversation_context, str):
-            conversation_context = str(conversation_context) if conversation_context is not None else ""
         
         try:
             # ✅ CORRECTION: Initialiser le résultat avec TOUS les champs requis
@@ -234,8 +165,8 @@ class AgentRAGEnhancer:
         additional_fields: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        ✅ FIX: Initialise un résultat complet avec TOUS les champs requis
-        Nomenclature standardisée sur weight_grams
+        ✅ NOUVELLE: Initialise un résultat complet avec TOUS les champs requis
+        Garantit qu'aucun champ ne sera manquant dans le résultat final
         """
         
         # Champs de base toujours présents
@@ -252,21 +183,21 @@ class AgentRAGEnhancer:
             "success": True,
             
             # Champs d'entrée propagés
-            "original_question": original_question,
-            "enriched_question": enriched_question,
-            "language": language,
+            "original_question": original_question or "",
+            "enriched_question": enriched_question or "",
+            "language": language or "fr",
             
             # Champs contextuels
-            "entities": entities,
-            "missing_entities": missing_entities,
+            "entities": entities or {},
+            "missing_entities": missing_entities or [],
             
             # Champs techniques
             "processing_time": datetime.now().isoformat(),
-            "entities_considered": len([k for k, v in entities.items() if v is not None]),
-            "missing_entities_count": len(missing_entities),
+            "entities_considered": len([k for k, v in (entities or {}).items() if v is not None]),
+            "missing_entities_count": len(missing_entities or []),
             
-            # ✅ FIX: Standardisation nomenclature weight_grams
-            "weight_grams": None,  # ✅ CHANGÉ: weight -> weight_grams
+            # ✅ CORRECTION: Champs spécifiques souvent attendus avec valeurs par défaut
+            "weight": None,
             "weight_confidence": None,
             "age_days": None,
             "age_weeks": None,
@@ -284,39 +215,18 @@ class AgentRAGEnhancer:
             # Champs d'évaluation technique
             "context_relevance": "unknown",
             "technical_accuracy": "unknown",
-            "practical_applicability": "unknown",
-            
-            # ✅ NOUVEAU: Champs d'extraction automatique
-            "detected_weight_grams": None,  # ✅ Poids détecté dans la réponse
-            "detected_age_days": None,      # ✅ Âge détecté dans la réponse
-            "detected_breed": None,         # ✅ Race détectée dans la réponse
-            "extraction_confidence": 0.0    # ✅ Confiance dans l'extraction
+            "practical_applicability": "unknown"
         }
         
         # ✅ CORRECTION: Propager les valeurs des entités si disponibles
         if entities:
-            # ✅ FIX: Mapping standardisé weight_grams
-            entity_mapping = {
-                "weight_grams": "weight_grams",  # ✅ Standardisé
-                "weight": "weight_grams",        # ✅ Compatibilité ancienne nomenclature
-                "age_days": "age_days",
-                "age_weeks": "age_weeks", 
-                "breed": "breed",
-                "sex": "sex",
-                "symptoms": "symptoms",
-                "mortality_rate": "mortality_rate",
-                "temperature": "temperature",
-                "housing_type": "housing_type",
-                "flock_size": "flock_size"
-            }
-            
-            for entity_key, result_key in entity_mapping.items():
-                if entity_key in entities and entities[entity_key] is not None:
-                    base_result[result_key] = entities[entity_key]
+            for field in ["weight", "age_days", "age_weeks", "breed", "sex", "symptoms", 
+                         "mortality_rate", "temperature", "housing_type", "flock_size"]:
+                if field in entities and entities[field] is not None:
+                    base_result[field] = entities[field]
             
             # Propager les champs de confiance
-            confidence_fields = ["weight_confidence", "age_confidence", "breed_confidence", "sex_confidence"]
-            for field in confidence_fields:
+            for field in ["weight_confidence", "age_confidence", "breed_confidence", "sex_confidence"]:
                 if field in entities and entities[field] is not None:
                     base_result[field] = entities[field]
         
@@ -328,94 +238,13 @@ class AgentRAGEnhancer:
                 elif value is not None:  # Remplacer les None par des valeurs réelles
                     base_result[key] = value
         
-        # ✅ NOUVEAU: Extraction automatique de données implicites
-        base_result.update(self._extract_implicit_data(rag_answer, entities))
-        
         logger.debug(f"🔧 [AgentRAGEnhancer] Résultat initialisé avec {len(base_result)} champs")
         
         return base_result
     
-    def _extract_implicit_data(self, text: str, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        ✅ NOUVEAU: Extrait des données implicites du texte (poids, âge, race)
-        """
-        
-        implicit_data = {
-            "detected_weight_grams": None,
-            "detected_age_days": None,
-            "detected_breed": None,
-            "extraction_confidence": 0.0
-        }
-        
-        extractions_count = 0
-        
-        try:
-            # Extraction poids (grammes/kg)
-            weight_patterns = [
-                r'(\d+(?:\.\d+)?)\s*(?:g|gr|grammes?|grams?)\b',
-                r'(\d+(?:\.\d+)?)\s*(?:kg|kilogrammes?|kilograms?)\b',
-                r'poids(?:.*?)(\d+(?:\.\d+)?)\s*(?:g|kg)',
-                r'weight(?:.*?)(\d+(?:\.\d+)?)\s*(?:g|kg)'
-            ]
-            
-            for pattern in weight_patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    weight = float(match.group(1))
-                    # Convertir kg en grammes
-                    if 'kg' in pattern.lower() or weight < 10:
-                        weight *= 1000
-                    implicit_data["detected_weight_grams"] = int(weight)
-                    extractions_count += 1
-                    break
-            
-            # Extraction âge (jours/semaines)
-            age_patterns = [
-                r'(\d+)\s*(?:jours?|days?)\b',
-                r'(\d+)\s*(?:semaines?|weeks?)\b',
-                r'âge(?:.*?)(\d+)',
-                r'age(?:.*?)(\d+)'
-            ]
-            
-            for pattern in age_patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    age = int(match.group(1))
-                    # Convertir semaines en jours
-                    if 'semaine' in pattern.lower() or 'week' in pattern.lower():
-                        age *= 7
-                    implicit_data["detected_age_days"] = age
-                    extractions_count += 1
-                    break
-            
-            # Extraction race
-            breed_patterns = [
-                r'\b(Ross\s*\d+)\b',
-                r'\b(Cobb\s*\d+)\b',
-                r'\b(Hubbard)\b',
-                r'\b(Arbor\s*Acres?)\b'
-            ]
-            
-            for pattern in breed_patterns:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    implicit_data["detected_breed"] = match.group(1).strip()
-                    extractions_count += 1
-                    break
-            
-            # Calculer confiance d'extraction
-            if extractions_count > 0:
-                implicit_data["extraction_confidence"] = min(extractions_count / 3.0, 1.0)
-                logger.debug(f"🔍 [AgentRAGEnhancer] {extractions_count} données extraites automatiquement")
-        
-        except Exception as e:
-            logger.error(f"❌ [AgentRAGEnhancer] Erreur extraction implicite: {e}")
-        
-        return implicit_data
-    
     def _merge_results(self, base_result: Dict[str, Any], enhancement_result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        ✅ Fusionne les résultats en préservant tous les champs
+        ✅ NOUVELLE: Fusionne les résultats en préservant tous les champs
         """
         
         # Commencer avec le résultat de base complet
@@ -705,7 +534,7 @@ Responde en JSON:
 }}"""
     
     def _format_entities_for_gpt(self, entities: Dict[str, Any]) -> str:
-        """✅ FIX: Formate les entités pour le prompt GPT - nomenclature standardisée"""
+        """Formate les entités pour le prompt GPT"""
         
         formatted_parts = []
         
@@ -732,16 +561,12 @@ Responde en JSON:
         else:
             formatted_parts.append("❌ Âge: inconnu")
         
-        # ✅ FIX: Poids standardisé sur weight_grams
-        weight_grams = entities.get("weight_grams") or entities.get("weight")  # Compatibilité
-        if weight_grams:
+        # Performance et santé
+        if entities.get("weight_grams"):
             confidence = entities.get("weight_confidence", 0.0)
             status = "✅" if confidence > 0.6 else "⚠️"
-            formatted_parts.append(f"{status} Poids actuel: {weight_grams}g")
-        else:
-            formatted_parts.append("❌ Poids: inconnu")
+            formatted_parts.append(f"{status} Poids actuel: {entities['weight_grams']}g")
         
-        # Performance et santé
         if entities.get("symptoms"):
             symptoms = ", ".join(entities["symptoms"]) if isinstance(entities["symptoms"], list) else str(entities["symptoms"])
             formatted_parts.append(f"🚨 Symptômes observés: {symptoms}")
@@ -998,7 +823,7 @@ Responde en JSON:
         }
     
     def get_stats(self) -> Dict[str, Any]:
-        """✅ FIX: Retourne les statistiques enrichies de l'agent"""
+        """Retourne les statistiques de l'agent"""
         
         total = self.stats["total_requests"]
         success_rate = (self.stats["openai_success"] / total * 100) if total > 0 else 0
@@ -1006,7 +831,6 @@ Responde en JSON:
         clarification_rate = (self.stats["clarifications_generated"] / total * 100) if total > 0 else 0
         coherence_issue_rate = (self.stats["coherence_issues_detected"] / total * 100) if total > 0 else 0
         field_propagation_success_rate = (self.stats["field_propagation_success"] / total * 100) if total > 0 else 0
-        input_validation_rate = (self.stats["input_validation_fixes"] / total * 100) if total > 0 else 0
         
         return {
             "agent_type": "rag_enhancer",
@@ -1015,8 +839,7 @@ Responde en JSON:
             "answer_enhancement_rate": f"{enhancement_rate:.1f}%",
             "clarification_generation_rate": f"{clarification_rate:.1f}%",
             "coherence_issue_detection_rate": f"{coherence_issue_rate:.1f}%",
-            "field_propagation_success_rate": f"{field_propagation_success_rate:.1f}%",
-            "input_validation_fixes_rate": f"{input_validation_rate:.1f}%",  # ✅ NOUVEAU
+            "field_propagation_success_rate": f"{field_propagation_success_rate:.1f}%",  # ✅ NOUVEAU
             "openai_available": self.openai_available,
             "model_used": self.model,
             "detailed_stats": self.stats.copy()
@@ -1025,27 +848,22 @@ Responde en JSON:
 # Instance globale
 agent_rag_enhancer = AgentRAGEnhancer()
 
-# ✅ FIX: Fonction utilitaire avec validation défensive
+# ✅ CORRECTION: Fonction utilitaire mise à jour avec propagation des champs
 async def enhance_rag_answer(
     rag_answer: str,
-    entities: Dict[str, Any] = None,  # ✅ FIX: Valeur par défaut None
-    missing_entities: List[str] = None,  # ✅ FIX: Valeur par défaut None
-    conversation_context: str = "",
+    entities: Dict[str, Any],
+    missing_entities: List[str],
+    conversation_context: str,
     original_question: str = "",
     enriched_question: str = "",
     language: str = "fr",
-    **additional_fields
+    **additional_fields  # ✅ NOUVEAU: Capture tous les champs supplémentaires
 ) -> Dict[str, Any]:
     """
-    ✅ FIX: Fonction utilitaire avec validation défensive et propagation complète
+    Fonction utilitaire pour améliorer une réponse RAG avec vérification de cohérence
+    ✅ CORRECTION: Propagation systématique de tous les champs
     """
     return await agent_rag_enhancer.enhance_rag_answer(
-        rag_answer, 
-        entities or {}, 
-        missing_entities or [], 
-        conversation_context, 
-        original_question, 
-        enriched_question, 
-        language, 
-        **additional_fields
+        rag_answer, entities, missing_entities, conversation_context, 
+        original_question, enriched_question, language, **additional_fields
     )
