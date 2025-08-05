@@ -605,4 +605,4 @@ logger.info("   - ✅ missing_entities: Optional[List[str]] = None")
 logger.info("   - ✅ missing_critical_entities: Optional[List[str]] = None")
 logger.info("   - ✅ clarification_required_critical: Optional[bool] = None")
 logger.info("   - ✅ critical_entities_for_type: Optional[List[str]] = None")
-logger.info("✨ [Expert Models] RÉSULTAT: Erreur 'missing_entities' corrigée, code prêt pour la production!")s
+logger.info("✨ [Expert Models] RÉSULTAT: Erreur 'missing_entities' corrigée, code prêt pour la production!")
