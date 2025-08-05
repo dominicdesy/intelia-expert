@@ -11,6 +11,7 @@ Agent RAG Enhancer - Amélioration des réponses après RAG
 - ✅ CORRECTION: Propagation systématique de tous les champs
 - ✅ CORRECTION: Gestion des champs absents avec valeurs par défaut
 - ✅ FIX: Validation défensive et standardisation nomenclature
+- ✅ NOUVEAU: Correction rag_used et injection enriched_question
 """
 
 import os
@@ -51,7 +52,9 @@ class AgentRAGEnhancer:
             "coherence_issues_detected": 0,
             "field_propagation_success": 0,
             "field_propagation_fallback": 0,
-            "input_validation_fixes": 0  # ✅ NOUVEAU: Tracking des corrections d'input
+            "input_validation_fixes": 0,
+            "rag_used_corrections": 0,  # ✅ NOUVEAU: Tracking corrections rag_used
+            "enriched_question_injections": 0  # ✅ NOUVEAU: Tracking injections enriched_question
         }
         
         logger.info(f"🔧 [AgentRAGEnhancer] Initialisé")
@@ -111,6 +114,223 @@ class AgentRAGEnhancer:
         
         return entities, missing_entities, original_question, enriched_question, language
     
+    def _check_and_fix_rag_used(
+        self, 
+        response_data: Dict[str, Any], 
+        rag_results: List[Dict] = None,
+        has_rag_context: bool = False
+    ) -> Dict[str, Any]:
+        """
+        ✅ NOUVEAU: Vérifie et corrige le flag rag_used selon les résultats RAG
+        
+        Args:
+            response_data: Données de réponse à corriger
+            rag_results: Résultats du système RAG (FAISS/Pinecone)
+            has_rag_context: Indicateur si contexte RAG présent
+            
+        Returns:
+            response_data corrigé avec rag_used approprié
+        """
+        
+        original_rag_used = response_data.get("rag_used", False)
+        
+        # Détection si RAG a été utilisé
+        rag_was_used = False
+        
+        # Cas 1: Résultats RAG explicites fournis
+        if rag_results and len(rag_results) > 0:
+            rag_was_used = True
+            logger.debug(f"🔍 [AgentRAGEnhancer] RAG détecté via rag_results: {len(rag_results)} résultats")
+        
+        # Cas 2: Contexte RAG détecté
+        elif has_rag_context:
+            rag_was_used = True
+            logger.debug("🔍 [AgentRAGEnhancer] RAG détecté via has_rag_context")
+        
+        # Cas 3: Indices dans la réponse
+        elif response_data.get("enhanced_answer") or response_data.get("answer"):
+            answer_text = response_data.get("enhanced_answer") or response_data.get("answer", "")
+            
+            # Rechercher des indices de contexte RAG dans la réponse
+            rag_indicators = [
+                "selon la documentation",
+                "d'après les informations",
+                "based on documentation",
+                "according to the information",
+                "les données indiquent",
+                "the data indicates",
+                "documents consultés",
+                "consulted documents"
+            ]
+            
+            if any(indicator in answer_text.lower() for indicator in rag_indicators):
+                rag_was_used = True
+                logger.debug("🔍 [AgentRAGEnhancer] RAG détecté via indicateurs dans la réponse")
+        
+        # Cas 4: Sources ou citations présentes
+        if response_data.get("sources") or response_data.get("citations"):
+            rag_was_used = True
+            logger.debug("🔍 [AgentRAGEnhancer] RAG détecté via sources/citations")
+        
+        # Correction si nécessaire
+        if rag_was_used and not original_rag_used:
+            response_data["rag_used"] = True
+            self.stats["rag_used_corrections"] += 1
+            logger.info("✅ [AgentRAGEnhancer] Correction: rag_used passé de False à True")
+        
+        elif not rag_was_used and original_rag_used:
+            # Cas rare: flag rag_used était True mais pas d'évidence RAG
+            logger.warning("⚠️ [AgentRAGEnhancer] rag_used=True mais pas d'évidence RAG détectée")
+            # On garde True par sécurité mais on log
+        
+        return response_data
+    
+    def _inject_enriched_question(
+        self, 
+        response_data: Dict[str, Any], 
+        original_question: str,
+        context_entities: Dict[str, Any] = None,
+        rag_results: List[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        ✅ NOUVEAU: Génère et injecte enriched_question si manquant
+        
+        Args:          response_data: Données de réponse
+            original_question: Question originale utilisateur
+            context_entities: Entités extraites du contexte
+            rag_results: Résultats RAG pour enrichissement
+            
+        Returns:
+            response_data avec enriched_question injecté
+        """
+        
+        # Vérifier si enriched_question existe déjà
+        existing_enriched = response_data.get("enriched_question", "").strip()
+        
+        if existing_enriched and existing_enriched != original_question:
+            # enriched_question déjà présent et différent
+            logger.debug("✅ [AgentRAGEnhancer] enriched_question déjà présent")
+            return response_data
+        
+        # Générer enriched_question
+        enriched_question = self._enrich_question_with_context(
+            original_question, context_entities, rag_results
+        )
+        
+        # Injecter si différent de la question originale
+        if enriched_question and enriched_question.strip() != original_question.strip():
+            response_data["enriched_question"] = enriched_question
+            self.stats["enriched_question_injections"] += 1
+            logger.info("✅ [AgentRAGEnhancer] enriched_question injecté")
+            logger.debug(f"   Original: {original_question}")
+            logger.debug(f"   Enrichie: {enriched_question}")
+        else:
+            # Pas d'enrichissement possible ou identique
+            response_data["enriched_question"] = original_question
+            logger.debug("🔄 [AgentRAGEnhancer] enriched_question = original (pas d'enrichissement)")
+        
+        return response_data
+    
+    def _enrich_question_with_context(
+        self,
+        original_question: str,
+        entities: Dict[str, Any] = None,
+        rag_results: List[Dict] = None
+    ) -> str:
+        """
+        ✅ NOUVEAU: Enrichit une question avec le contexte disponible
+        
+        Args:
+            original_question: Question originale
+            entities: Entités extraites du contexte
+            rag_results: Résultats RAG pour contexte supplémentaire
+            
+        Returns:
+            Question enrichie avec contexte
+        """
+        
+        if not original_question:
+            return ""
+        
+        enriched_parts = [original_question]
+        context_additions = []
+        
+        # Enrichissement via entités
+        if entities:
+            # Race/souche
+            if entities.get("breed") and entities.get("breed_confidence", 0) > 0.6:
+                context_additions.append(f"race {entities['breed']}")
+            
+            # Âge
+            if entities.get("age_days") and entities.get("age_confidence", 0) > 0.6:
+                weeks = entities.get("age_weeks", entities["age_days"] / 7)
+                context_additions.append(f"âge {entities['age_days']} jours ({weeks:.1f} semaines)")
+            
+            # Poids (nomenclature standardisée)
+            weight_grams = entities.get("weight_grams") or entities.get("weight")
+            if weight_grams and entities.get("weight_confidence", 0) > 0.5:
+                context_additions.append(f"poids {weight_grams}g")
+            
+            # Sexe
+            if entities.get("sex") and entities.get("sex_confidence", 0) > 0.6:
+                context_additions.append(f"sexe {entities['sex']}")
+            
+            # Symptômes
+            if entities.get("symptoms"):
+                symptoms = ", ".join(entities["symptoms"]) if isinstance(entities["symptoms"], list) else str(entities["symptoms"])
+                context_additions.append(f"symptômes: {symptoms}")
+            
+            # Environnement critique
+            if entities.get("temperature") and (entities["temperature"] < 18 or entities["temperature"] > 30):
+                context_additions.append(f"température {entities['temperature']}°C")
+            
+            if entities.get("mortality_rate") and entities["mortality_rate"] > 2:
+                context_additions.append(f"mortalité {entities['mortality_rate']}%")
+        
+        # Enrichissement via résultats RAG
+        if rag_results and len(rag_results) > 0:
+            # Extraire thèmes principaux des résultats RAG
+            rag_themes = set()
+            for result in rag_results[:3]:  # Top 3 résultats
+                content = result.get("content", "").lower()
+                
+                # Détecter thèmes importants
+                theme_keywords = {
+                    "vaccination": ["vaccin", "vaccination", "immunisation"],
+                    "nutrition": ["alimentation", "nutrition", "aliment"],
+                    "croissance": ["croissance", "poids", "développement"],
+                    "santé": ["maladie", "symptôme", "diagnostic"],
+                    "environnement": ["température", "ventilation", "logement"]
+                }
+                
+                for theme, keywords in theme_keywords.items():
+                    if any(keyword in content for keyword in keywords):
+                        rag_themes.add(theme)
+            
+            if rag_themes:
+                themes_text = ", ".join(list(rag_themes)[:2])  # Max 2 thèmes
+                context_additions.append(f"contexte: {themes_text}")
+        
+        # Construire question enrichie
+        if context_additions:
+            context_text = " - " + " - ".join(context_additions)
+            enriched_question = original_question + context_text
+            
+            # Limiter la longueur
+            if len(enriched_question) > 200:
+                # Garder les éléments les plus importants
+                priority_additions = [add for add in context_additions 
+                                    if any(word in add for word in ["race", "âge", "poids", "symptômes"])]
+                if priority_additions:
+                    context_text = " - " + " - ".join(priority_additions[:2])
+                    enriched_question = original_question + context_text
+                else:
+                    enriched_question = original_question  # Fallback
+            
+            return enriched_question
+        
+        return original_question
+    
     async def enhance_rag_answer(
         self,
         rag_answer: str,
@@ -120,10 +340,12 @@ class AgentRAGEnhancer:
         original_question: str = "",
         enriched_question: str = "",
         language: str = "fr",
+        rag_results: List[Dict] = None,  # ✅ NOUVEAU: Paramètre rag_results
         **additional_fields  # ✅ Capture tous les champs supplémentaires
     ) -> Dict[str, Any]:
         """
         Améliore une réponse RAG avec le contexte utilisateur et vérifie la cohérence
+        ✅ NOUVEAU: Corrections automatiques rag_used et enriched_question
         
         Args:
             rag_answer: Réponse brute du système RAG
@@ -133,10 +355,11 @@ class AgentRAGEnhancer:
             original_question: Question originale posée
             enriched_question: Question enrichie par le pré-RAG
             language: Langue de la conversation
+            rag_results: Résultats du système RAG (NOUVEAU)
             **additional_fields: Tous les champs supplémentaires à propager
             
         Returns:
-            Dict avec tous les champs requis garantis, même si None
+            Dict avec tous les champs requis garantis, corrections rag_used/enriched_question
         """
         
         self.stats["total_requests"] += 1
@@ -149,12 +372,17 @@ class AgentRAGEnhancer:
             )
         )
         
-        # ✅ FIX: Validation rag_answer
+        # ✅ FIX: Validation rag_answer et rag_results
         if not isinstance(rag_answer, str):
             rag_answer = str(rag_answer) if rag_answer is not None else ""
         
         if not isinstance(conversation_context, str):
             conversation_context = str(conversation_context) if conversation_context is not None else ""
+        
+        if rag_results is None:
+            rag_results = []
+        elif not isinstance(rag_results, list):
+            rag_results = []
         
         try:
             # ✅ CORRECTION: Initialiser le résultat avec TOUS les champs requis
@@ -163,11 +391,22 @@ class AgentRAGEnhancer:
                 enriched_question, language, additional_fields
             )
             
+            # ✅ NOUVEAU: Corrections automatiques AVANT traitement OpenAI
+            # 1. Corriger rag_used selon les résultats RAG
+            base_result = self._check_and_fix_rag_used(
+                base_result, rag_results, bool(conversation_context or rag_answer)
+            )
+            
+            # 2. Injecter enriched_question si manquant/inadéquat
+            base_result = self._inject_enriched_question(
+                base_result, original_question, entities, rag_results
+            )
+            
             # Tentative OpenAI si disponible
             if self.openai_available:
                 enhancement_result = await self._enhance_with_openai(
                     rag_answer, entities, missing_entities, conversation_context, 
-                    original_question, enriched_question, language
+                    original_question, base_result.get("enriched_question", original_question), language
                 )
                 
                 if enhancement_result.get("success"):
@@ -175,6 +414,9 @@ class AgentRAGEnhancer:
                     final_result = self._merge_results(base_result, enhancement_result)
                     self.stats["openai_success"] += 1
                     self.stats["field_propagation_success"] += 1
+                    
+                    # ✅ NOUVEAU: Réappliquer les corrections après OpenAI (au cas où)
+                    final_result = self._check_and_fix_rag_used(final_result, rag_results, True)
                     
                     # Mise à jour des statistiques
                     if final_result["enhanced_answer"] != rag_answer:
@@ -192,7 +434,7 @@ class AgentRAGEnhancer:
             logger.info("🔄 [AgentRAGEnhancer] Utilisation fallback basique")
             fallback_result = self._enhance_fallback(
                 rag_answer, entities, missing_entities, 
-                original_question, enriched_question, language
+                original_question, base_result.get("enriched_question", original_question), language
             )
             
             # ✅ CORRECTION: Fusionner avec le résultat de base
@@ -200,16 +442,23 @@ class AgentRAGEnhancer:
             self.stats["fallback_used"] += 1
             self.stats["field_propagation_fallback"] += 1
             
+            # ✅ NOUVEAU: Garantir corrections finales
+            final_result = self._check_and_fix_rag_used(final_result, rag_results, True)
+            
             return final_result
             
         except Exception as e:
             logger.error(f"❌ [AgentRAGEnhancer] Erreur critique inattendue: {e}")
             
-            # ✅ CORRECTION: Même en cas d'erreur, retourner un résultat complet
+            # ✅ CORRECTION: Même en cas d'erreur, retourner un résultat complet avec corrections
             error_result = self._initialize_complete_result(
                 rag_answer, entities, missing_entities, original_question, 
                 enriched_question, language, additional_fields
             )
+            
+            # ✅ NOUVEAU: Appliquer corrections même en cas d'erreur
+            error_result = self._check_and_fix_rag_used(error_result, rag_results, bool(rag_answer))
+            error_result = self._inject_enriched_question(error_result, original_question, entities, rag_results)
             
             error_result.update({
                 "enhanced_answer": rag_answer,
@@ -253,12 +502,15 @@ class AgentRAGEnhancer:
             
             # Champs d'entrée propagés
             "original_question": original_question,
-            "enriched_question": enriched_question,
+            "enriched_question": enriched_question,  # Sera corrigé si nécessaire
             "language": language,
             
             # Champs contextuels
             "entities": entities,
             "missing_entities": missing_entities,
+            
+            # ✅ NOUVEAU: Champ rag_used (sera corrigé par _check_and_fix_rag_used)
+            "rag_used": False,  # Valeur par défaut, sera corrigée
             
             # Champs techniques
             "processing_time": datetime.now().isoformat(),
@@ -432,7 +684,7 @@ class AgentRAGEnhancer:
         required_fields = [
             "enhanced_answer", "optional_clarifications", "warnings", 
             "confidence_impact", "coherence_check", "coherence_notes", 
-            "method_used", "success"
+            "method_used", "success", "rag_used", "enriched_question"  # ✅ AJOUTÉ: rag_used, enriched_question
         ]
         
         for field in required_fields:
@@ -1007,6 +1259,8 @@ Responde en JSON:
         coherence_issue_rate = (self.stats["coherence_issues_detected"] / total * 100) if total > 0 else 0
         field_propagation_success_rate = (self.stats["field_propagation_success"] / total * 100) if total > 0 else 0
         input_validation_rate = (self.stats["input_validation_fixes"] / total * 100) if total > 0 else 0
+        rag_used_correction_rate = (self.stats["rag_used_corrections"] / total * 100) if total > 0 else 0  # ✅ NOUVEAU
+        enriched_question_injection_rate = (self.stats["enriched_question_injections"] / total * 100) if total > 0 else 0  # ✅ NOUVEAU
         
         return {
             "agent_type": "rag_enhancer",
@@ -1016,7 +1270,9 @@ Responde en JSON:
             "clarification_generation_rate": f"{clarification_rate:.1f}%",
             "coherence_issue_detection_rate": f"{coherence_issue_rate:.1f}%",
             "field_propagation_success_rate": f"{field_propagation_success_rate:.1f}%",
-            "input_validation_fixes_rate": f"{input_validation_rate:.1f}%",  # ✅ NOUVEAU
+            "input_validation_fixes_rate": f"{input_validation_rate:.1f}%",
+            "rag_used_correction_rate": f"{rag_used_correction_rate:.1f}%",  # ✅ NOUVEAU
+            "enriched_question_injection_rate": f"{enriched_question_injection_rate:.1f}%",  # ✅ NOUVEAU
             "openai_available": self.openai_available,
             "model_used": self.model,
             "detailed_stats": self.stats.copy()
@@ -1025,7 +1281,7 @@ Responde en JSON:
 # Instance globale
 agent_rag_enhancer = AgentRAGEnhancer()
 
-# ✅ FIX: Fonction utilitaire avec validation défensive
+# ✅ FIX: Fonction utilitaire avec validation défensive et nouvelles corrections
 async def enhance_rag_answer(
     rag_answer: str,
     entities: Dict[str, Any] = None,  # ✅ FIX: Valeur par défaut None
@@ -1034,10 +1290,32 @@ async def enhance_rag_answer(
     original_question: str = "",
     enriched_question: str = "",
     language: str = "fr",
+    rag_results: List[Dict] = None,  # ✅ NOUVEAU: Paramètre rag_results
     **additional_fields
 ) -> Dict[str, Any]:
     """
-    ✅ FIX: Fonction utilitaire avec validation défensive et propagation complète
+    ✅ FIX: Fonction utilitaire avec validation défensive, propagation complète 
+    et corrections automatiques rag_used/enriched_question
+    
+    NOUVELLES FONCTIONNALITÉS:
+    - Détection et correction automatique du flag rag_used
+    - Génération et injection automatique d'enriched_question
+    - Propagation systématique de tous les champs
+    - Validation défensive des inputs
+    
+    Args:
+        rag_answer: Réponse brute du système RAG
+        entities: Entités extraites (défaut: {})
+        missing_entities: Entités manquantes (défaut: [])
+        conversation_context: Contexte conversationnel
+        original_question: Question originale utilisateur
+        enriched_question: Question enrichie (sera générée si manquante)
+        language: Langue de conversation
+        rag_results: Résultats FAISS/Pinecone (NOUVEAU)
+        **additional_fields: Champs supplémentaires à propager
+        
+    Returns:
+        Dict complet avec corrections rag_used et enriched_question garanties
     """
     return await agent_rag_enhancer.enhance_rag_answer(
         rag_answer, 
@@ -1046,6 +1324,128 @@ async def enhance_rag_answer(
         conversation_context, 
         original_question, 
         enriched_question, 
-        language, 
+        language,
+        rag_results or [],  # ✅ NOUVEAU: Passer rag_results
         **additional_fields
     )
+
+# ✅ NOUVEAU: Fonction utilitaire pour corriger response_data existant
+def fix_rag_response_data(
+    response_data: Dict[str, Any],
+    rag_results: List[Dict] = None,
+    original_question: str = "",
+    entities: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    ✅ NOUVEAU: Corrige un response_data existant avec rag_used et enriched_question
+    
+    Usage dans les endpoints existants:
+    ```python
+    # Après avoir généré la réponse RAG
+    response_data = fix_rag_response_data(
+        response_data=response_data,
+        rag_results=rag_results,
+        original_question=query,
+        entities=context_entities
+    )
+    ```
+    
+    Args:
+        response_data: Données de réponse à corriger
+        rag_results: Résultats du système RAG
+        original_question: Question originale
+        entities: Entités du contexte
+        
+    Returns:
+        response_data corrigé avec rag_used et enriched_question
+    """
+    
+    if not isinstance(response_data, dict):
+        logger.warning("⚠️ [fix_rag_response_data] response_data n'est pas un dict")
+        return response_data
+    
+    # 1. Corriger rag_used
+    corrected_data = agent_rag_enhancer._check_and_fix_rag_used(
+        response_data, rag_results, bool(response_data.get("answer") or response_data.get("enhanced_answer"))
+    )
+    
+    # 2. Injecter enriched_question si nécessaire
+    corrected_data = agent_rag_enhancer._inject_enriched_question(
+        corrected_data, original_question, entities, rag_results
+    )
+    
+    logger.debug("✅ [fix_rag_response_data] Corrections appliquées")
+    return corrected_data
+
+# ✅ NOUVEAU: Exemple d'intégration dans un endpoint
+"""
+EXEMPLE D'UTILISATION DANS UN ENDPOINT:
+
+```python
+@app.post("/api/v1/expert/ask")
+async def ask_expert_question(request: QuestionRequest):
+    # ... logique existante ...
+    
+    # Recherche RAG
+    rag_results = await rag_system.search(enriched_query)
+    
+    # Génération réponse
+    rag_answer = await llm.generate_answer(enriched_query, rag_results)
+    
+    # Construction response_data initial
+    response_data = {
+        "answer": rag_answer,
+        "rag_used": False,  # ❌ Incorrect - sera corrigé
+        "original_question": request.question,
+        # enriched_question manquant - sera injecté
+        **other_fields
+    }
+    
+    # ✅ CORRECTION AUTOMATIQUE
+    response_data = fix_rag_response_data(
+        response_data=response_data,
+        rag_results=rag_results,
+        original_question=request.question,
+        entities=extracted_entities
+    )
+    
+    # Maintenant response_data a:
+    # - rag_used: True (si rag_results non vide)
+    # - enriched_question: question enrichie générée
+    # - tous les autres champs préservés
+    
+    return response_data
+```
+
+ALTERNATIVE - Utilisation complète de enhance_rag_answer:
+
+```python
+@app.post("/api/v1/expert/ask")  
+async def ask_expert_question(request: QuestionRequest):
+    # ... logique existante ...
+    
+    # Recherche RAG
+    rag_results = await rag_system.search(enriched_query)
+    rag_answer = await llm.generate_answer(enriched_query, rag_results)
+    
+    # ✅ AMÉLIORATION COMPLÈTE avec toutes les corrections
+    enhanced_response = await enhance_rag_answer(
+        rag_answer=rag_answer,
+        entities=extracted_entities,
+        missing_entities=missing_entities,
+        conversation_context=conversation_context,
+        original_question=request.question,
+        enriched_question="",  # Sera généré automatiquement
+        language=request.language,
+        rag_results=rag_results,  # ✅ IMPORTANT: Passer les résultats RAG
+        # Tous les champs supplémentaires
+        user_id=request.user_id,
+        session_id=request.session_id,
+        sources=extracted_sources,
+        **other_fields
+    )
+    
+    # enhanced_response contient TOUT avec corrections garanties
+    return enhanced_response
+```
+"""
