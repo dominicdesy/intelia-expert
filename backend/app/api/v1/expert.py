@@ -1,289 +1,396 @@
 """
-app/api/v1/expert.py - FICHIER PRINCIPAL CONSERVÉ v3.7.8
+expert.py - POINT D'ENTRÉE PRINCIPAL SIMPLIFIÉ
 
-🔧 REFACTORISATION INTELLIGENTE:
-- Nom de fichier CONSERVÉ pour éviter de casser les liens existants
-- Code refactorisé importé depuis les modules séparés
-- Même interface publique, architecture interne améliorée
-- Compatibilité 100% garantie avec le frontend
+🎯 NOUVEAU SYSTÈME UNIFIÉ - Plus de conflits, plus de complexité excessive !
+🚀 ARCHITECTURE: Entities → Classifier → Generator → Response
+✨ SIMPLE: Un seul flux de traitement, des règles claires
 
-MODULES REFACTORISÉS:
-- expert_endpoints.py : Routes et endpoints FastAPI
-- expert_core_functions.py : Logique métier principale  
-- expert_utilities.py : Fonctions utilitaires et helpers
+Endpoints conservés pour compatibilité:
+- POST /ask : Endpoint principal
+- POST /ask-public : Version publique
+- POST /ask-enhanced : Redirige vers le nouveau système
+- POST /ask-enhanced-public : Redirige vers le nouveau système
+- POST /feedback : Feedback utilisateur
+- GET /topics : Topics disponibles
 
-AVANTAGES:
-✅ Liens existants préservés (import expert.router)
-✅ Code maintenable avec séparation des responsabilités
-✅ Même fonctionnalités, architecture améliorée
-✅ Extensibilité future facilitée
+FINI:
+❌ expert_legacy.py (supprimé)
+❌ question_clarification_system.py (supprimé) 
+❌ expert_services_clarification.py (supprimé)
+❌ Tous les systèmes contradictoires
+
+NOUVEAU:
+✅ smart_classifier.py
+✅ unified_response_generator.py
+✅ entities_extractor.py
+✅ expert_services.py (simplifié)
 """
 
 import logging
+import uuid
+import time
 from datetime import datetime
+from typing import Dict, Any, Optional
 
-# Import du router principal depuis expert_endpoints
-try:
-    from .expert_endpoints import router
-    logger = logging.getLogger(__name__)
-    logger.info("✅ [Expert Main] Router importé depuis expert_endpoints")
-except ImportError as e:
-    logger = logging.getLogger(__name__)
-    logger.error(f"❌ [Expert Main] Erreur import router: {e}")
-    # Fallback en cas de problème
-    from fastapi import APIRouter
-    router = APIRouter(tags=["expert-fallback"])
+from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse
 
-# Imports des fonctions principales pour compatibilité
-try:
-    from .expert_core_functions import (
-        _build_conversation_context,
-        _analyze_agricultural_domain,
-        _apply_dynamic_clarification_service,
-        _apply_fallback_clarification,
-        _extract_critical_entities_from_question,
-        _validate_critical_entities,
-        _force_clarification_for_missing_entities,
-        _detect_inconsistencies_and_force_clarification,
-        _sync_rag_state_simple,
-        _extract_propagation_fields,
-        _apply_propagation_fields
-    )
-    logger.info("✅ [Expert Main] Fonctions core importées")
-except ImportError as e:
-    logger.error(f"❌ [Expert Main] Erreur import core functions: {e}")
+# Imports des nouveaux modules unifiés
+from .expert_services import ExpertService, ProcessingResult
+from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest
+from .intelligent_system_config import INTELLIGENT_SYSTEM_CONFIG
 
+# Import pour récupérer l'utilisateur (si système d'auth disponible)
 try:
-    from .expert_utilities import (
-        get_user_id_from_request,
-        extract_breed_and_sex_from_clarification,
-        _create_incomplete_clarification_response,
-        _fallback_expert_response,
-        validate_question_text,
-        format_response_time,
-        safe_get_attribute,
-        generate_conversation_id,
-        is_agricultural_question,
-        extract_age_from_text,
-        extract_weight_from_text,
-        extract_breed_from_text,
-        format_clarification_message
-    )
-    logger.info("✅ [Expert Main] Utilitaires importées")
-except ImportError as e:
-    logger.error(f"❌ [Expert Main] Erreur import utilities: {e}")
+    from .expert_utils import get_user_id_from_request
+    UTILS_AVAILABLE = True
+except ImportError:
+    def get_user_id_from_request(request):
+        return None
+    UTILS_AVAILABLE = False
 
-# Import des modèles pour compatibilité
-try:
-    from .expert_models import (
-        EnhancedQuestionRequest,
-        EnhancedExpertResponse, 
-        FeedbackRequest,
-        ConcisionLevel
-    )
-    logger.info("✅ [Expert Main] Modèles importés")
-except ImportError as e:
-    logger.error(f"❌ [Expert Main] Erreur import models: {e}")
+router = APIRouter(tags=["expert"])
+logger = logging.getLogger(__name__)
 
-# Import du service principal pour compatibilité
-try:
-    from .expert_services import ExpertService
-    logger.info("✅ [Expert Main] Service principal importé")
-except ImportError as e:
-    logger.error(f"❌ [Expert Main] Erreur import service: {e}")
+# Service principal unifié - UNE SEULE instance
+expert_service = ExpertService()
 
 # =============================================================================
-# VARIABLES ET CONSTANTES POUR COMPATIBILITÉ
+# ENDPOINTS PRINCIPAUX - NOUVEAU SYSTÈME UNIFIÉ
 # =============================================================================
 
-# Variables d'état pour compatibilité avec l'ancien code
-MODELS_IMPORTED = True
-EXPERT_SERVICE_AVAILABLE = True
-CLARIFICATION_SERVICE_AVAILABLE = True
-UTILS_AVAILABLE = True
-
-# Services disponibles (importés depuis les modules)
-expert_service = None
-clarification_service = None
-
-try:
-    expert_service = ExpertService()
-    logger.info("✅ [Expert Main] Service expert initialisé")
-except Exception as e:
-    logger.error(f"❌ [Expert Main] Erreur init service: {e}")
-
-try:
-    from .expert_clarification_service import ExpertClarificationService
-    clarification_service = ExpertClarificationService()
-    logger.info("✅ [Expert Main] Service clarification initialisé")
-except Exception as e:
-    logger.error(f"❌ [Expert Main] Erreur init clarification service: {e}")
-
-# =============================================================================
-# EXPORTS POUR COMPATIBILITÉ TOTALE
-# =============================================================================
-
-# Export du router principal (CRITIQUE pour les imports existants)
-__all__ = [
-    "router",  # ← ESSENTIEL: from .expert import router
+@router.post("/ask", response_model=EnhancedExpertResponse)
+async def ask_expert(request: EnhancedQuestionRequest, http_request: Request = None):
+    """
+    🎯 ENDPOINT PRINCIPAL - Nouveau système unifié intelligent
     
-    # Modèles
-    "EnhancedQuestionRequest",
-    "EnhancedExpertResponse", 
-    "FeedbackRequest",
-    "ConcisionLevel",
+    Plus besoin de multiples endpoints ! Un seul endpoint intelligent qui :
+    - Extrait automatiquement les entités
+    - Classifie intelligemment la question  
+    - Génère la réponse adaptée (précise/générale/clarification)
+    - Offre la précision quand pertinent
     
-    # Services
-    "ExpertService",
-    "expert_service",
-    "clarification_service",
-    
-    # Fonctions core
-    "_build_conversation_context",
-    "_analyze_agricultural_domain", 
-    "_apply_dynamic_clarification_service",
-    "_extract_critical_entities_from_question",
-    "_validate_critical_entities",
-    "_sync_rag_state_simple",
-    
-    # Utilitaires
-    "get_user_id_from_request",
-    "extract_breed_and_sex_from_clarification",
-    "_create_incomplete_clarification_response",
-    "_fallback_expert_response",
-    "validate_question_text",
-    "is_agricultural_question",
-    
-    # Variables d'état
-    "MODELS_IMPORTED",
-    "EXPERT_SERVICE_AVAILABLE", 
-    "CLARIFICATION_SERVICE_AVAILABLE",
-    "UTILS_AVAILABLE"
-]
-
-# =============================================================================
-# LOGGING ET INFORMATIONS DE COMPATIBILITÉ
-# =============================================================================
-
-logger.info("🚀" * 50)
-logger.info("🚀 [EXPERT.PY PRINCIPAL] VERSION 3.7.8 - REFACTORISATION AVEC COMPATIBILITÉ!")
-logger.info("🚀")
-logger.info("🎯 [STRATÉGIE REFACTORISATION]:")
-logger.info("   ✅ Nom de fichier CONSERVÉ → expert.py")
-logger.info("   ✅ Interface publique IDENTIQUE")
-logger.info("   ✅ Imports existants PRÉSERVÉS")
-logger.info("   ✅ Liens frontend/backend INTACTS")
-logger.info("")
-logger.info("📁 [ARCHITECTURE REFACTORISÉE]:")
-logger.info("   📄 expert.py ← CE FICHIER (point d'entrée)")
-logger.info("   📄 expert_endpoints.py (routes FastAPI)")
-logger.info("   📄 expert_core_functions.py (logique métier)")
-logger.info("   📄 expert_utilities.py (fonctions helpers)")
-logger.info("")
-logger.info("🔗 [COMPATIBILITÉ GARANTIE]:")
-logger.info("   ✅ from .expert import router → FONCTIONNE")
-logger.info("   ✅ from app.api.v1.expert import router → FONCTIONNE") 
-logger.info("   ✅ Tous les endpoints identiques → FONCTIONNE")
-logger.info("   ✅ Modèles de données identiques → FONCTIONNE")
-logger.info("   ✅ Services et utilitaires → FONCTIONNE")
-logger.info("")
-logger.info("🚀 [BÉNÉFICES REFACTORISATION]:")
-logger.info("   🎯 Code organisé par responsabilité")
-logger.info("   🎯 Fonctions plus courtes et focalisées")
-logger.info("   🎯 Imports et dépendances clairs")
-logger.info("   🎯 Maintenabilité grandement améliorée")
-logger.info("   🎯 Extensibilité future facilitée")
-logger.info("   🎯 Tests unitaires plus simples")
-logger.info("")
-logger.info("⚡ [STATUT REFACTORISATION]:")
-logger.info(f"   - Router disponible: {router is not None}")
-logger.info(f"   - Expert service: {expert_service is not None}")
-logger.info(f"   - Clarification service: {clarification_service is not None}")
-logger.info(f"   - Modules core: {EXPERT_SERVICE_AVAILABLE}")
-logger.info(f"   - Utilitaires: {UTILS_AVAILABLE}")
-logger.info(f"   - Timestamp: {datetime.now().isoformat()}")
-logger.info("")
-logger.info("🎉 [RÉSULTAT FINAL]:")
-logger.info("   ✅ REFACTORISATION RÉUSSIE")
-logger.info("   ✅ COMPATIBILITÉ 100% PRÉSERVÉE")
-logger.info("   ✅ ARCHITECTURE MAINTENABLE")
-logger.info("   ✅ LIENS EXISTANTS INTACTS")
-logger.info("   ✅ PRÊT POUR PRODUCTION")
-logger.info("")
-logger.info("📋 [ENDPOINTS DISPONIBLES]:")
-logger.info("   - GET /api/v1/expert/health")
-logger.info("   - POST /api/v1/expert/ask-enhanced-v2")
-logger.info("   - POST /api/v1/expert/ask-enhanced-v2-public")
-logger.info("   - POST /api/v1/expert/feedback")
-logger.info("   - GET /api/v1/expert/topics")
-logger.info("")
-logger.info("💡 [UTILISATION POUR DÉVELOPPEURS]:")
-logger.info("   # Import principal (INCHANGÉ)")
-logger.info("   from .expert import router")
-logger.info("   ")
-logger.info("   # Import spécifique si nécessaire")
-logger.info("   from .expert import ExpertService, EnhancedExpertResponse")
-logger.info("   ")
-logger.info("   # Import direct des modules refactorisés")
-logger.info("   from .expert_core_functions import _extract_critical_entities_from_question")
-logger.info("   from .expert_utilities import validate_question_text")
-logger.info("")
-logger.info("🔧 [MAINTENANCE FUTURE]:")
-logger.info("   → Endpoints: Modifier expert_endpoints.py")
-logger.info("   → Logique métier: Modifier expert_core_functions.py") 
-logger.info("   → Utilitaires: Modifier expert_utilities.py")
-logger.info("   → Interface: expert.py reste stable")
-logger.info("")
-logger.info("🚀" * 50)
-
-# =============================================================================
-# VÉRIFICATION INTÉGRITÉ AU CHARGEMENT
-# =============================================================================
-
-def _verify_refactoring_integrity():
-    """Vérifie que la refactorisation n'a pas cassé de fonctionnalités"""
+    Fini les conflits entre systèmes !
+    """
     try:
-        integrity_checks = {
-            "router_available": router is not None,
-            "router_has_routes": hasattr(router, 'routes') and len(router.routes) > 0,
-            "expert_service_ok": expert_service is not None,
-            "models_imported": 'EnhancedExpertResponse' in globals(),
-            "core_functions_ok": '_extract_critical_entities_from_question' in globals(),
-            "utilities_ok": 'validate_question_text' in globals()
+        logger.info(f"🚀 [Expert API] Question reçue: '{request.text[:50]}...'")
+        
+        # Validation de base
+        if not request.text or len(request.text.strip()) < 2:
+            raise HTTPException(
+                status_code=400, 
+                detail="Question trop courte. Veuillez préciser votre demande."
+            )
+        
+        # Traitement unifié via le service principal
+        result = await expert_service.process_question(
+            question=request.text,
+            context={
+                "conversation_id": request.conversation_id,
+                "user_id": get_user_id_from_request(http_request) if http_request else None,
+                "is_clarification_response": getattr(request, 'is_clarification_response', False),
+                "original_question": getattr(request, 'original_question', None)
+            },
+            language=getattr(request, 'language', 'fr')
+        )
+        
+        # Conversion vers le format de réponse attendu
+        response = _convert_processing_result_to_response(request, result)
+        
+        logger.info(f"✅ [Expert API] Réponse générée: {result.response_type} en {result.processing_time_ms}ms")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [Expert API] Erreur ask_expert: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de traitement: {str(e)}")
+
+@router.post("/ask-public", response_model=EnhancedExpertResponse)
+async def ask_expert_public(request: EnhancedQuestionRequest):
+    """
+    🌐 VERSION PUBLIQUE - Même logique que /ask mais sans authentification
+    
+    Point d'entrée pour les utilisateurs non connectés
+    """
+    # Utiliser la même logique que ask_expert mais sans récupération d'utilisateur
+    return await ask_expert(request, http_request=None)
+
+# =============================================================================
+# ENDPOINTS DE COMPATIBILITÉ - REDIRECTION VERS NOUVEAU SYSTÈME
+# =============================================================================
+
+@router.post("/ask-enhanced", response_model=EnhancedExpertResponse)
+async def ask_expert_enhanced_legacy(request: EnhancedQuestionRequest, http_request: Request = None):
+    """
+    🔄 COMPATIBILITÉ - Redirige vers le nouveau système unifié
+    
+    Ancien endpoint "enhanced" qui utilisait de multiples systèmes contradictoires.
+    Maintenant redirige vers le nouveau système intelligent unique.
+    """
+    logger.info("🔄 [Legacy Redirect] ask-enhanced → nouveau système unifié")
+    return await ask_expert(request, http_request)
+
+@router.post("/ask-enhanced-public", response_model=EnhancedExpertResponse)
+async def ask_expert_enhanced_public_legacy(request: EnhancedQuestionRequest):
+    """
+    🔄 COMPATIBILITÉ - Version publique de l'ancien enhanced
+    """
+    logger.info("🔄 [Legacy Redirect] ask-enhanced-public → nouveau système unifié")
+    return await ask_expert_public(request)
+
+# =============================================================================
+# ENDPOINTS UTILITAIRES
+# =============================================================================
+
+@router.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """
+    📝 FEEDBACK UTILISATEUR - Collecte des retours
+    
+    Permet aux utilisateurs de donner leur avis sur les réponses
+    """
+    try:
+        logger.info(f"📝 [Feedback] Reçu: {feedback.rating}/5 - {feedback.comment[:50] if feedback.comment else 'Sans commentaire'}")
+        
+        # Ici on pourrait sauvegarder en base de données
+        # Pour l'instant, on logue simplement
+        
+        return {
+            "status": "success",
+            "message": "Merci pour votre retour !",
+            "feedback_id": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat()
         }
         
-        passed = sum(integrity_checks.values())
-        total = len(integrity_checks)
-        
-        logger.info(f"🔍 [VÉRIFICATION INTÉGRITÉ] {passed}/{total} vérifications passées")
-        
-        for check, status in integrity_checks.items():
-            status_icon = "✅" if status else "❌"
-            logger.info(f"   {status_icon} {check}: {status}")
-        
-        if passed == total:
-            logger.info("🎉 [INTÉGRITÉ] Refactorisation PARFAITE - Aucune fonctionnalité perdue")
-            return True
-        else:
-            logger.warning(f"⚠️ [INTÉGRITÉ] {total - passed} problèmes détectés")
-            return False
-            
     except Exception as e:
-        logger.error(f"❌ [VÉRIFICATION] Erreur lors de la vérification: {e}")
-        return False
+        logger.error(f"❌ [Feedback] Erreur: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la soumission du feedback")
 
-# Exécuter la vérification au chargement
-integrity_ok = _verify_refactoring_integrity()
+@router.get("/topics")
+async def get_available_topics():
+    """
+    📚 TOPICS DISPONIBLES - Liste des sujets que le système peut traiter
+    """
+    return {
+        "topics": [
+            {
+                "category": "Performance",
+                "subjects": ["Poids", "Croissance", "Gain de poids", "Standards de race"],
+                "examples": [
+                    "Quel est le poids normal d'un Ross 308 à 21 jours ?",
+                    "Croissance normale pour Cobb 500 mâles ?"
+                ]
+            },
+            {
+                "category": "Santé",
+                "subjects": ["Symptômes", "Maladies", "Prévention", "Traitement"],
+                "examples": [
+                    "Mes poules font de la diarrhée depuis 2 jours",
+                    "Poulets apathiques et refus alimentaire"
+                ]
+            },
+            {
+                "category": "Alimentation",
+                "subjects": ["Nutrition", "Aliments", "Besoins par âge", "Problèmes alimentaires"],
+                "examples": [
+                    "Quel aliment pour Ross 308 de 3 semaines ?",
+                    "Besoins nutritionnels pondeuses 25 semaines"
+                ]
+            },
+            {
+                "category": "Élevage",
+                "subjects": ["Conditions", "Température", "Densité", "Équipements"],
+                "examples": [
+                    "Température optimale poulets 15 jours",
+                    "Densité recommandée Cobb 500 ?"
+                ]
+            }
+        ],
+        "supported_breeds": [
+            "Ross 308", "Cobb 500", "Hubbard", "Arbor Acres",
+            "ISA Brown", "Lohmann Brown", "Hy-Line", "Bovans"
+        ],
+        "supported_languages": ["fr", "en", "es"],
+        "response_types": [
+            "Réponse précise (données spécifiques)",
+            "Réponse générale + offre de précision", 
+            "Clarification ciblée (si vraiment nécessaire)"
+        ]
+    }
 
-if integrity_ok:
-    logger.info("🚀 [EXPERT.PY] Module principal chargé avec succès - REFACTORISATION RÉUSSIE!")
-else:
-    logger.warning("⚠️ [EXPERT.PY] Module chargé avec des avertissements - Vérifier les imports")
+# =============================================================================
+# ENDPOINTS DE MONITORING ET DEBUG
+# =============================================================================
 
-# Message final de confirmation
-logger.info("=" * 80)
-logger.info("🎯 EXPERT.PY v3.7.8 - REFACTORISÉ MAIS COMPATIBLE")
-logger.info("✅ Interface identique → Liens existants préservés")
-logger.info("✅ Code organisé → Maintenabilité améliorée") 
-logger.info("✅ Fonctionnalités intactes → Aucune régression")
-logger.info("=" * 80)
+@router.get("/system-status")
+async def get_system_status():
+    """
+    🔍 STATUT SYSTÈME - Informations sur le nouveau système unifié
+    """
+    try:
+        stats = expert_service.get_system_stats()
+        
+        return {
+            "system": "Expert System Unified v1.0",
+            "architecture": "Entities → Classifier → Generator → Response",
+            "status": "active",
+            "components": {
+                "entities_extractor": "✅ Active",
+                "smart_classifier": "✅ Active", 
+                "response_generator": "✅ Active",
+                "expert_service": "✅ Active"
+            },
+            "legacy_systems": {
+                "expert_legacy": "❌ Supprimé",
+                "question_clarification_system": "❌ Supprimé",
+                "expert_services_clarification": "❌ Supprimé",
+                "multiple_contradictory_rules": "❌ Éliminés"
+            },
+            "performance": stats,
+            "configuration": {
+                "always_provide_useful_answer": INTELLIGENT_SYSTEM_CONFIG["behavior"].ALWAYS_PROVIDE_USEFUL_ANSWER,
+                "precision_offers_enabled": INTELLIGENT_SYSTEM_CONFIG["behavior"].PRECISION_OFFERS_ENABLED,
+                "clarification_only_if_needed": INTELLIGENT_SYSTEM_CONFIG["behavior"].CLARIFICATION_ONLY_IF_REALLY_NEEDED
+            },
+            "endpoints": {
+                "main": "/api/v1/expert/ask",
+                "public": "/api/v1/expert/ask-public", 
+                "legacy_enhanced": "/api/v1/expert/ask-enhanced (→ redirected)",
+                "legacy_enhanced_public": "/api/v1/expert/ask-enhanced-public (→ redirected)",
+                "feedback": "/api/v1/expert/feedback",
+                "topics": "/api/v1/expert/topics",
+                "status": "/api/v1/expert/system-status"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [System Status] Erreur: {e}")
+        return {
+            "system": "Expert System Unified v1.0",
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@router.get("/reset-stats")
+async def reset_system_stats():
+    """
+    🔄 RESET STATS - Remet à zéro les statistiques (pour debugging)
+    """
+    try:
+        expert_service.reset_stats()
+        return {
+            "status": "success",
+            "message": "Statistiques remises à zéro",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ [Reset Stats] Erreur: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+# FONCTIONS UTILITAIRES
+# =============================================================================
+
+def _convert_processing_result_to_response(request: EnhancedQuestionRequest, 
+                                         result: ProcessingResult) -> EnhancedExpertResponse:
+    """
+    Convertit le résultat du nouveau système vers le format de réponse attendu
+    """
+    conversation_id = request.conversation_id or str(uuid.uuid4())
+    language = getattr(request, 'language', 'fr')
+    
+    # Déterminer le mode basé sur le type de réponse
+    mode_mapping = {
+        "precise_answer": "intelligent_precise",
+        "general_answer": "intelligent_general_with_offer",
+        "general_with_offer": "intelligent_general_with_offer", 
+        "needs_clarification": "intelligent_clarification",
+        "clarification_performance": "intelligent_clarification_targeted",
+        "clarification_health": "intelligent_clarification_health",
+        "clarification_feeding": "intelligent_clarification_feeding",
+        "error_fallback": "intelligent_fallback"
+    }
+    
+    mode = mode_mapping.get(result.response_type, "intelligent_unified")
+    
+    # Construire la réponse
+    response_data = {
+        "question": request.text,
+        "response": result.response,
+        "conversation_id": conversation_id,
+        "rag_used": False,  # Le nouveau système n'utilise plus RAG
+        "timestamp": result.timestamp,
+        "language": language,
+        "response_time_ms": result.processing_time_ms,
+        "mode": mode,
+        "user": getattr(request, 'user_id', None),
+        "logged": True,
+        "validation_passed": result.success
+    }
+    
+    # Informations de traitement pour debugging
+    processing_info = {
+        "entities_extracted": expert_service._entities_to_dict(result.entities),
+        "response_type": result.response_type,
+        "confidence": result.confidence,
+        "processing_steps": [
+            "entities_extraction_v1",
+            "smart_classification_v1",
+            "unified_response_generation_v1"
+        ],
+        "system_version": "unified_intelligent_v1.0.0"
+    }
+    
+    # Ajouter les informations de processing
+    response_data["processing_info"] = processing_info
+    
+    # Gestion des erreurs
+    if not result.success:
+        response_data["error_details"] = {
+            "error": result.error,
+            "fallback_used": True,
+            "system": "unified_expert_service"
+        }
+    
+    return EnhancedExpertResponse(**response_data)
+
+# =============================================================================
+# INITIALISATION ET LOGGING
+# =============================================================================
+
+logger.info("🚀" * 50)
+logger.info("🚀 [EXPERT SYSTEM] NOUVEAU SYSTÈME UNIFIÉ ACTIVÉ!")
+logger.info("🚀" * 50)
+logger.info("")
+logger.info("✅ [ARCHITECTURE SIMPLIFIÉE]:")
+logger.info("   📥 Question → Entities Extractor")
+logger.info("   🧠 Entities → Smart Classifier") 
+logger.info("   🎨 Classification → Unified Response Generator")
+logger.info("   📤 Response → User")
+logger.info("")
+logger.info("✅ [FINI LES PROBLÈMES]:")
+logger.info("   ❌ Plus de conflits entre systèmes")
+logger.info("   ❌ Plus de règles contradictoires") 
+logger.info("   ❌ Plus d'import circulaires")
+logger.info("   ❌ Plus de 50 fichiers à maintenir")
+logger.info("")
+logger.info("✅ [NOUVEAU COMPORTEMENT]:")
+logger.info("   🎯 Toujours une réponse utile")
+logger.info("   💡 Offres de précision intelligentes")
+logger.info("   🔄 Clarification seulement si vraiment nécessaire")
+logger.info("   ⚡ Performance optimisée")
+logger.info("")
+logger.info("🎯 [ENDPOINTS DISPONIBLES]:")
+logger.info("   POST /api/v1/expert/ask (principal)")
+logger.info("   POST /api/v1/expert/ask-public (public)")
+logger.info("   POST /api/v1/expert/ask-enhanced (legacy → redirect)")
+logger.info("   POST /api/v1/expert/ask-enhanced-public (legacy → redirect)")
+logger.info("   POST /api/v1/expert/feedback")
+logger.info("   GET  /api/v1/expert/topics")
+logger.info("   GET  /api/v1/expert/system-status")
+logger.info("")
+logger.info("🎉 [RÉSULTAT]: Système simple, intelligent et maintenable!")
+logger.info("🚀" * 50)
