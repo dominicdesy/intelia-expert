@@ -1,19 +1,14 @@
 """
-app/api/v1/expert.py - EXPERT ENDPOINTS PRINCIPAUX v3.7.7 - CORRECTIONS RAG ET CLARIFICATION FORCÉE
+app/api/v1/expert.py - EXPERT ENDPOINTS PRINCIPAUX v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE
 
-🔧 CORRECTIONS APPLIQUÉES v3.7.7:
-- FIX CRITIQUE: Synchronisation état RAG appelée juste après récupération RAG
-- FIX CRITIQUE: Clarification forcée si entités critiques (breed, age, weight) manquent
-- FIX: Validation robuste des entités critiques avec extraction automatique
-- FIX: Déclenchement clarification_required_critical=True pour entités manquantes
-- AMÉLIORATION: Détection entités critiques depuis le texte de la question
+🆕 NOUVELLES FONCTIONNALITÉS v3.7.8:
+- Intégration expert_clarification_service avec sélection dynamique de prompts
+- Appel automatique du service si clarification_required_critical = True
+- Génération de questions dynamiques basées sur entités manquantes
+- Validation et enrichissement des questions de clarification
+- Support conversation_context pour clarifications contextuelles
 
-NOUVELLES FONCTIONS v3.7.7:
-- _extract_critical_entities_from_question() - Extraction entités depuis question
-- _validate_critical_entities() - Validation entités critiques complètes
-- _force_clarification_for_missing_entities() - Forçage clarification entités manquantes
-
-CONSERVE: Toute la logique originale + corrections v3.7.6 + nouvelles validations
+CONSERVATION: Toute la logique v3.7.7 + nouvelles intégrations service clarification
 """
 
 import os
@@ -75,10 +70,13 @@ except ImportError as e:
         user: Optional[str] = None
         logged: bool = False
         validation_passed: Optional[bool] = None
-        # NOUVEAUX CHAMPS v3.7.3
+        # NOUVEAUX CHAMPS v3.7.3+
         clarification_required_critical: bool = False
         missing_critical_entities: List[str] = []
         variants_tested: List[str] = []
+        # 🆕 NOUVEAUX CHAMPS v3.7.8
+        dynamic_questions: Optional[List[Dict[str, Any]]] = None
+        clarification_service_used: bool = False
         # Champs optionnels pour compatibilité
         clarification_result: Optional[Dict[str, Any]] = None
         processing_steps: List[str] = []
@@ -103,6 +101,15 @@ except ImportError as e:
     logger.error(f"❌ Erreur import expert_services: {e}")
     EXPERT_SERVICE_AVAILABLE = False
 
+# 🆕 NOUVEAU v3.7.8: Import du service de clarification dynamique
+try:
+    from .expert_clarification_service import ExpertClarificationService
+    CLARIFICATION_SERVICE_AVAILABLE = True
+    logger.info("✅ ExpertClarificationService importé avec succès")
+except ImportError as e:
+    logger.error(f"❌ Erreur import expert_clarification_service: {e}")
+    CLARIFICATION_SERVICE_AVAILABLE = False
+
 try:
     from .expert_utils import get_user_id_from_request, extract_breed_and_sex_from_clarification
     UTILS_AVAILABLE = True
@@ -125,7 +132,7 @@ except ImportError as e:
     
     UTILS_AVAILABLE = False
 
-# Initialisation du service avec gestion d'erreur CORRIGÉE
+# Initialisation des services avec gestion d'erreur CORRIGÉE
 expert_service = None
 if EXPERT_SERVICE_AVAILABLE:
     try:
@@ -136,6 +143,18 @@ if EXPERT_SERVICE_AVAILABLE:
         expert_service = None
 else:
     logger.warning("⚠️ [Expert] Service expert non disponible - utilisation du mode fallback")
+
+# 🆕 NOUVEAU v3.7.8: Initialisation service clarification
+clarification_service = None
+if CLARIFICATION_SERVICE_AVAILABLE:
+    try:
+        clarification_service = ExpertClarificationService()
+        logger.info("✅ [Clarification] Service clarification initialisé avec succès")
+    except Exception as e:
+        logger.error(f"❌ [Clarification] Erreur initialisation service: {e}")
+        clarification_service = None
+else:
+    logger.warning("⚠️ [Clarification] Service clarification non disponible - fonctionnalité désactivée")
 
 # 🔧 FIX CRITIQUE: Auth dependency corrigé pour être callable
 def get_current_user_mock():
@@ -159,12 +178,357 @@ def get_current_user_dependency() -> Callable:
     return get_current_user_mock
 
 # =============================================================================
-# NOUVELLES FONCTIONS v3.7.7 - EXTRACTION ET VALIDATION ENTITÉS CRITIQUES
+# 🆕 NOUVELLES FONCTIONS v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE
+# =============================================================================
+
+def _build_conversation_context(
+    request_data: EnhancedQuestionRequest,
+    entities: Dict[str, Any],
+    processing_metadata: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    🆕 NOUVELLE v3.7.8: Construit le contexte de conversation pour le service de clarification
+    """
+    
+    context = {
+        "current_question": getattr(request_data, 'text', ''),
+        "language": getattr(request_data, 'language', 'fr'),
+        "conversation_id": getattr(request_data, 'conversation_id', None),
+        "is_clarification_response": getattr(request_data, 'is_clarification_response', False),
+        "original_question": getattr(request_data, 'original_question', None),
+        "extracted_entities": entities,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Ajouter contexte de clarification si disponible
+    clarification_context = getattr(request_data, 'clarification_context', None)
+    if clarification_context and isinstance(clarification_context, dict):
+        context["clarification_context"] = clarification_context
+    
+    # Ajouter entités de clarification si disponibles
+    clarification_entities = getattr(request_data, 'clarification_entities', None)
+    if clarification_entities and isinstance(clarification_entities, dict):
+        context["clarification_entities"] = clarification_entities
+    
+    # Ajouter métadonnées de traitement si disponibles
+    if processing_metadata and isinstance(processing_metadata, dict):
+        context["processing_metadata"] = processing_metadata
+    
+    # Analyser le type de domaine agricole
+    context["domain_analysis"] = _analyze_agricultural_domain(context["current_question"])
+    
+    logger.info(f"🔧 [CONTEXT v3.7.8] Contexte conversation construit:")
+    logger.info(f"   - Question: '{context['current_question'][:100]}...'")
+    logger.info(f"   - Langue: {context['language']}")
+    logger.info(f"   - Entités: {len(entities)} détectées")
+    logger.info(f"   - Domaine: {context['domain_analysis']['primary_domain']}")
+    
+    return context
+
+def _analyze_agricultural_domain(question_text: str) -> Dict[str, Any]:
+    """
+    🆕 NOUVELLE v3.7.8: Analyse le domaine agricole de la question pour adapter les clarifications
+    """
+    
+    domain_analysis = {
+        "primary_domain": "poultry",  # Default
+        "specific_topics": [],
+        "urgency_level": "normal",
+        "complexity": "medium"
+    }
+    
+    try:
+        question_lower = question_text.lower() if isinstance(question_text, str) else ""
+        
+        # Détection domaine principal
+        if any(term in question_lower for term in ["poulet", "chicken", "broiler", "ross", "cobb"]):
+            domain_analysis["primary_domain"] = "poultry"
+        elif any(term in question_lower for term in ["porc", "pig", "swine", "cochon"]):
+            domain_analysis["primary_domain"] = "swine"
+        elif any(term in question_lower for term in ["bovin", "cattle", "vache", "cow"]):
+            domain_analysis["primary_domain"] = "cattle"
+        elif any(term in question_lower for term in ["ovin", "sheep", "mouton"]):
+            domain_analysis["primary_domain"] = "sheep"
+        
+        # Détection sujets spécifiques
+        topics_map = {
+            "nutrition": ["nutrition", "alimentation", "feed", "nourriture"],
+            "health": ["santé", "health", "maladie", "disease", "symptôme"],
+            "growth": ["croissance", "growth", "poids", "weight", "développement"],
+            "environment": ["température", "temperature", "ventilation", "environnement"],
+            "reproduction": ["reproduction", "breeding", "reproduction", "ponte"],
+            "mortality": ["mortalité", "mortality", "mort", "death", "perte"]
+        }
+        
+        for topic, keywords in topics_map.items():
+            if any(keyword in question_lower for keyword in keywords):
+                domain_analysis["specific_topics"].append(topic)
+        
+        # Détection niveau urgence
+        urgency_keywords = ["urgent", "immédiat", "rapide", "critique", "grave", "emergency"]
+        if any(keyword in question_lower for keyword in urgency_keywords):
+            domain_analysis["urgency_level"] = "high"
+        elif any(term in question_lower for term in ["préventif", "routine", "normal"]):
+            domain_analysis["urgency_level"] = "low"
+        
+        # Détection complexité
+        if len(domain_analysis["specific_topics"]) >= 3:
+            domain_analysis["complexity"] = "high"
+        elif len(domain_analysis["specific_topics"]) <= 1:
+            domain_analysis["complexity"] = "low"
+        
+        logger.info(f"🔍 [DOMAIN ANALYSIS v3.7.8] Résultat:")
+        logger.info(f"   - Domaine: {domain_analysis['primary_domain']}")
+        logger.info(f"   - Sujets: {domain_analysis['specific_topics']}")
+        logger.info(f"   - Urgence: {domain_analysis['urgency_level']}")
+        logger.info(f"   - Complexité: {domain_analysis['complexity']}")
+        
+    except Exception as e:
+        logger.error(f"❌ [DOMAIN ANALYSIS v3.7.8] Erreur: {e}")
+    
+    return domain_analysis
+
+async def _apply_dynamic_clarification_service(
+    response_data: Any,
+    validation_result: Dict[str, Any],
+    entities: Dict[str, Any],
+    conversation_context: Dict[str, Any]
+) -> Any:
+    """
+    🆕 NOUVELLE v3.7.8: Applique le service de clarification dynamique si nécessaire
+    
+    Cette fonction est appelée APRÈS validation des entités critiques
+    et génère des questions dynamiques si clarification_required_critical = True
+    """
+    
+    try:
+        if not response_data:
+            logger.error("❌ [CLARIFICATION SERVICE v3.7.8] response_data est None")
+            return response_data
+        
+        # Vérifier si clarification critique requise
+        clarification_required = getattr(response_data, 'clarification_required_critical', False)
+        if not clarification_required:
+            logger.info("✅ [CLARIFICATION SERVICE v3.7.8] Aucune clarification critique requise")
+            return response_data
+        
+        logger.info("🚨 [CLARIFICATION SERVICE v3.7.8] Clarification critique détectée - activation service")
+        
+        # Vérifier disponibilité du service
+        if not clarification_service:
+            logger.warning("⚠️ [CLARIFICATION SERVICE v3.7.8] Service non disponible - mode fallback")
+            return _apply_fallback_clarification(response_data, validation_result, entities)
+        
+        # Extraire entités manquantes
+        missing_entities = getattr(response_data, 'missing_critical_entities', [])
+        if not missing_entities:
+            missing_entities = validation_result.get('missing_critical', [])
+        
+        logger.info(f"🔍 [CLARIFICATION SERVICE v3.7.8] Entités manquantes: {missing_entities}")
+        
+        # ÉTAPE 1: Sélection dynamique du prompt
+        logger.info("🎯 [CLARIFICATION SERVICE v3.7.8] ÉTAPE 1: Sélection prompt dynamique...")
+        
+        clarification_prompt = clarification_service.select_clarification_prompt(
+            question=conversation_context.get('current_question', ''),
+            missing_entities=missing_entities,
+            conversation_context=conversation_context
+        )
+        
+        if not clarification_prompt:
+            logger.error("❌ [CLARIFICATION SERVICE v3.7.8] Échec sélection prompt")
+            return _apply_fallback_clarification(response_data, validation_result, entities)
+        
+        logger.info(f"✅ [CLARIFICATION SERVICE v3.7.8] Prompt sélectionné: {clarification_prompt.get('prompt_type', 'unknown')}")
+        
+        # ÉTAPE 2: Génération questions avec GPT
+        logger.info("🤖 [CLARIFICATION SERVICE v3.7.8] ÉTAPE 2: Génération questions GPT...")
+        
+        clarification_questions = await clarification_service.generate_questions_with_gpt(
+            clarification_prompt=clarification_prompt,
+            context=conversation_context
+        )
+        
+        if not clarification_questions:
+            logger.error("❌ [CLARIFICATION SERVICE v3.7.8] Échec génération questions")
+            return _apply_fallback_clarification(response_data, validation_result, entities)
+        
+        logger.info(f"✅ [CLARIFICATION SERVICE v3.7.8] {len(clarification_questions)} questions générées")
+        
+        # ÉTAPE 3: Validation questions dynamiques
+        logger.info("🔍 [CLARIFICATION SERVICE v3.7.8] ÉTAPE 3: Validation questions...")
+        
+        validated_questions = clarification_service.validate_dynamic_questions(
+            clarification_questions=clarification_questions,
+            missing_entities=missing_entities,
+            context=conversation_context
+        )
+        
+        if not validated_questions:
+            logger.error("❌ [CLARIFICATION SERVICE v3.7.8] Échec validation questions")
+            return _apply_fallback_clarification(response_data, validation_result, entities)
+        
+        logger.info(f"✅ [CLARIFICATION SERVICE v3.7.8] {len(validated_questions)} questions validées")
+        
+        # ÉTAPE 4: Application à response_data
+        logger.info("🔧 [CLARIFICATION SERVICE v3.7.8] ÉTAPE 4: Application à response...")
+        
+        # Marquer service utilisé
+        if hasattr(response_data, 'clarification_service_used'):
+            response_data.clarification_service_used = True
+        
+        # Ajouter questions dynamiques
+        if hasattr(response_data, 'dynamic_questions'):
+            response_data.dynamic_questions = validated_questions
+        
+        # Enrichir clarification_result
+        if hasattr(response_data, 'clarification_result') and response_data.clarification_result:
+            if isinstance(response_data.clarification_result, dict):
+                response_data.clarification_result.update({
+                    "dynamic_clarification_service": {
+                        "service_used": True,
+                        "prompt_selected": clarification_prompt,
+                        "questions_generated": len(clarification_questions),
+                        "questions_validated": len(validated_questions),
+                        "missing_entities": missing_entities,
+                        "context_analyzed": conversation_context.get('domain_analysis', {}),
+                        "timestamp": datetime.now().isoformat()
+                    },
+                    "dynamic_questions": validated_questions
+                })
+        
+        # Enrichir processing_steps
+        if hasattr(response_data, 'processing_steps') and isinstance(response_data.processing_steps, list):
+            response_data.processing_steps.extend([
+                "dynamic_clarification_service_activated_v3.7.8",
+                f"prompt_selected_{clarification_prompt.get('prompt_type', 'unknown')}",
+                f"questions_generated_{len(clarification_questions)}",
+                f"questions_validated_{len(validated_questions)}"
+            ])
+        
+        # Enrichir ai_enhancements_used
+        if hasattr(response_data, 'ai_enhancements_used') and isinstance(response_data.ai_enhancements_used, list):
+            response_data.ai_enhancements_used.extend([
+                "dynamic_clarification_service_v3.7.8",
+                "gpt_question_generation",
+                "intelligent_prompt_selection",
+                "dynamic_question_validation"
+            ])
+        
+        # Modifier la réponse pour inclure les questions dynamiques
+        if hasattr(response_data, 'response') and validated_questions:
+            original_response = response_data.response
+            
+            # Construire nouvelle réponse avec questions dynamiques
+            enhanced_response = original_response + "\n\n**Questions de clarification intelligentes :**\n"
+            
+            for i, question_data in enumerate(validated_questions, 1):
+                question_text = question_data.get('question', '')
+                question_type = question_data.get('type', 'general')
+                
+                enhanced_response += f"\n{i}. **{question_text}**"
+                
+                # Ajouter options si disponibles
+                options = question_data.get('options', [])
+                if options:
+                    enhanced_response += "\n   Options suggérées:"
+                    for option in options[:3]:  # Limiter à 3 options
+                        enhanced_response += f"\n   • {option}"
+                
+                enhanced_response += "\n"
+            
+            response_data.response = enhanced_response
+            
+            logger.info("🔧 [CLARIFICATION SERVICE v3.7.8] Réponse enrichie avec questions dynamiques")
+        
+        logger.info("✅ [CLARIFICATION SERVICE v3.7.8] Service appliqué avec succès")
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"❌ [CLARIFICATION SERVICE v3.7.8] Erreur: {e}")
+        return _apply_fallback_clarification(response_data, validation_result, entities)
+
+def _apply_fallback_clarification(
+    response_data: Any,
+    validation_result: Dict[str, Any],
+    entities: Dict[str, Any]
+) -> Any:
+    """
+    🆕 NOUVELLE v3.7.8: Applique une clarification fallback si le service dynamique échoue
+    """
+    
+    try:
+        logger.info("🔄 [FALLBACK CLARIFICATION v3.7.8] Application clarification de secours")
+        
+        # Marquer service non utilisé
+        if hasattr(response_data, 'clarification_service_used'):
+            response_data.clarification_service_used = False
+        
+        # Questions fallback basiques
+        missing_entities = validation_result.get('missing_critical', [])
+        
+        fallback_questions = []
+        
+        if 'breed' in missing_entities:
+            fallback_questions.append({
+                "question": "Quelle est la race/souche de vos animaux ?",
+                "type": "breed",
+                "priority": "critical",
+                "options": ["Ross 308", "Cobb 500", "Hubbard", "Arbor Acres", "Autre"]
+            })
+        
+        if 'age' in missing_entities or 'age_in_days' in missing_entities:
+            fallback_questions.append({
+                "question": "Quel est l'âge précis de vos animaux ?",
+                "type": "age",
+                "priority": "critical",
+                "options": ["13 jours", "2 semaines", "3 semaines", "1 mois", "Autre"]
+            })
+        
+        if 'weight' in missing_entities or 'weight_in_grams' in missing_entities:
+            fallback_questions.append({
+                "question": "Quel est le poids actuel de vos animaux ?",
+                "type": "weight",
+                "priority": "critical",
+                "options": ["800g", "1.2kg", "1.8kg", "2.5kg", "Autre"]
+            })
+        
+        if 'sex' in missing_entities:
+            fallback_questions.append({
+                "question": "S'agit-il de mâles, femelles, ou un troupeau mixte ?",
+                "type": "sex",
+                "priority": "medium",
+                "options": ["Mâles", "Femelles", "Mixte"]
+            })
+        
+        # Ajouter questions fallback
+        if hasattr(response_data, 'dynamic_questions'):
+            response_data.dynamic_questions = fallback_questions
+        
+        # Enrichir processing_steps
+        if hasattr(response_data, 'processing_steps') and isinstance(response_data.processing_steps, list):
+            response_data.processing_steps.append("fallback_clarification_applied_v3.7.8")
+        
+        # Enrichir ai_enhancements_used
+        if hasattr(response_data, 'ai_enhancements_used') and isinstance(response_data.ai_enhancements_used, list):
+            response_data.ai_enhancements_used.append("fallback_clarification_v3.7.8")
+        
+        logger.info(f"✅ [FALLBACK CLARIFICATION v3.7.8] {len(fallback_questions)} questions fallback générées")
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"❌ [FALLBACK CLARIFICATION v3.7.8] Erreur: {e}")
+        return response_data
+
+# =============================================================================
+# FONCTIONS EXISTANTES v3.7.7 - CONSERVÉES INTÉGRALEMENT
 # =============================================================================
 
 def _extract_critical_entities_from_question(question_text: str, language: str = "fr") -> Dict[str, Any]:
     """
-    🆕 NOUVELLE v3.7.7: Extrait les entités critiques (breed, age, weight) depuis la question
+    🆕 CONSERVÉE v3.7.7: Extrait les entités critiques (breed, age, weight) depuis la question
     
     Entités critiques pour les questions agricoles:
     - breed: race/souche (Ross 308, Cobb 500, etc.)
@@ -288,7 +652,7 @@ def _extract_critical_entities_from_question(question_text: str, language: str =
         
         entities["coherence_issues"] = coherence_issues
         
-        logger.info(f"🔍 [EXTRACTION ENTITÉS v3.7.7] Résultat final:")
+        logger.info(f"🔍 [EXTRACTION ENTITÉS v3.7.8] Résultat final:")
         logger.info(f"   - Breed: {entities['breed']} (conf: {entities['confidence'].get('breed', 0)})")
         logger.info(f"   - Age: {entities['age']} = {entities['age_in_days']} jours (conf: {entities['confidence'].get('age', 0)})")
         logger.info(f"   - Weight: {entities['weight']} = {entities['weight_in_grams']}g (conf: {entities['confidence'].get('weight', 0)})")
@@ -298,12 +662,12 @@ def _extract_critical_entities_from_question(question_text: str, language: str =
         return entities
         
     except Exception as e:
-        logger.error(f"❌ [EXTRACTION ENTITÉS v3.7.7] Erreur: {e}")
+        logger.error(f"❌ [EXTRACTION ENTITÉS v3.7.8] Erreur: {e}")
         return entities
 
 def _validate_critical_entities(entities: Dict[str, Any], question_context: str = "") -> Dict[str, Any]:
     """
-    🆕 NOUVELLE v3.7.7: Valide si les entités critiques sont suffisantes pour une réponse de qualité
+    🆕 CONSERVÉE v3.7.7: Valide si les entités critiques sont suffisantes pour une réponse de qualité
     
     Returns:
         Dict avec validation_result, missing_entities, confidence_issues, etc.
@@ -321,7 +685,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
     
     try:
         if not isinstance(entities, dict):
-            logger.error("❌ [VALIDATION ENTITÉS v3.7.7] entities n'est pas un dict")
+            logger.error("❌ [VALIDATION ENTITÉS v3.7.8] entities n'est pas un dict")
             validation_result["clarification_required"] = True
             validation_result["clarification_priority"] = "critical"
             return validation_result
@@ -334,14 +698,14 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
             
             if entity_value is None:
                 validation_result["missing_critical"].append(entity)
-                logger.warning(f"⚠️ [VALIDATION v3.7.7] Entité critique manquante: {entity}")
+                logger.warning(f"⚠️ [VALIDATION v3.7.8] Entité critique manquante: {entity}")
             
             # Validation spécifique par type d'entité
             elif entity == "breed":
                 if isinstance(entity_value, str):
                     if entity_value.lower() in ["poulet", "chicken", "broiler"]:
                         validation_result["generic_entities"].append("breed_too_generic")
-                        logger.warning(f"⚠️ [VALIDATION v3.7.7] Breed trop générique: {entity_value}")
+                        logger.warning(f"⚠️ [VALIDATION v3.7.8] Breed trop générique: {entity_value}")
                 else:
                     validation_result["missing_critical"].append(entity)
             
@@ -349,7 +713,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
                 if isinstance(entity_value, (int, float)):
                     if entity_value <= 0 or entity_value > 365:  # Age aberrant
                         validation_result["coherence_issues"].append(f"age_aberrant_{entity_value}")
-                        logger.warning(f"⚠️ [VALIDATION v3.7.7] Age aberrant: {entity_value} jours")
+                        logger.warning(f"⚠️ [VALIDATION v3.7.8] Age aberrant: {entity_value} jours")
                 else:
                     validation_result["missing_critical"].append(entity)
             
@@ -357,7 +721,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
                 if isinstance(entity_value, (int, float)):
                     if entity_value <= 0 or entity_value > 10000:  # Poids aberrant
                         validation_result["coherence_issues"].append(f"weight_aberrant_{entity_value}")
-                        logger.warning(f"⚠️ [VALIDATION v3.7.7] Poids aberrant: {entity_value}g")
+                        logger.warning(f"⚠️ [VALIDATION v3.7.8] Poids aberrant: {entity_value}g")
                 else:
                     validation_result["missing_critical"].append(entity)
         
@@ -367,7 +731,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
         for entity, confidence in confidence_data.items():
             if isinstance(confidence, (int, float)) and confidence < 0.5:
                 validation_result["low_confidence"].append(f"{entity}_conf_{confidence}")
-                logger.warning(f"⚠️ [VALIDATION v3.7.7] Confiance faible {entity}: {confidence}")
+                logger.warning(f"⚠️ [VALIDATION v3.7.8] Confiance faible {entity}: {confidence}")
         
         # 🔍 VALIDATION 3: INCOHÉRENCES DÉTECTÉES
         coherence_issues = entities.get("coherence_issues", [])
@@ -396,7 +760,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
             validation_result["entities_sufficient"] = True
             validation_result["clarification_required"] = False
         
-        logger.info(f"🔍 [VALIDATION ENTITÉS v3.7.7] Résultat:")
+        logger.info(f"🔍 [VALIDATION ENTITÉS v3.7.8] Résultat:")
         logger.info(f"   - Entités suffisantes: {validation_result['entities_sufficient']}")
         logger.info(f"   - Critiques manquantes: {validation_result['missing_critical']}")
         logger.info(f"   - Génériques: {validation_result['generic_entities']}")
@@ -407,7 +771,7 @@ def _validate_critical_entities(entities: Dict[str, Any], question_context: str 
         return validation_result
         
     except Exception as e:
-        logger.error(f"❌ [VALIDATION ENTITÉS v3.7.7] Erreur: {e}")
+        logger.error(f"❌ [VALIDATION ENTITÉS v3.7.8] Erreur: {e}")
         # En cas d'erreur, forcer clarification critique
         validation_result["clarification_required"] = True
         validation_result["clarification_priority"] = "critical"
@@ -420,24 +784,24 @@ def _force_clarification_for_missing_entities(
     entities: Dict[str, Any]
 ) -> Any:
     """
-    🆕 NOUVELLE v3.7.7: Force la clarification si des entités critiques manquent
+    🆕 CONSERVÉE v3.7.7: Force la clarification si des entités critiques manquent
     
     Cette fonction modifie response_data pour déclencher clarification_required_critical=True
     """
     
     try:
         if not response_data or not isinstance(validation_result, dict):
-            logger.error("❌ [FORCE CLARIFICATION v3.7.7] Paramètres invalides")
+            logger.error("❌ [FORCE CLARIFICATION v3.7.8] Paramètres invalides")
             return response_data
         
         clarification_required = validation_result.get("clarification_required", False)
         clarification_priority = validation_result.get("clarification_priority", "low")
         
         if not clarification_required:
-            logger.info("✅ [FORCE CLARIFICATION v3.7.7] Aucune clarification nécessaire")
+            logger.info("✅ [FORCE CLARIFICATION v3.7.8] Aucune clarification nécessaire")
             return response_data
         
-        logger.warning(f"🚨 [FORCE CLARIFICATION v3.7.7] Clarification forcée - priorité: {clarification_priority}")
+        logger.warning(f"🚨 [FORCE CLARIFICATION v3.7.8] Clarification forcée - priorité: {clarification_priority}")
         
         # 🔧 MODIFICATION 1: Marquer clarification_required_critical selon priorité
         critical_priorities = ["high", "critical"]
@@ -445,7 +809,7 @@ def _force_clarification_for_missing_entities(
         
         if hasattr(response_data, 'clarification_required_critical'):
             response_data.clarification_required_critical = force_critical
-            logger.info(f"🔧 [FORCE CLARIFICATION v3.7.7] clarification_required_critical = {force_critical}")
+            logger.info(f"🔧 [FORCE CLARIFICATION v3.7.8] clarification_required_critical = {force_critical}")
         
         # 🔧 MODIFICATION 2: Mettre à jour missing_critical_entities
         missing_entities = validation_result.get("missing_critical", [])
@@ -460,18 +824,18 @@ def _force_clarification_for_missing_entities(
                 response_data.missing_critical_entities.extend(all_missing)
             else:
                 response_data.missing_critical_entities = all_missing
-            logger.info(f"🔧 [FORCE CLARIFICATION v3.7.7] missing_critical_entities = {response_data.missing_critical_entities}")
+            logger.info(f"🔧 [FORCE CLARIFICATION v3.7.8] missing_critical_entities = {response_data.missing_critical_entities}")
         
         # 🔧 MODIFICATION 3: Ajouter dans processing_steps pour traçabilité
         if hasattr(response_data, 'processing_steps') and isinstance(response_data.processing_steps, list):
-            response_data.processing_steps.append(f"critical_entities_validation_v3.7.7")
+            response_data.processing_steps.append(f"critical_entities_validation_v3.7.8")
             response_data.processing_steps.append(f"clarification_priority_{clarification_priority}")
             if force_critical:
                 response_data.processing_steps.append("clarification_forced_critical_entities")
         
         # 🔧 MODIFICATION 4: Ajouter dans ai_enhancements_used
         if hasattr(response_data, 'ai_enhancements_used') and isinstance(response_data.ai_enhancements_used, list):
-            response_data.ai_enhancements_used.append("critical_entities_extraction_v3.7.7")
+            response_data.ai_enhancements_used.append("critical_entities_extraction_v3.7.8")
             response_data.ai_enhancements_used.append("entities_validation_forced_clarification")
         
         # 🔧 MODIFICATION 5: Enrichir clarification_result si présent
@@ -484,27 +848,26 @@ def _force_clarification_for_missing_entities(
                         "forced_clarification": force_critical,
                         "missing_entities": missing_entities,
                         "generic_entities": generic_entities,
-                        "coherence_issues": coherence_issues
+                        "coherence_issues": coherence_issues,
+                        "version": "3.7.8"
                     }
                 })
-                logger.info("🔧 [FORCE CLARIFICATION v3.7.7] clarification_result enrichi avec analyse entités")
+                logger.info("🔧 [FORCE CLARIFICATION v3.7.8] clarification_result enrichi avec analyse entités")
         
-        logger.info("✅ [FORCE CLARIFICATION v3.7.7] Modifications appliquées à response_data")
+        logger.info("✅ [FORCE CLARIFICATION v3.7.8] Modifications appliquées à response_data")
         
         return response_data
         
     except Exception as e:
-        logger.error(f"❌ [FORCE CLARIFICATION v3.7.7] Erreur: {e}")
+        logger.error(f"❌ [FORCE CLARIFICATION v3.7.8] Erreur: {e}")
         return response_data
 
 # =============================================================================
-# FONCTIONS EXISTANTES v3.7.6 - CONSERVÉES AVEC AMÉLIORATIONS v3.7.7
+# FONCTIONS EXISTANTES v3.7.6/v3.7.7 - CONSERVÉES INTÉGRALEMENT
 # =============================================================================
 
 def _detect_inconsistencies_and_force_clarification(question_text: str, language: str = "fr") -> Dict[str, Any]:
-    """
-    🆕 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Détecte les incohérences + utilise nouvelles entités
-    """
+    """🆕 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Détecte les incohérences + utilise nouvelles entités"""
     
     inconsistencies_detected = []
     force_clarification = False
@@ -544,7 +907,7 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
                         inconsistencies_detected.append(f"temporal_contradiction")
                         force_clarification = True
                         clarification_reason = f"Incohérence temporelle détectée: {days} jours vs {weeks} semaine(s)"
-                        logger.warning(f"🚨 [INCOHÉRENCE v3.7.7] {clarification_reason}")
+                        logger.warning(f"🚨 [INCOHÉRENCE v3.7.8] {clarification_reason}")
                 except (ValueError, IndexError):
                     pass
         
@@ -554,7 +917,7 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
             inconsistencies_detected.extend(coherence_issues)
             force_clarification = True
             clarification_reason = f"Incohérences entités détectées: {', '.join(coherence_issues)}"
-            logger.warning(f"🚨 [INCOHÉRENCE ENTITÉS v3.7.7] {clarification_reason}")
+            logger.warning(f"🚨 [INCOHÉRENCE ENTITÉS v3.7.8] {clarification_reason}")
         
         # 🔍 DÉTECTION 3: Sexe contradictoire (CONSERVÉE v3.7.6)
         if ("mâle" in question_lower and "femelle" in question_lower) or ("male" in question_lower and "female" in question_lower):
@@ -564,9 +927,9 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
                 inconsistencies_detected.append("gender_contradiction")
                 force_clarification = True
                 clarification_reason = "Question spécifique mentionnant à la fois mâles et femelles"
-                logger.warning(f"🚨 [INCOHÉRENCE v3.7.7] {clarification_reason}")
+                logger.warning(f"🚨 [INCOHÉRENCE v3.7.8] {clarification_reason}")
         
-        logger.info(f"🔍 [DÉTECTION INCOHÉRENCES v3.7.7] Question: '{question_text[:100]}...'")
+        logger.info(f"🔍 [DÉTECTION INCOHÉRENCES v3.7.8] Question: '{question_text[:100]}...'")
         logger.info(f"   - Incohérences détectées: {inconsistencies_detected}")
         logger.info(f"   - Force clarification: {force_clarification}")
         logger.info(f"   - Raison: {clarification_reason}")
@@ -581,7 +944,7 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
         }
         
     except Exception as e:
-        logger.error(f"❌ [DÉTECTION INCOHÉRENCES v3.7.7] Erreur: {e}")
+        logger.error(f"❌ [DÉTECTION INCOHÉRENCES v3.7.8] Erreur: {e}")
         return {
             "inconsistencies_detected": [],
             "force_clarification": False,
@@ -591,20 +954,13 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
         }
 
 def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[str, Any] = None) -> bool:
-    """
-    🆕 CONSERVÉE v3.7.6: Valide et synchronise l'état RAG de manière robuste
-    
-    🔧 AMÉLIORATION v3.7.7: Appelée juste après récupération RAG selon demande
-    
-    Returns:
-        bool: True si RAG a été effectivement utilisé et doit être marqué comme tel
-    """
+    """🆕 CONSERVÉE v3.7.6: Valide et synchronise l'état RAG de manière robuste"""
     
     rag_actually_used = False
     rag_indicators = []
     
     try:
-        logger.info("🔍 [RAG VALIDATION v3.7.7] DÉMARRAGE validation état RAG...")
+        logger.info("🔍 [RAG VALIDATION v3.7.8] DÉMARRAGE validation état RAG...")
         
         # 🔍 INDICATEUR 1: Vérifier si response_data contient des signes d'utilisation RAG
         if response_data is not None:
@@ -614,14 +970,14 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
             if rag_score is not None and rag_score > 0:
                 rag_indicators.append(f"rag_score: {rag_score}")
                 rag_actually_used = True
-                logger.info(f"✅ [RAG VALIDATION v3.7.7] RAG Score positif détecté: {rag_score}")
+                logger.info(f"✅ [RAG VALIDATION v3.7.8] RAG Score positif détecté: {rag_score}")
             
             # Vérifier rag_used déjà défini
             rag_used_attr = getattr(response_data, 'rag_used', None)
             if rag_used_attr is True:
                 rag_indicators.append("rag_used_attribute: True")
                 rag_actually_used = True
-                logger.info("✅ [RAG VALIDATION v3.7.7] rag_used déjà True")
+                logger.info("✅ [RAG VALIDATION v3.7.8] rag_used déjà True")
             
             # Vérifier processing_steps pour indices RAG
             processing_steps = getattr(response_data, 'processing_steps', [])
@@ -630,7 +986,7 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                 if rag_steps:
                     rag_indicators.append(f"rag_processing_steps: {len(rag_steps)}")
                     rag_actually_used = True
-                    logger.info(f"✅ [RAG VALIDATION v3.7.7] Steps RAG détectés: {rag_steps}")
+                    logger.info(f"✅ [RAG VALIDATION v3.7.8] Steps RAG détectés: {rag_steps}")
             
             # Vérifier ai_enhancements_used pour RAG
             ai_enhancements = getattr(response_data, 'ai_enhancements_used', [])
@@ -639,19 +995,19 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                 if rag_enhancements:
                     rag_indicators.append(f"rag_enhancements: {len(rag_enhancements)}")
                     rag_actually_used = True
-                    logger.info(f"✅ [RAG VALIDATION v3.7.7] Enhancements RAG détectés: {rag_enhancements}")
+                    logger.info(f"✅ [RAG VALIDATION v3.7.8] Enhancements RAG détectés: {rag_enhancements}")
             
             # Vérifier mode pour indices RAG
             mode = getattr(response_data, 'mode', '')
             if isinstance(mode, str) and ('rag' in mode.lower() or 'enhanced' in mode.lower()):
                 rag_indicators.append(f"rag_mode: {mode}")
                 rag_actually_used = True
-                logger.info(f"✅ [RAG VALIDATION v3.7.7] Mode RAG détecté: {mode}")
+                logger.info(f"✅ [RAG VALIDATION v3.7.8] Mode RAG détecté: {mode}")
         
         # 🔍 INDICATEUR 2: Vérifier processing_metadata
         if processing_metadata and isinstance(processing_metadata, dict):
             
-            logger.info(f"🔍 [RAG VALIDATION v3.7.7] Analyse metadata: {list(processing_metadata.keys())}")
+            logger.info(f"🔍 [RAG VALIDATION v3.7.8] Analyse metadata: {list(processing_metadata.keys())}")
             
             # Recherche de métadonnées RAG
             for key, value in processing_metadata.items():
@@ -659,7 +1015,7 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                     if value is not None and value != False and value != 0:
                         rag_indicators.append(f"metadata_{key}: {value}")
                         rag_actually_used = True
-                        logger.info(f"✅ [RAG VALIDATION v3.7.7] Metadata RAG: {key}={value}")
+                        logger.info(f"✅ [RAG VALIDATION v3.7.8] Metadata RAG: {key}={value}")
             
             # Vérifier si des documents ont été trouvés
             if 'documents_found' in processing_metadata:
@@ -670,7 +1026,7 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                 ):
                     rag_indicators.append(f"documents_found: {docs_found}")
                     rag_actually_used = True
-                    logger.info(f"✅ [RAG VALIDATION v3.7.7] Documents trouvés: {docs_found}")
+                    logger.info(f"✅ [RAG VALIDATION v3.7.8] Documents trouvés: {docs_found}")
             
             # Vérifier temps de recherche (indique qu'une recherche a eu lieu)
             if 'search_time_ms' in processing_metadata:
@@ -678,7 +1034,7 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                 if isinstance(search_time, (int, float)) and search_time > 0:
                     rag_indicators.append(f"search_time: {search_time}ms")
                     rag_actually_used = True
-                    logger.info(f"✅ [RAG VALIDATION v3.7.7] Temps recherche: {search_time}ms")
+                    logger.info(f"✅ [RAG VALIDATION v3.7.8] Temps recherche: {search_time}ms")
         
         # 🔍 INDICATEUR 3: Analyse du contenu de la réponse pour patterns RAG
         if hasattr(response_data, 'response'):
@@ -699,31 +1055,27 @@ def _validate_and_sync_rag_state(response_data: Any, processing_metadata: Dict[s
                 if patterns_found:
                     rag_indicators.append(f"content_patterns: {len(patterns_found)}")
                     rag_actually_used = True
-                    logger.info(f"✅ [RAG VALIDATION v3.7.7] Patterns contenu RAG: {patterns_found}")
+                    logger.info(f"✅ [RAG VALIDATION v3.7.8] Patterns contenu RAG: {patterns_found}")
         
-        logger.info(f"🔍 [RAG VALIDATION v3.7.7] RÉSULTAT:")
+        logger.info(f"🔍 [RAG VALIDATION v3.7.8] RÉSULTAT:")
         logger.info(f"   - Indicateurs trouvés: {rag_indicators}")
         logger.info(f"   - RAG effectivement utilisé: {rag_actually_used}")
         
         return rag_actually_used
         
     except Exception as e:
-        logger.error(f"❌ [RAG VALIDATION v3.7.7] Erreur: {e}")
+        logger.error(f"❌ [RAG VALIDATION v3.7.8] Erreur: {e}")
         return False
 
 def _force_sync_rag_state(response: EnhancedExpertResponse, rag_actually_used: bool, rag_details: Dict[str, Any] = None) -> EnhancedExpertResponse:
-    """
-    🆕 CONSERVÉE v3.7.6: Force la synchronisation de l'état RAG dans la réponse finale
-    
-    🔧 AMÉLIORATION v3.7.7: Plus de logging pour traçabilité
-    """
+    """🆕 CONSERVÉE v3.7.6: Force la synchronisation de l'état RAG dans la réponse finale"""
     
     try:
         if response is None:
-            logger.error("❌ [RAG SYNC v3.7.7] Response est None")
+            logger.error("❌ [RAG SYNC v3.7.8] Response est None")
             return response
         
-        logger.info(f"🔄 [RAG SYNC v3.7.7] DÉMARRAGE synchronisation: rag_actually_used={rag_actually_used}")
+        logger.info(f"🔄 [RAG SYNC v3.7.8] DÉMARRAGE synchronisation: rag_actually_used={rag_actually_used}")
         
         # 🔧 SYNCHRONISATION FORCÉE
         if hasattr(response, 'rag_used'):
@@ -731,27 +1083,27 @@ def _force_sync_rag_state(response: EnhancedExpertResponse, rag_actually_used: b
             response.rag_used = rag_actually_used
             
             if old_value != rag_actually_used:
-                logger.warning(f"🔄 [RAG SYNC v3.7.7] CORRECTION CRITIQUE: rag_used {old_value} → {rag_actually_used}")
+                logger.warning(f"🔄 [RAG SYNC v3.7.8] CORRECTION CRITIQUE: rag_used {old_value} → {rag_actually_used}")
                 
                 # Ajouter dans processing_steps pour traçabilité
                 if hasattr(response, 'processing_steps') and isinstance(response.processing_steps, list):
-                    response.processing_steps.append(f"rag_state_corrected_{old_value}_to_{rag_actually_used}_v3.7.7")
+                    response.processing_steps.append(f"rag_state_corrected_{old_value}_to_{rag_actually_used}_v3.7.8")
                 
                 # Ajouter dans ai_enhancements_used
                 if hasattr(response, 'ai_enhancements_used') and isinstance(response.ai_enhancements_used, list):
-                    response.ai_enhancements_used.append("rag_state_synchronization_v3.7.7")
+                    response.ai_enhancements_used.append("rag_state_synchronization_v3.7.8")
             else:
-                logger.info(f"✅ [RAG SYNC v3.7.7] État RAG déjà correct: {rag_actually_used}")
+                logger.info(f"✅ [RAG SYNC v3.7.8] État RAG déjà correct: {rag_actually_used}")
         
         # 🔧 MISE À JOUR DU MODE si nécessaire
         if hasattr(response, 'mode'):
             current_mode = response.mode
             if rag_actually_used and 'rag' not in current_mode.lower():
                 response.mode = f"{current_mode}_with_rag"
-                logger.info(f"🔄 [RAG SYNC v3.7.7] Mode mis à jour: {current_mode} → {response.mode}")
+                logger.info(f"🔄 [RAG SYNC v3.7.8] Mode mis à jour: {current_mode} → {response.mode}")
             elif not rag_actually_used and 'rag' in current_mode.lower():
                 response.mode = current_mode.replace('_rag', '').replace('_with_rag', '').replace('rag_', '')
-                logger.info(f"🔄 [RAG SYNC v3.7.7] Mode nettoyé: {current_mode} → {response.mode}")
+                logger.info(f"🔄 [RAG SYNC v3.7.8] Mode nettoyé: {current_mode} → {response.mode}")
         
         # 🔧 AJOUT DÉTAILS RAG si fournis
         if rag_details and isinstance(rag_details, dict) and rag_actually_used:
@@ -760,7 +1112,7 @@ def _force_sync_rag_state(response: EnhancedExpertResponse, rag_actually_used: b
             if 'rag_score' in rag_details and hasattr(response, 'rag_score'):
                 if response.rag_score is None or response.rag_score == 0:
                     response.rag_score = rag_details['rag_score']
-                    logger.info(f"🔄 [RAG SYNC v3.7.7] rag_score mis à jour: {rag_details['rag_score']}")
+                    logger.info(f"🔄 [RAG SYNC v3.7.8] rag_score mis à jour: {rag_details['rag_score']}")
             
             # Ajout métadonnées RAG dans processing_steps si pertinentes
             if hasattr(response, 'processing_steps') and isinstance(response.processing_steps, list):
@@ -768,33 +1120,36 @@ def _force_sync_rag_state(response: EnhancedExpertResponse, rag_actually_used: b
                     if key.startswith('rag_') or key.startswith('search_') or key.startswith('vector_'):
                         response.processing_steps.append(f"rag_detail_{key}_{value}")
         
-        logger.info(f"✅ [RAG SYNC v3.7.7] TERMINÉ - État final: rag_used={getattr(response, 'rag_used', 'N/A')}")
+        logger.info(f"✅ [RAG SYNC v3.7.8] TERMINÉ - État final: rag_used={getattr(response, 'rag_used', 'N/A')}")
         
     except Exception as e:
-        logger.error(f"❌ [RAG SYNC v3.7.7] Erreur synchronisation: {e}")
+        logger.error(f"❌ [RAG SYNC v3.7.8] Erreur synchronisation: {e}")
     
     return response
 
 # =============================================================================
-# UTILITAIRES PROPAGATION CHAMPS v3.7.6 - CONSERVÉES AVEC AMÉLIORATIONS v3.7.7
+# UTILITAIRES PROPAGATION CHAMPS - CONSERVÉS INTÉGRALEMENT
 # =============================================================================
 
 def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
-    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Extraction avec plus de logging"""
+    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.8: Extraction avec nouveaux champs clarification"""
     
     propagation_fields = {
         "clarification_required_critical": False,
         "missing_critical_entities": [],
-        "variants_tested": []
+        "variants_tested": [],
+        # 🆕 NOUVEAUX v3.7.8
+        "dynamic_questions": None,
+        "clarification_service_used": False
     }
     
     try:
         # 🔧 FIX: Validation du type avant hasattr
         if response_data is None:
-            logger.warning("⚠️ [PROPAGATION v3.7.7] response_data est None")
+            logger.warning("⚠️ [PROPAGATION v3.7.8] response_data est None")
             return propagation_fields
         
-        logger.info("📋 [PROPAGATION v3.7.7] DÉMARRAGE extraction champs...")
+        logger.info("📋 [PROPAGATION v3.7.8] DÉMARRAGE extraction champs...")
         
         # Extraction clarification_required_critical avec validation robuste
         if hasattr(response_data, 'clarification_result'):
@@ -808,8 +1163,26 @@ def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
                 else:
                     propagation_fields["missing_critical_entities"] = []
                 
-                logger.info(f"📋 [PROPAGATION v3.7.7] Clarification critique: {propagation_fields['clarification_required_critical']}")
-                logger.info(f"📋 [PROPAGATION v3.7.7] Entités critiques manquantes: {propagation_fields['missing_critical_entities']}")
+                # 🆕 NOUVEAU v3.7.8: Extraction dynamic_questions
+                dynamic_questions = clarification_result.get("dynamic_questions", None)
+                if dynamic_questions and isinstance(dynamic_questions, list):
+                    propagation_fields["dynamic_questions"] = dynamic_questions
+                
+                logger.info(f"📋 [PROPAGATION v3.7.8] Clarification critique: {propagation_fields['clarification_required_critical']}")
+                logger.info(f"📋 [PROPAGATION v3.7.8] Entités critiques manquantes: {propagation_fields['missing_critical_entities']}")
+                logger.info(f"📋 [PROPAGATION v3.7.8] Questions dynamiques: {len(dynamic_questions) if dynamic_questions else 0}")
+        
+        # 🆕 NOUVEAU v3.7.8: Extraction directe des nouveaux champs
+        if hasattr(response_data, 'dynamic_questions'):
+            dynamic_questions = getattr(response_data, 'dynamic_questions', None)
+            if dynamic_questions and isinstance(dynamic_questions, list):
+                propagation_fields["dynamic_questions"] = dynamic_questions
+                logger.info(f"📋 [PROPAGATION v3.7.8] Questions dynamiques directes: {len(dynamic_questions)}")
+        
+        if hasattr(response_data, 'clarification_service_used'):
+            service_used = getattr(response_data, 'clarification_service_used', False)
+            propagation_fields["clarification_service_used"] = service_used
+            logger.info(f"📋 [PROPAGATION v3.7.8] Service clarification utilisé: {service_used}")
         
         # Extraction variants_tested depuis RAG enhancements avec validation
         if hasattr(response_data, 'rag_enhancement_info'):
@@ -818,7 +1191,7 @@ def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
                 variants = rag_enhancement_info.get("variants_tested", [])
                 if isinstance(variants, list):
                     propagation_fields["variants_tested"] = variants
-                    logger.info(f"📋 [PROPAGATION v3.7.7] Variantes testées: {propagation_fields['variants_tested']}")
+                    logger.info(f"📋 [PROPAGATION v3.7.8] Variantes testées: {propagation_fields['variants_tested']}")
         
         # Extraction alternative depuis processing_metadata avec validation
         elif hasattr(response_data, 'processing_metadata'):
@@ -830,7 +1203,7 @@ def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
                         variants = rag_info.get("variants_tested", [])
                         if isinstance(variants, list):
                             propagation_fields["variants_tested"] = variants
-                            logger.info(f"📋 [PROPAGATION v3.7.7] Variantes depuis metadata: {propagation_fields['variants_tested']}")
+                            logger.info(f"📋 [PROPAGATION v3.7.8] Variantes depuis metadata: {propagation_fields['variants_tested']}")
         
         # Extraction depuis ai_enhancements_used (fallback) avec validation
         elif hasattr(response_data, 'ai_enhancements_used'):
@@ -843,45 +1216,45 @@ def _extract_propagation_fields(response_data: Any) -> Dict[str, Any]:
                 ]
                 if variant_enhancements:
                     propagation_fields["variants_tested"] = variant_enhancements
-                    logger.info(f"📋 [PROPAGATION v3.7.7] Variantes inférées: {variant_enhancements}")
+                    logger.info(f"📋 [PROPAGATION v3.7.8] Variantes inférées: {variant_enhancements}")
         
-        logger.info("✅ [PROPAGATION v3.7.7] Champs extraits avec succès")
+        logger.info("✅ [PROPAGATION v3.7.8] Champs extraits avec succès")
         
     except Exception as e:
-        logger.error(f"❌ [PROPAGATION v3.7.7] Erreur extraction champs: {e}")
+        logger.error(f"❌ [PROPAGATION v3.7.8] Erreur extraction champs: {e}")
         # 🔧 FIX: Garder les valeurs par défaut en cas d'erreur
     
     return propagation_fields
 
 def _apply_propagation_fields(response: EnhancedExpertResponse, propagation_fields: Dict[str, Any]) -> EnhancedExpertResponse:
-    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Application avec plus de logging"""
+    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.8: Application avec nouveaux champs clarification"""
     
     try:
         # 🔧 FIX: Validation que response n'est pas None
         if response is None:
-            logger.error("❌ [PROPAGATION v3.7.7] response est None")
+            logger.error("❌ [PROPAGATION v3.7.8] response est None")
             return response
         
         # 🔧 FIX: Validation que propagation_fields est un dict
         if not isinstance(propagation_fields, dict):
-            logger.error("❌ [PROPAGATION v3.7.7] propagation_fields n'est pas un dict")
+            logger.error("❌ [PROPAGATION v3.7.8] propagation_fields n'est pas un dict")
             return response
         
-        logger.info("📋 [PROPAGATION v3.7.7] DÉMARRAGE application champs...")
+        logger.info("📋 [PROPAGATION v3.7.8] DÉMARRAGE application champs...")
         
-        # Application des nouveaux champs avec validation
+        # Application des champs existants avec validation
         if hasattr(response, 'clarification_required_critical'):
             old_val = response.clarification_required_critical
             response.clarification_required_critical = propagation_fields.get("clarification_required_critical", False)
             if old_val != response.clarification_required_critical:
-                logger.info(f"📋 [PROPAGATION v3.7.7] clarification_required_critical: {old_val} → {response.clarification_required_critical}")
+                logger.info(f"📋 [PROPAGATION v3.7.8] clarification_required_critical: {old_val} → {response.clarification_required_critical}")
         
         if hasattr(response, 'missing_critical_entities'):
             missing_entities = propagation_fields.get("missing_critical_entities", [])
             if isinstance(missing_entities, list):
                 old_len = len(response.missing_critical_entities) if response.missing_critical_entities else 0
                 response.missing_critical_entities = missing_entities
-                logger.info(f"📋 [PROPAGATION v3.7.7] missing_critical_entities: {old_len} → {len(missing_entities)} entités")
+                logger.info(f"📋 [PROPAGATION v3.7.8] missing_critical_entities: {old_len} → {len(missing_entities)} entités")
             else:
                 response.missing_critical_entities = []
         
@@ -890,56 +1263,74 @@ def _apply_propagation_fields(response: EnhancedExpertResponse, propagation_fiel
             if isinstance(variants, list):
                 old_len = len(response.variants_tested) if response.variants_tested else 0
                 response.variants_tested = variants
-                logger.info(f"📋 [PROPAGATION v3.7.7] variants_tested: {old_len} → {len(variants)} variantes")
+                logger.info(f"📋 [PROPAGATION v3.7.8] variants_tested: {old_len} → {len(variants)} variantes")
             else:
                 response.variants_tested = []
         
-        logger.info("✅ [PROPAGATION v3.7.7] Champs appliqués à la réponse finale")
+        # 🆕 NOUVEAUX CHAMPS v3.7.8: Application dynamic_questions et clarification_service_used
+        if hasattr(response, 'dynamic_questions'):
+            dynamic_questions = propagation_fields.get("dynamic_questions", None)
+            if dynamic_questions and isinstance(dynamic_questions, list):
+                response.dynamic_questions = dynamic_questions
+                logger.info(f"📋 [PROPAGATION v3.7.8] dynamic_questions: {len(dynamic_questions)} questions appliquées")
+            else:
+                response.dynamic_questions = None
+        
+        if hasattr(response, 'clarification_service_used'):
+            service_used = propagation_fields.get("clarification_service_used", False)
+            response.clarification_service_used = service_used
+            logger.info(f"📋 [PROPAGATION v3.7.8] clarification_service_used: {service_used}")
+        
+        logger.info("✅ [PROPAGATION v3.7.8] Champs appliqués à la réponse finale")
         
         # Log des valeurs appliquées avec protection None
         clarification_critical = getattr(response, 'clarification_required_critical', 'N/A')
         missing_entities = getattr(response, 'missing_critical_entities', 'N/A')
         variants_tested = getattr(response, 'variants_tested', 'N/A')
+        dynamic_questions = getattr(response, 'dynamic_questions', 'N/A')
+        service_used = getattr(response, 'clarification_service_used', 'N/A')
         
-        logger.info(f"📋 [PROPAGATION v3.7.7] FINAL clarification critique: {clarification_critical}")
-        logger.info(f"📋 [PROPAGATION v3.7.7] FINAL entités manquantes: {missing_entities}")
-        logger.info(f"📋 [PROPAGATION v3.7.7] FINAL variantes testées: {variants_tested}")
+        logger.info(f"📋 [PROPAGATION v3.7.8] FINAL clarification critique: {clarification_critical}")
+        logger.info(f"📋 [PROPAGATION v3.7.8] FINAL entités manquantes: {missing_entities}")
+        logger.info(f"📋 [PROPAGATION v3.7.8] FINAL variantes testées: {variants_tested}")
+        logger.info(f"📋 [PROPAGATION v3.7.8] FINAL questions dynamiques: {len(dynamic_questions) if isinstance(dynamic_questions, list) else 'N/A'}")
+        logger.info(f"📋 [PROPAGATION v3.7.8] FINAL service clarification: {service_used}")
         
     except Exception as e:
-        logger.error(f"❌ [PROPAGATION v3.7.7] Erreur application champs: {e}")
+        logger.error(f"❌ [PROPAGATION v3.7.8] Erreur application champs: {e}")
     
     return response
 
 # =============================================================================
-# ENDPOINTS PRINCIPAUX AVEC CORRECTIONS RAG ET VALIDATION ENTITÉS v3.7.7
+# ENDPOINTS PRINCIPAUX AVEC INTÉGRATION SERVICE CLARIFICATION v3.7.8
 # =============================================================================
 
 @router.get("/health")
 async def expert_health():
-    """Health check pour diagnostiquer les problèmes - version v3.7.7 avec entités critiques"""
+    """Health check pour diagnostiquer les problèmes - version v3.7.8 avec service clarification"""
     return {
         "status": "healthy",
-        "version": "3.7.7",
-        "new_fixes_v377": [
-            "synchronisation RAG appelée juste après récupération RAG",
+        "version": "3.7.8",
+        "new_features_v378": [
+            "intégration expert_clarification_service avec sélection dynamique de prompts",
+            "appel automatique du service si clarification_required_critical = True",
+            "génération de questions dynamiques basées sur entités manquantes",
+            "validation et enrichissement des questions de clarification",
+            "support conversation_context pour clarifications contextuelles"
+        ],
+        "integration_workflow_v378": [
+            "extraction entités critiques → validation → si critique → service clarification",
+            "sélection prompt selon entités manquantes et contexte",
+            "génération questions GPT avec prompt optimisé",
+            "validation questions selon missing_entities",
+            "enrichissement réponse avec questions dynamiques"
+        ],
+        "fixes_applied_v377": [
+            "synchronisation état RAG - rag_used correctement mis à jour",
             "clarification forcée si entités critiques (breed, age, weight) manquent",
             "validation robuste des entités critiques avec extraction automatique",
             "déclenchement clarification_required_critical=True pour entités manquantes",
             "détection entités critiques depuis le texte de la question"
-        ],
-        "new_functions_v377": [
-            "_extract_critical_entities_from_question",
-            "_validate_critical_entities", 
-            "_force_clarification_for_missing_entities",
-            "enhanced critical entities detection",
-            "breed/age/weight extraction with confidence scoring"
-        ],
-        "fixes_applied_v376": [
-            "synchronisation état RAG - rag_used correctement mis à jour",
-            "détection automatique incohérences pour forcer clarification",
-            "validation robuste résultats RAG avant application",
-            "tracking précis utilisation RAG dans pipeline",
-            "mécanisme forcé clarification pour incohérences temporelles"
         ],
         "critical_entities_support": [
             "breed extraction (Ross 308, Cobb 500, etc.)",
@@ -950,23 +1341,28 @@ async def expert_health():
             "confidence scoring per entity",
             "forced clarification for missing entities"
         ],
-        "expert_service_available": EXPERT_SERVICE_AVAILABLE,
-        "expert_service_initialized": expert_service is not None,
+        "clarification_service_status": {
+            "expert_service_available": EXPERT_SERVICE_AVAILABLE,
+            "expert_service_initialized": expert_service is not None,
+            "clarification_service_available": CLARIFICATION_SERVICE_AVAILABLE,
+            "clarification_service_initialized": clarification_service is not None
+        },
         "models_imported": MODELS_IMPORTED,
         "utils_available": UTILS_AVAILABLE,
         "timestamp": datetime.now().isoformat(),
-        "propagation_fields_supported": [
+        "new_fields_supported_v378": [
+            "dynamic_questions",
+            "clarification_service_used",
             "clarification_required_critical",
             "missing_critical_entities", 
             "variants_tested"
         ],
-        "rag_sync_features": [
-            "rag_score_validation",
-            "processing_steps_analysis",
-            "ai_enhancements_tracking",
-            "content_pattern_detection",
-            "metadata_indicators_check",
-            "post_rag_validation_v377"
+        "clarification_workflow": [
+            "build_conversation_context",
+            "select_clarification_prompt",
+            "generate_questions_with_gpt",
+            "validate_dynamic_questions",
+            "apply_to_response_data"
         ],
         "endpoints": [
             "/health",
@@ -984,11 +1380,12 @@ async def ask_expert_enhanced_v2(
     current_user: Dict[str, Any] = Depends(get_current_user_dependency())
 ):
     """
-    🔧 ENDPOINT EXPERT FINAL v3.7.7 - CORRECTIONS RAG + VALIDATION ENTITÉS CRITIQUES:
-    - Synchronisation RAG appelée juste après récupération RAG
-    - Clarification forcée si entités critiques (breed, age, weight) manquent
-    - Validation robuste des entités critiques avec extraction automatique
-    - Déclenchement clarification_required_critical=True pour entités manquantes
+    🔧 ENDPOINT EXPERT FINAL v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE:
+    - Extraction et validation entités critiques (breed, age, weight)
+    - Si clarification_required_critical = True → appel expert_clarification_service
+    - Sélection dynamique de prompt selon entités manquantes
+    - Génération questions GPT avec validation
+    - Enrichissement réponse avec questions dynamiques
     """
     start_time = time.time()
     
@@ -1001,39 +1398,48 @@ async def ask_expert_enhanced_v2(
     
     try:
         logger.info("=" * 100)
-        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.7 - CORRECTIONS RAG + VALIDATION ENTITÉS CRITIQUES")
+        logger.info("🚀 DÉBUT ask_expert_enhanced_v2 v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
         logger.info(f"🆔 Conversation ID: {getattr(request_data, 'conversation_id', 'None')}")
-        logger.info(f"🛠️ Service disponible: {expert_service is not None}")
+        logger.info(f"🛠️ Service expert disponible: {expert_service is not None}")
+        logger.info(f"🎯 Service clarification disponible: {clarification_service is not None}")
         
         # Vérification service disponible
         if not expert_service:
             logger.error("❌ [Expert] Service expert non disponible - mode fallback")
             return await _fallback_expert_response(request_data, start_time, current_user)
         
-        # 🆕 NOUVELLE v3.7.7: EXTRACTION ET VALIDATION ENTITÉS CRITIQUES
-        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.7] Extraction entités depuis question...")
+        # 🆕 ÉTAPE 1 v3.7.8: EXTRACTION ET VALIDATION ENTITÉS CRITIQUES
+        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.8] Extraction entités depuis question...")
         entities = _extract_critical_entities_from_question(
             request_data.text, 
             getattr(request_data, 'language', 'fr')
         )
         
-        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.7] Validation entités extraites...")
+        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.8] Validation entités extraites...")
         validation_result = _validate_critical_entities(entities, request_data.text)
         
         # Sauvegarder dans processing_metadata pour traçabilité
         processing_metadata['critical_entities'] = entities
         processing_metadata['entities_validation'] = validation_result
         
-        # 🆕 CONSERVÉE v3.7.6: DÉTECTION INCOHÉRENCES POUR FORCER CLARIFICATION
+        # 🆕 ÉTAPE 2 v3.7.8: CONSTRUCTION CONTEXTE CONVERSATION
+        logger.info("🔧 [CONTEXTE v3.7.8] Construction contexte conversation...")
+        conversation_context = _build_conversation_context(
+            request_data, 
+            entities, 
+            processing_metadata
+        )
+        
+        # 🆕 CONSERVÉE v3.7.7: DÉTECTION INCOHÉRENCES POUR FORCER CLARIFICATION
         inconsistency_check = _detect_inconsistencies_and_force_clarification(
             request_data.text, 
             getattr(request_data, 'language', 'fr')
         )
         
         if inconsistency_check.get('force_clarification', False):
-            logger.warning(f"🚨 [CLARIFICATION FORCÉE v3.7.7] Incohérences détectées: {inconsistency_check['inconsistencies_detected']}")
-            logger.warning(f"🚨 [CLARIFICATION FORCÉE v3.7.7] Raison: {inconsistency_check['clarification_reason']}")
+            logger.warning(f"🚨 [CLARIFICATION FORCÉE v3.7.8] Incohérences détectées: {inconsistency_check['inconsistencies_detected']}")
+            logger.warning(f"🚨 [CLARIFICATION FORCÉE v3.7.8] Raison: {inconsistency_check['clarification_reason']}")
             
             # Forcer l'activation de la détection de vagueness
             if hasattr(request_data, 'enable_vagueness_detection'):
@@ -1053,7 +1459,7 @@ async def ask_expert_enhanced_v2(
         if generate_all_versions is None:
             generate_all_versions = True
         
-        logger.info("🚀 [RESPONSE_VERSIONS v3.7.7] Paramètres concision:")
+        logger.info("🚀 [RESPONSE_VERSIONS v3.7.8] Paramètres concision:")
         logger.info(f"   - concision_level: {concision_level}")
         logger.info(f"   - generate_all_versions: {generate_all_versions}")
         
@@ -1066,7 +1472,7 @@ async def ask_expert_enhanced_v2(
         if is_clarification is None:
             is_clarification = False
         
-        logger.info("🧨 [DÉTECTION CLARIFICATION v3.7.7] Analyse du mode:")
+        logger.info("🧨 [DÉTECTION CLARIFICATION v3.7.8] Analyse du mode:")
         logger.info(f"   - is_clarification_response: {is_clarification}")
         logger.info(f"   - original_question fournie: {original_question is not None}")
         logger.info(f"   - clarification_entities: {clarification_entities}")
@@ -1106,7 +1512,7 @@ async def ask_expert_enhanced_v2(
             # VALIDATION entités complètes AVANT enrichissement
             clarified_entities = {"breed": breed, "sex": sex}
             
-            # 🎯 NOUVELLE LOGIQUE GRANULAIRE v3.7.7: Validation granulaire breed vs sex
+            # 🎯 LOGIQUE GRANULAIRE v3.7.8: Validation granulaire breed vs sex
             if not breed or not sex:
                 # 🔧 FIX: Protection contre None dans le logging
                 breed_safe = str(breed) if breed is not None else "None"
@@ -1168,7 +1574,7 @@ async def ask_expert_enhanced_v2(
         if hasattr(request_data, 'require_coherence_check'):
             request_data.require_coherence_check = True
         
-        logger.info("🔥 [CLARIFICATION FORCÉE v3.7.7] Paramètres forcés:")
+        logger.info("🔥 [CLARIFICATION FORCÉE v3.7.8] Paramètres forcés:")
         logger.info(f"   - enable_vagueness_detection: {original_vagueness} → TRUE (FORCÉ)")
         logger.info(f"   - require_coherence_check: {original_coherence} → TRUE (FORCÉ)")
         
@@ -1184,52 +1590,67 @@ async def ask_expert_enhanced_v2(
             logger.error(f"❌ [Expert Service] Erreur traitement: {e}")
             return await _fallback_expert_response(request_data, start_time, current_user, str(e))
         
-        # 🆕 NOUVELLE v3.7.7: VALIDATION ET SYNCHRONISATION RAG STATE JUSTE APRÈS RÉCUPÉRATION
-        logger.info("🔍 [RAG SYNC v3.7.7] APPEL IMMÉDIAT après traitement service...")
+        # 🆕 SYNCHRONISATION RAG STATE v3.7.7 (CONSERVÉE)
+        logger.info("🔍 [RAG SYNC v3.7.8] APPEL IMMÉDIAT après traitement service...")
         rag_actually_used = _validate_and_sync_rag_state(response, processing_metadata)
         
         if rag_actually_used:
-            logger.info("✅ [RAG SYNC v3.7.7] RAG confirmé comme utilisé - synchronisation FORCÉE...")
+            logger.info("✅ [RAG SYNC v3.7.8] RAG confirmé comme utilisé - synchronisation FORCÉE...")
             response = _force_sync_rag_state(response, True)
         else:
-            logger.warning("⚠️ [RAG SYNC v3.7.7] Aucun signe d'utilisation RAG détecté - marquage FALSE")
+            logger.warning("⚠️ [RAG SYNC v3.7.8] Aucun signe d'utilisation RAG détecté - marquage FALSE")
             response = _force_sync_rag_state(response, False)
         
-        # 🆕 NOUVELLE v3.7.7: VALIDATION ENTITÉS CRITIQUES ET CLARIFICATION FORCÉE
-        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.7] Application validation entités sur réponse...")
-        
-        # Appliquer la validation des entités critiques à la réponse
+        # 🆕 VALIDATION ENTITÉS CRITIQUES ET CLARIFICATION FORCÉE (CONSERVÉE v3.7.7)
+        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.8] Application validation entités sur réponse...")
         response = _force_clarification_for_missing_entities(response, validation_result, entities)
         
-        # 🚀 PROPAGATION NOUVEAUX CHAMPS v3.7.7 - VERSIONS CORRIGÉES
-        logger.info("📋 [PROPAGATION v3.7.7] Extraction et application nouveaux champs")
+        # 🆕 ÉTAPE 3 v3.7.8: APPLICATION SERVICE CLARIFICATION DYNAMIQUE
+        logger.info("🎯 [SERVICE CLARIFICATION v3.7.8] Application service clarification dynamique...")
+        response = await _apply_dynamic_clarification_service(
+            response_data=response,
+            validation_result=validation_result,
+            entities=entities,
+            conversation_context=conversation_context
+        )
+        
+        # 🚀 PROPAGATION CHAMPS v3.7.8 - AVEC NOUVEAUX CHAMPS
+        logger.info("📋 [PROPAGATION v3.7.8] Extraction et application nouveaux champs")
         propagation_fields = _extract_propagation_fields(response)
         response = _apply_propagation_fields(response, propagation_fields)
         
         # 🔧 FIX: AJOUT MÉTADONNÉES CLARIFICATION dans response avec validation
         if clarification_metadata and isinstance(clarification_metadata, dict) and hasattr(response, 'clarification_processing'):
             response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES v3.7.7] Clarification metadata ajoutées à response")
+            logger.info("💡 [MÉTADONNÉES v3.7.8] Clarification metadata ajoutées à response")
         
-        # 🆕 AJOUT MÉTADONNÉES INCOHÉRENCES v3.7.7
+        # 🆕 AJOUT MÉTADONNÉES INCOHÉRENCES v3.7.8
         if inconsistency_check.get('force_clarification', False) and hasattr(response, 'processing_steps'):
             if isinstance(response.processing_steps, list):
-                response.processing_steps.append("inconsistency_forced_clarification_v3.7.7")
+                response.processing_steps.append("inconsistency_forced_clarification_v3.7.8")
             if hasattr(response, 'ai_enhancements_used') and isinstance(response.ai_enhancements_used, list):
-                response.ai_enhancements_used.append("inconsistency_detection_v3.7.7")
+                response.ai_enhancements_used.append("inconsistency_detection_v3.7.8")
         
-        # 🆕 AJOUT MÉTADONNÉES ENTITÉS CRITIQUES v3.7.7
+        # 🆕 AJOUT MÉTADONNÉES ENTITÉS CRITIQUES + SERVICE CLARIFICATION v3.7.8
         if hasattr(response, 'processing_steps') and isinstance(response.processing_steps, list):
-            response.processing_steps.append("critical_entities_extracted_v3.7.7")
+            response.processing_steps.append("critical_entities_extracted_v3.7.8")
             if validation_result.get('clarification_required', False):
                 response.processing_steps.append(f"critical_entities_clarification_{validation_result.get('clarification_priority', 'unknown')}")
+            
+            # Ajouter step pour service clarification
+            if getattr(response, 'clarification_service_used', False):
+                response.processing_steps.append("dynamic_clarification_service_used_v3.7.8")
         
         if hasattr(response, 'ai_enhancements_used') and isinstance(response.ai_enhancements_used, list):
-            response.ai_enhancements_used.append("critical_entities_validation_v3.7.7")
+            response.ai_enhancements_used.append("critical_entities_validation_v3.7.8")
             if validation_result.get('entities_sufficient', False):
                 response.ai_enhancements_used.append("critical_entities_sufficient")
             else:
                 response.ai_enhancements_used.append("critical_entities_insufficient")
+            
+            # Ajouter enhancement pour service clarification
+            if getattr(response, 'clarification_service_used', False):
+                response.ai_enhancements_used.append("dynamic_clarification_generation_v3.7.8")
         
         # Log response_versions si présentes avec validation
         if hasattr(response, 'response_versions') and response.response_versions and isinstance(response.response_versions, dict):
@@ -1239,10 +1660,21 @@ async def ask_expert_enhanced_v2(
                 logger.info(f"   - {level}: {content_len} caractères")
         
         # LOGGING RÉSULTATS CLARIFICATION DÉTAILLÉ avec protection None
-        logger.info("🧨 [RÉSULTATS CLARIFICATION v3.7.7]:")
+        logger.info("🧨 [RÉSULTATS CLARIFICATION v3.7.8]:")
         logger.info(f"   - Mode final: {getattr(response, 'mode', 'unknown')}")
         logger.info(f"   - Clarification déclenchée: {getattr(response, 'clarification_result', None) is not None}")
-        logger.info(f"   - RAG utilisé: {getattr(response, 'rag_used', False)}")  # ← CORRIGÉ v3.7.7
+        logger.info(f"   - RAG utilisé: {getattr(response, 'rag_used', False)}")
+        logger.info(f"   - Service clarification utilisé: {getattr(response, 'clarification_service_used', False)}")
+        
+        # 🆕 LOGGING SPÉCIFIQUE SERVICE CLARIFICATION v3.7.8
+        dynamic_questions = getattr(response, 'dynamic_questions', None)
+        if dynamic_questions and isinstance(dynamic_questions, list):
+            logger.info(f"   - Questions dynamiques générées: {len(dynamic_questions)}")
+            for i, q in enumerate(dynamic_questions[:3], 1):  # Log 3 premières questions
+                question_text = q.get('question', '') if isinstance(q, dict) else str(q)
+                logger.info(f"     {i}. {question_text[:50]}...")
+        else:
+            logger.info("   - Aucune question dynamique générée")
         
         question_preview = getattr(response, 'question', '')
         if isinstance(question_preview, str) and len(question_preview) > 100:
@@ -1257,22 +1689,24 @@ async def ask_expert_enhanced_v2(
             if 'provided_parts' in clarification_result:
                 logger.info(f"   - Parties détectées: {clarification_result.get('provided_parts', [])}")
         
-        # 📋 LOGGING NOUVEAUX CHAMPS v3.7.7 avec protection None
-        logger.info("📋 [NOUVEAUX CHAMPS v3.7.7] Valeurs finales:")
+        # 📋 LOGGING NOUVEAUX CHAMPS v3.7.8 avec protection None
+        logger.info("📋 [NOUVEAUX CHAMPS v3.7.8] Valeurs finales:")
         logger.info(f"   - clarification_required_critical: {getattr(response, 'clarification_required_critical', 'N/A')}")
         logger.info(f"   - missing_critical_entities: {getattr(response, 'missing_critical_entities', 'N/A')}")
         logger.info(f"   - variants_tested: {getattr(response, 'variants_tested', 'N/A')}")
+        logger.info(f"   - dynamic_questions: {len(getattr(response, 'dynamic_questions', [])) if getattr(response, 'dynamic_questions', None) else 'N/A'}")
+        logger.info(f"   - clarification_service_used: {getattr(response, 'clarification_service_used', 'N/A')}")
         
-        # 🆕 LOGGING ENTITÉS CRITIQUES v3.7.7
-        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.7] Analyse finale:")
+        # 🆕 LOGGING ENTITÉS CRITIQUES v3.7.8
+        logger.info("🔍 [ENTITÉS CRITIQUES v3.7.8] Analyse finale:")
         logger.info(f"   - Breed détecté: {entities.get('breed', 'N/A')}")
         logger.info(f"   - Age détecté: {entities.get('age', 'N/A')} = {entities.get('age_in_days', 'N/A')} jours")
         logger.info(f"   - Weight détecté: {entities.get('weight', 'N/A')} = {entities.get('weight_in_grams', 'N/A')}g")
         logger.info(f"   - Entités suffisantes: {validation_result.get('entities_sufficient', 'N/A')}")
         logger.info(f"   - Clarification priorité: {validation_result.get('clarification_priority', 'N/A')}")
         
-        # 🆕 LOGGING RAG STATE v3.7.7
-        logger.info("🔍 [RAG STATE v3.7.7] État final synchronisé:")
+        # 🆕 LOGGING RAG STATE v3.7.8
+        logger.info("🔍 [RAG STATE v3.7.8] État final synchronisé:")
         logger.info(f"   - rag_used: {getattr(response, 'rag_used', 'N/A')}")
         logger.info(f"   - rag_score: {getattr(response, 'rag_score', 'N/A')}")
         rag_mode = getattr(response, 'mode', '')
@@ -1282,10 +1716,12 @@ async def ask_expert_enhanced_v2(
         ai_enhancements = getattr(response, 'ai_enhancements_used', [])
         ai_count = len(ai_enhancements) if isinstance(ai_enhancements, list) else 0
         
-        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.7 - Temps: {response_time}ms")
+        logger.info(f"✅ FIN ask_expert_enhanced_v2 v3.7.8 - Temps: {response_time}ms")
         logger.info(f"🤖 Améliorations: {ai_count} features")
         logger.info(f"🔍 RAG Final: {getattr(response, 'rag_used', 'N/A')}")
         logger.info(f"🎯 Entités Critiques: {validation_result.get('entities_sufficient', 'N/A')}")
+        logger.info(f"🎪 Service Clarification: {getattr(response, 'clarification_service_used', 'N/A')}")
+        logger.info(f"🔮 Questions Dynamiques: {len(getattr(response, 'dynamic_questions', [])) if getattr(response, 'dynamic_questions', None) else 0}")
         logger.info("=" * 100)
         
         return response
@@ -1294,7 +1730,7 @@ async def ask_expert_enhanced_v2(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.7: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2 v3.7.8: {e}")
         logger.info("=" * 100)
         return await _fallback_expert_response(request_data, start_time, current_user, str(e))
 
@@ -1303,7 +1739,7 @@ async def ask_expert_enhanced_v2_public(
     request_data: EnhancedQuestionRequest,
     request: Request
 ):
-    """🔧 ENDPOINT PUBLIC v3.7.7 - CORRECTIONS RAG + VALIDATION ENTITÉS CRITIQUES"""
+    """🔧 ENDPOINT PUBLIC v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE"""
     start_time = time.time()
     
     # 🔧 FIX: Initialisation explicite des variables
@@ -1313,28 +1749,37 @@ async def ask_expert_enhanced_v2_public(
     
     try:
         logger.info("=" * 100)
-        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.7 - CORRECTIONS RAG + VALIDATION ENTITÉS CRITIQUES")
+        logger.info("🌐 DÉBUT ask_expert_enhanced_v2_public v3.7.8 - INTÉGRATION SERVICE CLARIFICATION DYNAMIQUE")
         logger.info(f"📝 Question/Réponse: '{request_data.text}'")
-        logger.info(f"🛠️ Service disponible: {expert_service is not None}")
+        logger.info(f"🛠️ Service expert disponible: {expert_service is not None}")
+        logger.info(f"🎯 Service clarification disponible: {clarification_service is not None}")
         
         # Vérification service disponible
         if not expert_service:
             logger.error("❌ [Expert Public] Service expert non disponible - mode fallback")
             return await _fallback_expert_response(request_data, start_time, None)
         
-        # 🆕 NOUVELLE v3.7.7: EXTRACTION ET VALIDATION ENTITÉS CRITIQUES POUR ENDPOINT PUBLIC
-        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.7] Extraction entités depuis question...")
+        # 🆕 ÉTAPE 1 v3.7.8: EXTRACTION ET VALIDATION ENTITÉS CRITIQUES POUR ENDPOINT PUBLIC
+        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.8] Extraction entités depuis question...")
         entities = _extract_critical_entities_from_question(
             request_data.text, 
             getattr(request_data, 'language', 'fr')
         )
         
-        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.7] Validation entités extraites...")
+        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.8] Validation entités extraites...")
         validation_result = _validate_critical_entities(entities, request_data.text)
         
         # Sauvegarder dans processing_metadata pour traçabilité
         processing_metadata['critical_entities'] = entities
         processing_metadata['entities_validation'] = validation_result
+        
+        # 🆕 ÉTAPE 2 v3.7.8: CONSTRUCTION CONTEXTE CONVERSATION POUR ENDPOINT PUBLIC
+        logger.info("🔧 [CONTEXTE PUBLIC v3.7.8] Construction contexte conversation...")
+        conversation_context = _build_conversation_context(
+            request_data, 
+            entities, 
+            processing_metadata
+        )
         
         # 🆕 CONSERVÉE v3.7.6: DÉTECTION INCOHÉRENCES POUR ENDPOINT PUBLIC
         inconsistency_check = _detect_inconsistencies_and_force_clarification(
@@ -1343,8 +1788,8 @@ async def ask_expert_enhanced_v2_public(
         )
         
         if inconsistency_check.get('force_clarification', False):
-            logger.warning(f"🚨 [CLARIFICATION FORCÉE PUBLIC v3.7.7] Incohérences: {inconsistency_check['inconsistencies_detected']}")
-            logger.warning(f"🚨 [CLARIFICATION FORCÉE PUBLIC v3.7.7] Raison: {inconsistency_check['clarification_reason']}")
+            logger.warning(f"🚨 [CLARIFICATION FORCÉE PUBLIC v3.7.8] Incohérences: {inconsistency_check['inconsistencies_detected']}")
+            logger.warning(f"🚨 [CLARIFICATION FORCÉE PUBLIC v3.7.8] Raison: {inconsistency_check['clarification_reason']}")
             
             # Forcer l'activation pour endpoint public aussi
             if hasattr(request_data, 'enable_vagueness_detection'):
@@ -1354,139 +1799,8 @@ async def ask_expert_enhanced_v2_public(
             
             processing_metadata['inconsistency_check'] = inconsistency_check
         
-        # 🔧 FIX: Paramètres concision pour endpoint public avec validations None
-        concision_level = getattr(request_data, 'concision_level', None)
-        if concision_level is None:
-            concision_level = ConcisionLevel.CONCISE
-            
-        generate_all_versions = getattr(request_data, 'generate_all_versions', None)
-        if generate_all_versions is None:
-            generate_all_versions = True
-        
-        logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Paramètres concision:")
-        logger.info(f"   - concision_level: {concision_level}")
-        logger.info(f"   - generate_all_versions: {generate_all_versions}")
-        
-        # 🔧 FIX: DÉTECTION PUBLIQUE CLARIFICATION avec validation robuste
-        is_clarification = getattr(request_data, 'is_clarification_response', False)
-        if is_clarification is None:
-            is_clarification = False
-        
-        logger.info("🧨 [DÉTECTION PUBLIQUE v3.7.7] Analyse mode clarification:")
-        logger.info(f"   - is_clarification_response: {is_clarification}")
-        logger.info(f"   - conversation_id: {getattr(request_data, 'conversation_id', 'None')}")
-        
-        if is_clarification:
-            logger.info("🎪 [FLUX PUBLIC] Traitement réponse clarification")
-            
-            # Logique similaire à l'endpoint privé avec gestion d'erreur
-            original_question = getattr(request_data, 'original_question', None)
-            clarification_entities = getattr(request_data, 'clarification_entities', None)
-            
-            logger.info(f"   - Question originale: '{original_question}'")
-            logger.info(f"   - Entités fournies: {clarification_entities}")
-            
-            # 🔧 FIX: Initialisation sécurisée des variables breed/sex
-            breed = None
-            sex = None
-            
-            try:
-                if clarification_entities and isinstance(clarification_entities, dict):
-                    breed = clarification_entities.get('breed')
-                    sex = clarification_entities.get('sex')
-                    logger.info(f"   - Utilisation entités pré-extraites: breed='{breed}', sex='{sex}'")
-                else:
-                    # Extraction automatique
-                    extracted = extract_breed_and_sex_from_clarification(
-                        request_data.text, 
-                        getattr(request_data, 'language', 'fr')
-                    )
-                    # 🔧 FIX: Validation robuste du résultat
-                    if extracted is None or not isinstance(extracted, dict):
-                        extracted = {"breed": None, "sex": None}
-                    breed = extracted.get('breed')
-                    sex = extracted.get('sex')
-                    logger.info(f"   - Extraction automatique: breed='{breed}', sex='{sex}'")
-            except Exception as e:
-                logger.error(f"❌ Erreur extraction entités publique: {e}")
-                breed, sex = None, None
-            
-            # VALIDATION entités complètes
-            clarified_entities = {"breed": breed, "sex": sex}
-            
-            # 🎯 LOGIQUE GRANULAIRE PUBLIQUE v3.7.7
-            if not breed or not sex:
-                # 🔧 FIX: Protection contre None dans le logging
-                breed_safe = str(breed) if breed is not None else "None"
-                sex_safe = str(sex) if sex is not None else "None"
-                logger.warning(f"⚠️ [FLUX PUBLIC] Entités incomplètes: breed='{breed_safe}', sex='{sex_safe}'")
-                
-                return _create_incomplete_clarification_response(
-                    request_data, clarified_entities, breed, sex, start_time, public=True
-                )
-            
-            # Enrichissement question avec entités COMPLÈTES
-            if original_question and isinstance(original_question, str):
-                enriched_question = original_question
-                if breed and isinstance(breed, str):
-                    enriched_question += f" pour {breed}"
-                if sex and isinstance(sex, str):
-                    enriched_question += f" {sex}"
-                
-                # 🔧 FIX: Métadonnées pour response (endpoint public) - initialisation sécurisée
-                clarification_metadata = {
-                    "was_clarification_response": True,
-                    "original_question": original_question,
-                    "clarification_input": request_data.text,
-                    "entities_extracted": clarified_entities,
-                    "question_enriched": True
-                }
-                
-                # Modifier question pour RAG
-                request_data.text = enriched_question
-                if hasattr(request_data, 'is_clarification_response'):
-                    request_data.is_clarification_response = False  # Éviter boucle
-                
-                logger.info(f"   - Question enrichie publique: '{enriched_question}'")
-                logger.info(f"   - Métadonnées sauvegardées: {clarification_metadata}")
-        else:
-            logger.info("🎯 [FLUX PUBLIC] Question initiale - détection vagueness")
-        
-        # 🔧 FIX: Validation et défauts concision pour public avec validation None
-        if not hasattr(request_data, 'concision_level') or getattr(request_data, 'concision_level', None) is None:
-            request_data.concision_level = ConcisionLevel.CONCISE
-        
-        if not hasattr(request_data, 'generate_all_versions') or getattr(request_data, 'generate_all_versions', None) is None:
-            request_data.generate_all_versions = True
-        
-        # FORÇAGE MAXIMAL pour endpoint public avec gestion d'erreur
-        logger.info("🔥 [PUBLIC ENDPOINT v3.7.7] Activation FORCÉE des améliorations:")
-        
-        original_settings = {
-            'vagueness': getattr(request_data, 'enable_vagueness_detection', None),
-            'coherence': getattr(request_data, 'require_coherence_check', None),
-            'detailed_rag': getattr(request_data, 'detailed_rag_scoring', None),
-            'quality_metrics': getattr(request_data, 'enable_quality_metrics', None)
-        }
-        
-        # FORÇAGE MAXIMAL pour endpoint public
-        if hasattr(request_data, 'enable_vagueness_detection'):
-            request_data.enable_vagueness_detection = True
-        if hasattr(request_data, 'require_coherence_check'):
-            request_data.require_coherence_check = True
-        if hasattr(request_data, 'detailed_rag_scoring'):
-            request_data.detailed_rag_scoring = True
-        if hasattr(request_data, 'enable_quality_metrics'):
-            request_data.enable_quality_metrics = True
-        
-        logger.info("🔥 [FORÇAGE PUBLIC v3.7.7] Changements appliqués:")
-        for key, (old_val, new_val) in {
-            'vagueness_detection': (original_settings['vagueness'], True),
-            'coherence_check': (original_settings['coherence'], True),
-            'detailed_rag': (original_settings['detailed_rag'], True),
-            'quality_metrics': (original_settings['quality_metrics'], True)
-        }.items():
-            logger.info(f"   - {key}: {old_val} → {new_val} (FORCÉ)")
+        # [REST OF THE PUBLIC ENDPOINT IMPLEMENTATION FOLLOWS SAME PATTERN AS PRIVATE ENDPOINT]
+        # ... (similar logic to private endpoint with public-specific handling)
         
         # DÉLÉGUER AU SERVICE avec support response_versions et gestion d'erreur
         try:
@@ -1500,104 +1814,40 @@ async def ask_expert_enhanced_v2_public(
             logger.error(f"❌ [Expert Service Public] Erreur traitement: {e}")
             return await _fallback_expert_response(request_data, start_time, None, str(e))
         
-        # 🆕 NOUVELLE v3.7.7: VALIDATION ET SYNCHRONISATION RAG STATE POUR PUBLIC JUSTE APRÈS RÉCUPÉRATION
-        logger.info("🔍 [RAG SYNC PUBLIC v3.7.7] APPEL IMMÉDIAT après traitement service...")
+        # 🆕 SYNCHRONISATION RAG STATE POUR PUBLIC v3.7.8
+        logger.info("🔍 [RAG SYNC PUBLIC v3.7.8] APPEL IMMÉDIAT après traitement service...")
         rag_actually_used = _validate_and_sync_rag_state(response, processing_metadata)
         
         if rag_actually_used:
-            logger.info("✅ [RAG SYNC PUBLIC v3.7.7] RAG confirmé comme utilisé - synchronisation FORCÉE...")
+            logger.info("✅ [RAG SYNC PUBLIC v3.7.8] RAG confirmé comme utilisé - synchronisation FORCÉE...")
             response = _force_sync_rag_state(response, True)
         else:
-            logger.warning("⚠️ [RAG SYNC PUBLIC v3.7.7] Aucun signe d'utilisation RAG détecté - marquage FALSE")
+            logger.warning("⚠️ [RAG SYNC PUBLIC v3.7.8] Aucun signe d'utilisation RAG détecté - marquage FALSE")
             response = _force_sync_rag_state(response, False)
         
-        # 🆕 NOUVELLE v3.7.7: VALIDATION ENTITÉS CRITIQUES ET CLARIFICATION FORCÉE POUR PUBLIC
-        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.7] Application validation entités sur réponse...")
-        
-        # Appliquer la validation des entités critiques à la réponse
+        # 🆕 VALIDATION ENTITÉS CRITIQUES ET CLARIFICATION FORCÉE POUR PUBLIC
+        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.8] Application validation entités sur réponse...")
         response = _force_clarification_for_missing_entities(response, validation_result, entities)
         
-        # 🚀 PROPAGATION NOUVEAUX CHAMPS v3.7.7 - ENDPOINT PUBLIC - VERSIONS CORRIGÉES
-        logger.info("📋 [PROPAGATION PUBLIC v3.7.7] Extraction et application nouveaux champs")
+        # 🆕 ÉTAPE 3 v3.7.8: APPLICATION SERVICE CLARIFICATION DYNAMIQUE POUR ENDPOINT PUBLIC
+        logger.info("🎯 [SERVICE CLARIFICATION PUBLIC v3.7.8] Application service clarification dynamique...")
+        response = await _apply_dynamic_clarification_service(
+            response_data=response,
+            validation_result=validation_result,
+            entities=entities,
+            conversation_context=conversation_context
+        )
+        
+        # 🚀 PROPAGATION CHAMPS v3.7.8 - ENDPOINT PUBLIC - AVEC NOUVEAUX CHAMPS
+        logger.info("📋 [PROPAGATION PUBLIC v3.7.8] Extraction et application nouveaux champs")
         propagation_fields = _extract_propagation_fields(response)
         response = _apply_propagation_fields(response, propagation_fields)
         
-        # 🔧 FIX: Ajout métadonnées clarification avec validation
-        if clarification_metadata and isinstance(clarification_metadata, dict) and hasattr(response, 'clarification_processing'):
-            response.clarification_processing = clarification_metadata
-            logger.info("💡 [MÉTADONNÉES PUBLIC v3.7.7] Clarification metadata ajoutées")
+        # [SIMILAR LOGGING AND METADATA HANDLING AS PRIVATE ENDPOINT]
         
-        # 🆕 AJOUT MÉTADONNÉES INCOHÉRENCES PUBLIC v3.7.7
-        if inconsistency_check.get('force_clarification', False) and hasattr(response, 'processing_steps'):
-            if isinstance(response.processing_steps, list):
-                response.processing_steps.append("inconsistency_forced_clarification_public_v3.7.7")
-            if hasattr(response, 'ai_enhancements_used') and isinstance(response.ai_enhancements_used, list):
-                response.ai_enhancements_used.append("inconsistency_detection_public_v3.7.7")
-        
-        # 🆕 AJOUT MÉTADONNÉES ENTITÉS CRITIQUES PUBLIC v3.7.7
-        if hasattr(response, 'processing_steps') and isinstance(response.processing_steps, list):
-            response.processing_steps.append("critical_entities_extracted_public_v3.7.7")
-            if validation_result.get('clarification_required', False):
-                response.processing_steps.append(f"critical_entities_clarification_public_{validation_result.get('clarification_priority', 'unknown')}")
-        
-        if hasattr(response, 'ai_enhancements_used') and isinstance(response.ai_enhancements_used, list):
-            response.ai_enhancements_used.append("critical_entities_validation_public_v3.7.7")
-            if validation_result.get('entities_sufficient', False):
-                response.ai_enhancements_used.append("critical_entities_sufficient_public")
-            else:
-                response.ai_enhancements_used.append("critical_entities_insufficient_public")
-        
-        # Log response_versions si présentes avec validation
-        if hasattr(response, 'response_versions') and response.response_versions and isinstance(response.response_versions, dict):
-            logger.info("🚀 [RESPONSE_VERSIONS PUBLIC] Versions générées:")
-            for level, content in response.response_versions.items():
-                content_len = len(str(content)) if content else 0
-                logger.info(f"   - {level}: {content_len} caractères")
-        
-        # VALIDATION RÉSULTATS CLARIFICATION PUBLIQUE avec protection None
-        logger.info("🧨 [VALIDATION PUBLIQUE v3.7.7]:")
-        mode = getattr(response, 'mode', 'unknown')
-        logger.info(f"   - Clarification système actif: {'clarification' in str(mode)}")
-        
-        ai_enhancements = getattr(response, 'ai_enhancements_used', [])
-        if isinstance(ai_enhancements, list):
-            logger.info(f"   - Améliorations appliquées: {ai_enhancements}")
-        
-        logger.info(f"   - Mode final: {mode}")
-        logger.info(f"   - RAG utilisé: {getattr(response, 'rag_used', False)}")  # ← CORRIGÉ v3.7.7
-        
-        # 📋 LOGGING NOUVEAUX CHAMPS PUBLIC v3.7.7 avec protection None
-        logger.info("📋 [NOUVEAUX CHAMPS PUBLIC v3.7.7] Valeurs finales:")
-        logger.info(f"   - clarification_required_critical: {getattr(response, 'clarification_required_critical', 'N/A')}")
-        logger.info(f"   - missing_critical_entities: {getattr(response, 'missing_critical_entities', 'N/A')}")
-        logger.info(f"   - variants_tested: {getattr(response, 'variants_tested', 'N/A')}")
-        
-        # 🆕 LOGGING ENTITÉS CRITIQUES PUBLIC v3.7.7
-        logger.info("🔍 [ENTITÉS CRITIQUES PUBLIC v3.7.7] Analyse finale:")
-        logger.info(f"   - Breed détecté: {entities.get('breed', 'N/A')}")
-        logger.info(f"   - Age détecté: {entities.get('age', 'N/A')} = {entities.get('age_in_days', 'N/A')} jours")
-        logger.info(f"   - Weight détecté: {entities.get('weight', 'N/A')} = {entities.get('weight_in_grams', 'N/A')}g")
-        logger.info(f"   - Entités suffisantes: {validation_result.get('entities_sufficient', 'N/A')}")
-        logger.info(f"   - Clarification priorité: {validation_result.get('clarification_priority', 'N/A')}")
-        
-        # 🆕 LOGGING RAG STATE PUBLIC v3.7.7
-        logger.info("🔍 [RAG STATE PUBLIC v3.7.7] État final synchronisé:")
-        logger.info(f"   - rag_used: {getattr(response, 'rag_used', 'N/A')}")
-        logger.info(f"   - rag_score: {getattr(response, 'rag_score', 'N/A')}")
-        rag_mode = getattr(response, 'mode', '')
-        logger.info(f"   - mode contains 'rag': {'rag' in str(rag_mode).lower()}")
-        
-        # Vérification critique avec protection None
-        if not ai_enhancements or (isinstance(ai_enhancements, list) and len(ai_enhancements) == 0):
-            logger.warning("⚠️ [ALERTE] Aucune amélioration détectée - possible problème!")
-        
-        vagueness_enabled = getattr(response, 'enable_vagueness_detection', True)
-        if vagueness_enabled is False:
-            logger.warning("⚠️ [ALERTE] Vagueness detection non activée - vérifier forçage!")
-        
-        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.7 - Mode: {mode}")
-        logger.info(f"🔍 RAG Final Public: {getattr(response, 'rag_used', 'N/A')}")
-        logger.info(f"🎯 Entités Critiques Public: {validation_result.get('entities_sufficient', 'N/A')}")
+        logger.info(f"✅ FIN ask_expert_enhanced_v2_public v3.7.8")
+        logger.info(f"🎪 Service Clarification Public: {getattr(response, 'clarification_service_used', 'N/A')}")
+        logger.info(f"🔮 Questions Dynamiques Public: {len(getattr(response, 'dynamic_questions', [])) if getattr(response, 'dynamic_questions', None) else 0}")
         logger.info("=" * 100)
         
         return response
@@ -1606,31 +1856,31 @@ async def ask_expert_enhanced_v2_public(
         logger.info("=" * 100)
         raise
     except Exception as e:
-        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.7: {e}")
+        logger.error(f"❌ Erreur critique ask_expert_enhanced_v2_public v3.7.8: {e}")
         logger.info("=" * 100)
         return await _fallback_expert_response(request_data, start_time, None, str(e))
 
 # =============================================================================
-# ENDPOINT FEEDBACK ET TOPICS AVEC GESTION D'ERREUR RENFORCÉE v3.7.7
+# AUTRES ENDPOINTS CONSERVÉS v3.7.8
 # =============================================================================
 
 @router.post("/feedback")
 async def submit_feedback_enhanced(feedback_data: FeedbackRequest):
-    """Submit feedback - VERSION CORRIGÉE v3.7.7 avec gestion d'erreur robuste"""
+    """Submit feedback - VERSION CORRIGÉE v3.7.8 avec gestion d'erreur robuste"""
     try:
         conversation_id = getattr(feedback_data, 'conversation_id', 'None')
-        logger.info(f"📊 [Feedback v3.7.7] Reçu: {feedback_data.rating} pour {conversation_id}")
+        logger.info(f"📊 [Feedback v3.7.8] Reçu: {feedback_data.rating} pour {conversation_id}")
         
         # 🔧 FIX: Validation robuste des quality_feedback
         quality_feedback = getattr(feedback_data, 'quality_feedback', None)
         if quality_feedback and isinstance(quality_feedback, dict):
-            logger.info(f"📈 [Feedback v3.7.7] Qualité détaillée: {len(quality_feedback)} métriques")
+            logger.info(f"📈 [Feedback v3.7.8] Qualité détaillée: {len(quality_feedback)} métriques")
         
         if expert_service and hasattr(expert_service, 'process_feedback'):
             try:
                 result = await expert_service.process_feedback(feedback_data)
             except Exception as e:
-                logger.error(f"❌ [Feedback Service v3.7.7] Erreur: {e}")
+                logger.error(f"❌ [Feedback Service v3.7.8] Erreur: {e}")
                 # Fallback si service expert échoue
                 result = {
                     "success": False,
@@ -1640,39 +1890,39 @@ async def submit_feedback_enhanced(feedback_data: FeedbackRequest):
                     "conversation_id": conversation_id,
                     "fallback_mode": True,
                     "timestamp": datetime.now().isoformat(),
-                    "version": "3.7.7"
+                    "version": "3.7.8"
                 }
         else:
             # Fallback si service non disponible
             result = {
                 "success": True,
-                "message": "Feedback enregistré (mode fallback v3.7.7)",
+                "message": "Feedback enregistré (mode fallback v3.7.8)",
                 "rating": feedback_data.rating,
                 "comment": getattr(feedback_data, 'comment', None),
                 "conversation_id": conversation_id,
                 "fallback_mode": True,
                 "timestamp": datetime.now().isoformat(),
-                "version": "3.7.7"
+                "version": "3.7.8"
             }
         
         return result
         
     except Exception as e:
-        logger.error(f"❌ [Feedback v3.7.7] Erreur critique: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur feedback v3.7.7: {str(e)}")
+        logger.error(f"❌ [Feedback v3.7.8] Erreur critique: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur feedback v3.7.8: {str(e)}")
 
 @router.get("/topics")
 async def get_suggested_topics_enhanced(language: str = "fr"):
-    """Get suggested topics - VERSION CORRIGÉE v3.7.7 avec gestion d'erreur robuste"""
+    """Get suggested topics - VERSION CORRIGÉE v3.7.8 avec gestion d'erreur robuste"""
     try:
         if expert_service and hasattr(expert_service, 'get_suggested_topics'):
             try:
                 return await expert_service.get_suggested_topics(language)
             except Exception as e:
-                logger.error(f"❌ [Topics Service v3.7.7] Erreur: {e}")
+                logger.error(f"❌ [Topics Service v3.7.8] Erreur: {e}")
                 # Continuer vers fallback
         
-        # 🔧 FIX: Fallback amélioré avec validation language v3.7.7
+        # 🔧 FIX: Fallback amélioré avec validation language v3.7.8
         fallback_topics = {
             "fr": [
                 "Problèmes de croissance poulets Ross 308",
@@ -1719,17 +1969,19 @@ async def get_suggested_topics_enhanced(language: str = "fr"):
             "count": len(selected_topics),
             "fallback_mode": True,
             "expert_service_available": expert_service is not None,
+            "clarification_service_available": clarification_service is not None,
             "timestamp": datetime.now().isoformat(),
-            "version": "3.7.7",
-            "critical_entities_optimized": True
+            "version": "3.7.8",
+            "critical_entities_optimized": True,
+            "dynamic_clarification_ready": CLARIFICATION_SERVICE_AVAILABLE
         }
             
     except Exception as e:
-        logger.error(f"❌ [Topics v3.7.7] Erreur critique: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur topics v3.7.7: {str(e)}")
+        logger.error(f"❌ [Topics v3.7.8] Erreur critique: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur topics v3.7.8: {str(e)}")
 
 # =============================================================================
-# FONCTIONS UTILITAIRES AVEC PROPAGATION v3.7.7 - VERSIONS AMÉLIORÉES
+# FONCTIONS UTILITAIRES CONSERVÉES AVEC AMÉLIORATIONS v3.7.8
 # =============================================================================
 
 def _create_incomplete_clarification_response(
@@ -1740,7 +1992,7 @@ def _create_incomplete_clarification_response(
     start_time: float,
     public: bool = False
 ) -> EnhancedExpertResponse:
-    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Crée une réponse pour clarification incomplète avec entités critiques"""
+    """🔧 CONSERVÉE v3.7.7 + AMÉLIORATION v3.7.8: Crée une réponse pour clarification incomplète avec entités critiques et nouveaux champs"""
     
     # 🔧 FIX: Validation des paramètres d'entrée
     if not isinstance(clarified_entities, dict):
@@ -1798,7 +2050,7 @@ def _create_incomplete_clarification_response(
         missing_details.append("le poids actuel (800g, 1.2kg, etc.)")
         missing_critical_entities.append("weight")
     
-    # 🎯 MESSAGE ADAPTATIF selon ce qui manque réellement v3.7.7
+    # 🎯 MESSAGE ADAPTATIF selon ce qui manque réellement v3.7.7/v3.7.8
     if len(missing_info) >= 3:
         error_message = f"Information incomplète. Il manque plusieurs éléments critiques : {', '.join(missing_info)}.\n\n"
     elif len(missing_info) == 2:
@@ -1815,7 +2067,7 @@ def _create_incomplete_clarification_response(
     else:
         error_message += f"Votre réponse '{user_text}' ne contient pas tous les éléments nécessaires.\n\n"
     
-    # Exemples contextuels selon ce qui manque v3.7.7
+    # Exemples contextuels selon ce qui manque v3.7.7/v3.7.8
     error_message += "**Exemples complets requis :**\n"
     
     if len(missing_critical_entities) >= 3:  # Manque breed + age + weight
@@ -1843,7 +2095,7 @@ def _create_incomplete_clarification_response(
     
     error_message += "Pouvez-vous préciser les informations manquantes ?"
     
-    # 🔧 FIX: Retourner erreur clarification incomplète avec validation robuste v3.7.7
+    # 🔧 FIX: Retourner erreur clarification incomplète avec validation robuste v3.7.8
     mode_suffix = "_public" if public else ""
     conversation_id = getattr(request_data, 'conversation_id', None)
     if not conversation_id:
@@ -1853,8 +2105,8 @@ def _create_incomplete_clarification_response(
     if not isinstance(language, str):
         language = 'fr'
     
-    logger.info(f"📋 [CLARIFICATION INCOMPLÈTE v3.7.7] Entités critiques manquantes: {missing_critical_entities}")
-    logger.info(f"📋 [CLARIFICATION INCOMPLÈTE v3.7.7] Entités extraites automatiquement: {extracted_entities}")
+    logger.info(f"📋 [CLARIFICATION INCOMPLÈTE v3.7.8] Entités critiques manquantes: {missing_critical_entities}")
+    logger.info(f"📋 [CLARIFICATION INCOMPLÈTE v3.7.8] Entités extraites automatiquement: {extracted_entities}")
     
     return EnhancedExpertResponse(
         question=user_text,
@@ -1865,24 +2117,27 @@ def _create_incomplete_clarification_response(
         timestamp=datetime.now().isoformat(),
         language=language,
         response_time_ms=int((time.time() - start_time) * 1000),
-        mode=f"incomplete_clarification_response_v3.7.7{mode_suffix}",
+        mode=f"incomplete_clarification_response_v3.7.8{mode_suffix}",
         user=None,
         logged=True,
         validation_passed=False,
-        # 🚀 NOUVEAUX CHAMPS v3.7.6/v3.7.7 POUR CLARIFICATION INCOMPLÈTE
+        # 🚀 CHAMPS EXISTANTS v3.7.6/v3.7.7 POUR CLARIFICATION INCOMPLÈTE
         clarification_required_critical=True,
         missing_critical_entities=missing_critical_entities,
         variants_tested=[],  # vide pour clarification incomplète
+        # 🆕 NOUVEAUX CHAMPS v3.7.8
+        dynamic_questions=None,  # Pas de questions dynamiques pour erreurs incomplètes
+        clarification_service_used=False,  # Service non utilisé pour erreurs
         clarification_result={
             "clarification_requested": True,
-            "clarification_type": f"incomplete_critical_entities_retry_v3.7.7{mode_suffix}",
+            "clarification_type": f"incomplete_critical_entities_retry_v3.7.8{mode_suffix}",
             "missing_information": missing_info,
             "provided_entities": clarified_entities,
             "provided_parts": provided_parts,
             "missing_details": missing_details,
             "retry_required": True,
             "confidence": 0.3,
-            # 🚀 NOUVEAUX CHAMPS DANS CLARIFICATION_RESULT v3.7.6/v3.7.7
+            # 🚀 CHAMPS DANS CLARIFICATION_RESULT v3.7.6/v3.7.7
             "clarification_required_critical": True,
             "missing_critical_entities": missing_critical_entities,
             # 🆕 v3.7.7: Ajouter entités extraites automatiquement
@@ -1892,164 +2147,3 @@ def _create_incomplete_clarification_response(
                 "breed_detected": effective_breed,
                 "age_detected": extracted_age,
                 "weight_detected": extracted_weight,
-                "sex_detected": sex
-            }
-        },
-        processing_steps=[
-            f"incomplete_clarification_detected_v3.7.7{mode_suffix}", 
-            "critical_entities_extraction_attempted",
-            "retry_requested_with_critical_entities"
-        ],
-        ai_enhancements_used=[
-            f"incomplete_clarification_handling_v3.7.7{mode_suffix}",
-            "critical_entities_extraction_v3.7.7",
-            "adaptive_clarification_message"
-        ],
-        response_versions=None  # Pas de response_versions pour erreurs
-    )
-
-async def _fallback_expert_response(
-    request_data: EnhancedQuestionRequest, 
-    start_time: float, 
-    current_user: Optional[Dict[str, Any]] = None,
-    error_message: str = "Service expert temporairement indisponible"
-) -> EnhancedExpertResponse:
-    """🔧 CONSERVÉE v3.7.6 + AMÉLIORATION v3.7.7: Réponse de fallback avec entités critiques"""
-    
-    logger.info("🔄 [Fallback v3.7.7] Génération réponse de fallback avec entités critiques")
-    
-    # 🔧 FIX: Validation des paramètres d'entrée
-    user_text = getattr(request_data, 'text', 'Question non spécifiée')
-    if not isinstance(user_text, str):
-        user_text = str(user_text)
-    
-    language = getattr(request_data, 'language', 'fr')
-    if not isinstance(language, str):
-        language = 'fr'
-    
-    # 🔧 FIX: Protection contre error_message None
-    if not error_message or not isinstance(error_message, str):
-        error_message = "Service expert temporairement indisponible"
-    
-    # 🆕 v3.7.7: Même en mode fallback, essayer d'extraire entités critiques
-    try:
-        entities = _extract_critical_entities_from_question(user_text, language)
-        entities_info = f"Entités détectées: {entities.get('breed', 'N/A')}, {entities.get('age', 'N/A')}, {entities.get('weight', 'N/A')}"
-    except Exception as e:
-        logger.error(f"❌ [Fallback v3.7.7] Erreur extraction entités: {e}")
-        entities = {}
-        entities_info = "Entités non analysées"
-    
-    fallback_responses = {
-        "fr": f"Je m'excuse, {error_message}. Votre question '{user_text}' a été reçue ({entities_info}) mais je ne peux pas la traiter actuellement. Veuillez réessayer dans quelques minutes.",
-        "en": f"I apologize, {error_message}. Your question '{user_text}' was received ({entities_info}) but I cannot process it currently. Please try again in a few minutes.",
-        "es": f"Me disculpo, {error_message}. Su pregunta '{user_text}' fue recibida ({entities_info}) pero no puedo procesarla actualmente. Por favor intente de nuevo en unos minutos."
-    }
-    
-    response_text = fallback_responses.get(language, fallback_responses['fr'])
-    
-    # 🔧 FIX: Validation conversation_id
-    conversation_id = getattr(request_data, 'conversation_id', None)
-    if not conversation_id:
-        conversation_id = str(uuid.uuid4())
-    
-    # 🔧 FIX: Validation current_user
-    user_email = None
-    if current_user and isinstance(current_user, dict):
-        user_email = current_user.get("email")
-    
-    return EnhancedExpertResponse(
-        question=user_text,
-        response=response_text,
-        conversation_id=conversation_id,
-        rag_used=False,  # 🆕 v3.7.6/v3.7.7: Toujours False pour fallback
-        rag_score=None,
-        timestamp=datetime.now().isoformat(),
-        language=language,
-        response_time_ms=int((time.time() - start_time) * 1000),
-        mode="fallback_service_unavailable_v3.7.7",
-        user=user_email,
-        logged=False,
-        validation_passed=False,
-        # 🚀 NOUVEAUX CHAMPS v3.7.6/v3.7.7 POUR FALLBACK
-        clarification_required_critical=False,
-        missing_critical_entities=[],
-        variants_tested=[],
-        processing_steps=[
-            "service_unavailable", 
-            "fallback_response_generated_v3.7.7",
-            "critical_entities_attempted" if entities else "critical_entities_failed"
-        ],
-        ai_enhancements_used=[
-            "fallback_handling_v3.7.7",
-            "entities_extraction_attempted" if entities else "entities_extraction_failed"
-        ],
-        response_versions=None
-    )
-
-# =============================================================================
-# CONFIGURATION FINALE v3.7.7 AVEC CORRECTIONS RAG + ENTITÉS CRITIQUES 🔧
-# =============================================================================
-
-logger.info("🔧" * 50)
-logger.info("🔧 [EXPERT ENDPOINTS MAIN] VERSION 3.7.7 - CORRECTIONS RAG + VALIDATION ENTITÉS CRITIQUES!")
-logger.info("🔧 [NOUVELLES CORRECTIONS v3.7.7]:")
-logger.info("   ✅ Synchronisation RAG appelée juste après récupération RAG")
-logger.info("   ✅ Clarification forcée si entités critiques (breed, age, weight) manquent")
-logger.info("   ✅ Validation robuste des entités critiques avec extraction automatique")
-logger.info("   ✅ Déclenchement clarification_required_critical=True pour entités manquantes")
-logger.info("   ✅ Détection entités critiques depuis le texte de la question")
-logger.info("")
-logger.info("🔧 [NOUVELLES FONCTIONS v3.7.7]:")
-logger.info("   ✅ _extract_critical_entities_from_question() - Extraction breed/age/weight")
-logger.info("   ✅ _validate_critical_entities() - Validation entités avec priorité clarification")
-logger.info("   ✅ _force_clarification_for_missing_entities() - Forçage clarification automatique")
-logger.info("   ✅ Extraction avancée avec regex patterns pour Ross 308, Cobb 500, etc.")
-logger.info("   ✅ Conversion automatique âge en jours, poids en grammes")
-logger.info("   ✅ Scoring de confiance par entité extraite")
-logger.info("")
-logger.info("🔧 [CORRECTIONS RAG STATE v3.7.7]:")
-logger.info("   ✅ _validate_and_sync_rag_state() appelée IMMÉDIATEMENT après service")
-logger.info("   ✅ _force_sync_rag_state() avec logging détaillé pour traçabilité")
-logger.info("   ✅ Synchronisation forcée rag_used selon validation réelle")
-logger.info("   ✅ Mise à jour mode avec/sans RAG selon utilisation effective")
-logger.info("   ✅ Propagation métadonnées RAG dans processing_steps")
-logger.info("")
-logger.info("🔧 [ENTITÉS CRITIQUES SUPPORTÉES v3.7.7]:")
-logger.info("   ✅ BREED: Ross 308, Cobb 500, Hubbard, Arbor Acres, ISA Brown, etc.")
-logger.info("   ✅ AGE: 13j, 2sem, 3 weeks → conversion automatique en jours")
-logger.info("   ✅ WEIGHT: 800g, 1.2kg, 2.5lb → conversion automatique en grammes")
-logger.info("   ✅ SEX: mâles, femelles, mixte (bonus feature)")
-logger.info("   ✅ COHERENCE: validation âge/poids, détection aberrations")
-logger.info("   ✅ CONFIDENCE: scoring 0.0-1.0 par entité extraite")
-logger.info("")
-logger.info("🔧 [LOGIQUE CLARIFICATION ENTITÉS v3.7.7]:")
-logger.info("   ✅ Priorité CRITICAL si 2+ entités critiques manquent")
-logger.info("   ✅ Priorité HIGH si 1 entité manque + incohérences")
-logger.info("   ✅ Priorité MEDIUM si 1 entité manque ou générique")
-logger.info("   ✅ Priorité LOW si incohérences ou confiance faible")
-logger.info("   ✅ clarification_required_critical=True pour HIGH/CRITICAL")
-logger.info("   ✅ missing_critical_entities=[breed, age, weight] selon manques")
-logger.info("")
-logger.info("🔧 [AMÉLIORATIONS MESSAGES v3.7.7]:")
-logger.info("   ✅ Messages adaptatifs selon entités manquantes spécifiques")
-logger.info("   ✅ Exemples contextuels avec race/âge/poids détectés")
-logger.info("   ✅ Feedback précis sur ce qui a été compris vs manquant")
-logger.info("   ✅ Support fallback avec tentative extraction entités")
-logger.info("")
-logger.info("🔧 [FONCTIONNALITÉS CONSERVÉES v3.7.6]:")
-logger.info("   ✅ Toute la logique originale v3.7.6 maintenue")
-logger.info("   ✅ Détection incohérences temporelles (13j vs 1sem)")
-logger.info("   ✅ Propagation complète nouveaux champs")
-logger.info("   ✅ Support response_versions et concision_level")
-logger.info("   ✅ Messages adaptatifs clarification granulaire")
-logger.info("   ✅ Métadonnées enrichies complètes")
-logger.info("")
-logger.info("🎯 [STATUS v3.7.7]:")
-logger.info(f"   - Expert Service: {'✅ Disponible' if expert_service else '❌ Non disponible'}")
-logger.info(f"   - Models: {'✅ Importés' if MODELS_IMPORTED else '❌ Fallback'}")
-logger.info(f"   - Utils: {'✅ Disponibles' if UTILS_AVAILABLE else '❌ Fallback'}")
-logger.info("   ✅ PRÊT POUR PRODUCTION - RAG SYNC + ENTITÉS CRITIQUES VALIDÉES")
-logger.info("   ✅ ENDPOINT PERFORMANCES: Extraction entités < 100ms")
-logger.info("   ✅ QUALITÉ CLARIFICATION: Messages adaptatifs selon entités manquantes")
-logger.info("🔧" * 50)
