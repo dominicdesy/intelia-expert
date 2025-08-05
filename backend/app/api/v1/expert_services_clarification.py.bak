@@ -6,7 +6,6 @@ app/api/v1/expert_services_clarification.py - SYSTÈME DE CLARIFICATION CRITIQUE
 2. ✅ Détection type volaille (pondeuses/broilers)
 3. ✅ Génération messages clarification sécurisés
 4. ✅ Gestion entités manquantes critiques
-5. ✅ VERSION PERMISSIVE pour poulets de chair appliquée
 """
 
 import logging
@@ -302,40 +301,37 @@ def analyze_layer_clarification_critical_safe(question_lower: str, language: str
         }
 
 def analyze_broiler_clarification_critical_safe(question_lower: str, language: str) -> dict:
-    """🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR - VERSION PERMISSIVE"""
+    """🍗 ANALYSE CLARIFICATION CRITIQUE POULETS DE CHAIR"""
     
     try:
         critical_missing = []
         optional_missing = []
         confidence = 0.0
         
-        # ✅ NOUVELLE LOGIQUE : Plus permissive pour les questions générales
+        # Entités critiques pour poulets de chair
         critical_broiler_info = {
             "breed": ["ross", "cobb", "hubbard", "race", "souche", "breed", "strain"],
-            # ❌ RETIRER age et sex de critical pour questions générales
-            # "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
-            # "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
+            "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
+            "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"]
         }
         
-        # ✅ DÉPLACER age et sex vers optionnel
+        # Entités non critiques (weight inclus ici maintenant)
         optional_broiler_info = {
-            "age": ["jour", "jours", "day", "days", "semaine", "week", "âge", "age"],
-            "sex": ["mâle", "male", "femelle", "female", "mixte", "mixed", "sexe", "sex"],
             "weight": ["poids", "weight", "peso", "gramme", "kg", "g"],
             "housing": ["température", "temperature", "ventilation", "density", "densité"],
             "feeding": ["alimentation", "feed", "fcr", "conversion", "nutrition"]
         }
         
-        # Vérifier entités CRITIQUES (maintenant seulement breed)
+        # Vérifier entités CRITIQUES de façon sécurisée
         for info_type, keywords in critical_broiler_info.items():
             try:
                 if not any(keyword in question_lower for keyword in keywords if keyword):
                     critical_missing.append(info_type)
-                    confidence += 0.5  # Plus de poids sur breed
+                    confidence += 0.3
             except Exception as e:
                 logger.warning(f"⚠️ [Broiler Critical v4.0.0] Erreur vérification {info_type}: {e}")
         
-        # Vérifier entités OPTIONNELLES
+        # Vérifier entités NON CRITIQUES de façon sécurisée (incluant weight)
         for info_type, keywords in optional_broiler_info.items():
             try:
                 if not any(keyword in question_lower for keyword in keywords if keyword):
@@ -344,21 +340,15 @@ def analyze_broiler_clarification_critical_safe(question_lower: str, language: s
             except Exception as e:
                 logger.warning(f"⚠️ [Broiler Optional v4.0.0] Erreur vérification {info_type}: {e}")
         
-        # ✅ NOUVELLE DÉCISION : Plus permissive
-        # Critique seulement si breed générique/manquant ET aucune info spécifique
-        has_specific_breed = any(breed in question_lower for breed in ["ross", "cobb", "hubbard"])
-        has_sex_info = any(sex in question_lower for sex in ["mâle", "male", "femelle", "female"])
-        
-        # Critique seulement si vraiment pas assez d'info
-        is_critical = len(critical_missing) >= 1 and not has_specific_breed
-        is_optional = len(optional_missing) >= 3  # Plus permissif
+        # Décision critique sécurisée
+        is_critical = len(critical_missing) >= 2
+        is_optional = len(optional_missing) >= 1
         
         logger.info(f"🍗 [Broiler Critical Safe v4.0.0] Critique: {critical_missing}, Optionnel: {optional_missing}")
-        logger.info(f"🍗 [Broiler Permissive] has_specific_breed: {has_specific_breed}, has_sex_info: {has_sex_info}")
         
         return {
             "clarification_required_critical": is_critical,
-            "clarification_required_optional": is_optional, 
+            "clarification_required_optional": is_optional,
             "missing_critical_entities": critical_missing,
             "missing_optional_entities": optional_missing,
             "confidence": confidence,
