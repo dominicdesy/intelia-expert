@@ -1,14 +1,17 @@
 """
-unified_response_generator.py - GÉNÉRATEUR UNIQUE DE RÉPONSES
+unified_response_generator.py - GÉNÉRATEUR AVEC SUPPORT CONTEXTUAL_ANSWER
 
-🎯 REMPLACE: general_response_generator, clarification_generators, tous les autres générateurs
-🚀 PRINCIPE: Un seul endroit pour générer toutes les réponses
-✨ SIMPLE: Templates clairs pour chaque type de réponse
+🎯 AMÉLIORATIONS AJOUTÉES:
+- ✅ Support du type CONTEXTUAL_ANSWER
+- ✅ Utilisation des weight_data calculées par le classifier
+- ✅ Génération de réponses précises Ross 308 mâle 12j
+- ✅ Interpolation automatique des âges intermédiaires
+- ✅ Templates spécialisés pour réponses contextuelles
 
-Types de réponse:
-- precise_answer: Réponses spécifiques avec données exactes
-- general_answer: Réponses générales + offre de précision  
-- needs_clarification: Questions ciblées pour clarification
+Nouveau flux:
+1. Classification → CONTEXTUAL_ANSWER avec weight_data
+2. Response Generator → Utilise weight_data pour réponse précise
+3. Output → "Ross 308 mâle à 12 jours : 380-420g" 🎯
 """
 
 import logging
@@ -16,24 +19,29 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
+# Import des fonctions de calcul de poids
+from .intelligent_system_config import get_weight_range, validate_weight_range
+
 logger = logging.getLogger(__name__)
 
 class ResponseData:
     """Structure pour les données de réponse"""
     def __init__(self, response: str, response_type: str, confidence: float = 0.8, 
-                 precision_offer: str = None, examples: List[str] = None):
+                 precision_offer: str = None, examples: List[str] = None,
+                 weight_data: Dict[str, Any] = None):
         self.response = response
         self.response_type = response_type
         self.confidence = confidence
         self.precision_offer = precision_offer
         self.examples = examples or []
+        self.weight_data = weight_data or {}
         self.generated_at = datetime.now().isoformat()
 
 class UnifiedResponseGenerator:
-    """Générateur unique pour tous les types de réponse"""
+    """Générateur unique pour tous les types de réponse avec support contextuel"""
     
     def __init__(self):
-        # Configuration des fourchettes de poids par race et âge
+        # Configuration des fourchettes de poids par race et âge (garde pour compatibilité)
         self.weight_ranges = {
             "ross_308": {
                 7: {"male": (180, 220), "female": (160, 200), "mixed": (170, 210)},
@@ -80,7 +88,11 @@ class UnifiedResponseGenerator:
         try:
             logger.info(f"🎨 [Response Generator] Type: {classification_result.response_type.value}")
             
-            if classification_result.response_type.value == "precise_answer":
+            # NOUVEAU: Support du type CONTEXTUAL_ANSWER
+            if classification_result.response_type.value == "contextual_answer":
+                return self._generate_contextual_answer(question, classification_result)
+            
+            elif classification_result.response_type.value == "precise_answer":
                 return self._generate_precise(question, entities)
             
             elif classification_result.response_type.value == "general_answer":
@@ -107,8 +119,124 @@ class UnifiedResponseGenerator:
             logger.error(f"❌ [Response Generator] Erreur génération: {e}")
             return self._generate_fallback_response(question)
 
+    def _generate_contextual_answer(self, question: str, classification_result) -> ResponseData:
+        """NOUVEAU: Génère une réponse contextuelle basée sur les données fusionnées"""
+        
+        merged_entities = classification_result.merged_entities
+        weight_data = classification_result.weight_data
+        
+        logger.info(f"🔗 [Contextual] Génération réponse avec données: {weight_data}")
+        
+        # Si on a des données de poids précalculées, les utiliser
+        if weight_data and 'weight_range' in weight_data:
+            return self._generate_contextual_weight_response(merged_entities, weight_data)
+        
+        # Sinon, générer une réponse contextuelle standard
+        else:
+            return self._generate_contextual_standard_response(merged_entities)
+
+    def _generate_contextual_weight_response(self, entities: Dict[str, Any], weight_data: Dict[str, Any]) -> ResponseData:
+        """Génère une réponse de poids contextuelle avec données précises"""
+        
+        breed = weight_data.get('breed', 'Race non spécifiée')
+        age_days = weight_data.get('age_days', 0)
+        sex = weight_data.get('sex', 'mixed')
+        min_weight, max_weight = weight_data.get('weight_range', (0, 0))
+        target_weight = weight_data.get('target_weight', (min_weight + max_weight) // 2)
+        
+        # Conversion du sexe pour affichage
+        sex_display = {
+            'male': 'mâle',
+            'female': 'femelle', 
+            'mixed': 'mixte'
+        }.get(sex, sex)
+        
+        # Indicateurs d'héritage contextuel
+        context_indicators = []
+        if entities.get('age_context_inherited'):
+            context_indicators.append("âge du contexte")
+        if entities.get('breed_context_inherited'):
+            context_indicators.append("race du contexte")
+        if entities.get('sex_context_inherited'):
+            context_indicators.append("sexe du contexte")
+        
+        context_info = ""
+        if context_indicators:
+            context_info = f"\n🔗 **Contexte utilisé** : {', '.join(context_indicators)}"
+        
+        response = f"""**Poids cible pour {breed} {sex_display} à {age_days} jours :**
+
+🎯 **Fourchette précise** : **{min_weight}-{max_weight} grammes**
+
+📊 **Détails spécifiques** :
+• Poids minimum : {min_weight}g
+• Poids cible optimal : {target_weight}g  
+• Poids maximum : {max_weight}g
+
+⚡ **Surveillance recommandée** :
+• Pesée hebdomadaire d'un échantillon représentatif
+• Vérification de l'homogénéité du troupeau
+• Ajustement alimentaire si écart >15%
+
+🚨 **Signaux d'alerte** :
+• <{weight_data.get('alert_thresholds', {}).get('low', int(min_weight * 0.85))}g : Retard de croissance
+• >{weight_data.get('alert_thresholds', {}).get('high', int(max_weight * 1.15))}g : Croissance excessive{context_info}
+
+💡 **Standards basés sur** : Données de référence {breed} officielles"""
+
+        return ResponseData(
+            response=response,
+            response_type="contextual_weight_precise",
+            confidence=0.95,
+            weight_data=weight_data
+        )
+
+    def _generate_contextual_standard_response(self, entities: Dict[str, Any]) -> ResponseData:
+        """Génère une réponse contextuelle standard (sans données de poids)"""
+        
+        breed = entities.get('breed_specific', 'Race spécifiée')
+        age = entities.get('age_days', 'Âge spécifié')
+        sex = entities.get('sex', 'Sexe spécifié')
+        
+        # Indicateurs d'héritage contextuel
+        context_parts = []
+        if entities.get('age_context_inherited'):
+            context_parts.append(f"âge ({age} jours)")
+        if entities.get('breed_context_inherited'):
+            context_parts.append(f"race ({breed})")
+        if entities.get('sex_context_inherited'):
+            context_parts.append(f"sexe ({sex})")
+        
+        if context_parts:
+            context_info = f"En me basant sur le contexte de notre conversation ({', '.join(context_parts)}), "
+        else:
+            context_info = f"Pour {breed} {sex} à {age} jours, "
+        
+        response = f"""**Réponse contextuelle basée sur votre clarification :**
+
+{context_info}voici les informations demandées :
+
+🔗 **Contexte de conversation détecté** :
+• Race : {breed}
+• Sexe : {sex}  
+• Âge : {age} jours
+• Type de question : Performance/Poids
+
+📊 **Recommandations générales** :
+• Surveillance des standards de croissance
+• Ajustement selon les performances observées
+• Consultation spécialisée si écarts significatifs
+
+💡 **Pour des valeurs précises**, consultez les standards de votre souche spécifique ou votre vétérinaire avicole."""
+
+        return ResponseData(
+            response=response,
+            response_type="contextual_standard",
+            confidence=0.8
+        )
+
     def _generate_precise(self, question: str, entities: Dict[str, Any]) -> ResponseData:
-        """Génère une réponse précise avec données spécifiques"""
+        """Génère une réponse précise avec données spécifiques (méthode existante améliorée)"""
         
         breed = entities.get('breed_specific', '').lower().replace(' ', '_')
         age_days = entities.get('age_days')
@@ -123,8 +251,17 @@ class UnifiedResponseGenerator:
             sex = 'mixed'
         
         # Questions de poids
-        if any(word in question.lower() for word in ['poids', 'weight', 'gramme']):
-            return self._generate_precise_weight_response(breed, age_days, sex)
+        if any(word in question.lower() for word in ['poids', 'weight', 'gramme', 'cible']):
+            # NOUVEAU: Utiliser la fonction de config au lieu des données locales
+            try:
+                weight_range = get_weight_range(breed, age_days, sex)
+                min_weight, max_weight = weight_range
+                
+                return self._generate_precise_weight_response_enhanced(breed, age_days, sex, weight_range)
+                
+            except Exception as e:
+                logger.error(f"❌ [Precise] Erreur calcul poids: {e}")
+                return self._generate_precise_weight_response(breed, age_days, sex)
         
         # Questions de croissance
         elif any(word in question.lower() for word in ['croissance', 'développement', 'grandir']):
@@ -140,8 +277,56 @@ class UnifiedResponseGenerator:
                 confidence=0.7
             )
 
+    def _generate_precise_weight_response_enhanced(self, breed: str, age_days: int, sex: str, weight_range: tuple) -> ResponseData:
+        """NOUVEAU: Génère réponse précise avec données de la config"""
+        
+        min_weight, max_weight = weight_range
+        target_weight = (min_weight + max_weight) // 2
+        
+        # Calculer les seuils d'alerte
+        alert_low = int(min_weight * 0.85)
+        alert_high = int(max_weight * 1.15)
+        
+        breed_name = breed.replace('_', ' ').title()
+        sex_str = {'male': 'mâles', 'female': 'femelles', 'mixed': 'mixtes'}[sex]
+        
+        response = f"""**Poids cible pour {breed_name} {sex_str} à {age_days} jours :**
+
+🎯 **Fourchette officielle** : **{min_weight}-{max_weight} grammes**
+
+📊 **Détails spécifiques** :
+• Poids minimum acceptable : {min_weight}g
+• Poids cible optimal : {target_weight}g  
+• Poids maximum normal : {max_weight}g
+
+⚡ **Surveillance recommandée** :
+• Pesée hebdomadaire d'échantillon représentatif (10-20 sujets)
+• Vérification homogénéité du troupeau
+• Ajustement alimentaire si nécessaire
+
+🚨 **Signaux d'alerte** :
+• <{alert_low}g : Retard de croissance - Vérifier alimentation et santé
+• >{alert_high}g : Croissance excessive - Contrôler distribution alimentaire
+• Hétérogénéité >20% : Problème de gestion du troupeau
+
+💡 **Standards basés sur** : Données de référence {breed_name} officielles avec interpolation précise"""
+
+        return ResponseData(
+            response=response,
+            response_type="precise_weight_enhanced",
+            confidence=0.95,
+            weight_data={
+                "breed": breed_name,
+                "age_days": age_days,
+                "sex": sex,
+                "weight_range": weight_range,
+                "target_weight": target_weight,
+                "alert_thresholds": {"low": alert_low, "high": alert_high}
+            }
+        )
+
     def _generate_precise_weight_response(self, breed: str, age_days: int, sex: str) -> ResponseData:
-        """Génère réponse précise pour le poids"""
+        """Génère réponse précise pour le poids (méthode existante de fallback)"""
         
         # Trouver la tranche d'âge la plus proche
         closest_age = self._find_closest_age(age_days)
@@ -186,13 +371,13 @@ class UnifiedResponseGenerator:
         )
 
     def _generate_general(self, question: str, entities: Dict[str, Any]) -> str:
-        """Génère une réponse générale utile"""
+        """Génère une réponse générale utile (méthode existante conservée)"""
         
         question_lower = question.lower()
         age_days = entities.get('age_days')
         
         # Questions de poids
-        if any(word in question_lower for word in ['poids', 'weight', 'gramme']):
+        if any(word in question_lower for word in ['poids', 'weight', 'gramme', 'cible']):
             return self._generate_general_weight_response(age_days)
         
         # Questions de croissance
@@ -212,7 +397,7 @@ class UnifiedResponseGenerator:
             return self._generate_general_default_response(age_days)
 
     def _generate_general_weight_response(self, age_days: int) -> str:
-        """Réponse générale pour questions de poids"""
+        """Réponse générale pour questions de poids (méthode existante conservée)"""
         
         if not age_days:
             return """**Poids des poulets - Standards généraux :**
@@ -264,7 +449,7 @@ class UnifiedResponseGenerator:
 • Hétérogénéité >20% : Problème de gestion"""
 
     def _generate_precision_offer(self, entities: Dict[str, Any], missing_entities: List[str]) -> str:
-        """Génère l'offre de précision selon les entités manquantes"""
+        """Génère l'offre de précision selon les entités manquantes (méthode existante conservée)"""
         
         if not missing_entities:
             return ""
@@ -290,12 +475,12 @@ class UnifiedResponseGenerator:
         return ""
 
     def _generate_clarification(self, question: str, entities: Dict[str, Any], missing_entities: List[str]) -> ResponseData:
-        """Génère une demande de clarification ciblée"""
+        """Génère une demande de clarification ciblée (méthode existante conservée)"""
         
         question_lower = question.lower()
         
         # Clarifications spécialisées selon le type de question
-        if any(word in question_lower for word in ['poids', 'croissance']):
+        if any(word in question_lower for word in ['poids', 'croissance', 'cible']):
             return self._generate_performance_clarification(missing_entities)
         
         elif any(word in question_lower for word in ['malade', 'symptôme', 'problème']):
@@ -308,7 +493,7 @@ class UnifiedResponseGenerator:
             return self._generate_general_clarification(missing_entities)
 
     def _generate_performance_clarification(self, missing_entities: List[str]) -> ResponseData:
-        """Clarification pour questions de performance/poids"""
+        """Clarification pour questions de performance/poids (méthode existante conservée)"""
         
         clarification = """Pour vous donner des informations précises sur les performances, j'ai besoin de :
 
@@ -338,7 +523,7 @@ class UnifiedResponseGenerator:
         )
 
     def _find_closest_age(self, age_days: int) -> int:
-        """Trouve l'âge le plus proche dans les données de référence"""
+        """Trouve l'âge le plus proche dans les données de référence (méthode existante conservée)"""
         available_ages = [7, 14, 21, 28, 35]
         
         if age_days <= 7:
@@ -355,7 +540,7 @@ class UnifiedResponseGenerator:
             return 35
 
     def _generate_fallback_response(self, question: str) -> ResponseData:
-        """Génère une réponse de fallback en cas d'erreur"""
+        """Génère une réponse de fallback en cas d'erreur (méthode existante conservée)"""
         return ResponseData(
             response="Je rencontre une difficulté pour analyser votre question. "
                     "Pouvez-vous la reformuler en précisant le contexte (race, âge, problème spécifique) ?",
@@ -363,7 +548,7 @@ class UnifiedResponseGenerator:
             confidence=0.3
         )
 
-    # Méthodes additionnelles pour autres types de réponses générales
+    # Méthodes additionnelles pour autres types de réponses générales (conservées)
     def _generate_general_growth_response(self, age_days: int) -> str:
         """Réponse générale pour croissance"""
         return f"""**Croissance normale des poulets** {"à " + str(age_days) + " jours" if age_days else ""} :
@@ -514,6 +699,57 @@ class UnifiedResponseGenerator:
             confidence=0.7
         )
 
+    def _generate_precise_growth_response(self, breed: str, age_days: int, sex: str) -> ResponseData:
+        """Génère réponse précise pour la croissance"""
+        
+        breed_name = breed.replace('_', ' ').title()
+        sex_str = {'male': 'mâles', 'female': 'femelles', 'mixed': 'mixtes'}[sex]
+        
+        # Calculs de gain quotidien selon l'âge
+        if age_days <= 7:
+            daily_gain_range = "3-8g"
+            growth_phase = "Démarrage critique"
+        elif age_days <= 14:
+            daily_gain_range = "25-35g"
+            growth_phase = "Croissance initiale"
+        elif age_days <= 21:
+            daily_gain_range = "45-65g"
+            growth_phase = "Croissance rapide"
+        elif age_days <= 28:
+            daily_gain_range = "65-85g"
+            growth_phase = "Croissance intensive"
+        else:
+            daily_gain_range = "70-95g"
+            growth_phase = "Finition"
+        
+        response = f"""**Croissance {breed_name} {sex_str} à {age_days} jours :**
+
+🎯 **Phase actuelle** : {growth_phase}
+
+📈 **Gain quotidien attendu** : {daily_gain_range} par jour
+
+📊 **Indicateurs de performance** :
+• Homogénéité du troupeau >85%
+• Activité normale et appétit constant
+• Absence de retards de croissance
+• Développement harmonieux du plumage
+
+⚡ **Surveillance spécifique** :
+• Pesée bi-hebdomadaire représentative
+• Contrôle de la courbe de croissance
+• Ajustement nutritionnel selon gains observés
+
+🚨 **Signaux d'alerte** :
+• Gain <{daily_gain_range.split('-')[0]} : Retard de croissance
+• Stagnation >2 jours : Problème sanitaire potentiel
+• Hétérogénéité >15% : Gestion à réviser"""
+
+        return ResponseData(
+            response=response,
+            response_type="precise_growth",
+            confidence=0.9
+        )
+
 # =============================================================================
 # FONCTIONS UTILITAIRES
 # =============================================================================
@@ -525,9 +761,11 @@ def quick_generate(question: str, entities: Dict[str, Any], response_type: str) 
     # Créer un objet de classification simulé
     class MockClassification:
         def __init__(self, resp_type):
-            from smart_classifier import ResponseType
+            from .smart_classifier import ResponseType
             self.response_type = ResponseType(resp_type)
             self.missing_entities = []
+            self.merged_entities = entities
+            self.weight_data = {}
     
     classification = MockClassification(response_type)
     result = generator.generate(question, entities, classification)
@@ -535,31 +773,56 @@ def quick_generate(question: str, entities: Dict[str, Any], response_type: str) 
     return result.response
 
 # =============================================================================
-# TESTS INTÉGRÉS
+# TESTS INTÉGRÉS AVEC CONTEXTUAL_ANSWER
 # =============================================================================
 
-def test_generator():
-    """Tests rapides du générateur"""
+def test_generator_contextual():
+    """Tests du générateur avec support CONTEXTUAL_ANSWER"""
     generator = UnifiedResponseGenerator()
     
-    # Test réponse précise
-    entities_precise = {
-        'breed_specific': 'Ross 308',
-        'age_days': 21,
-        'sex': 'mâle'
-    }
+    print("🧪 Test générateur avec support CONTEXTUAL_ANSWER")
+    print("=" * 60)
     
-    # Test réponse générale
-    entities_general = {
-        'age_days': 22,
-        'weight_mentioned': True
-    }
+    # Test CONTEXTUAL_ANSWER avec données de poids
+    class MockContextualClassification:
+        def __init__(self):
+            from .smart_classifier import ResponseType
+            self.response_type = ResponseType.CONTEXTUAL_ANSWER
+            self.merged_entities = {
+                'breed_specific': 'Ross 308',
+                'age_days': 12,
+                'sex': 'mâle',
+                'context_type': 'performance',
+                'age_context_inherited': True
+            }
+            self.weight_data = {
+                'breed': 'Ross 308',
+                'age_days': 12,
+                'sex': 'male',
+                'weight_range': (380, 420),
+                'target_weight': 400,
+                'alert_thresholds': {'low': 323, 'high': 483},
+                'confidence': 0.95
+            }
     
-    print("🧪 Tests du générateur de réponses")
-    print("=" * 50)
-    print("✅ Générateur initialisé avec succès")
-    print(f"✅ {len(generator.weight_ranges)} races configurées")
-    print("✅ Templates de réponse prêts")
+    # Test génération contextuelle
+    question = "Pour un Ross 308 male"
+    entities = {'breed_specific': 'Ross 308', 'sex': 'mâle'}
+    classification = MockContextualClassification()
+    
+    result = generator.generate(question, entities, classification)
+    
+    print(f"Question: {question}")
+    print(f"Type de réponse: {result.response_type}")
+    print(f"Confiance: {result.confidence}")
+    print(f"Données de poids: {result.weight_data}")
+    print(f"Aperçu réponse: {result.response[:200]}...")
+    
+    # Vérifier que la réponse contient les bonnes données
+    if "380-420" in result.response and "Ross 308" in result.response:
+        print("✅ SUCCESS: Réponse contextuelle avec données précises générée!")
+    else:
+        print("❌ FAILED: Données Ross 308 mâle 12j non trouvées dans la réponse")
 
 if __name__ == "__main__":
-    test_generator()
+    test_generator_contextual()
