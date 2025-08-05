@@ -1,911 +1,500 @@
 """
-app/api/v1/expert_services.py - SERVICE PRINCIPAL EXPERT SYSTEM (REFACTORISÉ v4.0.0)
+expert_services.py - SERVICE PRINCIPAL SIMPLIFIÉ
 
-🚀 CORRECTIONS APPLIQUÉES v4.0.0:
-1. ✅ REFACTORISATION en modules séparés
-2. ✅ CORRECTION complète des problèmes d'indentation
-3. ✅ CONSERVATION de tout le code original
-4. ✅ STRUCTURE modulaire maintenable
-5. 🆕 AJOUT: Intégration GeneralResponseGenerator dans pipeline clarification
+🎯 REMPLACE: Tous les services complexes et contradictoires
+🚀 PRINCIPE: Un seul point d'entrée, logique claire et unifiée
+✨ SIMPLE: Flux linéaire sans conflits
+
+Architecture:
+1. EntitiesExtractor -> Extraction des informations
+2. SmartClassifier -> Décision du type de réponse  
+3. UnifiedResponseGenerator -> Génération de la réponse
+4. Formatage final -> Réponse standardisée
+
+Fini les imports circulaires, les conflits de règles, et la complexité excessive !
 """
 
-import os
 import logging
-import uuid
 import time
+import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any, Optional, List
 
-from fastapi import HTTPException, Request
+# Imports des nouveaux modules simplifiés
+from .entities_extractor import EntitiesExtractor, ExtractedEntities
+from .smart_classifier import SmartClassifier, ClassificationResult, ResponseType
+from .unified_response_generator import UnifiedResponseGenerator, ResponseData
 
-# Imports des modules refactorisés
-from .expert_services_utils import (
-    safe_get_weight, safe_get_weight_unit, validate_and_normalize_weight,
-    extract_weight_from_text_safe, safe_get_missing_entities, 
-    safe_update_missing_entities, validate_missing_entities_list,
-    safe_get_conversation_context, safe_extract_entities_from_context,
-    safe_add_message_to_memory, safe_mark_pending_clarification,
-    safe_set_field_if_exists, safe_get_field_if_exists,
-    validate_response_object_compatibility
-)
-
-from .expert_services_responses import (
-    ExpertResponseCreator
-)
-
-from .expert_services_clarification import (
-    analyze_question_for_clarification_enhanced,
-    generate_critical_clarification_message_safe
-)
-
-logger = logging.getLogger(__name__)
-
-# 🆕 NOUVEAU: Import du générateur de réponse générale
+# Import des modèles (gardés pour compatibilité)
 try:
-    from .general_response_generator import GeneralResponseGenerator
-    GENERAL_RESPONSE_GENERATOR_AVAILABLE = True
-    logger.info("✅ [Services] GeneralResponseGenerator importé avec succès")
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"⚠️ [Services] GeneralResponseGenerator non disponible: {e}")
-    
-    # Générateur fallback
-    class MockGeneralResponseGenerator:
-        async def generate_general_response(self, question, entities, ai_classification, **kwargs):
-            return f"Réponse générale générée pour: {question[:100]}..."
-    
-    GENERAL_RESPONSE_GENERATOR_AVAILABLE = False
-
-# 🆕 NOUVEAU: Fonction d'extraction d'entités basiques pour le générateur général
-def extract_basic_entities(question_text):
-    """Extraction basique d'entités pour le générateur de réponse générale"""
-    try:
-        entities = {}
-        question_lower = question_text.lower()
-        
-        # Extraction basique de race
-        breeds = {
-            'ross 308': 'ross_308',
-            'cobb 500': 'cobb_500', 
-            'hubbard': 'hubbard',
-            'isa brown': 'isa_brown',
-            'lohmann': 'lohmann_brown'
-        }
-        
-        for breed_name, breed_code in breeds.items():
-            if breed_name in question_lower:
-                entities['breed'] = breed_code
-                entities['breed_name'] = breed_name
-                break
-        
-        # Extraction basique d'âge
-        import re
-        age_patterns = [
-            r'(\d+)\s*semaines?',
-            r'(\d+)\s*jours?',
-            r'(\d+)\s*weeks?',
-            r'(\d+)\s*days?'
-        ]
-        
-        for pattern in age_patterns:
-            match = re.search(pattern, question_lower)
-            if match:
-                age_value = int(match.group(1))
-                if 'semaine' in pattern or 'week' in pattern:
-                    entities['age_weeks'] = age_value
-                    entities['age_days'] = age_value * 7
-                else:
-                    entities['age_days'] = age_value
-                    entities['age_weeks'] = age_value / 7
-                break
-        
-        # Extraction basique de poids
-        weight_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:kg|kilo)',
-            r'(\d+(?:\.\d+)?)\s*(?:g|gram)',
-            r'(\d+(?:\.\d+)?)\s*(?:lb|pound)'
-        ]
-        
-        for pattern in weight_patterns:
-            match = re.search(pattern, question_lower)
-            if match:
-                weight_value = float(match.group(1))
-                if 'kg' in pattern or 'kilo' in pattern:
-                    entities['weight'] = weight_value
-                    entities['weight_unit'] = 'kg'
-                elif 'g' in pattern or 'gram' in pattern:
-                    entities['weight'] = weight_value / 1000
-                    entities['weight_unit'] = 'kg'
-                else:  # pounds
-                    entities['weight'] = weight_value * 0.453592
-                    entities['weight_unit'] = 'kg'
-                break
-        
-        logger.debug(f"🔍 [Extract Basic] Entités extraites: {entities}")
-        return entities
-        
-    except Exception as e:
-        logger.error(f"❌ [Extract Basic] Erreur extraction entités: {e}")
-        return {}
-
-# 🚀 IMPORTS SÉCURISÉS AVEC FALLBACKS ROBUSTES
-try:
-    from .clarification_entities import normalize_breed_name, infer_sex_from_breed, get_breed_type, get_supported_breeds
-    CLARIFICATION_ENTITIES_AVAILABLE = True
-    logger.info("✅ [Services] clarification_entities importé avec succès")
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"⚠️ [Services] clarification_entities non disponible: {e}")
-    
-    # Fonctions fallback
-    def normalize_breed_name(breed):
-        if not breed or not isinstance(breed, str):
-            return "", "manual"
-        return breed.lower().strip(), "manual"
-    
-    def infer_sex_from_breed(breed):
-        if not breed or not isinstance(breed, str):
-            return None, False
-        layer_breeds = ['isa brown', 'lohmann brown', 'hy-line', 'bovans', 'shaver', 'hissex', 'novogen']
-        breed_lower = breed.lower()
-        is_layer = any(layer in breed_lower for layer in layer_breeds)
-        return "femelles" if is_layer else None, is_layer
-    
-    def get_breed_type(breed):
-        if not breed or not isinstance(breed, str):
-            return "unknown"
-        breed_lower = breed.lower()
-        layer_breeds = ['isa brown', 'lohmann brown', 'hy-line', 'bovans', 'shaver', 'hissex', 'novogen']
-        if any(layer in breed_lower for layer in layer_breeds):
-            return "layers"
-        broiler_breeds = ['ross 308', 'cobb 500', 'hubbard', 'ross', 'cobb']
-        if any(broiler in breed_lower for broiler in broiler_breeds):
-            return "broilers"
-        return "unknown"
-    
-    def get_supported_breeds():
-        return ["ross 308", "cobb 500", "hubbard", "isa brown", "lohmann brown", "hy-line", "bovans", "shaver"]
-    
-    CLARIFICATION_ENTITIES_AVAILABLE = False
-
-# CORRECTION v4.0.0: Imports sécurisés des modèles avec ALIGNMENT COMPLET
-try:
-    from .expert_models import (
-        EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest,
-        ValidationResult, ProcessingContext, VaguenessResponse, ResponseFormat,
-        ConcisionLevel, ConcisionMetrics, DynamicClarification, ClarificationResult,
-        IntelligentEntities
-    )
+    from .expert_models import EnhancedExpertResponse, EnhancedQuestionRequest
     MODELS_AVAILABLE = True
-    logger.info("✅ [Services v4.0.0] expert_models importé avec ALIGNMENT COMPLET")
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"⚠️ [Services v4.0.0] expert_models non disponible: {e}")
-    from pydantic import BaseModel
-    
-    # Modèles de fallback robustes
-    class ValidationResult:
-        def __init__(self, is_valid=True, rejection_message="", confidence=1.0):
-            self.is_valid = bool(is_valid)
-            self.rejection_message = str(rejection_message) if rejection_message else ""
-            self.confidence = float(confidence) if confidence is not None else 1.0
-    
-    class ConcisionLevel:
-        CONCISE = "concise"
-        STANDARD = "standard"
-        DETAILED = "detailed"
-        ULTRA_CONCISE = "ultra_concise"
-    
+except ImportError:
+    MODELS_AVAILABLE = False
+    # Classes de fallback minimalistes
     class EnhancedExpertResponse:
         def __init__(self, **kwargs):
             for key, value in kwargs.items():
                 setattr(self, key, value)
     
-    MODELS_AVAILABLE = False
+    class EnhancedQuestionRequest:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
 
-# Imports des services et intégrations
-try:
-    from .expert_integrations import IntegrationsManager
-    INTEGRATIONS_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    class IntegrationsManager:
-        def __init__(self):
-            self.agricultural_validator_available = False
-        
-        def get_current_user_dependency(self):
-            return lambda: {"id": "fallback", "email": "fallback@intelia.com"}
-        
-        def is_agricultural_validation_enabled(self):
-            return False
-        
-        def validate_agricultural_question(self, **kwargs):
-            return ValidationResult(is_valid=True, rejection_message="", confidence=0.5)
-    
-    INTEGRATIONS_AVAILABLE = False
+logger = logging.getLogger(__name__)
 
-try:
-    from .agent_contextualizer import agent_contextualizer
-    from .agent_rag_enhancer import agent_rag_enhancer
-    AGENTS_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    class MockAgent:
-        async def enrich_question(self, *args, **kwargs):
-            question = args[0] if args else kwargs.get('question', 'Question vide')
-            return {"enriched_question": str(question), "method_used": "mock", "entities_used": []}
-        
-        async def enhance_rag_answer(self, *args, **kwargs):
-            answer = args[0] if args else kwargs.get('rag_answer', 'Réponse vide')
-            return {"enhanced_answer": str(answer), "optional_clarifications": [], "method_used": "mock"}
-    
-    agent_contextualizer = MockAgent()
-    agent_rag_enhancer = MockAgent()
-    AGENTS_AVAILABLE = False
-
-try:
-    from .conversation_memory import IntelligentConversationMemory
-    CONVERSATION_MEMORY_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    class MockConversationMemory:
-        def get_conversation_context(self, conversation_id):
-            return None
-        
-        async def add_message_to_conversation(self, *args, **kwargs):
-            return True
-        
-        def mark_pending_clarification(self, conversation_id, question, critical_entities):
-            return True
-    
-    CONVERSATION_MEMORY_AVAILABLE = False
-
-try:
-    from .expert_concision_service import ConcisionService
-    CONCISION_SERVICE_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    class MockConcisionService:
-        def generate_all_versions(self, text, language="fr"):
-            if not text:
-                text = "Réponse indisponible"
-            words = text.split()
-            return {
-                "ultra_concise": " ".join(words[:10]) + ("..." if len(words) > 10 else ""),
-                "concise": " ".join(words[:25]) + ("..." if len(words) > 25 else ""),
-                "standard": " ".join(words[:50]) + ("..." if len(words) > 50 else ""),
-                "detailed": text
-            }
-    
-    CONCISION_SERVICE_AVAILABLE = False
-
-# =============================================================================
-# 🚀 SERVICE PRINCIPAL EXPERT AVEC INDENTATION CORRIGÉE v4.0.0
-# =============================================================================
+class ProcessingResult:
+    """Résultat du traitement d'une question"""
+    def __init__(self, success: bool, response: str, response_type: str, 
+                 confidence: float, entities: ExtractedEntities, 
+                 processing_time_ms: int, error: str = None):
+        self.success = success
+        self.response = response
+        self.response_type = response_type
+        self.confidence = confidence
+        self.entities = entities
+        self.processing_time_ms = processing_time_ms
+        self.error = error
+        self.timestamp = datetime.now().isoformat()
 
 class ExpertService:
-    """Service principal pour le système expert avec ALIGNMENT COMPLET v4.0.0"""
+    """Service expert unifié - Point d'entrée unique pour toutes les questions"""
     
     def __init__(self):
-        try:
-            self.integrations = IntegrationsManager()
-            
-            # Initialiser le service de concision
-            if CONCISION_SERVICE_AVAILABLE:
-                try:
-                    self.concision_service = ConcisionService()
-                    logger.info("✅ [Expert Service v4.0.0] ConcisionService initialisé")
-                except Exception as e:
-                    logger.error(f"❌ [Expert Service v4.0.0] Erreur init ConcisionService: {e}")
-                    self.concision_service = MockConcisionService()
-            else:
-                self.concision_service = MockConcisionService()
-                logger.warning("⚠️ [Expert Service v4.0.0] ConcisionService mock utilisé")
-            
-            # Initialiser la mémoire conversationnelle
-            if CONVERSATION_MEMORY_AVAILABLE:
-                try:
-                    self.conversation_memory = IntelligentConversationMemory()
-                    logger.info("✅ [Expert Service v4.0.0] Mémoire conversationnelle initialisée")
-                except Exception as e:
-                    logger.error(f"❌ [Expert Service v4.0.0] Erreur init mémoire: {e}")
-                    self.conversation_memory = MockConversationMemory()
-            else:
-                self.conversation_memory = MockConversationMemory()
-            
-            # 🆕 NOUVEAU: Initialiser le générateur de réponse générale
-            if GENERAL_RESPONSE_GENERATOR_AVAILABLE:
-                try:
-                    self.general_response_generator = GeneralResponseGenerator()
-                    logger.info("✅ [Expert Service v4.0.0] GeneralResponseGenerator initialisé")
-                except Exception as e:
-                    logger.error(f"❌ [Expert Service v4.0.0] Erreur init GeneralResponseGenerator: {e}")
-                    self.general_response_generator = MockGeneralResponseGenerator()
-            else:
-                self.general_response_generator = MockGeneralResponseGenerator()
-                logger.warning("⚠️ [Expert Service v4.0.0] GeneralResponseGenerator mock utilisé")
-            
-            # Initialiser le créateur de réponses
-            self.response_creator = ExpertResponseCreator(self.concision_service)
-            
-            # Configuration
-            self.config = {
-                "enable_concise_responses": True,
-                "default_concision_level": getattr(ConcisionLevel, 'CONCISE', 'concise'),
-                "fallback_mode": not all([MODELS_AVAILABLE, INTEGRATIONS_AVAILABLE]),
-                "critical_clarification_blocking": True,
-                "optional_clarification_non_blocking": True,
-                "agents_enabled": AGENTS_AVAILABLE,
-                "conversation_memory_enabled": CONVERSATION_MEMORY_AVAILABLE,
-                "concision_service_enabled": CONCISION_SERVICE_AVAILABLE or True,
-                "general_response_generator_enabled": GENERAL_RESPONSE_GENERATOR_AVAILABLE,  # 🆕
-                "safe_weight_access": True,
-                "safe_missing_entities_access": True,
-                "robust_memory_error_handling": True,
-                "field_existence_verification": True,
-                "response_object_validation": True,
-                "alignment_expert_models": True
-            }
-            
-            logger.info("🚀 [Expert Service v4.0.0] Service expert initialisé avec ALIGNMENT COMPLET + GeneralResponseGenerator")
-            
-        except Exception as e:
-            logger.error(f"❌ [Expert Service v4.0.0] Erreur critique lors de l'initialisation: {e}")
-            # Configuration d'urgence
-            self.integrations = IntegrationsManager()
-            self.conversation_memory = MockConversationMemory()
-            self.concision_service = MockConcisionService()
-            self.general_response_generator = MockGeneralResponseGenerator()  # 🆕
-            self.response_creator = ExpertResponseCreator(self.concision_service)
-            self.config = {
-                "enable_concise_responses": False,
-                "fallback_mode": True,
-                "critical_clarification_blocking": False,
-                "agents_enabled": False,
-                "conversation_memory_enabled": False,
-                "general_response_generator_enabled": False,  # 🆕
-                "safe_weight_access": True,
-                "safe_missing_entities_access": True,
-                "robust_memory_error_handling": True,
-                "field_existence_verification": True,
-                "response_object_validation": True,
-                "alignment_expert_models": False
-            }
-    
-    def get_current_user_dependency(self):
-        """Retourne la dépendance pour l'authentification de façon sécurisée"""
-        try:
-            return self.integrations.get_current_user_dependency()
-        except Exception as e:
-            logger.error(f"❌ [Expert Service v4.0.0] Erreur get_current_user_dependency: {e}")
-            return lambda: {"id": "error", "email": "error@intelia.com"}
-    
-    async def process_expert_question(
-        self,
-        request_data,
-        request: Request,
-        current_user: Optional[Dict[str, Any]] = None,
-        start_time: float = None
-    ):
-        """🚀 MÉTHODE PRINCIPALE AVEC ALIGNMENT COMPLET v4.0.0"""
+        """Initialisation du service avec les 3 composants principaux"""
+        self.entities_extractor = EntitiesExtractor()
+        self.smart_classifier = SmartClassifier()
+        self.response_generator = UnifiedResponseGenerator()
         
-        if start_time is None:
-            start_time = time.time()
+        # Statistiques pour monitoring
+        self.stats = {
+            "questions_processed": 0,
+            "precise_answers": 0,
+            "general_answers": 0,
+            "clarifications": 0,
+            "errors": 0,
+            "average_processing_time_ms": 0
+        }
         
-        try:
-            logger.info("🚀 [ExpertService v4.0.0] Traitement avec ALIGNMENT COMPLET expert_models")
-            
-            # Extraction sécurisée des paramètres
-            question_text = self._extract_question_safe(request_data)
-            language = self._extract_language_safe(request_data)
-            conversation_id = self._extract_conversation_id_safe(request_data)
-            
-            logger.info(f"📝 [ExpertService v4.0.0] Question: '{question_text[:100] if question_text else 'VIDE'}...'")
-            logger.info(f"🌐 [ExpertService v4.0.0] Langue: {language}")
-            logger.info(f"🆔 [ExpertService v4.0.0] Conversation: {conversation_id}")
-            
-            # Variables de traitement
-            processing_steps = ["initialization", "parameter_extraction"]
-            ai_enhancements_used = []
-            
-            # Authentification sécurisée
-            user_id = self._extract_user_id_safe(current_user, request_data, request)
-            user_email = current_user.get("email") if current_user and isinstance(current_user, dict) else None
-            
-            processing_steps.append("authentication")
-            
-            # Validation question
-            if not question_text or len(question_text.strip()) < 3:
-                return self.response_creator.create_error_response(
-                    "Question trop courte", question_text or "Question vide", 
-                    conversation_id, language, start_time
-                )
-            
-            processing_steps.append("question_validation")
-            
-            # Mode fallback si nécessaire
-            if self.config["fallback_mode"]:
-                logger.info("🔄 [ExpertService v4.0.0] Mode fallback activé")
-                return await self._process_question_fallback(
-                    question_text, conversation_id, language, user_email, start_time, processing_steps
-                )
-            
-            # Pipeline principal avec gestion d'erreurs
-            return await self._process_question_critical_clarification_pipeline_safe(
-                request_data, request, current_user, start_time, processing_steps, ai_enhancements_used,
-                question_text, language, conversation_id, user_id
-            )
-                
-        except Exception as e:
-            logger.error(f"❌ [ExpertService v4.0.0] Erreur critique: {e}")
-            return self.response_creator.create_error_response(
-                f"Erreur interne: {str(e)}", 
-                self._extract_question_safe(request_data), 
-                self._extract_conversation_id_safe(request_data), 
-                self._extract_language_safe(request_data), 
-                start_time
-            )
-    
-    # === MÉTHODES D'EXTRACTION SÉCURISÉES ===
-    
-    def _extract_question_safe(self, request_data) -> str:
-        """Extraction sécurisée du texte de la question"""
-        try:
-            if hasattr(request_data, 'text') and request_data.text:
-                return str(request_data.text)
-            elif isinstance(request_data, dict) and 'text' in request_data:
-                return str(request_data['text'])
-            else:
-                return "Question vide"
-        except Exception as e:
-            logger.error(f"❌ [Extract Question v4.0.0] Erreur: {e}")
-            return "Question invalide"
-    
-    def _extract_language_safe(self, request_data) -> str:
-        """Extraction sécurisée de la langue"""
-        try:
-            if hasattr(request_data, 'language') and request_data.language:
-                lang = str(request_data.language).lower()
-                return lang if lang in ['fr', 'en', 'es'] else 'fr'
-            elif isinstance(request_data, dict) and 'language' in request_data:
-                lang = str(request_data['language']).lower()
-                return lang if lang in ['fr', 'en', 'es'] else 'fr'
-            else:
-                return "fr"
-        except Exception as e:
-            logger.error(f"❌ [Extract Language v4.0.0] Erreur: {e}")
-            return "fr"
-    
-    def _extract_conversation_id_safe(self, request_data) -> str:
-        """Extraction sécurisée de l'ID de conversation"""
-        try:
-            if hasattr(request_data, 'conversation_id') and request_data.conversation_id:
-                return str(request_data.conversation_id)
-            elif isinstance(request_data, dict) and 'conversation_id' in request_data:
-                return str(request_data['conversation_id'])
-            else:
-                return str(uuid.uuid4())
-        except Exception as e:
-            logger.error(f"❌ [Extract Conversation ID v4.0.0] Erreur: {e}")
-            return str(uuid.uuid4())
-    
-    def _extract_user_id_safe(self, current_user, request_data, request) -> str:
-        """Extraction sécurisée de l'ID utilisateur"""
-        try:
-            if current_user and isinstance(current_user, dict) and "id" in current_user:
-                return str(current_user["id"])
-            elif hasattr(request_data, 'user_id') and request_data.user_id:
-                return str(request_data.user_id)
-            else:
-                return f"fallback_{uuid.uuid4().hex[:8]}"
-        except Exception as e:
-            logger.warning(f"⚠️ [ExpertService v4.0.0] Erreur extraction user_id: {e}")
-            return f"error_{uuid.uuid4().hex[:8]}"
-    
-    # === PIPELINE PRINCIPAL SÉCURISÉ ===
-    
-    async def _process_question_critical_clarification_pipeline_safe(
-        self, request_data, request, current_user, start_time, processing_steps, ai_enhancements_used,
-        question_text, language, conversation_id, user_id
-    ):
-        """🛑 Pipeline avec clarification critique et GESTION ROBUSTE ERREURS MÉMOIRE v4.0.0"""
+        # Configuration
+        self.config = {
+            "enable_logging": True,
+            "enable_stats": True,
+            "max_processing_time_ms": 10000,  # 10 secondes max
+            "fallback_enabled": True
+        }
         
-        try:
-            logger.info("🛑 [ExpertService v4.0.0] Pipeline clarification critique activé")
-            processing_steps.append("critical_clarification_pipeline_activated")
-            
-            # ANALYSE CLARIFICATION CRITIQUE AVANT RAG
-            try:
-                logger.info("🛑 [Pipeline v4.0.0] Analyse clarification critique AVANT RAG")
-                
-                clarification_result = await analyze_question_for_clarification_enhanced(question_text, language)
-                
-                processing_steps.append("critical_clarification_analysis")
-                ai_enhancements_used.append("critical_clarification_analysis")
-                
-                # Vérifier si clarification critique requise
-                if clarification_result.get("clarification_required_critical", False):
-                    logger.info("🛑 [Pipeline v4.0.0] Clarification critique requise - ARRÊT AVANT RAG")
-                    processing_steps.append("critical_clarification_blocking")
-                    
-                    return await self._handle_critical_clarification_safe(
-                        clarification_result, question_text, conversation_id, language, 
-                        start_time, current_user, processing_steps, ai_enhancements_used
-                    )
-                    
-            except Exception as e:
-                logger.error(f"❌ [Pipeline v4.0.0] Erreur analyse clarification critique: {e}")
-                processing_steps.append("critical_clarification_error_continue")
-            
-            # PIPELINE NORMAL SI PAS DE CLARIFICATION CRITIQUE
-            logger.info("✅ [Pipeline v4.0.0] Pas de clarification critique - continuation pipeline normal")
-            
-            return await self._process_normal_pipeline_safe(
-                question_text, language, conversation_id, user_id, current_user,
-                start_time, processing_steps, ai_enhancements_used, request, request_data
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [Pipeline Safe v4.0.0] Erreur critique: {e}")
-            return self.response_creator.create_error_response(
-                str(e), question_text, conversation_id, language, start_time
-            )
-    
-    async def _handle_critical_clarification_safe(
-        self, clarification_result, question_text, conversation_id, language, 
-        start_time, current_user, processing_steps, ai_enhancements_used
-    ):
-        """🆕 MODIFIÉ: Gestion clarification avec support réponse générale IA"""
-        
-        try:
-            # 🧠 NOUVEAU: Vérifier si IA suggère réponse générale
-            ai_classification = clarification_result.get("ai_classification", {})
-            
-            if ai_classification.get("decision") == "general_answer":
-                logger.info("🧠 [Pipeline] IA suggère réponse générale - génération...")
-                processing_steps.append("ai_general_response_suggested")
-                
-                # Générer réponse générale avec IA
-                entities = extract_basic_entities(question_text)
-                
-                try:
-                    general_response = await self.general_response_generator.generate_general_response(
-                        question_text, entities, ai_classification, language=language
-                    )
-                    
-                    logger.info(f"✅ [Pipeline] Réponse générale générée: {len(general_response)} caractères")
-                    processing_steps.append("ai_general_response_generated")
-                    ai_enhancements_used.extend(["intelligent_classification", "general_response_generator"])
-                    
-                    # Créer réponse avec contenu généré
-                    return self.response_creator.create_enhanced_response_safe_aligned(
-                        question_text=question_text,
-                        final_answer=general_response,
-                        conversation_id=conversation_id,
-                        language=language,
-                        response_time_ms=int((time.time() - start_time) * 1000),
-                        user_email=current_user.get("email") if current_user else None,
-                        processing_steps=processing_steps,
-                        ai_enhancements_used=ai_enhancements_used,
-                        rag_score=0.0,
-                        mode="ai_general_response",
-                        contextualization_info={"ai_classification": ai_classification},
-                        enhancement_info={"method": "ai_general_response"},
-                        optional_clarifications=[],
-                        conversation_context={},
-                        entities=entities,
-                        missing_entities=[],
-                        question_for_rag=question_text,
-                        response_versions=None
-                    )
-                    
-                except Exception as gen_error:
-                    logger.error(f"❌ [Pipeline] Erreur génération réponse générale: {gen_error}")
-                    processing_steps.append("ai_general_response_error_fallback_to_clarification")
-                    # Continue vers clarification traditionnelle en cas d'erreur
-            
-            # Sinon logique clarification existante
-            return await self._handle_traditional_clarification(
-                clarification_result, question_text, conversation_id, language,
-                start_time, current_user, processing_steps, ai_enhancements_used
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [AI Enhanced Clarification] Erreur: {e}")
-            return self.response_creator.create_error_response(
-                str(e), question_text, conversation_id, language, start_time
-            )
-    
-    async def _handle_traditional_clarification(
-        self, clarification_result, question_text, conversation_id, language, 
-        start_time, current_user, processing_steps, ai_enhancements_used
-    ):
-        """🔧 SÉPARÉE: Gestion clarification traditionnelle (code original conservé)"""
-        try:
-            # Validation missing_entities sécurisée
-            raw_missing_critical = clarification_result.get("missing_critical_entities", [])
-            missing_critical_entities = safe_get_missing_entities({"missing_entities": raw_missing_critical})
-            
-            # Marquage dans la mémoire avec GESTION ROBUSTE D'ERREURS
-            if self.config["robust_memory_error_handling"]:
-                try:
-                    mark_success = safe_mark_pending_clarification(
-                        self.conversation_memory, conversation_id, question_text, missing_critical_entities
-                    )
-                    
-                    if mark_success:
-                        logger.info(f"🧠 [Pipeline v4.0.0] Clarification critique marquée: {missing_critical_entities}")
-                        processing_steps.append("memory_clarification_marked_success")
-                    else:
-                        logger.warning(f"⚠️ [Pipeline v4.0.0] Échec marquage clarification: {conversation_id}")
-                        processing_steps.append("memory_clarification_marked_failed_non_blocking")
-                        
-                except Exception as e:
-                    logger.error(f"❌ [Pipeline v4.0.0] Erreur marquage mémoire (NON BLOQUANT): {e}")
-                    processing_steps.append("memory_clarification_error_non_blocking")
-            
-            # Générer message de clarification critique
-            poultry_type = clarification_result.get("poultry_type", "unknown")
-            critical_message = generate_critical_clarification_message_safe(
-                missing_critical_entities, poultry_type, language
-            )
-            
-            # Retourner la réponse de clarification
-            response_time_ms = int((time.time() - start_time) * 1000)
-            
-            return self.response_creator.create_critical_clarification_response(
-                question_text, critical_message, conversation_id, language, response_time_ms,
-                current_user, processing_steps, ai_enhancements_used, clarification_result
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [Traditional Clarification v4.0.0] Erreur: {e}")
-            return self.response_creator.create_error_response(
-                "Erreur lors de la clarification critique", question_text, 
-                conversation_id, language, start_time
-            )
-    
-    async def _process_normal_pipeline_safe(
-        self, question_text, language, conversation_id, user_id, current_user,
-        start_time, processing_steps, ai_enhancements_used, request, request_data
-    ):
-        """Pipeline normal avec GESTION ROBUSTE ERREURS MÉMOIRE et ALIGNMENT"""
-        try:
-            # Variables par défaut
-            question_for_rag = question_text
-            final_answer = ""
-            rag_score = None
-            mode = "unknown"
-            optional_clarifications = []
-            
-            # Récupération contexte conversationnel avec GESTION ROBUSTE ERREURS
-            conversation_context = None
-            entities = {}
-            missing_entities = []
-            formatted_context = ""
-            
-            if self.config["robust_memory_error_handling"] and self.conversation_memory:
-                try:
-                    conversation_context = safe_get_conversation_context(self.conversation_memory, conversation_id)
-                    
-                    if conversation_context:
-                        entities, missing_entities = safe_extract_entities_from_context(conversation_context)
-                        
-                        # Accès sécurisé weight avec validation
-                        if self.config["safe_weight_access"]:
-                            weight_value = safe_get_weight(entities)
-                            weight_unit = safe_get_weight_unit(entities)
-                            
-                            if weight_value is not None:
-                                logger.info(f"⚖️ [Pipeline v4.0.0] Weight récupéré: {weight_value} {weight_unit}")
-                                weight_result = validate_and_normalize_weight(weight_value, weight_unit)
-                                if weight_result["is_valid"]:
-                                    entities["weight"] = weight_result["value"]
-                                    entities["weight_unit"] = weight_result["unit"]
-                        
-                        logger.info(f"🧠 [Pipeline v4.0.0] Contexte récupéré: {len(entities)} entités")
-                        processing_steps.append("conversation_context_retrieved_safe")
-                    else:
-                        logger.info("🆕 [Pipeline v4.0.0] Nouvelle conversation")
-                        
-                except Exception as e:
-                    logger.error(f"❌ [Pipeline v4.0.0] Erreur récupération contexte (NON BLOQUANT): {e}")
-                    processing_steps.append("context_retrieval_error_non_blocking")
-            
-            # Agent Contextualizer sécurisé
-            contextualization_info = {}
-            
-            if self.config["agents_enabled"]:
-                try:
-                    logger.info("🤖 [Pipeline v4.0.0] Agent Contextualizer")
-                    
-                    safe_missing_entities = safe_get_missing_entities({"missing_entities": missing_entities})
-                    
-                    contextualization_result = await agent_contextualizer.enrich_question(
-                        question=question_text,
-                        entities=entities,
-                        missing_entities=safe_missing_entities,
-                        conversation_context=formatted_context,
-                        language=language
-                    )
-                    
-                    if isinstance(contextualization_result, dict):
-                        question_for_rag = contextualization_result.get("enriched_question", question_text)
-                        contextualization_info = contextualization_result
-                        ai_enhancements_used.append(f"contextualizer_{contextualization_result.get('method_used', 'unknown')}")
-                    
-                except Exception as e:
-                    logger.error(f"❌ [Pipeline v4.0.0] Erreur Agent Contextualizer: {e}")
-                    question_for_rag = question_text
-            
-            # Traitement RAG sécurisé
-            try:
-                app = request.app if request else None
-                process_rag = getattr(app.state, 'process_question_with_rag', None) if app else None
-                
-                if process_rag:
-                    logger.info("🔍 [Pipeline v4.0.0] Système RAG disponible")
-                    processing_steps.append("rag_processing_with_enriched_question")
-                    
-                    result = await process_rag(
-                        question=question_for_rag,
-                        user=current_user,
-                        language=language,
-                        speed_mode=getattr(request_data, 'speed_mode', 'balanced')
-                    )
-                    
-                    if isinstance(result, dict):
-                        final_answer = str(result.get("response", ""))
-                        rag_score = result.get("score", 0.0)
-                        mode = "rag_processing_with_enriched_question"
-                else:
-                    logger.info("🔄 [Pipeline v4.0.0] RAG non disponible - Fallback")
-                    fallback_data = self._generate_fallback_responses_safe(question_for_rag, language)
-                    final_answer = fallback_data["response"]
-                    rag_score = None
-                    mode = "no_rag_fallback_enriched"
-                    
-            except Exception as e:
-                logger.error(f"❌ [Pipeline v4.0.0] Erreur traitement RAG: {e}")
-                fallback_data = self._generate_fallback_responses_safe(question_for_rag, language)
-                final_answer = fallback_data["response"]
-                rag_score = None
-                mode = "rag_error_fallback"
-            
-            # Agent RAG Enhancer sécurisé
-            enhancement_info = {}
-            
-            if self.config["agents_enabled"]:
-                try:
-                    logger.info("🔧 [Pipeline v4.0.0] Agent RAG Enhancer")
-                    
-                    safe_missing_entities = safe_get_missing_entities({"missing_entities": missing_entities})
-                    
-                    enhancement_result = await agent_rag_enhancer.enhance_rag_answer(
-                        rag_answer=final_answer,
-                        entities=entities,
-                        missing_entities=safe_missing_entities,
-                        conversation_context=formatted_context,
-                        original_question=question_text,
-                        enriched_question=question_for_rag,
-                        language=language
-                    )
-                    
-                    if isinstance(enhancement_result, dict):
-                        final_answer = enhancement_result.get("enhanced_answer", final_answer)
-                        optional_clarifications.extend(enhancement_result.get("optional_clarifications", []))
-                        enhancement_info = enhancement_result
-                        ai_enhancements_used.append(f"rag_enhancer_{enhancement_result.get('method_used', 'unknown')}")
-                    
-                except Exception as e:
-                    logger.error(f"❌ [Pipeline v4.0.0] Erreur Agent RAG Enhancer: {e}")
-            
-            # Génération des versions de réponse
-            response_versions = None
-            try:
-                if self.config["concision_service_enabled"] and final_answer:
-                    response_versions = self.concision_service.generate_all_versions(final_answer, language)
-                    processing_steps.append("response_versions_generated")
-            except Exception as e:
-                logger.error(f"❌ [Pipeline v4.0.0] Erreur génération versions: {e}")
-            
-            # Mise à jour mémoire avec GESTION ROBUSTE D'ERREURS
-            if self.config["robust_memory_error_handling"] and self.conversation_memory:
-                try:
-                    user_message_success = await safe_add_message_to_memory(
-                        self.conversation_memory, conversation_id, user_id, 
-                        question_for_rag, "user", language
-                    )
-                    
-                    assistant_message_success = await safe_add_message_to_memory(
-                        self.conversation_memory, conversation_id, user_id, 
-                        final_answer, "assistant", language
-                    )
-                    
-                    if user_message_success and assistant_message_success:
-                        processing_steps.append("conversation_memory_updated_success")
-                        logger.info("✅ [Pipeline v4.0.0] Mémoire mise à jour avec succès")
-                    
-                except Exception as e:
-                    logger.error(f"❌ [Pipeline v4.0.0] Erreur mise à jour mémoire (NON BLOQUANT): {e}")
-                    processing_steps.append("conversation_memory_error_non_blocking")
-            
-            # Construction réponse finale avec ALIGNMENT COMPLET
-            response_time_ms = int((time.time() - start_time) * 1000)
-            user_email = current_user.get("email") if current_user and isinstance(current_user, dict) else None
-            
-            return self.response_creator.create_enhanced_response_safe_aligned(
-                question_text, final_answer, conversation_id, language, response_time_ms,
-                user_email, processing_steps, ai_enhancements_used, rag_score, mode,
-                contextualization_info, enhancement_info, optional_clarifications,
-                conversation_context, entities, missing_entities, question_for_rag, response_versions
-            )
+        logger.info("✅ [Expert Service] Service unifié initialisé")
+        logger.info(f"   📊 Extracteur: {self.entities_extractor.get_extraction_stats()}")
+        logger.info(f"   🧠 Classifier: {self.smart_classifier.get_classification_stats()}")
 
-        except Exception as e:
-            logger.error(f"❌ [Normal Pipeline v4.0.0] Erreur: {e}")
-            return self.response_creator.create_error_response(
-                str(e), question_text, conversation_id, language, start_time
-            )
-    
-    async def _process_question_fallback(self, question_text, conversation_id, language, user_email, start_time, processing_steps):
-        """Pipeline de fallback sécurisé avec alignment"""
+    async def process_question(self, question: str, context: Dict[str, Any] = None, 
+                             language: str = "fr") -> ProcessingResult:
+        """
+        POINT D'ENTRÉE PRINCIPAL - Traite une question de A à Z
+        
+        Args:
+            question: Question à traiter
+            context: Contexte optionnel (conversation_id, user_id, etc.)
+            language: Langue de réponse
+            
+        Returns:
+            ProcessingResult avec la réponse et les métadonnées
+        """
+        start_time = time.time()
+        
         try:
-            logger.info("🔄 [ExpertService v4.0.0] Mode fallback complet activé")
-            processing_steps.append("fallback_mode_complete_aligned")
+            logger.info(f"🚀 [Expert Service] Traitement: '{question[:50]}...'")
             
-            fallback_data = self._generate_fallback_responses_safe(question_text, language)
-            response_time_ms = int((time.time() - start_time) * 1000)
+            # Validation de base
+            if not question or len(question.strip()) < 2:
+                return ProcessingResult(
+                    success=False,
+                    response="Question trop courte. Pouvez-vous préciser votre demande ?",
+                    response_type="error",
+                    confidence=0.0,
+                    entities=ExtractedEntities(),
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                    error="Question invalide"
+                )
             
-            return self.response_creator.create_basic_response_safe_aligned(
-                question_text, fallback_data["response"], conversation_id, 
-                language, response_time_ms, processing_steps
+            # 1️⃣ EXTRACTION DES ENTITÉS
+            entities = self.entities_extractor.extract(question)
+            logger.info(f"   🔍 Entités extraites: {entities}")
+            
+            # 2️⃣ CLASSIFICATION INTELLIGENTE
+            classification = self.smart_classifier.classify_question(question, self._entities_to_dict(entities))
+            logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
+            
+            # 3️⃣ GÉNÉRATION DE LA RÉPONSE
+            response_data = self.response_generator.generate(question, self._entities_to_dict(entities), classification)
+            logger.info(f"   🎨 Réponse générée: {response_data.response_type}")
+            
+            # 4️⃣ FORMATAGE FINAL
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            result = ProcessingResult(
+                success=True,
+                response=response_data.response,
+                response_type=response_data.response_type,
+                confidence=response_data.confidence,
+                entities=entities,
+                processing_time_ms=processing_time_ms
             )
+            
+            # 5️⃣ MISE À JOUR DES STATISTIQUES
+            self._update_stats(classification.response_type, processing_time_ms, True)
+            
+            logger.info(f"✅ [Expert Service] Traitement réussi en {processing_time_ms}ms")
+            return result
             
         except Exception as e:
-            logger.error(f"❌ [Process Fallback v4.0.0] Erreur: {e}")
-            return self.response_creator.create_error_response(
-                "Erreur fallback", question_text, conversation_id, language, start_time
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            error_msg = f"Erreur de traitement: {str(e)}"
+            
+            logger.error(f"❌ [Expert Service] {error_msg}")
+            
+            # Réponse de fallback
+            fallback_response = self._generate_fallback_response(question, language)
+            
+            result = ProcessingResult(
+                success=False,
+                response=fallback_response,
+                response_type="error_fallback",
+                confidence=0.3,
+                entities=ExtractedEntities(),
+                processing_time_ms=processing_time_ms,
+                error=error_msg
             )
-    
-    def _generate_fallback_responses_safe(self, question, language):
-        """Génération de réponses de fallback sécurisées"""
+            
+            self._update_stats(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False)
+            return result
+
+    async def ask_expert_enhanced(self, request: EnhancedQuestionRequest) -> EnhancedExpertResponse:
+        """
+        Interface compatible avec l'ancien système - Point d'entrée pour API
+        
+        Args:
+            request: Requête formatée selon l'ancien modèle
+            
+        Returns:
+            EnhancedExpertResponse compatible avec l'ancien système
+        """
         try:
-            fallback_responses = {
-                "fr": {
-                    "response": "Je ne peux pas accéder à ma base de connaissances pour le moment. Pouvez-vous reformuler votre question ou réessayer plus tard ?",
-                    "suggestion": "Essayez de poser une question plus spécifique sur l'élevage avicole."
-                },
-                "en": {
-                    "response": "I cannot access my knowledge base at the moment. Could you rephrase your question or try again later?",
-                    "suggestion": "Try asking a more specific question about poultry farming."
-                },
-                "es": {
-                    "response": "No puedo acceder a mi base de conocimientos en este momento. ¿Podrías reformular tu pregunta o intentar más tarde?",
-                    "suggestion": "Intenta hacer una pregunta más específica sobre avicultura."
+            # Traitement unifié
+            context = {
+                "conversation_id": getattr(request, 'conversation_id', None),
+                "user_id": getattr(request, 'user_id', None),
+                "is_clarification_response": getattr(request, 'is_clarification_response', False),
+                "original_question": getattr(request, 'original_question', None)
+            }
+            
+            result = await self.process_question(
+                question=request.text,
+                context=context,
+                language=getattr(request, 'language', 'fr')
+            )
+            
+            # Conversion en format ancien pour compatibilité
+            return self._convert_to_legacy_response(request, result)
+            
+        except Exception as e:
+            logger.error(f"❌ [Expert Service] Erreur ask_expert_enhanced: {e}")
+            return self._create_error_response(request, str(e))
+
+    def _entities_to_dict(self, entities: ExtractedEntities) -> Dict[str, Any]:
+        """Convertit les entités en dictionnaire pour compatibilité"""
+        return {
+            'age_days': entities.age_days,
+            'age_weeks': entities.age_weeks,
+            'age': entities.age,
+            'breed_specific': entities.breed_specific,
+            'breed_generic': entities.breed_generic,
+            'sex': entities.sex,
+            'weight_mentioned': entities.weight_mentioned,
+            'weight_grams': entities.weight_grams,
+            'weight_unit': entities.weight_unit,
+            'symptoms': entities.symptoms,
+            'context_type': entities.context_type,
+            'housing_conditions': entities.housing_conditions,
+            'feeding_context': entities.feeding_context
+        }
+
+    def _convert_to_legacy_response(self, request: EnhancedQuestionRequest, 
+                                  result: ProcessingResult) -> EnhancedExpertResponse:
+        """Convertit le résultat moderne vers le format legacy"""
+        
+        conversation_id = getattr(request, 'conversation_id', None) or str(uuid.uuid4())
+        language = getattr(request, 'language', 'fr')
+        
+        # Données de base obligatoires
+        response_data = {
+            "question": request.text,
+            "response": result.response,
+            "conversation_id": conversation_id,
+            "rag_used": False,  # Le nouveau système n'utilise plus RAG
+            "timestamp": result.timestamp,
+            "language": language,
+            "response_time_ms": result.processing_time_ms,
+            "mode": "unified_intelligent_system"
+        }
+        
+        # Ajout des champs optionnels pour compatibilité
+        optional_fields = {
+            "user": getattr(request, 'user_id', None),
+            "logged": True,
+            "validation_passed": result.success,
+            "processing_steps": [
+                "entities_extraction",
+                "smart_classification", 
+                "unified_response_generation"
+            ],
+            "ai_enhancements_used": [
+                "smart_classifier_v1",
+                "unified_generator_v1",
+                "entities_extractor_v1"
+            ]
+        }
+        
+        # Informations de classification pour debugging
+        classification_info = {
+            "response_type_detected": result.response_type,
+            "confidence_score": result.confidence,
+            "entities_extracted": self._entities_to_dict(result.entities),
+            "processing_successful": result.success
+        }
+        
+        # Fusionner toutes les données
+        response_data.update(optional_fields)
+        response_data["classification_result"] = classification_info
+        
+        # Gestion d'erreur si échec
+        if not result.success:
+            response_data["error_details"] = {
+                "error_message": result.error,
+                "fallback_used": True,
+                "original_processing_failed": True
+            }
+        
+        if MODELS_AVAILABLE:
+            return EnhancedExpertResponse(**response_data)
+        else:
+            # Fallback si modèles pas disponibles
+            return EnhancedExpertResponse(**response_data)
+
+    def _create_error_response(self, request: EnhancedQuestionRequest, error: str) -> EnhancedExpertResponse:
+        """Crée une réponse d'erreur compatible"""
+        
+        error_responses = {
+            "fr": f"Désolé, je rencontre une difficulté technique. Erreur: {error}. Pouvez-vous reformuler votre question ?",
+            "en": f"Sorry, I'm experiencing a technical difficulty. Error: {error}. Could you rephrase your question?",
+            "es": f"Lo siento, estoy experimentando una dificultad técnica. Error: {error}. ¿Podrías reformular tu pregunta?"
+        }
+        
+        language = getattr(request, 'language', 'fr')
+        error_response = error_responses.get(language, error_responses['fr'])
+        
+        return EnhancedExpertResponse(
+            question=request.text,
+            response=error_response,
+            conversation_id=getattr(request, 'conversation_id', str(uuid.uuid4())),
+            rag_used=False,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=0,
+            mode="error_fallback",
+            logged=True,
+            validation_passed=False,
+            error_details={"error": error, "system": "unified_expert_service"}
+        )
+
+    def _generate_fallback_response(self, question: str, language: str = "fr") -> str:
+        """Génère une réponse de fallback en cas d'erreur"""
+        
+        fallback_responses = {
+            "fr": """Je rencontre une difficulté technique pour analyser votre question.
+
+💡 **Pour m'aider à mieux vous répondre, précisez** :
+• Le type de volailles (poulets de chair, pondeuses...)
+• L'âge de vos animaux (21 jours, 3 semaines...)
+• Votre problème ou objectif spécifique
+
+**Exemple** : "Poids normal Ross 308 mâles à 21 jours ?"
+
+🔄 Veuillez réessayer en reformulant votre question.""",
+
+            "en": """I'm experiencing a technical difficulty analyzing your question.
+
+💡 **To help me better assist you, please specify** :
+• Type of poultry (broilers, layers...)
+• Age of your animals (21 days, 3 weeks...)
+• Your specific problem or objective
+
+**Example** : "Normal weight Ross 308 males at 21 days?"
+
+🔄 Please try again by rephrasing your question.""",
+
+            "es": """Estoy experimentando una dificultad técnica para analizar tu pregunta.
+
+💡 **Para ayudarme a responderte mejor, especifica** :
+• Tipo de aves (pollos de engorde, ponedoras...)
+• Edad de tus animales (21 días, 3 semanas...)
+• Tu problema u objetivo específico
+
+**Ejemplo** : "Peso normal Ross 308 machos a 21 días?"
+
+🔄 Por favor, inténtalo de nuevo reformulando tu pregunta."""
+        }
+        
+        return fallback_responses.get(language, fallback_responses['fr'])
+
+    def _update_stats(self, response_type: ResponseType, processing_time_ms: int, success: bool):
+        """Met à jour les statistiques de traitement"""
+        
+        if not self.config["enable_stats"]:
+            return
+        
+        self.stats["questions_processed"] += 1
+        
+        if success:
+            if response_type == ResponseType.PRECISE_ANSWER:
+                self.stats["precise_answers"] += 1
+            elif response_type == ResponseType.GENERAL_ANSWER:
+                self.stats["general_answers"] += 1
+            elif response_type == ResponseType.NEEDS_CLARIFICATION:
+                self.stats["clarifications"] += 1
+        else:
+            self.stats["errors"] += 1
+        
+        # Mise à jour du temps moyen (moyenne mobile)
+        current_avg = self.stats["average_processing_time_ms"]
+        total_questions = self.stats["questions_processed"]
+        
+        self.stats["average_processing_time_ms"] = int(
+            (current_avg * (total_questions - 1) + processing_time_ms) / total_questions
+        )
+
+    def get_system_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques système pour monitoring"""
+        
+        total_questions = self.stats["questions_processed"]
+        
+        if total_questions == 0:
+            return {
+                "service_status": "ready",
+                "questions_processed": 0,
+                "statistics": "No questions processed yet"
+            }
+        
+        success_rate = ((total_questions - self.stats["errors"]) / total_questions) * 100
+        
+        return {
+            "service_status": "active",
+            "version": "unified_v1.0.0",
+            "questions_processed": total_questions,
+            "success_rate_percent": round(success_rate, 2),
+            "response_distribution": {
+                "precise_answers": self.stats["precise_answers"],
+                "general_answers": self.stats["general_answers"], 
+                "clarifications": self.stats["clarifications"],
+                "errors": self.stats["errors"]
+            },
+            "performance": {
+                "average_processing_time_ms": self.stats["average_processing_time_ms"],
+                "system_components": {
+                    "entities_extractor": "active",
+                    "smart_classifier": "active",
+                    "response_generator": "active"
                 }
-            }
+            },
+            "configuration": self.config,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def reset_stats(self):
+        """Remet à zéro les statistiques"""
+        self.stats = {
+            "questions_processed": 0,
+            "precise_answers": 0,
+            "general_answers": 0,
+            "clarifications": 0,
+            "errors": 0,
+            "average_processing_time_ms": 0
+        }
+        logger.info("📊 [Expert Service] Statistiques remises à zéro")
+
+    def update_config(self, new_config: Dict[str, Any]):
+        """Met à jour la configuration du service"""
+        self.config.update(new_config)
+        logger.info(f"⚙️ [Expert Service] Configuration mise à jour: {new_config}")
+
+# =============================================================================
+# FONCTIONS UTILITAIRES ET TESTS
+# =============================================================================
+
+async def quick_ask(question: str, language: str = "fr") -> str:
+    """Interface rapide pour poser une question"""
+    service = ExpertService()
+    result = await service.process_question(question, language=language)
+    return result.response
+
+def create_expert_service() -> ExpertService:
+    """Factory pour créer une instance du service"""
+    return ExpertService()
+
+# =============================================================================
+# TESTS INTÉGRÉS
+# =============================================================================
+
+async def test_expert_service():
+    """Tests du service expert unifié"""
+    
+    print("🧪 Tests du Service Expert Unifié")
+    print("=" * 60)
+    
+    service = ExpertService()
+    
+    test_cases = [
+        # Cas précis (devrait donner une réponse spécifique)
+        ("Quel est le poids d'un Ross 308 mâle de 21 jours ?", "precise"),
+        
+        # Cas général (devrait donner une réponse générale + offre de précision)
+        ("Poids normal poulet 22 jours ?", "general"),
+        
+        # Cas clarification (vraiment trop vague)
+        ("Mes poulets vont mal", "clarification"),
+        
+        # Cas santé avec contexte
+        ("Poules 25 semaines font diarrhée depuis 2 jours", "general")
+    ]
+    
+    for question, expected_type in test_cases:
+        print(f"\n📝 Question: {question}")
+        print(f"   🎯 Type attendu: {expected_type}")
+        
+        try:
+            result = await service.process_question(question)
+            status = "✅" if result.success else "❌"
+            print(f"   {status} Type: {result.response_type}")
+            print(f"   ⏱️ Temps: {result.processing_time_ms}ms")
+            print(f"   🎯 Confiance: {result.confidence:.2f}")
             
-            lang_responses = fallback_responses.get(language, fallback_responses["fr"])
-            
-            return {
-                "response": lang_responses["response"],
-                "suggestion": lang_responses["suggestion"],
-                "mode": "fallback_safe_aligned"
-            }
+            if len(result.response) > 100:
+                preview = result.response[:100] + "..."
+            else:
+                preview = result.response
+            print(f"   💬 Réponse: {preview}")
             
         except Exception as e:
-            logger.error(f"❌ [Generate Fallback v4.0.0] Erreur: {e}")
-            return {
-                "response": "Une erreur s'est produite. Veuillez réessayer.",
-                "suggestion": "Reformulez votre question.",
-                "mode": "fallback_error_aligned"
-            }
+            print(f"   ❌ Erreur: {e}")
+    
+    print(f"\n📊 Statistiques finales:")
+    stats = service.get_system_stats()
+    print(f"   Questions traitées: {stats['questions_processed']}")
+    print(f"   Taux de succès: {stats['success_rate_percent']:.1f}%")
+    print(f"   Temps moyen: {stats['performance']['average_processing_time_ms']}ms")
 
-
-# Instance globale du service expert
-try:
-    expert_service = ExpertService()
-    logger.info("🎉 [Expert Services v4.0.0] Service expert global initialisé avec REFACTORISATION COMPLÈTE + GeneralResponseGenerator")
-except Exception as e:
-    logger.error(f"❌ [Expert Services v4.0.0] Erreur initialisation service global: {e}")
-    expert_service = None
-
-# Export des fonctions principales
-__all__ = [
-    'ExpertService',
-    'expert_service',
-    'extract_basic_entities'  # 🆕 Export de la fonction d'extraction basique
-]
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_expert_service())
