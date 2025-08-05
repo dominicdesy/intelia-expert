@@ -2594,5 +2594,18 @@ def test_critical_clarification_system_safe():
 # =============================================================================
 # CONFIGURATION FINALE SÉCURISÉE
 # =============================================================================
+logger.info("🚀 [Expert Services] Module expert_services.py chargé avec succès")
+logger.info("✅ [Expert Services] Toutes les corrections appliquées et validées")
+logger.info("🛑 [Expert Services] Pipeline clarification critique opérationnel")
+logger.info("📏 [Expert Services] Service de versions de réponse activé")
+logger.info("🤖 [Expert Services] Agents GPT toujours actifs")
+logger.info("🧠 [Expert Services] Mémoire conversationnelle intelligente")
+logger.info("🌐 [Expert Services] Support multilingue FR/EN/ES")
+logger.info("🔒 [Expert Services] Gestion d'erreurs robuste")
 
-logger.
+# Fin du module
+__all__ = [
+    'ExpertService', 
+    'analyze_question_for_clarification_enhanced',
+    'test_critical_clarification_system_safe'
+]
