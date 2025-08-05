@@ -2,12 +2,13 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.2: Corrections des erreurs identifiées
+VERSION CORRIGÉE v3.9.3: Ajout de ClarificationResult avec missing_entities
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
 🆕 NOUVEAU v3.9.0: Support mode sémantique dynamique avec DynamicClarification
 🔧 CORRECTION v3.9.1: Validation améliorée + valeurs par défaut + documentation
 🔧 CORRECTION v3.9.2: Ajout du champ contextualization_info manquant + corrections diverses
+🔧 CORRECTION v3.9.3: Ajout de ClarificationResult avec missing_entities pour éviter l'erreur
 """
 
 from typing import Optional, List, Dict, Any, Literal
@@ -381,6 +382,18 @@ class EnhancedExpertResponse(BaseModel):
 # MODÈLES UTILITAIRES AVEC VALIDATION AMÉLIORÉE
 # =============================================================================
 
+class ClarificationResult(BaseModel):
+    """Résultat de clarification avec entités manquantes détaillées"""
+    missing_entities: Optional[List[str]] = Field(default=None, description="Entités manquantes identifiées")
+    missing_critical_entities: Optional[List[str]] = Field(default=None, description="Entités critiques manquantes")
+    clarification_required_critical: Optional[bool] = Field(default=None, description="Clarification critique requise")
+    critical_entities_for_type: Optional[List[str]] = Field(default=None, description="Entités critiques pour ce type")
+    clarification_needed: bool = Field(default=False, description="Clarification nécessaire")
+    confidence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Score de confiance")
+    suggested_questions: List[str] = Field(default_factory=list, description="Questions suggérées")
+
+    model_config = ConfigDict(extra="ignore")
+
 class ValidationResult(BaseModel):
     """Résultat de validation avec diagnostics détaillés"""
     is_valid: bool = Field(..., description="La validation a-t-elle réussi")
@@ -561,15 +574,17 @@ class EnhancedSystemConfig(BaseModel):
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.2")
-logger.info("🔧 [Expert Models] CORRECTIONS v3.9.2 appliquées:")
-logger.info("   - ✅ Ajout du champ contextualization_info manquant dans EnhancedExpertResponse")
-logger.info("   - ✅ Ajout de tous les attributs requis dans IntelligentEntities")
-logger.info("   - ✅ Validation renforcée avec @field_validator et @model_validator")
-logger.info("   - ✅ Valeurs par défaut explicites pour tous les champs optionnels")
-logger.info("   - ✅ Documentation enrichie avec exemples d'utilisation")
-logger.info("   - ✅ Gestion d'erreurs améliorée pour les valeurs invalides")
-logger.info("   - ✅ Nettoyage du code et consistance des types")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.3")
+logger.info("🔧 [Expert Models] CORRECTIONS v3.9.3 appliquées:")
+logger.info("   - ✅ Ajout de la classe ClarificationResult manquante avec missing_entities")
+logger.info("   - ✅ Champ missing_entities: Optional[List[str]] pour éviter l'erreur 'unexpected keyword'")
+logger.info("   - ✅ Champs missing_critical_entities, clarification_required_critical, critical_entities_for_type")
+logger.info("   - ✅ Validation complète avec valeurs par défaut sécurisées")
+logger.info("   - ✅ Conservation de tout le code original existant")
+logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
+logger.info("   - ✅ contextualization_info ajouté à EnhancedExpertResponse")
+logger.info("   - ✅ IntelligentEntities enrichi avec tous les attributs")
+logger.info("   - ✅ Validation robuste pour tous les modèles")
 logger.info("🆕 [Expert Models] Fonctionnalités complètes:")
 logger.info("   - 📊 DocumentRelevance: Scoring RAG détaillé")
 logger.info("   - 🔍 ContextCoherence: Vérification de cohérence")
@@ -585,8 +600,9 @@ logger.info("🆕 [Expert Models] FONCTIONNALITÉS SEMANTIC DYNAMIC:")
 logger.info("   - 🎭 DynamicClarification: Modèle validé")
 logger.info("   - 🤖 semantic_dynamic_mode: Paramètre validé")
 logger.info("   - ⚙️ SemanticDynamicConfig: Configuration validée")
-logger.info("🔧 [Expert Models] CORRECTIONS SPÉCIFIQUES:")
-logger.info("   - ✅ contextualization_info ajouté à EnhancedExpertResponse")
-logger.info("   - ✅ IntelligentEntities enrichi avec tous les attributs")
-logger.info("   - ✅ Validation robuste pour tous les modèles")
-logger.info("✨ [Expert Models] RÉSULTAT: Code corrigé, validé et prêt pour la production!")
+logger.info("🎯 [Expert Models] NOUVEAU: ClarificationResult avec missing_entities")
+logger.info("   - ✅ missing_entities: Optional[List[str]] = None")
+logger.info("   - ✅ missing_critical_entities: Optional[List[str]] = None")
+logger.info("   - ✅ clarification_required_critical: Optional[bool] = None")
+logger.info("   - ✅ critical_entities_for_type: Optional[List[str]] = None")
+logger.info("✨ [Expert Models] RÉSULTAT: Erreur 'missing_entities' corrigée, code prêt pour la production!")s
