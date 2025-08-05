@@ -49,12 +49,7 @@ class ClarificationState(Enum):
 
 @dataclass
 class ExtractedEntities:
-    """
-    Entités extraites intelligemment du contexte avec reconnaissance de souches
-    
-    🔧 MISE À JOUR: Ajout de tous les champs nécessaires pour éviter les erreurs AttributeError
-    """
-    # Champs principaux existants
+    """Entités extraites intelligemment du contexte avec reconnaissance de souches"""
     breed: Optional[str] = None
     breed_type: Optional[str] = None
     sex: Optional[str] = None
@@ -71,50 +66,9 @@ class ExtractedEntities:
     duration_problem: Optional[str] = None
     previous_treatments: Optional[List[str]] = None
     
-    # 🆕 NOUVEAUX CHAMPS REQUIS: Pour éviter AttributeError
-    age: Optional[int] = None  # Alias pour age_days pour compatibilité
-    weight: Optional[float] = None  # Alias pour weight_grams pour compatibilité
-    feed: Optional[str] = None  # Alias pour feed_type pour compatibilité
-    environment: Optional[str] = None  # Informations environnementales générales
-    
-    # Métadonnées d'inférence (existantes)
+    # 🆕 NOUVEAUX CHAMPS: Métadonnées d'inférence
     sex_inferred: Optional[bool] = None  # True si sexe inféré automatiquement
     breed_normalized: Optional[bool] = None  # True si race normalisée automatiquement
-    
-    def __post_init__(self):
-        """
-        🆕 NOUVEAU: Post-traitement pour synchroniser les champs alias
-        """
-        # Synchroniser age et age_days
-        if self.age is not None and self.age_days is None:
-            self.age_days = self.age
-        elif self.age_days is not None and self.age is None:
-            self.age = self.age_days
-        
-        # Synchroniser weight et weight_grams
-        if self.weight is not None and self.weight_grams is None:
-            self.weight_grams = self.weight
-        elif self.weight_grams is not None and self.weight is None:
-            self.weight = self.weight_grams
-        
-        # Synchroniser feed et feed_type
-        if self.feed is not None and self.feed_type is None:
-            self.feed_type = self.feed
-        elif self.feed_type is not None and self.feed is None:
-            self.feed = self.feed_type
-        
-        # Construire environment à partir des données disponibles
-        if self.environment is None:
-            env_parts = []
-            if self.temperature is not None:
-                env_parts.append(f"temp:{self.temperature}°C")
-            if self.humidity is not None:
-                env_parts.append(f"humidité:{self.humidity}%")
-            if self.housing_type is not None:
-                env_parts.append(f"logement:{self.housing_type}")
-            
-            if env_parts:
-                self.environment = ", ".join(env_parts)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire pour logs"""
@@ -150,29 +104,26 @@ class ExtractedEntities:
         elif question_type in ["feeding", "nutrition"]:
             return base_entities + ["feed"]
         elif question_type in ["growth", "weight", "performance"]:
-            return base_entities + ["sex", "weight"]
+            return base_entities + ["sex"]
         else:
             return base_entities
     
     def _has_entity_value(self, entity: str) -> bool:
         """
         🔧 NOUVEAU: Vérifie si une entité a une valeur valide
-        🔧 MISE À JOUR: Support des nouveaux champs alias
         """
         if entity == "breed":
             return bool(self.breed and self.breed_type != "generic")
         elif entity == "age":
-            return bool(self.age_days or self.age_weeks or self.age)
+            return bool(self.age_days or self.age_weeks)
         elif entity == "sex":
             return bool(self.sex)
         elif entity == "symptoms":
             return bool(self.symptoms and len(self.symptoms) > 0)
         elif entity == "environment":
-            return bool(self.temperature or self.housing_type or self.humidity or self.environment)
+            return bool(self.temperature or self.housing_type or self.humidity)
         elif entity == "feed":
-            return bool(self.feed_type or self.feed)
-        elif entity == "weight":
-            return bool(self.weight_grams or self.weight)
+            return bool(self.feed_type)
         else:
             return False
     
@@ -187,9 +138,6 @@ class ExtractedEntities:
         
         for entity in CRITICAL_ENTITIES:
             status[entity] = self._has_entity_value(entity)
-        
-        # Ajouter weight si pertinent
-        status["weight"] = self._has_entity_value("weight")
         
         return status
     
@@ -498,6 +446,5 @@ def get_critical_entities_info() -> Dict[str, str]:
         "sex": "Sexe des animaux (mâle/femelle/mixte)",
         "symptoms": "Symptômes observés pour questions de santé",
         "environment": "Conditions environnementales (température, humidité, logement)",
-        "feed": "Type d'alimentation ou formule nutritionnelle",
-        "weight": "Poids des animaux pour évaluation croissance"
+        "feed": "Type d'alimentation ou formule nutritionnelle"
     }
