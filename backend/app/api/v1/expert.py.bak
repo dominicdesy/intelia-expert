@@ -12,6 +12,7 @@ CONSERVE: Toute la logique originale + propagation champs + clarification intell
 """
 
 import os
+import re
 import logging
 import uuid
 import time
@@ -186,7 +187,6 @@ def _detect_inconsistencies_and_force_clarification(question_text: str, language
         # Si plusieurs unités temporelles avec des valeurs qui pourraient être contradictoires
         if len(temporal_units) >= 2:
             # Recherche de motifs comme "13j" et "1sem"
-            import re
             day_pattern = r'(\d+)\s*j(?:our)?s?'
             week_pattern = r'(\d+)\s*sem(?:aine)?s?'
             
