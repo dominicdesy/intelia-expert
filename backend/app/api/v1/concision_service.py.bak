@@ -56,8 +56,8 @@ class ConcisionService:
                 Pour un oui/non : réponds juste "Oui" ou "Non"
                 Pour une quantité : réponds juste le chiffre avec l'unité
                 """,
-                "max_tokens": 150,    # ✅ Augmenté de 25 à 150
-                "temperature": 0.2    # ✅ Augmenté de 0.1 à 0.2
+                "max_tokens": 25,
+                "temperature": 0.1
             },
             
             ConcisionLevel.CONCISE: {
@@ -66,7 +66,7 @@ class ConcisionService:
                 Évite les conseils non demandés.
                 Exemple : "Le poids normal est de 350-400g à cet âge."
                 """,
-                "max_tokens": 300,    # ✅ Augmenté de 80 à 300
+                "max_tokens": 80,
                 "temperature": 0.2
             },
             
@@ -76,7 +76,7 @@ class ConcisionService:
                 Évite les répétitions et les conseils génériques excessifs.
                 Garde un ton professionnel mais accessible.
                 """,
-                "max_tokens": 600,    # ✅ Augmenté de 200 à 600
+                "max_tokens": 200,
                 "temperature": 0.3
             },
             
@@ -86,7 +86,7 @@ class ConcisionService:
                 les considérations techniques et les recommandations précises.
                 C'est la version de référence complète.
                 """,
-                "max_tokens": 1200,   # ✅ Augmenté de 500 à 1200
+                "max_tokens": 500,
                 "temperature": 0.3
             }
         }
@@ -422,11 +422,6 @@ try:
     logger.info("   - Fallback automatique si erreur LLM")
     logger.info("   - Métriques détaillées de génération")
     logger.info("   - Compatible avec architecture expert_services existante")
-    logger.info("📏 [ConcisionService] Limites de tokens augmentées:")
-    logger.info("   - ULTRA_CONCISE: 25 → 150 tokens")
-    logger.info("   - CONCISE: 80 → 300 tokens")
-    logger.info("   - STANDARD: 200 → 600 tokens")
-    logger.info("   - DETAILED: 500 → 1200 tokens")
 except Exception as e:
     logger.error(f"❌ [ConcisionService] Erreur initialisation: {e}")
     concision_service = None

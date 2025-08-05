@@ -2,7 +2,7 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.4: Ajout des champs manquants enriched_question et weight
+VERSION CORRIGÉE v3.9.5: Ajout des champs manquants + corrections demandées
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
 🆕 NOUVEAU v3.9.0: Support mode sémantique dynamique avec DynamicClarification
@@ -10,6 +10,7 @@ VERSION CORRIGÉE v3.9.4: Ajout des champs manquants enriched_question et weight
 🔧 CORRECTION v3.9.2: Ajout du champ contextualization_info manquant + corrections diverses
 🔧 CORRECTION v3.9.3: Ajout de ClarificationResult avec missing_entities pour éviter l'erreur
 🔧 CORRECTION v3.9.4: Ajout enriched_question dans EnhancedExpertResponse et weight dans IntelligentEntities
+🔧 CORRECTION v3.9.5: Ajout mortality dans IntelligentEntities + champs supplémentaires demandés
 """
 
 from typing import Optional, List, Dict, Any, Literal
@@ -284,7 +285,7 @@ class FeedbackRequest(BaseModel):
     )
 
 # =============================================================================
-# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS
+# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS + CORRECTIONS DEMANDÉES
 # =============================================================================
 
 class EnhancedExpertResponse(BaseModel):
@@ -302,6 +303,7 @@ class EnhancedExpertResponse(BaseModel):
         language="fr",
         response_time_ms=1500,
         mode="standard",
+        enriched_question="Quel est le poids normal d'un poulet de race Ross 308 à 20 jours d'âge?",
         response_versions={
             "ultra_concise": "350-400g",
             "concise": "Le poids normal est de 350-400g à cet âge.",
@@ -316,14 +318,19 @@ class EnhancedExpertResponse(BaseModel):
     question: str = Field(..., description="Question posée par l'utilisateur")
     response: str = Field(..., description="Réponse générée par l'IA")
     conversation_id: str = Field(..., description="ID unique de conversation")
-    rag_used: bool = Field(..., description="RAG utilisé pour cette réponse")
+    rag_used: Optional[bool] = Field(default=None, description="RAG utilisé pour cette réponse")
     timestamp: str = Field(..., description="Timestamp ISO de la réponse")
     language: str = Field(..., description="Langue de la réponse")
     response_time_ms: int = Field(..., ge=0, description="Temps de réponse en millisecondes")
     mode: str = Field(..., description="Mode de traitement utilisé")
     
-    # 🔧 CORRECTION v3.9.4: Ajout du champ enriched_question manquant
+    # 🔧 CORRECTION v3.9.5: Ajout du champ enriched_question demandé
     enriched_question: Optional[str] = Field(default=None, description="Question enrichie par agent_rag_enhancer")
+    
+    # 🔧 CORRECTION v3.9.5: Ajout des champs demandés dans les spécifications
+    clarification_required_critical: Optional[bool] = Field(default=None, description="Clarification critique requise")
+    missing_critical_entities: Optional[List[str]] = Field(default=None, description="Entités critiques manquantes")
+    variants_tested: Optional[List[str]] = Field(default=None, description="Variantes testées par le système")
     
     # Champs optionnels avec valeurs par défaut
     rag_score: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Score de pertinence RAG")
@@ -358,7 +365,7 @@ class EnhancedExpertResponse(BaseModel):
     ai_enhancements_used: List[str] = Field(default_factory=list, description="Améliorations IA utilisées")
     clarification_processing: Optional[Dict[str, Any]] = Field(default=None, description="Métadonnées traitement clarification")
     
-    # 🔧 CORRECTION: Ajout du champ manquant contextualization_info
+    # Ajout du champ manquant contextualization_info
     contextualization_info: Optional[Dict[str, Any]] = Field(default=None, description="Informations de contextualisation")
     
     # Fonctionnalités avancées
@@ -420,11 +427,14 @@ class ProcessingContext(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
-# MODÈLES POUR AMÉLIORER LA MÉMOIRE CONVERSATIONNELLE - CORRECTIONS v3.9.4
+# MODÈLES POUR AMÉLIORER LA MÉMOIRE CONVERSATIONNELLE - CORRECTIONS v3.9.5
 # =============================================================================
 
 class IntelligentEntities(BaseModel):
-    """Entités intelligentes pour améliorer la mémoire conversationnelle"""
+    """
+    Entités intelligentes pour améliorer la mémoire conversationnelle
+    🔧 CORRECTION v3.9.5: Ajout des champs weight et mortality demandés
+    """
     # Attributs existants conservés
     age: Optional[str] = Field(default=None, description="Age de l'animal")
     breed: Optional[str] = Field(default=None, description="Race de l'animal")
@@ -436,14 +446,17 @@ class IntelligentEntities(BaseModel):
     health_status: Optional[str] = Field(default=None, description="État de santé")
     environment_conditions: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Conditions environnementales")
     
-    # 🔧 CORRECTION v3.9.4: Ajout du champ weight manquant identifié dans l'analyse
+    # 🔧 CORRECTION v3.9.5: Ajout des champs demandés dans les spécifications
+    age_in_days: Optional[int] = Field(default=None, description="Age en jours")
+    age_in_weeks: Optional[int] = Field(default=None, description="Age en semaines")
     weight: Optional[float] = Field(default=None, description="Poids de l'animal en grammes")
+    mortality: Optional[float] = Field(default=None, description="Taux de mortalité observé")
     
     # Champs supplémentaires pour compatibilité avec conversation_memory
     temperature: Optional[float] = Field(default=None, description="Température ambiante")
     humidity: Optional[float] = Field(default=None, description="Humidité relative")
     density: Optional[float] = Field(default=None, description="Densité d'élevage")
-    mortality_rate: Optional[float] = Field(default=None, description="Taux de mortalité")
+    mortality_rate: Optional[float] = Field(default=None, description="Taux de mortalité (alias de mortality)")
     growth_rate: Optional[float] = Field(default=None, description="Taux de croissance")
     feed_conversion_ratio: Optional[float] = Field(default=None, description="Indice de consommation")
     
@@ -588,12 +601,16 @@ class EnhancedSystemConfig(BaseModel):
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.4")
-logger.info("🔧 [Expert Models] CORRECTIONS v3.9.4 appliquées:")
-logger.info("   - ✅ Ajout du champ enriched_question: Optional[str] dans EnhancedExpertResponse")
-logger.info("   - ✅ Ajout du champ weight: Optional[float] dans IntelligentEntities")
-logger.info("   - ✅ Ajout de champs additionnels dans IntelligentEntities pour conversation_memory")
-logger.info("   - ✅ Synchronisation complète avec les usages en aval")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.5")
+logger.info("🔧 [Expert Models] CORRECTIONS v3.9.5 appliquées (selon spécifications):")
+logger.info("   - ✅ enriched_question: Optional[str] dans EnhancedExpertResponse")
+logger.info("   - ✅ clarification_required_critical: Optional[bool] dans EnhancedExpertResponse")
+logger.info("   - ✅ missing_critical_entities: Optional[List[str]] dans EnhancedExpertResponse")
+logger.info("   - ✅ variants_tested: Optional[List[str]] dans EnhancedExpertResponse")
+logger.info("   - ✅ age_in_days: Optional[int] dans IntelligentEntities")
+logger.info("   - ✅ age_in_weeks: Optional[int] dans IntelligentEntities")
+logger.info("   - ✅ weight: Optional[float] dans IntelligentEntities")
+logger.info("   - ✅ mortality: Optional[float] dans IntelligentEntities")
 logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
 logger.info("   - ✅ ClarificationResult avec missing_entities pour éviter l'erreur")
 logger.info("   - ✅ contextualization_info ajouté à EnhancedExpertResponse")
@@ -614,9 +631,4 @@ logger.info("🆕 [Expert Models] FONCTIONNALITÉS SEMANTIC DYNAMIC:")
 logger.info("   - 🎭 DynamicClarification: Modèle validé")
 logger.info("   - 🤖 semantic_dynamic_mode: Paramètre validé")
 logger.info("   - ⚙️ SemanticDynamicConfig: Configuration validée")
-logger.info("🎯 [Expert Models] NOUVEAUX CHAMPS v3.9.4:")
-logger.info("   - ✅ enriched_question dans EnhancedExpertResponse (pour agent_rag_enhancer)")
-logger.info("   - ✅ weight dans IntelligentEntities (pour conversation_memory)")
-logger.info("   - ✅ Champs additionnels: temperature, humidity, density, mortality_rate, etc.")
-logger.info("   - ✅ Compatibilité totale avec expert_services et conversation_memory")
-logger.info("✨ [Expert Models] RÉSULTAT: Tous les champs manquants ajoutés, synchronisation complète!")
+logger.info("✨ [Expert Models] RÉSULTAT v3.9.5: Tous les champs demandés ajoutés et synchronisés!")
