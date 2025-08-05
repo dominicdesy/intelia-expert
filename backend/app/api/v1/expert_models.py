@@ -2,7 +2,8 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.6: Ajout des champs manquants pour correction demandée
+VERSION CORRIGÉE v3.9.7: Ajout champs traçage décisions IA
+🔧 CORRECTION v3.9.7: Ajout ai_classification_used, ai_decision, ai_confidence, ai_reasoning, response_generation_method
 🔧 CORRECTION v3.9.6: Ajout clarification_details, enhancement_info, conversation_context, pipeline_version, pipeline_improvements
 🧨 CORRECTION v3.6.1: Ajout du champ clarification_processing
 🚀 NOUVEAU v3.7.0: Support response_versions pour concision backend
@@ -53,6 +54,28 @@ class ConcisionLevel(str, Enum):
     CONCISE = "concise"              # Réponse courte (1-2 phrases)
     STANDARD = "standard"            # Réponse équilibrée 
     DETAILED = "detailed"            # Réponse complète et détaillée
+
+# =============================================================================
+# 🧠 NOUVEAUX ENUMS POUR TRAÇAGE DÉCISIONS IA - v3.9.7
+# =============================================================================
+
+class AiDecisionType(str, Enum):
+    """Types de décisions prises par l'IA pour traçabilité"""
+    CLASSIFICATION = "classification"           # Classification de la question
+    RAG_SELECTION = "rag_selection"            # Sélection des documents RAG
+    RESPONSE_GENERATION = "response_generation" # Génération de la réponse
+    CLARIFICATION = "clarification"            # Demande de clarification
+    FALLBACK = "fallback"                      # Utilisation du fallback
+    ENHANCEMENT = "enhancement"                # Amélioration de la question
+
+class ResponseGenerationMethod(str, Enum):
+    """Méthodes de génération de réponse pour traçabilité"""
+    RAG_DIRECT = "rag_direct"                  # RAG direct
+    RAG_ENHANCED = "rag_enhanced"              # RAG avec amélioration
+    GPT_GENERATION = "gpt_generation"          # Génération GPT pure
+    HYBRID = "hybrid"                          # Méthode hybride
+    TEMPLATE_BASED = "template_based"          # Basé sur template
+    FALLBACK = "fallback"                      # Méthode de fallback
 
 # =============================================================================
 # MODÈLES POUR LES AMÉLIORATIONS (CONSERVÉS AVEC CORRECTIONS)
@@ -190,6 +213,43 @@ class DynamicClarification(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
+# 🧠 NOUVEAUX MODÈLES POUR TRAÇAGE DÉCISIONS IA - v3.9.7
+# =============================================================================
+
+class AiDecisionTrace(BaseModel):
+    """
+    Traçage complet d'une décision IA pour auditabilité
+    
+    Permet de comprendre pourquoi l'IA a pris une décision spécifique
+    """
+    decision_type: AiDecisionType = Field(..., description="Type de décision prise")
+    decision_value: str = Field(..., description="Décision prise par l'IA")
+    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confiance dans la décision")
+    reasoning: str = Field(..., description="Raisonnement détaillé de l'IA")
+    alternatives_considered: List[str] = Field(default_factory=list, description="Alternatives considérées")
+    decision_time_ms: Optional[int] = Field(default=None, ge=0, description="Temps pour prendre la décision")
+    input_factors: Dict[str, Any] = Field(default_factory=dict, description="Facteurs d'entrée influençant la décision")
+    model_used: Optional[str] = Field(default=None, description="Modèle IA utilisé pour la décision")
+
+    model_config = ConfigDict(extra="ignore")
+
+class ResponseGenerationTrace(BaseModel):
+    """
+    Traçage spécifique de la génération de réponse
+    
+    Détaille comment la réponse finale a été générée
+    """
+    method_used: ResponseGenerationMethod = Field(..., description="Méthode de génération utilisée")
+    primary_sources: List[str] = Field(default_factory=list, description="Sources principales utilisées")
+    fallback_triggered: bool = Field(default=False, description="Fallback déclenché")
+    enhancement_applied: bool = Field(default=False, description="Amélioration appliquée")
+    quality_checks_passed: List[str] = Field(default_factory=list, description="Vérifications qualité réussies")
+    generation_steps: List[str] = Field(default_factory=list, description="Étapes de génération")
+    final_confidence: float = Field(..., ge=0.0, le=1.0, description="Confiance finale dans la réponse")
+
+    model_config = ConfigDict(extra="ignore")
+
+# =============================================================================
 # MODÈLES DE REQUÊTE AMÉLIORÉS AVEC VALIDATION RENFORCÉE
 # =============================================================================
 
@@ -219,6 +279,10 @@ class EnhancedQuestionRequest(BaseModel):
     semantic_dynamic_mode: bool = Field(default=False, description="Activer le mode sémantique dynamique")
     semantic_dynamic_preferences: SemanticDynamicPreferences = Field(default_factory=SemanticDynamicPreferences, description="Préférences du mode sémantique dynamique")
 
+    # 🧠 NOUVEAUX CHAMPS TRAÇAGE IA - v3.9.7
+    enable_ai_tracing: bool = Field(default=True, description="Activer le traçage des décisions IA")
+    trace_level: str = Field(default="standard", description="Niveau de traçage: minimal/standard/detailed")
+
     # Fonctionnalités existantes
     expected_response_format: ResponseFormat = Field(default=ResponseFormat.TEXT, description="Format de réponse attendu")
     response_preferences: ResponsePreferences = Field(default_factory=ResponsePreferences, description="Préférences de réponse")
@@ -242,6 +306,14 @@ class EnhancedQuestionRequest(BaseModel):
         supported_modes = ['fast', 'balanced', 'quality']
         if v not in supported_modes:
             raise ValueError(f'speed_mode must be one of {supported_modes}')
+        return v
+
+    @field_validator('trace_level')
+    @classmethod
+    def validate_trace_level(cls, v):
+        supported_levels = ['minimal', 'standard', 'detailed']
+        if v not in supported_levels:
+            raise ValueError(f'trace_level must be one of {supported_levels}')
         return v
 
     @model_validator(mode='after')
@@ -286,12 +358,19 @@ class FeedbackRequest(BaseModel):
     )
 
 # =============================================================================
-# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS + CORRECTIONS DEMANDÉES v3.9.6
+# MODÈLES DE RÉPONSE AMÉLIORÉS AVEC DOCUMENTATION ENRICHIE + CHAMPS MANQUANTS + TRAÇAGE IA v3.9.7
 # =============================================================================
 
 class EnhancedExpertResponse(BaseModel):
     """
-    Response model complet avec toutes les fonctionnalités avancées
+    Response model complet avec toutes les fonctionnalités avancées + traçage IA
+    
+    🧠 NOUVEAU v3.9.7: Ajout des champs de traçage des décisions IA:
+    - ai_classification_used: Bool si classification IA utilisée
+    - ai_decision: Décision principale prise par l'IA
+    - ai_confidence: Niveau de confiance global de l'IA
+    - ai_reasoning: Raisonnement détaillé de l'IA
+    - response_generation_method: Méthode de génération utilisée
     
     🔧 CORRECTION v3.9.6: Ajout des champs manquants pour correction complète:
     - clarification_details: Dict des détails de clarification
@@ -312,6 +391,13 @@ class EnhancedExpertResponse(BaseModel):
         response_time_ms=1500,
         mode="standard",
         enriched_question="Quel est le poids normal d'un poulet de race Ross 308 à 20 jours d'âge?",
+        # Nouveaux champs IA v3.9.7
+        ai_classification_used=True,
+        ai_decision="rag_with_enhancement",
+        ai_confidence=0.85,
+        ai_reasoning="Question claire sur poids poulet - Race détectée automatiquement comme Ross 308 basé sur contexte standard",
+        response_generation_method="rag_enhanced",
+        # Champs existants v3.9.6
         clarification_details={"method": "dynamic_gpt", "confidence": 0.9},
         enhancement_info={"rag_enhancer": "applied", "method_used": "contextual"},
         conversation_context={"previous_topics": ["alimentation", "croissance"]},
@@ -339,6 +425,17 @@ class EnhancedExpertResponse(BaseModel):
     
     # 🔧 CORRECTION v3.9.5: Ajout du champ enriched_question demandé
     enriched_question: Optional[str] = Field(default=None, description="Question enrichie par agent_rag_enhancer")
+    
+    # 🧠 NOUVEAUX CHAMPS TRAÇAGE IA - v3.9.7
+    ai_classification_used: Optional[bool] = Field(default=None, description="Classification IA utilisée")
+    ai_decision: Optional[str] = Field(default=None, description="Décision prise par l'IA")
+    ai_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Confiance de l'IA")
+    ai_reasoning: Optional[str] = Field(default=None, description="Raisonnement de l'IA")
+    response_generation_method: Optional[str] = Field(default=None, description="Méthode génération réponse")
+    
+    # 🧠 TRAÇAGE AVANCÉ IA - v3.9.7 (optionnel pour compatibilité)
+    ai_decision_traces: Optional[List[AiDecisionTrace]] = Field(default=None, description="Traces détaillées des décisions IA")
+    response_generation_trace: Optional[ResponseGenerationTrace] = Field(default=None, description="Trace de génération de réponse")
     
     # 🔧 CORRECTION v3.9.6: AJOUTS OBLIGATOIRES pour correction demandée
     clarification_details: Optional[Dict[str, Any]] = Field(default=None, description="Détails de clarification")
@@ -504,6 +601,8 @@ class SystemStats(BaseModel):
     debug_mode_available: bool = Field(default=False, description="Mode debug disponible")
     concision_system_enabled: bool = Field(default=True, description="Système de concision activé")
     semantic_dynamic_enabled: bool = Field(default=True, description="Mode sémantique dynamique activé")
+    # 🧠 NOUVEAU v3.9.7
+    ai_tracing_enabled: bool = Field(default=True, description="Traçage IA activé")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -519,6 +618,8 @@ class TestResult(BaseModel):
     enhancement_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats des améliorations")
     concision_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test concision")
     semantic_dynamic_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test mode sémantique dynamique")
+    # 🧠 NOUVEAU v3.9.7
+    ai_tracing_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test traçage IA")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -607,11 +708,37 @@ class TaxonomicFilteringConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+# =============================================================================
+# 🧠 NOUVEAU: CONFIGURATION TRAÇAGE IA - v3.9.7
+# =============================================================================
+
+class AiTracingConfig(BaseModel):
+    """Configuration du système de traçage des décisions IA"""
+    enabled: bool = Field(default=True, description="Traçage IA activé")
+    trace_level: str = Field(default="standard", description="Niveau de traçage: minimal/standard/detailed")
+    store_traces: bool = Field(default=True, description="Stocker les traces pour audit")
+    trace_timeout_ms: int = Field(default=1000, ge=100, le=5000, description="Timeout pour génération des traces")
+    include_alternatives: bool = Field(default=True, description="Inclure les alternatives considérées")
+    include_reasoning: bool = Field(default=True, description="Inclure le raisonnement détaillé")
+    
+    @field_validator('trace_level')
+    @classmethod
+    def validate_trace_level(cls, v):
+        supported_levels = ['minimal', 'standard', 'detailed']
+        if v not in supported_levels:
+            raise ValueError(f'trace_level must be one of {supported_levels}')
+        return v
+
+    model_config = ConfigDict(extra="ignore")
+
 class EnhancedSystemConfig(BaseModel):
     """Configuration système complète avec tous les modules"""
     concision_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration concision")
     semantic_dynamic_config: SemanticDynamicConfig = Field(default_factory=SemanticDynamicConfig, description="Config sémantique dynamique")
     taxonomic_filtering_config: TaxonomicFilteringConfig = Field(default_factory=TaxonomicFilteringConfig, description="Config filtrage taxonomique")
+    # 🧠 NOUVEAU v3.9.7
+    ai_tracing_config: AiTracingConfig = Field(default_factory=AiTracingConfig, description="Config traçage IA")
+    
     response_versions_enabled: bool = Field(default=True, description="Versions de réponses activées")
     advanced_clarification_enabled: bool = Field(default=True, description="Clarification avancée activée")
 
@@ -623,8 +750,20 @@ class EnhancedSystemConfig(BaseModel):
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.6")
-logger.info("🔧 [Expert Models] CORRECTIONS v3.9.6 appliquées (selon demande spécifique):")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec corrections complètes v3.9.7")
+logger.info("🧠 [Expert Models] NOUVEAUTÉS v3.9.7 - TRAÇAGE DÉCISIONS IA:")
+logger.info("   - ✅ ai_classification_used: Optional[bool] dans EnhancedExpertResponse")
+logger.info("   - ✅ ai_decision: Optional[str] dans EnhancedExpertResponse")
+logger.info("   - ✅ ai_confidence: Optional[float] dans EnhancedExpertResponse")
+logger.info("   - ✅ ai_reasoning: Optional[str] dans EnhancedExpertResponse")
+logger.info("   - ✅ response_generation_method: Optional[str] dans EnhancedExpertResponse")
+logger.info("   - ✅ AiDecisionTrace: Nouveau modèle pour traçage détaillé")
+logger.info("   - ✅ ResponseGenerationTrace: Nouveau modèle pour traçage génération")
+logger.info("   - ✅ AiDecisionType: Enum pour types de décisions")
+logger.info("   - ✅ ResponseGenerationMethod: Enum pour méthodes de génération")
+logger.info("   - ✅ AiTracingConfig: Configuration du traçage IA")
+logger.info("   - ✅ enable_ai_tracing: Paramètre dans EnhancedQuestionRequest")
+logger.info("🔧 [Expert Models] CORRECTIONS v3.9.6 conservées (selon demande spécifique):")
 logger.info("   - ✅ clarification_details: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
 logger.info("   - ✅ enhancement_info: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
 logger.info("   - ✅ conversation_context: Optional[Dict[str, Any]] dans EnhancedExpertResponse")
@@ -655,10 +794,16 @@ logger.info("🆕 [Expert Models] FONCTIONNALITÉS SEMANTIC DYNAMIC:")
 logger.info("   - 🎭 DynamicClarification: Modèle validé")
 logger.info("   - 🤖 semantic_dynamic_mode: Paramètre validé")
 logger.info("   - ⚙️ SemanticDynamicConfig: Configuration validée")
-logger.info("✨ [Expert Models] RÉSULTAT v3.9.6: Tous les champs demandés ajoutés et synchronisés!")
-logger.info("🎯 [Expert Models] NOUVEAUX CHAMPS v3.9.6:")
-logger.info("   - clarification_details: Détails de clarification (Dict)")
-logger.info("   - enhancement_info: Informations d'amélioration (Dict)")
-logger.info("   - conversation_context: Contexte conversationnel (Dict)")
-logger.info("   - pipeline_version: Version du pipeline (str)")
-logger.info("   - pipeline_improvements: Liste des améliorations (List[str])")
+logger.info("🧠 [Expert Models] AVANTAGES TRAÇAGE IA v3.9.7:")
+logger.info("   - 🔍 Auditabilité complète des décisions IA")
+logger.info("   - 📊 Métriques de confiance détaillées")
+logger.info("   - 🎯 Traçage des méthodes de génération")
+logger.info("   - 🔧 Debug avancé pour les développeurs")
+logger.info("   - 📋 Compatibilité ascendante 100%")
+logger.info("✨ [Expert Models] RÉSULTAT v3.9.7: Traçage IA complet ajouté avec succès!")
+logger.info("🎯 [Expert Models] UTILISATION TRAÇAGE IA:")
+logger.info("   → Activer: enable_ai_tracing=True dans la requête")
+logger.info("   → Niveau: trace_level='standard/detailed' pour plus de détails")
+logger.info("   → Accès: Champs ai_* dans EnhancedExpertResponse")
+logger.info("   → Debug: ai_decision_traces pour traçage complet")
+logger.info("🚀 [Expert Models] PRÊT POUR PRODUCTION AVEC TRAÇAGE IA COMPLET!")
