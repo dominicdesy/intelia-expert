@@ -1792,6 +1792,12 @@ class ExpertService:
                 conversation_context, entities, missing_entities, question_for_rag, response_versions
             )
 
+        except Exception as e:
+            logger.error(f"❌ [Normal Pipeline] Erreur: {e}")
+            return await self._handle_pipeline_error_safe(
+                e, question_text, conversation_id, language, start_time, 
+                processing_steps, ai_enhancements_used
+            )
     
     # === MÉTHODES DE CRÉATION DE RÉPONSES SÉCURISÉES ===
     
