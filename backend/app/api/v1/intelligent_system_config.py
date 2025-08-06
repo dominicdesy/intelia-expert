@@ -7,6 +7,7 @@ intelligent_system_config.py - CONFIGURATION UNIFIÉE DU SYSTÈME INTELLIGENT
 - ✅ Calcul correct: Ross 308 mâle 12j → 380-420g
 - ✅ Nouvelles fonctions pour les clarifications contextuelles
 - ✅ Gestion améliorée des races et variantes
+- ✅ NOUVEAU: Configuration IA intégrée selon le plan de transformation
 
 CENTRALISE: Toute la configuration du nouveau système
 PRINCIPE: Une seule source de vérité pour tous les paramètres
@@ -23,59 +24,181 @@ from enum import Enum
 class SystemBehavior:
     """Configuration du comportement général"""
     
-    # Principe directeur
+    # ✅ CONSERVER: Configuration existante
     ALWAYS_PROVIDE_USEFUL_ANSWER = True
     PRECISION_OFFERS_ENABLED = True
     CLARIFICATION_ONLY_IF_REALLY_NEEDED = True
     
-    # NOUVEAU: Support du contexte conversationnel
+    # ✅ CONSERVER: Support du contexte conversationnel
     ENABLE_CONVERSATIONAL_CONTEXT = True
     CONTEXT_EXPIRY_MINUTES = 10
     ENABLE_CLARIFICATION_DETECTION = True
     
-    # Fallback et récupération d'erreur
+    # ✅ CONSERVER: Fallback et récupération d'erreur
     FALLBACK_ENABLED = True
     FALLBACK_TO_GENERAL_ON_ERROR = True
     MAX_PROCESSING_TIME_MS = 10000  # 10 secondes max
     
-    # Logging et debugging
+    # ✅ CONSERVER: Logging et debugging
     ENABLE_DETAILED_LOGGING = True
     ENABLE_PERFORMANCE_MONITORING = True
     ENABLE_STATS_COLLECTION = True
+    
+    # ✅ NOUVEAU: Configuration IA selon le plan de transformation
+    AI_SERVICES_ENABLED = True
+    AI_FALLBACK_ENABLED = True
+    AI_RESPONSE_TIMEOUT = 10  # secondes
+    AI_CACHE_ENABLED = True
+    AI_CACHE_TTL = 3600  # 1 heure
+    
+    # Configuration des services IA individuels
+    AI_ENTITY_EXTRACTION_ENABLED = True
+    AI_CONTEXT_ENHANCEMENT_ENABLED = True
+    AI_RESPONSE_GENERATION_ENABLED = True
+    AI_VALIDATION_SERVICE_ENABLED = True
+    
+    # Configuration du pipeline unifié IA
+    UNIFIED_AI_PIPELINE_ENABLED = True
+    AI_PIPELINE_TIMEOUT = 15  # seconds pour pipeline complet
+    AI_PARALLEL_PROCESSING = True  # Traitement parallèle des services IA
 
 class DecisionThresholds:
     """Seuils pour les décisions de classification"""
     
-    # Seuils de confiance pour chaque type de réponse
+    # ✅ CONSERVER: Seuils de confiance pour chaque type de réponse
     CONFIDENCE_THRESHOLD_PRECISE = 0.85    # Réponse précise
     CONFIDENCE_THRESHOLD_GENERAL = 0.60    # Réponse générale
     CONFIDENCE_THRESHOLD_CLARIFICATION = 0.40  # Clarification
-    CONFIDENCE_THRESHOLD_CONTEXTUAL = 0.90    # NOUVEAU: Réponse contextuelle
+    CONFIDENCE_THRESHOLD_CONTEXTUAL = 0.90    # Réponse contextuelle
     
-    # Critères pour réponse précise
+    # ✅ CONSERVER: Critères pour réponse précise
     MIN_ENTITIES_FOR_PRECISE = 2  # race + âge, ou race + sexe, etc.
     REQUIRED_ENTITIES_PRECISE = ["breed_specific"]  # Au minimum une race spécifique
     
-    # Critères pour réponse générale  
+    # ✅ CONSERVER: Critères pour réponse générale  
     MIN_ENTITIES_FOR_GENERAL = 1  # Au moins un contexte utile
     MAX_MISSING_ENTITIES_FOR_GENERAL = 2  # Maximum 2 entités manquantes
     
-    # Critères pour clarification forcée
+    # ✅ CONSERVER: Critères pour clarification forcée
     MAX_QUESTION_WORDS_FOR_CLARIFICATION = 4  # Questions trop courtes
     MIN_CONTEXT_FOR_USEFUL_RESPONSE = 1  # Minimum de contexte
     
-    # NOUVEAU: Critères pour contexte conversationnel
+    # ✅ CONSERVER: Critères pour contexte conversationnel
     MIN_CONTEXT_FRESHNESS_MINUTES = 10  # Contexte valide 10 minutes
     ENABLE_ENTITY_INHERITANCE = True    # Hériter entités du contexte
+    
+    # ✅ NOUVEAU: Seuils spécifiques aux services IA
+    AI_CONFIDENCE_THRESHOLD = 0.8  # Confiance minimum pour utiliser IA
+    AI_ENTITY_EXTRACTION_CONFIDENCE = 0.75  # Confiance extraction entités IA
+    AI_CONTEXT_ENHANCEMENT_CONFIDENCE = 0.70  # Confiance amélioration contexte IA
+    AI_RESPONSE_GENERATION_CONFIDENCE = 0.80  # Confiance génération réponse IA
+    AI_VALIDATION_CONFIDENCE = 0.85  # Confiance validation IA
+    
+    # Seuils de fallback vers système classique
+    AI_FALLBACK_THRESHOLD = 0.5  # En dessous de ce seuil, utiliser fallback
+    AI_ERROR_THRESHOLD = 3  # Nombre d'erreurs IA avant fallback temporaire
 
 # =============================================================================
-# DONNÉES DE RÉFÉRENCE - POIDS ET PERFORMANCES (AMÉLIORÉES)
+# NOUVELLE CONFIGURATION IA SELON LE PLAN DE TRANSFORMATION
+# =============================================================================
+
+class AIServiceConfig:
+    """Configuration des services IA"""
+    
+    # Configuration OpenAI
+    OPENAI_MODEL = "gpt-4o-mini"  # Modèle pour la production
+    OPENAI_MAX_TOKENS = 2000
+    OPENAI_TEMPERATURE = 0.1  # Peu de créativité, maximum de précision
+    OPENAI_TIMEOUT = 30  # Timeout par appel API
+    
+    # Rate limiting
+    OPENAI_MAX_REQUESTS_PER_MINUTE = 100
+    OPENAI_MAX_TOKENS_PER_MINUTE = 50000
+    
+    # Cache et performance
+    AI_RESPONSE_CACHE_SIZE = 1000  # Nombre de réponses en cache
+    AI_CACHE_COMPRESSION_ENABLED = True
+    AI_METRICS_COLLECTION_ENABLED = True
+    
+    # Configuration par service
+    ENTITY_EXTRACTOR_CONFIG = {
+        "model": "gpt-4o-mini",
+        "temperature": 0.0,  # Maximum de précision pour l'extraction
+        "max_tokens": 500,
+        "timeout": 10
+    }
+    
+    CONTEXT_ENHANCER_CONFIG = {
+        "model": "gpt-4o-mini", 
+        "temperature": 0.2,  # Légère créativité pour l'amélioration
+        "max_tokens": 800,
+        "timeout": 15
+    }
+    
+    RESPONSE_GENERATOR_CONFIG = {
+        "model": "gpt-4o-mini",
+        "temperature": 0.3,  # Créativité modérée pour les réponses
+        "max_tokens": 1500,
+        "timeout": 20
+    }
+    
+    VALIDATION_SERVICE_CONFIG = {
+        "model": "gpt-4o-mini",
+        "temperature": 0.0,  # Maximum de précision pour la validation
+        "max_tokens": 300,
+        "timeout": 8
+    }
+
+class AIFallbackConfig:
+    """Configuration du système de fallback IA"""
+    
+    # Stratégies de fallback
+    FALLBACK_STRATEGY = "graceful"  # graceful, immediate, hybrid
+    MAX_AI_RETRIES = 2  # Nombre de tentatives avant fallback
+    FALLBACK_TIMEOUT = 5  # Timeout avant activation fallback
+    
+    # Monitoring et récupération
+    AI_HEALTH_CHECK_INTERVAL = 60  # Vérification santé services (secondes)
+    AI_RECOVERY_COOLDOWN = 300  # Temps avant réessayer après échec (secondes)
+    
+    # Préservation du code existant
+    PRESERVE_CLASSIC_PATTERNS = True  # Conserver patterns regex comme backup
+    PRESERVE_RULE_BASED_CLASSIFICATION = True  # Conserver règles classification
+    PRESERVE_TEMPLATE_SYSTEM = True  # Conserver templates d'urgence
+    
+    # Fallback progressif
+    ENABLE_PROGRESSIVE_FALLBACK = True  # Fallback service par service
+    PARTIAL_AI_PROCESSING = True  # Permettre traitement hybride IA + classique
+
+class UnifiedPipelineConfig:
+    """Configuration du pipeline unifié IA"""
+    
+    # Architecture du pipeline
+    PIPELINE_MODE = "async"  # async, sync, hybrid
+    ENABLE_PARALLEL_PROCESSING = True  # Traitement parallèle des services
+    MAX_CONCURRENT_AI_CALLS = 5  # Nombre max d'appels IA simultanés
+    
+    # Orchestration des services
+    SERVICE_ORCHESTRATION = {
+        "entity_extraction": {"priority": 1, "required": True},
+        "context_enhancement": {"priority": 2, "required": False},
+        "response_generation": {"priority": 3, "required": True},
+        "validation": {"priority": 4, "required": False}
+    }
+    
+    # Coordination et cohérence
+    INTER_SERVICE_VALIDATION = True  # Validation cohérence entre services
+    PIPELINE_RESULT_VALIDATION = True  # Validation finale du pipeline
+    ENABLE_PIPELINE_CACHING = True  # Cache des résultats pipeline complet
+
+# =============================================================================
+# DONNÉES DE RÉFÉRENCE - POIDS ET PERFORMANCES (CONSERVÉES)
 # =============================================================================
 
 class ReferenceData:
     """Données de référence pour les calculs de performance"""
     
-    # Poids de référence par race, âge et sexe (en grammes)
+    # ✅ CONSERVER INTÉGRALEMENT: Poids de référence par race, âge et sexe (en grammes)
     WEIGHT_STANDARDS = {
         "ross_308": {
             7: {"male": (180, 220), "female": (160, 200), "mixed": (170, 210)},
@@ -111,7 +234,7 @@ class ReferenceData:
         }
     }
     
-    # NOUVEAU: Mapping des variantes de noms de races
+    # ✅ CONSERVER: Mapping des variantes de noms de races
     BREED_NAME_MAPPING = {
         "ross 308": "ross_308",
         "ross308": "ross_308", 
@@ -127,20 +250,20 @@ class ReferenceData:
         "poulet": "standard_broiler"
     }
     
-    # Différences mâles/femelles en pourcentage
+    # ✅ CONSERVER: Différences mâles/femelles en pourcentage
     MALE_FEMALE_WEIGHT_DIFFERENCE = {
         "male_bonus_percent": 12,  # Mâles +12% en moyenne
         "female_penalty_percent": 10  # Femelles -10% en moyenne
     }
     
-    # Tolérances pour les alertes
+    # ✅ CONSERVER: Tolérances pour les alertes
     WEIGHT_TOLERANCES = {
         "normal_range_percent": 15,    # ±15% = normal
         "alert_threshold_percent": 20,  # ±20% = alerte
         "critical_threshold_percent": 30  # ±30% = critique
     }
     
-    # Races reconnues et leurs catégories
+    # ✅ CONSERVER: Races reconnues et leurs catégories
     BREED_CATEGORIES = {
         "heavy_broilers": ["ross_308", "cobb_500", "arbor_acres"],
         "standard_broilers": ["hubbard", "standard_broiler"],
@@ -149,13 +272,13 @@ class ReferenceData:
     }
 
 # =============================================================================
-# TEMPLATES DE MESSAGES STANDARDISÉS (AMÉLIORÉS)
+# TEMPLATES DE MESSAGES STANDARDISÉS (CONSERVÉS + ENRICHIS)
 # =============================================================================
 
 class MessageTemplates:
     """Templates standardisés pour tous les messages"""
     
-    # Messages d'offre de précision
+    # ✅ CONSERVER: Messages d'offre de précision
     PRECISION_OFFERS = {
         "fr": {
             "breed_missing": "Précisez la **race/souche** (Ross 308, Cobb 500, Hubbard...) pour une réponse plus spécifique",
@@ -175,7 +298,7 @@ class MessageTemplates:
         }
     }
     
-    # Messages de clarification par contexte
+    # ✅ CONSERVER: Messages de clarification par contexte
     CLARIFICATION_TEMPLATES = {
         "fr": {
             "performance": """Pour vous donner des informations précises sur les performances, j'ai besoin de :
@@ -227,7 +350,7 @@ class MessageTemplates:
 
 💡 Plus votre question est précise, plus ma réponse sera adaptée !""",
 
-            # NOUVEAU: Template pour réponse contextuelle
+            # ✅ CONSERVER: Template pour réponse contextuelle
             "contextual_success": """🔗 **Clarification détectée - Réponse basée sur le contexte de notre conversation**
 
 {contextual_response}
@@ -236,7 +359,7 @@ class MessageTemplates:
         }
     }
     
-    # Messages d'erreur et fallback
+    # ✅ CONSERVER + ENRICHIR: Messages d'erreur et fallback
     FALLBACK_MESSAGES = {
         "fr": {
             "technical_error": """Je rencontre une difficulté technique pour analyser votre question.
@@ -254,10 +377,21 @@ class MessageTemplates:
             
             "no_context": "Je n'ai pas assez d'informations pour vous aider. Pouvez-vous préciser votre question avec plus de contexte ?",
             
-            # NOUVEAU: Messages pour contexte
+            # ✅ CONSERVER: Messages pour contexte
             "context_expired": "Le contexte de notre conversation a expiré. Pouvez-vous repréciser votre question complète ?",
             
-            "context_error": "Erreur lors de la récupération du contexte conversationnel. Posez votre question complète."
+            "context_error": "Erreur lors de la récupération du contexte conversationnel. Posez votre question complète.",
+            
+            # ✅ NOUVEAU: Messages spécifiques aux erreurs IA
+            "ai_service_unavailable": "Les services IA sont temporairement indisponibles. Je traite votre question avec le système classique.",
+            
+            "ai_timeout": "Le traitement IA a pris trop de temps. Voici une réponse basée sur notre système classique :",
+            
+            "ai_low_confidence": "La réponse IA n'est pas suffisamment fiable. Voici une réponse basée sur nos données vérifiées :",
+            
+            "ai_partial_failure": "Certains services IA sont indisponibles. Traitement hybride en cours...",
+            
+            "ai_recovery_mode": "🔄 Services IA en récupération. Réponse basée sur le système classique fiable."
         },
         "en": {
             "technical_error": """I'm experiencing a technical difficulty analyzing your question.
@@ -273,18 +407,28 @@ class MessageTemplates:
             
             "question_too_short": "Your question seems incomplete. Could you provide more details about your situation?",
             
-            "no_context": "I don't have enough information to help you. Could you clarify your question with more context?"
+            "no_context": "I don't have enough information to help you. Could you clarify your question with more context?",
+            
+            "ai_service_unavailable": "AI services are temporarily unavailable. Processing your question with the classic system.",
+            
+            "ai_timeout": "AI processing took too long. Here's an answer based on our classic system:",
+            
+            "ai_low_confidence": "AI response confidence is insufficient. Here's an answer based on our verified data:",
+            
+            "ai_partial_failure": "Some AI services are unavailable. Hybrid processing in progress...",
+            
+            "ai_recovery_mode": "🔄 AI services recovering. Answer based on reliable classic system."
         }
     }
 
 # =============================================================================
-# CONFIGURATION AVANCÉE
+# CONFIGURATION AVANCÉE (CONSERVÉE + ENRICHIE)
 # =============================================================================
 
 class AdvancedConfig:
     """Configuration avancée du système"""
     
-    # Extraction d'entités
+    # ✅ CONSERVER: Extraction d'entités
     ENTITY_EXTRACTION = {
         "enable_fuzzy_matching": True,  # Correspondance approximative
         "min_confidence_entity": 0.7,   # Confiance minimum pour une entité
@@ -292,41 +436,51 @@ class AdvancedConfig:
         "max_entities_per_question": 10   # Maximum d'entités à extraire
     }
     
-    # Classification intelligente
+    # ✅ CONSERVER: Classification intelligente
     SMART_CLASSIFICATION = {
         "enable_learning": False,  # Apprentissage automatique (désactivé pour simplicité)
         "confidence_adjustment": True,  # Ajustement dynamique de confiance
         "context_weight": 0.3,     # Poids du contexte dans la décision
         "entity_completeness_weight": 0.7,  # Poids de la complétude des entités
-        "enable_contextual_classification": True  # NOUVEAU: Classification contextuelle
+        "enable_contextual_classification": True  # Classification contextuelle
     }
     
-    # Génération de réponse
+    # ✅ CONSERVER: Génération de réponse
     RESPONSE_GENERATION = {
         "enable_dynamic_templates": True,  # Templates dynamiques
         "max_response_length": 2000,      # Longueur maximum de réponse
         "include_examples": True,         # Inclure des exemples
         "include_precision_offers": True,  # Inclure offres de précision
         "format_with_emojis": True,       # Formatage avec emojis
-        "enable_contextual_responses": True  # NOUVEAU: Réponses contextuelles
+        "enable_contextual_responses": True  # Réponses contextuelles
     }
     
-    # Performance et monitoring
+    # ✅ CONSERVER: Performance et monitoring
     PERFORMANCE = {
         "cache_responses": False,     # Cache des réponses (désactivé pour simplicité)
         "log_all_interactions": True, # Logger toutes les interactions
         "collect_analytics": True,    # Collecter des analytics
         "alert_on_errors": True,      # Alertes en cas d'erreur
-        "enable_context_monitoring": True  # NOUVEAU: Monitoring du contexte
+        "enable_context_monitoring": True  # Monitoring du contexte
+    }
+    
+    # ✅ NOUVEAU: Configuration monitoring IA
+    AI_MONITORING = {
+        "track_ai_performance": True,  # Suivi performance IA
+        "track_fallback_usage": True,  # Suivi utilisation fallbacks
+        "track_cost_optimization": True,  # Suivi optimisation coûts
+        "alert_on_ai_failures": True,  # Alertes échecs IA
+        "collect_ai_metrics": True,    # Collecte métriques IA
+        "enable_a_b_testing": False,   # Test A/B IA vs classique (désactivé)
     }
 
 # =============================================================================
-# FONCTIONS UTILITAIRES DE CONFIGURATION (AMÉLIORÉES)
+# FONCTIONS UTILITAIRES DE CONFIGURATION (CONSERVÉES INTÉGRALEMENT)
 # =============================================================================
 
 def normalize_breed_name(breed: str) -> str:
     """
-    NOUVEAU: Normalise le nom d'une race selon le mapping
+    ✅ CONSERVER: Normalise le nom d'une race selon le mapping
     
     Args:
         breed: Nom de race brut
@@ -352,7 +506,7 @@ def normalize_breed_name(breed: str) -> str:
 
 def get_weight_range(breed: str, age_days: int, sex: str = "mixed") -> Tuple[int, int]:
     """
-    🔧 FONCTION CORRIGÉE: Récupère la fourchette de poids avec interpolation linéaire précise
+    ✅ CONSERVER: Fonction corrigée - Récupère la fourchette de poids avec interpolation linéaire précise
     
     Args:
         breed: Nom de la race (Ross 308, Cobb 500, etc.)
@@ -365,7 +519,7 @@ def get_weight_range(breed: str, age_days: int, sex: str = "mixed") -> Tuple[int
     Example:
         get_weight_range("Ross 308", 12, "male") → (380, 420)
     """
-    # NOUVEAU: Normaliser le nom de race
+    # Normaliser le nom de race
     breed_key = normalize_breed_name(breed)
     
     # Vérifier si la race existe
@@ -388,7 +542,7 @@ def get_weight_range(breed: str, age_days: int, sex: str = "mixed") -> Tuple[int
         weight_range = breed_data[age_days].get(sex, breed_data[age_days]["mixed"])
         return weight_range
     
-    # 🔧 CORRECTION: Interpolation linéaire précise pour âges intermédiaires
+    # Interpolation linéaire précise pour âges intermédiaires
     
     # Trouver les âges encadrants
     lower_age = None
@@ -416,7 +570,7 @@ def get_weight_range(breed: str, age_days: int, sex: str = "mixed") -> Tuple[int
         factor = age_days / closest_age
         return (int(weight_range[0] * factor), int(weight_range[1] * factor))
     
-    # 🎯 INTERPOLATION LINÉAIRE PRÉCISE
+    # Interpolation linéaire précise
     if lower_age == upper_age:  # Âge exact trouvé
         weight_range = breed_data[lower_age].get(sex, breed_data[lower_age]["mixed"])
         return weight_range
@@ -436,7 +590,7 @@ def get_weight_range(breed: str, age_days: int, sex: str = "mixed") -> Tuple[int
 
 def get_precision_offer_message(missing_entities: List[str], language: str = "fr") -> str:
     """
-    Génère le message d'offre de précision selon les entités manquantes
+    ✅ CONSERVER: Génère le message d'offre de précision selon les entités manquantes
     
     Args:
         missing_entities: Liste des entités manquantes
@@ -469,7 +623,7 @@ def get_precision_offer_message(missing_entities: List[str], language: str = "fr
 
 def get_clarification_template(context_type: str, language: str = "fr") -> str:
     """
-    Récupère le template de clarification pour un type de contexte
+    ✅ CONSERVER: Récupère le template de clarification pour un type de contexte
     
     Args:
         context_type: Type de contexte (performance, health, feeding, general)
@@ -483,10 +637,10 @@ def get_clarification_template(context_type: str, language: str = "fr") -> str:
 
 def get_fallback_message(error_type: str, language: str = "fr") -> str:
     """
-    Récupère un message de fallback selon le type d'erreur
+    ✅ CONSERVER + ENRICHIR: Récupère un message de fallback selon le type d'erreur
     
     Args:
-        error_type: Type d'erreur (technical_error, question_too_short, no_context)
+        error_type: Type d'erreur (technical_error, question_too_short, no_context, ai_*)
         language: Langue du message
         
     Returns:
@@ -496,12 +650,12 @@ def get_fallback_message(error_type: str, language: str = "fr") -> str:
     return messages.get(error_type, messages["technical_error"])
 
 def is_breed_recognized(breed_name: str) -> bool:
-    """Vérifie si une race est reconnue dans le système"""
+    """✅ CONSERVER: Vérifie si une race est reconnue dans le système"""
     normalized = normalize_breed_name(breed_name)
     return normalized in ReferenceData.WEIGHT_STANDARDS
 
 def get_breed_category(breed_name: str) -> str:
-    """Retourne la catégorie d'une race"""
+    """✅ CONSERVER: Retourne la catégorie d'une race"""
     breed_key = normalize_breed_name(breed_name)
     
     for category, breeds in ReferenceData.BREED_CATEGORIES.items():
@@ -512,7 +666,7 @@ def get_breed_category(breed_name: str) -> str:
 
 def validate_weight_range(weight: float, breed: str, age_days: int, sex: str = "mixed") -> Dict[str, Any]:
     """
-    Valide si un poids est dans la fourchette normale
+    ✅ CONSERVER: Valide si un poids est dans la fourchette normale
     
     Returns:
         Dict avec status (normal/alert/critical) et détails
@@ -533,12 +687,12 @@ def validate_weight_range(weight: float, breed: str, age_days: int, sex: str = "
         return {"status": "critical", "message": f"Écart critique de {deviation_percent:.1f}% - Consultation recommandée"}
 
 # =============================================================================
-# NOUVELLES FONCTIONS POUR LE CONTEXTE CONVERSATIONNEL
+# FONCTIONS CONTEXTUELLES (CONSERVÉES)
 # =============================================================================
 
 def get_contextual_response_template(context_details: str, language: str = "fr") -> str:
     """
-    NOUVEAU: Génère un template pour les réponses contextuelles
+    ✅ CONSERVER: Génère un template pour les réponses contextuelles
     
     Args:
         context_details: Détails du contexte utilisé
@@ -552,7 +706,7 @@ def get_contextual_response_template(context_details: str, language: str = "fr")
 
 def calculate_weight_with_sex_adjustment(base_range: Tuple[int, int], sex: str) -> Tuple[int, int]:
     """
-    NOUVEAU: Ajuste une fourchette de poids selon le sexe
+    ✅ CONSERVER: Ajuste une fourchette de poids selon le sexe
     
     Args:
         base_range: Fourchette de base (mixed)
@@ -578,7 +732,7 @@ def calculate_weight_with_sex_adjustment(base_range: Tuple[int, int], sex: str) 
 
 def get_interpolation_debug_info(breed: str, age_days: int, sex: str = "mixed") -> Dict[str, Any]:
     """
-    NOUVEAU: Retourne les informations de debug pour l'interpolation
+    ✅ CONSERVER: Retourne les informations de debug pour l'interpolation
     
     Args:
         breed: Race
@@ -620,12 +774,117 @@ def get_interpolation_debug_info(breed: str, age_days: int, sex: str = "mixed") 
     }
 
 # =============================================================================
-# FONCTION DE TEST POUR VALIDATION
+# NOUVELLES FONCTIONS UTILITAIRES IA
+# =============================================================================
+
+def get_ai_service_config(service_name: str) -> Dict[str, Any]:
+    """
+    ✅ NOUVEAU: Récupère la configuration d'un service IA spécifique
+    
+    Args:
+        service_name: Nom du service (entity_extractor, context_enhancer, etc.)
+        
+    Returns:
+        Configuration du service
+    """
+    config_map = {
+        "entity_extractor": AIServiceConfig.ENTITY_EXTRACTOR_CONFIG,
+        "context_enhancer": AIServiceConfig.CONTEXT_ENHANCER_CONFIG,
+        "response_generator": AIServiceConfig.RESPONSE_GENERATOR_CONFIG,
+        "validation_service": AIServiceConfig.VALIDATION_SERVICE_CONFIG
+    }
+    
+    return config_map.get(service_name, AIServiceConfig.ENTITY_EXTRACTOR_CONFIG)
+
+def should_use_ai_service(service_name: str, confidence: float = None) -> bool:
+    """
+    ✅ NOUVEAU: Détermine si un service IA doit être utilisé
+    
+    Args:
+        service_name: Nom du service IA
+        confidence: Confiance optionnelle pour la décision
+        
+    Returns:
+        True si le service IA doit être utilisé
+    """
+    if not SystemBehavior.AI_SERVICES_ENABLED:
+        return False
+    
+    # Vérifications spécifiques par service
+    service_checks = {
+        "entity_extractor": SystemBehavior.AI_ENTITY_EXTRACTION_ENABLED,
+        "context_enhancer": SystemBehavior.AI_CONTEXT_ENHANCEMENT_ENABLED,
+        "response_generator": SystemBehavior.AI_RESPONSE_GENERATION_ENABLED,
+        "validation_service": SystemBehavior.AI_VALIDATION_SERVICE_ENABLED
+    }
+    
+    if not service_checks.get(service_name, True):
+        return False
+    
+    # Vérification de confiance si fournie
+    if confidence is not None:
+        threshold = DecisionThresholds.AI_CONFIDENCE_THRESHOLD
+        return confidence >= threshold
+    
+    return True
+
+def get_ai_fallback_strategy() -> str:
+    """
+    ✅ NOUVEAU: Récupère la stratégie de fallback IA actuelle
+    
+    Returns:
+        Stratégie de fallback (graceful, immediate, hybrid)
+    """
+    return AIFallbackConfig.FALLBACK_STRATEGY
+
+def is_ai_service_healthy(service_name: str) -> bool:
+    """
+    ✅ NOUVEAU: Vérifie la santé d'un service IA
+    
+    Args:
+        service_name: Nom du service à vérifier
+        
+    Returns:
+        True si le service est sain
+    """
+    # Implémentation simple - pourrait être enrichie avec monitoring réel
+    return SystemBehavior.AI_SERVICES_ENABLED and should_use_ai_service(service_name)
+
+def get_pipeline_service_priority(service_name: str) -> int:
+    """
+    ✅ NOUVEAU: Récupère la priorité d'un service dans le pipeline
+    
+    Args:
+        service_name: Nom du service
+        
+    Returns:
+        Priorité du service (plus bas = plus prioritaire)
+    """
+    return UnifiedPipelineConfig.SERVICE_ORCHESTRATION.get(
+        service_name, {}
+    ).get("priority", 999)
+
+def is_service_required_in_pipeline(service_name: str) -> bool:
+    """
+    ✅ NOUVEAU: Détermine si un service est requis dans le pipeline
+    
+    Args:
+        service_name: Nom du service
+        
+    Returns:
+        True si le service est requis
+    """
+    return UnifiedPipelineConfig.SERVICE_ORCHESTRATION.get(
+        service_name, {}
+    ).get("required", False)
+
+# =============================================================================
+# FONCTION DE TEST POUR VALIDATION (CONSERVÉE)
 # =============================================================================
 
 def test_weight_calculations():
     """
-    NOUVEAU: Teste les calculs de poids pour validation
+    ✅ CONSERVER: Teste les calculs de poids pour validation
     """
     test_cases = [
         # Test cas Ross 308 mâle 12 jours (le cas problématique)
@@ -675,8 +934,40 @@ def test_weight_calculations():
     else:
         print(f"  ❌ PROBLÈME: {result[0]}-{result[1]}g (devrait être 380-420g)")
 
+def test_ai_configuration():
+    """
+    ✅ NOUVEAU: Teste la configuration IA
+    """
+    print("\n🤖 Test de la configuration IA")
+    print("=" * 60)
+    
+    # Test des services IA
+    services = ["entity_extractor", "context_enhancer", "response_generator", "validation_service"]
+    
+    for service in services:
+        enabled = should_use_ai_service(service)
+        config = get_ai_service_config(service)
+        priority = get_pipeline_service_priority(service)
+        required = is_service_required_in_pipeline(service)
+        
+        print(f"\n{service}:")
+        print(f"  Activé: {'✅' if enabled else '❌'}")
+        print(f"  Modèle: {config.get('model', 'N/A')}")
+        print(f"  Priorité: {priority}")
+        print(f"  Requis: {'✅' if required else '❌'}")
+    
+    # Test stratégie de fallback
+    strategy = get_ai_fallback_strategy()
+    print(f"\nStratégie de fallback: {strategy}")
+    
+    # Test santé des services
+    print(f"\nSanté des services:")
+    for service in services:
+        healthy = is_ai_service_healthy(service)
+        print(f"  {service}: {'✅ Sain' if healthy else '❌ Problème'}")
+
 # =============================================================================
-# CONFIGURATION GLOBALE EXPORTÉE
+# CONFIGURATION GLOBALE EXPORTÉE (ENRICHIE)
 # =============================================================================
 
 # Configuration principale utilisée par le système
@@ -685,12 +976,19 @@ INTELLIGENT_SYSTEM_CONFIG = {
     "thresholds": DecisionThresholds,
     "reference_data": ReferenceData,
     "templates": MessageTemplates,
-    "advanced": AdvancedConfig
+    "advanced": AdvancedConfig,
+    # ✅ NOUVEAU: Configuration IA
+    "ai_services": AIServiceConfig,
+    "ai_fallback": AIFallbackConfig,
+    "ai_pipeline": UnifiedPipelineConfig
 }
 
-# Export des fonctions utilitaires principales
+# Export des fonctions utilitaires principales (conservées + enrichies)
 __all__ = [
+    # Configuration
     'INTELLIGENT_SYSTEM_CONFIG',
+    
+    # ✅ CONSERVER: Fonctions existantes
     'get_weight_range',
     'get_precision_offer_message', 
     'get_clarification_template',
@@ -702,9 +1000,19 @@ __all__ = [
     'get_contextual_response_template',
     'calculate_weight_with_sex_adjustment',
     'get_interpolation_debug_info',
-    'test_weight_calculations'
+    'test_weight_calculations',
+    
+    # ✅ NOUVEAU: Fonctions IA
+    'get_ai_service_config',
+    'should_use_ai_service',
+    'get_ai_fallback_strategy',
+    'is_ai_service_healthy',
+    'get_pipeline_service_priority',
+    'is_service_required_in_pipeline',
+    'test_ai_configuration'
 ]
 
 if __name__ == "__main__":
     # Lancer les tests si exécuté directement
     test_weight_calculations()
+    test_ai_configuration()

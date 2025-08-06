@@ -8,6 +8,13 @@ app/api/v1/general_response_generator.py - GÉNÉRATEUR DE RÉPONSES GÉNÉRALES
 ✅ Intégration données techniques avicoles
 ✅ Gestion robuste des erreurs avec fallbacks intelligents
 ✅ Optimisé pour réponses utiles même avec informations partielles
+
+🆕 MODIFICATIONS - INTÉGRATION IA + FALLBACK:
+- ✅ Intégration AIResponseGenerator en priorité
+- ✅ Fallback robuste vers templates classiques conservés
+- ✅ Gestion d'erreurs centralisée avec monitoring
+- ✅ Pipeline unifié avec le nouveau système IA
+- ✅ Conservation complète du code original comme backup
 """
 
 import logging
@@ -26,11 +33,24 @@ except ImportError:
     openai = None
     OpenAI = None
 
+# 🆕 NOUVEAU: Import des services IA avec fallback
+try:
+    from .ai_response_generator import AIResponseGenerator, ResponseData
+    AI_RESPONSE_GENERATOR_AVAILABLE = True
+except ImportError:
+    AI_RESPONSE_GENERATOR_AVAILABLE = False
+    logging.warning("AIResponseGenerator non disponible - utilisation templates classiques")
+
 logger = logging.getLogger(__name__)
 
 class GeneralResponseGenerator:
     """
     Générateur de réponses générales avec IA
+    
+    🆕 NOUVEAU: Pipeline IA + fallback intelligent
+    - Priorité: AIResponseGenerator pour génération intelligente
+    - Fallback: Templates classiques conservés intacts
+    - Robustesse: Gestion complète des erreurs
     
     Crée des réponses utiles avec fourchettes et standards
     pour questions qui n'ont pas besoin de clarification.
@@ -41,25 +61,51 @@ class GeneralResponseGenerator:
         self.client = None
         self.available = False
         
-        # Statistiques pour monitoring
+        # 🆕 NOUVEAU: Intégration du générateur IA
+        self.ai_generator = None
+        self.ai_available = False
+        self._initialize_ai_generator()
+        
+        # Statistiques pour monitoring (enrichies)
         self.stats = {
             "total_generations": 0,
             "successful_generations": 0,
+            "ai_generations": 0,        # 🆕 NOUVEAU: Compteur IA
             "fallback_used": 0,
+            "emergency_fallback": 0,    # 🆕 NOUVEAU: Compteur urgence
             "average_response_length": 0,
-            "topics_covered": {}
+            "topics_covered": {},
+            "ai_success_rate": 0.0,     # 🆕 NOUVEAU: Taux succès IA
+            "generation_methods": {}    # 🆕 NOUVEAU: Méthodes utilisées
         }
         
-        # Templates de fallback par sujet
+        # Templates de fallback par sujet (CONSERVÉS intacts)
         self.fallback_templates = self._initialize_fallback_templates()
         
-        # Initialiser OpenAI
+        # Initialiser OpenAI (CONSERVÉ pour backward compatibility)
         self._initialize_openai()
         
-        logger.info(f"🤖 [General Response Generator] Initialisé - Disponible: {self.available}")
+        logger.info(f"🤖 [General Response Generator] Initialisé - IA: {self.ai_available}, OpenAI: {self.available}")
+    
+    def _initialize_ai_generator(self) -> bool:
+        """🆕 NOUVEAU: Initialise le générateur IA"""
+        try:
+            if not AI_RESPONSE_GENERATOR_AVAILABLE:
+                logger.warning("⚠️ [General Response] AIResponseGenerator non disponible")
+                return False
+            
+            self.ai_generator = AIResponseGenerator()
+            self.ai_available = True
+            logger.info("✅ [General Response] AIResponseGenerator initialisé")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ [General Response] Erreur initialisation IA: {e}")
+            self.ai_available = False
+            return False
     
     def _initialize_openai(self) -> bool:
-        """Initialise le client OpenAI"""
+        """CONSERVÉ: Initialise le client OpenAI (pour backward compatibility)"""
         try:
             if not OPENAI_AVAILABLE:
                 logger.warning("⚠️ [General Response] OpenAI non disponible")
@@ -76,13 +122,19 @@ class GeneralResponseGenerator:
             return True
             
         except Exception as e:
-            logger.error(f"❌ [General Response] Erreur initialisation: {e}")
+            logger.error(f"❌ [General Response] Erreur initialisation OpenAI: {e}")
             self.available = False
             return False
     
     async def generate_general_response(self, question: str, entities: Dict[str, Any], classification: Dict[str, Any], language: str = "fr") -> str:
         """
         Génère une réponse générale basée sur la classification IA
+        
+        🆕 NOUVEAU: Pipeline IA intégré avec fallback robuste
+        1. Priorité: Nouveau AIResponseGenerator
+        2. Fallback 1: Code original avec améliorations IA
+        3. Fallback 2: Templates classiques
+        4. Fallback 3: Réponse d'urgence
         
         Args:
             question: Question originale de l'utilisateur
@@ -98,6 +150,29 @@ class GeneralResponseGenerator:
         self.stats["total_generations"] += 1
         
         try:
+            # 🆕 PRIORITÉ 1: Nouveau générateur IA
+            if self.ai_available:
+                try:
+                    logger.info("🤖 [General Response] Tentative génération avec AIResponseGenerator")
+                    
+                    ai_response = await self.ai_generator.generate_general_response(
+                        question=question,
+                        merged_entities=entities,
+                        conversation_context=classification.get("context", ""),
+                        language=language
+                    )
+                    
+                    if ai_response and isinstance(ai_response, ResponseData) and len(ai_response.content) > 50:
+                        self.stats["ai_generations"] += 1
+                        self.stats["successful_generations"] += 1
+                        self._update_stats(ai_response.content, "ai_generated")
+                        logger.info("✅ [General Response] Réponse générée par IA")
+                        return ai_response.content
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ [General Response] Échec AIResponseGenerator: {e}")
+            
+            # 🔄 FALLBACK 1: Code original avec améliorations IA (CONSERVÉ)
             # Si l'IA de classification a déjà suggéré une réponse, la valider et potentiellement l'améliorer
             if classification.get("suggested_general_response") and len(classification["suggested_general_response"]) > 50:
                 logger.info("🤖 [General Response] Utilisation réponse suggérée par classificateur")
@@ -114,14 +189,14 @@ class GeneralResponseGenerator:
                 self._update_stats(suggested_response, "suggested_direct")
                 return suggested_response
             
-            # Générer nouvelle réponse avec IA
+            # 🔄 FALLBACK 2: Génération classique avec IA (CONSERVÉ)
             if self.available:
                 generated_response = await self._generate_with_ai(question, entities, classification, language)
                 if generated_response:
-                    self._update_stats(generated_response, "ai_generated")
+                    self._update_stats(generated_response, "ai_generated_legacy")
                     return generated_response
             
-            # Fallback intelligent basé sur le sujet
+            # 🔄 FALLBACK 3: Templates intelligents (CONSERVÉ)
             fallback_response = self._generate_fallback_response(question, entities, language)
             self._update_stats(fallback_response, "fallback")
             return fallback_response
@@ -129,10 +204,38 @@ class GeneralResponseGenerator:
         except Exception as e:
             logger.error(f"❌ [General Response] Erreur génération: {e}")
             self.stats["fallback_used"] += 1
+            self.stats["emergency_fallback"] += 1
             return self._generate_emergency_fallback(question, language)
     
+    # 🆕 NOUVEAU: Méthode pour réponse générale simple (compatible avec AIResponseGenerator)
+    async def generate_simple_response(self, question: str, entities: Dict[str, Any], language: str = "fr") -> str:
+        """
+        🆕 NOUVEAU: Interface simplifiée pour le nouveau pipeline IA
+        
+        Args:
+            question: Question de l'utilisateur
+            entities: Entités extraites
+            language: Langue de génération
+            
+        Returns:
+            str: Réponse générée
+        """
+        # Créer une classification minimale pour compatibilité
+        minimal_classification = {
+            "decision": "general_answer",
+            "confidence": 0.8,
+            "missing_for_precision": [],
+            "context": ""
+        }
+        
+        return await self.generate_general_response(question, entities, minimal_classification, language)
+    
+    # =====================================================================
+    # MÉTHODES CONSERVÉES INTACTES (pour backward compatibility)
+    # =====================================================================
+    
     async def _enhance_suggested_response(self, suggested_response: str, question: str, entities: Dict[str, Any], language: str) -> Optional[str]:
-        """Améliore une réponse suggérée par le classificateur"""
+        """CONSERVÉ: Améliore une réponse suggérée par le classificateur"""
         
         prompt = self._build_enhancement_prompt(suggested_response, question, entities, language)
         
@@ -161,8 +264,8 @@ class GeneralResponseGenerator:
             logger.warning(f"⚠️ [General Response] Erreur amélioration: {e}")
             return None
     
-    async def _generate_with_ai(self, question: str, entities: Dict[str, Any], classification: Dict[str, Any], language: str) -> Optional[str]:
-        """Génère une réponse complète avec IA"""
+    async def _generate_with_ai(self, question: str, entities: Dict[str, Any], classification: Dict[str, Any], language: str = "fr") -> Optional[str]:
+        """CONSERVÉ: Génère une réponse complète avec IA"""
         
         prompt = self._build_generation_prompt(question, entities, classification, language)
         
@@ -193,7 +296,7 @@ class GeneralResponseGenerator:
             return None
     
     def _build_generation_prompt(self, question: str, entities: Dict[str, Any], classification: Dict[str, Any], language: str) -> str:
-        """Construit le prompt de génération selon la langue et le contexte"""
+        """CONSERVÉ: Construit le prompt de génération selon la langue et le contexte"""
         
         entities_text = self._format_entities_for_prompt(entities, language)
         missing_info = ", ".join(classification.get("missing_for_precision", []))
@@ -256,7 +359,7 @@ Genera la respuesta ahora:"""
         return prompts.get(language, prompts["fr"])
     
     def _build_enhancement_prompt(self, suggested_response: str, question: str, entities: Dict[str, Any], language: str) -> str:
-        """Construit prompt pour améliorer une réponse suggérée"""
+        """CONSERVÉ: Construit prompt pour améliorer une réponse suggérée"""
         
         prompts = {
             "fr": f"""Améliore cette réponse en la rendant plus complète et professionnelle:
@@ -292,7 +395,7 @@ Hazla más completa y útil (200-350 palabras):"""
         return prompts.get(language, prompts["fr"])
     
     def _get_system_message(self, language: str) -> str:
-        """Messages système selon la langue"""
+        """CONSERVÉ: Messages système selon la langue"""
         
         messages = {
             "fr": "Tu es un vétérinaire avicole expert qui génère des réponses générales précises, utiles et professionnelles. Tu donnes toujours des informations pratiques avec des fourchettes de valeurs standard et des conseils concrets.",
@@ -305,7 +408,7 @@ Hazla más completa y útil (200-350 palabras):"""
         return messages.get(language, messages["fr"])
     
     def _generate_fallback_response(self, question: str, entities: Dict[str, Any], language: str = "fr") -> str:
-        """Génère une réponse fallback intelligente basée sur le sujet"""
+        """CONSERVÉ: Génère une réponse fallback intelligente basée sur le sujet"""
         
         topic = self._detect_topic(question, language)
         template = self.fallback_templates[language].get(topic, self.fallback_templates[language]["general"])
@@ -326,7 +429,7 @@ Hazla más completa y útil (200-350 palabras):"""
             return template
     
     def _generate_emergency_fallback(self, question: str, language: str = "fr") -> str:
-        """Fallback d'urgence minimal"""
+        """CONSERVÉ: Fallback d'urgence minimal"""
         
         emergency_responses = {
             "fr": f"Je comprends votre question sur '{question}'. Pour vous donner la réponse la plus précise possible, j'aurais besoin de connaître la race, l'âge et le sexe de vos animaux. Cependant, je peux vous dire que les standards varient généralement selon ces paramètres. N'hésitez pas à consulter un vétérinaire pour des conseils personnalisés.",
@@ -339,7 +442,7 @@ Hazla más completa y útil (200-350 palabras):"""
         return emergency_responses.get(language, emergency_responses["fr"])
     
     def _detect_topic(self, question: str, language: str = "fr") -> str:
-        """Détecte le sujet principal de la question"""
+        """CONSERVÉ: Détecte le sujet principal de la question"""
         
         question_lower = question.lower()
         
@@ -360,7 +463,7 @@ Hazla más completa y útil (200-350 palabras):"""
         return "général"
     
     def _format_entities_for_prompt(self, entities: Dict[str, Any], language: str = "fr") -> str:
-        """Formate les entités pour les prompts"""
+        """CONSERVÉ: Formate les entités pour les prompts"""
         
         if not entities:
             return {"fr": "Aucune", "en": "None", "es": "Ninguna"}.get(language, "Aucune")
@@ -380,7 +483,7 @@ Hazla más completa y útil (200-350 palabras):"""
         return ", ".join(parts) if parts else "Partielles"
     
     def _initialize_fallback_templates(self) -> Dict[str, Dict[str, str]]:
-        """Initialise les templates de fallback par sujet et langue"""
+        """CONSERVÉ: Initialise les templates de fallback par sujet et langue"""
         
         return {
             "fr": {
@@ -409,35 +512,55 @@ Hazla más completa y útil (200-350 palabras):"""
         }
     
     def _update_stats(self, response: str, method: str) -> None:
-        """Met à jour les statistiques"""
+        """🆕 AMÉLIORÉ: Met à jour les statistiques avec nouvelles métriques"""
         
-        if method != "fallback":
+        if method not in ["fallback", "emergency_fallback"]:
             self.stats["successful_generations"] += 1
         else:
             self.stats["fallback_used"] += 1
+        
+        # Compter les méthodes utilisées
+        if method in self.stats["generation_methods"]:
+            self.stats["generation_methods"][method] += 1
+        else:
+            self.stats["generation_methods"][method] = 1
         
         # Longueur moyenne
         current_avg = self.stats["average_response_length"]
         total = self.stats["total_generations"]
         new_length = len(response)
         self.stats["average_response_length"] = ((current_avg * (total - 1)) + new_length) / total
+        
+        # 🆕 NOUVEAU: Taux de succès IA
+        if self.stats["total_generations"] > 0:
+            self.stats["ai_success_rate"] = self.stats["ai_generations"] / self.stats["total_generations"]
     
     def get_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques"""
+        """🆕 AMÉLIORÉ: Retourne les statistiques enrichies"""
         return {
             **self.stats,
-            "availability": self.available,
+            "availability": {
+                "ai_generator": self.ai_available,
+                "openai_direct": self.available
+            },
             "model": self.model,
-            "success_rate": self.stats["successful_generations"] / max(1, self.stats["total_generations"])
+            "success_rate": self.stats["successful_generations"] / max(1, self.stats["total_generations"]),
+            "generation_pipeline": {
+                "ai_generator_priority": self.ai_available,
+                "fallback_levels": ["ai_generator", "openai_enhancement", "openai_direct", "templates", "emergency"],
+                "current_primary": "ai_generator" if self.ai_available else "openai_direct" if self.available else "templates"
+            }
         }
 
-# Instance globale
+# Instance globale (CONSERVÉE)
 general_response_generator = GeneralResponseGenerator()
 
-# Fonction utilitaire
+# Fonction utilitaire (CONSERVÉE + améliorée)
 async def generate_general_response(question: str, entities: Dict[str, Any], classification: Dict[str, Any], language: str = "fr") -> str:
     """
     Fonction utilitaire pour génération de réponse générale
+    
+    🆕 AMÉLIORÉ: Support du nouveau pipeline IA avec fallback robuste
     
     Usage:
         response = await generate_general_response(
@@ -448,4 +571,17 @@ async def generate_general_response(question: str, entities: Dict[str, Any], cla
     """
     return await general_response_generator.generate_general_response(question, entities, classification, language)
 
-logger.info("🤖 [General Response Generator] Module de génération de réponses générales chargé")
+# 🆕 NOUVELLE fonction utilitaire simplifiée pour le pipeline IA
+async def generate_simple_general_response(question: str, entities: Dict[str, Any], language: str = "fr") -> str:
+    """
+    🆕 NOUVEAU: Interface simplifiée pour le nouveau pipeline IA
+    
+    Usage:
+        response = await generate_simple_general_response(
+            "Poids poulet Ross 308 mâle 19 jours",
+            {"breed": "Ross 308", "age_in_days": 19, "sex": "mâle"}
+        )
+    """
+    return await general_response_generator.generate_simple_response(question, entities, language)
+
+logger.info("🤖 [General Response Generator] Module de génération de réponses générales chargé avec intégration IA")

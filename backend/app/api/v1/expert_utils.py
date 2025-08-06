@@ -10,6 +10,7 @@ Fonctions utilitaires nécessaires pour le bon fonctionnement du système expert
 🚀 INTÉGRÉ: Centralisation via clarification_entities
 🚀 AJOUTÉ: score_question_variant() pour scoring générique des variantes
 🚀 AJOUTÉ: convert_legacy_entities() pour normalisation des entités anciennes
+🚀 MODIFIÉ: Selon Plan de Transformation du Projet - Phase 1 Normalisation
 """
 
 import re
@@ -47,18 +48,25 @@ except ImportError as e:
 
 # =============================================================================
 # NOUVELLES FONCTIONS POUR NORMALISATION DES ENTITÉS (PHASE 1)
+# 🚀 AJOUT selon Plan de Transformation: Fonctions d'aide pour la normalisation
 # =============================================================================
 
 def convert_legacy_entities(old_entities: Dict) -> Dict:
     """
     Convertit les anciennes entités vers le format normalisé
     🚀 NOUVEAU: Support pour la normalisation des entités legacy
+    🎯 PHASE 1: Fonction d'aide selon spécifications Plan de Transformation
     
     Args:
         old_entities: Anciennes entités au format variable
         
     Returns:
         Dict: Entités normalisées avec clés standardisées
+        
+    Example:
+        >>> old = {"race": "Ross 308", "âge": "25 jours", "sexe": "mâle"}
+        >>> convert_legacy_entities(old)
+        {'breed': 'ross 308', 'age_days': 25, 'sex': 'males'}
     """
     try:
         if not old_entities or not isinstance(old_entities, dict):
@@ -157,12 +165,18 @@ def convert_legacy_entities(old_entities: Dict) -> Dict:
 def validate_normalized_entities(entities: Dict) -> Dict[str, Any]:
     """
     Valide que les entités sont dans le format normalisé attendu
+    🚀 NOUVEAU: Fonction d'aide pour validation selon Plan de Transformation
     
     Args:
         entities: Entités à valider
         
     Returns:
         Dict: Résultat de validation avec suggestions de correction
+        
+    Example:
+        >>> entities = {"breed": "ross 308", "age_days": 25, "sex": "males"}
+        >>> validate_normalized_entities(entities)
+        {'valid': True, 'normalization_score': 1.0, ...}
     """
     if not isinstance(entities, dict):
         return {
@@ -263,13 +277,20 @@ def validate_normalized_entities(entities: Dict) -> Dict[str, Any]:
 def merge_entities_intelligently(primary_entities: Dict, secondary_entities: Dict) -> Dict:
     """
     Fusionne intelligemment deux dictionnaires d'entités en priorisant les plus fiables
+    🚀 NOUVEAU: Fusion intelligente selon Plan de Transformation
     
     Args:
         primary_entities: Entités prioritaires (plus fiables)
         secondary_entities: Entités secondaires (fallback)
         
     Returns:
-        Dict: Entités fusionnées
+        Dict: Entités fusionnées avec métadonnées
+        
+    Example:
+        >>> primary = {"breed": "ross 308", "sex": "males"}
+        >>> secondary = {"age_days": 25, "sex": "females"}
+        >>> merge_entities_intelligently(primary, secondary)
+        {'breed': 'ross 308', 'sex': 'males', 'age_days': 25, ...}
     """
     if not primary_entities and not secondary_entities:
         return {}
@@ -831,6 +852,7 @@ def extract_conversation_context(conversation_history: List[Dict[str, Any]], max
 def score_question_variant(variant: str, entities: Dict[str, Any]) -> float:
     """
     Score une variante de question en fonction des entités présentes
+    🚀 NOUVEAU: Scoring générique des variantes
     
     Args:
         variant: La variante de question à scorer
@@ -1318,7 +1340,7 @@ logger.info("🚀 [Expert Utils] NOUVEAU: merge_entities_intelligently() - Fusio
 logger.info("✅ [Expert Utils] CORRECTIONS APPLIQUÉES:")
 logger.info("   - Type annotations améliorées")
 logger.info("   - Gestion des exceptions renforcée")
-logger.info("   - Validation des paramètres None-safe")
+logger.info("   - Validation des paramètres None-safety")
 logger.info("   - Gestion des erreurs regex")
 logger.info("   - Validation des types d'entrée")
 logger.info("   - Support normalisation entités legacy")
@@ -1327,6 +1349,7 @@ logger.info("   - Fusion intelligente entités multiples")
 if CLARIFICATION_ENTITIES_AVAILABLE:
     logger.info("   ✅ clarification_entities: normalize_breed_name, infer_sex_from_breed")
 else:
-    logger.info("   ⚠️ clarification_entities: Mode fallback actif")
+    logger.info("   ⚠️ clarification_entities: Mode fallback activ")
 logger.info("✨ [Expert Utils] Toutes les dépendances expert.py et expert_services.py satisfaites!")
-logger.info("🎯 [Expert Utils] PHASE 1 NORMALISATION: Fonctions ajoutées selon spécifications améliorations!")
+logger.info("🎯 [Expert Utils] PHASE 1 NORMALISATION: Fonctions ajoutées selon spécifications Plan de Transformation!")
+logger.info("🔧 [Expert Utils] MODIFIÉ selon Plan de Transformation du Projet - Améliorations intégrées!")
