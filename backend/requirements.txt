@@ -1,4 +1,4 @@
-# 🔧 REQUIREMENTS.TXT - VERSION ULTRA-SIMPLIFIÉE
+# 🔧 REQUIREMENTS.TXT - VERSION CORRIGÉE TORCH UINT64
 
 # Core FastAPI
 fastapi==0.104.1
@@ -18,28 +18,39 @@ passlib[bcrypt]==1.7.4
 # OpenAI
 openai==1.3.8
 
-# RAG System
-huggingface_hub==0.19.4
-sentence-transformers==2.2.2
-transformers==4.36.2
-torch==2.1.2
-torchvision==0.16.2
-faiss-cpu==1.7.4
-numpy==1.24.4
+# RAG System - VERSIONS CORRIGÉES POUR torch.uint64
+# ✅ MODIFIÉ: torch>=2.2.0 pour supporter torch.uint64
+torch==2.2.2
+torchvision==0.17.2
+# ✅ MODIFIÉ: transformers compatible avec torch 2.2
+transformers==4.40.0
+# ✅ MODIFIÉ: sentence-transformers compatible
+sentence-transformers==2.7.0
+# ✅ Autres dépendances mises à jour
+huggingface_hub==0.23.0
+safetensors==0.4.3
+faiss-cpu==1.8.0
+numpy==1.26.4
 
 # Utils
 python-dotenv==1.0.0
 aiofiles==23.2.1
 toml==0.10.2
 
-# ML libs
-scikit-learn==1.3.2
-scipy==1.11.4
+# ML libs - Versions compatibles avec torch 2.2
+scikit-learn==1.4.2
+scipy==1.13.0
 tqdm==4.66.1
-pillow==10.1.0
+pillow==10.3.0
 
 # Requests
 requests==2.31.0
 
-# 🔧 SUPPRIMÉ: typing-extensions et autres dépendances conflictuelles
-# Pip les installera automatiquement avec les bonnes versions
+# 🔧 CHANGEMENTS CRITIQUES:
+# - torch: 2.1.2 → 2.2.2 (pour torch.uint64)
+# - torchvision: 0.16.2 → 0.17.2 (compatible torch 2.2)
+# - transformers: 4.36.2 → 4.40.0 (compatible torch 2.2)
+# - sentence-transformers: 2.2.2 → 2.7.0 (meilleure compatibilité)
+# - safetensors: ajouté 0.4.3 (gestion torch.uint64)
+# - faiss-cpu: 1.7.4 → 1.8.0 (performance améliorée)
+# - numpy: 1.24.4 → 1.26.4 (compatible torch 2.2)
