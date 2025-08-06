@@ -1,13 +1,16 @@
 """
-smart_classifier_v4.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + FALLBACK ROBUSTE
+smart_classifier.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + FALLBACK ROBUSTE
 
-🎯 AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
+🎯 VERSION CORRIGÉE - Nom de classe fixé pour compatibilité
+
+AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
 - ✅ Intégration IA pour classification intelligente
 - ✅ Système de fallback robuste vers règles existantes
 - ✅ Conservation du code original comme backup
 - ✅ Pipeline hybride IA + règles hardcodées
 - ✅ Validation contextuelle avec ContextManager
 - ✅ Correction du bug "contexte utile"
+- 🔧 CORRECTION: Classe renommée SmartClassifier (plus EnhancedSmartClassifier)
 
 Architecture hybride selon plan:
 1. PRIORITÉ: Classification IA pour comprendre l'intention
@@ -47,8 +50,8 @@ class ClassificationResult:
     fallback_used: bool = False  # 🆕 Indicateur fallback
     context_source: str = "unknown"  # 🆕 Source du contexte
 
-class EnhancedSmartClassifier:
-    """Classifier intelligent avec IA OpenAI selon plan de transformation"""
+class SmartClassifier:
+    """🔧 CORRIGÉ: Classifier intelligent avec IA OpenAI selon plan de transformation"""
     
     def __init__(self, openai_client=None, db_path: str = "conversations.db", context_manager=None):
         self.db_path = db_path
@@ -65,7 +68,7 @@ class EnhancedSmartClassifier:
         # 🔧 Conservation du code original comme fallback
         self._initialize_classic_rules()
         
-        logger.info(f"🤖 [Enhanced Classifier v4] IA: {self.use_ai} | ContextManager: {context_manager is not None}")
+        logger.info(f"🤖 [SmartClassifier] IA: {self.use_ai} | ContextManager: {context_manager is not None}")
 
     def _initialize_classic_rules(self):
         """🔧 CONSERVATION: Initialise les règles classiques comme backup"""
@@ -606,9 +609,9 @@ Réponds en JSON strict:
             "recommandation_fusion": "utiliser_entites_actuelles"
         }
 
-# =============================================================================
-# MÉTHODES DE COMPATIBILITÉ (conservation de l'interface existante)
-# =============================================================================
+    # =============================================================================
+    # MÉTHODES DE COMPATIBILITÉ (conservation de l'interface existante)
+    # =============================================================================
 
     async def classify_question(self, question: str, entities: Dict[str, Any], 
                               conversation_context: Optional[Dict] = None,
@@ -619,11 +622,38 @@ Réponds en JSON strict:
         )
 
 # =============================================================================
-# EXEMPLE D'UTILISATION AVEC LE NOUVEAU SYSTÈME
+# FONCTION DE COMPATIBILITÉ POUR LES IMPORTS
 # =============================================================================
 
-async def demo_enhanced_classifier_v4():
-    """Démo du classifier amélioré v4 selon plan de transformation"""
+def quick_classify(question: str, entities: Dict[str, Any]) -> ClassificationResult:
+    """Fonction rapide de classification pour compatibilité"""
+    classifier = SmartClassifier()
+    # Version synchrone simplifiée 
+    return classifier._classify_with_rules_enhanced(question, entities)
+
+# =============================================================================
+# EXPORTS POUR COMPATIBILITÉ
+# =============================================================================
+
+__all__ = [
+    'SmartClassifier',
+    'ClassificationResult', 
+    'ResponseType',
+    'quick_classify'
+]
+
+logger.info("✅ [SmartClassifier] Module initialisé")
+logger.info("   - Classe: SmartClassifier (nom corrigé)")
+logger.info("   - Support IA: OpenAI GPT-4")
+logger.info("   - Fallback: Règles améliorées")
+logger.info("   - Exports: SmartClassifier, ClassificationResult, ResponseType")
+
+# =============================================================================
+# EXEMPLE D'UTILISATION AVEC LE SYSTÈME CORRIGÉ
+# =============================================================================
+
+async def demo_smart_classifier():
+    """Démo du classifier corrigé selon plan de transformation"""
     
     # Initialisation avec client OpenAI + ContextManager
     import openai
@@ -642,7 +672,7 @@ async def demo_enhanced_classifier_v4():
             }
     
     context_manager = MockContextManager()
-    classifier = EnhancedSmartClassifier(
+    classifier = SmartClassifier(
         openai_client=client, 
         context_manager=context_manager
     )
@@ -668,4 +698,4 @@ async def demo_enhanced_classifier_v4():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(demo_enhanced_classifier_v4())
+    asyncio.run(demo_smart_classifier())
