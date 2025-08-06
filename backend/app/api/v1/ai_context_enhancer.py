@@ -536,4 +536,146 @@ Réponds en JSON:
                 }
             }
             
+        except Exception as e:
+            logger.error(f"❌ [AI Context Enhancer] Erreur classification enhancement: {e}")
+            return {
+                "enhanced_question": question,
+                "context_confidence": 0.0,
+                "has_references": False,
+                "merged_entities": {},
+                "classification_hints": {
+                    "likely_contextual": False,
+                    "needs_clarification": True,
+                    "has_sufficient_context": False
+                }
+            }
+
+# =============================================================================
+# INSTANCES GLOBALES ET FACTORY FUNCTIONS
+# =============================================================================
+
+# Instance globale pour réutilisation
+_ai_context_enhancer_instance = None
+
+def get_ai_context_enhancer() -> AIContextEnhancer:
+    """Factory function pour récupérer l'instance singleton"""
+    global _ai_context_enhancer_instance
+    
+    if _ai_context_enhancer_instance is None:
+        _ai_context_enhancer_instance = AIContextEnhancer()
+        logger.info("🤖 [AI Context Enhancer] Instance singleton créée")
+    
+    return _ai_context_enhancer_instance
+
+# =============================================================================
+# FONCTIONS DE COMPATIBILITÉ AVEC L'ANCIEN SYSTÈME  
+# =============================================================================
+
+async def enhance_question_for_rag_legacy(question: str, context: str = "") -> str:
+    """
+    Fonction de compatibilité avec l'ancien système RAG
+    
+    Args:
+        question: Question à enrichir
+        context: Contexte conversationnel
         
+    Returns:
+        Question enrichie pour la recherche RAG
+    """
+    try:
+        enhancer = get_ai_context_enhancer()
+        enhanced_context = await enhancer.enhance_question_for_rag(
+            original_question=question,
+            conversation_context=context
+        )
+        return enhanced_context.rag_optimized_query
+        
+    except Exception as e:
+        logger.warning(f"⚠️ [Legacy RAG Enhancement] Erreur: {e}")
+        return question
+
+async def analyze_contextual_references_legacy(question: str, history: str = "") -> Dict[str, Any]:
+    """
+    Fonction de compatibilité pour l'analyse des références contextuelles
+    
+    Args:
+        question: Question à analyser
+        history: Historique conversationnel
+        
+    Returns:
+        Dictionnaire avec les références détectées
+    """
+    try:
+        enhancer = get_ai_context_enhancer()
+        analysis = await enhancer.analyze_conversational_context(
+            current_question=question,
+            conversation_history=history
+        )
+        
+        return {
+            "has_references": analysis.references_detected,
+            "referenced_entities": analysis.context_entities,
+            "confidence": analysis.confidence,
+            "missing_context": analysis.missing_context,
+            "reasoning": analysis.reasoning
+        }
+        
+    except Exception as e:
+        logger.warning(f"⚠️ [Legacy Context Analysis] Erreur: {e}")
+        return {
+            "has_references": False,
+            "referenced_entities": {},
+            "confidence": 0.0,
+            "missing_context": [],
+            "reasoning": f"Erreur: {e}"
+        }
+
+# =============================================================================
+# TESTS ET VALIDATION
+# =============================================================================
+
+async def test_ai_context_enhancer():
+    """Tests intégrés pour valider le fonctionnement"""
+    
+    logger.info("🧪 Tests AI Context Enhancer")
+    logger.info("=" * 50)
+    
+    enhancer = get_ai_context_enhancer()
+    
+    test_cases = [
+        {
+            "question": "Leur poids à 21 jours ?",
+            "context": "Conversation précédente: Ross 308 mâles, problèmes de croissance",
+            "expected_enhancement": True
+        },
+        {
+            "question": "Quel est le poids normal des Ross 308 à 21 jours ?",
+            "context": "",
+            "expected_enhancement": False
+        },
+        {
+            "question": "Et pour les femelles ?",
+            "context": "Discussion sur les mâles Cobb 500 de 14 jours",
+            "expected_enhancement": True
+        }
+    ]
+    
+    for i, case in enumerate(test_cases, 1):
+        try:
+            logger.info(f"\n🧪 Test {i}: '{case['question']}'")
+            
+            enhanced_context = await enhancer.enhance_question_for_rag(
+                original_question=case["question"],
+                conversation_context=case["context"]
+            )
+            
+            logger.info(f"   ✅ Question enrichie: '{enhanced_context.enhanced_question}'")
+            logger.info(f"   ✅ Confiance: {enhanced_context.enhancement_confidence:.2f}")
+            logger.info(f"   ✅ Entités fusionnées: {len(enhanced_context.merged_entities)}")
+            
+        except Exception as e:
+            logger.error(f"   ❌ Erreur test {i}: {e}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_ai_context_enhancer())
