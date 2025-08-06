@@ -33,6 +33,9 @@ from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, Test
 from .expert_services import ExpertService
 from .expert_utils import get_user_id_from_request, extract_breed_and_sex_from_clarification
 
+# 🔧 CORRECTION CRITIQUE: Définir le logger AVANT tout usage
+logger = logging.getLogger(__name__)
+
 # 🆕 NOUVEAUX IMPORTS v3.8.0: Modules de normalisation
 try:
     from .entity_normalizer import EntityNormalizer
@@ -59,7 +62,6 @@ except ImportError:
     logger.warning("⚠️ [Debug] ContextManager non disponible - phase 3 pas encore déployée")
 
 router = APIRouter(tags=["expert-debug"])
-logger = logging.getLogger(__name__)
 
 # Service principal
 expert_service = ExpertService()
