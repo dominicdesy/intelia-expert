@@ -561,6 +561,15 @@ class EntityNormalizer:
             "success_rate": f"{((total-self.stats['validation_failures'])/total)*100:.1f}%"
         }
 
+    def get_normalization_stats(self) -> Dict[str, Any]:
+        """
+        🔧 FIX: Alias pour get_stats() - compatibilité avec entities_extractor
+        
+        Returns:
+            Dict avec les statistiques de normalisation
+        """
+        return self.get_stats()
+
 # Instance globale pour réutilisation
 entity_normalizer = EntityNormalizer()
 

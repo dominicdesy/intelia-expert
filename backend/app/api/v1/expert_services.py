@@ -109,9 +109,23 @@ class ExpertService:
         }
         
         logger.info("✅ [Expert Service] Service unifié avec normalisation initialisé")
-        logger.info(f"   📊 Extracteur: {self.entities_extractor.get_extraction_stats()}")
+        
+        # 🔧 FIX: Gestion sécurisée des statistiques de l'extracteur
+        try:
+            extractor_stats = self.entities_extractor.get_extraction_stats()
+            logger.info(f"   📊 Extracteur: {extractor_stats}")
+        except Exception as e:
+            logger.warning(f"   ⚠️ Impossible de récupérer les stats extracteur: {e}")
+        
         logger.info(f"   🔧 Normalizer: Races={len(self.entity_normalizer.breed_mapping)}")
-        logger.info(f"   🧠 Classifier: {self.smart_classifier.get_classification_stats()}")
+        
+        # 🔧 FIX: Gestion sécurisée des statistiques du classifier
+        try:
+            classifier_stats = self.smart_classifier.get_classification_stats()
+            logger.info(f"   🧠 Classifier: {classifier_stats}")
+        except Exception as e:
+            logger.warning(f"   ⚠️ Impossible de récupérer les stats classifier: {e}")
+        
         logger.info(f"   🔗 Contexte: {'Activé' if self.config['enable_context'] else 'Désactivé'}")
         logger.info(f"   🎯 Normalisation: {'Activée' if self.config['enable_normalization'] else 'Désactivée'}")
 
@@ -287,23 +301,35 @@ class ExpertService:
             logger.error(f"❌ [Expert Service] Erreur ask_expert_enhanced: {e}")
             return self._create_error_response(request, str(e))
 
-    def _entities_to_dict(self, entities: ExtractedEntities) -> Dict[str, Any]:
+    def _entities_to_dict(self, entities) -> Dict[str, Any]:
         """Convertit les entités en dictionnaire pour compatibilité"""
-        return {
-            'age_days': entities.age_days,
-            'age_weeks': entities.age_weeks,
-            'age': entities.age,
-            'breed_specific': entities.breed_specific,
-            'breed_generic': entities.breed_generic,
-            'sex': entities.sex,
-            'weight_mentioned': entities.weight_mentioned,
-            'weight_grams': entities.weight_grams,
-            'weight_unit': entities.weight_unit,
-            'symptoms': entities.symptoms,
-            'context_type': entities.context_type,
-            'housing_conditions': entities.housing_conditions,
-            'feeding_context': entities.feeding_context
-        }
+        # 🔧 FIX: Gestion flexible des différents types d'entités
+        if hasattr(entities, '__dict__'):
+            # Pour ExtractedEntities ou NormalizedEntities
+            entity_dict = {}
+            for key, value in entities.__dict__.items():
+                if not key.startswith('_'):
+                    entity_dict[key] = value
+            return entity_dict
+        elif isinstance(entities, dict):
+            return entities
+        else:
+            # Fallback pour autres types
+            return {
+                'age_days': getattr(entities, 'age_days', None),
+                'age_weeks': getattr(entities, 'age_weeks', None),
+                'age': getattr(entities, 'age', None),
+                'breed_specific': getattr(entities, 'breed_specific', None),
+                'breed_generic': getattr(entities, 'breed_generic', None),
+                'sex': getattr(entities, 'sex', None),
+                'weight_mentioned': getattr(entities, 'weight_mentioned', False),
+                'weight_grams': getattr(entities, 'weight_grams', None),
+                'weight_unit': getattr(entities, 'weight_unit', None),
+                'symptoms': getattr(entities, 'symptoms', []),
+                'context_type': getattr(entities, 'context_type', None),
+                'housing_conditions': getattr(entities, 'housing_conditions', None),
+                'feeding_context': getattr(entities, 'feeding_context', None)
+            }
 
     def _normalized_summary(self, normalized_entities: NormalizedEntities) -> str:
         """NOUVEAU: Crée un résumé des entités normalisées pour le logging"""
