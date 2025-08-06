@@ -8,6 +8,7 @@ smart_classifier.py - CLASSIFIER INTELLIGENT AVEC CONTEXTE CONVERSATIONNEL COMPL
 - ✅ Intégration avec le pipeline existant
 - ✅ Support complet du type CONTEXTUAL_ANSWER
 - 🆕 MODIFICATION: Intégration ContextManager centralisé
+- ✅ CORRECTION: Interfaces d'accès aux objets harmonisées
 
 Architecture:
 - classify_question() : Point d'entrée unique avec contexte
@@ -21,7 +22,7 @@ import logging
 import re
 import sqlite3
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -175,7 +176,7 @@ class SmartClassifier:
         except Exception as e:
             logger.error(f"❌ [Smart Classifier] Erreur init table contexte: {e}")
 
-    def classify_question(self, question: str, entities: Dict[str, Any], 
+    def classify_question(self, question: str, entities: Union[Dict[str, Any], object], 
                          conversation_id: Optional[str] = None,
                          is_clarification_response: bool = False) -> ClassificationResult:
         """
@@ -183,7 +184,7 @@ class SmartClassifier:
         
         Args:
             question: Texte de la question
-            entities: Entités extraites de la question
+            entities: Entités extraites de la question (Dict ou objet NormalizedEntities)
             conversation_id: ID de la conversation pour récupérer le contexte
             is_clarification_response: Indique si c'est une réponse de clarification
             
@@ -192,7 +193,10 @@ class SmartClassifier:
         """
         try:
             logger.info(f"🧠 [Smart Classifier] Classification: '{question[:50]}...'")
-            logger.info(f"🔍 [Smart Classifier] Entités: {entities}")
+            
+            # ✅ CORRECTION: Normaliser l'input entities
+            entities_dict = self._normalize_entities_input(entities)
+            logger.info(f"🔍 [Smart Classifier] Entités: {entities_dict}")
             
             # 🆕 MODIFICATION: Récupérer le contexte via ContextManager ou système local
             conversation_context = None
@@ -201,8 +205,8 @@ class SmartClassifier:
                 logger.info(f"🔗 [Smart Classifier] Contexte récupéré: {conversation_context is not None}")
             
             # NOUVEAU: Détection des clarifications contextuelles
-            if self._is_clarification_response(question, entities, conversation_context, is_clarification_response):
-                merged_entities = self._merge_with_context(entities, conversation_context)
+            if self._is_clarification_response(question, entities_dict, conversation_context, is_clarification_response):
+                merged_entities = self._merge_with_context(entities_dict, conversation_context)
                 logger.info(f"🔗 [Contextual] Entités fusionnées: {merged_entities}")
                 
                 if self._has_specific_info(merged_entities):
@@ -225,8 +229,8 @@ class SmartClassifier:
                     return result
             
             # Règle 1: PRÉCIS - Assez d'informations pour réponse spécifique
-            if self._has_specific_info(entities):
-                weight_data = self._calculate_weight_data(entities)
+            if self._has_specific_info(entities_dict):
+                weight_data = self._calculate_weight_data(entities_dict)
                 result = ClassificationResult(
                     ResponseType.PRECISE_ANSWER,
                     confidence=0.9,
@@ -236,14 +240,14 @@ class SmartClassifier:
                 
                 # 🆕 MODIFICATION: Sauvegarder le contexte via ContextManager ou système local
                 if conversation_id:
-                    new_context = self._create_conversation_context(question, entities, conversation_context)
+                    new_context = self._create_conversation_context(question, entities_dict, conversation_context)
                     self._save_conversation_context_unified(conversation_id, new_context)
                 
                 return result
             
             # Règle 2: GÉNÉRAL - Contexte suffisant pour réponse utile
-            elif self._has_useful_context(question, entities):
-                missing = self._identify_missing_for_precision(entities)
+            elif self._has_useful_context(question, entities_dict):
+                missing = self._identify_missing_for_precision(entities_dict)
                 result = ClassificationResult(
                     ResponseType.GENERAL_ANSWER,
                     confidence=0.8,
@@ -253,14 +257,14 @@ class SmartClassifier:
                 
                 # 🆕 MODIFICATION: Sauvegarder le contexte via ContextManager ou système local
                 if conversation_id:
-                    new_context = self._create_conversation_context(question, entities, conversation_context)
+                    new_context = self._create_conversation_context(question, entities_dict, conversation_context)
                     self._save_conversation_context_unified(conversation_id, new_context)
                 
                 return result
             
             # Règle 3: CLARIFICATION - Vraiment trop vague
             else:
-                missing = self._identify_critical_missing(question, entities)
+                missing = self._identify_critical_missing(question, entities_dict)
                 return ClassificationResult(
                     ResponseType.NEEDS_CLARIFICATION,
                     confidence=0.6,
@@ -277,6 +281,55 @@ class SmartClassifier:
                 reasoning="Erreur de classification - fallback général"
             )
 
+    def _normalize_entities_input(self, entities: Union[Dict[str, Any], object, None]) -> Dict[str, Any]:
+        """
+        ✅ CORRECTION: Normalise l'input entities pour gérer différents types
+        
+        Gère:
+        - None → {}
+        - Dict → retour direct
+        - NormalizedEntities object → conversion via getattr
+        - Autres objets → tentative de conversion via __dict__
+        """
+        if entities is None:
+            return {}
+        
+        if isinstance(entities, dict):
+            return entities
+        
+        # Si c'est un objet avec des attributs (comme NormalizedEntities)
+        if hasattr(entities, '__dict__'):
+            try:
+                # Essayer d'abord une méthode to_dict si disponible
+                if hasattr(entities, 'to_dict') and callable(getattr(entities, 'to_dict')):
+                    return entities.to_dict()
+                
+                # Sinon, utiliser __dict__ directement
+                entity_dict = entities.__dict__.copy()
+                logger.debug(f"🔧 [Smart Classifier] Entités converties via __dict__: {len(entity_dict)} attributs")
+                return entity_dict
+            except Exception as e:
+                logger.warning(f"⚠️ [Smart Classifier] Erreur conversion entités via __dict__: {e}")
+        
+        # Si c'est un objet dataclass ou similaire, essayer de convertir les attributs connus
+        try:
+            known_attributes = ['breed', 'breed_specific', 'age_days', 'age_weeks', 'sex', 'weight_grams', 
+                              'weight_mentioned', 'symptoms', 'context_type', 'normalization_confidence']
+            
+            result = {}
+            for attr in known_attributes:
+                if hasattr(entities, attr):
+                    value = getattr(entities, attr, None)
+                    if value is not None:
+                        result[attr] = value
+            
+            logger.debug(f"🔧 [Smart Classifier] Entités converties: {len(result)} attributs")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"⚠️ [Smart Classifier] Erreur conversion entités: {e}")
+            return {}
+
     # 🆕 NOUVELLE MÉTHODE: Récupération de contexte unifiée
     def _get_conversation_context_unified(self, conversation_id: str) -> Optional[ConversationContext]:
         """Récupère le contexte via ContextManager ou système local"""
@@ -287,7 +340,7 @@ class SmartClassifier:
                     conversation_id, context_type="classification"
                 )
                 if context_data:
-                    # Convertir les données du ContextManager vers ConversationContext
+                    # ✅ CORRECTION: Convertir les données du ContextManager vers ConversationContext
                     return self._convert_context_manager_data(context_data)
             except Exception as e:
                 logger.warning(f"⚠️ [Context] Erreur ContextManager, fallback local: {e}")
@@ -302,10 +355,18 @@ class SmartClassifier:
             try:
                 # Convertir ConversationContext vers format ContextManager
                 context_data = self._convert_to_context_manager_format(context)
-                self.context_manager.save_unified_context(
-                    conversation_id, context_data, context_type="classification"
+                
+                # ✅ CORRECTION: Utiliser update_context au lieu de save_unified_context
+                success = self.context_manager.update_context(
+                    conversation_id, 
+                    entities=context_data,
+                    topic=context.conversation_topic
                 )
-                logger.info(f"💾 [Context] Contexte sauvegardé via ContextManager: {conversation_id}")
+                
+                if success:
+                    logger.info(f"💾 [Context] Contexte sauvegardé via ContextManager: {conversation_id}")
+                else:
+                    logger.warning(f"⚠️ [Context] Échec sauvegarde ContextManager: {conversation_id}")
                 return
             except Exception as e:
                 logger.warning(f"⚠️ [Context] Erreur sauvegarde ContextManager, fallback local: {e}")
@@ -314,23 +375,32 @@ class SmartClassifier:
         self._save_conversation_context(conversation_id, context)
 
     # 🆕 NOUVELLE MÉTHODE: Conversion depuis ContextManager
-    def _convert_context_manager_data(self, context_data: Dict[str, Any]) -> ConversationContext:
-        """Convertit les données du ContextManager vers ConversationContext"""
+    def _convert_context_manager_data(self, context_data) -> ConversationContext:
+        """
+        ✅ CORRECTION: Convertit les données du ContextManager vers ConversationContext
+        Utilise getattr au lieu de .get() pour les objets
+        """
         context = ConversationContext()
         
-        # Mapping des champs
-        context.previous_question = context_data.get("last_question")
-        context.previous_entities = context_data.get("last_entities")
-        context.conversation_topic = context_data.get("topic")
-        context.established_breed = context_data.get("established_breed")
-        context.established_age = context_data.get("established_age_days")
-        context.established_sex = context_data.get("established_sex")
+        # ✅ CORRECTION: Utiliser getattr pour accéder aux attributs d'objets
+        # Mapping des champs avec gestion defensive
+        context.previous_question = getattr(context_data, 'last_question', None) or getattr(context_data, 'previous_questions', [None])[-1] if getattr(context_data, 'previous_questions', None) else None
+        context.previous_entities = getattr(context_data, 'last_entities', None)
+        context.conversation_topic = getattr(context_data, 'conversation_topic', None)
+        context.established_breed = getattr(context_data, 'established_breed', None)
+        context.established_age = getattr(context_data, 'established_age', None) or getattr(context_data, 'established_age_days', None)
+        context.established_sex = getattr(context_data, 'established_sex', None)
         
         # Gestion de la date
-        last_interaction_str = context_data.get("last_interaction")
-        if last_interaction_str:
+        last_interaction = getattr(context_data, 'last_interaction', None)
+        if last_interaction:
             try:
-                context.last_interaction = datetime.fromisoformat(last_interaction_str)
+                if isinstance(last_interaction, str):
+                    context.last_interaction = datetime.fromisoformat(last_interaction)
+                elif isinstance(last_interaction, datetime):
+                    context.last_interaction = last_interaction
+                else:
+                    context.last_interaction = datetime.now()
             except:
                 context.last_interaction = datetime.now()
         
@@ -419,8 +489,8 @@ class SmartClassifier:
             r'pour un\s+\w+',  # "pour un Ross 308"
             r'avec un\s+\w+',  # "avec un mâle"  
             r'chez\s+\w+',     # "chez Ross 308"
-            r'^\w+\s+\w+$',    # "Ross 308" ou "cobb 500"
-            r'^(mâle|femelle|mâles|femelles)$'  # Juste le sexe
+            r'^\w+\s+\w+,    # "Ross 308" ou "cobb 500"
+            r'^(mâle|femelle|mâles|femelles)  # Juste le sexe
         ]
         
         for pattern in clarification_patterns:
@@ -720,7 +790,7 @@ class SmartClassifier:
 # FONCTIONS UTILITAIRES
 # =============================================================================
 
-def quick_classify(question: str, entities: Dict[str, Any] = None, 
+def quick_classify(question: str, entities: Union[Dict[str, Any], object] = None, 
                   conversation_id: str = None) -> str:
     """
     Classification rapide pour usage simple avec support du contexte

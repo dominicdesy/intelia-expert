@@ -5,6 +5,7 @@ Context Manager - Gestionnaire centralisé du contexte conversationnel
 🎯 OBJECTIF: Éliminer les récupérations multiples incohérentes du contexte
 ✅ RÉSOUT: get_context_for_rag() vs get_context_for_clarification() vs get_conversation_context()
 🚀 IMPACT: +15% de cohérence conversationnelle
+✅ CORRECTION: Ajout de la méthode save_unified_context manquante
 
 PRINCIPE:
 - Récupération unique du contexte mémoire
@@ -261,6 +262,8 @@ class ContextManager:
                 # Mettre à jour entités établies
                 if entities.get('breed') and not context.established_breed:
                     context.established_breed = entities['breed']
+                if entities.get('breed_specific') and not context.established_breed:
+                    context.established_breed = entities['breed_specific']
                 if entities.get('age_days') and not context.established_age:
                     context.established_age = entities['age_days']
                 if entities.get('sex') and not context.established_sex:
@@ -282,6 +285,69 @@ class ContextManager:
             
         except Exception as e:
             logger.error(f"❌ [ContextManager] Erreur mise à jour contexte: {e}")
+            return False
+    
+    def save_unified_context(
+        self, 
+        conversation_id: str, 
+        context_data: Union[Dict[str, Any], object], 
+        context_type: str = "general"
+    ) -> bool:
+        """
+        ✅ CORRECTION: Méthode de compatibilité pour save_unified_context
+        
+        Cette méthode était manquante et causait l'erreur dans smart_classifier.py
+        Elle redirige vers update_context avec normalisation des données.
+        
+        Args:
+            conversation_id: ID de la conversation
+            context_data: Données du contexte à sauvegarder (dict ou objet)
+            context_type: Type de contexte
+            
+        Returns:
+            bool: True si la sauvegarde a réussi
+        """
+        try:
+            # ✅ CORRECTION: Normaliser context_data pour gérer différents types
+            entities = {}
+            topic = None
+            
+            if isinstance(context_data, dict):
+                entities = context_data.copy()
+                topic = entities.pop('topic', None) or entities.pop('conversation_topic', None)
+            elif hasattr(context_data, '__dict__'):
+                # Si c'est un objet avec des attributs
+                try:
+                    if hasattr(context_data, 'to_dict') and callable(getattr(context_data, 'to_dict')):
+                        entities = context_data.to_dict()
+                    else:
+                        entities = context_data.__dict__.copy()
+                    
+                    topic = entities.pop('topic', None) or entities.pop('conversation_topic', None)
+                except Exception as e:
+                    logger.warning(f"⚠️ [ContextManager] Erreur conversion objet: {e}")
+                    entities = {}
+            else:
+                # Fallback pour autres types
+                logger.warning(f"⚠️ [ContextManager] Type de données inattendu: {type(context_data)}")
+                entities = {"raw_data": str(context_data)}
+            
+            # Utiliser update_context pour faire la sauvegarde
+            success = self.update_context(
+                conversation_id=conversation_id,
+                entities=entities,
+                topic=topic
+            )
+            
+            if success:
+                logger.info(f"✅ [ContextManager] Contexte unifié sauvegardé: {conversation_id} (type: {context_type})")
+            else:
+                logger.warning(f"⚠️ [ContextManager] Échec sauvegarde contexte unifié: {conversation_id}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"❌ [ContextManager] Erreur save_unified_context: {e}")
             return False
     
     def _get_from_cache(self, conversation_id: str) -> Optional[UnifiedContext]:
@@ -695,7 +761,23 @@ def test_context_manager():
         ctx = manager.get_unified_context(test_conv_id, ctx_type)
         print(f"   Type {ctx_type}: entités={ctx.has_entities()}, âge={ctx.context_age_minutes:.1f}min")
     
-    # Test 5: Statistiques
+    # ✅ NOUVEAU Test 5: Test save_unified_context
+    print("\n📝 Test 5: Test save_unified_context")
+    test_context_data = {
+        "breed_specific": "Cobb 500",
+        "age_days": 14,
+        "sex": "female",
+        "topic": "health"
+    }
+    success = manager.save_unified_context(test_conv_id, test_context_data, "test")
+    print(f"   save_unified_context: {'✅' if success else '❌'}")
+    
+    # Vérifier que les données ont été sauvegardées
+    updated_context = manager.get_unified_context(test_conv_id, "general")
+    print(f"   Breed après save: {updated_context.established_breed}")
+    print(f"   Age après save: {updated_context.established_age}")
+    
+    # Test 6: Statistiques
     print("\n📊 Statistiques:")
     stats = manager.get_stats()
     for key, value in stats.items():

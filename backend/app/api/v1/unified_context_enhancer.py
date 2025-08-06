@@ -141,7 +141,7 @@ class UnifiedContextEnhancer:
     async def process_unified(
         self,
         question: str,
-        entities: Dict[str, Any] = None,
+        entities: Union[Dict[str, Any], object] = None,
         missing_entities: List[str] = None,
         conversation_context: str = "",
         rag_results: List[Dict] = None,
@@ -160,7 +160,7 @@ class UnifiedContextEnhancer:
         
         Args:
             question: Question originale utilisateur
-            entities: Entités normalisées (via EntityNormalizer)
+            entities: Entités normalisées (via EntityNormalizer) ou objet NormalizedEntities
             missing_entities: Entités manquantes critiques
             conversation_context: Contexte conversationnel unifié (via ContextManager)
             rag_results: Résultats de la recherche RAG
@@ -175,8 +175,8 @@ class UnifiedContextEnhancer:
         start_time = time.time()
         self.stats["total_enhancements"] += 1
         
-        # Validation et nettoyage des inputs
-        entities = entities or {}
+        # ✅ CORRECTION: Validation et normalisation des inputs
+        entities_dict = self._normalize_entities_input(entities)
         missing_entities = missing_entities or []
         rag_results = rag_results or []
         conversation_context = conversation_context or ""
@@ -185,7 +185,7 @@ class UnifiedContextEnhancer:
         try:
             # Phase 1: Enrichissement de la question (ancien agent_contextualizer)
             enriched_question, enrichment_confidence = await self._enrich_question_phase(
-                question, entities, missing_entities, conversation_context, language
+                question, entities_dict, missing_entities, conversation_context, language
             )
             
             if enriched_question:
@@ -194,7 +194,7 @@ class UnifiedContextEnhancer:
             # Phase 2: Amélioration de la réponse (ancien agent_rag_enhancer)
             if rag_answer:
                 enhanced_answer, enhancement_data = await self._enhance_answer_phase(
-                    rag_answer, enriched_question, question, entities, missing_entities,
+                    rag_answer, enriched_question, question, entities_dict, missing_entities,
                     conversation_context, rag_results, language
                 )
                 
@@ -214,7 +214,7 @@ class UnifiedContextEnhancer:
             
             # Phase 3: Vérification de cohérence unifiée
             coherence_result = self._verify_unified_coherence(
-                question, enriched_question, enhanced_answer, entities, rag_results
+                question, enriched_question, enhanced_answer, entities_dict, rag_results
             )
             
             # Construction du résultat unifié
@@ -272,6 +272,53 @@ class UnifiedContextEnhancer:
                 fallback_used=True,
                 language=language
             )
+    
+    def _normalize_entities_input(self, entities: Union[Dict[str, Any], object, None]) -> Dict[str, Any]:
+        """
+        ✅ CORRECTION: Normalise l'input entities pour gérer différents types
+        
+        Gère:
+        - None → {}
+        - Dict → retour direct
+        - NormalizedEntities object → conversion via getattr
+        - Autres objets → tentative de conversion via __dict__
+        """
+        if entities is None:
+            return {}
+        
+        if isinstance(entities, dict):
+            return entities
+        
+        # Si c'est un objet avec des attributs (comme NormalizedEntities)
+        if hasattr(entities, '__dict__'):
+            try:
+                # Essayer d'abord une méthode to_dict si disponible
+                if hasattr(entities, 'to_dict') and callable(getattr(entities, 'to_dict')):
+                    return entities.to_dict()
+                
+                # Sinon, utiliser __dict__ directement
+                return entities.__dict__
+            except Exception as e:
+                logger.warning(f"⚠️ [UnifiedContextEnhancer] Erreur conversion entités via __dict__: {e}")
+        
+        # Si c'est un objet dataclass ou similaire, essayer de convertir les attributs connus
+        try:
+            known_attributes = ['breed', 'breed_specific', 'age_days', 'age_weeks', 'sex', 'weight_grams', 
+                              'weight_mentioned', 'symptoms', 'context_type', 'normalization_confidence']
+            
+            result = {}
+            for attr in known_attributes:
+                if hasattr(entities, attr):
+                    value = getattr(entities, attr, None)
+                    if value is not None:
+                        result[attr] = value
+            
+            logger.debug(f"🔧 [UnifiedContextEnhancer] Entités converties: {len(result)} attributs")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"⚠️ [UnifiedContextEnhancer] Erreur conversion entités: {e}")
+            return {}
     
     async def _enrich_question_phase(
         self,
@@ -537,8 +584,10 @@ Respond in strict JSON:
         
         summary_parts = []
         
-        if entities.get('breed'):
-            summary_parts.append(f"Race: {entities['breed']}")
+        # ✅ CORRECTION: Utiliser .get() pour les dictionnaires
+        if entities.get('breed') or entities.get('breed_specific'):
+            breed = entities.get('breed') or entities.get('breed_specific')
+            summary_parts.append(f"Race: {breed}")
         
         if entities.get('age_days'):
             summary_parts.append(f"Âge: {entities['age_days']} jours")
@@ -652,9 +701,10 @@ Respond in strict JSON:
         enriched_parts = [question.strip()]
         
         # Ajouter entités importantes
-        if entities.get('breed'):
-            if entities['breed'].lower() not in question.lower():
-                enriched_parts.append(f"race {entities['breed']}")
+        breed = entities.get('breed') or entities.get('breed_specific')
+        if breed:
+            if breed.lower() not in question.lower():
+                enriched_parts.append(f"race {breed}")
         
         if entities.get('age_days'):
             age_mentioned = any(term in question.lower() for term in ['jour', 'semaine', 'âge', 'day', 'week', 'age'])
@@ -682,8 +732,9 @@ Respond in strict JSON:
         
         # Ajouter contexte disponible
         context_parts = []
-        if entities.get('breed'):
-            context_parts.append(f"race {entities['breed']}")
+        breed = entities.get('breed') or entities.get('breed_specific')
+        if breed:
+            context_parts.append(f"race {breed}")
         if entities.get('age_days'):
             context_parts.append(f"âge {entities['age_days']} jours")
         
@@ -836,7 +887,7 @@ unified_context_enhancer = UnifiedContextEnhancer()
 # Fonction utilitaire pour usage direct
 async def process_unified_enhancement(
     question: str,
-    entities: Dict[str, Any] = None,
+    entities: Union[Dict[str, Any], object] = None,
     conversation_context: str = "",
     rag_results: List[Dict] = None,
     rag_answer: str = "",
