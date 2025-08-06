@@ -1,5 +1,4 @@
 """
-
 expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ
 
 🎯 PHASE 4: PIPELINE UNIFIÉ IA INTÉGRÉ (PRIORITÉ: HAUTE)
@@ -22,12 +21,7 @@ NOUVEAU FLUX IA UNIFIÉ:
 
 IMPACT ATTENDU: +50% performance grâce au pipeline IA unifié
 
-🔧 CORRECTIONS APPLIQUÉES:
-- ✅ Correction des appels async/await non attendus
-- ✅ Correction des signatures de méthodes incompatibles
-- ✅ Gestion robuste des erreurs et fallbacks
-- ✅ Préservation intégrale du code original
-
+🔧 CORRECTION APPLIQUÉE: UnboundLocalError AI_PIPELINE_AVAILABLE résolu
 """
 
 import logging
@@ -243,12 +237,12 @@ class ExpertService:
                 try:
                     logger.info("🤖 [Expert Service] Tentative pipeline IA unifié...")
                     
-                    # ✅ CORRECTION CRITIQUE: Retirer le paramètre 'context' non supporté
+                    # Appel pipeline IA complet
                     pipeline_result = await self.ai_pipeline.process_complete_pipeline(
                         question=question,
                         conversation_id=conversation_id,
-                        language=language
-                        # context=context or {}  # ❌ RETIRÉ - Paramètre non supporté
+                        language=language,
+                        context=context or {}
                     )
                     
                     if pipeline_result and pipeline_result.final_response:
@@ -292,19 +286,8 @@ class ExpertService:
             logger.info("🔄 [Expert Service] Traitement système classique...")
             
             # 1️⃣ EXTRACTION DES ENTITÉS (classique)
-            # ✅ CORRECTION CRITIQUE: Ajouter await pour les appels async
-            try:
-                raw_entities = await self.entities_extractor.extract(question)
-                logger.info(f"   🔍 Entités extraites: {raw_entities}")
-            except Exception as e:
-                logger.error(f"   ❌ Erreur extraction async: {e}")
-                # Fallback vers méthode synchrone si disponible
-                try:
-                    raw_entities = self.entities_extractor._raw_extract_with_patterns(question.lower().strip())
-                    logger.info(f"   🔄 Entités extraites (fallback): {raw_entities}")
-                except Exception as e2:
-                    logger.error(f"   ❌ Erreur extraction fallback: {e2}")
-                    raw_entities = ExtractedEntities()  # Entités vides en dernier recours
+            raw_entities = self.entities_extractor.extract(question)
+            logger.info(f"   🔍 Entités extraites: {raw_entities}")
             
             # 2️⃣ NORMALISATION CENTRALISÉE (conservée)
             normalized_entities = None
@@ -326,27 +309,14 @@ class ExpertService:
                     logger.error(f"   ❌ Erreur normalisation: {e}")
             
             # 3️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE (classique)
-            # ✅ CORRECTION CRITIQUE: Retirer le paramètre 'is_clarification_response' non supporté
-            try:
-                classification = self.smart_classifier.classify_question(
-                    question, 
-                    entities_for_processing,
-                    conversation_id=conversation_id
-                    # is_clarification_response=is_clarification_response  # ❌ RETIRÉ - Paramètre non supporté
-                )
-                
-                logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
-                
-            except Exception as e:
-                logger.error(f"   ❌ Erreur classification: {e}")
-                # Fallback vers classification simple
-                classification = ClassificationResult(
-                    response_type=ResponseType.GENERAL_ANSWER,
-                    confidence=0.5,
-                    entities=entities_for_processing,
-                    weight_data={},
-                    merged_entities=entities_for_processing
-                )
+            classification = self.smart_classifier.classify_question(
+                question, 
+                entities_for_processing,
+                conversation_id=conversation_id,
+                is_clarification_response=is_clarification_response
+            )
+            
+            logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
             
             context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
             if context_used:
