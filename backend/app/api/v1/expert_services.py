@@ -1,6 +1,6 @@
 """
 
-expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ
+expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ - VERSION CORRIGÉE
 
 🎯 PHASE 4: PIPELINE UNIFIÉ IA INTÉGRÉ (PRIORITÉ: HAUTE)
 
@@ -14,6 +14,14 @@ TRANSFORMATIONS APPLIQUÉES selon Plan de Transformation:
 - ✅ Entités normalisées systématiquement
 - ✅ Compatibilité totale avec l'ancien système
 
+🔧 CORRECTIONS APPLIQUÉES DANS CETTE VERSION:
+- ✅ Correction des appels async/await avec vérification dynamique
+- ✅ Gestion robuste des méthodes sync/async avec detection
+- ✅ Fallback intelligent vers patterns classiques  
+- ✅ Conservation intégrale du code original
+- ✅ Gestion d'erreurs améliorée avec fallbacks multiples
+- ✅ Détection automatique du type de méthode (sync/async)
+
 NOUVEAU FLUX IA UNIFIÉ:
 1. Tentative pipeline IA complet (UnifiedAIPipeline)
 2. Si succès: résultat IA optimisé
@@ -22,17 +30,12 @@ NOUVEAU FLUX IA UNIFIÉ:
 
 IMPACT ATTENDU: +50% performance grâce au pipeline IA unifié
 
-🔧 CORRECTIONS APPLIQUÉES:
-- ✅ Correction des appels async/await non attendus
-- ✅ Correction des signatures de méthodes incompatibles
-- ✅ Gestion robuste des erreurs et fallbacks
-- ✅ Préservation intégrale du code original
-
 """
 
 import logging
 import time
 import uuid
+import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -291,20 +294,9 @@ class ExpertService:
             # =============================================================
             logger.info("🔄 [Expert Service] Traitement système classique...")
             
-            # 1️⃣ EXTRACTION DES ENTITÉS (classique)
-            # ✅ CORRECTION CRITIQUE: Ajouter await pour les appels async
-            try:
-                raw_entities = await self.entities_extractor.extract(question)
-                logger.info(f"   🔍 Entités extraites: {raw_entities}")
-            except Exception as e:
-                logger.error(f"   ❌ Erreur extraction async: {e}")
-                # Fallback vers méthode synchrone si disponible
-                try:
-                    raw_entities = self.entities_extractor._raw_extract_with_patterns(question.lower().strip())
-                    logger.info(f"   🔄 Entités extraites (fallback): {raw_entities}")
-                except Exception as e2:
-                    logger.error(f"   ❌ Erreur extraction fallback: {e2}")
-                    raw_entities = ExtractedEntities()  # Entités vides en dernier recours
+            # 1️⃣ EXTRACTION DES ENTITÉS (classique avec correction async/sync)
+            raw_entities = await self._safe_extract_entities(question)
+            logger.info(f"   🔍 Entités extraites: {raw_entities}")
             
             # 2️⃣ NORMALISATION CENTRALISÉE (conservée)
             normalized_entities = None
@@ -408,6 +400,47 @@ class ExpertService:
             
             self._update_stats_ai(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False, False, True)
             return result
+
+    async def _safe_extract_entities(self, question: str) -> ExtractedEntities:
+        """
+        🔧 NOUVELLE MÉTHODE: Extraction sécurisée avec détection async/sync automatique
+        
+        Cette méthode résout le problème d'appel async/await en détectant automatiquement
+        si la méthode extract() est synchrone ou asynchrone et l'appelle correctement.
+        """
+        try:
+            # ✅ CORRECTION PRINCIPALE: Vérifier si extract() est une coroutine function
+            extract_method = self.entities_extractor.extract
+            
+            if asyncio.iscoroutinefunction(extract_method):
+                # Méthode asynchrone - utiliser await
+                logger.debug("   🔍 [Safe Extract] Extraction async détectée")
+                raw_entities = await extract_method(question)
+                logger.debug("   ✅ [Safe Extract] Extraction async réussie")
+            else:
+                # Méthode synchrone - appel direct
+                logger.debug("   🔍 [Safe Extract] Extraction sync détectée")
+                raw_entities = extract_method(question)
+                logger.debug("   ✅ [Safe Extract] Extraction sync réussie")
+            
+            return raw_entities
+            
+        except Exception as e:
+            logger.error(f"   ❌ [Safe Extract] Erreur extraction principale: {e}")
+            
+            # ✅ FALLBACK ROBUSTE vers patterns classiques
+            try:
+                logger.info("   🔄 [Safe Extract] Tentative patterns fallback...")
+                raw_entities = self.entities_extractor._raw_extract_with_patterns(question.lower().strip())
+                logger.info("   ✅ [Safe Extract] Patterns fallback réussi")
+                return raw_entities
+                
+            except Exception as e2:
+                logger.error(f"   ❌ [Safe Extract] Erreur patterns fallback: {e2}")
+                
+                # ✅ DERNIER RECOURS: Entités vides mais valides
+                logger.warning("   🆘 [Safe Extract] Utilisation entités vides (dernier recours)")
+                return ExtractedEntities()
 
     async def ask_expert_enhanced(self, request: EnhancedQuestionRequest) -> EnhancedExpertResponse:
         """

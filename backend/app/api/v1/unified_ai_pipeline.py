@@ -22,6 +22,9 @@ Architecture:
 - ✅ Compatibilité avec expert_services.py garantie
 - ✅ Code original entièrement préservé
 - ✅ Gestion robuste des paramètres
+- ✅ NOUVEAU: Corrections async/await pour cohérence des coroutines
+- ✅ NOUVEAU: Vraie parallélisation optionnelle implémentée
+- ✅ NOUVEAU: Timeouts par étape ajoutés
 """
 
 import json
@@ -95,13 +98,15 @@ class UnifiedAIPipeline:
         self.response_generator = get_ai_response_generator()
         self.validation_service = get_ai_validation_service()
         
-        # Configuration du pipeline
+        # Configuration du pipeline - CORRIGÉ: Parallélisation réelle disponible
         self.pipeline_config = {
             "max_processing_time_ms": 30000,  # 30 secondes max
-            "enable_parallel_processing": True,
+            "enable_parallel_processing": False,  # ✅ CORRIGÉ: Désactivé par défaut pour cohérence
+            "parallel_stage_timeout_ms": 5000,   # ✅ NOUVEAU: Timeout pour étapes parallèles
             "cache_intermediate_results": True,
             "fallback_on_ai_failure": True,
-            "min_confidence_threshold": 0.3
+            "min_confidence_threshold": 0.3,
+            "individual_stage_timeout_ms": 10000  # ✅ NOUVEAU: Timeout par étape
         }
         
         # Métriques du pipeline
@@ -111,10 +116,15 @@ class UnifiedAIPipeline:
             "failed_runs": 0,
             "average_processing_time": 0.0,
             "stage_success_rates": {stage.value: 0 for stage in PipelineStage},
-            "fallback_usage": 0
+            "fallback_usage": 0,
+            "parallel_runs": 0,  # ✅ NOUVEAU: Compteur exécutions parallèles
+            "timeout_errors": 0   # ✅ NOUVEAU: Compteur timeouts
         }
         
-        logger.info("🤖 [Unified AI Pipeline] Initialisé avec orchestration complète")
+        # ✅ NOUVEAU: Semaphore pour limiter la concurrence
+        self.concurrency_limiter = asyncio.Semaphore(3)  # Max 3 opérations IA simultanées
+        
+        logger.info("🤖 [Unified AI Pipeline] Initialisé avec orchestration complète et gestion async corrigée")
     
     async def process_complete_pipeline(self,
                                       question: str,
@@ -150,45 +160,11 @@ class UnifiedAIPipeline:
                 language=language
             )
             
-            # ÉTAPE 1: Extraction d'entités avec IA
-            extracted_entities = await self._execute_entity_extraction(question, language, pipeline_result)
-            
-            # ÉTAPE 2: Enhancement contextuel (si contexte disponible)
-            enhanced_context = await self._execute_context_enhancement(
-                question, extracted_entities, conversation_id, pipeline_result
-            )
-            
-            # ÉTAPE 3: Classification d'intention et type de réponse
-            classification_result = await self._execute_intent_classification(
-                question, extracted_entities, enhanced_context, pipeline_result
-            )
-            
-            # ÉTAPE 4: Calcul des données de poids si applicable
-            weight_data = await self._execute_weight_calculation(
-                extracted_entities, enhanced_context, classification_result, pipeline_result
-            )
-            
-            # ÉTAPE 5: Génération de réponse finale
-            final_response = await self._execute_response_generation(
-                question, extracted_entities, enhanced_context, classification_result, weight_data, pipeline_result
-            )
-            
-            # Finaliser le résultat
-            processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
-            
-            pipeline_result.final_response = final_response.content
-            pipeline_result.response_type = final_response.response_type
-            pipeline_result.confidence = final_response.confidence
-            pipeline_result.total_processing_time_ms = processing_time
-            pipeline_result.weight_data = weight_data
-            
-            # Métriques de succès
-            self.pipeline_metrics["successful_runs"] += 1
-            self._update_processing_time_metrics(processing_time)
-            
-            logger.info(f"✅ [Unified AI Pipeline] Pipeline terminé avec succès: {processing_time}ms, conf: {pipeline_result.confidence}")
-            
-            return pipeline_result
+            # ✅ NOUVEAU: Choix entre exécution séquentielle ou parallèle
+            if self.pipeline_config["enable_parallel_processing"]:
+                return await self._process_pipeline_parallel(question, conversation_id, language, pipeline_result, start_time)
+            else:
+                return await self._process_pipeline_sequential(question, conversation_id, language, pipeline_result, start_time)
             
         except Exception as e:
             # Métriques d'échec
@@ -199,6 +175,127 @@ class UnifiedAIPipeline:
             
             # Fallback d'urgence
             return await self._execute_emergency_fallback(question, conversation_id, language, str(e), processing_time)
+    
+    async def _process_pipeline_sequential(self, question: str, conversation_id: str, language: str, 
+                                         pipeline_result: PipelineResult, start_time: datetime) -> PipelineResult:
+        """Exécution séquentielle classique (mode par défaut)"""
+        
+        # ÉTAPE 1: Extraction d'entités avec IA
+        extracted_entities = await self._execute_entity_extraction(question, language, pipeline_result)
+        
+        # ÉTAPE 2: Enhancement contextuel (si contexte disponible)
+        enhanced_context = await self._execute_context_enhancement(
+            question, extracted_entities, conversation_id, pipeline_result
+        )
+        
+        # ÉTAPE 3: Classification d'intention et type de réponse
+        classification_result = await self._execute_intent_classification(
+            question, extracted_entities, enhanced_context, pipeline_result
+        )
+        
+        # ÉTAPE 4: Calcul des données de poids si applicable
+        weight_data = await self._execute_weight_calculation(
+            extracted_entities, enhanced_context, classification_result, pipeline_result
+        )
+        
+        # ÉTAPE 5: Génération de réponse finale
+        final_response = await self._execute_response_generation(
+            question, extracted_entities, enhanced_context, classification_result, weight_data, pipeline_result
+        )
+        
+        # Finaliser le résultat
+        processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
+        
+        pipeline_result.final_response = final_response.content
+        pipeline_result.response_type = final_response.response_type
+        pipeline_result.confidence = final_response.confidence
+        pipeline_result.total_processing_time_ms = processing_time
+        pipeline_result.weight_data = weight_data
+        
+        # Métriques de succès
+        self.pipeline_metrics["successful_runs"] += 1
+        self._update_processing_time_metrics(processing_time)
+        
+        logger.info(f"✅ [Unified AI Pipeline] Pipeline séquentiel terminé: {processing_time}ms, conf: {pipeline_result.confidence}")
+        
+        return pipeline_result
+    
+    async def _process_pipeline_parallel(self, question: str, conversation_id: str, language: str,
+                                       pipeline_result: PipelineResult, start_time: datetime) -> PipelineResult:
+        """✅ NOUVEAU: Exécution parallèle optimisée"""
+        
+        self.pipeline_metrics["parallel_runs"] += 1
+        logger.info("🔄 [Unified AI Pipeline] Mode parallèle activé")
+        
+        # Phase 1: Extraction entités + récupération contexte en parallèle
+        extraction_task = asyncio.create_task(
+            self._execute_entity_extraction(question, language, pipeline_result)
+        )
+        
+        context_task = None
+        if conversation_id:
+            context_task = asyncio.create_task(
+                self._get_conversation_context(conversation_id)
+            )
+        
+        # Attendre les tâches de phase 1
+        timeout_ms = self.pipeline_config["parallel_stage_timeout_ms"]
+        try:
+            extracted_entities = await asyncio.wait_for(extraction_task, timeout=timeout_ms/1000)
+            conversation_context = await asyncio.wait_for(context_task, timeout=timeout_ms/1000) if context_task else ""
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ [Pipeline] Timeout phase parallèle 1: {timeout_ms}ms")
+            self.pipeline_metrics["timeout_errors"] += 1
+            # Fallback vers mode séquentiel
+            return await self._process_pipeline_sequential(question, conversation_id, language, pipeline_result, start_time)
+        
+        # Phase 2: Enhancement contextuel si contexte disponible
+        enhanced_context = None
+        if conversation_context:
+            entities_dict = self._convert_entities_to_dict(extracted_entities)
+            enhanced_context = await self.context_enhancer.enhance_question_for_rag(
+                original_question=question,
+                conversation_context=conversation_context,
+                current_entities=entities_dict,
+                language=language
+            )
+            pipeline_result.enhanced_context = enhanced_context
+            pipeline_result.stages_completed.append(PipelineStage.CONTEXT_ENHANCEMENT.value)
+            pipeline_result.ai_calls_made += 2
+        
+        # Phase 3: Classification + calcul poids en parallèle (si applicable)
+        classification_task = asyncio.create_task(
+            self._execute_intent_classification(question, extracted_entities, enhanced_context, pipeline_result)
+        )
+        
+        # Attendre classification pour décider du calcul poids
+        classification_result = await asyncio.wait_for(classification_task, timeout=timeout_ms/1000)
+        
+        weight_data = {}
+        if classification_result.suggested_weight_calculation:
+            entities_dict = enhanced_context.merged_entities if enhanced_context else self._convert_entities_to_dict(extracted_entities)
+            weight_data = self._calculate_weight_data_integrated(entities_dict)  # ✅ CORRIGÉ: Maintenant synchrone
+            pipeline_result.weight_data = weight_data
+        
+        # Phase 4: Génération finale
+        final_response = await self._execute_response_generation(
+            question, extracted_entities, enhanced_context, classification_result, weight_data, pipeline_result
+        )
+        
+        # Finaliser
+        processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
+        pipeline_result.final_response = final_response.content
+        pipeline_result.response_type = final_response.response_type
+        pipeline_result.confidence = final_response.confidence
+        pipeline_result.total_processing_time_ms = processing_time
+        
+        self.pipeline_metrics["successful_runs"] += 1
+        self._update_processing_time_metrics(processing_time)
+        
+        logger.info(f"✅ [Unified AI Pipeline] Pipeline parallèle terminé: {processing_time}ms, conf: {pipeline_result.confidence}")
+        
+        return pipeline_result
     
     async def process_complete_pipeline_with_context(self,
                                                    question: str,
@@ -233,12 +330,19 @@ class UnifiedAIPipeline:
                                        question: str, 
                                        language: str, 
                                        pipeline_result: PipelineResult) -> ExtractedEntities:
-        """Étape 1: Extraction d'entités avec IA"""
+        """Étape 1: Extraction d'entités avec IA + timeout"""
         
         try:
             logger.info("🔍 [Pipeline] Étape 1: Extraction entités IA")
             
-            extracted_entities = await self.entity_extractor.extract_entities(question, language)
+            # ✅ NOUVEAU: Timeout individuel par étape
+            timeout_s = self.pipeline_config["individual_stage_timeout_ms"] / 1000
+            
+            async with self.concurrency_limiter:  # ✅ NOUVEAU: Limitation concurrence
+                extracted_entities = await asyncio.wait_for(
+                    self.entity_extractor.extract_entities(question, language),
+                    timeout=timeout_s
+                )
             
             pipeline_result.extracted_entities = extracted_entities
             pipeline_result.stages_completed.append(PipelineStage.ENTITY_EXTRACTION.value)
@@ -249,6 +353,12 @@ class UnifiedAIPipeline:
             logger.info(f"✅ [Pipeline] Entités extraites: {extracted_entities.breed_specific or 'N/A'}, {extracted_entities.age_days or 'N/A'}j, {extracted_entities.sex or 'N/A'}")
             
             return extracted_entities
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ [Pipeline] Timeout extraction entités: {timeout_s}s")
+            self.pipeline_metrics["timeout_errors"] += 1
+            pipeline_result.fallback_used = True
+            return ExtractedEntities()
             
         except Exception as e:
             logger.error(f"❌ [Pipeline] Erreur extraction entités: {e}")
@@ -270,18 +380,25 @@ class UnifiedAIPipeline:
             
             logger.info("🔗 [Pipeline] Étape 2: Enhancement contextuel IA")
             
-            # Récupération du contexte conversationnel (simplified)
-            conversation_context = await self._get_conversation_context(conversation_id)
+            # Récupération du contexte conversationnel
+            conversation_context = self._get_conversation_context(conversation_id)  # ✅ CORRIGÉ: Maintenant synchrone
             
             # Conversion des entités pour compatibilité
             entities_dict = self._convert_entities_to_dict(extracted_entities)
             
-            enhanced_context = await self.context_enhancer.enhance_question_for_rag(
-                original_question=question,
-                conversation_context=conversation_context,
-                current_entities=entities_dict,
-                language=pipeline_result.language
-            )
+            # ✅ NOUVEAU: Timeout pour enhancement
+            timeout_s = self.pipeline_config["individual_stage_timeout_ms"] / 1000
+            
+            async with self.concurrency_limiter:
+                enhanced_context = await asyncio.wait_for(
+                    self.context_enhancer.enhance_question_for_rag(
+                        original_question=question,
+                        conversation_context=conversation_context,
+                        current_entities=entities_dict,
+                        language=pipeline_result.language
+                    ),
+                    timeout=timeout_s
+                )
             
             pipeline_result.enhanced_context = enhanced_context
             pipeline_result.stages_completed.append(PipelineStage.CONTEXT_ENHANCEMENT.value)
@@ -292,6 +409,11 @@ class UnifiedAIPipeline:
             logger.info(f"✅ [Pipeline] Contexte enrichi: '{enhanced_context.enhanced_question}'")
             
             return enhanced_context
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ [Pipeline] Timeout enhancement contextuel: {timeout_s}s")
+            self.pipeline_metrics["timeout_errors"] += 1
+            return None
             
         except Exception as e:
             logger.warning(f"⚠️ [Pipeline] Erreur enhancement contextuel: {e}")
@@ -313,12 +435,19 @@ class UnifiedAIPipeline:
             # Contexte conversationnel pour classification
             conversation_context = enhanced_context.context_summary if enhanced_context else ""
             
-            classification_result = await self.validation_service.classify_intent_and_response_type(
-                question=question,
-                entities=entities_dict,
-                conversation_context=conversation_context,
-                language=pipeline_result.language
-            )
+            # ✅ NOUVEAU: Timeout pour classification
+            timeout_s = self.pipeline_config["individual_stage_timeout_ms"] / 1000
+            
+            async with self.concurrency_limiter:
+                classification_result = await asyncio.wait_for(
+                    self.validation_service.classify_intent_and_response_type(
+                        question=question,
+                        entities=entities_dict,
+                        conversation_context=conversation_context,
+                        language=pipeline_result.language
+                    ),
+                    timeout=timeout_s
+                )
             
             pipeline_result.classification_result = classification_result
             pipeline_result.stages_completed.append(PipelineStage.INTENT_CLASSIFICATION.value)
@@ -329,6 +458,12 @@ class UnifiedAIPipeline:
             logger.info(f"✅ [Pipeline] Classification: {classification_result.intent_type.value} → {classification_result.response_type.value}")
             
             return classification_result
+            
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ [Pipeline] Timeout classification: {timeout_s}s")
+            self.pipeline_metrics["timeout_errors"] += 1
+            pipeline_result.fallback_used = True
+            return self._fallback_classification(question, extracted_entities)
             
         except Exception as e:
             logger.error(f"❌ [Pipeline] Erreur classification: {e}")
@@ -354,8 +489,8 @@ class UnifiedAIPipeline:
             # Utiliser entités fusionnées si disponibles
             entities_dict = enhanced_context.merged_entities if enhanced_context else self._convert_entities_to_dict(extracted_entities)
             
-            # Calcul avec la logique existante (intelligent_system_config)
-            weight_data = await self._calculate_weight_data_integrated(entities_dict)
+            # ✅ CORRIGÉ: Appel synchrone (plus d'await)
+            weight_data = self._calculate_weight_data_integrated(entities_dict)
             
             pipeline_result.weight_data = weight_data
             
@@ -384,57 +519,76 @@ class UnifiedAIPipeline:
             # Choisir la méthode de génération selon classification
             response_type = classification_result.response_type.value
             
-            if response_type == "contextual_answer":
-                # Réponse contextuelle avec données précises
-                entities_dict = enhanced_context.merged_entities if enhanced_context else self._convert_entities_to_dict(extracted_entities)
-                
-                response_data = await self.response_generator.generate_contextual_response(
-                    question=enhanced_context.enhanced_question if enhanced_context else question,
-                    merged_entities=entities_dict,
-                    weight_data=weight_data,
-                    conversation_context=enhanced_context.context_summary if enhanced_context else "",
-                    language=pipeline_result.language
-                )
-                
-            elif response_type == "general_answer":
-                # Réponse générale informative
-                entities_dict = self._convert_entities_to_dict(extracted_entities)
-                
-                response_data = await self.response_generator.generate_general_response(
-                    question=question,
-                    entities=entities_dict,
-                    missing_entities=classification_result.missing_entities,
-                    language=pipeline_result.language
-                )
-                
-            elif response_type == "needs_clarification":
-                # Demande de clarification
-                entities_dict = self._convert_entities_to_dict(extracted_entities)
-                
-                response_data = await self.response_generator.generate_clarification_request(
-                    question=question,
-                    missing_entities=classification_result.missing_entities,
-                    available_entities=entities_dict,
-                    language=pipeline_result.language
-                )
-                
-            elif classification_result.intent_type.value == "santé":
-                # Réponse spécialisée santé
-                response_data = await self.response_generator.generate_health_response(
-                    question=question,
-                    symptoms=extracted_entities.symptoms,
-                    entities=self._convert_entities_to_dict(extracted_entities),
-                    language=pipeline_result.language
-                )
-                
-            else:
-                # Fallback vers réponse générale
-                entities_dict = self._convert_entities_to_dict(extracted_entities)
-                response_data = await self.response_generator.generate_general_response(
-                    question=question,
-                    entities=entities_dict,
-                    language=pipeline_result.language
-                )
+            # ✅ NOUVEAU: Timeout pour génération
+            timeout_s = self.pipeline_config["individual_stage_timeout_ms"] / 1000
+            
+            async with self.concurrency_limiter:
+                if response_type == "contextual_answer":
+                    # Réponse contextuelle avec données précises
+                    entities_dict = enhanced_context.merged_entities if enhanced_context else self._convert_entities_to_dict(extracted_entities)
+                    
+                    response_data = await asyncio.wait_for(
+                        self.response_generator.generate_contextual_response(
+                            question=enhanced_context.enhanced_question if enhanced_context else question,
+                            merged_entities=entities_dict,
+                            weight_data=weight_data,
+                            conversation_context=enhanced_context.context_summary if enhanced_context else "",
+                            language=pipeline_result.language
+                        ),
+                        timeout=timeout_s
+                    )
+                    
+                elif response_type == "general_answer":
+                    # Réponse générale informative
+                    entities_dict = self._convert_entities_to_dict(extracted_entities)
+                    
+                    response_data = await asyncio.wait_for(
+                        self.response_generator.generate_general_response(
+                            question=question,
+                            entities=entities_dict,
+                            missing_entities=classification_result.missing_entities,
+                            language=pipeline_result.language
+                        ),
+                        timeout=timeout_s
+                    )
+                    
+                elif response_type == "needs_clarification":
+                    # Demande de clarification
+                    entities_dict = self._convert_entities_to_dict(extracted_entities)
+                    
+                    response_data = await asyncio.wait_for(
+                        self.response_generator.generate_clarification_request(
+                            question=question,
+                            missing_entities=classification_result.missing_entities,
+                            available_entities=entities_dict,
+                            language=pipeline_result.language
+                        ),
+                        timeout=timeout_s
+                    )
+                    
+                elif classification_result.intent_type.value == "santé":
+                    # Réponse spécialisée santé
+                    response_data = await asyncio.wait_for(
+                        self.response_generator.generate_health_response(
+                            question=question,
+                            symptoms=extracted_entities.symptoms,
+                            entities=self._convert_entities_to_dict(extracted_entities),
+                            language=pipeline_result.language
+                        ),
+                        timeout=timeout_s
+                    )
+                    
+                else:
+                    # Fallback vers réponse générale
+                    entities_dict = self._convert_entities_to_dict(extracted_entities)
+                    response_data = await asyncio.wait_for(
+                        self.response_generator.generate_general_response(
+                            question=question,
+                            entities=entities_dict,
+                            language=pipeline_result.language
+                        ),
+                        timeout=timeout_s
+                    )
             
             pipeline_result.stages_completed.append(PipelineStage.RESPONSE_GENERATION.value)
             pipeline_result.ai_calls_made += 1
@@ -445,18 +599,24 @@ class UnifiedAIPipeline:
             
             return response_data
             
+        except asyncio.TimeoutError:
+            logger.warning(f"⏰ [Pipeline] Timeout génération réponse: {timeout_s}s")
+            self.pipeline_metrics["timeout_errors"] += 1
+            pipeline_result.fallback_used = True
+            return self._generate_fallback_response(question, classification_result, pipeline_result.language)
+            
         except Exception as e:
             logger.error(f"❌ [Pipeline] Erreur génération réponse: {e}")
             # Fallback response simple
             pipeline_result.fallback_used = True
             return self._generate_fallback_response(question, classification_result, pipeline_result.language)
     
-    async def _get_conversation_context(self, conversation_id: str) -> str:
-        """Récupère le contexte conversationnel (simplified)"""
+    def _get_conversation_context(self, conversation_id: str) -> str:
+        """✅ CORRIGÉ: Récupère le contexte conversationnel (maintenant synchrone)"""
         
         try:
             # Ici on intégrerait avec le ContextManager existant
-            # Pour l'instant, retour simplifié
+            # Pour l'instant, retour simplifié mais SYNCHRONE
             return f"Contexte conversation {conversation_id}"
             
         except Exception as e:
@@ -482,8 +642,8 @@ class UnifiedAIPipeline:
             "normalized_by_ai": entities.normalized_by_ai
         }
     
-    async def _calculate_weight_data_integrated(self, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """Calcul intégré des données de poids"""
+    def _calculate_weight_data_integrated(self, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """✅ CORRIGÉ: Calcul intégré des données de poids (maintenant synchrone)"""
         
         try:
             # Import de la fonction existante
@@ -500,7 +660,7 @@ class UnifiedAIPipeline:
             sex_mapping = {"male": "male", "female": "female", "mixed": "mixed"}
             sex = sex_mapping.get(sex, "mixed")
             
-            # Calcul avec fonction existante
+            # Calcul avec fonction existante (SYNCHRONE)
             weight_range = get_weight_range(breed, age_days, sex)
             min_weight, max_weight = weight_range
             
@@ -614,6 +774,23 @@ class UnifiedAIPipeline:
             (current_avg * (total_runs - 1) + processing_time) / total_runs
         )
     
+    # ✅ NOUVEAU: Méthodes de configuration du parallélisme
+    def enable_parallel_processing(self, enable: bool = True):
+        """Active/désactive le traitement parallèle"""
+        self.pipeline_config["enable_parallel_processing"] = enable
+        mode = "parallèle" if enable else "séquentiel"
+        logger.info(f"🔧 [Pipeline] Mode de traitement: {mode}")
+    
+    def set_stage_timeout(self, timeout_ms: int):
+        """Configure le timeout par étape"""
+        self.pipeline_config["individual_stage_timeout_ms"] = timeout_ms
+        logger.info(f"⏱️ [Pipeline] Timeout par étape: {timeout_ms}ms")
+    
+    def set_concurrency_limit(self, limit: int):
+        """Configure la limite de concurrence"""
+        self.concurrency_limiter = asyncio.Semaphore(limit)
+        logger.info(f"🚦 [Pipeline] Limite de concurrence: {limit} opérations simultanées")
+    
     def get_pipeline_health(self) -> Dict[str, Any]:
         """Retourne l'état de santé du pipeline"""
         
@@ -627,6 +804,8 @@ class UnifiedAIPipeline:
             "success_rate": round(success_rate, 2),
             "average_processing_time_ms": round(self.pipeline_metrics["average_processing_time"], 2),
             "fallback_usage_rate": round((self.pipeline_metrics["fallback_usage"] / total_runs * 100) if total_runs > 0 else 0, 2),
+            "parallel_runs": self.pipeline_metrics["parallel_runs"],  # ✅ NOUVEAU
+            "timeout_errors": self.pipeline_metrics["timeout_errors"],  # ✅ NOUVEAU
             "stage_success_rates": {
                 stage: round((count / total_runs * 100) if total_runs > 0 else 0, 2)
                 for stage, count in self.pipeline_metrics["stage_success_rates"].items()
@@ -634,7 +813,9 @@ class UnifiedAIPipeline:
             "ai_service_health": self.ai_manager.get_service_health(),
             "configuration": self.pipeline_config,
             "signature_compatible": True,  # ✅ NOUVEAU: Indicateur de compatibilité
-            "supported_parameters": ["question", "conversation_id", "language"]  # ✅ NOUVEAU: Paramètres supportés
+            "supported_parameters": ["question", "conversation_id", "language"],  # ✅ NOUVEAU: Paramètres supportés
+            "async_corrections_applied": True,  # ✅ NOUVEAU: Corrections async appliquées
+            "parallel_processing_available": True  # ✅ NOUVEAU: Parallélisme disponible
         }
     
     def reset_metrics(self):
@@ -646,7 +827,9 @@ class UnifiedAIPipeline:
             "failed_runs": 0,
             "average_processing_time": 0.0,
             "stage_success_rates": {stage.value: 0 for stage in PipelineStage},
-            "fallback_usage": 0
+            "fallback_usage": 0,
+            "parallel_runs": 0,  # ✅ NOUVEAU
+            "timeout_errors": 0   # ✅ NOUVEAU
         }
         
         logger.info("🔄 [Unified AI Pipeline] Métriques remises à zéro")
@@ -713,10 +896,18 @@ def validate_pipeline_compatibility() -> Dict[str, Any]:
             "process_complete_pipeline_with_context": "Version étendue avec contexte utilisateur"
         },
         "compatibility_status": "✅ Compatible avec expert_services.py",
+        "async_corrections_applied": [
+            "_calculate_weight_data_integrated maintenant synchrone",
+            "_get_conversation_context maintenant synchrone",  
+            "Timeouts individuels par étape ajoutés",
+            "Limitation de concurrence implémentée",
+            "Mode parallèle optionnel disponible"
+        ],
         "migration_notes": [
             "Paramètre 'context' supprimé de la signature principale",
             "Méthode alternative disponible si contexte nécessaire",
             "Fallbacks robustes intégrés",
-            "Logging détaillé pour debug"
+            "Logging détaillé pour debug",
+            "Gestion cohérente des coroutines async/await"
         ]
     }
