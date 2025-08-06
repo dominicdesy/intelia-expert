@@ -1,10 +1,11 @@
 """
-entities_extractor.py - EXTRACTION D'ENTITÉS SIMPLIFIÉE
+entities_extractor.py - EXTRACTION D'ENTITÉS AVEC INTÉGRATION IA + FALLBACK
 
-🎯 REMPLACE: clarification_entities.py et tous les autres extracteurs complexes
-🚀 PRINCIPE: Extraction simple et efficace des informations clés
-✨ SIMPLE: Patterns regex clairs et maintenables
-🔧 NOUVEAU: Intégration avec EntityNormalizer pour normalisation systématique
+🎯 TRANSFORMÉ: Intégration IA avec fallback vers patterns classiques
+🚀 PRINCIPE: IA en priorité, patterns regex comme backup
+✨ INTELLIGENT: AIEntityExtractor pour extraction avancée
+🔧 ROBUST: Fallback complet vers code classique existant
+💡 NOUVEAU: Pipeline unifié avec gestion d'erreurs
 
 Entités extraites:
 - age_days: Âge en jours (converti automatiquement)
@@ -22,7 +23,15 @@ import re
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 
-# 🔧 NOUVEAU: Import du normalizer pour normalisation systématique
+# 🔧 NOUVEAU: Import des services IA avec fallback
+try:
+    from .ai_entity_extractor import AIEntityExtractor
+    AI_EXTRACTOR_AVAILABLE = True
+except ImportError:
+    AI_EXTRACTOR_AVAILABLE = False
+    logging.warning("AIEntityExtractor non disponible - utilisation patterns classiques")
+
+# 🔧 CONSERVÉ: Import du normalizer pour normalisation systématique
 try:
     from .entity_normalizer import EntityNormalizer
     NORMALIZER_AVAILABLE = True
@@ -54,10 +63,21 @@ class ExtractedEntities:
             self.symptoms = []
 
 class EntitiesExtractor:
-    """Extracteur d'entités simple et efficace avec normalisation intégrée"""
+    """
+    🔧 TRANSFORMÉ: Extracteur d'entités hybride IA + Patterns classiques
+    NOUVEAU: Priorité IA avec fallback robuste vers code existant
+    """
     
     def __init__(self):
-        # 🔧 NOUVEAU: Intégration du normalizer
+        # 🔧 NOUVEAU: Intégration services IA
+        if AI_EXTRACTOR_AVAILABLE:
+            self.ai_extractor = AIEntityExtractor()
+            logger.info("✅ [Entities Extractor] AIEntityExtractor initialisé")
+        else:
+            self.ai_extractor = None
+            logger.warning("⚠️ [Entities Extractor] Fonctionnement sans IA - patterns classiques")
+            
+        # 🔧 CONSERVÉ: Intégration du normalizer
         if NORMALIZER_AVAILABLE:
             self.normalizer = EntityNormalizer()
             logger.info("✅ [Entities Extractor] EntityNormalizer initialisé")
@@ -65,7 +85,7 @@ class EntitiesExtractor:
             self.normalizer = None
             logger.warning("⚠️ [Entities Extractor] Fonctionnement sans EntityNormalizer")
             
-        # Races spécifiques reconnues (nom complet)
+        # 🔧 CONSERVÉ: Patterns classiques comme fallback (CODE ORIGINAL PRÉSERVÉ)
         self.specific_breeds = {
             # Poulets de chair
             'ross 308': 'Ross 308',
@@ -88,13 +108,13 @@ class EntitiesExtractor:
             'novogen': 'Novogen'
         }
         
-        # Races génériques (mentions partielles)
+        # 🔧 CONSERVÉ: Races génériques (mentions partielles)
         self.generic_breeds = [
             'ross', 'cobb', 'broiler', 'poulet', 'poule', 'poussin',
             'chicken', 'hen', 'rooster', 'cockerel', 'pullet'
         ]
         
-        # Symptômes de santé
+        # 🔧 CONSERVÉ: Symptômes de santé
         self.health_symptoms = {
             'digestifs': ['diarrhée', 'fientes', 'liquide', 'verdâtre', 'sanguinolente'],
             'respiratoires': ['toux', 'râle', 'dyspnée', 'essoufflement', 'respiration'],
@@ -103,10 +123,9 @@ class EntitiesExtractor:
             'généraux': ['fièvre', 'perte', 'appétit', 'amaigrissement', 'mortalité']
         }
 
-    def extract(self, question: str) -> ExtractedEntities:
+    async def extract(self, question: str) -> ExtractedEntities:
         """
-        POINT D'ENTRÉE PRINCIPAL - Extrait toutes les entités de la question
-        🔧 NOUVEAU: Avec normalisation systématique via EntityNormalizer
+        🔧 TRANSFORMÉ: POINT D'ENTRÉE PRINCIPAL - IA en priorité avec fallback complet
         
         Args:
             question: Texte de la question à analyser
@@ -117,35 +136,55 @@ class EntitiesExtractor:
         try:
             logger.info(f"🔍 [Entities Extractor] Analyse: '{question[:50]}...'")
             
+            # 🔧 NOUVEAU: PRIORITÉ IA
+            if self.ai_extractor:
+                try:
+                    logger.debug("🤖 [Entities Extractor] Tentative extraction IA...")
+                    ai_result = await self.ai_extractor.extract_entities(question)
+                    
+                    # Normalisation si disponible
+                    if self.normalizer:
+                        logger.debug("🔄 [Entities Extractor] Normalisation IA...")
+                        normalized_result = self.normalizer.normalize(ai_result)
+                        logger.info(f"✅ [Entities Extractor] Extraction IA réussie + normalisée: {self._entities_summary(normalized_result)}")
+                        return normalized_result
+                    else:
+                        logger.info(f"✅ [Entities Extractor] Extraction IA réussie: {self._entities_summary(ai_result)}")
+                        return ai_result
+                        
+                except Exception as ai_error:
+                    logger.warning(f"⚠️ [Entities Extractor] IA échouée: {ai_error}, fallback vers patterns...")
+                    # Continue vers fallback patterns classiques
+            
+            # 🔧 FALLBACK: PATTERNS CLASSIQUES (CODE ORIGINAL PRÉSERVÉ)
+            logger.debug("🔧 [Entities Extractor] Utilisation patterns classiques...")
             question_lower = question.lower().strip()
+            raw_entities = self._raw_extract_with_patterns(question_lower)
             
-            # 🔧 NOUVEAU: Extraction brute puis normalisation
-            raw_entities = self._raw_extract(question_lower)
-            
-            # 🔧 NOUVEAU: Normalisation systématique si disponible
+            # 🔧 CONSERVÉ: Normalisation systématique si disponible
             if self.normalizer:
                 logger.debug("🔄 [Entities Extractor] Application de la normalisation...")
                 normalized_entities = self.normalizer.normalize(raw_entities)
-                logger.info(f"✅ [Entities Extractor] Entités normalisées: {self._entities_summary(normalized_entities)}")
+                logger.info(f"✅ [Entities Extractor] Entités normalisées (patterns): {self._entities_summary(normalized_entities)}")
                 return normalized_entities
             else:
                 # Fallback: normalisation de base
                 self._normalize_extracted_data(raw_entities)
-                logger.info(f"✅ [Entities Extractor] Entités extraites (normalisation de base): {self._entities_summary(raw_entities)}")
+                logger.info(f"✅ [Entities Extractor] Entités extraites (patterns + normalisation de base): {self._entities_summary(raw_entities)}")
                 return raw_entities
             
         except Exception as e:
-            logger.error(f"❌ [Entities Extractor] Erreur extraction: {e}")
-            return ExtractedEntities()  # Retourner entités vides en cas d'erreur
+            logger.error(f"❌ [Entities Extractor] Erreur critique extraction: {e}")
+            return ExtractedEntities()  # Retourner entités vides en cas d'erreur critique
 
-    def _raw_extract(self, question: str) -> ExtractedEntities:
+    def _raw_extract_with_patterns(self, question: str) -> ExtractedEntities:
         """
-        🔧 NOUVEAU: Extraction brute sans normalisation
-        Sépare l'extraction de la normalisation pour flexibilité
+        🔧 CONSERVÉ: Extraction brute avec patterns classiques (CODE ORIGINAL)
+        Méthode de fallback préservant toute la logique existante
         """
         entities = ExtractedEntities()
         
-        # Extraction par type d'information
+        # 🔧 CONSERVÉ: Extraction par type d'information (CODE ORIGINAL)
         entities.age_days = self._extract_age_days(question)
         entities.age_weeks = self._extract_age_weeks(question)
         entities.age = self._extract_age_text(question)
@@ -166,6 +205,8 @@ class EntitiesExtractor:
         
         return entities
 
+    # 🔧 CONSERVÉ: TOUT LE CODE ORIGINAL DES MÉTHODES D'EXTRACTION (CODE EXACT PRÉSERVÉ)
+    
     def _extract_age_days(self, question: str) -> Optional[int]:
         """Extrait l'âge en jours"""
         
@@ -437,8 +478,8 @@ class EntitiesExtractor:
 
     def _normalize_extracted_data(self, entities: ExtractedEntities):
         """
-        Normalise et enrichit les données extraites (version de base)
-        🔧 MODIFICATION: Fallback quand EntityNormalizer n'est pas disponible
+        🔧 CONSERVÉ: Normalise et enrichit les données extraites (version de base)
+        Fallback quand EntityNormalizer n'est pas disponible
         """
         
         # Conversion semaines -> jours si manquant
@@ -469,7 +510,7 @@ class EntitiesExtractor:
             entities.weight_mentioned = True
 
     def _entities_summary(self, entities) -> str:
-        """Crée un résumé des entités pour le logging"""
+        """🔧 CONSERVÉ: Crée un résumé des entités pour le logging"""
         
         summary_parts = []
         
@@ -501,43 +542,50 @@ class EntitiesExtractor:
         return ", ".join(summary_parts) if summary_parts else "aucune"
 
     def get_extraction_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques de l'extracteur pour debugging"""
+        """🔧 AMÉLIORÉ: Retourne les statistiques de l'extracteur pour debugging"""
         stats = {
-            "extractor_version": "1.1.0",  # 🔧 NOUVEAU: Version mise à jour
-            "normalizer_enabled": NORMALIZER_AVAILABLE,  # 🔧 NOUVEAU: Status normalizer
+            "extractor_version": "1.2.0",  # 🔧 NOUVEAU: Version avec IA
+            "ai_extractor_enabled": AI_EXTRACTOR_AVAILABLE,  # 🔧 NOUVEAU: Status IA
+            "normalizer_enabled": NORMALIZER_AVAILABLE,
             "specific_breeds_count": len(self.specific_breeds),
             "generic_breeds_count": len(self.generic_breeds),
             "health_symptoms_categories": len(self.health_symptoms),
-            "total_symptoms": sum(len(symptoms) for symptoms in self.health_symptoms.values())
+            "total_symptoms": sum(len(symptoms) for symptoms in self.health_symptoms.values()),
+            "extraction_mode": "IA+Fallback" if AI_EXTRACTOR_AVAILABLE else "Patterns+Normalizer" if NORMALIZER_AVAILABLE else "Patterns seulement"
         }
         
-        # 🔧 FIX: Stats du normalizer si disponible - utilise la méthode correcte
+        # 🔧 NOUVEAU: Stats IA si disponible
+        if self.ai_extractor:
+            try:
+                stats["ai_extractor_stats"] = self.ai_extractor.get_stats()
+            except AttributeError:
+                stats["ai_extractor_stats"] = {"error": "Méthode de statistiques IA non disponible"}
+        
+        # 🔧 CONSERVÉ: Stats du normalizer si disponible
         if self.normalizer:
             try:
-                stats["normalizer_stats"] = self.normalizer.get_stats()  # 🔧 FIX: Utilise get_stats() au lieu de get_normalization_stats()
+                stats["normalizer_stats"] = self.normalizer.get_stats()
             except AttributeError:
-                # Si la méthode n'existe pas, essayer l'alias
                 try:
                     stats["normalizer_stats"] = self.normalizer.get_normalization_stats()
                 except AttributeError:
-                    stats["normalizer_stats"] = {"error": "Méthode de statistiques non disponible"}
+                    stats["normalizer_stats"] = {"error": "Méthode de statistiques normalizer non disponible"}
         
         return stats
 
 # =============================================================================
-# FONCTIONS UTILITAIRES - MISES À JOUR
+# 🔧 NOUVELLES FONCTIONS UTILITAIRES - IA + FALLBACK
 # =============================================================================
 
-def quick_extract(question: str) -> Dict[str, Any]:
+async def extract_with_ai_fallback(question: str) -> Dict[str, Any]:
     """
-    Extraction rapide pour usage simple
-    🔧 NOUVEAU: Retourne les entités normalisées
+    🔧 NOUVEAU: Extraction avec IA en priorité et fallback complet
     
     Returns:
-        Dict avec les entités principales extraites et normalisées
+        Dict avec les entités principales extraites (IA ou patterns)
     """
     extractor = EntitiesExtractor()
-    entities = extractor.extract(question)
+    entities = await extractor.extract(question)  # 🔧 NOUVEAU: async pour IA
     
     return {
         'age_days': getattr(entities, 'age_days', None),
@@ -548,7 +596,54 @@ def quick_extract(question: str) -> Dict[str, Any]:
         'weight_grams': getattr(entities, 'weight_grams', None),
         'symptoms': getattr(entities, 'symptoms', []),
         'context_type': getattr(entities, 'context_type', None),
-        # 🔧 NOUVEAU: Champs additionnels normalisés
+        'age_weeks': getattr(entities, 'age_weeks', None),
+        'weight_unit': getattr(entities, 'weight_unit', None),
+        'housing_conditions': getattr(entities, 'housing_conditions', None),
+        'feeding_context': getattr(entities, 'feeding_context', None),
+        'extraction_method': 'IA' if AI_EXTRACTOR_AVAILABLE else 'Patterns'  # 🔧 NOUVEAU: Traçabilité
+    }
+
+# 🔧 CONSERVÉ: Fonctions utilitaires existantes avec ajout IA
+
+def quick_extract(question: str) -> Dict[str, Any]:
+    """
+    🔧 MODIFIÉ: Extraction rapide - synchrone avec fallback
+    Pour compatibilité avec code existant synchrone
+    """
+    extractor = EntitiesExtractor()
+    
+    # Si IA disponible, tenter version async rapidement
+    if extractor.ai_extractor:
+        try:
+            import asyncio
+            # Tenter extraction IA avec timeout court
+            entities = asyncio.get_event_loop().run_until_complete(
+                asyncio.wait_for(extractor.extract(question), timeout=5.0)
+            )
+        except (TimeoutError, Exception):
+            # Fallback immediate vers patterns
+            entities = extractor._raw_extract_with_patterns(question.lower().strip())
+            if extractor.normalizer:
+                entities = extractor.normalizer.normalize(entities)
+            else:
+                extractor._normalize_extracted_data(entities)
+    else:
+        # Extraction patterns directe
+        entities = extractor._raw_extract_with_patterns(question.lower().strip())
+        if extractor.normalizer:
+            entities = extractor.normalizer.normalize(entities)
+        else:
+            extractor._normalize_extracted_data(entities)
+    
+    return {
+        'age_days': getattr(entities, 'age_days', None),
+        'breed_specific': getattr(entities, 'breed_specific', None),
+        'breed_generic': getattr(entities, 'breed_generic', None),
+        'sex': getattr(entities, 'sex', None),
+        'weight_mentioned': getattr(entities, 'weight_mentioned', False),
+        'weight_grams': getattr(entities, 'weight_grams', None),
+        'symptoms': getattr(entities, 'symptoms', []),
+        'context_type': getattr(entities, 'context_type', None),
         'age_weeks': getattr(entities, 'age_weeks', None),
         'weight_unit': getattr(entities, 'weight_unit', None),
         'housing_conditions': getattr(entities, 'housing_conditions', None),
@@ -556,57 +651,48 @@ def quick_extract(question: str) -> Dict[str, Any]:
     }
 
 def extract_age_only(question: str) -> Optional[int]:
-    """Extrait seulement l'âge en jours (normalisé)"""
-    extractor = EntitiesExtractor()
-    entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return getattr(entities, 'age_days', None)
+    """🔧 CONSERVÉ: Extrait seulement l'âge en jours (avec amélioration IA si disponible)"""
+    entities = quick_extract(question)
+    return entities.get('age_days')
 
 def extract_breed_only(question: str) -> Optional[str]:
-    """Extrait seulement la race spécifique (normalisée)"""
-    extractor = EntitiesExtractor()
-    entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None)
+    """🔧 CONSERVÉ: Extrait seulement la race spécifique (avec amélioration IA si disponible)"""
+    entities = quick_extract(question)
+    return entities.get('breed_specific') or entities.get('breed')
 
 def has_health_context(question: str) -> bool:
-    """Détermine rapidement si c'est un contexte de santé"""
-    extractor = EntitiesExtractor()
-    entities = extractor.extract(question)
-    context_type = getattr(entities, 'context_type', None)
-    symptoms = getattr(entities, 'symptoms', [])
+    """🔧 CONSERVÉ: Détermine rapidement si c'est un contexte de santé (avec amélioration IA)"""
+    entities = quick_extract(question)
+    context_type = entities.get('context_type')
+    symptoms = entities.get('symptoms', [])
     return context_type == 'santé' or len(symptoms) > 0
 
-# 🔧 NOUVELLES FONCTIONS UTILITAIRES
-
-def extract_normalized_entities(question: str):
+def get_extraction_capabilities() -> Dict[str, Any]:
     """
-    🔧 NOUVEAU: Extraction complète avec normalisation garantie
+    🔧 NOUVEAU: Retourne les capacités d'extraction disponibles
     
     Returns:
-        ExtractedEntities ou NormalizedEntities complètement normalisées
-    """
-    extractor = EntitiesExtractor()
-    return extractor.extract(question)
-
-def get_normalization_status() -> Dict[str, Any]:
-    """
-    🔧 NOUVEAU: Retourne le statut de la normalisation
-    
-    Returns:
-        Dict avec le statut du système de normalisation
+        Dict avec le statut de tous les modules d'extraction
     """
     return {
+        "ai_extraction_available": AI_EXTRACTOR_AVAILABLE,
         "normalizer_available": NORMALIZER_AVAILABLE,
-        "extractor_version": "1.1.0",
-        "normalization_enabled": True,
-        "fallback_normalization": not NORMALIZER_AVAILABLE
+        "extraction_mode": "IA+Patterns+Normalizer" if AI_EXTRACTOR_AVAILABLE and NORMALIZER_AVAILABLE 
+                          else "IA+Patterns" if AI_EXTRACTOR_AVAILABLE 
+                          else "Patterns+Normalizer" if NORMALIZER_AVAILABLE
+                          else "Patterns seulement",
+        "fallback_enabled": True,  # Toujours vrai - patterns toujours disponibles
+        "extractor_version": "1.2.0",
+        "supports_async": AI_EXTRACTOR_AVAILABLE,
+        "supports_normalization": True  # Via normalizer ou fallback
     }
 
 # =============================================================================
-# TESTS INTÉGRÉS - MISE À JOUR
+# 🔧 TESTS INTÉGRÉS - MISE À JOUR AVEC IA
 # =============================================================================
 
-def test_extractor():
-    """Tests rapides de l'extracteur avec normalisation"""
+async def test_extractor_with_ai():
+    """🔧 NOUVEAU: Tests de l'extracteur avec IA et fallback"""
     extractor = EntitiesExtractor()
     
     test_cases = [
@@ -616,14 +702,18 @@ def test_extractor():
         "La température est trop élevée dans mon bâtiment d'élevage"
     ]
     
-    print("🧪 Tests de l'extracteur d'entités avec normalisation:")
-    print("=" * 60)
-    print(f"🔧 Normalizer disponible: {NORMALIZER_AVAILABLE}")
-    print("=" * 60)
+    print("🧪 Tests de l'extracteur d'entités avec IA + fallback:")
+    print("=" * 70)
+    capabilities = get_extraction_capabilities()
+    for key, value in capabilities.items():
+        print(f"🔧 {key}: {value}")
+    print("=" * 70)
     
     for i, test_case in enumerate(test_cases, 1):
         print(f"\n📝 Test {i}: {test_case}")
-        entities = extractor.extract(test_case)
+        
+        # Test avec IA si disponible
+        entities = await extractor.extract(test_case)
         
         age_days = getattr(entities, 'age_days', None)
         age_weeks = getattr(entities, 'age_weeks', None)
@@ -644,9 +734,14 @@ def test_extractor():
         print(f"   ✅ Symptômes: {symptoms}")
         print(f"   ✅ Contexte: {context_type}")
         
-        # 🔧 NOUVEAU: Affichage statut normalisation
+        # 🔧 NOUVEAU: Affichage méthode d'extraction
+        if extractor.ai_extractor:
+            print(f"   🤖 Extraction: ✅ IA + Fallback disponible")
+        else:
+            print(f"   🔧 Extraction: ⚠️ Patterns classiques seulement")
+            
         if extractor.normalizer:
-            print(f"   🔄 Normalisation: ✅ Appliquée")
+            print(f"   🔄 Normalisation: ✅ EntityNormalizer")
         else:
             print(f"   🔄 Normalisation: ⚠️ Fallback de base")
     
@@ -655,7 +750,35 @@ def test_extractor():
     for key, value in stats.items():
         print(f"   {key}: {value}")
     
-    print("\n✅ Tests terminés!")
+    print("\n✅ Tests avec IA terminés!")
+
+def test_extractor():
+    """🔧 CONSERVÉ: Tests synchrones pour compatibilité"""
+    import asyncio
+    try:
+        # Tenter version async si possible
+        asyncio.run(test_extractor_with_ai())
+    except Exception as e:
+        print(f"⚠️ Test async échoué ({e}), utilisation version synchrone...")
+        
+        # Fallback version synchrone
+        extractor = EntitiesExtractor()
+        test_cases = [
+            "Quel est le poids d'un poulet Ross 308 mâle de 21 jours ?",
+            "Mes poules Cobb 500 de 3 semaines ont des problèmes de diarrhée"
+        ]
+        
+        print("🧪 Tests de l'extracteur d'entités (mode synchrone):")
+        print("=" * 60)
+        
+        for i, test_case in enumerate(test_cases, 1):
+            print(f"\n📝 Test {i}: {test_case}")
+            entities = quick_extract(test_case)
+            
+            for key, value in entities.items():
+                print(f"   ✅ {key}: {value}")
+        
+        print("\n✅ Tests synchrones terminés!")
 
 if __name__ == "__main__":
     test_extractor()

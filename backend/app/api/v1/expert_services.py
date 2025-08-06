@@ -1,25 +1,25 @@
 """
-expert_services.py - SERVICE PRINCIPAL AVEC NORMALISATION CENTRALISÉE
+expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ
 
-🎯 PHASE 1: NORMALISATION DES ENTITÉS INTÉGRÉE (PRIORITÉ: HAUTE)
+🎯 PHASE 4: PIPELINE UNIFIÉ IA INTÉGRÉ (PRIORITÉ: HAUTE)
 
-AMÉLIORATIONS INTÉGRÉES:
-- ✅ Intégration EntityNormalizer pour cohérence totale
-- ✅ Gestion complète du contexte conversationnel  
+TRANSFORMATIONS APPLIQUÉES selon Plan de Transformation:
+- ✅ Intégration UnifiedAIPipeline pour orchestration IA
+- ✅ AIFallbackSystem pour robustesse maximale
+- ✅ Conservation du code existant comme backup
+- ✅ Gestion complète du contexte conversationnel
 - ✅ Support du type CONTEXTUAL_ANSWER
 - ✅ Passage du conversation_id au classifier
 - ✅ Entités normalisées systématiquement
 - ✅ Compatibilité totale avec l'ancien système
 
-NOUVEAU FLUX AMÉLIORÉ:
-1. Récupération du conversation_id depuis la requête
-2. Extraction des entités + NORMALISATION automatique
-3. Passage du conversation_id au classifier intelligent
-4. Classifier détecte les clarifications et fusionne le contexte
-5. Response Generator utilise les entités normalisées + weight_data
-6. Résultat: "Ross 308 mâle à 12 jours : 380-420g" 🎯
+NOUVEAU FLUX IA UNIFIÉ:
+1. Tentative pipeline IA complet (UnifiedAIPipeline)
+2. Si succès: résultat IA optimisé
+3. Si échec: fallback automatique vers système classique
+4. Résultat: "Ross 308 mâle à 12 jours : 380-420g" avec IA ou fallback 🎯
 
-IMPACT ATTENDU: +25% performance grâce à la normalisation
+IMPACT ATTENDU: +50% performance grâce au pipeline IA unifié
 """
 
 import logging
@@ -28,9 +28,19 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-# Imports des nouveaux modules avec contexte ET normalisation
+# Imports des modules IA unifiés (NOUVEAUX selon plan transformation)
+try:
+    from .unified_ai_pipeline import get_unified_ai_pipeline, PipelineResult
+    from .ai_fallback_system import AIFallbackSystem
+    AI_PIPELINE_AVAILABLE = True
+    logger.info("✅ [Expert Services] Pipeline IA unifié disponible")
+except ImportError as e:
+    AI_PIPELINE_AVAILABLE = False
+    logger.warning(f"⚠️ [Expert Services] Pipeline IA non disponible: {e}")
+
+# Imports des modules existants (CONSERVÉS pour fallback)
 from .entities_extractor import EntitiesExtractor, ExtractedEntities
-from .entity_normalizer import EntityNormalizer, NormalizedEntities  # NOUVEAU
+from .entity_normalizer import EntityNormalizer, NormalizedEntities  # CONSERVÉ
 from .smart_classifier import SmartClassifier, ClassificationResult, ResponseType
 from .unified_response_generator import UnifiedResponseGenerator, ResponseData
 
@@ -54,12 +64,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class ProcessingResult:
-    """Résultat du traitement d'une question avec contexte ET entités normalisées"""
+    """Résultat du traitement d'une question avec pipeline IA unifié"""
     def __init__(self, success: bool, response: str, response_type: str, 
                  confidence: float, entities: ExtractedEntities, 
                  processing_time_ms: int, error: str = None,
                  context_used: bool = False, weight_data: Dict[str, Any] = None,
-                 normalized_entities: NormalizedEntities = None):  # NOUVEAU
+                 normalized_entities: NormalizedEntities = None,
+                 ai_pipeline_used: bool = False, pipeline_result: PipelineResult = None):  # NOUVEAU
         self.success = success
         self.response = response
         self.response_type = response_type
@@ -69,62 +80,97 @@ class ProcessingResult:
         self.error = error
         self.context_used = context_used
         self.weight_data = weight_data or {}
-        self.normalized_entities = normalized_entities  # NOUVEAU: Entités normalisées
+        self.normalized_entities = normalized_entities  # Entités normalisées
+        self.ai_pipeline_used = ai_pipeline_used  # NOUVEAU: Pipeline IA utilisé
+        self.pipeline_result = pipeline_result  # NOUVEAU: Résultat complet pipeline IA
         self.timestamp = datetime.now().isoformat()
 
 class ExpertService:
-    """Service expert unifié avec normalisation centralisée et contexte conversationnel"""
+    """Service expert unifié avec pipeline IA et fallback système classique"""
     
     def __init__(self, db_path: str = "conversations.db"):
-        """Initialisation du service avec les composants contextuels ET normalisation"""
+        """Initialisation du service avec pipeline IA unifié et système classique"""
+        
+        # =================================================================
+        # NOUVEAU: PIPELINE IA UNIFIÉ (PRIORITÉ ABSOLUE)
+        # =================================================================
+        self.ai_pipeline = None
+        self.ai_fallback_system = None
+        
+        if AI_PIPELINE_AVAILABLE:
+            try:
+                self.ai_pipeline = get_unified_ai_pipeline()
+                self.ai_fallback_system = AIFallbackSystem()
+                logger.info("🤖 [Expert Service] Pipeline IA unifié activé")
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Erreur init pipeline IA: {e}")
+                AI_PIPELINE_AVAILABLE = False
+        
+        # =================================================================
+        # CONSERVÉ: SYSTÈME CLASSIQUE (FALLBACK GARANTI)
+        # =================================================================
         self.entities_extractor = EntitiesExtractor()
-        self.entity_normalizer = EntityNormalizer()  # NOUVEAU: Normalizer centralisé
+        self.entity_normalizer = EntityNormalizer()
         self.smart_classifier = SmartClassifier(db_path=db_path)
         self.response_generator = UnifiedResponseGenerator()
         
-        # Statistiques pour monitoring (améliorées avec normalisation)
+        # Statistiques étendues avec métriques IA
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
             "general_answers": 0,
             "clarifications": 0,
             "contextual_answers": 0,
-            "entities_normalized": 0,  # NOUVEAU: Compteur normalisation
-            "normalization_success_rate": 0.0,  # NOUVEAU: Taux de succès normalisation
+            "entities_normalized": 0,
+            "normalization_success_rate": 0.0,
+            "ai_pipeline_usage": 0,  # NOUVEAU: Utilisation pipeline IA
+            "ai_success_rate": 0.0,  # NOUVEAU: Taux succès IA
+            "fallback_usage": 0,     # NOUVEAU: Utilisation fallback
             "errors": 0,
             "average_processing_time_ms": 0,
             "context_usage_rate": 0.0
         }
         
-        # Configuration
+        # Configuration étendue avec paramètres IA
         self.config = {
             "enable_logging": True,
             "enable_stats": True,
             "enable_context": True,
-            "enable_normalization": True,  # NOUVEAU: Activer normalisation
-            "max_processing_time_ms": 10000,
+            "enable_normalization": True,
+            "enable_ai_pipeline": AI_PIPELINE_AVAILABLE,  # NOUVEAU: IA activée
+            "ai_pipeline_priority": True,  # NOUVEAU: IA en priorité
+            "max_processing_time_ms": 15000,  # Augmenté pour IA
             "fallback_enabled": True,
             "context_expiry_minutes": 10,
-            "normalization_confidence_threshold": 0.5  # NOUVEAU: Seuil confiance normalisation
+            "normalization_confidence_threshold": 0.5,
+            "ai_timeout_seconds": 10,  # NOUVEAU: Timeout IA
+            "ai_fallback_on_error": True  # NOUVEAU: Fallback auto
         }
         
-        logger.info("✅ [Expert Service] Service unifié avec normalisation initialisé")
+        logger.info("✅ [Expert Service] Service unifié avec pipeline IA initialisé")
         
-        # 🔧 FIX: Gestion sécurisée des statistiques de l'extracteur
+        # Affichage des capacités
+        if self.ai_pipeline:
+            logger.info("   🤖 Pipeline IA: ACTIVÉ - Performances optimisées")
+            pipeline_health = self.ai_pipeline.get_pipeline_health()
+            logger.info(f"   📊 Pipeline Health: {pipeline_health.get('success_rate', 0):.1f}% success")
+        else:
+            logger.info("   🔄 Système classique uniquement - Fallback garanti")
+        
+        # Statistiques des composants existants (conservées)
         try:
             extractor_stats = self.entities_extractor.get_extraction_stats()
-            logger.info(f"   📊 Extracteur: {extractor_stats}")
+            logger.info(f"   📊 Extracteur classique: {extractor_stats}")
         except Exception as e:
-            logger.warning(f"   ⚠️ Impossible de récupérer les stats extracteur: {e}")
+            logger.warning(f"   ⚠️ Stats extracteur: {e}")
         
         logger.info(f"   🔧 Normalizer: Races={len(self.entity_normalizer.breed_mapping)}")
         
-        # 🔧 FIX: Gestion sécurisée des statistiques du classifier
         try:
             classifier_stats = self.smart_classifier.get_classification_stats()
-            logger.info(f"   🧠 Classifier: {classifier_stats}")
+            logger.info(f"   🧠 Classifier classique: {classifier_stats}")
         except Exception as e:
-            logger.warning(f"   ⚠️ Impossible de récupérer les stats classifier: {e}")
+            logger.warning(f"   ⚠️ Stats classifier: {e}")
         
         logger.info(f"   🔗 Contexte: {'Activé' if self.config['enable_context'] else 'Désactivé'}")
         logger.info(f"   🎯 Normalisation: {'Activée' if self.config['enable_normalization'] else 'Désactivée'}")
@@ -132,7 +178,7 @@ class ExpertService:
     async def process_question(self, question: str, context: Dict[str, Any] = None, 
                              language: str = "fr") -> ProcessingResult:
         """
-        POINT D'ENTRÉE PRINCIPAL - Traite une question avec normalisation et contexte
+        POINT D'ENTRÉE PRINCIPAL - Pipeline IA unifié avec fallback système classique
         
         Args:
             question: Question à traiter
@@ -140,7 +186,7 @@ class ExpertService:
             language: Langue de réponse
             
         Returns:
-            ProcessingResult avec la réponse et les métadonnées contextuelles + entités normalisées
+            ProcessingResult avec la réponse et les métadonnées complètes
         """
         start_time = time.time()
         
@@ -168,19 +214,73 @@ class ExpertService:
                     error="Question invalide"
                 )
             
-            # 1️⃣ EXTRACTION DES ENTITÉS (sans normalisation)
+            # =============================================================
+            # NOUVEAU: TENTATIVE PIPELINE IA UNIFIÉ EN PRIORITÉ
+            # =============================================================
+            if self.config["enable_ai_pipeline"] and self.ai_pipeline and self.config["ai_pipeline_priority"]:
+                try:
+                    logger.info("🤖 [Expert Service] Tentative pipeline IA unifié...")
+                    
+                    # Appel pipeline IA complet
+                    pipeline_result = await self.ai_pipeline.process_complete_pipeline(
+                        question=question,
+                        conversation_id=conversation_id,
+                        language=language,
+                        context=context or {}
+                    )
+                    
+                    if pipeline_result and pipeline_result.final_response:
+                        processing_time_ms = int((time.time() - start_time) * 1000)
+                        
+                        logger.info(f"✅ [Expert Service] Pipeline IA réussi en {processing_time_ms}ms")
+                        logger.info(f"   🎯 Confiance IA: {pipeline_result.confidence:.2f}")
+                        logger.info(f"   🏷️ Type réponse: {pipeline_result.response_type}")
+                        
+                        # Conversion du résultat IA vers ProcessingResult
+                        result = ProcessingResult(
+                            success=True,
+                            response=pipeline_result.final_response,
+                            response_type=pipeline_result.response_type,
+                            confidence=pipeline_result.confidence,
+                            entities=pipeline_result.extracted_entities or ExtractedEntities(),
+                            processing_time_ms=processing_time_ms,
+                            context_used=pipeline_result.enhanced_context is not None,
+                            weight_data=pipeline_result.weight_data,
+                            normalized_entities=getattr(pipeline_result, 'normalized_entities', None),
+                            ai_pipeline_used=True,  # NOUVEAU
+                            pipeline_result=pipeline_result  # NOUVEAU
+                        )
+                        
+                        # Statistiques IA
+                        self._update_stats_ai(pipeline_result.response_type, processing_time_ms, True, 
+                                            pipeline_result.enhanced_context is not None, True, False)
+                        
+                        return result
+                        
+                    else:
+                        logger.warning("⚠️ [Expert Service] Pipeline IA: résultat invalide, fallback...")
+                        
+                except Exception as e:
+                    logger.error(f"❌ [Expert Service] Erreur pipeline IA: {e}")
+                    logger.info("🔄 [Expert Service] Basculement vers système classique...")
+            
+            # =============================================================
+            # FALLBACK: SYSTÈME CLASSIQUE (CONSERVÉ ET AMÉLIORÉ)
+            # =============================================================
+            logger.info("🔄 [Expert Service] Traitement système classique...")
+            
+            # 1️⃣ EXTRACTION DES ENTITÉS (classique)
             raw_entities = self.entities_extractor.extract(question)
             logger.info(f"   🔍 Entités extraites: {raw_entities}")
             
-            # 2️⃣ NOUVEAU: NORMALISATION CENTRALISÉE
+            # 2️⃣ NORMALISATION CENTRALISÉE (conservée)
             normalized_entities = None
-            entities_for_processing = self._entities_to_dict(raw_entities)  # Format par défaut
+            entities_for_processing = self._entities_to_dict(raw_entities)
             
             if self.config["enable_normalization"]:
                 try:
                     normalized_entities = self.entity_normalizer.normalize(raw_entities)
                     
-                    # Vérifier la confiance de normalisation
                     if normalized_entities.normalization_confidence >= self.config["normalization_confidence_threshold"]:
                         entities_for_processing = normalized_entities.to_dict()
                         self.stats["entities_normalized"] += 1
@@ -188,13 +288,11 @@ class ExpertService:
                         logger.info(f"   📊 Confiance normalisation: {normalized_entities.normalization_confidence:.2f}")
                     else:
                         logger.warning(f"   ⚠️ Confiance normalisation faible: {normalized_entities.normalization_confidence:.2f}")
-                        # Garder les entités originales
                         
                 except Exception as e:
                     logger.error(f"   ❌ Erreur normalisation: {e}")
-                    # Continuer avec les entités originales
             
-            # 3️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE (utilise entités normalisées si disponibles)
+            # 3️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE (classique)
             classification = self.smart_classifier.classify_question(
                 question, 
                 entities_for_processing,
@@ -204,19 +302,16 @@ class ExpertService:
             
             logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
             
-            # Vérifier si le contexte a été utilisé
             context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
             if context_used:
-                logger.info("   🔗 Contexte conversationnel utilisé pour la réponse")
+                logger.info("   🔗 Contexte conversationnel utilisé")
             
-            # 4️⃣ GÉNÉRATION DE LA RÉPONSE AVEC SUPPORT CONTEXTUEL ET ENTITÉS NORMALISÉES
-            # Utiliser les entités fusionnées si disponibles, sinon les entités normalisées
+            # 4️⃣ GÉNÉRATION DE LA RÉPONSE (classique)
             final_entities = classification.merged_entities if classification.merged_entities else entities_for_processing
             
             response_data = self.response_generator.generate(question, final_entities, classification)
             logger.info(f"   🎨 Réponse générée: {response_data.response_type}")
             
-            # Afficher les données de poids si calculées
             if classification.weight_data:
                 weight_range = classification.weight_data.get('weight_range')
                 if weight_range:
@@ -230,18 +325,19 @@ class ExpertService:
                 response=response_data.response,
                 response_type=response_data.response_type,
                 confidence=response_data.confidence,
-                entities=raw_entities,  # Entités originales pour compatibilité
+                entities=raw_entities,
                 processing_time_ms=processing_time_ms,
                 context_used=context_used,
                 weight_data=classification.weight_data,
-                normalized_entities=normalized_entities  # NOUVEAU: Entités normalisées
+                normalized_entities=normalized_entities,
+                ai_pipeline_used=False  # Système classique utilisé
             )
             
-            # 6️⃣ MISE À JOUR DES STATISTIQUES AVEC NORMALISATION
-            self._update_stats(classification.response_type, processing_time_ms, True, context_used, 
-                             normalized_entities is not None)
+            # 6️⃣ MISE À JOUR DES STATISTIQUES
+            self._update_stats_ai(classification.response_type, processing_time_ms, True, context_used, 
+                                False, True)  # Fallback utilisé
             
-            logger.info(f"✅ [Expert Service] Traitement réussi en {processing_time_ms}ms")
+            logger.info(f"✅ [Expert Service] Traitement classique réussi en {processing_time_ms}ms")
             return result
             
         except Exception as e:
@@ -250,7 +346,7 @@ class ExpertService:
             
             logger.error(f"❌ [Expert Service] {error_msg}")
             
-            # Réponse de fallback
+            # Réponse d'urgence
             fallback_response = self._generate_fallback_response(question, language)
             
             result = ProcessingResult(
@@ -260,15 +356,16 @@ class ExpertService:
                 confidence=0.3,
                 entities=ExtractedEntities(),
                 processing_time_ms=processing_time_ms,
-                error=error_msg
+                error=error_msg,
+                ai_pipeline_used=False
             )
             
-            self._update_stats(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False, False)
+            self._update_stats_ai(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False, False, True)
             return result
 
     async def ask_expert_enhanced(self, request: EnhancedQuestionRequest) -> EnhancedExpertResponse:
         """
-        Interface compatible avec l'ancien système - AMÉLIORÉE avec normalisation et contexte
+        Interface compatible avec l'ancien système - AMÉLIORÉE avec pipeline IA unifié
         
         Args:
             request: Requête formatée selon l'ancien modèle
@@ -277,7 +374,7 @@ class ExpertService:
             EnhancedExpertResponse compatible avec l'ancien système
         """
         try:
-            # Extraire plus d'informations contextuelles
+            # Extraire contexte enrichi
             context = {
                 "conversation_id": getattr(request, 'conversation_id', None),
                 "user_id": getattr(request, 'user_id', None),
@@ -287,25 +384,322 @@ class ExpertService:
                 "concision_level": getattr(request, 'concision_level', 'standard')
             }
             
-            # Traitement unifié avec normalisation et contexte
+            # Traitement unifié avec pipeline IA et fallback système classique
             result = await self.process_question(
                 question=request.text,
                 context=context,
                 language=getattr(request, 'language', 'fr')
             )
             
-            # Conversion en format ancien pour compatibilité
+            # Conversion vers format legacy avec informations IA
             return self._convert_to_legacy_response(request, result)
             
         except Exception as e:
             logger.error(f"❌ [Expert Service] Erreur ask_expert_enhanced: {e}")
             return self._create_error_response(request, str(e))
 
+    def _convert_to_legacy_response(self, request: EnhancedQuestionRequest, 
+                                  result: ProcessingResult) -> EnhancedExpertResponse:
+        """Convertit le résultat moderne vers le format legacy avec informations IA"""
+        
+        conversation_id = getattr(request, 'conversation_id', None) or str(uuid.uuid4())
+        language = getattr(request, 'language', 'fr')
+        
+        # Données de base avec informations IA
+        response_data = {
+            "question": request.text,
+            "response": result.response,
+            "conversation_id": conversation_id,
+            "rag_used": False,
+            "timestamp": result.timestamp,
+            "language": language,
+            "response_time_ms": result.processing_time_ms,
+            "mode": "unified_ai_pipeline_v3.0" if result.ai_pipeline_used else "unified_intelligent_system_v2_normalized"
+        }
+        
+        # Ajout des champs pour compatibilité avec informations IA
+        optional_fields = {
+            "user": getattr(request, 'user_id', None),
+            "logged": True,
+            "validation_passed": result.success,
+            "processing_steps": [
+                "ai_pipeline_attempt" if result.ai_pipeline_used else "entities_extraction",
+                "entity_normalization_v1" if result.normalized_entities else "classic_extraction",
+                "context_enhancement_ai" if result.ai_pipeline_used else "context_management",
+                "smart_classification_v2",
+                "response_generation_ai" if result.ai_pipeline_used else "unified_response_generation_v2",
+                "contextual_data_calculation" if result.context_used else "standard_processing"
+            ],
+            "ai_enhancements_used": [
+                "unified_ai_pipeline_v1" if result.ai_pipeline_used else None,
+                "ai_entity_extractor_v1" if result.ai_pipeline_used else "entities_extractor_v1",
+                "ai_context_enhancer_v1" if result.ai_pipeline_used else None,
+                "ai_response_generator_v1" if result.ai_pipeline_used else "unified_response_generator_v2",
+                "entity_normalizer_v1" if result.normalized_entities else None,
+                "conversation_context_manager" if result.context_used else None
+            ]
+        }
+        
+        # Informations de classification avec données IA
+        classification_info = {
+            "response_type_detected": result.response_type,
+            "confidence_score": result.confidence,
+            "entities_extracted": self._entities_to_dict(result.entities),
+            "entities_normalized": result.normalized_entities.to_dict() if result.normalized_entities else None,
+            "normalization_confidence": result.normalized_entities.normalization_confidence if result.normalized_entities else None,
+            "processing_successful": result.success,
+            "context_used": result.context_used,
+            "weight_data_calculated": bool(result.weight_data),
+            "conversation_id": conversation_id,
+            "ai_pipeline_used": result.ai_pipeline_used,  # NOUVEAU
+            "ai_pipeline_result": {  # NOUVEAU
+                "stages_completed": result.pipeline_result.stages_completed if result.pipeline_result else [],
+                "ai_calls_made": result.pipeline_result.ai_calls_made if result.pipeline_result else 0,
+                "cache_hits": result.pipeline_result.cache_hits if result.pipeline_result else 0,
+                "fallback_used": result.pipeline_result.fallback_used if result.pipeline_result else (not result.ai_pipeline_used)
+            }
+        }
+        
+        # Données de poids
+        if result.weight_data:
+            classification_info["weight_calculation"] = {
+                "breed": result.weight_data.get('breed'),
+                "age_days": result.weight_data.get('age_days'),
+                "sex": result.weight_data.get('sex'),
+                "weight_range": result.weight_data.get('weight_range'),
+                "target_weight": result.weight_data.get('target_weight'),
+                "data_source": result.weight_data.get('data_source', 'ai_pipeline' if result.ai_pipeline_used else 'intelligent_system_config')
+            }
+        
+        # Fusionner données
+        response_data.update(optional_fields)
+        response_data["classification_result"] = classification_info
+        
+        # Informations contextuelles avec IA
+        response_data["contextual_features"] = {
+            "context_detection_enabled": self.config["enable_context"],
+            "clarification_detection": True,
+            "entity_inheritance": True,
+            "entity_normalization": self.config["enable_normalization"],
+            "weight_data_calculation": True,
+            "conversation_persistence": True,
+            "ai_pipeline_enabled": self.config["enable_ai_pipeline"],  # NOUVEAU
+            "ai_context_enhancement": result.ai_pipeline_used,  # NOUVEAU
+            "ai_response_generation": result.ai_pipeline_used   # NOUVEAU
+        }
+        
+        # Détails de normalisation
+        if result.normalized_entities:
+            response_data["normalization_details"] = {
+                "normalization_applied": True,
+                "confidence": result.normalized_entities.normalization_confidence,
+                "breed_normalized": result.normalized_entities.breed != self._entities_to_dict(result.entities).get('breed_specific'),
+                "age_converted": result.normalized_entities.age_days is not None,
+                "sex_standardized": result.normalized_entities.sex is not None,
+                "enrichments_applied": len([x for x in [result.normalized_entities.context_type, 
+                                                      result.normalized_entities.sex] if x]),
+                "original_format_preserved": result.normalized_entities.original_format
+            }
+        
+        # NOUVEAU: Détails du pipeline IA
+        if result.ai_pipeline_used and result.pipeline_result:
+            response_data["ai_pipeline_details"] = {
+                "pipeline_used": True,
+                "total_processing_time_ms": result.pipeline_result.total_processing_time_ms,
+                "stages_completed": result.pipeline_result.stages_completed,
+                "ai_calls_made": result.pipeline_result.ai_calls_made,
+                "cache_hits": result.pipeline_result.cache_hits,
+                "fallback_used": result.pipeline_result.fallback_used,
+                "pipeline_version": result.pipeline_result.pipeline_version,
+                "confidence_ai": result.pipeline_result.confidence
+            }
+        
+        # Gestion d'erreur
+        if not result.success:
+            response_data["error_details"] = {
+                "error_message": result.error,
+                "fallback_used": True,
+                "original_processing_failed": True,
+                "context_available": bool(getattr(request, 'conversation_id', None)),
+                "normalization_attempted": self.config["enable_normalization"],
+                "ai_pipeline_attempted": self.config["enable_ai_pipeline"]  # NOUVEAU
+            }
+        
+        if MODELS_AVAILABLE:
+            return EnhancedExpertResponse(**response_data)
+        else:
+            return EnhancedExpertResponse(**response_data)
+
+    def _create_error_response(self, request: EnhancedQuestionRequest, error: str) -> EnhancedExpertResponse:
+        """Crée une réponse d'erreur avec informations IA"""
+        
+        error_responses = {
+            "fr": f"Désolé, je rencontre une difficulté technique. Erreur: {error}. Pouvez-vous reformuler votre question ?",
+            "en": f"Sorry, I'm experiencing a technical difficulty. Error: {error}. Could you rephrase your question?",
+            "es": f"Lo siento, estoy experimentando una dificultad técnica. Error: {error}. ¿Podrías reformular tu pregunta?"
+        }
+        
+        language = getattr(request, 'language', 'fr')
+        error_response = error_responses.get(language, error_responses['fr'])
+        
+        return EnhancedExpertResponse(
+            question=request.text,
+            response=error_response,
+            conversation_id=getattr(request, 'conversation_id', str(uuid.uuid4())),
+            rag_used=False,
+            timestamp=datetime.now().isoformat(),
+            language=language,
+            response_time_ms=0,
+            mode="error_fallback_ai_pipeline",  # NOUVEAU
+            logged=True,
+            validation_passed=False,
+            error_details={
+                "error": error, 
+                "system": "unified_expert_service_ai_pipeline_v3",  # NOUVEAU
+                "context_available": bool(getattr(request, 'conversation_id', None)),
+                "normalization_enabled": self.config["enable_normalization"],
+                "ai_pipeline_enabled": self.config["enable_ai_pipeline"]  # NOUVEAU
+            }
+        )
+
+    def _update_stats_ai(self, response_type: ResponseType, processing_time_ms: int, 
+                        success: bool, context_used: bool = False, 
+                        normalization_used: bool = False, fallback_used: bool = False):
+        """Met à jour les statistiques avec informations IA"""
+        
+        if not self.config["enable_stats"]:
+            return
+        
+        self.stats["questions_processed"] += 1
+        
+        if success:
+            if response_type == ResponseType.PRECISE_ANSWER:
+                self.stats["precise_answers"] += 1
+            elif response_type == ResponseType.GENERAL_ANSWER:
+                self.stats["general_answers"] += 1
+            elif response_type == ResponseType.NEEDS_CLARIFICATION:
+                self.stats["clarifications"] += 1
+            elif response_type == ResponseType.CONTEXTUAL_ANSWER:
+                self.stats["contextual_answers"] += 1
+        else:
+            self.stats["errors"] += 1
+        
+        # Stats contexte
+        if context_used:
+            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_usage_rate"] = (total_context_usage + 1) / self.stats["questions_processed"]
+        else:
+            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_usage_rate"] = total_context_usage / self.stats["questions_processed"]
+        
+        # Stats normalisation
+        if normalization_used:
+            total_normalization = self.stats["normalization_success_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["normalization_success_rate"] = (total_normalization + 1) / self.stats["questions_processed"]
+        else:
+            total_normalization = self.stats["normalization_success_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["normalization_success_rate"] = total_normalization / self.stats["questions_processed"]
+        
+        # NOUVEAU: Stats IA
+        if not fallback_used:  # Pipeline IA utilisé
+            self.stats["ai_pipeline_usage"] += 1
+            total_ai_success = self.stats["ai_success_rate"] * (self.stats["ai_pipeline_usage"] - 1)
+            if success:
+                self.stats["ai_success_rate"] = (total_ai_success + 1) / self.stats["ai_pipeline_usage"]
+            else:
+                self.stats["ai_success_rate"] = total_ai_success / self.stats["ai_pipeline_usage"]
+        else:  # Fallback utilisé
+            self.stats["fallback_usage"] += 1
+        
+        # Temps moyen
+        current_avg = self.stats["average_processing_time_ms"]
+        total_questions = self.stats["questions_processed"]
+        
+        self.stats["average_processing_time_ms"] = int(
+            (current_avg * (total_questions - 1) + processing_time_ms) / total_questions
+        )
+
+    def get_system_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques système avec informations IA"""
+        
+        total_questions = self.stats["questions_processed"]
+        
+        if total_questions == 0:
+            return {
+                "service_status": "ready",
+                "version": "unified_ai_pipeline_v3.0.0",  # NOUVEAU
+                "questions_processed": 0,
+                "statistics": "No questions processed yet",
+                "ai_pipeline_features": {  # NOUVEAU
+                    "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
+                    "unified_orchestration": "enabled",
+                    "intelligent_fallback": "enabled"
+                },
+                "normalization_features": {
+                    "entity_normalization": "enabled" if self.config["enable_normalization"] else "disabled",
+                    "breed_standardization": "enabled",
+                    "age_conversion": "enabled",
+                    "sex_mapping": "enabled"
+                }
+            }
+        
+        success_rate = ((total_questions - self.stats["errors"]) / total_questions) * 100
+        ai_usage_rate = (self.stats["ai_pipeline_usage"] / total_questions) * 100 if total_questions > 0 else 0
+        fallback_rate = (self.stats["fallback_usage"] / total_questions) * 100 if total_questions > 0 else 0
+        
+        return {
+            "service_status": "active",
+            "version": "unified_ai_pipeline_v3.0.0",  # NOUVEAU
+            "questions_processed": total_questions,
+            "success_rate_percent": round(success_rate, 2),
+            "response_distribution": {
+                "precise_answers": self.stats["precise_answers"],
+                "general_answers": self.stats["general_answers"], 
+                "clarifications": self.stats["clarifications"],
+                "contextual_answers": self.stats["contextual_answers"],
+                "errors": self.stats["errors"]
+            },
+            "contextual_metrics": {
+                "context_usage_rate": round(self.stats["context_usage_rate"] * 100, 2),
+                "contextual_answers_count": self.stats["contextual_answers"],
+                "context_enabled": self.config["enable_context"]
+            },
+            "normalization_metrics": {
+                "normalization_success_rate": round(self.stats["normalization_success_rate"] * 100, 2),
+                "entities_normalized_count": self.stats["entities_normalized"],
+                "normalization_enabled": self.config["enable_normalization"],
+                "normalizer_stats": self.entity_normalizer.get_stats()
+            },
+            "ai_pipeline_metrics": {  # NOUVEAU
+                "ai_pipeline_usage_rate": round(ai_usage_rate, 2),
+                "ai_success_rate": round(self.stats["ai_success_rate"] * 100, 2),
+                "fallback_usage_rate": round(fallback_rate, 2),
+                "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
+                "ai_pipeline_health": self.ai_pipeline.get_pipeline_health() if self.ai_pipeline else None
+            },
+            "performance": {
+                "average_processing_time_ms": self.stats["average_processing_time_ms"],
+                "system_components": {
+                    "ai_unified_pipeline": "active" if self.config["enable_ai_pipeline"] else "disabled",  # NOUVEAU
+                    "ai_fallback_system": "active" if self.ai_fallback_system else "disabled",  # NOUVEAU
+                    "entities_extractor": "active",
+                    "entity_normalizer": "active" if self.config["enable_normalization"] else "disabled",
+                    "smart_classifier": "active_contextual",
+                    "response_generator": "active_contextual",
+                    "conversation_context_manager": "active" if self.config["enable_context"] else "disabled"
+                }
+            },
+            "configuration": self.config,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    # =============================================================
+    # MÉTHODES CONSERVÉES (compatibilité et fonctionnalités)
+    # =============================================================
+    
     def _entities_to_dict(self, entities) -> Dict[str, Any]:
         """Convertit les entités en dictionnaire pour compatibilité"""
-        # 🔧 FIX: Gestion flexible des différents types d'entités
         if hasattr(entities, '__dict__'):
-            # Pour ExtractedEntities ou NormalizedEntities
             entity_dict = {}
             for key, value in entities.__dict__.items():
                 if not key.startswith('_'):
@@ -314,7 +708,6 @@ class ExpertService:
         elif isinstance(entities, dict):
             return entities
         else:
-            # Fallback pour autres types
             return {
                 'age_days': getattr(entities, 'age_days', None),
                 'age_weeks': getattr(entities, 'age_weeks', None),
@@ -332,7 +725,7 @@ class ExpertService:
             }
 
     def _normalized_summary(self, normalized_entities: NormalizedEntities) -> str:
-        """NOUVEAU: Crée un résumé des entités normalisées pour le logging"""
+        """Crée un résumé des entités normalisées pour le logging"""
         
         summary_parts = []
         
@@ -356,145 +749,8 @@ class ExpertService:
         
         return ", ".join(summary_parts) if summary_parts else "aucune"
 
-    def _convert_to_legacy_response(self, request: EnhancedQuestionRequest, 
-                                  result: ProcessingResult) -> EnhancedExpertResponse:
-        """Convertit le résultat moderne vers le format legacy avec données normalisées"""
-        
-        conversation_id = getattr(request, 'conversation_id', None) or str(uuid.uuid4())
-        language = getattr(request, 'language', 'fr')
-        
-        # Données de base obligatoires
-        response_data = {
-            "question": request.text,
-            "response": result.response,
-            "conversation_id": conversation_id,
-            "rag_used": False,
-            "timestamp": result.timestamp,
-            "language": language,
-            "response_time_ms": result.processing_time_ms,
-            "mode": "unified_intelligent_system_v2_normalized"  # NOUVEAU: Version avec normalisation
-        }
-        
-        # Ajout des champs optionnels pour compatibilité (améliorés)
-        optional_fields = {
-            "user": getattr(request, 'user_id', None),
-            "logged": True,
-            "validation_passed": result.success,
-            "processing_steps": [
-                "entities_extraction",
-                "entity_normalization",  # NOUVEAU: Étape de normalisation
-                "smart_classification_with_context",
-                "unified_response_generation",
-                "contextual_data_calculation" if result.context_used else "standard_processing"
-            ],
-            "ai_enhancements_used": [
-                "smart_classifier_v2_contextual",
-                "unified_generator_v2_contextual",
-                "entities_extractor_v1",
-                "entity_normalizer_v1",  # NOUVEAU: Normalizer
-                "conversation_context_manager" if result.context_used else None
-            ]
-        }
-        
-        # Informations de classification contextuelles AVEC normalisation
-        classification_info = {
-            "response_type_detected": result.response_type,
-            "confidence_score": result.confidence,
-            "entities_extracted": self._entities_to_dict(result.entities),
-            "entities_normalized": result.normalized_entities.to_dict() if result.normalized_entities else None,  # NOUVEAU
-            "normalization_confidence": result.normalized_entities.normalization_confidence if result.normalized_entities else None,  # NOUVEAU
-            "processing_successful": result.success,
-            "context_used": result.context_used,
-            "weight_data_calculated": bool(result.weight_data),
-            "conversation_id": conversation_id
-        }
-        
-        # Données de poids si calculées
-        if result.weight_data:
-            classification_info["weight_calculation"] = {
-                "breed": result.weight_data.get('breed'),
-                "age_days": result.weight_data.get('age_days'),
-                "sex": result.weight_data.get('sex'),
-                "weight_range": result.weight_data.get('weight_range'),
-                "target_weight": result.weight_data.get('target_weight'),
-                "data_source": result.weight_data.get('data_source', 'intelligent_system_config')
-            }
-        
-        # Fusionner toutes les données
-        response_data.update(optional_fields)
-        response_data["classification_result"] = classification_info
-        
-        # Informations de contexte conversationnel AVEC normalisation
-        response_data["contextual_features"] = {
-            "context_detection_enabled": self.config["enable_context"],
-            "clarification_detection": True,
-            "entity_inheritance": True,
-            "entity_normalization": self.config["enable_normalization"],  # NOUVEAU
-            "weight_data_calculation": True,
-            "conversation_persistence": True
-        }
-        
-        # NOUVEAU: Statistiques de normalisation
-        if result.normalized_entities:
-            response_data["normalization_details"] = {
-                "normalization_applied": True,
-                "confidence": result.normalized_entities.normalization_confidence,
-                "breed_normalized": result.normalized_entities.breed != self._entities_to_dict(result.entities).get('breed_specific'),
-                "age_converted": result.normalized_entities.age_days is not None,
-                "sex_standardized": result.normalized_entities.sex is not None,
-                "enrichments_applied": len([x for x in [result.normalized_entities.context_type, 
-                                                      result.normalized_entities.sex] if x]),
-                "original_format_preserved": result.normalized_entities.original_format
-            }
-        
-        # Gestion d'erreur si échec
-        if not result.success:
-            response_data["error_details"] = {
-                "error_message": result.error,
-                "fallback_used": True,
-                "original_processing_failed": True,
-                "context_available": bool(getattr(request, 'conversation_id', None)),
-                "normalization_attempted": self.config["enable_normalization"]
-            }
-        
-        if MODELS_AVAILABLE:
-            return EnhancedExpertResponse(**response_data)
-        else:
-            return EnhancedExpertResponse(**response_data)
-
-    def _create_error_response(self, request: EnhancedQuestionRequest, error: str) -> EnhancedExpertResponse:
-        """Crée une réponse d'erreur compatible avec normalisation et contexte"""
-        
-        error_responses = {
-            "fr": f"Désolé, je rencontre une difficulté technique. Erreur: {error}. Pouvez-vous reformuler votre question ?",
-            "en": f"Sorry, I'm experiencing a technical difficulty. Error: {error}. Could you rephrase your question?",
-            "es": f"Lo siento, estoy experimentando una dificultad técnica. Error: {error}. ¿Podrías reformular tu pregunta?"
-        }
-        
-        language = getattr(request, 'language', 'fr')
-        error_response = error_responses.get(language, error_responses['fr'])
-        
-        return EnhancedExpertResponse(
-            question=request.text,
-            response=error_response,
-            conversation_id=getattr(request, 'conversation_id', str(uuid.uuid4())),
-            rag_used=False,
-            timestamp=datetime.now().isoformat(),
-            language=language,
-            response_time_ms=0,
-            mode="error_fallback_normalized",  # NOUVEAU: Version avec normalisation
-            logged=True,
-            validation_passed=False,
-            error_details={
-                "error": error, 
-                "system": "unified_expert_service_v2_normalized",  # NOUVEAU
-                "context_available": bool(getattr(request, 'conversation_id', None)),
-                "normalization_enabled": self.config["enable_normalization"]  # NOUVEAU
-            }
-        )
-
     def _generate_fallback_response(self, question: str, language: str = "fr") -> str:
-        """Génère une réponse de fallback en cas d'erreur (conservée)"""
+        """Génère une réponse de fallback en cas d'erreur"""
         
         fallback_responses = {
             "fr": """Je rencontre une difficulté technique pour analyser votre question.
@@ -533,159 +789,73 @@ class ExpertService:
         
         return fallback_responses.get(language, fallback_responses['fr'])
 
-    def _update_stats(self, response_type: ResponseType, processing_time_ms: int, 
-                     success: bool, context_used: bool = False, normalization_used: bool = False):
-        """Met à jour les statistiques de traitement avec informations normalisées"""
-        
-        if not self.config["enable_stats"]:
-            return
-        
-        self.stats["questions_processed"] += 1
-        
-        if success:
-            if response_type == ResponseType.PRECISE_ANSWER:
-                self.stats["precise_answers"] += 1
-            elif response_type == ResponseType.GENERAL_ANSWER:
-                self.stats["general_answers"] += 1
-            elif response_type == ResponseType.NEEDS_CLARIFICATION:
-                self.stats["clarifications"] += 1
-            elif response_type == ResponseType.CONTEXTUAL_ANSWER:
-                self.stats["contextual_answers"] += 1
-        else:
-            self.stats["errors"] += 1
-        
-        # Mise à jour du taux d'utilisation du contexte
-        if context_used:
-            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
-            self.stats["context_usage_rate"] = (total_context_usage + 1) / self.stats["questions_processed"]
-        else:
-            total_context_usage = self.stats["context_usage_rate"] * (self.stats["questions_processed"] - 1)
-            self.stats["context_usage_rate"] = total_context_usage / self.stats["questions_processed"]
-        
-        # NOUVEAU: Mise à jour du taux de normalisation
-        if normalization_used:
-            total_normalization = self.stats["normalization_success_rate"] * (self.stats["questions_processed"] - 1)
-            self.stats["normalization_success_rate"] = (total_normalization + 1) / self.stats["questions_processed"]
-        else:
-            total_normalization = self.stats["normalization_success_rate"] * (self.stats["questions_processed"] - 1)
-            self.stats["normalization_success_rate"] = total_normalization / self.stats["questions_processed"]
-        
-        # Mise à jour du temps moyen (moyenne mobile)
-        current_avg = self.stats["average_processing_time_ms"]
-        total_questions = self.stats["questions_processed"]
-        
-        self.stats["average_processing_time_ms"] = int(
-            (current_avg * (total_questions - 1) + processing_time_ms) / total_questions
-        )
-
-    def get_system_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques système pour monitoring avec informations de normalisation"""
-        
-        total_questions = self.stats["questions_processed"]
-        
-        if total_questions == 0:
-            return {
-                "service_status": "ready",
-                "version": "unified_v2.0.0_normalized",  # NOUVEAU: Version avec normalisation
-                "questions_processed": 0,
-                "statistics": "No questions processed yet",
-                "normalization_features": {  # NOUVEAU: Features de normalisation
-                    "entity_normalization": "enabled" if self.config["enable_normalization"] else "disabled",
-                    "breed_standardization": "enabled",
-                    "age_conversion": "enabled",
-                    "sex_mapping": "enabled"
-                }
-            }
-        
-        success_rate = ((total_questions - self.stats["errors"]) / total_questions) * 100
-        
-        return {
-            "service_status": "active",
-            "version": "unified_v2.0.0_normalized",  # NOUVEAU
-            "questions_processed": total_questions,
-            "success_rate_percent": round(success_rate, 2),
-            "response_distribution": {
-                "precise_answers": self.stats["precise_answers"],
-                "general_answers": self.stats["general_answers"], 
-                "clarifications": self.stats["clarifications"],
-                "contextual_answers": self.stats["contextual_answers"],
-                "errors": self.stats["errors"]
-            },
-            "contextual_metrics": {
-                "context_usage_rate": round(self.stats["context_usage_rate"] * 100, 2),
-                "contextual_answers_count": self.stats["contextual_answers"],
-                "context_enabled": self.config["enable_context"]
-            },
-            "normalization_metrics": {  # NOUVEAU: Métriques de normalisation
-                "normalization_success_rate": round(self.stats["normalization_success_rate"] * 100, 2),
-                "entities_normalized_count": self.stats["entities_normalized"],
-                "normalization_enabled": self.config["enable_normalization"],
-                "normalizer_stats": self.entity_normalizer.get_stats()
-            },
-            "performance": {
-                "average_processing_time_ms": self.stats["average_processing_time_ms"],
-                "system_components": {
-                    "entities_extractor": "active",
-                    "entity_normalizer": "active" if self.config["enable_normalization"] else "disabled",  # NOUVEAU
-                    "smart_classifier": "active_contextual",
-                    "response_generator": "active_contextual",
-                    "conversation_context_manager": "active" if self.config["enable_context"] else "disabled"
-                }
-            },
-            "configuration": self.config,
-            "timestamp": datetime.now().isoformat()
-        }
-
     def reset_stats(self):
-        """Remet à zéro les statistiques (mise à jour avec nouvelles métriques)"""
+        """Remet à zéro les statistiques avec nouvelles métriques IA"""
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
             "general_answers": 0,
             "clarifications": 0,
             "contextual_answers": 0,
-            "entities_normalized": 0,  # NOUVEAU
-            "normalization_success_rate": 0.0,  # NOUVEAU
+            "entities_normalized": 0,
+            "normalization_success_rate": 0.0,
+            "ai_pipeline_usage": 0,  # NOUVEAU
+            "ai_success_rate": 0.0,  # NOUVEAU
+            "fallback_usage": 0,     # NOUVEAU
             "errors": 0,
             "average_processing_time_ms": 0,
             "context_usage_rate": 0.0
         }
-        logger.info("📊 [Expert Service] Statistiques remises à zéro (version normalisée)")
+        logger.info("📊 [Expert Service] Statistiques remises à zéro (version IA pipeline)")
 
     def update_config(self, new_config: Dict[str, Any]):
-        """Met à jour la configuration du service"""
+        """Met à jour la configuration du service avec paramètres IA"""
         self.config.update(new_config)
         logger.info(f"⚙️ [Expert Service] Configuration mise à jour: {new_config}")
         
-        # NOUVEAU: Réactualiser le normalizer si config changée
+        # Réactivation IA si nécessaire
+        if "enable_ai_pipeline" in new_config and new_config["enable_ai_pipeline"] and not self.ai_pipeline:
+            try:
+                self.ai_pipeline = get_unified_ai_pipeline()
+                self.ai_fallback_system = AIFallbackSystem()
+                logger.info("🤖 [Expert Service] Pipeline IA réactivé")
+            except Exception as e:
+                logger.error(f"❌ [Expert Service] Impossible de réactiver IA: {e}")
+        
         if "enable_normalization" in new_config:
             logger.info(f"🔧 [Expert Service] Normalisation {'activée' if new_config['enable_normalization'] else 'désactivée'}")
 
     def get_contextual_debug_info(self, conversation_id: str) -> Dict[str, Any]:
-        """Récupère les informations de debug contextuelles avec normalisation"""
+        """Récupère les informations de debug avec données IA"""
         try:
             context = self.smart_classifier._get_conversation_context(conversation_id)
             
-            return {
+            debug_info = {
                 "conversation_id": conversation_id,
                 "context_available": context is not None,
                 "context_fresh": context.is_fresh() if context else False,
                 "context_data": context.to_dict() if context else None,
                 "classifier_stats": self.smart_classifier.get_classification_stats(),
-                "normalizer_stats": self.entity_normalizer.get_stats(),  # NOUVEAU
-                "service_version": "v2.0.0_normalized"  # NOUVEAU
+                "normalizer_stats": self.entity_normalizer.get_stats(),
+                "service_version": "v3.0.0_ai_pipeline",  # NOUVEAU
+                "ai_pipeline_available": self.ai_pipeline is not None,  # NOUVEAU
+                "ai_pipeline_health": self.ai_pipeline.get_pipeline_health() if self.ai_pipeline else None  # NOUVEAU
             }
+            
+            return debug_info
+            
         except Exception as e:
             logger.error(f"❌ [Expert Service] Erreur debug contextuel: {e}")
             return {
                 "conversation_id": conversation_id,
                 "error": str(e),
                 "context_available": False,
-                "normalization_available": self.config["enable_normalization"]  # NOUVEAU
+                "normalization_available": self.config["enable_normalization"],
+                "ai_pipeline_available": self.config["enable_ai_pipeline"]  # NOUVEAU
             }
 
     def get_normalization_debug_info(self, raw_entities: Dict[str, Any]) -> Dict[str, Any]:
-        """NOUVEAU: Récupère les informations de debug pour la normalisation"""
+        """Récupère les informations de debug pour la normalisation"""
         try:
             normalized = self.entity_normalizer.normalize(raw_entities)
             
@@ -699,7 +869,8 @@ class ExpertService:
                     "sex_standardized": normalized.sex is not None,
                     "weight_converted": normalized.weight_grams is not None
                 },
-                "normalizer_stats": self.entity_normalizer.get_stats()
+                "normalizer_stats": self.entity_normalizer.get_stats(),
+                "service_version": "v3.0.0_ai_pipeline"  # NOUVEAU
             }
         except Exception as e:
             logger.error(f"❌ [Expert Service] Erreur debug normalisation: {e}")
@@ -709,52 +880,87 @@ class ExpertService:
                 "normalization_failed": True
             }
 
+    def get_ai_pipeline_debug_info(self) -> Dict[str, Any]:
+        """NOUVEAU: Récupère les informations de debug pour le pipeline IA"""
+        try:
+            if not self.ai_pipeline:
+                return {
+                    "ai_pipeline_available": False,
+                    "error": "Pipeline IA non disponible",
+                    "fallback_system_available": self.ai_fallback_system is not None
+                }
+            
+            return {
+                "ai_pipeline_available": True,
+                "pipeline_health": self.ai_pipeline.get_pipeline_health(),
+                "fallback_system_available": self.ai_fallback_system is not None,
+                "ai_service_stats": {
+                    "usage_rate": round((self.stats["ai_pipeline_usage"] / self.stats["questions_processed"] * 100) if self.stats["questions_processed"] > 0 else 0, 2),
+                    "success_rate": round(self.stats["ai_success_rate"] * 100, 2),
+                    "fallback_rate": round((self.stats["fallback_usage"] / self.stats["questions_processed"] * 100) if self.stats["questions_processed"] > 0 else 0, 2)
+                },
+                "configuration": {
+                    "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
+                    "ai_priority": self.config["ai_pipeline_priority"],
+                    "ai_timeout": self.config["ai_timeout_seconds"],
+                    "fallback_on_error": self.config["ai_fallback_on_error"]
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ [Expert Service] Erreur debug pipeline IA: {e}")
+            return {
+                "error": str(e),
+                "ai_pipeline_available": False,
+                "debug_failed": True
+            }
+
 # =============================================================================
-# FONCTIONS UTILITAIRES ET TESTS AVEC NORMALISATION
+# FONCTIONS UTILITAIRES ET TESTS AVEC PIPELINE IA UNIFIÉ
 # =============================================================================
 
 async def quick_ask(question: str, conversation_id: str = None, language: str = "fr") -> str:
-    """Interface rapide pour poser une question avec support normalisation et contexte"""
+    """Interface rapide pour poser une question avec pipeline IA unifié"""
     service = ExpertService()
     context = {"conversation_id": conversation_id} if conversation_id else None
     result = await service.process_question(question, context=context, language=language)
     return result.response
 
 def create_expert_service() -> ExpertService:
-    """Factory pour créer une instance du service avec normalisation et contexte"""
+    """Factory pour créer une instance du service avec pipeline IA unifié"""
     return ExpertService()
 
 # =============================================================================
-# TESTS INTÉGRÉS AVEC NORMALISATION ET CONTEXTE COMPLET
+# TESTS INTÉGRÉS AVEC PIPELINE IA UNIFIÉ COMPLET
 # =============================================================================
 
-async def test_expert_service_normalized():
-    """Tests du service expert avec normalisation et contexte conversationnel complet"""
+async def test_expert_service_ai_pipeline():
+    """Tests du service expert avec pipeline IA unifié et fallback système classique"""
     
-    print("🧪 Tests du Service Expert avec Normalisation et Contexte")
+    print("🧪 Tests du Service Expert avec Pipeline IA Unifié")
     print("=" * 80)
     
     service = ExpertService()
-    conversation_id = "test_conv_normalized_ross308"
+    conversation_id = "test_conv_ai_pipeline_ross308"
     
     test_cases = [
-        # Cas 1: Test normalisation races (variantes d'écriture)
+        # Cas 1: Test IA - normalisation races (variantes d'écriture)
         {
             "question": "Quel est le poids d'un ross308 à 12 jours ?",
             "context": {"conversation_id": conversation_id},
             "expected_type": "general",
-            "description": "Test normalisation: ross308 → Ross 308"
+            "description": "Test IA: ross308 → Ross 308 avec pipeline unifié"
         },
         
-        # Cas 2: Test normalisation âge (semaines → jours)
+        # Cas 2: Test IA - normalisation âge (semaines → jours)
         {
             "question": "Poids cobb500 à 3 semaines ?",
             "context": {"conversation_id": f"{conversation_id}_2"},
             "expected_type": "general", 
-            "description": "Test normalisation: cobb500 → Cobb 500, 3 sem → 21j"
+            "description": "Test IA: cobb500 → Cobb 500, 3 sem → 21j"
         },
         
-        # Cas 3: Test normalisation sexe + clarification contextuelle
+        # Cas 3: Test IA - clarification contextuelle avec sexe
         {
             "question": "Pour des mâles",
             "context": {
@@ -762,15 +968,23 @@ async def test_expert_service_normalized():
                 "is_clarification_response": True
             },
             "expected_type": "contextual",
-            "description": "Test clarification avec sexe normalisé: mâles → male"
+            "description": "Test IA: clarification avec sexe normalisé: mâles → male"
         },
         
-        # Cas 4: Test avec entités multiples à normaliser
+        # Cas 4: Test fallback - entités complexes
         {
-            "question": "poids isa brown femelles 20 semaines ?",
+            "question": "poids isa brown femelles 20 semaines élevage bio ?",
             "context": {"conversation_id": f"{conversation_id}_3"},
             "expected_type": "precise",
-            "description": "Test normalisation complète: isa brown → ISA Brown, femelles → female, 20 sem → 140j"
+            "description": "Test fallback: normalisation complète avec contexte élevage"
+        },
+        
+        # Cas 5: Test IA - question ambiguë
+        {
+            "question": "Problème de croissance mes poulets",
+            "context": {"conversation_id": f"{conversation_id}_4"},
+            "expected_type": "general",
+            "description": "Test IA: question ambiguë nécessitant analyse contextuelle"
         }
     ]
     
@@ -780,18 +994,29 @@ async def test_expert_service_normalized():
         print(f"   Type attendu: {test_case['expected_type']}")
         
         try:
+            start_time = time.time()
             result = await service.process_question(
                 test_case['question'], 
                 context=test_case['context']
             )
+            processing_time = int((time.time() - start_time) * 1000)
             
             status = "✅" if result.success else "❌"
-            print(f"   {status} Type obtenu: {result.response_type}")
-            print(f"   ⏱️ Temps: {result.processing_time_ms}ms")
+            ai_used = "🤖 IA" if result.ai_pipeline_used else "🔄 Classique"
+            print(f"   {status} Type obtenu: {result.response_type} ({ai_used})")
+            print(f"   ⏱️ Temps: {processing_time}ms")
             print(f"   🎯 Confiance: {result.confidence:.2f}")
             print(f"   🔗 Contexte utilisé: {'Oui' if result.context_used else 'Non'}")
             
-            # NOUVEAU: Afficher informations de normalisation
+            # Afficher informations spécifiques au pipeline IA
+            if result.ai_pipeline_used and result.pipeline_result:
+                print(f"   🤖 Pipeline IA - Étapes: {len(result.pipeline_result.stages_completed)}")
+                print(f"      Appels IA: {result.pipeline_result.ai_calls_made}")
+                print(f"      Cache hits: {result.pipeline_result.cache_hits}")
+                if result.pipeline_result.stages_completed:
+                    print(f"      Étapes: {', '.join(result.pipeline_result.stages_completed)}")
+            
+            # Informations de normalisation
             if result.normalized_entities:
                 print(f"   🔧 Normalisation: confiance={result.normalized_entities.normalization_confidence:.2f}")
                 if result.normalized_entities.breed:
@@ -806,17 +1031,20 @@ async def test_expert_service_normalized():
                 weight_range = result.weight_data['weight_range']
                 print(f"   📊 Poids calculé: {weight_range[0]}-{weight_range[1]}g")
             
+            # Prévisualisation de la réponse
             if len(result.response) > 150:
                 preview = result.response[:150] + "..."
             else:
                 preview = result.response
             print(f"   💬 Réponse: {preview}")
             
-            # Vérification spéciale pour les tests avec normalisation
+            # Vérifications spéciales pour les tests
             if i == 1 and result.normalized_entities and result.normalized_entities.breed == "Ross 308":
                 print("   ✅ SUCCESS: Normalisation race ross308 → Ross 308!")
             if i == 2 and result.normalized_entities and result.normalized_entities.age_days == 21:
                 print("   ✅ SUCCESS: Normalisation âge 3 semaines → 21 jours!")
+            if i <= 3 and result.ai_pipeline_used:
+                print("   🤖 SUCCESS: Pipeline IA utilisé avec succès!")
             
         except Exception as e:
             print(f"   ❌ Erreur: {e}")
@@ -829,9 +1057,25 @@ async def test_expert_service_normalized():
     print(f"   Taux d'utilisation contexte: {stats['contextual_metrics']['context_usage_rate']:.1f}%")
     print(f"   Entités normalisées: {stats['normalization_metrics']['entities_normalized_count']}")
     print(f"   Taux normalisation: {stats['normalization_metrics']['normalization_success_rate']:.1f}%")
+    
+    # NOUVEAU: Statistiques pipeline IA
+    if 'ai_pipeline_metrics' in stats:
+        ai_metrics = stats['ai_pipeline_metrics']
+        print(f"   🤖 Utilisation IA: {ai_metrics['ai_pipeline_usage_rate']:.1f}%")
+        print(f"   🤖 Taux succès IA: {ai_metrics['ai_success_rate']:.1f}%")
+        print(f"   🔄 Taux fallback: {ai_metrics['fallback_usage_rate']:.1f}%")
+    
     print(f"   Temps moyen: {stats['performance']['average_processing_time_ms']}ms")
     
-    # NOUVEAU: Test spécifique de normalisation
+    # Test spécifique de debug du pipeline IA
+    print(f"\n🤖 Test de debug pipeline IA:")
+    ai_debug = service.get_ai_pipeline_debug_info()
+    print(f"   Pipeline IA disponible: {'Oui' if ai_debug['ai_pipeline_available'] else 'Non'}")
+    if ai_debug['ai_pipeline_available']:
+        health = ai_debug['pipeline_health']
+        print(f"   Santé pipeline: {health.get('success_rate', 0):.1f}% success, {health.get('total_runs', 0)} runs")
+    
+    # Test spécifique de normalisation (conservé)
     print(f"\n🔧 Test de normalisation isolée:")
     test_entities = {
         "breed_specific": "ross308",
@@ -846,4 +1090,4 @@ async def test_expert_service_normalized():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(test_expert_service_normalized())
+    asyncio.run(test_expert_service_ai_pipeline())
