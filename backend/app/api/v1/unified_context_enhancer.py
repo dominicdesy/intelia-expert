@@ -46,12 +46,12 @@ logger = logging.getLogger(__name__)
 class UnifiedEnhancementResult:
     """Résultat unifié de l'enrichissement complet"""
     
-    # Question enrichie (sortie de l'ancien contextualizer)
+    # ✅ CORRECTION: Champs obligatoires (sans défaut) EN PREMIER
     enriched_question: str
-    enriched_confidence: float = 0.0
-    
-    # Réponse améliorée (sortie de l'ancien rag_enhancer)
     enhanced_answer: str
+    
+    # ✅ CORRECTION: Champs optionnels (avec défaut) APRÈS
+    enriched_confidence: float = 0.0
     enhancement_confidence: float = 0.0
     
     # Éléments de cohérence
@@ -220,10 +220,11 @@ class UnifiedContextEnhancer:
             # Construction du résultat unifié
             processing_time = int((time.time() - start_time) * 1000)
             
+            # ✅ CORRECTION: Passer d'abord les champs obligatoires
             result = UnifiedEnhancementResult(
                 enriched_question=enriched_question,
-                enriched_confidence=enrichment_confidence,
                 enhanced_answer=enhanced_answer,
+                enriched_confidence=enrichment_confidence,
                 enhancement_confidence=enhancement_data.get("confidence", 0.0),
                 coherence_check=coherence_result["status"],
                 coherence_notes=coherence_result["notes"],
@@ -258,11 +259,11 @@ class UnifiedContextEnhancer:
         except Exception as e:
             logger.error(f"❌ [UnifiedContextEnhancer] Erreur traitement unifié: {e}")
             
-            # Retourner résultat de fallback
+            # ✅ CORRECTION: Retourner résultat de fallback avec champs obligatoires en premier
             return UnifiedEnhancementResult(
                 enriched_question=question,
-                enriched_confidence=0.1,
                 enhanced_answer=rag_answer or question,
+                enriched_confidence=0.1,
                 enhancement_confidence=0.1,
                 coherence_check="poor",
                 coherence_notes=f"Erreur traitement: {str(e)}",
