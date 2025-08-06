@@ -47,40 +47,6 @@ from fastapi.responses import JSONResponse
 from .expert_services import ExpertService, ProcessingResult
 from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest
 
-# Ajoutez ces lignes tout en haut de votre expert.py, juste après les imports standards
-print("🔍 [DEBUG] Début chargement expert.py...")
-
-try:
-    print("🔍 [DEBUG] Test import expert_services...")
-    from .expert_services import ExpertService, ProcessingResult
-    print("✅ [DEBUG] expert_services importé")
-    
-    print("🔍 [DEBUG] Test création ExpertService...")
-    test_service = ExpertService()
-    print("✅ [DEBUG] ExpertService créé")
-    
-except Exception as e:
-    print(f"❌ [DEBUG] Erreur expert_services: {e}")
-    import traceback
-    print(f"❌ [DEBUG] Traceback: {traceback.format_exc()}")
-
-try:
-    print("🔍 [DEBUG] Test import expert_models...")
-    from .expert_models import EnhancedQuestionRequest, EnhancedExpertResponse, FeedbackRequest
-    print("✅ [DEBUG] expert_models importé")
-    
-except Exception as e:
-    print(f"❌ [DEBUG] Erreur expert_models: {e}")
-    import traceback
-    print(f"❌ [DEBUG] Traceback: {traceback.format_exc()}")
-
-print("🔍 [DEBUG] Fin tests imports, création router...")
-
-
-
-
-
-
 # 🆕 MODIFICATIONS SELON LE PLAN: Import sécurisé des 3 nouveaux modules
 # Phase 1: Entity Normalizer
 try:
