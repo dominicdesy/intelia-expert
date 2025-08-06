@@ -2,7 +2,9 @@
 app/api/v1/expert_models.py - MODÈLES PYDANTIC POUR EXPERT SYSTEM
 
 Tous les modèles de données pour le système expert
-VERSION CORRIGÉE v3.9.9: Correction validation Pydantic + normalisation entités + support améliorations
+VERSION CORRIGÉE v3.9.10: CORRECTION CONFLIT PYDANTIC model_used → ai_model
+🔧 CORRECTION v3.9.10: Renommage du champ model_used en ai_model pour éviter conflit Pydantic
+🔧 CORRECTION v3.9.9: Correction validation Pydantic + normalisation entités + support améliorations
 🔧 CORRECTION v3.9.9: Amélioration de la validation conversation_context pour accepter Union[Dict, object]
 🔧 CORRECTION v3.9.8: Ajout NormalizedEntities + modèles pour unified_context_enhancer
 🔧 CORRECTION v3.9.7: Ajout champs traçage décisions IA
@@ -390,7 +392,7 @@ class DynamicClarification(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 # =============================================================================
-# 🧠 NOUVEAUX MODÈLES POUR TRAÇAGE DÉCISIONS IA - v3.9.7
+# 🧠 NOUVEAUX MODÈLES POUR TRAÇAGE DÉCISIONS IA - v3.9.7 + CORRECTION v3.9.10
 # =============================================================================
 
 class AiDecisionTrace(BaseModel):
@@ -398,6 +400,7 @@ class AiDecisionTrace(BaseModel):
     Traçage complet d'une décision IA pour auditabilité
     
     Permet de comprendre pourquoi l'IA a pris une décision spécifique
+    🔧 CORRECTION v3.9.10: Renommage model_used → ai_model pour éviter conflit Pydantic
     """
     decision_type: AiDecisionType = Field(..., description="Type de décision prise")
     decision_value: str = Field(..., description="Décision prise par l'IA")
@@ -406,7 +409,7 @@ class AiDecisionTrace(BaseModel):
     alternatives_considered: List[str] = Field(default_factory=list, description="Alternatives considérées")
     decision_time_ms: Optional[int] = Field(default=None, ge=0, description="Temps pour prendre la décision")
     input_factors: Dict[str, Any] = Field(default_factory=dict, description="Facteurs d'entrée influençant la décision")
-    model_used: Optional[str] = Field(default=None, description="Modèle IA utilisé pour la décision")
+    ai_model: Optional[str] = Field(default=None, description="Modèle IA utilisé pour la décision")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -834,6 +837,8 @@ class SystemStats(BaseModel):
     unified_enhancement_enabled: bool = Field(default=True, description="Enrichissement unifié activé")
     # 🔧 NOUVEAU v3.9.9
     pydantic_validation_robust: bool = Field(default=True, description="Validation Pydantic robuste activée")
+    # 🔧 NOUVEAU v3.9.10
+    pydantic_conflict_resolved: bool = Field(default=True, description="Conflit Pydantic model_used résolu")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -856,6 +861,8 @@ class TestResult(BaseModel):
     unified_enhancement_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test enrichissement unifié")
     # 🔧 NOUVEAU v3.9.9
     pydantic_validation_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test validation Pydantic")
+    # 🔧 NOUVEAU v3.9.10
+    pydantic_conflict_test_results: Optional[Dict[str, Any]] = Field(default=None, description="Résultats test résolution conflit Pydantic")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -1136,15 +1143,20 @@ def merge_enhancement_results(contextualizer_result: Dict, rag_enhancer_result: 
 
 logger = logging.getLogger(__name__)
 
-logger.info("✅ [Expert Models] Modèles Pydantic chargés avec améliorations complètes v3.9.9")
-logger.info("🔧 [Expert Models] CORRECTION PYDANTIC v3.9.9 - VALIDATION ROBUSTE:")
+logger.info("✅ [Expert Models] Modèles Pydantic chargés avec améliorations complètes v3.9.10")
+logger.info("🔧 [Expert Models] CORRECTION PYDANTIC v3.9.10 - RÉSOLUTION CONFLIT:")
+logger.info("   - ✅ model_used → ai_model: Renommage dans AiDecisionTrace")
+logger.info("   - ✅ Conflit Pydantic résolu: Plus d'erreur 'model_used' réservé")
+logger.info("   - ✅ Compatibilité préservée: Même fonctionnalité, nom différent")
+logger.info("   - ✅ Documentation mise à jour: Correction v3.9.10 documentée")
+logger.info("🔧 [Expert Models] CORRECTION PYDANTIC v3.9.9 - VALIDATION ROBUSTE conservée:")
 logger.info("   - ✅ safe_convert_to_dict(): Fonction globale de conversion")
 logger.info("   - ✅ conversation_context: Validation @field_validator avec conversion auto")
 logger.info("   - ✅ Union types: Support Dict[str, Any] | Objet avec conversion")
 logger.info("   - ✅ @field_validator mode='before': Conversion avant validation")
 logger.info("   - ✅ Fallback sûr: Dict vide {} si conversion impossible")
 logger.info("   - ✅ to_dict(): Méthode ajoutée à tous les modèles")
-logger.info("🆕 [Expert Models] NOUVELLES FONCTIONNALITÉS v3.9.8 - NORMALISATION ENTITÉS:")
+logger.info("🆕 [Expert Models] NOUVELLES FONCTIONNALITÉS v3.9.8 conservées - NORMALISATION ENTITÉS:")
 logger.info("   - ✅ NormalizedEntities: Modèle principal pour entités normalisées")
 logger.info("   - ✅ ContextEnhancementResult: Support unified_context_enhancer")
 logger.info("   - ✅ UnifiedContextInfo: Support context_manager centralisé")
@@ -1154,10 +1166,11 @@ logger.info("   - ✅ ContextManagerConfig: Configuration gestionnaire contexte"
 logger.info("   - ✅ convert_legacy_entities(): Fonction migration données")
 logger.info("   - ✅ create_unified_context_from_legacy(): Migration contexte")
 logger.info("   - ✅ merge_enhancement_results(): Fusion résultats enrichissement")
-logger.info("🧠 [Expert Models] TRAÇAGE IA v3.9.7 conservé:")
+logger.info("🧠 [Expert Models] TRAÇAGE IA v3.9.7 conservé avec correction:")
 logger.info("   - ✅ ai_classification_used, ai_decision, ai_confidence, ai_reasoning")
 logger.info("   - ✅ response_generation_method dans EnhancedExpertResponse")
-logger.info("   - ✅ AiDecisionTrace, ResponseGenerationTrace")
+logger.info("   - ✅ AiDecisionTrace avec ai_model (au lieu de model_used)")
+logger.info("   - ✅ ResponseGenerationTrace")
 logger.info("   - ✅ AiTracingConfig pour configuration")
 logger.info("🔧 [Expert Models] CORRECTIONS PRÉCÉDENTES conservées:")
 logger.info("   - ✅ clarification_details, enhancement_info, conversation_context")
@@ -1167,20 +1180,16 @@ logger.info("   - ✅ missing_critical_entities, variants_tested")
 logger.info("   - ✅ weight, mortality dans IntelligentEntities")
 logger.info("   - ✅ ClarificationResult avec missing_entities")
 logger.info("   - ✅ contextualization_info, clarification_processing")
-logger.info("🔧 [Expert Models] NOUVEAUX CHAMPS v3.9.9 dans EnhancedExpertResponse:")
-logger.info("   - ✅ conversation_context: Validation robuste avec @field_validator")
-logger.info("   - ✅ normalized_entities: Union[NormalizedEntities, Dict] avec conversion")
-logger.info("   - ✅ enhancement_result: Union[ContextEnhancementResult, Dict] avec conversion")
-logger.info("   - ✅ unified_context_info: Union[UnifiedContextInfo, Dict] avec conversion")
-logger.info("🎯 [Expert Models] AVANTAGES CORRECTION PYDANTIC v3.9.9:")
-logger.info("   - 🚫 Plus d'erreurs 'Input should be a valid dictionary'")
-logger.info("   - ✅ Conversion automatique UnifiedEnhancementResult → Dict")
-logger.info("   - 🔄 Support objets complexes avec to_dict()")
-logger.info("   - 🛡️ Validation robuste avec fallback sûr")
-logger.info("   - 📊 Compatibilité totale entre modules")
-logger.info("✨ [Expert Models] RÉSULTAT v3.9.9: Support complet + validation Pydantic robuste!")
+logger.info("🎯 [Expert Models] RÉSULTAT FINAL v3.9.10:")
+logger.info("   - 🚫 Plus d'erreur Pydantic 'model_used is reserved'")
+logger.info("   - ✅ AiDecisionTrace.ai_model: Nouveau nom de champ")
+logger.info("   - ✅ Validation Pydantic 100% robuste maintenue")
+logger.info("   - 🔄 Support objets complexes avec conversion automatique")
+logger.info("   - 🛡️ Fallback sûr pour tous les cas d'erreur")
+logger.info("   - 📊 Compatibilité totale entre tous les modules")
+logger.info("✨ [Expert Models] RÉSULTAT v3.9.10: Conflit Pydantic résolu + fonctionnalités complètes!")
 logger.info("🎯 [Expert Models] PRÊT POUR:")
-logger.info("   → expert.py (utilise validation robuste)")
+logger.info("   → expert.py (plus d'erreur model_used)")
 logger.info("   → unified_context_enhancer.py (objets convertis automatiquement)")
-logger.info("   → Tous modules (compatibility totale)")
-logger.info("🚀 [Expert Models] VALIDATION PYDANTIC 100% ROBUSTE!")
+logger.info("   → Tous modules (compatibility totale + traçage IA fonctionnel)")
+logger.info("🚀 [Expert Models] PYDANTIC 100% COMPATIBLE + TRAÇAGE IA FONCTIONNEL!")

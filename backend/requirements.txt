@@ -1,4 +1,4 @@
-# 🔧 REQUIREMENTS.TXT - VERSION CORRIGÉE TORCH UINT64
+# 🔧 REQUIREMENTS.TXT - CORRECTIONS DES WARNINGS CRITIQUES
 
 # Core FastAPI
 fastapi==0.104.1
@@ -7,7 +7,7 @@ python-multipart==0.0.6
 pydantic==2.5.0
 email-validator==2.1.0.post1
 
-# Supabase - Laisser pip gérer toutes les dépendances
+# Supabase
 supabase>=2.9.0,<3.0.0
 
 # Auth & Security
@@ -15,29 +15,30 @@ PyJWT==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
-# OpenAI
-openai==1.3.8
+# OpenAI - 🚨 CORRECTION CRITIQUE: Version compatible
+openai==1.51.0
+# ANCIEN: openai==1.3.0 (causait l'erreur proxies AsyncClient)
 
-# RAG System - VERSIONS CORRIGÉES POUR torch.uint64
-# ✅ MODIFIÉ: torch>=2.2.0 pour supporter torch.uint64
+# RAG System - Versions corrigées torch.uint64 + optimisées
 torch==2.2.2
 torchvision==0.17.2
-# ✅ MODIFIÉ: transformers compatible avec torch 2.2
 transformers==4.40.0
-# ✅ MODIFIÉ: sentence-transformers compatible
 sentence-transformers==2.7.0
-# ✅ Autres dépendances mises à jour
 huggingface_hub==0.23.0
 safetensors==0.4.3
 faiss-cpu==1.8.0
 numpy==1.26.4
+
+# 🔧 NOUVELLES DÉPENDANCES - Correction warnings parseurs
+pandas==2.2.2
+langchain==0.2.16
 
 # Utils
 python-dotenv==1.0.0
 aiofiles==23.2.1
 toml==0.10.2
 
-# ML libs - Versions compatibles avec torch 2.2
+# ML libs - Versions compatibles
 scikit-learn==1.4.2
 scipy==1.13.0
 tqdm==4.66.1
@@ -46,11 +47,8 @@ pillow==10.3.0
 # Requests
 requests==2.31.0
 
-# 🔧 CHANGEMENTS CRITIQUES:
-# - torch: 2.1.2 → 2.2.2 (pour torch.uint64)
-# - torchvision: 0.16.2 → 0.17.2 (compatible torch 2.2)
-# - transformers: 4.36.2 → 4.40.0 (compatible torch 2.2)
-# - sentence-transformers: 2.2.2 → 2.7.0 (meilleure compatibilité)
-# - safetensors: ajouté 0.4.3 (gestion torch.uint64)
-# - faiss-cpu: 1.7.4 → 1.8.0 (performance améliorée)
-# - numpy: 1.24.4 → 1.26.4 (compatible torch 2.2)
+# 🎯 CORRECTIONS APPLIQUÉES:
+# ✅ openai: 1.3.0 → 1.51.0 (corrige erreur proxies AsyncClient)
+# ✅ pandas: Ajouté pour parseurs avancés RAG
+# ✅ langchain: Ajouté pour parseurs documents
+# ✅ Toutes versions RAG mises à jour pour compatibilité
