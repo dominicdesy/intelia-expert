@@ -468,31 +468,34 @@ class EntitiesExtractor:
         if entities.weight_grams and not entities.weight_mentioned:
             entities.weight_mentioned = True
 
-    def _entities_summary(self, entities: ExtractedEntities) -> str:
+    def _entities_summary(self, entities) -> str:
         """Crée un résumé des entités pour le logging"""
         
         summary_parts = []
         
-        if entities.age_days:
+        # Gérer les deux types d'entités (ExtractedEntities et NormalizedEntities)
+        if hasattr(entities, 'age_days') and entities.age_days:
             summary_parts.append(f"âge={entities.age_days}j")
         
-        if entities.breed_specific:
+        if hasattr(entities, 'breed_specific') and entities.breed_specific:
             summary_parts.append(f"race={entities.breed_specific}")
-        elif entities.breed_generic:
+        elif hasattr(entities, 'breed') and entities.breed:
+            summary_parts.append(f"race={entities.breed}")
+        elif hasattr(entities, 'breed_generic') and entities.breed_generic:
             summary_parts.append(f"race_gen={entities.breed_generic}")
         
-        if entities.sex:
+        if hasattr(entities, 'sex') and entities.sex:
             summary_parts.append(f"sexe={entities.sex}")
         
-        if entities.weight_grams:
+        if hasattr(entities, 'weight_grams') and entities.weight_grams:
             summary_parts.append(f"poids={entities.weight_grams}g")
-        elif entities.weight_mentioned:
+        elif hasattr(entities, 'weight_mentioned') and entities.weight_mentioned:
             summary_parts.append("poids_mentionné")
         
-        if entities.symptoms:
+        if hasattr(entities, 'symptoms') and entities.symptoms:
             summary_parts.append(f"symptômes={len(entities.symptoms)}")
         
-        if entities.context_type:
+        if hasattr(entities, 'context_type') and entities.context_type:
             summary_parts.append(f"contexte={entities.context_type}")
         
         return ", ".join(summary_parts) if summary_parts else "aucune"
@@ -508,9 +511,16 @@ class EntitiesExtractor:
             "total_symptoms": sum(len(symptoms) for symptoms in self.health_symptoms.values())
         }
         
-        # 🔧 NOUVEAU: Stats du normalizer si disponible
+        # 🔧 FIX: Stats du normalizer si disponible - utilise la méthode correcte
         if self.normalizer:
-            stats["normalizer_stats"] = self.normalizer.get_normalization_stats()
+            try:
+                stats["normalizer_stats"] = self.normalizer.get_stats()  # 🔧 FIX: Utilise get_stats() au lieu de get_normalization_stats()
+            except AttributeError:
+                # Si la méthode n'existe pas, essayer l'alias
+                try:
+                    stats["normalizer_stats"] = self.normalizer.get_normalization_stats()
+                except AttributeError:
+                    stats["normalizer_stats"] = {"error": "Méthode de statistiques non disponible"}
         
         return stats
 
@@ -530,47 +540,49 @@ def quick_extract(question: str) -> Dict[str, Any]:
     entities = extractor.extract(question)
     
     return {
-        'age_days': entities.age_days,
-        'breed_specific': entities.breed_specific,
-        'breed_generic': entities.breed_generic,
-        'sex': entities.sex,
-        'weight_mentioned': entities.weight_mentioned,
-        'weight_grams': entities.weight_grams,
-        'symptoms': entities.symptoms,
-        'context_type': entities.context_type,
+        'age_days': getattr(entities, 'age_days', None),
+        'breed_specific': getattr(entities, 'breed_specific', None),
+        'breed_generic': getattr(entities, 'breed_generic', None),
+        'sex': getattr(entities, 'sex', None),
+        'weight_mentioned': getattr(entities, 'weight_mentioned', False),
+        'weight_grams': getattr(entities, 'weight_grams', None),
+        'symptoms': getattr(entities, 'symptoms', []),
+        'context_type': getattr(entities, 'context_type', None),
         # 🔧 NOUVEAU: Champs additionnels normalisés
-        'age_weeks': entities.age_weeks,
-        'weight_unit': entities.weight_unit,
-        'housing_conditions': entities.housing_conditions,
-        'feeding_context': entities.feeding_context
+        'age_weeks': getattr(entities, 'age_weeks', None),
+        'weight_unit': getattr(entities, 'weight_unit', None),
+        'housing_conditions': getattr(entities, 'housing_conditions', None),
+        'feeding_context': getattr(entities, 'feeding_context', None)
     }
 
 def extract_age_only(question: str) -> Optional[int]:
     """Extrait seulement l'âge en jours (normalisé)"""
     extractor = EntitiesExtractor()
     entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return entities.age_days
+    return getattr(entities, 'age_days', None)
 
 def extract_breed_only(question: str) -> Optional[str]:
     """Extrait seulement la race spécifique (normalisée)"""
     extractor = EntitiesExtractor()
     entities = extractor.extract(question)  # 🔧 NOUVEAU: Utilise extract() pour normalisation
-    return entities.breed_specific
+    return getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None)
 
 def has_health_context(question: str) -> bool:
     """Détermine rapidement si c'est un contexte de santé"""
     extractor = EntitiesExtractor()
     entities = extractor.extract(question)
-    return entities.context_type == 'santé' or len(entities.symptoms) > 0
+    context_type = getattr(entities, 'context_type', None)
+    symptoms = getattr(entities, 'symptoms', [])
+    return context_type == 'santé' or len(symptoms) > 0
 
 # 🔧 NOUVELLES FONCTIONS UTILITAIRES
 
-def extract_normalized_entities(question: str) -> ExtractedEntities:
+def extract_normalized_entities(question: str):
     """
     🔧 NOUVEAU: Extraction complète avec normalisation garantie
     
     Returns:
-        ExtractedEntities complètement normalisées
+        ExtractedEntities ou NormalizedEntities complètement normalisées
     """
     extractor = EntitiesExtractor()
     return extractor.extract(question)
@@ -613,14 +625,24 @@ def test_extractor():
         print(f"\n📝 Test {i}: {test_case}")
         entities = extractor.extract(test_case)
         
-        print(f"   ✅ Âge: {entities.age_days} jours ({entities.age_weeks} semaines)")
-        print(f"   ✅ Race spécifique: {entities.breed_specific}")
-        print(f"   ✅ Race générique: {entities.breed_generic}")
-        print(f"   ✅ Sexe: {entities.sex}")
-        print(f"   ✅ Poids mentionné: {entities.weight_mentioned}")
-        print(f"   ✅ Poids valeur: {entities.weight_grams}g")
-        print(f"   ✅ Symptômes: {entities.symptoms}")
-        print(f"   ✅ Contexte: {entities.context_type}")
+        age_days = getattr(entities, 'age_days', None)
+        age_weeks = getattr(entities, 'age_weeks', None)
+        breed_specific = getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None)
+        breed_generic = getattr(entities, 'breed_generic', None)
+        sex = getattr(entities, 'sex', None)
+        weight_mentioned = getattr(entities, 'weight_mentioned', False)
+        weight_grams = getattr(entities, 'weight_grams', None)
+        symptoms = getattr(entities, 'symptoms', [])
+        context_type = getattr(entities, 'context_type', None)
+        
+        print(f"   ✅ Âge: {age_days} jours ({age_weeks} semaines)")
+        print(f"   ✅ Race spécifique: {breed_specific}")
+        print(f"   ✅ Race générique: {breed_generic}")
+        print(f"   ✅ Sexe: {sex}")
+        print(f"   ✅ Poids mentionné: {weight_mentioned}")
+        print(f"   ✅ Poids valeur: {weight_grams}g")
+        print(f"   ✅ Symptômes: {symptoms}")
+        print(f"   ✅ Contexte: {context_type}")
         
         # 🔧 NOUVEAU: Affichage statut normalisation
         if extractor.normalizer:
