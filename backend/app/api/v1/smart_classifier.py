@@ -1,24 +1,28 @@
 """
-smart_classifier.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + FALLBACK ROBUSTE
+smart_classifier.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + CONTEXTMANAGER MAXIMISÉ
 
-🎯 VERSION CORRIGÉE - Compatibilité paramètres améliorée + get_classification_stats() AJOUTÉE
+🎯 VERSION AMÉLIORÉE - Utilisation MAXIMALE du ContextManager + Pipeline IA complet
 
-AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
+AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION PHASE 2:
 - ✅ Intégration IA pour classification intelligente
 - ✅ Système de fallback robuste vers règles existantes
 - ✅ Conservation du code original comme backup
 - ✅ Pipeline hybride IA + règles hardcodées
-- ✅ Validation contextuelle avec ContextManager
+- ✅ Validation contextuelle avec ContextManager MAXIMISÉ
 - ✅ Correction du bug "contexte utile"
-- 🔧 CORRECTION: Compatibilité paramètres (is_clarification_response, question_text, etc.)
-- 🔧 CORRECTION CRITIQUE: Méthode get_classification_stats() ajoutée
+- 🔧 NOUVEAU: Initialisation automatique du ContextManager
+- 🔧 NOUVEAU: Conversion UnifiedContext → Dict pour compatibilité
+- 🔧 NOUVEAU: Mise à jour automatique du contexte après classification
+- 🔧 NOUVEAU: Configuration IA du ContextManager pour enrichissement
 
-Architecture hybride selon plan:
-1. PRIORITÉ: Classification IA pour comprendre l'intention
-2. Validation avec ContextManager centralisé
-3. Calcul des données de poids enrichi
-4. FALLBACK: Règles hardcodées si IA indisponible
-5. Conservation totale du code original
+Architecture hybride avec ContextManager centralisé:
+1. PRIORITÉ: Récupération contexte via ContextManager unifié
+2. Classification IA pour comprendre l'intention  
+3. Validation avec ContextManager centralisé
+4. Calcul des données de poids enrichi
+5. MISE À JOUR: Sauvegarde dans ContextManager après classification
+6. FALLBACK: Règles hardcodées si IA indisponible
+7. Conservation totale du code original
 """
 
 import logging
@@ -52,15 +56,23 @@ class ClassificationResult:
     context_source: str = "unknown"  # 🆕 Source du contexte
 
 class SmartClassifier:
-    """🔧 CORRIGÉ: Classifier intelligent avec IA OpenAI selon plan de transformation"""
+    """🔧 ENHANCED: Classifier intelligent avec IA OpenAI + ContextManager MAXIMISÉ selon plan Phase 2"""
     
     def __init__(self, openai_client=None, db_path: str = "conversations.db", context_manager=None):
         self.db_path = db_path
         self.openai_client = openai_client
         self.use_ai = openai_client is not None
         
-        # 🆕 NOUVEAU: ContextManager selon plan Phase 3
+        # 🆕 NOUVEAU: ContextManager selon plan Phase 2 - Initialisation automatique
         self.context_manager = context_manager
+        if not self.context_manager:
+            try:
+                from .context_manager import ContextManager
+                self.context_manager = ContextManager(db_path=db_path)
+                logger.info("✅ [SmartClassifier] ContextManager initialisé automatiquement")
+            except ImportError as e:
+                logger.warning(f"⚠️ [SmartClassifier] ContextManager non disponible: {e}")
+                self.context_manager = None
         
         # Configuration IA
         self.ai_model = "gpt-4"  # ou "gpt-3.5-turbo" pour économie
@@ -79,7 +91,17 @@ class SmartClassifier:
         # 🔧 Conservation du code original comme fallback
         self._initialize_classic_rules()
         
-        logger.info(f"🤖 [SmartClassifier] IA: {self.use_ai} | ContextManager: {context_manager is not None}")
+        logger.info(f"🤖 [SmartClassifier] IA: {self.use_ai} | ContextManager: {self.context_manager is not None}")
+        
+        # 🆕 NOUVEAU: Configuration du ContextManager avec IA si disponible
+        if self.context_manager and self.use_ai:
+            try:
+                # Passer l'instance OpenAI au ContextManager pour enrichissement IA
+                if hasattr(self.context_manager, 'set_ai_enhancer'):
+                    self.context_manager.set_ai_enhancer(openai_client)
+                    logger.info("🤖 [SmartClassifier] ContextManager configuré avec IA enhancer")
+            except Exception as e:
+                logger.warning(f"⚠️ [SmartClassifier] Erreur configuration IA enhancer: {e}")
 
     def _initialize_classic_rules(self):
         """🔧 CONSERVATION: Initialise les règles classiques comme backup"""
@@ -91,19 +113,34 @@ class SmartClassifier:
                                       conversation_id: Optional[str] = None) -> ClassificationResult:
         """
         🆕 Classification intelligente avec IA selon plan de transformation
-        PRIORITÉ: IA → FALLBACK: Règles classiques conservées
+        PRIORITÉ: ContextManager → IA → FALLBACK: Règles classiques conservées
         """
         context_source = "parameter"
         self._total_classifications += 1
         
         try:
-            # 🆕 PHASE 3: Utiliser ContextManager centralisé si disponible
+            # 🆕 PHASE 2: Utilisation MAXIMALE du ContextManager centralisé
+            unified_context = None
             if self.context_manager and conversation_id:
-                conversation_context = self.context_manager.get_unified_context(
-                    conversation_id, type="classification"
-                )
-                context_source = "context_manager"
-                logger.info(f"📋 [ContextManager] Contexte récupéré: {len(conversation_context) if conversation_context else 0} éléments")
+                try:
+                    unified_context = self.context_manager.get_unified_context(
+                        conversation_id, type="classification"
+                    )
+                    context_source = "context_manager"
+                    logger.info(f"📋 [ContextManager] Contexte unifié récupéré - Entités: {unified_context.has_entities() if hasattr(unified_context, 'has_entities') else 'N/A'}")
+                    
+                    # Convertir UnifiedContext vers format dict pour compatibilité
+                    conversation_context = self._convert_unified_context_to_dict(unified_context)
+                    
+                except Exception as context_error:
+                    logger.error(f"❌ [ContextManager] Erreur récupération contexte: {context_error}")
+                    # Fallback vers contexte fourni en paramètre
+                    logger.info("🔄 [ContextManager] Fallback vers contexte paramètre")
+            
+            # Si pas de ContextManager ou erreur, utiliser contexte fourni
+            if not unified_context and conversation_context:
+                context_source = "parameter"
+                logger.info("📋 [Parameter] Utilisation contexte fourni en paramètre")
             
             # 1. PRIORITÉ: Analyse IA si disponible
             if self.use_ai:
@@ -121,6 +158,11 @@ class SmartClassifier:
                     ai_analysis, merged_entities, context_source
                 )
                 
+                # 🆕 NOUVEAU: Mise à jour contexte après classification réussie
+                self._update_context_after_classification(
+                    conversation_id, final_classification, question, entities
+                )
+                
                 self._ai_classifications += 1
                 self._update_response_counters(final_classification.response_type)
                 
@@ -133,6 +175,12 @@ class SmartClassifier:
                 result = self._classify_with_rules_enhanced(
                     question, entities, conversation_context, context_source
                 )
+                
+                # 🆕 NOUVEAU: Mise à jour contexte même en fallback
+                self._update_context_after_classification(
+                    conversation_id, result, question, entities
+                )
+                
                 self._fallback_classifications += 1
                 self._update_response_counters(result.response_type)
                 return result
@@ -144,9 +192,127 @@ class SmartClassifier:
             result = self._classify_with_rules_enhanced(
                 question, entities, conversation_context, context_source, error=str(e)
             )
+            
+            # 🆕 NOUVEAU: Mise à jour contexte même en cas d'erreur
+            if conversation_id:
+                self._update_context_after_classification(
+                    conversation_id, result, question, entities
+                )
+            
             self._fallback_classifications += 1
             self._update_response_counters(result.response_type)
             return result
+
+    def _convert_unified_context_to_dict(self, unified_context) -> Dict[str, Any]:
+        """
+        🆕 NOUVEAU: Convertit UnifiedContext en dict pour compatibilité avec le code existant
+        """
+        if not unified_context:
+            return {}
+        
+        try:
+            context_dict = {
+                'conversation_id': getattr(unified_context, 'conversation_id', ''),
+                'previous_question': '',
+                'previous_entities': {},
+                'established_entities': {},
+                'conversation_topic': getattr(unified_context, 'conversation_topic', ''),
+                'conversation_intent': getattr(unified_context, 'conversation_intent', ''),
+                'conversation_flow': getattr(unified_context, 'conversation_flow', ''),
+                'ai_inferred_entities': getattr(unified_context, 'ai_inferred_entities', {}),
+                'confidence_scores': getattr(unified_context, 'confidence_scores', {}),
+                'user_expertise_level': getattr(unified_context, 'user_expertise_level', ''),
+                'preferred_response_style': getattr(unified_context, 'preferred_response_style', ''),
+                'ai_context_summary': getattr(unified_context, 'ai_context_summary', ''),
+                'context_age_minutes': getattr(unified_context, 'context_age_minutes', 0),
+                'cache_hit': getattr(unified_context, 'cache_hit', False)
+            }
+            
+            # Entités établies
+            if hasattr(unified_context, 'established_breed') and unified_context.established_breed:
+                context_dict['established_entities']['breed'] = unified_context.established_breed
+                context_dict['previous_entities']['breed_specific'] = unified_context.established_breed
+            
+            if hasattr(unified_context, 'established_age') and unified_context.established_age:
+                context_dict['established_entities']['age_days'] = unified_context.established_age
+                context_dict['previous_entities']['age_days'] = unified_context.established_age
+            
+            if hasattr(unified_context, 'established_sex') and unified_context.established_sex:
+                context_dict['established_entities']['sex'] = unified_context.established_sex
+                context_dict['previous_entities']['sex'] = unified_context.established_sex
+            
+            if hasattr(unified_context, 'established_weight') and unified_context.established_weight:
+                context_dict['established_entities']['weight'] = unified_context.established_weight
+                context_dict['previous_entities']['weight_mentioned'] = True
+            
+            # Questions précédentes
+            if hasattr(unified_context, 'previous_questions') and unified_context.previous_questions:
+                context_dict['previous_question'] = unified_context.previous_questions[-1]
+            
+            # Fusionner entités IA si disponibles
+            if unified_context.ai_inferred_entities:
+                context_dict['previous_entities'].update(unified_context.ai_inferred_entities)
+            
+            logger.info(f"🔄 [Conversion] UnifiedContext → Dict: {len(context_dict['previous_entities'])} entités")
+            return context_dict
+            
+        except Exception as e:
+            logger.error(f"❌ [Conversion] Erreur conversion UnifiedContext: {e}")
+            return {}
+
+    def _update_context_after_classification(self, conversation_id: str, 
+                                           classification_result: ClassificationResult,
+                                           question: str, entities: Dict[str, Any]):
+        """
+        🆕 NOUVEAU: Met à jour le contexte dans ContextManager après classification
+        """
+        if not self.context_manager or not conversation_id:
+            return
+        
+        try:
+            # Déterminer topic/intent selon classification
+            topic = None
+            intent = None
+            
+            if classification_result.response_type == ResponseType.PRECISE_ANSWER:
+                if classification_result.weight_data:
+                    topic = "performance"
+                    intent = "weight_inquiry"
+                else:
+                    topic = "general_inquiry" 
+                    intent = "precise_info"
+            elif classification_result.response_type == ResponseType.CONTEXTUAL_ANSWER:
+                topic = "clarification"
+                intent = "context_completion"
+            elif classification_result.response_type == ResponseType.NEEDS_CLARIFICATION:
+                topic = "incomplete_inquiry"
+                intent = "needs_clarification"
+            
+            # Extraire nouvelles entités à sauvegarder
+            update_entities = {}
+            if classification_result.merged_entities:
+                for key, value in classification_result.merged_entities.items():
+                    if key in ['breed_specific', 'age_days', 'sex', 'weight_mentioned']:
+                        update_entities[key] = value
+            
+            # Mettre à jour via ContextManager
+            success = self.context_manager.update_context(
+                conversation_id=conversation_id,
+                entities=update_entities,
+                topic=topic,
+                intent=intent,
+                question=question,
+                classification_confidence=classification_result.confidence,
+                ai_analysis=classification_result.ai_analysis
+            )
+            
+            if success:
+                logger.info(f"✅ [ContextUpdate] Classification sauvée: {topic}/{intent}")
+            else:
+                logger.warning("⚠️ [ContextUpdate] Échec mise à jour contexte")
+                
+        except Exception as e:
+            logger.error(f"❌ [ContextUpdate] Erreur mise à jour: {e}")
 
     def _update_response_counters(self, response_type: ResponseType):
         """Met à jour les compteurs selon le type de réponse"""
@@ -206,10 +372,19 @@ class SmartClassifier:
         if context:
             previous_q = context.get('previous_question', '')
             previous_e = context.get('previous_entities', {})
+            # 🆕 NOUVEAU: Inclure données ContextManager
+            ai_summary = context.get('ai_context_summary', '')
+            user_level = context.get('user_expertise_level', '')
+            
             context_info = f"""
-CONTEXTE CONVERSATIONNEL:
+CONTEXTE CONVERSATIONNEL (via ContextManager):
 - Question précédente: "{previous_q}"
 - Entités précédentes: {json.dumps(previous_e, ensure_ascii=False, indent=2)}
+- Résumé IA: "{ai_summary}"
+- Niveau utilisateur: "{user_level}"
+- Topic actuel: "{context.get('conversation_topic', '')}"
+- Intent: "{context.get('conversation_intent', '')}"
+- Cache hit: {context.get('cache_hit', False)}
 """
 
         prompt = f"""Analyse cette question d'élevage avicole et détermine le type de réponse optimal.
@@ -232,6 +407,7 @@ PRIORITÉS SPÉCIALES:
 - Pour poids/croissance: race + âge = PRECISE_ANSWER
 - Éviter NEEDS_CLARIFICATION sauf si réellement impossible
 - Favoriser CONTEXTUAL_ANSWER si c'est une suite de conversation
+- Utiliser insights IA du contexte précédent
 
 Réponds en JSON strict:
 {{
@@ -242,7 +418,8 @@ Réponds en JSON strict:
     "entites_manquantes": ["race", "age", "sexe"],
     "contexte_suffisant": true,
     "peut_calculer_poids": true,
-    "recommandation_fusion": "fuser_avec_contexte|utiliser_entites_actuelles|demander_clarification"
+    "recommandation_fusion": "fuser_avec_contexte|utiliser_entites_actuelles|demander_clarification",
+    "contexte_manager_insights": "insights du ContextManager utilisés pour classification"
 }}"""
 
         return prompt
@@ -259,23 +436,38 @@ Réponds en JSON strict:
         
         if fusion_recommendation == 'fuser_avec_contexte' and context:
             previous_entities = context.get('previous_entities', {})
+            established_entities = context.get('established_entities', {})
             
-            # Hériter intelligemment selon les recommandations IA
-            if not merged.get('age_days') and previous_entities.get('age_days'):
-                merged['age_days'] = previous_entities['age_days']
-                merged['age_inherited_from_context'] = True
-                logger.info(f"🔗 [AI Merge] Âge hérité du contexte: {previous_entities['age_days']}j")
+            # 🆕 AMÉLIORATION: Utiliser entités établies du ContextManager en priorité
+            for entity_type in ['breed_specific', 'age_days', 'sex']:
+                if not merged.get(entity_type):
+                    # Priorité 1: Entités établies dans ContextManager
+                    if established_entities.get(entity_type.split('_')[0]):  # breed, age, sex
+                        merged[entity_type] = established_entities[entity_type.split('_')[0]]
+                        merged[f'{entity_type}_inherited_from_context_manager'] = True
+                        logger.info(f"🔗 [ContextManager Merge] {entity_type} hérité: {merged[entity_type]}")
+                    
+                    # Priorité 2: Entités précédentes
+                    elif previous_entities.get(entity_type):
+                        merged[entity_type] = previous_entities[entity_type]
+                        merged[f'{entity_type}_inherited_from_context'] = True
+                        logger.info(f"🔗 [AI Merge] {entity_type} hérité du contexte: {previous_entities[entity_type]}")
             
-            if not merged.get('context_type') and previous_entities.get('weight_mentioned'):
+            # Hériter contexte performance si poids mentionné précédemment
+            if not merged.get('context_type') and (previous_entities.get('weight_mentioned') or 
+                                                  context.get('conversation_topic') == 'performance'):
                 merged['context_type'] = 'performance'
                 merged['context_inherited_from_weight_question'] = True
-                logger.info("🔗 [AI Merge] Contexte performance hérité")
+                logger.info("🔗 [ContextManager Merge] Contexte performance hérité")
             
-            # Hériter race si manquante
-            if not merged.get('breed_specific') and previous_entities.get('breed_specific'):
-                merged['breed_specific'] = previous_entities['breed_specific']
-                merged['breed_inherited_from_context'] = True
-                logger.info(f"🔗 [AI Merge] Race héritée: {previous_entities['breed_specific']}")
+            # 🆕 NOUVEAU: Utiliser entités inférées par l'IA
+            ai_inferred = context.get('ai_inferred_entities', {})
+            if ai_inferred:
+                for key, value in ai_inferred.items():
+                    if not merged.get(key):
+                        merged[key] = value
+                        merged[f'{key}_from_ai_inference'] = True
+                        logger.info(f"🤖 [AI Inference] {key} inféré: {value}")
         
         return merged
 
@@ -422,23 +614,38 @@ Réponds en JSON strict:
         """Fusion améliorée des entités avec contexte"""
         merged = entities.copy()
         
-        if context and context.get('previous_entities'):
-            prev = context['previous_entities']
+        if context:
+            # 🆕 PRIORITÉ: Entités établies du ContextManager
+            established = context.get('established_entities', {})
+            if established:
+                for key, value in established.items():
+                    if key == 'breed' and not merged.get('breed_specific'):
+                        merged['breed_specific'] = value
+                        merged['breed_from_context_manager'] = True
+                    elif key == 'age_days' and not merged.get('age_days'):
+                        merged['age_days'] = value
+                        merged['age_from_context_manager'] = True
+                    elif key == 'sex' and not merged.get('sex'):
+                        merged['sex'] = value
+                        merged['sex_from_context_manager'] = True
             
-            # Hériter âge si manquant
-            if not merged.get('age_days') and prev.get('age_days'):
-                merged['age_days'] = prev['age_days']
-                merged['age_inherited_from_context'] = True
-            
-            # Hériter race si manquante
-            if not merged.get('breed_specific') and prev.get('breed_specific'):
-                merged['breed_specific'] = prev['breed_specific']
-                merged['breed_inherited_from_context'] = True
-            
-            # Hériter contexte performance
-            if not merged.get('context_type') and prev.get('weight_mentioned'):
-                merged['context_type'] = 'performance'
-                merged['context_inherited_from_weight_question'] = True
+            # Fallback vers entités précédentes
+            prev = context.get('previous_entities', {})
+            if prev:
+                # Hériter âge si manquant
+                if not merged.get('age_days') and prev.get('age_days'):
+                    merged['age_days'] = prev['age_days']
+                    merged['age_inherited_from_context'] = True
+                
+                # Hériter race si manquante
+                if not merged.get('breed_specific') and prev.get('breed_specific'):
+                    merged['breed_specific'] = prev['breed_specific']
+                    merged['breed_inherited_from_context'] = True
+                
+                # Hériter contexte performance
+                if not merged.get('context_type') and prev.get('weight_mentioned'):
+                    merged['context_type'] = 'performance'
+                    merged['context_inherited_from_weight_question'] = True
             
             logger.info(f"🔗 [Enhanced Merge] Entités fusionnées: {list(merged.keys())}")
         
@@ -507,7 +714,10 @@ Réponds en JSON strict:
         inherited_markers = [
             'age_inherited_from_context',
             'context_inherited_from_weight_question',
-            'breed_inherited_from_context'
+            'breed_inherited_from_context',
+            'age_from_context_manager',
+            'breed_from_context_manager',
+            'sex_from_context_manager'
         ]
         
         if any(entities.get(marker) for marker in inherited_markers):
@@ -570,16 +780,17 @@ Réponds en JSON strict:
                     "critical_high": critical_high
                 },
                 "data_source": "intelligent_system_config",
-                "calculation_method": "enhanced_with_context",
+                "calculation_method": "enhanced_with_context_manager",
                 "confidence": 0.95,
                 "context_used": {
                     "age_inherited": entities.get('age_inherited_from_context', False),
                     "breed_inherited": entities.get('breed_inherited_from_context', False),
-                    "performance_context": entities.get('context_inherited_from_weight_question', False)
+                    "performance_context": entities.get('context_inherited_from_weight_question', False),
+                    "context_manager_data": any(entities.get(k) for k in ['age_from_context_manager', 'breed_from_context_manager', 'sex_from_context_manager'])
                 }
             }
             
-            logger.info(f"📊 [Enhanced Weight] {breed} {sex} {age_days}j → {min_weight}-{max_weight}g")
+            logger.info(f"📊 [Enhanced Weight] {breed} {sex} {age_days}j → {min_weight}-{max_weight}g (ContextManager: {weight_data['context_used']['context_manager_data']})")
             return weight_data
             
         except Exception as e:
@@ -661,7 +872,7 @@ Réponds en JSON strict:
             
             return {
                 "service_name": "Smart Classifier",
-                "version": "v3.0_ai_pipeline_fixed",
+                "version": "v3.1_context_manager_maximized",
                 "total_classifications": self._total_classifications,
                 "precise_responses": self._precise_responses,
                 "general_responses": self._general_responses,
@@ -676,13 +887,21 @@ Réponds en JSON strict:
                 "error_rate": f"{error_rate:.1f}%",
                 "ai_available": self.use_ai,
                 "context_manager_active": self.context_manager is not None,
+                "context_manager_features": [
+                    "unified_context_retrieval",
+                    "automatic_context_update", 
+                    "ai_enhancement_integration",
+                    "established_entities_prioritization",
+                    "conversation_flow_tracking"
+                ],
                 "features": [
                     "ai_classification",
                     "contextual_analysis", 
                     "weight_calculation",
                     "entity_fusion",
                     "conversation_context",
-                    "enhanced_fallback"
+                    "enhanced_fallback",
+                    "context_manager_integration"
                 ]
             }
         except Exception as e:
@@ -776,50 +995,51 @@ __all__ = [
     'quick_classify'
 ]
 
-logger.info("✅ [SmartClassifier] Module initialisé (version compatibilité étendue)")
-logger.info("   - Classe: SmartClassifier (nom corrigé)")
-logger.info("   - Support IA: OpenAI GPT-4")
-logger.info("   - Fallback: Règles améliorées")
+logger.info("✅ [SmartClassifier] Module initialisé (version ContextManager maximisé)")
+logger.info("   - Classe: SmartClassifier (ContextManager auto-init)")
+logger.info("   - Support IA: OpenAI GPT-4 + IA enhancer pour ContextManager")
+logger.info("   - ContextManager: Initialisation automatique + mise à jour après classification")
+logger.info("   - Fallback: Règles améliorées avec priorité entités ContextManager")
 logger.info("   - 🔧 Compatibilité: question_text, context, is_clarification_response")
-logger.info("   - 🔧 CORRECTION: get_classification_stats() ajoutée")
+logger.info("   - 🔧 NOUVEAU: UnifiedContext → Dict conversion pour compatibilité")
 logger.info("   - Exports: SmartClassifier, ClassificationResult, ResponseType")
 
 # =============================================================================
-# EXEMPLE D'UTILISATION AVEC TOUS LES FORMATS D'APPEL SUPPORTÉS
+# EXEMPLE D'UTILISATION AVEC CONTEXTMANAGER MAXIMISÉ
 # =============================================================================
 
-async def demo_compatibility():
-    """Démo des différents formats d'appel supportés"""
+async def demo_context_manager_integration():
+    """Démo d'utilisation avec ContextManager maximisé"""
     
+    # 🆕 Le ContextManager s'initialise automatiquement
     classifier = SmartClassifier()
+    conversation_id = "demo_conv_2025"
     
-    # Format 1: Original
+    print(f"✅ ContextManager actif: {classifier.context_manager is not None}")
+    
+    # Classification avec récupération automatique du contexte
     result1 = await classifier.classify_question(
         question="Quel poids pour Ross 308 mâle 14 jours?",
-        entities={"breed_specific": "Ross 308", "sex": "male", "age_days": 14}
+        entities={"breed_specific": "Ross 308", "sex": "male", "age_days": 14},
+        conversation_id=conversation_id  # ← Le ContextManager récupère automatiquement le contexte
     )
-    print(f"✅ Format original: {result1.response_type.value}")
+    print(f"✅ Première classification: {result1.response_type.value} (source: {result1.context_source})")
     
-    # Format 2: expert_services.py (problématique corrigée)  
+    # Classification suivante avec clarification - le contexte est automatiquement utilisé
     result2 = await classifier.classify_question(
-        question_text="Quel poids pour Ross 308 mâle 14 jours?",
-        context={"previous_question": "Question précédente"},
-        is_clarification_response=False  # ← Maintenant supporté (ignoré proprement)
+        question="Et pour une femelle?",
+        entities={"sex": "female"},  # Moins d'infos car contexte sera fusionné
+        conversation_id=conversation_id  # ← Race et âge seront hérités automatiquement
     )
-    print(f"✅ Format expert_services: {result2.response_type.value}")
+    print(f"✅ Clarification: {result2.response_type.value}")
+    print(f"   - Entités fusionnées: {list(result2.merged_entities.keys()) if result2.merged_entities else 'Aucune'}")
+    print(f"   - Source contexte: {result2.context_source}")
     
-    # Format 3: Flexible
-    result3 = await classifier.classify_question(
-        question="Ross 308 male",
-        entities={"breed_specific": "Ross 308", "sex": "male"},
-        extra_param="ignoré"  # Paramètres additionnels ignorés
-    )
-    print(f"✅ Format flexible: {result3.response_type.value}")
-
-    # Test de la méthode get_classification_stats() corrigée
+    # Vérifier les statistiques incluant l'utilisation du ContextManager
     stats = classifier.get_classification_stats()
-    print(f"✅ Stats: {stats['total_classifications']} classifications")
+    print(f"✅ Stats ContextManager: {stats['context_manager_active']}")
+    print(f"   - Fonctionnalités: {stats.get('context_manager_features', [])}")
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(demo_compatibility())
+    asyncio.run(demo_context_manager_integration())
