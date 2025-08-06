@@ -609,31 +609,24 @@ def quick_extract(question: str) -> Dict[str, Any]:
     """
     🔧 MODIFIÉ: Extraction rapide - synchrone avec fallback
     Pour compatibilité avec code existant synchrone
+    ✅ CORRIGÉ: RuntimeWarning évité en utilisant directement les patterns
     """
     extractor = EntitiesExtractor()
     
-    # Si IA disponible, tenter version async rapidement
-    if extractor.ai_extractor:
-        try:
-            import asyncio
-            # Tenter extraction IA avec timeout court
-            entities = asyncio.get_event_loop().run_until_complete(
-                asyncio.wait_for(extractor.extract(question), timeout=5.0)
-            )
-        except (TimeoutError, Exception):
-            # Fallback immediate vers patterns
-            entities = extractor._raw_extract_with_patterns(question.lower().strip())
-            if extractor.normalizer:
-                entities = extractor.normalizer.normalize(entities)
-            else:
-                extractor._normalize_extracted_data(entities)
+    # 🔧 CORRECTION: Pour éviter le RuntimeWarning, on utilise directement les patterns
+    # en mode synchrone. L'IA reste disponible via extract() en mode async.
+    # Cette approche évite les complications avec les event loops imbriqués.
+    
+    logger.debug("🔧 [Entities Extractor] Mode synchrone - utilisation patterns directe")
+    
+    # Extraction patterns directe (toujours fonctionnel)
+    entities = extractor._raw_extract_with_patterns(question.lower().strip())
+    
+    # Application de la normalisation si disponible
+    if extractor.normalizer:
+        entities = extractor.normalizer.normalize(entities)
     else:
-        # Extraction patterns directe
-        entities = extractor._raw_extract_with_patterns(question.lower().strip())
-        if extractor.normalizer:
-            entities = extractor.normalizer.normalize(entities)
-        else:
-            extractor._normalize_extracted_data(entities)
+        extractor._normalize_extracted_data(entities)
     
     return {
         'age_days': getattr(entities, 'age_days', None),
