@@ -1,12 +1,12 @@
 # app/api/v1/unified_context_enhancer.py
 """
-Unified Context Enhancer - Fusion des agents d'enrichissement - VERSION CORRIGÉE v1.4
+Unified Context Enhancer - Fusion des agents d'enrichissement - VERSION CORRIGÉE v1.3
 
-🔧 CORRECTIONS CRITIQUES v1.4:
+🔧 CORRECTIONS CRITIQUES v1.3:
    - ✅ ERREUR RÉSOLUE: Client OpenAI sans paramètre 'proxies' - compatible v1.51.0
-   - ✅ CORRECTION SYNTAXE: Bloc try/except restructuré correctement
-   - ✅ AsyncOpenAI utilisé pour cohérence avec le reste du système
-   - ✅ Gestion d'erreur robuste avec fallback
+   - ✅ Correction _make_openai_call() pour nouvelle API OpenAI
+   - ✅ Gestion robuste client.chat.completions.create
+   - ✅ Support versions OpenAI v1.0+ avec fallback v0.28.x
 
 🎯 OBJECTIF: Éliminer les reformulations contradictoires entre modules
 ✅ RÉSOUT: agent_contextualizer + agent_rag_enhancer → 1 seul pipeline cohérent
@@ -144,17 +144,16 @@ class UnifiedContextEnhancer:
         logger.info(f"   OpenAI module disponible: {'✅' if OPENAI_AVAILABLE else '❌'}")
         logger.info(f"   API Key configurée: {'✅' if self.api_key else '❌'}")
         logger.info(f"   Modèle: {self.model}")
-        logger.info(f"   🔧 CORRECTION v1.4: Client compatible OpenAI v1.51.0 avec syntaxe corrigée")
+        logger.info(f"   🔧 CORRECTION v1.3: Client compatible OpenAI v1.51.0")
         logger.info(f"   Fusion: agent_contextualizer + agent_rag_enhancer")
     
     def _initialize_openai_client(self) -> bool:
         """
-        🔧 CORRECTION CRITIQUE v1.4: Initialisation client OpenAI compatible v1.51.0
+        🔧 CORRECTION CRITIQUE v1.3: Initialisation client OpenAI compatible v1.51.0
         
         Corrections appliquées:
         - Suppression paramètre 'proxies' (causait l'erreur)
-        - AsyncOpenAI pour cohérence avec le système
-        - Syntaxe corrigée avec blocs try/except appropriés
+        - Support OpenAI v1.0+ et v1.51.0
         - Fallback pour versions anciennes
         """
         
@@ -168,57 +167,26 @@ class UnifiedContextEnhancer:
             return False
         
         try:
-            # 🔧 CORRECTION v1.4: Vérifier si openai.AsyncOpenAI existe (v1.0+)
+            # 🔧 CORRECTION v1.3: Initialisation OpenAI v1.0+ SANS proxies
             logger.debug("🔧 [UnifiedContextEnhancer] Tentative initialisation OpenAI v1.51.0...")
             
-            if hasattr(openai, 'AsyncOpenAI'):
-                # 🔧 CORRECTION CRITIQUE: Utiliser AsyncOpenAI pour cohérence
-                try:
-                    self.client = openai.AsyncOpenAI(
-                        api_key=self.api_key,
-                        timeout=self.timeout
-                    )
-                    logger.info("✅ [UnifiedContextEnhancer] Client AsyncOpenAI v1.51.0 initialisé avec succès")
-                    self.client_initialized = True
-                    return True
-                except TypeError as e:
-                    if "proxies" in str(e):
-                        logger.warning(f"⚠️ [UnifiedContextEnhancer] Fallback OpenAI client (proxies): {e}")
-                        # Essayer sans timeout si problème proxies
-                        self.client = openai.AsyncOpenAI(api_key=self.api_key)
-                        logger.info("✅ [UnifiedContextEnhancer] Client AsyncOpenAI initialisé sans timeout")
-                        self.client_initialized = True
-                        return True
-                    else:
-                        raise e
+            # Vérifier si openai.OpenAI existe (v1.0+)
+            if hasattr(openai, 'OpenAI'):
+                # 🔧 CORRECTION CRITIQUE: SANS paramètre proxies
+                self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    timeout=self.timeout
+                    # SUPPRIMÉ: proxies=... (causait l'erreur)
+                )
+                logger.info("✅ [UnifiedContextEnhancer] Client OpenAI v1.51.0 initialisé avec succès")
+                self.client_initialized = True
+                return True
             
-            # 🔧 FALLBACK: Essayer OpenAI synchrone si AsyncOpenAI non disponible
-            elif hasattr(openai, 'OpenAI'):
-                logger.warning("⚠️ [UnifiedContextEnhancer] AsyncOpenAI non trouvé, utilisation OpenAI synchrone")
-                try:
-                    self.client = openai.OpenAI(
-                        api_key=self.api_key,
-                        timeout=self.timeout
-                    )
-                    logger.info("✅ [UnifiedContextEnhancer] Client OpenAI synchrone initialisé")
-                    self.client_initialized = True
-                    return True
-                except TypeError as e:
-                    if "proxies" in str(e):
-                        logger.warning(f"⚠️ [UnifiedContextEnhancer] Fallback OpenAI sans timeout: {e}")
-                        self.client = openai.OpenAI(api_key=self.api_key)
-                        logger.info("✅ [UnifiedContextEnhancer] Client OpenAI initialisé sans timeout")
-                        self.client_initialized = True
-                        return True
-                    else:
-                        raise e
-            
-            # 🔧 FALLBACK: Versions très anciennes (v0.28.x)
+            # Fallback pour versions anciennes (v0.28.x)
             elif hasattr(openai, 'api_key'):
-                logger.warning("⚠️ [UnifiedContextEnhancer] Version OpenAI ancienne détectée")
                 openai.api_key = self.api_key
                 self.client = openai  # Utiliser l'API directement (v0.28.x)
-                logger.info("✅ [UnifiedContextEnhancer] Client OpenAI v0.28.x initialisé")
+                logger.info("✅ [UnifiedContextEnhancer] Client OpenAI v0.28.x initialisé avec succès")
                 self.client_initialized = True
                 return True
             
@@ -556,10 +524,10 @@ class UnifiedContextEnhancer:
     
     async def _make_openai_call(self, messages: List[Dict], max_tokens: int = 400, temperature: float = 0.3):
         """
-        🔧 CORRECTION CRITIQUE v1.4: Méthode centralisée pour appels OpenAI compatible v1.51.0
+        🔧 CORRECTION CRITIQUE v1.3: Méthode centralisée pour appels OpenAI compatible v1.51.0
         
         Corrections appliquées:
-        - Client AsyncOpenAI ou OpenAI selon disponibilité
+        - Client OpenAI sans paramètre 'proxies'
         - Gestion correcte pour OpenAI v1.0+ avec client.chat.completions.create
         - Fallback v0.28.x maintenu pour compatibilité
         - Gestion d'erreur robuste
@@ -569,27 +537,17 @@ class UnifiedContextEnhancer:
             raise Exception("Client OpenAI non initialisé")
         
         try:
-            # 🔧 CORRECTION v1.4: Vérifier type de client (AsyncOpenAI ou OpenAI)
+            # 🔧 CORRECTION v1.3: OpenAI v1.0+ (client moderne)
             if hasattr(self.client, 'chat') and hasattr(self.client.chat, 'completions'):
-                logger.debug("🔧 [UnifiedContextEnhancer] Utilisation client moderne (v1.0+)")
+                logger.debug("🔧 [UnifiedContextEnhancer] Utilisation OpenAI v1.51.0 API")
                 
-                # Appel différent selon async ou sync
-                if hasattr(self.client, 'aclose'):  # AsyncOpenAI
-                    response = await self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        timeout=self.timeout
-                    )
-                else:  # OpenAI synchrone
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        timeout=self.timeout
-                    )
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=self.timeout
+                )
                 return response
             
             # 🔧 MÉTHODE 2: OpenAI v0.28.x (API ancienne)
@@ -1187,21 +1145,21 @@ if __name__ == "__main__":
     test_unified_enhancer()
 
 # =============================================================================
-# LOGGING FINAL AVEC CORRECTIONS APPLIQUÉES v1.4
+# LOGGING FINAL AVEC CORRECTIONS APPLIQUÉES v1.3
 # =============================================================================
 
 try:
     logger.info("🔧" * 60)
-    logger.info("🔧 [UNIFIED CONTEXT ENHANCER] VERSION CORRIGÉE v1.4 - SYNTAXE ET OPENAI FIXES!")
+    logger.info("🔧 [UNIFIED CONTEXT ENHANCER] VERSION CORRIGÉE v1.3 - OPENAI v1.51.0 COMPATIBLE!")
     logger.info("🔧" * 60)
     logger.info("")
-    logger.info("✅ [CORRECTIONS CRITIQUES APPLIQUÉES v1.4]:")
-    logger.info("   🔧 ERREUR RÉSOLUE: Syntaxe try/except corrigée")
-    logger.info("   🔧 ERREUR RÉSOLUE: Client AsyncOpenAI sans paramètre 'proxies'")
-    logger.info("   ✅ Solution: Détection automatique AsyncOpenAI vs OpenAI")
-    logger.info("   ✅ Compatible: OpenAI v1.51.0+ avec fallbacks robustes")
-    logger.info("   ✅ Gestion: Client sync/async automatique")
-    logger.info("   ✅ Fallback: Support versions anciennes maintenu")
+    logger.info("✅ [CORRECTIONS CRITIQUES APPLIQUÉES v1.3]:")
+    logger.info("   🔧 ERREUR RÉSOLUE: Client OpenAI sans paramètre 'proxies'")
+    logger.info("   ✅ Solution: openai.OpenAI(api_key=key, timeout=timeout)")
+    logger.info("   ✅ Compatible: OpenAI v1.51.0+ (requirements.txt mis à jour)")
+    logger.info("   ✅ Méthode _make_openai_call() corrigée pour v1.51.0")
+    logger.info("   ✅ Fallback: Support v0.28.x maintenu")
+    logger.info("   ✅ Factory pattern: get_unified_context_enhancer()")
     logger.info("")
     logger.info("✅ [ARCHITECTURE UNIFIÉE CONSERVÉE]:")
     logger.info("   📥 Question → Enrichissement (ex-agent_contextualizer)")
@@ -1216,15 +1174,15 @@ try:
     logger.info("   💾 to_dict(): Support validation Pydantic robuste")
     logger.info("   🛡️ Résistance aux erreurs OpenAI/httpx")
     logger.info("")
-    logger.info("🎯 [COMPATIBILITÉ v1.4]:")
+    logger.info("🎯 [COMPATIBILITÉ v1.3]:")
     logger.info("   ✅ Remplace: agent_contextualizer.py")
     logger.info("   ✅ Remplace: agent_rag_enhancer.py")
     logger.info("   ✅ Interface: process_unified() + UnifiedEnhancementResult")
     logger.info("   ✅ Expert Services: Compatible avec expert.py")
     logger.info("   ✅ Validation Pydantic: Conversion automatique Dict")
-    logger.info("   ✅ OpenAI v1.51.0: Fully compatible avec syntaxe corrigée")
+    logger.info("   ✅ OpenAI v1.51.0: Fully compatible")
     logger.info("")
-    logger.info("🚀 [RÉSULTAT FINAL v1.4]: Agent unifié production-ready avec syntaxe corrigée!")
+    logger.info("🚀 [RÉSULTAT FINAL v1.3]: Agent unifié production-ready avec OpenAI v1.51.0!")
     logger.info("🔧" * 60)
     
 except Exception as e:

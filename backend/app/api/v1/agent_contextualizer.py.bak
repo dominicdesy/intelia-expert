@@ -704,15 +704,7 @@ class AgentContextualizer:
             )
             
             # 🔧 CORRECTION CRITIQUE: Gestion d'erreur OpenAI spécifique sans paramètre 'proxies'
-            try:
-                client = openai.AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-            except TypeError as e:
-                if "proxies" in str(e):
-                    # Fallback pour version OpenAI incompatible
-                    logger.warning(f"⚠️ Incompatibilité OpenAI détectée: {e}")
-                    client = openai.AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-                else:
-                    raise e
+            client = openai.AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             
             try:
                 response = await client.chat.completions.create(
