@@ -1,4 +1,4 @@
-# 🔧 REQUIREMENTS.TXT - RÉSOLUTION FINALE DES CONFLITS
+# 🔧 REQUIREMENTS.TXT - VERSION SIMPLIFIÉE SANS CONFLITS
 
 # Core FastAPI - versions exactes maintenues
 fastapi==0.104.1
@@ -7,12 +7,9 @@ python-multipart==0.0.6
 pydantic==2.5.0
 email-validator==2.1.0.post1
 
-# Supabase - VERSIONS COMPATIBLES CORRIGÉES
-supabase==2.9.1
-gotrue==2.9.1                    
-httpx==0.27.0                    # 🔧 CORRIGÉ: 0.25.2 → 0.27.0 (compatible avec supabase qui exige >=0.26)
-realtime-py==0.1.3              # 🔧 CORRIGÉ: Version existante
-postgrest==0.17.0               # 🔧 CORRIGÉ: 0.13.2 → 0.17.0 (supabase exige >=0.17.0,<0.18.0)               
+# Supabase - VERSIONS FLEXIBLES pour éviter les conflits
+supabase>=2.9.0,<3.0.0          # 🔧 SIMPLIFIÉ: Laisse pip choisir la version compatible
+# Les dépendances de supabase (gotrue, httpx, realtime-py, postgrest) seront installées automatiquement
 
 # Auth & Security - maintenu
 PyJWT==2.8.0
