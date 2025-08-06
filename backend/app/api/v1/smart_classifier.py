@@ -1,7 +1,7 @@
 """
 smart_classifier.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + FALLBACK ROBUSTE
 
-🎯 VERSION CORRIGÉE - Nom de classe fixé pour compatibilité
+🎯 VERSION CORRIGÉE - Compatibilité paramètres améliorée
 
 AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
 - ✅ Intégration IA pour classification intelligente
@@ -10,7 +10,7 @@ AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
 - ✅ Pipeline hybride IA + règles hardcodées
 - ✅ Validation contextuelle avec ContextManager
 - ✅ Correction du bug "contexte utile"
-- 🔧 CORRECTION: Classe renommée SmartClassifier (plus EnhancedSmartClassifier)
+- 🔧 CORRECTION: Compatibilité paramètres (is_clarification_response, question_text, etc.)
 
 Architecture hybride selon plan:
 1. PRIORITÉ: Classification IA pour comprendre l'intention
@@ -610,16 +610,65 @@ Réponds en JSON strict:
         }
 
     # =============================================================================
-    # MÉTHODES DE COMPATIBILITÉ (conservation de l'interface existante)
+    # 🔧 MÉTHODES DE COMPATIBILITÉ (conservation de l'interface existante + corrections)
     # =============================================================================
 
-    async def classify_question(self, question: str, entities: Dict[str, Any], 
+    async def classify_question(self, question: Optional[str] = None, entities: Optional[Dict[str, Any]] = None, 
                               conversation_context: Optional[Dict] = None,
-                              conversation_id: Optional[str] = None) -> ClassificationResult:
-        """Interface de compatibilité avec l'ancienne méthode"""
+                              conversation_id: Optional[str] = None,
+                              # 🔧 CORRECTION: Paramètres de compatibilité ajoutés
+                              question_text: Optional[str] = None,
+                              context: Optional[Dict] = None,
+                              is_clarification_response: Optional[bool] = None,
+                              **kwargs) -> ClassificationResult:
+        """
+        🔧 CORRIGÉ: Interface de compatibilité étendue pour supporter tous les appels
+        
+        Cette méthode supporte maintenant:
+        - classify_question(question, entities, conversation_context, conversation_id)  # Format original
+        - classify_question(question_text=..., context=..., is_clarification_response=...)  # Format expert_services.py
+        - classify_question(**kwargs)  # Format flexible
+        """
+        
+        # 🔧 NORMALISATION DES PARAMÈTRES: Résoudre les différents formats d'appel
+        if question_text and not question:
+            question = question_text
+        if context and not conversation_context:
+            conversation_context = context
+        
+        # Log pour debug compatibilité
+        if is_clarification_response is not None:
+            logger.info(f"🔧 [Compatibility] is_clarification_response={is_clarification_response} (paramètre ignoré)")
+        
+        if kwargs:
+            logger.info(f"🔧 [Compatibility] Paramètres additionnels ignorés: {list(kwargs.keys())}")
+        
+        # Validation des paramètres essentiels
+        if not question:
+            logger.error("❌ [Compatibility] Paramètre 'question' ou 'question_text' requis")
+            return ClassificationResult(
+                response_type=ResponseType.NEEDS_CLARIFICATION,
+                confidence=0.0,
+                reasoning="Erreur: question manquante dans l'appel",
+                fallback_used=True,
+                context_source="error"
+            )
+        
+        if not entities:
+            logger.warning("⚠️ [Compatibility] Paramètre 'entities' manquant, utilisation dict vide")
+            entities = {}
+        
+        # Appel de la méthode principale avec paramètres normalisés
+        logger.info(f"🔄 [Compatibility] Appel normalisé: question='{question[:50]}...', entities={len(entities)} éléments")
+        
         return await self.classify_question_with_ai(
             question, entities, conversation_context, conversation_id
         )
+
+    # Alias pour compatibilité maximale
+    async def classify(self, **kwargs) -> ClassificationResult:
+        """Alias simplifié pour tous types d'appels"""
+        return await self.classify_question(**kwargs)
 
 # =============================================================================
 # FONCTION DE COMPATIBILITÉ POUR LES IMPORTS
@@ -642,60 +691,45 @@ __all__ = [
     'quick_classify'
 ]
 
-logger.info("✅ [SmartClassifier] Module initialisé")
+logger.info("✅ [SmartClassifier] Module initialisé (version compatibilité étendue)")
 logger.info("   - Classe: SmartClassifier (nom corrigé)")
 logger.info("   - Support IA: OpenAI GPT-4")
 logger.info("   - Fallback: Règles améliorées")
+logger.info("   - 🔧 Compatibilité: question_text, context, is_clarification_response")
 logger.info("   - Exports: SmartClassifier, ClassificationResult, ResponseType")
 
 # =============================================================================
-# EXEMPLE D'UTILISATION AVEC LE SYSTÈME CORRIGÉ
+# EXEMPLE D'UTILISATION AVEC TOUS LES FORMATS D'APPEL SUPPORTÉS
 # =============================================================================
 
-async def demo_smart_classifier():
-    """Démo du classifier corrigé selon plan de transformation"""
+async def demo_compatibility():
+    """Démo des différents formats d'appel supportés"""
     
-    # Initialisation avec client OpenAI + ContextManager
-    import openai
-    client = openai.AsyncOpenAI(api_key="your-api-key")
+    classifier = SmartClassifier()
     
-    # Simulation ContextManager (Phase 3 du plan)
-    class MockContextManager:
-        def get_unified_context(self, conv_id: str, type: str = "classification"):
-            return {
-                "previous_question": "Quel est le poids cible pour un poulet au jour 10 ?",
-                "previous_entities": {
-                    "age_days": 10, 
-                    "weight_mentioned": True, 
-                    "context_type": "performance"
-                }
-            }
-    
-    context_manager = MockContextManager()
-    classifier = SmartClassifier(
-        openai_client=client, 
-        context_manager=context_manager
+    # Format 1: Original
+    result1 = await classifier.classify_question(
+        question="Quel poids pour Ross 308 mâle 14 jours?",
+        entities={"breed_specific": "Ross 308", "sex": "male", "age_days": 14}
     )
+    print(f"✅ Format original: {result1.response_type.value}")
     
-    # Test conversation problématique corrigée
-    entities = {"breed_specific": "Ross 308", "sex": "male"}
-    
-    result = await classifier.classify_question_with_ai(
-        question="Ross 308 male", 
-        entities=entities,
-        conversation_id="conv_123"
+    # Format 2: expert_services.py (problématique corrigée)  
+    result2 = await classifier.classify_question(
+        question_text="Quel poids pour Ross 308 mâle 14 jours?",
+        context={"previous_question": "Question précédente"},
+        is_clarification_response=False  # ← Maintenant supporté (ignoré proprement)
     )
+    print(f"✅ Format expert_services: {result2.response_type.value}")
     
-    print(f"📊 Résultats de classification:")
-    print(f"   Classification: {result.response_type.value}")
-    print(f"   Confiance: {result.confidence}")
-    print(f"   Source contexte: {result.context_source}")
-    print(f"   IA utilisée: {not result.fallback_used}")
-    print(f"   Données poids: {bool(result.weight_data)}")
-    
-    if result.ai_analysis:
-        print(f"   Analyse IA: {result.ai_analysis.get('intention', 'N/A')}")
+    # Format 3: Flexible
+    result3 = await classifier.classify_question(
+        question="Ross 308 male",
+        entities={"breed_specific": "Ross 308", "sex": "male"},
+        extra_param="ignoré"  # Paramètres additionnels ignorés
+    )
+    print(f"✅ Format flexible: {result3.response_type.value}")
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(demo_smart_classifier())
+    asyncio.run(demo_compatibility())
