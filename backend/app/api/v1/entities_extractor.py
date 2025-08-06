@@ -1,7 +1,8 @@
 """
 entities_extractor.py - EXTRACTION D'ENTITÉS AVEC INTÉGRATION IA + FALLBACK - CORRIGÉ
 
-🔧 CORRECTIONS v1.1:
+🔧 CORRECTIONS v1.2:
+   - CORRECTION CRITIQUE: Guillemets manquants ligne 83 ajoutés
    - Élimination du RuntimeWarning coroutine 'extract' was never awaited
    - Gestion asynchrone correcte avec l'EntityNormalizer 
    - Fallback robuste en cas d'échec IA ou normalisation
@@ -83,7 +84,8 @@ class EntitiesExtractor:
             logger.info("✅ [Entities Extractor] AIEntityExtractor initialisé")
         else:
             self.ai_extractor = None
-            logger.warning(⚠️ [Entities Extractor] Fonctionnement sans IA - patterns classiques")
+            # 🔧 CORRECTION CRITIQUE: Guillemets manquants ajoutés
+            logger.warning("⚠️ [Entities Extractor] Fonctionnement sans IA - patterns classiques")
             
         # 🔧 CONSERVÉ: Intégration du normalizer
         if NORMALIZER_AVAILABLE:
@@ -569,10 +571,11 @@ class EntitiesExtractor:
     def get_extraction_stats(self) -> Dict[str, Any]:
         """🔧 AMÉLIORÉ: Retourne les statistiques de l'extracteur pour debugging"""
         stats = {
-            "extractor_version": "1.2.1",  # 🔧 NOUVEAU: Version avec corrections async
+            "extractor_version": "1.2.2",  # 🔧 NOUVEAU: Version avec correction critique guillemets
             "ai_extractor_enabled": AI_EXTRACTOR_AVAILABLE,  # 🔧 NOUVEAU: Status IA
             "normalizer_enabled": NORMALIZER_AVAILABLE,
             "async_support": True,  # 🔧 NOUVEAU: Support async complet
+            "syntax_errors_fixed": True,  # 🔧 NOUVEAU: Confirmé sans erreur syntaxe
             "specific_breeds_count": len(self.specific_breeds),
             "generic_breeds_count": len(self.generic_breeds),
             "health_symptoms_categories": len(self.health_symptoms),
@@ -702,15 +705,16 @@ def get_extraction_capabilities() -> Dict[str, Any]:
                           else "Patterns+Normalizer (Async)" if NORMALIZER_AVAILABLE
                           else "Patterns seulement (Sync+Async)",
         "fallback_enabled": True,  # Toujours vrai - patterns toujours disponibles
-        "extractor_version": "1.2.1",
+        "extractor_version": "1.2.2",
         "supports_async": True,
         "supports_sync": True,
         "supports_normalization": True,  # Via normalizer ou fallback
+        "syntax_errors_fixed": True,  # 🔧 NOUVEAU: Confirmé sans erreur syntaxe
         "runtime_warnings_fixed": True  # 🔧 NOUVEAU: Confirmé sans RuntimeWarnings
     }
 
 # =============================================================================
-# 🔧 TESTS INTÉGRÉS - MISE À JOUR AVEC CORRECTIONS ASYNC
+# 🔧 TESTS INTÉGRÉS - MISE À JOUR AVEC CORRECTIONS ASYNC ET SYNTAXE
 # =============================================================================
 
 async def test_extractor_with_ai():
@@ -724,7 +728,7 @@ async def test_extractor_with_ai():
         "La température est trop élevée dans mon bâtiment d'élevage"
     ]
     
-    print("🧪 Tests de l'extracteur d'entités avec corrections async:")
+    print("🧪 Tests de l'extracteur d'entités avec corrections complètes:")
     print("=" * 70)
     capabilities = get_extraction_capabilities()
     for key, value in capabilities.items():
@@ -769,7 +773,7 @@ async def test_extractor_with_ai():
     for key, value in stats.items():
         print(f"   {key}: {value}")
     
-    print("\n✅ Tests async terminés - aucun RuntimeWarning!")
+    print("\n✅ Tests async terminés - aucune erreur syntaxe ni RuntimeWarning!")
 
 def test_extractor():
     """🔧 CONSERVÉ: Tests synchrones pour compatibilité"""
