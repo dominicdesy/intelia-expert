@@ -1,5 +1,4 @@
 """
-
 smart_classifier.py - CLASSIFIER INTELLIGENT AVEC CONTEXTE CONVERSATIONNEL COMPLET
 
 🎯 SOLUTION COMPLÈTE:
@@ -17,7 +16,6 @@ Architecture:
 - Persistance automatique du contexte conversationnel
 - Fusion intelligente des entités
 - 🆕 ContextManager pour gestion centralisée du contexte
-
 """
 
 import logging
