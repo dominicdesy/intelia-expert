@@ -28,6 +28,9 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
+# ✅ CORRECTION: Initialiser le logger EN PREMIER
+logger = logging.getLogger(__name__)
+
 # Imports des modules IA unifiés (NOUVEAUX selon plan transformation)
 try:
     from .unified_ai_pipeline import get_unified_ai_pipeline, PipelineResult
@@ -60,8 +63,6 @@ except ImportError:
         def __init__(self, **kwargs):
             for key, value in kwargs.items():
                 setattr(self, key, value)
-
-logger = logging.getLogger(__name__)
 
 class ProcessingResult:
     """Résultat du traitement d'une question avec pipeline IA unifié"""
@@ -152,8 +153,11 @@ class ExpertService:
         # Affichage des capacités
         if self.ai_pipeline:
             logger.info("   🤖 Pipeline IA: ACTIVÉ - Performances optimisées")
-            pipeline_health = self.ai_pipeline.get_pipeline_health()
-            logger.info(f"   📊 Pipeline Health: {pipeline_health.get('success_rate', 0):.1f}% success")
+            try:
+                pipeline_health = self.ai_pipeline.get_pipeline_health()
+                logger.info(f"   📊 Pipeline Health: {pipeline_health.get('success_rate', 0):.1f}% success")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Pipeline Health non disponible: {e}")
         else:
             logger.info("   🔄 Système classique uniquement - Fallback garanti")
         
