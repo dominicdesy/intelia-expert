@@ -9,6 +9,13 @@ ai_service_manager.py - GESTIONNAIRE CENTRALISÉ DES SERVICES IA
 - ✅ Fallback automatique si IA indisponible
 - ✅ Optimisation des coûts API
 
+🔧 CORRECTIONS APPLIQUÉES:
+- ✅ Gestion correcte des timeouts avec asyncio.wait_for()
+- ✅ Opérations Redis async avec aioredis + fallback
+- ✅ Gestion spécifique des TimeoutError
+- ✅ Initialisation Redis non-bloquante
+- ✅ Métriques d'erreurs détaillées
+
 Architecture:
 - Un seul point d'entrée pour tous les appels IA
 - Cache Redis/Memory pour éviter appels redondants
@@ -26,6 +33,7 @@ from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
 
 # Imports sécurisés
 try:
@@ -37,12 +45,20 @@ except ImportError:
     openai = None
     AsyncOpenAI = None
 
+# Redis avec support async
 try:
     import redis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
     redis = None
+
+try:
+    import aioredis
+    AIOREDIS_AVAILABLE = True
+except ImportError:
+    AIOREDIS_AVAILABLE = False
+    aioredis = None
 
 logger = logging.getLogger(__name__)
 
@@ -139,24 +155,38 @@ class AIServiceManager:
         self.client = None
         self.available = False
         
-        # Cache
+        # Cache - Support async et sync
         self.redis_client = None
+        self.aioredis_client = None
         self.memory_cache = {}
         self.cache_enabled = False
+        self._cache_initialized = False
         
         # Circuit breaker
         self.circuit_breaker = CircuitBreaker() if enable_circuit_breaker else None
         
-        # Métriques
+        # Thread pool pour opérations sync dans contexte async
+        self._executor = ThreadPoolExecutor(max_workers=5)
+        
+        # Métriques avec détails d'erreurs
         self.metrics = {
             "total_requests": 0,
             "successful_requests": 0,
             "failed_requests": 0,
+            "timeout_errors": 0,
+            "api_errors": 0,
+            "circuit_breaker_errors": 0,
             "cached_requests": 0,
             "total_tokens_used": 0,
             "total_cost": 0.0,
             "response_times": [],
-            "requests_by_service": {service.value: 0 for service in AIServiceType}
+            "requests_by_service": {service.value: 0 for service in AIServiceType},
+            "errors_by_type": {
+                "timeout": 0,
+                "api_error": 0,
+                "circuit_breaker": 0,
+                "unknown": 0
+            }
         }
         
         # Rate limiting
@@ -170,9 +200,10 @@ class AIServiceManager:
         
         # Initialisation
         self._initialize_openai()
-        self._initialize_cache(redis_url)
+        # Cache sera initialisé de manière async lors du premier appel
+        self._redis_url = redis_url
         
-        logger.info(f"🤖 [AI Service Manager] Initialisé - IA: {self.available}, Cache: {self.cache_enabled}")
+        logger.info(f"🤖 [AI Service Manager] Initialisé - IA: {self.available}")
     
     def _initialize_openai(self):
         """Initialise le client OpenAI"""
@@ -196,24 +227,64 @@ class AIServiceManager:
             self.available = False
             return False
     
-    def _initialize_cache(self, redis_url: str = None):
-        """Initialise le système de cache"""
+    async def _initialize_cache_async(self):
+        """Initialise le système de cache de manière asynchrone"""
+        if self._cache_initialized:
+            return
+        
         try:
-            # Essayer Redis d'abord
-            if REDIS_AVAILABLE and redis_url:
-                self.redis_client = redis.from_url(redis_url)
-                self.redis_client.ping()
-                self.cache_enabled = True
-                logger.info("✅ [AI Manager] Cache Redis initialisé")
-                return
+            # Essayer aioredis d'abord (version async)
+            if AIOREDIS_AVAILABLE and self._redis_url:
+                try:
+                    self.aioredis_client = await aioredis.from_url(
+                        self._redis_url,
+                        encoding="utf-8",
+                        decode_responses=True
+                    )
+                    # Test de connexion
+                    await self.aioredis_client.ping()
+                    self.cache_enabled = True
+                    logger.info("✅ [AI Manager] Cache Redis async (aioredis) initialisé")
+                    self._cache_initialized = True
+                    return
+                except Exception as e:
+                    logger.warning(f"⚠️ [AI Manager] Échec aioredis: {e}")
+                    if self.aioredis_client:
+                        await self.aioredis_client.close()
+                        self.aioredis_client = None
+            
+            # Fallback vers Redis synchrone avec executor
+            if REDIS_AVAILABLE and self._redis_url:
+                try:
+                    # Initialiser Redis sync dans un thread
+                    self.redis_client = await asyncio.get_event_loop().run_in_executor(
+                        self._executor,
+                        lambda: redis.from_url(self._redis_url)
+                    )
+                    
+                    # Test de connexion
+                    await asyncio.get_event_loop().run_in_executor(
+                        self._executor,
+                        self.redis_client.ping
+                    )
+                    
+                    self.cache_enabled = True
+                    logger.info("✅ [AI Manager] Cache Redis sync initialisé")
+                    self._cache_initialized = True
+                    return
+                except Exception as e:
+                    logger.warning(f"⚠️ [AI Manager] Échec Redis sync: {e}")
+                    self.redis_client = None
             
             # Fallback vers cache mémoire
             self.cache_enabled = True
+            self._cache_initialized = True
             logger.info("✅ [AI Manager] Cache mémoire activé")
             
         except Exception as e:
-            logger.warning(f"⚠️ [AI Manager] Cache indisponible: {e}")
+            logger.warning(f"⚠️ [AI Manager] Cache complètement indisponible: {e}")
             self.cache_enabled = False
+            self._cache_initialized = True
     
     def _generate_cache_key(self, request: AIRequest) -> str:
         """Génère une clé de cache pour la requête"""
@@ -226,14 +297,30 @@ class AIServiceManager:
         return f"ai_cache:{request.service_type.value}:{hash_key}"
     
     async def _get_from_cache(self, cache_key: str) -> Optional[AIResponse]:
-        """Récupère une réponse du cache"""
+        """Récupère une réponse du cache de manière asynchrone"""
         if not self.cache_enabled:
             return None
         
+        # Assurer l'initialisation du cache
+        await self._initialize_cache_async()
+        
         try:
-            # Redis en priorité
-            if self.redis_client:
-                cached_data = self.redis_client.get(cache_key)
+            # aioredis en priorité (async natif)
+            if self.aioredis_client:
+                cached_data = await self.aioredis_client.get(cache_key)
+                if cached_data:
+                    data = json.loads(cached_data)
+                    response = AIResponse(**data)
+                    response.cached = True
+                    return response
+            
+            # Redis sync avec executor
+            elif self.redis_client:
+                cached_data = await asyncio.get_event_loop().run_in_executor(
+                    self._executor,
+                    self.redis_client.get,
+                    cache_key
+                )
                 if cached_data:
                     data = json.loads(cached_data)
                     response = AIResponse(**data)
@@ -256,21 +343,33 @@ class AIServiceManager:
         return None
     
     async def _save_to_cache(self, cache_key: str, response: AIResponse):
-        """Sauvegarde une réponse en cache"""
+        """Sauvegarde une réponse en cache de manière asynchrone"""
         if not self.cache_enabled:
             return
+        
+        # Assurer l'initialisation du cache
+        await self._initialize_cache_async()
         
         try:
             response_dict = asdict(response)
             response_dict['timestamp'] = response.timestamp.isoformat()
+            response_json = json.dumps(response_dict, default=str)
             
-            # Redis en priorité
-            if self.redis_client:
-                self.redis_client.setex(
+            # aioredis en priorité (async natif)
+            if self.aioredis_client:
+                await self.aioredis_client.setex(
                     cache_key, 
                     self.cache_ttl, 
-                    json.dumps(response_dict, default=str)
+                    response_json
                 )
+            
+            # Redis sync avec executor
+            elif self.redis_client:
+                await asyncio.get_event_loop().run_in_executor(
+                    self._executor,
+                    lambda: self.redis_client.setex(cache_key, self.cache_ttl, response_json)
+                )
+            
             else:
                 # Cache mémoire
                 self.memory_cache[cache_key] = {
@@ -297,9 +396,25 @@ class AIServiceManager:
         output_cost = output_tokens * pricing[model]["output"]
         return input_cost + output_cost
     
+    def _record_error_metrics(self, error_type: str):
+        """Enregistre les métriques d'erreur détaillées"""
+        self.metrics["failed_requests"] += 1
+        
+        if error_type == "timeout":
+            self.metrics["timeout_errors"] += 1
+            self.metrics["errors_by_type"]["timeout"] += 1
+        elif error_type == "api_error":
+            self.metrics["api_errors"] += 1
+            self.metrics["errors_by_type"]["api_error"] += 1
+        elif error_type == "circuit_breaker":
+            self.metrics["circuit_breaker_errors"] += 1
+            self.metrics["errors_by_type"]["circuit_breaker"] += 1
+        else:
+            self.metrics["errors_by_type"]["unknown"] += 1
+    
     async def call_ai_service(self, request: AIRequest) -> AIResponse:
         """
-        Point d'entrée principal pour tous les appels IA
+        Point d'entrée principal pour tous les appels IA avec gestion correcte des timeouts
         
         Args:
             request: Requête IA structurée
@@ -317,6 +432,7 @@ class AIServiceManager:
         try:
             # Vérifier circuit breaker
             if self.circuit_breaker and not self.circuit_breaker.can_execute():
+                self._record_error_metrics("circuit_breaker")
                 raise Exception("Circuit breaker OPEN - IA temporairement indisponible")
             
             # Vérifier cache
@@ -328,26 +444,40 @@ class AIServiceManager:
                 logger.info(f"✅ [AI Manager] Réponse depuis cache: {request.service_type.value}")
                 return cached_response
             
-            # Appel IA
+            # Appel IA avec gestion correcte du timeout
             if not self.available:
+                self._record_error_metrics("api_error")
                 raise Exception("Client OpenAI non disponible")
             
-            response = await self.client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Tu es un expert en élevage avicole. Réponds de manière précise et professionnelle."
-                    },
-                    {
-                        "role": "user", 
-                        "content": request.prompt
-                    }
-                ],
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                timeout=request.timeout
-            )
+            try:
+                # ✅ CORRECTION: Utiliser asyncio.wait_for() pour le timeout
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=request.model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "Tu es un expert en élevage avicole. Réponds de manière précise et professionnelle."
+                            },
+                            {
+                                "role": "user", 
+                                "content": request.prompt
+                            }
+                        ],
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature
+                        # ✅ timeout géré par asyncio.wait_for, pas par le client
+                    ),
+                    timeout=request.timeout  # ✅ Timeout correct avec asyncio
+                )
+                
+            except asyncio.TimeoutError:
+                # ✅ CORRECTION: Gestion spécifique des timeouts
+                self._record_error_metrics("timeout")
+                if self.circuit_breaker:
+                    self.circuit_breaker.record_failure()
+                logger.error(f"⏰ [AI Manager] Timeout API après {request.timeout}s pour {request.service_type.value}")
+                raise Exception(f"Timeout API après {request.timeout} secondes")
             
             # Construire réponse
             content = response.choices[0].message.content.strip()
@@ -364,10 +494,10 @@ class AIServiceManager:
                 cost_estimate=cost
             )
             
-            # Sauvegarder en cache
+            # Sauvegarder en cache (async)
             await self._save_to_cache(cache_key, ai_response)
             
-            # Métriques
+            # Métriques de succès
             self.metrics["successful_requests"] += 1
             self.metrics["total_tokens_used"] += tokens_used
             self.metrics["total_cost"] += cost
@@ -380,19 +510,24 @@ class AIServiceManager:
             logger.info(f"✅ [AI Manager] Appel réussi: {request.service_type.value} ({response_time_ms}ms, {tokens_used} tokens)")
             return ai_response
             
-        except Exception as e:
-            # Métriques d'erreur
-            self.metrics["failed_requests"] += 1
+        except asyncio.TimeoutError:
+            # Déjà géré dans le bloc try interne
+            raise
             
-            # Circuit breaker failure
-            if self.circuit_breaker:
+        except Exception as e:
+            # Gestion des autres erreurs
+            if "Circuit breaker" not in str(e):
+                self._record_error_metrics("api_error")
+            
+            # Circuit breaker failure (sauf si déjà géré)
+            if self.circuit_breaker and "Circuit breaker" not in str(e):
                 self.circuit_breaker.record_failure()
             
             logger.error(f"❌ [AI Manager] Erreur appel IA: {e}")
             raise
     
     def get_service_health(self) -> Dict[str, Any]:
-        """Retourne l'état de santé des services IA"""
+        """Retourne l'état de santé des services IA avec métriques détaillées"""
         total_requests = self.metrics["total_requests"]
         success_rate = (self.metrics["successful_requests"] / total_requests * 100) if total_requests > 0 else 0
         
@@ -401,6 +536,7 @@ class AIServiceManager:
         return {
             "ai_available": self.available,
             "cache_enabled": self.cache_enabled,
+            "cache_type": "aioredis" if self.aioredis_client else ("redis_sync" if self.redis_client else "memory"),
             "circuit_breaker_state": self.circuit_breaker.state if self.circuit_breaker else None,
             "total_requests": total_requests,
             "success_rate": round(success_rate, 2),
@@ -408,7 +544,14 @@ class AIServiceManager:
             "average_response_time_ms": round(avg_response_time, 2),
             "total_tokens_used": self.metrics["total_tokens_used"],
             "estimated_total_cost": round(self.metrics["total_cost"], 4),
-            "requests_by_service": self.metrics["requests_by_service"]
+            "requests_by_service": self.metrics["requests_by_service"],
+            "error_breakdown": {
+                "total_errors": self.metrics["failed_requests"],
+                "timeout_errors": self.metrics["timeout_errors"],
+                "api_errors": self.metrics["api_errors"],
+                "circuit_breaker_errors": self.metrics["circuit_breaker_errors"],
+                "errors_by_type": self.metrics["errors_by_type"]
+            }
         }
     
     def reset_metrics(self):
@@ -417,13 +560,38 @@ class AIServiceManager:
             "total_requests": 0,
             "successful_requests": 0,
             "failed_requests": 0,
+            "timeout_errors": 0,
+            "api_errors": 0,
+            "circuit_breaker_errors": 0,
             "cached_requests": 0,
             "total_tokens_used": 0,
             "total_cost": 0.0,
             "response_times": [],
-            "requests_by_service": {service.value: 0 for service in AIServiceType}
+            "requests_by_service": {service.value: 0 for service in AIServiceType},
+            "errors_by_type": {
+                "timeout": 0,
+                "api_error": 0,
+                "circuit_breaker": 0,
+                "unknown": 0
+            }
         }
         logger.info("🔄 [AI Manager] Métriques remises à zéro")
+    
+    async def close(self):
+        """Ferme proprement les connexions"""
+        try:
+            if self.aioredis_client:
+                await self.aioredis_client.close()
+                logger.info("✅ [AI Manager] Connexion aioredis fermée")
+        except Exception as e:
+            logger.warning(f"⚠️ [AI Manager] Erreur fermeture aioredis: {e}")
+        
+        try:
+            if self._executor:
+                self._executor.shutdown(wait=True)
+                logger.info("✅ [AI Manager] Thread pool fermé")
+        except Exception as e:
+            logger.warning(f"⚠️ [AI Manager] Erreur fermeture thread pool: {e}")
 
 # Instance globale singleton
 _ai_service_manager = None
@@ -440,9 +608,10 @@ async def call_ai(service_type: AIServiceType,
                  prompt: str, 
                  model: str = "gpt-4",
                  max_tokens: int = 1000,
+                 timeout: int = 30,
                  cache_key: str = None,
                  **kwargs) -> AIResponse:
-    """Fonction utilitaire pour appeler l'IA depuis d'autres modules"""
+    """Fonction utilitaire pour appeler l'IA depuis d'autres modules avec timeout correct"""
     
     manager = get_ai_service_manager()
     
@@ -451,6 +620,7 @@ async def call_ai(service_type: AIServiceType,
         prompt=prompt,
         model=model,
         max_tokens=max_tokens,
+        timeout=timeout,  # ✅ Timeout correctement transmis
         cache_key=cache_key,
         **kwargs
     )

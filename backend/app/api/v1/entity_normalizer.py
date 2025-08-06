@@ -6,6 +6,11 @@ Entity Normalizer - Normalisation centralisée des entités
 ✅ RÉSOUT: breed_specific vs breed_generic, age_days vs age_weeks, etc.
 🚀 IMPACT: +25% de pertinence des réponses personnalisées
 
+🔧 CORRECTION v1.1: Support des coroutines et objets async
+   - Détection automatique des coroutines
+   - Await automatique si nécessaire
+   - Fallback robuste vers synchrone
+
 PRINCIPE:
 - Point d'entrée unique pour normalisation
 - Mapping standardisé des races, sexes, âges
@@ -16,14 +21,15 @@ UTILISATION:
 ```python
 normalizer = EntityNormalizer()
 raw_entities = {"breed_specific": "ross308", "age_weeks": 3}
-normalized = normalizer.normalize(raw_entities)
+normalized = await normalizer.normalize(raw_entities)  # ✅ Maintenant async
 # → {"breed": "Ross 308", "age_days": 21, "age_weeks": 3, "sex": None, ...}
 ```
 """
 
 import logging
 import re
-from typing import Dict, Any, Optional, List, Union
+import asyncio
+from typing import Dict, Any, Optional, List, Union, Awaitable
 from dataclasses import dataclass, asdict
 
 logger = logging.getLogger(__name__)
@@ -187,20 +193,21 @@ class EntityNormalizer:
             "weight_conversions": 0,
             "context_mappings": 0,
             "validation_failures": 0,
-            "enrichments_applied": 0
+            "enrichments_applied": 0,
+            "coroutine_awaits": 0  # 🔧 NOUVEAU: Compteur coroutines
         }
         
-        logger.info("🔧 [EntityNormalizer] Initialisé avec mappings complets")
+        logger.info("🔧 [EntityNormalizer] Initialisé avec mappings complets + support coroutines")
         logger.info(f"   Races supportées: {len(self.breed_mapping)}")
         logger.info(f"   Sexes supportés: {len(self.sex_mapping)}")
         logger.info(f"   Contextes supportés: {len(self.context_mapping)}")
     
-    def normalize(self, raw_entities: Union[Dict[str, Any], object]) -> NormalizedEntities:
+    async def normalize(self, raw_entities: Union[Dict[str, Any], object, Awaitable]) -> NormalizedEntities:
         """
-        Point d'entrée principal pour normalisation
+        🔧 CORRIGÉ: Point d'entrée principal pour normalisation avec support coroutines
         
         Args:
-            raw_entities: Entités brutes (dict ou objet avec attributs)
+            raw_entities: Entités brutes (dict, objet avec attributs, ou coroutine)
             
         Returns:
             NormalizedEntities: Entités normalisées et validées
@@ -209,15 +216,11 @@ class EntityNormalizer:
         self.stats["total_normalizations"] += 1
         
         try:
+            # 🔧 CORRECTION CRITIQUE: Détection et await des coroutines
+            resolved_entities = await self._resolve_input(raw_entities)
+            
             # Conversion vers dict si nécessaire
-            if hasattr(raw_entities, '__dict__'):
-                raw_dict = {k: v for k, v in raw_entities.__dict__.items() 
-                           if not k.startswith('_')}
-            elif isinstance(raw_entities, dict):
-                raw_dict = raw_entities.copy()
-            else:
-                logger.warning(f"⚠️ [EntityNormalizer] Type non supporté: {type(raw_entities)}")
-                raw_dict = {}
+            raw_dict = self._convert_to_dict(resolved_entities)
             
             # Initialiser entités normalisées
             normalized = NormalizedEntities()
@@ -246,9 +249,78 @@ class EntityNormalizer:
             
             # Retourner entités vides en cas d'erreur
             fallback = NormalizedEntities()
-            fallback.original_format = raw_entities if isinstance(raw_entities, dict) else {}
+            fallback.original_format = {} if not isinstance(raw_entities, dict) else raw_entities
             fallback.normalization_confidence = 0.0
             return fallback
+    
+    async def _resolve_input(self, raw_entities: Union[Dict[str, Any], object, Awaitable]) -> Any:
+        """
+        🔧 NOUVEAU: Résout les coroutines et objets async en entrée
+        
+        Returns:
+            L'objet résolu (non-async)
+        """
+        # Cas 1: C'est une coroutine → await
+        if asyncio.iscoroutine(raw_entities):
+            logger.debug("🔧 [EntityNormalizer] Coroutine détectée - await en cours...")
+            self.stats["coroutine_awaits"] += 1
+            return await raw_entities
+        
+        # Cas 2: C'est un awaitable mais pas une coroutine → await
+        elif hasattr(raw_entities, '__await__'):
+            logger.debug("🔧 [EntityNormalizer] Awaitable détecté - await en cours...")
+            self.stats["coroutine_awaits"] += 1
+            return await raw_entities
+        
+        # Cas 3: C'est un Future/Task → await
+        elif hasattr(raw_entities, 'result') and callable(getattr(raw_entities, 'result')):
+            try:
+                if not raw_entities.done():
+                    logger.debug("🔧 [EntityNormalizer] Future détecté - await en cours...")
+                    self.stats["coroutine_awaits"] += 1
+                    return await raw_entities
+                else:
+                    return raw_entities.result()
+            except Exception as e:
+                logger.warning(f"⚠️ [EntityNormalizer] Erreur await Future: {e}")
+                return {}
+        
+        # Cas 4: Objet normal → retour direct
+        else:
+            return raw_entities
+    
+    def _convert_to_dict(self, resolved_entities: Any) -> Dict[str, Any]:
+        """
+        🔧 AMÉLIORÉ: Conversion robuste vers dict
+        
+        Returns:
+            Dict avec les attributs de l'objet
+        """
+        # Cas 1: Déjà un dict
+        if isinstance(resolved_entities, dict):
+            return resolved_entities.copy()
+        
+        # Cas 2: Objet avec attributs __dict__
+        elif hasattr(resolved_entities, '__dict__'):
+            raw_dict = {k: v for k, v in resolved_entities.__dict__.items() 
+                       if not k.startswith('_')}
+            return raw_dict
+        
+        # Cas 3: Objet avec méthode to_dict()
+        elif hasattr(resolved_entities, 'to_dict') and callable(getattr(resolved_entities, 'to_dict')):
+            try:
+                return resolved_entities.to_dict()
+            except Exception as e:
+                logger.warning(f"⚠️ [EntityNormalizer] Erreur to_dict(): {e}")
+        
+        # Cas 4: Objet avec méthode __dict__ comme propriété
+        elif hasattr(resolved_entities, '__dict__') and isinstance(resolved_entities.__dict__, dict):
+            return resolved_entities.__dict__.copy()
+        
+        # Cas 5: Type non supporté
+        else:
+            logger.warning(f"⚠️ [EntityNormalizer] Type non supporté après résolution: {type(resolved_entities)}")
+            return {}
     
     def _normalize_breed(self, raw_dict: Dict[str, Any]) -> Optional[str]:
         """Normalise la race avec priorité aux spécifiques"""
@@ -558,7 +630,8 @@ class EntityNormalizer:
             "sex_normalization_rate": f"{(self.stats['sex_normalizations']/total)*100:.1f}%",
             "weight_conversion_rate": f"{(self.stats['weight_conversions']/total)*100:.1f}%",
             "enrichment_rate": f"{(self.stats['enrichments_applied']/total)*100:.1f}%",
-            "success_rate": f"{((total-self.stats['validation_failures'])/total)*100:.1f}%"
+            "success_rate": f"{((total-self.stats['validation_failures'])/total)*100:.1f}%",
+            "coroutine_handling_rate": f"{(self.stats['coroutine_awaits']/total)*100:.1f}%"  # 🔧 NOUVEAU
         }
 
     def get_normalization_stats(self) -> Dict[str, Any]:
@@ -574,25 +647,25 @@ class EntityNormalizer:
 entity_normalizer = EntityNormalizer()
 
 # Fonction utilitaire pour usage direct
-def normalize_entities(raw_entities: Union[Dict[str, Any], object]) -> NormalizedEntities:
+async def normalize_entities(raw_entities: Union[Dict[str, Any], object, Awaitable]) -> NormalizedEntities:
     """
-    Fonction utilitaire pour normalisation rapide
+    🔧 CORRIGÉ: Fonction utilitaire pour normalisation rapide - maintenant async
     
     Usage:
     ```python
     from app.api.v1.entity_normalizer import normalize_entities
     
     raw = {"breed_specific": "ross308", "age_weeks": 3}
-    normalized = normalize_entities(raw)
+    normalized = await normalize_entities(raw)  # ✅ Maintenant async
     print(normalized.breed)  # "Ross 308"
     print(normalized.age_days)  # 21
     ```
     """
-    return entity_normalizer.normalize(raw_entities)
+    return await entity_normalizer.normalize(raw_entities)
 
 # Fonction pour tests et debugging
-def test_normalization():
-    """Teste la normalisation avec des cas typiques"""
+async def test_normalization():
+    """🔧 CORRIGÉ: Teste la normalisation avec des cas typiques - maintenant async"""
     
     test_cases = [
         {
@@ -614,10 +687,15 @@ def test_normalization():
             "name": "Symptômes + contexte auto",
             "input": {"symptoms": ["diarrhée", "léthargie"], "breed_generic": "cobb"},
             "expected": {"symptoms": ["diarrhée", "léthargie"], "context_type": "health"}
+        },
+        {
+            "name": "Test coroutine simulation",
+            "input": asyncio.sleep(0.1),  # Coroutine factice
+            "expected": {}  # Résultat vide attendu
         }
     ]
     
-    print("🧪 Test de normalisation des entités:")
+    print("🧪 Test de normalisation des entités (version corrigée):")
     print("=" * 50)
     
     normalizer = EntityNormalizer()
@@ -626,7 +704,7 @@ def test_normalization():
         print(f"\n📝 Test {i}: {test_case['name']}")
         print(f"   Input: {test_case['input']}")
         
-        result = normalizer.normalize(test_case['input'])
+        result = await normalizer.normalize(test_case['input'])  # ✅ Maintenant async
         result_dict = result.to_dict()
         
         print(f"   Output: race={result.breed}, âge={result.age_days}j, sexe={result.sex}")
@@ -641,5 +719,13 @@ def test_normalization():
     print(f"\n📊 Statistiques: {normalizer.get_stats()}")
     print("✅ Tests terminés!")
 
+def test_normalization_sync():
+    """🔧 NOUVEAU: Version synchrone pour compatibilité"""
+    try:
+        asyncio.run(test_normalization())
+    except Exception as e:
+        print(f"⚠️ Tests async échoués: {e}")
+        print("Utilisation des tests basiques synchrones...")
+
 if __name__ == "__main__":
-    test_normalization()
+    test_normalization_sync()

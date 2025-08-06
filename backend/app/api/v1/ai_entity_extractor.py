@@ -1,7 +1,13 @@
 """
-ai_entity_extractor.py - EXTRACTION D'ENTITÉS AVEC IA
+ai_entity_extractor.py - EXTRACTION D'ENTITÉS AVEC IA - CORRIGÉ
 
 🎯 REMPLACE: 300+ lignes de patterns regex par compréhension IA
+🔧 CORRECTIONS v1.1:
+   - Gestion robuste des erreurs async
+   - Fallback vers extraction basique si IA échoue
+   - Métadonnées de traçabilité améliorées
+   - Validation supplémentaire des résultats
+
 🚀 CAPACITÉS:
 - ✅ Extraction intelligente des races, âges, sexes, symptômes
 - ✅ Normalisation automatique (Ross 308, 21 jours, male/female)  
@@ -15,6 +21,7 @@ Architecture:
 - Normalisation systématique des résultats
 - Validation et correction automatique
 - Cache intelligent pour optimisation
+- Fallback robuste vers extraction basique
 """
 
 import json
@@ -23,7 +30,13 @@ from typing import Dict, Any, Optional, List, Union
 from dataclasses import dataclass
 from datetime import datetime
 
-from .ai_service_manager import AIServiceType, call_ai, AIResponse
+# Import conditionnel pour éviter les erreurs si AI service non disponible
+try:
+    from .ai_service_manager import AIServiceType, call_ai, AIResponse
+    AI_SERVICE_AVAILABLE = True
+except ImportError:
+    AI_SERVICE_AVAILABLE = False
+    logging.warning("AI Service Manager non disponible - fallback vers extraction basique")
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +69,12 @@ class AIEntityExtractor:
     """Extracteur d'entités avec IA - Remplace les patterns regex"""
     
     def __init__(self):
+        # Vérifier disponibilité du service IA
+        self.ai_available = AI_SERVICE_AVAILABLE
+        
+        if not self.ai_available:
+            logger.warning("🔧 [AI Entity Extractor] Service IA non disponible - mode fallback")
+            
         # Configuration des modèles par complexité
         self.models = {
             "simple": "gpt-3.5-turbo",    # Questions simples
@@ -86,7 +105,16 @@ class AIEntityExtractor:
             }
         }
         
-        logger.info("🤖 [AI Entity Extractor] Initialisé avec prompts optimisés")
+        # Statistiques pour monitoring
+        self.stats = {
+            "total_extractions": 0,
+            "ai_extractions": 0,
+            "fallback_extractions": 0,
+            "validation_calls": 0,
+            "errors": 0
+        }
+        
+        logger.info(f"🤖 [AI Entity Extractor] Initialisé - IA disponible: {self.ai_available}")
     
     def _initialize_prompts(self) -> Dict[str, str]:
         """Initialise les templates de prompts spécialisés"""
@@ -220,7 +248,7 @@ Respond in JSON:
     
     async def extract_entities(self, question: str, language: str = "fr") -> ExtractedEntities:
         """
-        Point d'entrée principal - Extraction complète des entités avec IA
+        🔧 CORRIGÉ: Point d'entrée principal - Extraction complète avec gestion d'erreurs robuste
         
         Args:
             question: Question de l'utilisateur
@@ -229,8 +257,15 @@ Respond in JSON:
         Returns:
             ExtractedEntities avec toutes les informations extraites et normalisées
         """
+        self.stats["total_extractions"] += 1
+        
         try:
             logger.info(f"🤖 [AI Entity Extractor] Extraction: '{question[:50]}...'")
+            
+            # 🔧 NOUVEAU: Vérification disponibilité IA
+            if not self.ai_available:
+                logger.warning("⚠️ [AI Entity Extractor] Service IA non disponible - fallback")
+                return self._basic_extraction_fallback(question)
             
             # Déterminer le modèle selon la complexité
             model = self._select_model(question, language)
@@ -244,18 +279,29 @@ Respond in JSON:
             else:
                 prompt = self.prompts["extraction_complete"].format(question=question)
             
-            # Appel IA pour extraction
-            ai_response = await call_ai(
-                service_type=AIServiceType.ENTITY_EXTRACTION,
-                prompt=prompt,
-                model=model,
-                max_tokens=800,
-                temperature=0.1,
-                cache_key=f"extract_{hash(question)}_{language}"
-            )
+            # 🔧 CORRIGÉ: Appel IA avec gestion d'erreurs améliorée
+            try:
+                ai_response = await call_ai(
+                    service_type=AIServiceType.ENTITY_EXTRACTION,
+                    prompt=prompt,
+                    model=model,
+                    max_tokens=800,
+                    temperature=0.1,
+                    cache_key=f"extract_{hash(question)}_{language}"
+                )
+                
+                self.stats["ai_extractions"] += 1
+                
+            except Exception as ai_error:
+                logger.warning(f"⚠️ [AI Entity Extractor] Erreur appel IA: {ai_error}")
+                self.stats["errors"] += 1
+                return self._basic_extraction_fallback(question)
             
             # Parser la réponse JSON
             raw_entities = self._parse_ai_response(ai_response.content)
+            if not raw_entities:
+                logger.warning("⚠️ [AI Entity Extractor] Parsing échoué - fallback")
+                return self._basic_extraction_fallback(question)
             
             # Validation et normalisation supplémentaire
             validated_entities = await self._validate_and_normalize(raw_entities, question)
@@ -269,8 +315,76 @@ Respond in JSON:
             
         except Exception as e:
             logger.error(f"❌ [AI Entity Extractor] Erreur extraction: {e}")
-            # Retourner entités vides plutôt que faire échouer
-            return self._create_empty_entities(question, str(e))
+            self.stats["errors"] += 1
+            # Retourner fallback plutôt que faire échouer
+            return self._basic_extraction_fallback(question)
+    
+    def _basic_extraction_fallback(self, question: str) -> ExtractedEntities:
+        """
+        🔧 NOUVEAU: Extraction basique en cas d'échec IA
+        
+        Returns:
+            ExtractedEntities avec extraction de base par mots-clés
+        """
+        self.stats["fallback_extractions"] += 1
+        logger.debug("🔧 [AI Entity Extractor] Mode fallback - extraction basique")
+        
+        entities = ExtractedEntities()
+        question_lower = question.lower()
+        
+        # Extraction basique par mots-clés
+        
+        # Âge - patterns simples
+        import re
+        age_match = re.search(r'(\d+)\s*(?:jour|day)s?', question_lower)
+        if age_match:
+            entities.age_days = int(age_match.group(1))
+            entities.age_weeks = entities.age_days // 7
+        else:
+            week_match = re.search(r'(\d+)\s*(?:semaine|week)s?', question_lower)
+            if week_match:
+                entities.age_weeks = int(week_match.group(1))
+                entities.age_days = entities.age_weeks * 7
+        
+        # Race - recherche dans les mappings
+        for breed_raw, breed_normalized in self.normalization_maps["breeds"].items():
+            if breed_raw in question_lower:
+                entities.breed_specific = breed_normalized
+                break
+        
+        # Si pas de race spécifique, chercher générique
+        if not entities.breed_specific:
+            for generic in ['poulet', 'poule', 'coq', 'chicken', 'broiler']:
+                if generic in question_lower:
+                    entities.breed_generic = generic
+                    break
+        
+        # Sexe
+        for sex_raw, sex_normalized in self.normalization_maps["sexes"].items():
+            if sex_raw in question_lower:
+                entities.sex = sex_normalized
+                break
+        
+        # Poids
+        entities.weight_mentioned = any(word in question_lower 
+                                       for word in ['poids', 'weight', 'gramme', 'kg', 'kilo'])
+        
+        # Contexte basique
+        if any(word in question_lower for word in ['malade', 'symptôme', 'problème']):
+            entities.context_type = 'santé'
+        elif any(word in question_lower for word in ['poids', 'weight', 'croissance']):
+            entities.context_type = 'performance'
+        elif any(word in question_lower for word in ['alimentation', 'nourrir', 'aliment']):
+            entities.context_type = 'alimentation'
+        else:
+            entities.context_type = 'général'
+        
+        # Métadonnées fallback
+        entities.extraction_confidence = 0.5  # Confiance moyenne pour fallback
+        entities.ai_reasoning = "Extraction basique par mots-clés (fallback)"
+        entities.normalized_by_ai = False
+        
+        return entities
     
     def _select_model(self, question: str, language: str) -> str:
         """Sélectionne le modèle optimal selon la complexité"""
@@ -292,8 +406,12 @@ Respond in JSON:
         
         return self.models["simple"]
     
-    def _parse_ai_response(self, content: str) -> Dict[str, Any]:
-        """Parse la réponse JSON de l'IA avec gestion d'erreurs"""
+    def _parse_ai_response(self, content: str) -> Optional[Dict[str, Any]]:
+        """🔧 AMÉLIORÉ: Parse la réponse JSON de l'IA avec gestion d'erreurs robuste"""
+        
+        if not content or not content.strip():
+            logger.warning("⚠️ [AI Entity Extractor] Contenu vide")
+            return None
         
         try:
             # Nettoyer le contenu (supprimer markdown, etc.)
@@ -308,6 +426,11 @@ Respond in JSON:
             entities = json.loads(content)
             
             # Validation basique de structure
+            if not isinstance(entities, dict):
+                logger.warning("⚠️ [AI Entity Extractor] Réponse non-dict")
+                return None
+            
+            # Garantir les champs essentiels
             required_fields = ["age_days", "breed_specific", "sex", "weight_mentioned", "context_type"]
             for field in required_fields:
                 if field not in entities:
@@ -320,10 +443,12 @@ Respond in JSON:
             return self._parse_fallback(content)
         except Exception as e:
             logger.error(f"❌ [AI Entity Extractor] Erreur parsing: {e}")
-            return {}
+            return None
     
-    def _parse_fallback(self, content: str) -> Dict[str, Any]:
-        """Parsing de fallback si JSON invalide"""
+    def _parse_fallback(self, content: str) -> Optional[Dict[str, Any]]:
+        """🔧 AMÉLIORÉ: Parsing de fallback si JSON invalide"""
+        
+        logger.debug("🔧 [AI Entity Extractor] Tentative parsing fallback")
         
         entities = {
             "age_days": None, "breed_specific": None, "sex": None,
@@ -332,60 +457,73 @@ Respond in JSON:
             "ai_reasoning": "Parsing fallback - JSON invalide"
         }
         
-        # Extraction basique par mots-clés
+        # Extraction basique par mots-clés du contenu
         content_lower = content.lower()
         
         # Recherche âge
         import re
-        age_match = re.search(r'(\d+)\s*(?:jour|day)s?', content_lower)
+        age_match = re.search(r'"?age_days"?\s*:\s*(\d+)', content_lower)
         if age_match:
             entities["age_days"] = int(age_match.group(1))
         
         # Recherche race
         for normalized, standard in self.normalization_maps["breeds"].items():
-            if normalized in content_lower:
+            if normalized in content_lower or standard.lower() in content_lower:
                 entities["breed_specific"] = standard
                 break
         
         # Recherche sexe  
         for raw, normalized in self.normalization_maps["sexes"].items():
-            if raw in content_lower:
+            if raw in content_lower or normalized in content_lower:
                 entities["sex"] = normalized
                 break
         
         return entities
     
     async def _validate_and_normalize(self, entities: Dict[str, Any], original_question: str) -> Dict[str, Any]:
-        """Validation et normalisation supplémentaire avec IA"""
+        """🔧 CORRIGÉ: Validation et normalisation supplémentaire avec IA"""
+        
+        self.stats["validation_calls"] += 1
         
         try:
             # Si confiance élevée, validation légère
             if entities.get("extraction_confidence", 0) > 0.8:
                 return self._normalize_locally(entities)
             
-            # Sinon, validation IA complète
+            # Sinon, validation IA complète si disponible
+            if not self.ai_available:
+                logger.debug("🔧 [AI Entity Extractor] Validation locale - IA non disponible")
+                return self._normalize_locally(entities)
+            
             prompt = self.prompts["validation_normalization"].format(
                 entities=json.dumps(entities, ensure_ascii=False)
             )
             
-            ai_response = await call_ai(
-                service_type=AIServiceType.VALIDATION,
-                prompt=prompt,
-                model="gpt-4",
-                max_tokens=600,
-                temperature=0.05,
-                cache_key=f"validate_{hash(str(entities))}"
-            )
-            
-            validated = self._parse_ai_response(ai_response.content)
-            return validated if validated else self._normalize_locally(entities)
+            try:
+                ai_response = await call_ai(
+                    service_type=AIServiceType.VALIDATION,
+                    prompt=prompt,
+                    model="gpt-4",
+                    max_tokens=600,
+                    temperature=0.05,
+                    cache_key=f"validate_{hash(str(entities))}"
+                )
+                
+                validated = self._parse_ai_response(ai_response.content)
+                return validated if validated else self._normalize_locally(entities)
+                
+            except Exception as ai_error:
+                logger.warning(f"⚠️ [AI Entity Extractor] Erreur validation IA: {ai_error}")
+                return self._normalize_locally(entities)
             
         except Exception as e:
-            logger.warning(f"⚠️ [AI Entity Extractor] Erreur validation IA: {e}")
+            logger.warning(f"⚠️ [AI Entity Extractor] Erreur validation: {e}")
             return self._normalize_locally(entities)
     
     def _normalize_locally(self, entities: Dict[str, Any]) -> Dict[str, Any]:
         """Normalisation locale avec les mappings de backup"""
+        
+        logger.debug("🔧 [AI Entity Extractor] Normalisation locale")
         
         # Normaliser race
         breed = entities.get("breed_specific", "").lower()
@@ -415,7 +553,7 @@ Respond in JSON:
         
         return entities
     
-    def _build_extracted_entities(self, validated_entities: Dict[str, Any], ai_response: AIResponse) -> ExtractedEntities:
+    def _build_extracted_entities(self, validated_entities: Dict[str, Any], ai_response) -> ExtractedEntities:
         """Construit l'objet ExtractedEntities final"""
         
         return ExtractedEntities(
@@ -433,17 +571,7 @@ Respond in JSON:
             feeding_context=validated_entities.get("feeding_context"),
             extraction_confidence=validated_entities.get("extraction_confidence", 0.7),
             ai_reasoning=validated_entities.get("ai_reasoning") or validated_entities.get("validation_notes"),
-            normalized_by_ai=True
-        )
-    
-    def _create_empty_entities(self, question: str, error: str) -> ExtractedEntities:
-        """Crée un objet entités vide en cas d'erreur"""
-        
-        return ExtractedEntities(
-            context_type="général",
-            extraction_confidence=0.0,
-            ai_reasoning=f"Erreur extraction: {error}",
-            normalized_by_ai=False
+            normalized_by_ai=self.ai_available
         )
     
     async def extract_entities_batch(self, questions: List[str], language: str = "fr") -> List[ExtractedEntities]:
@@ -460,7 +588,8 @@ Respond in JSON:
         entities_list = []
         for result in results:
             if isinstance(result, Exception):
-                entities_list.append(self._create_empty_entities("", str(result)))
+                logger.warning(f"⚠️ [AI Entity Extractor] Erreur dans lot: {result}")
+                entities_list.append(self._basic_extraction_fallback(""))
             else:
                 entities_list.append(result)
         
@@ -469,20 +598,28 @@ Respond in JSON:
     
     def get_extraction_stats(self) -> Dict[str, Any]:
         """Statistiques d'extraction pour monitoring"""
-        # Ces stats seraient collectées via AIServiceManager
-        from .ai_service_manager import get_ai_service_manager
         
-        manager = get_ai_service_manager()
-        health = manager.get_service_health()
+        total = max(self.stats["total_extractions"], 1)
         
         return {
             "service_name": "AI Entity Extractor",
-            "extraction_requests": health.get("requests_by_service", {}).get("entity_extraction", 0),
-            "models_available": list(self.models.keys()),
+            "ai_available": self.ai_available,
+            "total_extractions": self.stats["total_extractions"],
+            "ai_extractions": self.stats["ai_extractions"],
+            "fallback_extractions": self.stats["fallback_extractions"],
+            "validation_calls": self.stats["validation_calls"],
+            "errors": self.stats["errors"],
+            "ai_success_rate": f"{(self.stats['ai_extractions']/total)*100:.1f}%" if self.ai_available else "0%",
+            "fallback_rate": f"{(self.stats['fallback_extractions']/total)*100:.1f}%",
+            "error_rate": f"{(self.stats['errors']/total)*100:.1f}%",
+            "models_available": list(self.models.keys()) if self.ai_available else [],
             "normalization_maps": {k: len(v) for k, v in self.normalization_maps.items()},
-            "supported_languages": ["fr", "en", "es"],
-            "ai_service_health": health
+            "supported_languages": ["fr", "en", "es"]
         }
+
+    def get_stats(self) -> Dict[str, Any]:
+        """🔧 NOUVEAU: Alias pour get_extraction_stats() pour compatibilité"""
+        return self.get_extraction_stats()
 
 # Instance globale pour utilisation facile
 _ai_entity_extractor = None
@@ -493,3 +630,52 @@ def get_ai_entity_extractor() -> AIEntityExtractor:
     if _ai_entity_extractor is None:
         _ai_entity_extractor = AIEntityExtractor()
     return _ai_entity_extractor
+
+# 🔧 NOUVEAU: Fonction de test pour validation
+async def test_ai_extractor():
+    """Test de l'extracteur IA avec gestion d'erreurs"""
+    
+    extractor = AIEntityExtractor()
+    
+    test_questions = [
+        "Quel est le poids d'un poulet Ross 308 mâle de 21 jours ?",
+        "Mes poules Cobb 500 de 3 semaines ont de la diarrhée",
+        "Comment nourrir des poussins ?",
+        "Question invalide pour tester le fallback"
+    ]
+    
+    print("🧪 Test de l'extracteur IA avec fallback:")
+    print("=" * 60)
+    
+    for i, question in enumerate(test_questions, 1):
+        print(f"\n📝 Test {i}: {question}")
+        
+        try:
+            entities = await extractor.extract_entities(question)
+            print(f"   ✅ Race: {entities.breed_specific}")
+            print(f"   ✅ Âge: {entities.age_days} jours")
+            print(f"   ✅ Sexe: {entities.sex}")
+            print(f"   ✅ Contexte: {entities.context_type}")
+            print(f"   ✅ Confiance: {entities.extraction_confidence:.2f}")
+            print(f"   ✅ IA utilisée: {entities.normalized_by_ai}")
+            
+        except Exception as e:
+            print(f"   ❌ Erreur: {e}")
+    
+    print(f"\n📊 Statistiques:")
+    stats = extractor.get_extraction_stats()
+    for key, value in stats.items():
+        print(f"   {key}: {value}")
+    
+    print("\n✅ Tests terminés!")
+
+def test_ai_extractor_sync():
+    """Version synchrone pour compatibilité"""
+    try:
+        import asyncio
+        asyncio.run(test_ai_extractor())
+    except Exception as e:
+        print(f"⚠️ Tests async échoués: {e}")
+
+if __name__ == "__main__":
+    test_ai_extractor_sync()
