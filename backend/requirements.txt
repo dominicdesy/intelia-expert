@@ -1,4 +1,4 @@
-# 🔧 REQUIREMENTS.TXT - RÉSOLUTION RAPIDE OPTIMISÉE - CORRIGÉ
+# 🔧 REQUIREMENTS.TXT - RÉSOLUTION FINALE DES CONFLITS
 
 # Core FastAPI - versions exactes maintenues
 fastapi==0.104.1
@@ -7,12 +7,12 @@ python-multipart==0.0.6
 pydantic==2.5.0
 email-validator==2.1.0.post1
 
-# Supabase - VERSIONS CORRIGÉES pour éviter les conflits
+# Supabase - VERSIONS COMPATIBLES CORRIGÉES
 supabase==2.9.1
-gotrue==2.9.1                    # 🔧 FIXÉ: Version exacte au lieu de >=2.9.0,<3.0.0
-httpx==0.25.2                    # 🔧 FIXÉ: Version exacte au lieu de >=0.24.0,<1.0.0
-realtime-py==0.1.3              # 🔧 CORRIGÉ: 0.2.0 n'existe pas ! Utilisation de la dernière version disponible
-postgrest==0.13.2               # 🔧 AJOUTÉ: Dépendance de supabase
+gotrue==2.9.1                    
+httpx==0.27.0                    # 🔧 CORRIGÉ: 0.25.2 → 0.27.0 (compatible avec supabase qui exige >=0.26)
+realtime-py==0.1.3              # 🔧 CORRIGÉ: Version existante
+postgrest==0.13.2               
 
 # Auth & Security - maintenu
 PyJWT==2.8.0
@@ -20,16 +20,16 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
 # OpenAI - mise à jour recommandée
-openai==1.3.8                   # 🔧 MISE À JOUR: Version plus récente et stable
+openai==1.3.8                   
 
 # RAG System - VERSIONS COMPATIBLES OPTIMISÉES
-huggingface_hub==0.19.4         # 🔧 MISE À JOUR: Plus récente et compatible
-sentence-transformers==2.2.2    # Maintenu - stable
-transformers==4.36.2            # 🔧 MISE À JOUR: Compatible avec HF Hub
-torch==2.1.2                    # 🔧 MISE À JOUR: Patch version plus récente
-torchvision==0.16.2             # 🔧 AJOUTÉ: Version explicite pour éviter conflits
-faiss-cpu==1.7.4                # Maintenu - stable
-numpy==1.24.4                   # 🔧 MISE À JOUR: Dernière version 1.24.x
+huggingface_hub==0.19.4         
+sentence-transformers==2.2.2    
+transformers==4.36.2            
+torch==2.1.2                    
+torchvision==0.16.2             
+faiss-cpu==1.7.4                
+numpy==1.24.4                   
 
 # Utils - versions maintenues
 python-dotenv==1.0.0
@@ -46,8 +46,8 @@ pillow==10.1.0
 requests==2.31.0
 
 # 🔧 DÉPENDANCES AJOUTÉES pour éviter les résolutions lentes
-typing-extensions==4.8.0        # Compatibilité pydantic/fastapi
-certifi>=2023.7.22             # Sécurité SSL
-charset-normalizer>=3.3.0      # Encodage
-idna>=3.4                       # Noms de domaine internationaux
-urllib3>=2.0.0                  # HTTP client
+typing-extensions==4.8.0        
+certifi>=2023.7.22             
+charset-normalizer>=3.3.0      
+idna>=3.4                       
+urllib3>=2.0.0
