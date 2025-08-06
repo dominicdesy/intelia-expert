@@ -487,14 +487,15 @@ class SmartClassifier:
         question_lower = question.lower()
         
         # Patterns de clarification
+
         clarification_patterns = [
             r'pour un\s+\w+',  # "pour un Ross 308"
             r'avec un\s+\w+',  # "avec un mâle"  
             r'chez\s+\w+',     # "chez Ross 308"
-            r'^\w+\s+\w+,    # "Ross 308" ou "cobb 500"
-            r'^(mâle|femelle|mâles|femelles)  # Juste le sexe
+            r'^\w+\s+\w+$',    # "Ross 308" ou "cobb 500"  # ✅ CORRIGÉ
+            r'^(mâle|femelle|mâles|femelles)$'  # Juste le sexe
         ]
-        
+      
         for pattern in clarification_patterns:
             if re.search(pattern, question_lower):
                 logger.info(f"🔗 [Clarification] Pattern détecté: {pattern}")
