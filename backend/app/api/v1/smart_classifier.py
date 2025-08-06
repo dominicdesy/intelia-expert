@@ -1,7 +1,7 @@
 """
 smart_classifier.py - CLASSIFIER INTELLIGENT AVEC IA OpenAI + FALLBACK ROBUSTE
 
-🎯 VERSION CORRIGÉE - Compatibilité paramètres améliorée
+🎯 VERSION CORRIGÉE - Compatibilité paramètres améliorée + get_classification_stats() AJOUTÉE
 
 AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
 - ✅ Intégration IA pour classification intelligente
@@ -11,6 +11,7 @@ AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION:
 - ✅ Validation contextuelle avec ContextManager
 - ✅ Correction du bug "contexte utile"
 - 🔧 CORRECTION: Compatibilité paramètres (is_clarification_response, question_text, etc.)
+- 🔧 CORRECTION CRITIQUE: Méthode get_classification_stats() ajoutée
 
 Architecture hybride selon plan:
 1. PRIORITÉ: Classification IA pour comprendre l'intention
@@ -65,6 +66,16 @@ class SmartClassifier:
         self.ai_model = "gpt-4"  # ou "gpt-3.5-turbo" pour économie
         self.max_tokens = 500
         
+        # 🔧 CORRECTION: Initialisation des compteurs pour les statistiques
+        self._total_classifications = 0
+        self._ai_classifications = 0
+        self._fallback_classifications = 0
+        self._classification_errors = 0
+        self._precise_responses = 0
+        self._general_responses = 0
+        self._contextual_responses = 0
+        self._clarification_requests = 0
+        
         # 🔧 Conservation du code original comme fallback
         self._initialize_classic_rules()
         
@@ -83,6 +94,7 @@ class SmartClassifier:
         PRIORITÉ: IA → FALLBACK: Règles classiques conservées
         """
         context_source = "parameter"
+        self._total_classifications += 1
         
         try:
             # 🆕 PHASE 3: Utiliser ContextManager centralisé si disponible
@@ -109,22 +121,43 @@ class SmartClassifier:
                     ai_analysis, merged_entities, context_source
                 )
                 
+                self._ai_classifications += 1
+                self._update_response_counters(final_classification.response_type)
+                
                 logger.info(f"✅ [AI Pipeline] Classification: {final_classification.response_type.value}")
                 return final_classification
             
             # 4. FALLBACK: Règles classiques conservées
             else:
                 logger.warning("⚠️ [AI Fallback] OpenAI indisponible - utilisation règles classiques")
-                return self._classify_with_rules_enhanced(
+                result = self._classify_with_rules_enhanced(
                     question, entities, conversation_context, context_source
                 )
+                self._fallback_classifications += 1
+                self._update_response_counters(result.response_type)
+                return result
                 
         except Exception as e:
             logger.error(f"❌ [AI Classification] Erreur: {e}")
+            self._classification_errors += 1
             # FALLBACK ROBUSTE: Toujours avoir une réponse
-            return self._classify_with_rules_enhanced(
+            result = self._classify_with_rules_enhanced(
                 question, entities, conversation_context, context_source, error=str(e)
             )
+            self._fallback_classifications += 1
+            self._update_response_counters(result.response_type)
+            return result
+
+    def _update_response_counters(self, response_type: ResponseType):
+        """Met à jour les compteurs selon le type de réponse"""
+        if response_type == ResponseType.PRECISE_ANSWER:
+            self._precise_responses += 1
+        elif response_type == ResponseType.GENERAL_ANSWER:
+            self._general_responses += 1
+        elif response_type == ResponseType.CONTEXTUAL_ANSWER:
+            self._contextual_responses += 1
+        elif response_type == ResponseType.NEEDS_CLARIFICATION:
+            self._clarification_requests += 1
 
     async def _analyze_with_openai(self, question: str, entities: Dict[str, Any], 
                                  context: Optional[Dict] = None) -> Dict[str, Any]:
@@ -610,6 +643,58 @@ Réponds en JSON strict:
         }
 
     # =============================================================================
+    # 🔧 CORRECTION CRITIQUE: MÉTHODE MANQUANTE get_classification_stats() AJOUTÉE
+    # =============================================================================
+
+    def get_classification_stats(self) -> Dict[str, Any]:
+        """
+        Retourne les statistiques de classification
+        🔧 CORRECTION CRITIQUE: Méthode manquante qui causait le warning dans les logs
+        """
+        try:
+            # Calculer les taux de réussite
+            total = max(self._total_classifications, 1)
+            success_rate = ((self._total_classifications - self._classification_errors) / total) * 100
+            ai_success_rate = (self._ai_classifications / total) * 100
+            fallback_rate = (self._fallback_classifications / total) * 100
+            error_rate = (self._classification_errors / total) * 100
+            
+            return {
+                "service_name": "Smart Classifier",
+                "version": "v3.0_ai_pipeline_fixed",
+                "total_classifications": self._total_classifications,
+                "precise_responses": self._precise_responses,
+                "general_responses": self._general_responses,
+                "contextual_responses": self._contextual_responses,
+                "clarification_requests": self._clarification_requests,
+                "ai_classifications": self._ai_classifications,
+                "fallback_classifications": self._fallback_classifications,
+                "classification_errors": self._classification_errors,
+                "success_rate": f"{success_rate:.1f}%",
+                "ai_success_rate": f"{ai_success_rate:.1f}%",
+                "fallback_rate": f"{fallback_rate:.1f}%",
+                "error_rate": f"{error_rate:.1f}%",
+                "ai_available": self.use_ai,
+                "context_manager_active": self.context_manager is not None,
+                "features": [
+                    "ai_classification",
+                    "contextual_analysis", 
+                    "weight_calculation",
+                    "entity_fusion",
+                    "conversation_context",
+                    "enhanced_fallback"
+                ]
+            }
+        except Exception as e:
+            logger.error(f"❌ [SmartClassifier] Erreur stats: {e}")
+            return {
+                "service_name": "Smart Classifier",
+                "error": str(e),
+                "ai_available": getattr(self, 'use_ai', False),
+                "total_classifications": getattr(self, '_total_classifications', 0)
+            }
+
+    # =============================================================================
     # 🔧 MÉTHODES DE COMPATIBILITÉ (conservation de l'interface existante + corrections)
     # =============================================================================
 
@@ -696,6 +781,7 @@ logger.info("   - Classe: SmartClassifier (nom corrigé)")
 logger.info("   - Support IA: OpenAI GPT-4")
 logger.info("   - Fallback: Règles améliorées")
 logger.info("   - 🔧 Compatibilité: question_text, context, is_clarification_response")
+logger.info("   - 🔧 CORRECTION: get_classification_stats() ajoutée")
 logger.info("   - Exports: SmartClassifier, ClassificationResult, ResponseType")
 
 # =============================================================================
@@ -729,6 +815,10 @@ async def demo_compatibility():
         extra_param="ignoré"  # Paramètres additionnels ignorés
     )
     print(f"✅ Format flexible: {result3.response_type.value}")
+
+    # Test de la méthode get_classification_stats() corrigée
+    stats = classifier.get_classification_stats()
+    print(f"✅ Stats: {stats['total_classifications']} classifications")
 
 if __name__ == "__main__":
     import asyncio
