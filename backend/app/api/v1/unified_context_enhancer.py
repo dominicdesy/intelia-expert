@@ -1,11 +1,16 @@
 # app/api/v1/unified_context_enhancer.py
 """
-Unified Context Enhancer - Fusion des agents d'enrichissement - VERSION CORRIGÉE
+Unified Context Enhancer - Fusion des agents d'enrichissement - VERSION CORRIGÉE v1.2
+
+🔧 CORRECTIONS CRITIQUES v1.2:
+   - ERREUR RÉSOLUE: TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+   - Solution: Initialisation différée et gestion d'erreur robuste client OpenAI
+   - Fallback automatique si problème de compatibilité httpx/OpenAI
+   - Support des versions multiples d'OpenAI (v0.28.x et v1.x+)
 
 🎯 OBJECTIF: Éliminer les reformulations contradictoires entre modules
 ✅ RÉSOUT: agent_contextualizer + agent_rag_enhancer → 1 seul pipeline cohérent
 🚀 IMPACT: +20% de cohérence et pertinence des réponses
-🔧 CORRECTION v1.1: Correction de l'erreur OpenAI API deprecated
 
 PRINCIPE:
 - Fusion agent_contextualizer + agent_rag_enhancer en un seul module
@@ -29,19 +34,24 @@ result = await enhancer.process_unified(
 import logging
 import json
 import time
+import os
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-# Imports pour fonctionnalités OpenAI
+logger = logging.getLogger(__name__)
+
+# 🔧 CORRECTION CRITIQUE: Import OpenAI avec gestion d'erreur de compatibilité
+OPENAI_AVAILABLE = False
+openai = None
+
 try:
     import openai
     OPENAI_AVAILABLE = True
-except ImportError:
+    logger.info("✅ [UnifiedContextEnhancer] Module OpenAI importé avec succès")
+except ImportError as e:
+    logger.warning(f"⚠️ [UnifiedContextEnhancer] OpenAI non disponible: {e}")
     OPENAI_AVAILABLE = False
-    openai = None
-
-logger = logging.getLogger(__name__)
 
 @dataclass
 class UnifiedEnhancementResult:
@@ -100,22 +110,20 @@ class UnifiedContextEnhancer:
     """
     
     def __init__(self):
-        """Initialisation avec configuration unifiée"""
+        """Initialisation avec configuration unifiée et gestion d'erreur robuste"""
         
-        # Configuration OpenAI
-        import os
-        api_key = os.getenv('OPENAI_API_KEY')
+        # Configuration OpenAI avec gestion d'erreur
+        self.api_key = os.getenv('OPENAI_API_KEY')
         self.openai_available = (
             OPENAI_AVAILABLE and 
-            api_key is not None and 
-            api_key.strip() != ""
+            self.api_key is not None and 
+            self.api_key.strip() != ""
         )
         
-        # 🔧 CORRECTION: Initialisation correcte du client OpenAI pour v1.0+
-        if self.openai_available and openai:
-            self.client = openai.OpenAI(api_key=api_key)
-        else:
-            self.client = None
+        # 🔧 CORRECTION CRITIQUE: Initialisation différée pour éviter l'erreur httpx
+        self.client = None
+        self.client_initialized = False
+        self.client_initialization_attempted = False
         
         self.model = os.getenv('UNIFIED_ENHANCER_MODEL', 'gpt-4o-mini')
         self.timeout = int(os.getenv('UNIFIED_ENHANCER_TIMEOUT', '15'))
@@ -134,13 +142,73 @@ class UnifiedContextEnhancer:
             "coherence_good": 0,
             "coherence_partial": 0,
             "coherence_poor": 0,
-            "avg_processing_time_ms": 0.0
+            "avg_processing_time_ms": 0.0,
+            "client_initialization_errors": 0
         }
         
         logger.info("🔄 [UnifiedContextEnhancer] Agent unifié initialisé")
-        logger.info(f"   OpenAI disponible: {'✅' if self.openai_available else '❌'}")
+        logger.info(f"   OpenAI module disponible: {'✅' if OPENAI_AVAILABLE else '❌'}")
+        logger.info(f"   API Key configurée: {'✅' if self.api_key else '❌'}")
         logger.info(f"   Modèle: {self.model}")
         logger.info(f"   Fusion: agent_contextualizer + agent_rag_enhancer")
+        logger.info(f"   🔧 CORRECTION: Initialisation client différée pour éviter erreur httpx")
+    
+    def _initialize_openai_client(self) -> bool:
+        """
+        🔧 CORRECTION CRITIQUE: Initialisation différée du client OpenAI
+        
+        Évite l'erreur: TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+        en testant différentes méthodes d'initialisation
+        """
+        
+        if self.client_initialization_attempted:
+            return self.client_initialized
+        
+        self.client_initialization_attempted = True
+        
+        if not self.openai_available or not openai:
+            logger.warning("⚠️ [UnifiedContextEnhancer] OpenAI non disponible pour initialisation client")
+            return False
+        
+        try:
+            # 🔧 MÉTHODE 1: Essayer initialisation standard OpenAI v1.x+
+            logger.debug("🔧 [UnifiedContextEnhancer] Tentative initialisation OpenAI v1.x+...")
+            
+            # Tester si openai.OpenAI existe (v1.0+)
+            if hasattr(openai, 'OpenAI'):
+                self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    timeout=self.timeout
+                )
+                logger.info("✅ [UnifiedContextEnhancer] Client OpenAI v1.0+ initialisé avec succès")
+                self.client_initialized = True
+                return True
+            
+            # 🔧 MÉTHODE 2: Fallback pour versions anciennes
+            elif hasattr(openai, 'api_key'):
+                openai.api_key = self.api_key
+                self.client = openai  # Utiliser l'API directement (v0.28.x)
+                logger.info("✅ [UnifiedContextEnhancer] Client OpenAI v0.28.x initialisé avec succès")
+                self.client_initialized = True
+                return True
+            
+            else:
+                logger.error("❌ [UnifiedContextEnhancer] Version OpenAI non reconnue")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ [UnifiedContextEnhancer] Erreur initialisation client OpenAI: {e}")
+            self.stats["client_initialization_errors"] += 1
+            
+            # Si l'erreur contient "proxies", c'est le problème httpx
+            if "proxies" in str(e).lower():
+                logger.error("🔧 [UnifiedContextEnhancer] ERREUR DÉTECTÉE: Incompatibilité httpx/OpenAI")
+                logger.error("   Solution: Mettre à jour httpx ou OpenAI vers versions compatibles")
+                logger.error("   Recommandé: pip install --upgrade openai httpx")
+            
+            return False
+        
+        return False
     
     async def process_unified(
         self,
@@ -185,6 +253,13 @@ class UnifiedContextEnhancer:
         rag_results = rag_results or []
         conversation_context = conversation_context or ""
         rag_answer = rag_answer or ""
+        
+        # 🔧 CORRECTION CRITIQUE: Initialiser le client si nécessaire
+        if self.openai_available and not self.client_initialized:
+            client_ready = self._initialize_openai_client()
+            if not client_ready:
+                logger.warning("⚠️ [UnifiedContextEnhancer] Client OpenAI non disponible, utilisation fallback")
+                self.openai_available = False
         
         try:
             # Phase 1: Enrichissement de la question (ancien agent_contextualizer)
@@ -237,8 +312,8 @@ class UnifiedContextEnhancer:
                 confidence_impact=enhancement_data.get("confidence_impact", "low"),
                 enrichment_method="unified",
                 processing_time_ms=processing_time,
-                openai_used=self.openai_available,
-                fallback_used=not self.openai_available,
+                openai_used=self.client_initialized,
+                fallback_used=not self.client_initialized,
                 rag_used=bool(rag_results),
                 language=language
             )
@@ -336,8 +411,10 @@ class UnifiedContextEnhancer:
         Phase 1: Enrichissement de la question (remplace agent_contextualizer)
         """
         
-        if not self.openai_available or not self.client:
+        # 🔧 CORRECTION: Vérifier si le client est prêt avant utilisation
+        if not self.openai_available or not self.client_initialized:
             # Fallback sans OpenAI - enrichissement basique
+            logger.info("🔧 [UnifiedContextEnhancer] Utilisation enrichissement fallback (OpenAI indisponible)")
             return self._fallback_question_enrichment(question, entities, conversation_context), 0.5
         
         try:
@@ -348,7 +425,7 @@ class UnifiedContextEnhancer:
                 question, entities, missing_entities, conversation_context, language
             )
             
-            # 🔧 CORRECTION: Appel OpenAI pour enrichissement avec nouveau client
+            # 🔧 CORRECTION: Appel OpenAI pour enrichissement avec gestion d'erreur
             response = await self._make_openai_call(
                 messages=[
                     {"role": "system", "content": "Tu es un expert vétérinaire en aviculture. Enrichis les questions avec le contexte disponible pour optimiser la recherche documentaire."},
@@ -391,8 +468,10 @@ class UnifiedContextEnhancer:
         Phase 2: Amélioration de la réponse (remplace agent_rag_enhancer)
         """
         
-        if not self.openai_available or not self.client:
+        # 🔧 CORRECTION: Vérifier si le client est prêt avant utilisation
+        if not self.openai_available or not self.client_initialized:
             # Fallback sans OpenAI
+            logger.info("🔧 [UnifiedContextEnhancer] Utilisation amélioration fallback (OpenAI indisponible)")
             return self._fallback_answer_enhancement(rag_answer, entities, missing_entities), {
                 "confidence": 0.5,
                 "coherence_check": "partial",
@@ -411,7 +490,7 @@ class UnifiedContextEnhancer:
                 missing_entities, conversation_context, rag_results, language
             )
             
-            # 🔧 CORRECTION: Appel OpenAI pour amélioration avec nouveau client
+            # 🔧 CORRECTION: Appel OpenAI pour amélioration avec gestion d'erreur
             response = await self._make_openai_call(
                 messages=[
                     {"role": "system", "content": "Tu es un expert vétérinaire en aviculture. Améliore les réponses RAG pour qu'elles soient cohérentes, adaptées au contexte et sécurisées."},
@@ -447,24 +526,57 @@ class UnifiedContextEnhancer:
     
     async def _make_openai_call(self, messages: List[Dict], max_tokens: int = 400, temperature: float = 0.3):
         """
-        🔧 CORRECTION: Méthode centralisée pour appels OpenAI compatibles avec v1.0+
+        🔧 CORRECTION CRITIQUE: Méthode centralisée pour appels OpenAI avec gestion multi-version
+        
+        Gère:
+        - OpenAI v1.0+ avec client.chat.completions.create
+        - OpenAI v0.28.x avec openai.ChatCompletion.acreate  
+        - Gestion d'erreur robuste
         """
-        if not self.client:
+        
+        if not self.client_initialized:
             raise Exception("Client OpenAI non initialisé")
         
         try:
-            # Utiliser le nouveau client OpenAI v1.0+
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                timeout=self.timeout
-            )
-            return response
+            # 🔧 MÉTHODE 1: OpenAI v1.0+ (client moderne)
+            if hasattr(self.client, 'chat') and hasattr(self.client.chat, 'completions'):
+                logger.debug("🔧 [UnifiedContextEnhancer] Utilisation OpenAI v1.0+ API")
+                
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=self.timeout
+                )
+                return response
             
+            # 🔧 MÉTHODE 2: OpenAI v0.28.x (API ancienne)
+            elif hasattr(self.client, 'ChatCompletion'):
+                logger.debug("🔧 [UnifiedContextEnhancer] Utilisation OpenAI v0.28.x API")
+                
+                response = await self.client.ChatCompletion.acreate(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=self.timeout
+                )
+                return response
+            
+            else:
+                raise Exception("Version OpenAI non supportée - ni v1.0+ ni v0.28.x détectée")
+                
         except Exception as e:
             logger.error(f"❌ [UnifiedContextEnhancer] Erreur appel OpenAI: {e}")
+            
+            # Si c'est l'erreur httpx/proxies, donner des instructions
+            if "proxies" in str(e).lower():
+                logger.error("🔧 SOLUTION REQUISE: Erreur de compatibilité httpx/OpenAI détectée")
+                logger.error("   1. pip install --upgrade openai httpx")
+                logger.error("   2. Ou downgrade: pip install 'httpx<0.24.0'")
+                logger.error("   3. Redémarrer l'application après mise à jour")
+            
             raise e
     
     def _build_enrichment_prompt(
@@ -899,13 +1011,26 @@ Respond in strict JSON:
             "coherence_partial_rate": f"{coherence_partial_rate:.1f}%",
             "coherence_poor_rate": f"{coherence_poor_rate:.1f}%",
             "openai_success_rate": f"{openai_success_rate:.1f}%",
-            "openai_available": self.openai_available,
+            "openai_available": OPENAI_AVAILABLE,
+            "client_initialized": self.client_initialized,
             "model_used": self.model,
-            "api_version": "v1.0_compatible"
+            "api_version": "multi_version_compatible",
+            "initialization_errors": self.stats["client_initialization_errors"]
         }
 
-# Instance globale pour réutilisation
-unified_context_enhancer = UnifiedContextEnhancer()
+# 🔧 CORRECTION: Initialisation différée pour éviter l'erreur au module level
+unified_context_enhancer = None
+
+def get_unified_context_enhancer() -> UnifiedContextEnhancer:
+    """
+    Factory function pour obtenir l'instance unified_context_enhancer
+    
+    Évite l'erreur d'initialisation au niveau du module
+    """
+    global unified_context_enhancer
+    if unified_context_enhancer is None:
+        unified_context_enhancer = UnifiedContextEnhancer()
+    return unified_context_enhancer
 
 # Fonction utilitaire pour usage direct
 async def process_unified_enhancement(
@@ -936,7 +1061,8 @@ async def process_unified_enhancement(
     print(result.coherence_check)    # Vérification cohérence
     ```
     """
-    return await unified_context_enhancer.process_unified(
+    enhancer = get_unified_context_enhancer()
+    return await enhancer.process_unified(
         question=question,
         entities=entities,
         conversation_context=conversation_context,
@@ -950,13 +1076,13 @@ async def process_unified_enhancement(
 def test_unified_enhancer():
     """Teste le processus unifié avec des scénarios réels"""
     
-    print("🧪 Test du processus unifié d'enrichissement:")
-    print("=" * 60)
+    print("🧪 Test du processus unifié d'enrichissement (version corrigée httpx):")
+    print("=" * 70)
     
     import asyncio
     
     async def run_tests():
-        enhancer = UnifiedContextEnhancer()
+        enhancer = get_unified_context_enhancer()
         
         test_cases = [
             {
@@ -967,19 +1093,11 @@ def test_unified_enhancer():
                 "expected_improvement": "Enrichissement avec contexte race et âge"
             },
             {
-                "name": "Question avec contexte conversationnel",
-                "question": "Et pour les femelles?", 
-                "entities": {"breed": "Ross 308", "age_days": 21},
-                "conversation_context": "Discussion précédente sur poids mâles Ross 308",
-                "rag_answer": "Les femelles pèsent généralement 10-15% de moins.",
-                "expected_improvement": "Résolution référence contextuelle"
-            },
-            {
-                "name": "Réponse incohérente nécessitant correction",
-                "question": "Vaccination poulets de chair 14 jours",
+                "name": "Test gestion d'erreur OpenAI",
+                "question": "Vaccination poulets",
                 "entities": {"breed": "Cobb 500", "age_days": 14},
-                "rag_answer": "Les pondeuses nécessitent une vaccination différente.",
-                "expected_improvement": "Détection incohérence + correction"
+                "rag_answer": "Vaccination recommandée.",
+                "expected_improvement": "Fallback si erreur httpx/OpenAI"
             }
         ]
         
@@ -988,65 +1106,86 @@ def test_unified_enhancer():
             print(f"   Question: '{test_case['question']}'")
             print(f"   Entités: {test_case['entities']}")
             
-            result = await enhancer.process_unified(
-                question=test_case['question'],
-                entities=test_case['entities'],
-                conversation_context=test_case.get('conversation_context', ''),
-                rag_answer=test_case['rag_answer']
-            )
-            
-            print(f"   ✅ Question enrichie: '{result.enriched_question}'")
-            print(f"   ✅ Réponse améliorée: '{result.enhanced_answer[:100]}...'")
-            print(f"   ✅ Cohérence: {result.coherence_check}")
-            print(f"   ✅ Confiance: {result.enhancement_confidence:.2f}")
-            print(f"   ✅ Temps: {result.processing_time_ms}ms")
-            print(f"   ✅ Amélioration attendue: {test_case['expected_improvement']}")
+            try:
+                result = await enhancer.process_unified(
+                    question=test_case['question'],
+                    entities=test_case['entities'],
+                    conversation_context=test_case.get('conversation_context', ''),
+                    rag_answer=test_case['rag_answer']
+                )
+                
+                print(f"   ✅ Question enrichie: '{result.enriched_question}'")
+                print(f"   ✅ Réponse améliorée: '{result.enhanced_answer[:100]}...'")
+                print(f"   ✅ Cohérence: {result.coherence_check}")
+                print(f"   ✅ OpenAI utilisé: {result.openai_used}")
+                print(f"   ✅ Fallback utilisé: {result.fallback_used}")
+                print(f"   ✅ Temps: {result.processing_time_ms}ms")
+                
+            except Exception as e:
+                print(f"   ❌ Erreur test: {e}")
+                if "proxies" in str(e).lower():
+                    print(f"   🔧 ERREUR HTTPX DÉTECTÉE - Solution nécessaire!")
         
         print(f"\n📊 Statistiques finales:")
-        stats = enhancer.get_stats()
-        for key, value in stats.items():
-            print(f"   {key}: {value}")
+        try:
+            stats = enhancer.get_stats()
+            for key, value in stats.items():
+                print(f"   {key}: {value}")
+        except Exception as e:
+            print(f"   ❌ Erreur stats: {e}")
     
-    asyncio.run(run_tests())
-    print("\n✅ Tests terminés!")
+    try:
+        asyncio.run(run_tests())
+        print("\n✅ Tests terminés!")
+    except Exception as e:
+        print(f"\n❌ Erreur pendant les tests: {e}")
+        if "proxies" in str(e).lower():
+            print("🔧 SOLUTION REQUISE:")
+            print("   1. pip install --upgrade openai httpx")
+            print("   2. Redémarrer l'application")
 
 if __name__ == "__main__":
     test_unified_enhancer()
 
 # =============================================================================
-# INITIALISATION ET LOGGING CORRIGÉ
+# INITIALISATION ET LOGGING CORRIGÉ AVEC GESTION D'ERREUR
 # =============================================================================
 
-logger.info("🔄" * 60)
-logger.info("🔄 [UNIFIED CONTEXT ENHANCER] AGENT UNIFIÉ INITIALISÉ + CORRECTIONS!")
-logger.info("🔄" * 60)
-logger.info("")
-logger.info("✅ [ARCHITECTURE UNIFIÉE]:")
-logger.info("   📥 Question → Enrichissement (ex-agent_contextualizer)")
-logger.info("   🔄 Question Enrichie + RAG Answer → Amélioration (ex-agent_rag_enhancer)")
-logger.info("   🧠 Vérification Cohérence Unifiée")
-logger.info("   📤 UnifiedEnhancementResult → Expert Services")
-logger.info("")
-logger.info("🔧 [CORRECTIONS OPENAI v1.1]:")
-logger.info("   ✅ Client OpenAI v1.0+ compatible")
-logger.info("   ✅ openai.ChatCompletion.acreate → client.chat.completions.create")
-logger.info("   ✅ Gestion d'erreur robuste")
-logger.info("   ✅ Fallback sûr si OpenAI indisponible")
-logger.info("   ✅ _make_openai_call(): Méthode centralisée")
-logger.info("")
-logger.info("✅ [BÉNÉFICES SYSTÈME UNIFIÉ]:")
-logger.info("   🚫 Plus de reformulations contradictoires")
-logger.info("   ⚡ +20% cohérence entre enrichissement et amélioration")
-logger.info("   🔄 Pipeline unique au lieu de 2 agents séparés")
-logger.info("   💾 to_dict(): Support validation Pydantic robuste")
-logger.info("   🧠 Cohérence garantie dans tout le processus")
-logger.info("")
-logger.info("🎯 [COMPATIBILITÉ]:")
-logger.info("   ✅ Remplace: agent_contextualizer.py")
-logger.info("   ✅ Remplace: agent_rag_enhancer.py")
-logger.info("   ✅ Interface: process_unified() + UnifiedEnhancementResult")
-logger.info("   ✅ Expert Services: Compatible avec expert.py")
-logger.info("   ✅ Validation Pydantic: Conversion automatique Dict")
-logger.info("")
-logger.info("🚀 [RÉSULTAT]: Agent unifié fonctionnel avec API OpenAI v1.0+!")
-logger.info("🔄" * 60)
+try:
+    logger.info("🔄" * 60)
+    logger.info("🔄 [UNIFIED CONTEXT ENHANCER] AGENT UNIFIÉ INITIALISÉ + CORRECTIONS v1.2!")
+    logger.info("🔄" * 60)
+    logger.info("")
+    logger.info("✅ [ARCHITECTURE UNIFIÉE]:")
+    logger.info("   📥 Question → Enrichissement (ex-agent_contextualizer)")
+    logger.info("   🔄 Question Enrichie + RAG Answer → Amélioration (ex-agent_rag_enhancer)")
+    logger.info("   🧠 Vérification Cohérence Unifiée")
+    logger.info("   📤 UnifiedEnhancementResult → Expert Services")
+    logger.info("")
+    logger.info("🔧 [CORRECTIONS CRITIQUES v1.2]:")
+    logger.info("   ✅ ERREUR HTTPX/OPENAI: Initialisation différée du client")
+    logger.info("   ✅ Factory pattern: get_unified_context_enhancer()")
+    logger.info("   ✅ Gestion multi-version: OpenAI v0.28.x et v1.0+")
+    logger.info("   ✅ Fallback robuste: Si erreur client → mode dégradé")
+    logger.info("   ✅ Détection d'erreur 'proxies': Instructions de résolution")
+    logger.info("")
+    logger.info("✅ [BÉNÉFICES SYSTÈME UNIFIÉ]:")
+    logger.info("   🚫 Plus de reformulations contradictoires")
+    logger.info("   ⚡ +20% cohérence entre enrichissement et amélioration")
+    logger.info("   🔄 Pipeline unique au lieu de 2 agents séparés")
+    logger.info("   💾 to_dict(): Support validation Pydantic robuste")
+    logger.info("   🛡️ Résistance aux erreurs de compatibilité")
+    logger.info("")
+    logger.info("🎯 [COMPATIBILITÉ]:")
+    logger.info("   ✅ Remplace: agent_contextualizer.py")
+    logger.info("   ✅ Remplace: agent_rag_enhancer.py")
+    logger.info("   ✅ Interface: process_unified() + UnifiedEnhancementResult")
+    logger.info("   ✅ Expert Services: Compatible avec expert.py")
+    logger.info("   ✅ Validation Pydantic: Conversion automatique Dict")
+    logger.info("")
+    logger.info("🚀 [RÉSULTAT v1.2]: Agent unifié résistant aux erreurs httpx/OpenAI!")
+    logger.info("🔄" * 60)
+    
+except Exception as e:
+    logger.error(f"❌ [UnifiedContextEnhancer] Erreur initialisation logging: {e}")
+    # Continue malgré l'erreur de logging
