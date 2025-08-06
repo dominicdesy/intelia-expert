@@ -20,6 +20,8 @@ NOUVEAU FLUX IA UNIFIÉ:
 4. Résultat: "Ross 308 mâle à 12 jours : 380-420g" avec IA ou fallback 🎯
 
 IMPACT ATTENDU: +50% performance grâce au pipeline IA unifié
+
+🔧 CORRECTION APPLIQUÉE: UnboundLocalError AI_PIPELINE_AVAILABLE résolu
 """
 
 import logging
@@ -31,15 +33,22 @@ from typing import Dict, Any, Optional, List
 # ✅ CORRECTION: Initialiser le logger EN PREMIER
 logger = logging.getLogger(__name__)
 
+# ✅ CORRECTION PRINCIPALE: Initialisation sécurisée de AI_PIPELINE_AVAILABLE
+AI_PIPELINE_AVAILABLE = False
+
 # Imports des modules IA unifiés (NOUVEAUX selon plan transformation)
 try:
     from .unified_ai_pipeline import get_unified_ai_pipeline, PipelineResult
     from .ai_fallback_system import AIFallbackSystem
+    # ✅ CORRECTION: Assignment locale seulement après importation réussie
     AI_PIPELINE_AVAILABLE = True
     logger.info("✅ [Expert Services] Pipeline IA unifié disponible")
 except ImportError as e:
-    AI_PIPELINE_AVAILABLE = False
+    # ✅ CORRECTION: Ne pas réassigner la variable globale ici
     logger.warning(f"⚠️ [Expert Services] Pipeline IA non disponible: {e}")
+except Exception as e:
+    # ✅ CORRECTION: Gestion d'autres exceptions potentielles
+    logger.error(f"❌ [Expert Services] Erreur import pipeline IA: {e}")
 
 # Imports des modules existants (CONSERVÉS pour fallback)
 from .entities_extractor import EntitiesExtractor, ExtractedEntities
@@ -98,6 +107,7 @@ class ExpertService:
         self.ai_pipeline = None
         self.ai_fallback_system = None
         
+        # ✅ CORRECTION: Utiliser la variable globale sans la modifier localement
         if AI_PIPELINE_AVAILABLE:
             try:
                 self.ai_pipeline = get_unified_ai_pipeline()
@@ -105,7 +115,9 @@ class ExpertService:
                 logger.info("🤖 [Expert Service] Pipeline IA unifié activé")
             except Exception as e:
                 logger.error(f"❌ [Expert Service] Erreur init pipeline IA: {e}")
-                AI_PIPELINE_AVAILABLE = False
+                # ✅ CORRECTION: Ne pas modifier la variable globale ici
+                # Utiliser un flag d'instance à la place si nécessaire
+                self.ai_pipeline_failed = True
         
         # =================================================================
         # CONSERVÉ: SYSTÈME CLASSIQUE (FALLBACK GARANTI)
@@ -138,7 +150,7 @@ class ExpertService:
             "enable_stats": True,
             "enable_context": True,
             "enable_normalization": True,
-            "enable_ai_pipeline": AI_PIPELINE_AVAILABLE,  # NOUVEAU: IA activée
+            "enable_ai_pipeline": AI_PIPELINE_AVAILABLE and self.ai_pipeline is not None,  # ✅ CORRECTION
             "ai_pipeline_priority": True,  # NOUVEAU: IA en priorité
             "max_processing_time_ms": 15000,  # Augmenté pour IA
             "fallback_enabled": True,
@@ -817,14 +829,17 @@ class ExpertService:
         self.config.update(new_config)
         logger.info(f"⚙️ [Expert Service] Configuration mise à jour: {new_config}")
         
-        # Réactivation IA si nécessaire
+        # ✅ CORRECTION: Réactivation IA sans modification de variable globale
         if "enable_ai_pipeline" in new_config and new_config["enable_ai_pipeline"] and not self.ai_pipeline:
-            try:
-                self.ai_pipeline = get_unified_ai_pipeline()
-                self.ai_fallback_system = AIFallbackSystem()
-                logger.info("🤖 [Expert Service] Pipeline IA réactivé")
-            except Exception as e:
-                logger.error(f"❌ [Expert Service] Impossible de réactiver IA: {e}")
+            if AI_PIPELINE_AVAILABLE:  # Utiliser la variable globale
+                try:
+                    self.ai_pipeline = get_unified_ai_pipeline()
+                    self.ai_fallback_system = AIFallbackSystem()
+                    logger.info("🤖 [Expert Service] Pipeline IA réactivé")
+                except Exception as e:
+                    logger.error(f"❌ [Expert Service] Impossible de réactiver IA: {e}")
+            else:
+                logger.warning("⚠️ [Expert Service] Pipeline IA non disponible globalement")
         
         if "enable_normalization" in new_config:
             logger.info(f"🔧 [Expert Service] Normalisation {'activée' if new_config['enable_normalization'] else 'désactivée'}")
