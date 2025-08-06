@@ -14,6 +14,7 @@ AMÉLIORATIONS SELON LE PLAN DE TRANSFORMATION PHASE 2:
 - 🔧 NOUVEAU: Conversion UnifiedContext → Dict pour compatibilité
 - 🔧 NOUVEAU: Mise à jour automatique du contexte après classification
 - 🔧 NOUVEAU: Configuration IA du ContextManager pour enrichissement
+- 🔧 CORRECTION: Classification moins restrictive (GÉNÉRAL au lieu de CLARIFICATION)
 
 Architecture hybride avec ContextManager centralisé:
 1. PRIORITÉ: Récupération contexte via ContextManager unifié
@@ -514,7 +515,7 @@ Réponds en JSON strict:
                                    context: Optional[Dict] = None, 
                                    context_source: str = "parameter",
                                    error: str = None) -> ClassificationResult:
-        """🔧 FALLBACK AMÉLIORÉ: Classification avec règles conservées + améliorations"""
+        """🔧 FALLBACK AMÉLIORÉ: Classification avec règles conservées + améliorations + CORRECTION classification moins restrictive"""
         
         if error:
             logger.info(f"🔧 [Enhanced Fallback] Erreur IA: {error[:100]}... | Utilisation règles")
@@ -538,8 +539,48 @@ Réponds en JSON strict:
                     fallback_used=True,
                     context_source=context_source
                 )
+
+        # 🔧 CORRECTION APPLIQUÉE: Nouvelle logique équilibrée (moins restrictive)
+        age_days = entities.get('age_days')
+        context_type = entities.get('context_type', 'général')
+        breed_specific = entities.get('breed_specific')
+        breed_generic = entities.get('breed_generic')
+        sex = entities.get('sex')
         
-        # Règles classiques conservées mais améliorées
+        # ✅ NOUVELLE LOGIQUE: Âge + contexte performance = réponse générale (pas clarification!)
+        if age_days and context_type == 'performance':
+            if breed_specific and sex:
+                weight_data = self._calculate_weight_data_enhanced(entities)
+                return ClassificationResult(
+                    ResponseType.PRECISE_ANSWER,
+                    confidence=0.95,
+                    reasoning="Race spécifique + âge + sexe = réponse précise possible (règles corrigées)",
+                    weight_data=weight_data,
+                    fallback_used=True,
+                    context_source=context_source
+                )
+            elif breed_specific or breed_generic:
+                weight_data = self._calculate_weight_data_enhanced(entities)
+                return ClassificationResult(
+                    ResponseType.GENERAL_ANSWER,  # ✅ GÉNÉRAL au lieu de CLARIFICATION !
+                    confidence=0.85,
+                    reasoning="Âge + race (partielle) = réponse générale + offre précision (règles corrigées)",
+                    missing_entities=self._identify_missing_for_precision_enhanced(entities),
+                    weight_data=weight_data,
+                    fallback_used=True,
+                    context_source=context_source
+                )
+            elif age_days:
+                return ClassificationResult(
+                    ResponseType.GENERAL_ANSWER,  # ✅ GÉNÉRAL au lieu de CLARIFICATION !
+                    confidence=0.75,
+                    reasoning="Âge spécifique en contexte performance = réponse générale utile (règles corrigées)",
+                    missing_entities=['race_specifique', 'sexe'],
+                    fallback_used=True,
+                    context_source=context_source
+                )
+        
+        # Règles classiques conservées mais avec logique améliorée
         if self._has_precise_info_enhanced(entities):
             weight_data = self._calculate_weight_data_enhanced(entities)
             return ClassificationResult(
@@ -561,12 +602,24 @@ Réponds en JSON strict:
                 context_source=context_source
             )
         
-        else:
+        # ✅ CORRECTION: Seulement si vraiment trop vague (condition plus stricte)
+        elif not age_days and not breed_generic and not breed_specific:
             return ClassificationResult(
                 ResponseType.NEEDS_CLARIFICATION,
                 confidence=0.6,
-                reasoning="Informations insuffisantes (règles de fallback)",
+                reasoning="Informations vraiment insuffisantes pour réponse utile (règles corrigées)",
                 missing_entities=self._identify_critical_missing_enhanced(question, entities),
+                fallback_used=True,
+                context_source=context_source
+            )
+        
+        else:
+            # ✅ NOUVEAU: Fallback vers réponse générale plutôt que clarification
+            return ClassificationResult(
+                ResponseType.GENERAL_ANSWER,
+                confidence=0.7,
+                reasoning="Informations partielles = réponse générale (règles moins restrictives)",
+                missing_entities=self._identify_missing_for_precision_enhanced(entities),
                 fallback_used=True,
                 context_source=context_source
             )
@@ -872,7 +925,7 @@ Réponds en JSON strict:
             
             return {
                 "service_name": "Smart Classifier",
-                "version": "v3.1_context_manager_maximized",
+                "version": "v3.2_less_restrictive_classification",
                 "total_classifications": self._total_classifications,
                 "precise_responses": self._precise_responses,
                 "general_responses": self._general_responses,
@@ -901,7 +954,14 @@ Réponds en JSON strict:
                     "entity_fusion",
                     "conversation_context",
                     "enhanced_fallback",
-                    "context_manager_integration"
+                    "context_manager_integration",
+                    "less_restrictive_classification"  # 🆕 Nouvelle fonctionnalité
+                ],
+                "classification_improvements": [
+                    "age_context_performance_general_answer",
+                    "partial_breed_info_general_answer", 
+                    "fallback_to_general_instead_clarification",
+                    "stricter_needs_clarification_conditions"
                 ]
             }
         except Exception as e:
@@ -995,21 +1055,22 @@ __all__ = [
     'quick_classify'
 ]
 
-logger.info("✅ [SmartClassifier] Module initialisé (version ContextManager maximisé)")
+logger.info("✅ [SmartClassifier] Module initialisé (version classification moins restrictive)")
 logger.info("   - Classe: SmartClassifier (ContextManager auto-init)")
 logger.info("   - Support IA: OpenAI GPT-4 + IA enhancer pour ContextManager")
 logger.info("   - ContextManager: Initialisation automatique + mise à jour après classification")
 logger.info("   - Fallback: Règles améliorées avec priorité entités ContextManager")
+logger.info("   - 🔧 NOUVEAU: Classification moins restrictive (GÉNÉRAL vs CLARIFICATION)")
 logger.info("   - 🔧 Compatibilité: question_text, context, is_clarification_response")
 logger.info("   - 🔧 NOUVEAU: UnifiedContext → Dict conversion pour compatibilité")
 logger.info("   - Exports: SmartClassifier, ClassificationResult, ResponseType")
 
 # =============================================================================
-# EXEMPLE D'UTILISATION AVEC CONTEXTMANAGER MAXIMISÉ
+# EXEMPLE D'UTILISATION AVEC CONTEXTMANAGER MAXIMISÉ ET CLASSIFICATION CORRIGÉE
 # =============================================================================
 
 async def demo_context_manager_integration():
-    """Démo d'utilisation avec ContextManager maximisé"""
+    """Démo d'utilisation avec ContextManager maximisé et classification moins restrictive"""
     
     # 🆕 Le ContextManager s'initialise automatiquement
     classifier = SmartClassifier()
@@ -1017,28 +1078,33 @@ async def demo_context_manager_integration():
     
     print(f"✅ ContextManager actif: {classifier.context_manager is not None}")
     
-    # Classification avec récupération automatique du contexte
+    # Test 1: Question avec âge seulement (avant: CLARIFICATION, maintenant: GENERAL)
     result1 = await classifier.classify_question(
-        question="Quel poids pour Ross 308 mâle 14 jours?",
-        entities={"breed_specific": "Ross 308", "sex": "male", "age_days": 14},
-        conversation_id=conversation_id  # ← Le ContextManager récupère automatiquement le contexte
+        question="Quel poids pour 14 jours?",
+        entities={"age_days": 14, "context_type": "performance"},  # Pas de race spécifique
+        conversation_id=conversation_id
     )
-    print(f"✅ Première classification: {result1.response_type.value} (source: {result1.context_source})")
+    print(f"✅ Test âge seul: {result1.response_type.value} (Avant: NEEDS_CLARIFICATION, Maintenant: GENERAL_ANSWER)")
     
-    # Classification suivante avec clarification - le contexte est automatiquement utilisé
+    # Test 2: Question avec race générique + âge (avant: possiblement CLARIFICATION, maintenant: GENERAL)
     result2 = await classifier.classify_question(
-        question="Et pour une femelle?",
-        entities={"sex": "female"},  # Moins d'infos car contexte sera fusionné
-        conversation_id=conversation_id  # ← Race et âge seront hérités automatiquement
+        question="Poids broiler 14 jours?",
+        entities={"breed_generic": "broiler", "age_days": 14, "context_type": "performance"},
+        conversation_id=conversation_id
     )
-    print(f"✅ Clarification: {result2.response_type.value}")
-    print(f"   - Entités fusionnées: {list(result2.merged_entities.keys()) if result2.merged_entities else 'Aucune'}")
-    print(f"   - Source contexte: {result2.context_source}")
+    print(f"✅ Test race générique + âge: {result2.response_type.value}")
     
-    # Vérifier les statistiques incluant l'utilisation du ContextManager
+    # Test 3: Question très vague (devrait rester CLARIFICATION car vraiment insuffisant)
+    result3 = await classifier.classify_question(
+        question="Comment faire?",
+        entities={},  # Aucune entité
+        conversation_id=conversation_id
+    )
+    print(f"✅ Test très vague: {result3.response_type.value} (Devrait rester NEEDS_CLARIFICATION)")
+    
+    # Vérifier les statistiques incluant les améliorations de classification
     stats = classifier.get_classification_stats()
-    print(f"✅ Stats ContextManager: {stats['context_manager_active']}")
-    print(f"   - Fonctionnalités: {stats.get('context_manager_features', [])}")
+    print(f"✅ Stats améliorées: {stats.get('classification_improvements', [])}")
 
 if __name__ == "__main__":
     import asyncio
