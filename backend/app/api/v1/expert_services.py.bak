@@ -459,8 +459,8 @@ class ExpertService:
             
             if self.config["enable_normalization"]:
                 try:
-                    normalized_entities = await self.entity_normalizer.normalize(raw_entities)  
-
+                    normalized_entities = self.entity_normalizer.normalize(raw_entities)
+                    
                     if normalized_entities.normalization_confidence >= self.config["normalization_confidence_threshold"]:
                         entities_for_processing = normalized_entities.to_dict()
                         self.stats["entities_normalized"] += 1
