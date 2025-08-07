@@ -76,7 +76,7 @@ class PipelineResult:
     # Métadonnées
     conversation_id: Optional[str] = None
     language: str = "fr"
-    pipeline_version: str = "1.0.0"
+    pipeline_version: "str = "1.0.0"
     timestamp: datetime = None
     
     def __post_init__(self):
