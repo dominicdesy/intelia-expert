@@ -42,6 +42,7 @@ class ResponseType(Enum):
     GENERAL_ANSWER = "general_answer" 
     NEEDS_CLARIFICATION = "needs_clarification"
     CONTEXTUAL_ANSWER = "contextual_answer"
+    NEEDS_RAG_CLARIFICATION = "needs_rag_clarification"
 
 @dataclass 
 class ClassificationResult:

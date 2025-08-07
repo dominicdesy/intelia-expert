@@ -400,14 +400,15 @@ ENTITÉS DÉTECTÉES:
 RÈGLES DE CLASSIFICATION:
 1. PRECISE_ANSWER: Question avec race spécifique + âge/sexe suffisants pour réponse précise
 2. CONTEXTUAL_ANSWER: Clarification courte qui complète le contexte précédent (ex: "Ross 308 male" après question poids)
-3. GENERAL_ANSWER: Contexte suffisant pour conseil général utile mais pas assez spécifique
-4. NEEDS_CLARIFICATION: Informations vraiment insuffisantes pour toute réponse utile
+3. GENERAL_ANSWER: TOUJOURS PRIVILÉGIER - Donner réponse utile même avec informations partielles (âge seul, contexte performance, etc.)
+4. NEEDS_CLARIFICATION: RÉSERVÉ uniquement aux questions incompréhensibles (moins de 3 mots, aucun contexte avicole)
 
 PRIORITÉS SPÉCIALES:
+- FAVORISER GENERAL_ANSWER pour toute question avec contexte avicole identifiable
+- Pour poids/croissance: âge seul = GENERAL_ANSWER (donner fourchettes générales)
+- Éviter NEEDS_CLARIFICATION sauf si vraiment impossible de donner info utile
+- Même "poulet 6 jours" = GENERAL_ANSWER avec fourchettes par race
 - Détecter les clarifications contextuelles même très courtes
-- Pour poids/croissance: race + âge = PRECISE_ANSWER
-- Éviter NEEDS_CLARIFICATION sauf si réellement impossible
-- Favoriser CONTEXTUAL_ANSWER si c'est une suite de conversation
 - Utiliser insights IA du contexte précédent
 
 Réponds en JSON strict:

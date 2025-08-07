@@ -12,7 +12,6 @@ unified_response_generator.py - GÉNÉRATEUR AVEC MAXIMISATION CONTEXTMANAGER
 - 🆕 INTÉGRATION IA: AIResponseGenerator avec fallback
 - 🆕 PIPELINE UNIFIÉ: Génération hybride IA + Templates
 - 🆕 MAXIMISATION SIMPLE: Utilisation complète ContextManager sans sur-ingénierie
-- 🆕 SUPPORT RAG: Méthodes generate_with_rag pour intégration complète
 
 Nouveau flux avec ContextManager maximisé:
 1. Récupération contexte enrichi via ContextManager (plus de données)
@@ -47,9 +46,7 @@ class ResponseData:
     def __init__(self, response: str, response_type: str, confidence: float = 0.8, 
                  precision_offer: str = None, examples: List[str] = None,
                  weight_data: Dict[str, Any] = None, ai_generated: bool = False,
-                 context_data: Dict[str, Any] = None, conversation_id: str = None,
-                 rag_used: bool = False, sources: List[Dict] = None, 
-                 documents_consulted: int = 0):
+                 context_data: Dict[str, Any] = None):
         self.response = response
         self.response_type = response_type
         self.confidence = confidence
@@ -58,26 +55,17 @@ class ResponseData:
         self.weight_data = weight_data or {}
         self.ai_generated = ai_generated
         self.context_data = context_data or {}  # 🆕 Données contextuelles pour sauvegarde
-        self.conversation_id = conversation_id
-        self.rag_used = rag_used  # 🆕 Indicateur utilisation RAG
-        self.sources = sources or []  # 🆕 Sources consultées
-        self.documents_consulted = documents_consulted  # 🆕 Nombre de documents
         self.generated_at = datetime.now().isoformat()
 
 class UnifiedResponseGenerator:
     """
-    Générateur unique avec maximisation ContextManager SIMPLE + Support RAG
+    Générateur unique avec maximisation ContextManager SIMPLE
     
     🆕 UTILISATION MAXIMISÉE ContextManager:
     - RÉCUPÉRATION: Contexte enrichi avec plus de données
     - SAUVEGARDE: Informations complètes après génération
     - PATTERNS: Apprentissage des combinaisons réussies
     - CACHE: Optimisation automatique
-    
-    🆕 SUPPORT RAG:
-    - generate_with_rag: Génération avec documents RAG
-    - Intégration IA + RAG ou templates + RAG
-    - Gestion des sources et références
     """
     
     def __init__(self, db_path: str = "conversations.db"):
@@ -154,147 +142,6 @@ class UnifiedResponseGenerator:
         except Exception as e:
             logger.error(f"❌ [Response Generator] Erreur génération: {e}")
             return self._generate_fallback_response(question)
-
-    # =============================================================================
-    # 🆕 NOUVELLES MÉTHODES RAG (MODIFICATION MAJEURE 2)
-    # =============================================================================
-
-    def generate_with_rag(self, question: str, entities: Dict[str, Any], 
-                         classification, 
-                         rag_results: List[Dict] = None) -> ResponseData:
-        """Génère une réponse en utilisant les documents RAG"""
-        
-        logger.info(f"🎨 [Response Generator] Génération avec RAG: {len(rag_results) if rag_results else 0} docs")
-        
-        # Si pas de documents RAG, utiliser génération classique
-        if not rag_results:
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                return loop.run_until_complete(self.generate(question, entities, classification))
-            except RuntimeError:
-                return asyncio.run(self.generate(question, entities, classification))
-        
-        # Construire le contexte à partir des documents RAG
-        rag_context = self._build_rag_context(rag_results)
-        
-        # Générer réponse avec contexte RAG
-        try:
-            if self.ai_generator and hasattr(self.ai_generator, 'openai_client'):
-                return self._generate_with_ai_and_rag(question, entities, classification, rag_context, rag_results)
-            else:
-                return self._generate_with_templates_and_rag(question, entities, classification, rag_context, rag_results)
-        
-        except Exception as e:
-            logger.error(f"❌ [Response Generator] Erreur génération RAG: {e}")
-            # Fallback vers génération classique
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                return loop.run_until_complete(self.generate(question, entities, classification))
-            except RuntimeError:
-                return asyncio.run(self.generate(question, entities, classification))
-
-    def _build_rag_context(self, rag_results: List[Dict]) -> str:
-        """Construit le contexte à partir des documents RAG"""
-        
-        if not rag_results:
-            return ""
-        
-        context_parts = []
-        for i, result in enumerate(rag_results[:5]):  # Limiter à 5 documents
-            text = str(result.get('text', ''))
-            score = result.get('score', 0)
-            
-            # Prendre un extrait du document (400 caractères)
-            excerpt = text[:400] + "..." if len(text) > 400 else text
-            context_parts.append(f"Document {i+1} (score: {score:.2f}):\n{excerpt}")
-        
-        return "\n\n".join(context_parts)
-
-    def _generate_with_ai_and_rag(self, question: str, entities: Dict[str, Any], 
-                                 classification, rag_context: str,
-                                 rag_results: List[Dict]) -> ResponseData:
-        """Génération IA avec contexte RAG"""
-        
-        # Prompt enrichi avec contexte RAG
-        system_prompt = f"""Tu es un expert vétérinaire avicole. Utilise les documents fournis pour répondre précisément à la question.
-
-DOCUMENTS DE RÉFÉRENCE:
-{rag_context}
-
-INSTRUCTIONS:
-- Base ta réponse sur les documents fournis
-- Donne des informations précises et pratiques
-- Si les documents ne contiennent pas toutes les informations, précise ce qui manque
-- Propose des précisions supplémentaires si nécessaire (race, âge, sexe)
-
-ENTITÉS DÉTECTÉES: {entities}
-CLASSIFICATION: {classification.response_type.value}"""
-
-        try:
-            response = self.ai_generator.openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": question}
-                ],
-                temperature=0.7,
-                max_tokens=800
-            )
-            
-            generated_response = response.choices[0].message.content
-            
-            # Ajouter sources si pertinentes
-            sources = []
-            for result in rag_results[:3]:  # Top 3 sources
-                sources.append({
-                    "score": result.get('score', 0),
-                    "preview": str(result.get('text', ''))[:100] + "..."
-                })
-            
-            return ResponseData(
-                response=generated_response,
-                response_type=classification.response_type.value,
-                confidence=min(0.9, getattr(classification, 'confidence', 0.7) + 0.2),  # Boost confiance avec RAG
-                conversation_id=None,
-                rag_used=True,
-                sources=sources,
-                documents_consulted=len(rag_results)
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ [Response Generator] Erreur IA+RAG: {e}")
-            raise
-
-    def _generate_with_templates_and_rag(self, question: str, entities: Dict[str, Any],
-                                       classification, rag_context: str,
-                                       rag_results: List[Dict]) -> ResponseData:
-        """Génération template avec contexte RAG"""
-        
-        # Utiliser génération classique mais mentionner les sources
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-            base_response = loop.run_until_complete(self.generate(question, entities, classification))
-        except RuntimeError:
-            base_response = asyncio.run(self.generate(question, entities, classification))
-        
-        # Enrichir avec mention des sources consultées
-        enhanced_response = f"{base_response.response}\n\n💡 *Réponse basée sur {len(rag_results)} documents de la base de connaissances.*"
-        
-        return ResponseData(
-            response=enhanced_response,
-            response_type=base_response.response_type,
-            confidence=base_response.confidence,
-            conversation_id=base_response.conversation_id,
-            rag_used=True,
-            documents_consulted=len(rag_results)
-        )
-
-    # =============================================================================
-    # 🆕 MAXIMISATION CONTEXTMANAGER (EXISTANT - CONSERVÉ)
-    # =============================================================================
 
     def _get_maximized_context(self, conversation_id: str, response_type: str) -> Dict[str, Any]:
         """
@@ -396,7 +243,6 @@ CLASSIFICATION: {classification.response_type.value}"""
                     "type": response_data.response_type,
                     "confidence": response_data.confidence,
                     "ai_generated": response_data.ai_generated,
-                    "rag_used": response_data.rag_used,  # 🆕 Ajout rag_used
                     "timestamp": response_data.generated_at
                 },
                 "entities_processed": {
@@ -410,8 +256,7 @@ CLASSIFICATION: {classification.response_type.value}"""
                     "has_weight_data": bool(response_data.weight_data),
                     "has_precision_offer": bool(response_data.precision_offer),
                     "confidence_level": "high" if response_data.confidence > 0.8 else "medium",
-                    "generation_method": "ai" if response_data.ai_generated else "template",
-                    "rag_documents": response_data.documents_consulted  # 🆕 Ajout compteur docs RAG
+                    "generation_method": "ai" if response_data.ai_generated else "template"
                 },
                 "context_usage": response_data.context_data or {}
             }
@@ -949,166 +794,13 @@ CLASSIFICATION: {classification.response_type.value}"""
             "fallback_templates_count": len(self.weight_ranges),
             "context_manager_active": self.context_manager is not None,
             "context_maximization_enabled": True,  # 🆕 Indicateur maximisation
-            "rag_support_enabled": True,  # 🆕 Support RAG
             "maximization_features": [  # 🆕 Fonctionnalités de maximisation
                 "enriched_context_retrieval",
                 "enhanced_context_saving", 
                 "context_quality_assessment",
-                "topic_and_intent_inference",
-                "rag_document_integration",  # 🆕
-                "ai_rag_generation",  # 🆕
-                "template_rag_fallback"  # 🆕
+                "topic_and_intent_inference"
             ]
         }
-
-    # =============================================================================
-    # ✅ CONSERVATION: Autres méthodes manquantes pour compléter l'API
-    # =============================================================================
-
-    def _generate_precision_offer(self, entities: Dict[str, Any], missing_entities: List[str]) -> Optional[str]:
-        """Génère une offre de précision basée sur les entités manquantes"""
-        if not missing_entities:
-            return None
-        
-        offers = []
-        if 'breed' in missing_entities:
-            offers.append("spécifiez la race (Ross 308, Cobb 500, etc.)")
-        if 'age' in missing_entities:
-            offers.append("précisez l'âge en jours")
-        if 'sex' in missing_entities:
-            offers.append("indiquez le sexe (mâle/femelle)")
-        
-        if offers:
-            return f"Pour une réponse plus précise, {', '.join(offers)}."
-        return None
-
-    def _generate_clarification(self, question: str, entities: Dict[str, Any], 
-                              missing_entities: List[str], context: Dict = None) -> ResponseData:
-        """Génère une demande de clarification"""
-        clarifications = []
-        
-        if 'breed' in missing_entities:
-            clarifications.append("• **Race** : Ross 308, Cobb 500, Hubbard, ou autre ?")
-        if 'age' in missing_entities:
-            clarifications.append("• **Âge** : Combien de jours ont vos poulets ?")
-        if 'sex' in missing_entities:
-            clarifications.append("• **Sexe** : Mâles, femelles, ou troupeau mixte ?")
-        
-        base_response = "Pour vous donner une réponse précise, j'ai besoin de quelques précisions :\n\n"
-        base_response += "\n".join(clarifications)
-        base_response += "\n\n💡 Ces informations m'aideront à vous fournir des données spécifiques à votre situation."
-        
-        return ResponseData(
-            response=base_response,
-            response_type="clarification_request",
-            confidence=0.9,
-            precision_offer=None
-        )
-
-    def _generate_general_weight_response(self, age_days: Optional[int], context: Dict = None) -> str:
-        """Génère une réponse générale sur le poids"""
-        if age_days:
-            return f"""**Poids des poulets de chair à {age_days} jours :**
-
-Les fourchettes de poids varient selon la race et le sexe :
-
-📊 **Fourchettes générales** :
-• Ross 308 : 300-800g (selon sexe)
-• Cobb 500 : 290-780g (selon sexe)
-• Hubbard : 280-760g (selon sexe)
-
-⚠️ **Important** : Ces valeurs sont indicatives. Pour des données précises, spécifiez la race et le sexe."""
-        else:
-            return """**Poids des poulets de chair :**
-
-Le poids varie énormément selon l'âge, la race et le sexe :
-
-📈 **Évolution générale** :
-• 7 jours : 150-220g
-• 14 jours : 350-550g  
-• 21 jours : 700-1050g
-• 28 jours : 1200-1700g
-• 35 jours : 1800-2400g"""
-
-    def _generate_general_growth_response(self, age_days: Optional[int], context: Dict = None) -> str:
-        """Génère une réponse générale sur la croissance"""
-        return """**Croissance des poulets de chair :**
-
-🚀 **Phases de croissance** :
-• **Démarrage** (0-14j) : Croissance rapide, développement digestif
-• **Croissance** (15-28j) : Gain de poids maximal
-• **Finition** (29j+) : Optimisation du rendement
-
-📈 **Facteurs clés** :
-• Alimentation adaptée à chaque phase
-• Température et ventilation optimales
-• Densité d'élevage appropriée
-• Suivi sanitaire rigoureux"""
-
-    def _generate_general_health_response(self, age_days: Optional[int], context: Dict = None) -> str:
-        """Génère une réponse générale sur la santé"""
-        return """**Santé des poulets de chair :**
-
-🏥 **Surveillance quotidienne** :
-• Observation du comportement général
-• Contrôle de la consommation d'eau et d'aliment
-• Vérification des signes cliniques
-
-⚠️ **Signaux d'alerte** :
-• Mortalité anormale (>1% par semaine)
-• Baisse d'appétit ou de croissance
-• Symptômes respiratoires ou digestifs
-• Changements de comportement
-
-💡 **En cas de doute**, contactez immédiatement votre vétérinaire avicole."""
-
-    def _generate_general_feeding_response(self, age_days: Optional[int], context: Dict = None) -> str:
-        """Génère une réponse générale sur l'alimentation"""
-        return """**Alimentation des poulets de chair :**
-
-🍽️ **Programmes alimentaires** :
-• **Starter** (0-14j) : 20-22% protéines, 3000-3100 kcal/kg
-• **Grower** (15-28j) : 18-20% protéines, 3100-3200 kcal/kg  
-• **Finisher** (29j+) : 16-18% protéines, 3200-3300 kcal/kg
-
-💧 **Eau** :
-• Accès permanent à eau propre et fraîche
-• Ratio eau/aliment : 1,8-2,2 litres/kg d'aliment
-
-⚡ **Distribution** :
-• Ad libitum recommandé
-• Surveillance régulière de la consommation"""
-
-    def _generate_general_default_response(self, age_days: Optional[int], context: Dict = None) -> str:
-        """Génère une réponse générale par défaut"""
-        return """**Élevage de poulets de chair :**
-
-🐔 **Points essentiels** :
-• Respect des standards de race pour le poids et la croissance
-• Surveillance quotidienne de la santé et du comportement
-• Alimentation adaptée aux phases de développement
-• Conditions d'ambiance optimales (température, ventilation)
-
-💡 **Pour des conseils spécifiques**, précisez votre question avec la race, l'âge et le contexte de votre élevage."""
-
-    def _generate_precise_weight_response(self, breed: str, age_days: int, sex: str, context: Dict = None) -> ResponseData:
-        """Fallback pour réponse précise de poids"""
-        return ResponseData(
-            response=f"Pour {breed} {sex} à {age_days} jours, consultez les standards officiels de la race "
-                    f"ou contactez votre fournisseur de souche pour les données précises.",
-            response_type="precise_weight_fallback",
-            confidence=0.6
-        )
-
-    def _generate_precise_growth_response(self, breed: str, age_days: int, sex: str, context: Dict = None) -> ResponseData:
-        """Génère une réponse précise sur la croissance"""
-        return ResponseData(
-            response=f"**Croissance {breed} {sex} à {age_days} jours :**\n\n"
-                    f"Consultez les courbes de croissance officielles de la souche "
-                    f"pour des données précises adaptées à vos conditions d'élevage.",
-            response_type="precise_growth",
-            confidence=0.7
-        )
 
 # =============================================================================
 # ✅ CONSERVATION: Fonctions utilitaires originales
@@ -1141,16 +833,16 @@ def quick_generate(question: str, entities: Dict[str, Any], response_type: str) 
     return result.response
 
 # =============================================================================
-# ✅ CONSERVATION: Tests avec ajout de vérification maximisation + RAG
+# ✅ CONSERVATION: Tests avec ajout de vérification maximisation
 # =============================================================================
 
 async def test_generator_maximized():
     """
-    🆕 Tests du générateur avec maximisation ContextManager SIMPLE + RAG
+    🆕 Tests du générateur avec maximisation ContextManager SIMPLE
     """
     generator = UnifiedResponseGenerator()
     
-    print("🧪 Test générateur MAXIMISATION CONTEXTMANAGER + RAG")
+    print("🧪 Test générateur MAXIMISATION CONTEXTMANAGER SIMPLE")
     print("=" * 60)
     
     # Afficher les statistiques
@@ -1158,7 +850,6 @@ async def test_generator_maximized():
     print(f"📊 Statistiques système:")
     print(f"   - Services IA disponibles: {stats['ai_services_available']}")
     print(f"   - ContextManager maximisé: {stats['context_maximization_enabled']}")
-    print(f"   - Support RAG: {stats['rag_support_enabled']}")
     print(f"   - Features maximisation: {len(stats['maximization_features'])}")
     for feature in stats['maximization_features']:
         print(f"     • {feature}")
@@ -1185,7 +876,7 @@ async def test_generator_maximized():
                 'confidence': 0.95
             }
     
-    # Test génération classique
+    # Test génération
     question = "Pour un Ross 308 mâle"
     entities = {'breed': 'ross_308', 'sex': 'male', 'age_days': 12}
     classification = MockContextualClassification()
@@ -1193,57 +884,34 @@ async def test_generator_maximized():
     
     result = await generator.generate(question, entities, classification, conversation_id)
     
-    print(f"\n🎯 Résultats du test classique:")
+    print(f"\n🎯 Résultats du test:")
     print(f"   Question: {question}")
     print(f"   Entités: {entities}")
     print(f"   Type réponse: {result.response_type}")
     print(f"   Confiance: {result.confidence}")
     print(f"   Généré par IA: {result.ai_generated}")
-    print(f"   RAG utilisé: {result.rag_used}")
     print(f"   Contexte data: {bool(result.context_data)}")
     print(f"   Aperçu: {result.response[:150]}...")
     
-    # 🆕 Test génération avec RAG
-    print(f"\n🎯 Test génération RAG:")
-    mock_rag_results = [
-        {"text": "Les poulets Ross 308 mâles atteignent 400g à 12 jours selon les standards officiels.", "score": 0.95},
-        {"text": "Surveillance recommandée pour maintenir la croissance optimale.", "score": 0.88}
-    ]
-    
-    rag_result = generator.generate_with_rag(question, entities, classification, mock_rag_results)
-    
-    print(f"   RAG résultats: {len(mock_rag_results)} documents")
-    print(f"   Type réponse RAG: {rag_result.response_type}")
-    print(f"   RAG utilisé: {rag_result.rag_used}")
-    print(f"   Documents consultés: {rag_result.documents_consulted}")
-    print(f"   Sources: {len(rag_result.sources)}")
-    print(f"   Aperçu RAG: {rag_result.response[:150]}...")
-    
-    # Vérifications spécifiques à la maximisation + RAG
+    # Vérifications spécifiques à la maximisation
     success_checks = []
-    success_checks.append(("Données 380-420g", "380-420" in result.response or "400" in result.response))
+    success_checks.append(("Données 380-420g", "380-420" in result.response))
     success_checks.append(("Mention Ross 308", "Ross 308" in result.response))
     success_checks.append(("Structure ResponseData avec context_data", hasattr(result, 'context_data')))
     success_checks.append(("Poids data présent", bool(result.weight_data)))
     success_checks.append(("Context data ajouté", bool(result.context_data)))
-    success_checks.append(("RAG support disponible", hasattr(generator, 'generate_with_rag')))
-    success_checks.append(("RAG flag correct", rag_result.rag_used == True))
-    success_checks.append(("Documents RAG comptés", rag_result.documents_consulted == 2))
     
-    print(f"\n✅ Vérifications maximisation + RAG:")
+    print(f"\n✅ Vérifications maximisation:")
     for check_name, passed in success_checks:
         status = "✅" if passed else "❌"
         print(f"   {status} {check_name}")
     
     if all(check[1] for check in success_checks):
-        print(f"\n🎉 SUCCESS: Générateur avec ContextManager MAXIMISÉ + RAG opérationnel!")
+        print(f"\n🎉 SUCCESS: Générateur avec ContextManager MAXIMISÉ (simple) opérationnel!")
         print(f"   - Récupération contexte enrichie: ✅")
         print(f"   - Sauvegarde maximisée: ✅") 
         print(f"   - Évaluation qualité contexte: ✅")
         print(f"   - Inférence topic/intent: ✅")
-        print(f"   - Support RAG complet: ✅")
-        print(f"   - Génération IA + RAG: ✅")
-        print(f"   - Fallback templates + RAG: ✅")
         print(f"   - SANS sur-ingénierie: ✅")
     else:
         print(f"\n⚠️  ATTENTION: Certaines vérifications ont échoué")
