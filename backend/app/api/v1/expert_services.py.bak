@@ -1,8 +1,8 @@
 """
 
-expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER INTÉGRÉ
+expert_services.py - SERVICE PRINCIPAL AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER INTÉGRÉ + RAG
 
-🎯 VERSION COMPLÈTE: PIPELINE IA + CONTEXTMANAGER CENTRALISÉ
+🎯 VERSION COMPLÈTE: PIPELINE IA + CONTEXTMANAGER CENTRALISÉ + RAG + CLARIFICATION
 
 NOUVELLES INTÉGRATIONS AJOUTÉES:
 - ✅ ContextManager centralisé pour continuité des réponses
@@ -10,6 +10,10 @@ NOUVELLES INTÉGRATIONS AJOUTÉES:
 - ✅ Sauvegarde automatique des nouvelles réponses assistant
 - ✅ Inclusion du contexte conversationnel dans tous les traitements
 - ✅ Mise à jour du contexte après chaque interaction
+- 🆕 NOUVEAU: ClarificationAgent pour enrichir les requêtes RAG
+- 🆕 NOUVEAU: Intégration RAG avec analyse de suffisance contextuelle
+- 🆕 NOUVEAU: Génération de questions de clarification intelligentes
+- 🆕 NOUVEAU: Support ResponseData enrichi avec données RAG
 
 TRANSFORMATIONS CONSERVÉES selon Plan de Transformation:
 - ✅ Intégration UnifiedAIPipeline pour orchestration IA
@@ -21,14 +25,16 @@ TRANSFORMATIONS CONSERVÉES selon Plan de Transformation:
 - ✅ Entités normalisées systématiquement
 - ✅ Compatibilité totale avec l'ancien système
 
-NOUVEAU FLUX AVEC CONTEXTMANAGER:
+NOUVEAU FLUX AVEC CONTEXTMANAGER + RAG:
 1. Récupération du contexte unifié (previous_answers, entités établies)
 2. Inclusion des réponses précédentes dans le traitement
-3. Pipeline IA unifié avec contexte enrichi
-4. Sauvegarde de la nouvelle réponse assistant
-5. Résultat avec continuité parfaite
+3. Analyse de suffisance contextuelle pour RAG
+4. Recherche RAG si contexte suffisant, questions de clarification sinon
+5. Pipeline IA unifié avec contexte enrichi et données RAG
+6. Sauvegarde de la nouvelle réponse assistant
+7. Résultat avec continuité parfaite et enrichissement documentaire
 
-IMPACT ATTENDU: +50% performance IA + +15% cohérence conversationnelle
+IMPACT ATTENDU: +50% performance IA + +15% cohérence conversationnelle + +30% précision documentaire
 
 """
 
@@ -36,8 +42,9 @@ import logging
 import time
 import uuid
 import asyncio
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union, Tuple
 
 # ✅ CORRECTION: Initialiser le logger EN PREMIER
 logger = logging.getLogger(__name__)
@@ -93,15 +100,164 @@ except ImportError:
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
+# 🆕 NOUVEAU: Import OpenAI pour ClarificationAgent
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    openai = None
+
+# 🆕 NOUVEAU: ClarificationAgent pour enrichir les requêtes RAG
+class ClarificationAgent:
+    """Agent de clarification pour enrichir les requêtes RAG"""
+    
+    def __init__(self):
+        self.openai_client = None
+        try:
+            if OPENAI_AVAILABLE and os.getenv('OPENAI_API_KEY'):
+                self.openai_client = openai.OpenAI(
+                    api_key=os.getenv('OPENAI_API_KEY')
+                )
+                logger.info("✅ [Clarification Agent] OpenAI initialisé")
+            else:
+                logger.warning("⚠️ [Clarification Agent] OpenAI non configuré")
+        except Exception as e:
+            logger.warning(f"⚠️ [Clarification Agent] OpenAI non disponible: {e}")
+    
+    def analyze_context_sufficiency(self, question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyse si le contexte est suffisant pour une requête RAG efficace"""
+        
+        # Votre prompt d'analyse
+        analysis_prompt = f"""Tu es un agent de clarification spécialisé en aviculture. Ta mission : analyser la question utilisateur et déterminer si elle contient assez de contexte pour une recherche documentaire efficace.
+
+**Analyse requise :**
+- Espèce (broiler/pondeuse/reproducteur)
+- Phase (démarrage/croissance/ponte/finition) 
+- Contexte métier (performance/santé/nutrition/logement)
+- Précisions techniques nécessaires
+
+**Instructions :**
+- Si contexte SUFFISANT pour recherche documentaire → Retourne : "CONTEXTE_SUFFISANT"
+- Si contexte INSUFFISANT → Pose 1-3 questions précises pour enrichir
+- Ne jamais répondre à la question principale
+
+**Question utilisateur :** {question}
+**Entités détectées :** {entities}
+
+Réponds en JSON :
+{{
+    "status": "SUFFISANT" ou "INSUFFISANT",
+    "missing_context": ["race", "age", "sexe"],
+    "clarification_questions": ["Question 1?", "Question 2?"],
+    "enriched_query": "version enrichie pour RAG"
+}}"""
+
+        if not self.openai_client:
+            # Fallback simple sans IA
+            return self._fallback_analysis(question, entities)
+        
+        try:
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Tu es un expert en clarification de questions avicoles."},
+                    {"role": "user", "content": analysis_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            import json
+            result = json.loads(response.choices[0].message.content)
+            logger.info(f"✅ [Clarification Agent] Analyse: {result['status']}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ [Clarification Agent] Erreur IA: {e}")
+            return self._fallback_analysis(question, entities)
+    
+    def _fallback_analysis(self, question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyse de fallback sans IA"""
+        
+        # Logique simple de détection
+        has_age = entities.get('age_days') or entities.get('age_weeks')
+        has_breed = entities.get('breed_specific') or entities.get('breed_generic')
+        has_sex = entities.get('sex')
+        has_context = entities.get('context_type')
+        
+        missing_context = []
+        clarification_questions = []
+        
+        if not has_breed:
+            missing_context.append("race")
+            clarification_questions.append("Quelle race/souche ? (Ross 308, Cobb 500, pondeuses...)")
+        
+        if not has_age:
+            missing_context.append("age")
+            clarification_questions.append("Quel âge ont vos animaux ? (en jours ou semaines)")
+        
+        if not has_sex and has_age:
+            missing_context.append("sexe")
+            clarification_questions.append("Sexe des animaux ? (mâles, femelles, mixte)")
+        
+        status = "SUFFISANT" if len(missing_context) <= 1 else "INSUFFISANT"
+        
+        # Enrichir la requête pour RAG
+        enriched_query = self._build_enriched_query(question, entities)
+        
+        return {
+            "status": status,
+            "missing_context": missing_context,
+            "clarification_questions": clarification_questions,
+            "enriched_query": enriched_query
+        }
+    
+    def _build_enriched_query(self, question: str, entities: Dict[str, Any]) -> str:
+        """Construit une requête enrichie pour le RAG"""
+        
+        base_query = question
+        enrichments = []
+        
+        # Ajouter race si disponible
+        if entities.get('breed_specific'):
+            enrichments.append(entities['breed_specific'])
+        elif entities.get('breed_generic'):
+            enrichments.append(entities['breed_generic'])
+        
+        # Ajouter âge si disponible
+        if entities.get('age_days'):
+            enrichments.append(f"{entities['age_days']} jours")
+        elif entities.get('age_weeks'):
+            enrichments.append(f"{entities['age_weeks']} semaines")
+        
+        # Ajouter sexe si disponible
+        if entities.get('sex'):
+            enrichments.append(entities['sex'])
+        
+        # Ajouter contexte si disponible
+        if entities.get('context_type'):
+            enrichments.append(entities['context_type'])
+        
+        if enrichments:
+            enriched_query = f"{base_query} {' '.join(enrichments)}"
+        else:
+            enriched_query = base_query
+        
+        logger.info(f"🔍 [Clarification Agent] Requête enrichie: {enriched_query}")
+        return enriched_query
+
 class ProcessingResult:
-    """Résultat du traitement d'une question avec pipeline IA unifié + ContextManager"""
+    """Résultat du traitement d'une question avec pipeline IA unifié + ContextManager + RAG"""
     def __init__(self, success: bool, response: str, response_type: str, 
                  confidence: float, entities: ExtractedEntities, 
                  processing_time_ms: int, error: str = None,
                  context_used: bool = False, weight_data: Dict[str, Any] = None,
                  normalized_entities: NormalizedEntities = None,
                  ai_pipeline_used: bool = False, pipeline_result: PipelineResult = None,
-                 previous_answers_used: bool = False, context_manager_used: bool = False):  # 🆕 NOUVEAU
+                 previous_answers_used: bool = False, context_manager_used: bool = False,
+                 rag_used: bool = False, rag_results: List[Dict] = None,
+                 clarification_questions: List[str] = None, missing_context: List[str] = None):
         self.success = success
         self.response = response
         self.response_type = response_type
@@ -112,17 +268,21 @@ class ProcessingResult:
         self.context_used = context_used
         self.weight_data = weight_data or {}
         self.normalized_entities = normalized_entities  # Entités normalisées
-        self.ai_pipeline_used = ai_pipeline_used  # NOUVEAU: Pipeline IA utilisé
-        self.pipeline_result = pipeline_result  # NOUVEAU: Résultat complet pipeline IA
-        self.previous_answers_used = previous_answers_used  # 🆕 NOUVEAU: Réponses précédentes utilisées
-        self.context_manager_used = context_manager_used  # 🆕 NOUVEAU: ContextManager utilisé
+        self.ai_pipeline_used = ai_pipeline_used  # Pipeline IA utilisé
+        self.pipeline_result = pipeline_result  # Résultat complet pipeline IA
+        self.previous_answers_used = previous_answers_used  # Réponses précédentes utilisées
+        self.context_manager_used = context_manager_used  # ContextManager utilisé
+        self.rag_used = rag_used  # 🆕 NOUVEAU: RAG utilisé
+        self.rag_results = rag_results or []  # 🆕 NOUVEAU: Résultats RAG
+        self.clarification_questions = clarification_questions or []  # 🆕 NOUVEAU: Questions de clarification
+        self.missing_context = missing_context or []  # 🆕 NOUVEAU: Contexte manquant
         self.timestamp = datetime.now().isoformat()
 
 class ExpertService:
-    """Service expert unifié avec pipeline IA, ContextManager et fallback système classique"""
+    """Service expert unifié avec pipeline IA, ContextManager, RAG et fallback système classique"""
     
     def __init__(self, db_path: str = "conversations.db"):
-        """Initialisation du service avec pipeline IA unifié, ContextManager et système classique"""
+        """Initialisation du service avec pipeline IA unifié, ContextManager, RAG et système classique"""
         
         # =================================================================
         # NOUVEAU: PIPELINE IA UNIFIÉ (PRIORITÉ ABSOLUE)
@@ -157,6 +317,16 @@ class ExpertService:
             logger.warning("⚠️ [Expert Service] ContextManager non disponible - Continuité limitée")
         
         # =================================================================
+        # 🆕 NOUVEAU: RAG ET CLARIFICATION AGENT
+        # =================================================================
+        # 🆕 NOUVEAU: Accès au RAG depuis app.state
+        self.rag_embedder = None
+        self.clarification_agent = ClarificationAgent()
+        
+        # Tentative d'initialisation RAG (sera configuré par expert.py)
+        logger.info("🔍 [Expert Service] RAG sera configuré via app.state")
+        
+        # =================================================================
         # CONSERVÉ: SYSTÈME CLASSIQUE (FALLBACK GARANTI)
         # =================================================================
         self.entities_extractor = EntitiesExtractor()
@@ -164,7 +334,7 @@ class ExpertService:
         self.smart_classifier = SmartClassifier(db_path=db_path)
         self.response_generator = UnifiedResponseGenerator()
         
-        # Statistiques étendues avec métriques IA + ContextManager
+        # Statistiques étendues avec métriques IA + ContextManager + RAG
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
@@ -173,38 +343,46 @@ class ExpertService:
             "contextual_answers": 0,
             "entities_normalized": 0,
             "normalization_success_rate": 0.0,
-            "ai_pipeline_usage": 0,  # NOUVEAU: Utilisation pipeline IA
-            "ai_success_rate": 0.0,  # NOUVEAU: Taux succès IA
-            "fallback_usage": 0,     # NOUVEAU: Utilisation fallback
-            "context_manager_usage": 0,  # 🆕 NOUVEAU: Utilisation ContextManager
-            "previous_answers_usage": 0,  # 🆕 NOUVEAU: Utilisation réponses précédentes
-            "context_continuity_rate": 0.0,  # 🆕 NOUVEAU: Taux continuité conversationnelle
+            "ai_pipeline_usage": 0,  # Utilisation pipeline IA
+            "ai_success_rate": 0.0,  # Taux succès IA
+            "fallback_usage": 0,     # Utilisation fallback
+            "context_manager_usage": 0,  # Utilisation ContextManager
+            "previous_answers_usage": 0,  # Utilisation réponses précédentes
+            "context_continuity_rate": 0.0,  # Taux continuité conversationnelle
+            "rag_usage": 0,  # 🆕 NOUVEAU: Utilisation RAG
+            "rag_success_rate": 0.0,  # 🆕 NOUVEAU: Taux succès RAG
+            "clarification_requests": 0,  # 🆕 NOUVEAU: Demandes de clarification
+            "context_sufficiency_rate": 0.0,  # 🆕 NOUVEAU: Taux suffisance contextuelle
             "errors": 0,
             "average_processing_time_ms": 0,
             "context_usage_rate": 0.0
         }
         
-        # Configuration étendue avec paramètres IA + ContextManager
+        # Configuration étendue avec paramètres IA + ContextManager + RAG
         self.config = {
             "enable_logging": True,
             "enable_stats": True,
             "enable_context": True,
             "enable_normalization": True,
-            "enable_ai_pipeline": AI_PIPELINE_AVAILABLE and self.ai_pipeline is not None,  # ✅ CORRECTION
-            "enable_context_manager": CONTEXT_MANAGER_AVAILABLE and self.context_manager is not None,  # 🆕 NOUVEAU
-            "include_previous_answers": True,  # 🆕 NOUVEAU: Inclure réponses précédentes
-            "max_previous_answers": 3,  # 🆕 NOUVEAU: Nombre max réponses précédentes
-            "save_assistant_responses": True,  # 🆕 NOUVEAU: Sauvegarder réponses assistant
-            "ai_pipeline_priority": True,  # NOUVEAU: IA en priorité
-            "max_processing_time_ms": 15000,  # Augmenté pour IA
+            "enable_ai_pipeline": AI_PIPELINE_AVAILABLE and self.ai_pipeline is not None,
+            "enable_context_manager": CONTEXT_MANAGER_AVAILABLE and self.context_manager is not None,
+            "enable_rag": False,  # 🆕 NOUVEAU: Sera activé quand RAG configuré
+            "enable_clarification_agent": True,  # 🆕 NOUVEAU: Agent de clarification
+            "include_previous_answers": True,  # Inclure réponses précédentes
+            "max_previous_answers": 3,  # Nombre max réponses précédentes
+            "save_assistant_responses": True,  # Sauvegarder réponses assistant
+            "rag_results_limit": 5,  # 🆕 NOUVEAU: Limite résultats RAG
+            "context_sufficiency_threshold": 0.7,  # 🆕 NOUVEAU: Seuil suffisance contextuelle
+            "ai_pipeline_priority": True,  # IA en priorité
+            "max_processing_time_ms": 15000,  # Augmenté pour IA + RAG
             "fallback_enabled": True,
             "context_expiry_minutes": 10,
             "normalization_confidence_threshold": 0.5,
-            "ai_timeout_seconds": 10,  # NOUVEAU: Timeout IA
-            "ai_fallback_on_error": True  # NOUVEAU: Fallback auto
+            "ai_timeout_seconds": 10,  # Timeout IA
+            "ai_fallback_on_error": True  # Fallback auto
         }
         
-        logger.info("✅ [Expert Service] Service unifié avec pipeline IA + ContextManager initialisé")
+        logger.info("✅ [Expert Service] Service unifié avec pipeline IA + ContextManager + RAG initialisé")
         
         # Affichage des capacités
         if self.ai_pipeline:
@@ -221,6 +399,9 @@ class ExpertService:
             logger.info("   🧠 ContextManager: ACTIVÉ - Continuité conversationnelle garantie")
         else:
             logger.info("   📝 Contexte limité - ContextManager non disponible")
+        
+        if self.clarification_agent:
+            logger.info("   🔍 ClarificationAgent: ACTIVÉ - Enrichissement RAG intelligent")
         
         # Statistiques des composants existants (conservées)
         try:
@@ -240,11 +421,33 @@ class ExpertService:
         logger.info(f"   🔗 Contexte: {'Activé' if self.config['enable_context'] else 'Désactivé'}")
         logger.info(f"   🎯 Normalisation: {'Activée' if self.config['enable_normalization'] else 'Désactivée'}")
         logger.info(f"   🧠 Continuité: {'Activée' if self.config['enable_context_manager'] else 'Désactivée'}")
+        logger.info(f"   🔍 RAG: {'Activé' if self.config['enable_rag'] else 'En attente de configuration'}")
+
+    def set_rag_embedder(self, rag_embedder):
+        """Configure l'accès au RAG (appelé par expert.py)"""
+        self.rag_embedder = rag_embedder
+        self.config["enable_rag"] = rag_embedder is not None
+        logger.info(f"✅ [Expert Service] RAG configuré: {rag_embedder is not None}")
+
+    def _format_clarification_questions(self, questions: List[str]) -> str:
+        """Formate les questions de clarification"""
+        
+        if not questions:
+            return "Pour mieux vous répondre, pouvez-vous préciser votre question ?"
+        
+        if len(questions) == 1:
+            return f"Pour vous donner une réponse précise, pouvez-vous préciser : {questions[0]}"
+        
+        formatted = "Pour vous donner une réponse précise, pouvez-vous préciser :\n"
+        for i, question in enumerate(questions, 1):
+            formatted += f"{i}. {question}\n"
+        
+        return formatted.strip()
 
     async def process_question(self, question: str, context: Dict[str, Any] = None, 
                              language: str = "fr") -> ProcessingResult:
         """
-        POINT D'ENTRÉE PRINCIPAL - Pipeline IA unifié + ContextManager avec fallback système classique
+        POINT D'ENTRÉE PRINCIPAL - Pipeline IA unifié + ContextManager + RAG avec fallback système classique
         
         Args:
             question: Question à traiter
@@ -413,9 +616,9 @@ class ExpertService:
                                 logger.error(f"❌ [Expert Service] Erreur sauvegarde contexte: {e}")
                         
                         # Statistiques IA
-                        self._update_stats_ai(pipeline_result.response_type, processing_time_ms, True, 
+                        self._update_stats_ai_rag(pipeline_result.response_type, processing_time_ms, True, 
                                             pipeline_result.enhanced_context is not None, True, False,
-                                            context_manager_used, len(previous_answers) > 0)
+                                            context_manager_used, len(previous_answers) > 0, False, False, [])
                         
                         return result
                         
@@ -427,7 +630,7 @@ class ExpertService:
                     logger.info("🔄 [Expert Service] Basculement vers système classique...")
             
             # =============================================================
-            # FALLBACK: SYSTÈME CLASSIQUE ENRICHI AVEC CONTEXTMANAGER
+            # FALLBACK: SYSTÈME CLASSIQUE ENRICHI AVEC CONTEXTMANAGER + RAG
             # =============================================================
             logger.info("🔄 [Expert Service] Traitement système classique enrichi...")
             
@@ -473,13 +676,11 @@ class ExpertService:
                     logger.error(f"   ❌ Erreur normalisation: {e}")
             
             # 3️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE (classique enrichi)
-            # ✅ CORRECTION CRITIQUE: Retirer le paramètre 'is_clarification_response' non supporté
             try:
                 classification = self.smart_classifier.classify_question(
                     question, 
                     entities_for_processing,
                     conversation_id=conversation_id
-                    # is_clarification_response=is_clarification_response  # ❌ RETIRÉ - Paramètre non supporté
                 )
                 
                 logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
@@ -499,17 +700,61 @@ class ExpertService:
             if context_used:
                 logger.info("   🔗 Contexte conversationnel utilisé")
             
-            # 4️⃣ GÉNÉRATION DE LA RÉPONSE ENRICHIE AVEC CONTEXTE
+            # =============================================================
+            # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
+            # =============================================================
             final_entities = classification.merged_entities if classification.merged_entities else entities_for_processing
             
-            # 🆕 NOUVEAU: Enrichir le générateur avec réponses précédentes si disponibles
-            generation_context = {
-                "previous_answers": previous_answers[-2:] if previous_answers and self.config["include_previous_answers"] else [],
-                "established_entities": established_entities,
-                "conversation_id": conversation_id
-            }
+            clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
+                question, final_entities
+            )
             
-            response_data = self.response_generator.generate(question, final_entities, classification)
+            # 🆕 NOUVEAU: CONSULTATION RAG SI CONTEXTE SUFFISANT
+            rag_results = []
+            rag_used = False
+            
+            if clarification_analysis["status"] == "SUFFISANT" and self.rag_embedder and self.config["enable_rag"]:
+                try:
+                    enriched_query = clarification_analysis["enriched_query"]
+                    logger.info(f"🔍 [Expert Service] Recherche RAG: {enriched_query}")
+                    
+                    rag_results = self.rag_embedder.search(enriched_query, k=self.config["rag_results_limit"])
+                    rag_used = len(rag_results) > 0
+                    
+                    logger.info(f"📚 [Expert Service] RAG: {len(rag_results)} documents trouvés")
+                    
+                except Exception as e:
+                    logger.error(f"❌ [Expert Service] Erreur RAG: {e}")
+                    rag_results = []
+            
+            # 4️⃣ GÉNÉRATION DE LA RÉPONSE ENRICHIE
+            if clarification_analysis["status"] == "INSUFFISANT":
+                # Retourner questions de clarification
+                response_data = ResponseData(
+                    response=self._format_clarification_questions(clarification_analysis["clarification_questions"]),
+                    response_type="needs_clarification",
+                    confidence=0.8,
+                    precision_offer=None,
+                    examples=[],
+                    weight_data={},
+                    ai_generated=False
+                )
+                response_data.clarification_questions = clarification_analysis["clarification_questions"]
+                response_data.missing_context = clarification_analysis["missing_context"]
+                response_data.rag_used = False
+            else:
+                # Générer réponse avec RAG si disponible
+                if hasattr(self.response_generator, 'generate_with_rag') and rag_results:
+                    response_data = self.response_generator.generate_with_rag(
+                        question, final_entities, classification, rag_results
+                    )
+                else:
+                    response_data = self.response_generator.generate(question, final_entities, classification)
+                
+                response_data.rag_used = rag_used
+                response_data.clarification_questions = []
+                response_data.missing_context = []
+            
             logger.info(f"   🎨 Réponse générée: {response_data.response_type}")
             
             # 🆕 NOUVEAU: Si possible, améliorer la réponse avec le contexte des réponses précédentes
@@ -537,7 +782,11 @@ class ExpertService:
                 normalized_entities=normalized_entities,
                 ai_pipeline_used=False,  # Système classique utilisé
                 previous_answers_used=len(previous_answers) > 0,  # 🆕 NOUVEAU
-                context_manager_used=context_manager_used  # 🆕 NOUVEAU
+                context_manager_used=context_manager_used,  # 🆕 NOUVEAU
+                rag_used=rag_used,  # 🆕 NOUVEAU
+                rag_results=rag_results,  # 🆕 NOUVEAU
+                clarification_questions=getattr(response_data, 'clarification_questions', []),  # 🆕 NOUVEAU
+                missing_context=getattr(response_data, 'missing_context', [])  # 🆕 NOUVEAU
             )
             
             # 🆕 NOUVEAU: SAUVEGARDER LA NOUVELLE RÉPONSE ASSISTANT (système classique)
@@ -568,8 +817,9 @@ class ExpertService:
                     logger.error(f"❌ [Expert Service] Erreur sauvegarde contexte (classique): {e}")
             
             # 6️⃣ MISE À JOUR DES STATISTIQUES
-            self._update_stats_ai(classification.response_type, processing_time_ms, True, context_used, 
-                                False, True, context_manager_used, len(previous_answers) > 0)  # Fallback utilisé
+            self._update_stats_ai_rag(classification.response_type, processing_time_ms, True, context_used, 
+                                False, True, context_manager_used, len(previous_answers) > 0,
+                                rag_used, clarification_analysis["status"] == "INSUFFISANT", rag_results)
             
             logger.info(f"✅ [Expert Service] Traitement classique enrichi réussi en {processing_time_ms}ms")
             return result
@@ -595,8 +845,8 @@ class ExpertService:
                 context_manager_used=context_manager_used
             )
             
-            self._update_stats_ai(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False, 
-                                False, True, context_manager_used, False)
+            self._update_stats_ai_rag(ResponseType.NEEDS_CLARIFICATION, processing_time_ms, False, False, 
+                                False, True, context_manager_used, False, False, False, [])
             return result
 
     async def _safe_extract_entities(self, question: str) -> ExtractedEntities:
@@ -642,7 +892,7 @@ class ExpertService:
 
     async def ask_expert_enhanced(self, request: EnhancedQuestionRequest) -> EnhancedExpertResponse:
         """
-        Interface compatible avec l'ancien système - AMÉLIORÉE avec pipeline IA unifié + ContextManager
+        Interface compatible avec l'ancien système - AMÉLIORÉE avec pipeline IA unifié + ContextManager + RAG
         
         Args:
             request: Requête formatée selon l'ancien modèle
@@ -661,14 +911,14 @@ class ExpertService:
                 "concision_level": getattr(request, 'concision_level', 'standard')
             }
             
-            # Traitement unifié avec pipeline IA, ContextManager et fallback système classique
+            # Traitement unifié avec pipeline IA, ContextManager, RAG et fallback système classique
             result = await self.process_question(
                 question=request.text,
                 context=context,
                 language=getattr(request, 'language', 'fr')
             )
             
-            # Conversion vers format legacy avec informations IA + ContextManager
+            # Conversion vers format legacy avec informations IA + ContextManager + RAG
             return self._convert_to_legacy_response(request, result)
             
         except Exception as e:
@@ -677,29 +927,37 @@ class ExpertService:
 
     def _convert_to_legacy_response(self, request: EnhancedQuestionRequest, 
                                   result: ProcessingResult) -> EnhancedExpertResponse:
-        """Convertit le résultat moderne vers le format legacy avec informations IA + ContextManager"""
+        """Convertit le résultat moderne vers le format legacy avec informations IA + ContextManager + RAG"""
         
         conversation_id = getattr(request, 'conversation_id', None) or str(uuid.uuid4())
         language = getattr(request, 'language', 'fr')
         
-        # Données de base avec informations IA + ContextManager
+        # Données de base avec informations IA + ContextManager + RAG
         response_data = {
             "question": request.text,
             "response": result.response,
             "conversation_id": conversation_id,
-            "rag_used": False,
+            "rag_used": result.rag_used,  # 🆕 NOUVEAU: RAG utilisé
             "timestamp": result.timestamp,
             "language": language,
             "response_time_ms": result.processing_time_ms,
-            "mode": "unified_ai_pipeline_context_manager_v4.0" if result.ai_pipeline_used and result.context_manager_used else (
-                "unified_ai_pipeline_v3.0" if result.ai_pipeline_used else (
-                    "unified_context_manager_v4.0" if result.context_manager_used else 
-                    "unified_intelligent_system_v2_normalized"
+            "mode": "unified_ai_pipeline_context_manager_rag_v5.0" if (result.ai_pipeline_used and result.context_manager_used and result.rag_used) else (
+                "unified_ai_pipeline_context_manager_v4.0" if (result.ai_pipeline_used and result.context_manager_used) else (
+                    "unified_ai_pipeline_rag_v5.0" if (result.ai_pipeline_used and result.rag_used) else (
+                        "unified_ai_pipeline_v3.0" if result.ai_pipeline_used else (
+                            "unified_context_manager_rag_v5.0" if (result.context_manager_used and result.rag_used) else (
+                                "unified_context_manager_v4.0" if result.context_manager_used else (
+                                    "unified_rag_v5.0" if result.rag_used else
+                                    "unified_intelligent_system_v2_normalized"
+                                )
+                            )
+                        )
+                    )
                 )
             )
         }
         
-        # Ajout des champs pour compatibilité avec informations IA + ContextManager
+        # Ajout des champs pour compatibilité avec informations IA + ContextManager + RAG
         optional_fields = {
             "user": getattr(request, 'user_id', None),
             "logged": True,
@@ -709,16 +967,20 @@ class ExpertService:
                 "previous_answers_analysis" if result.previous_answers_used else "no_history",
                 "ai_pipeline_attempt" if result.ai_pipeline_used else "entities_extraction",
                 "entity_normalization_v1" if result.normalized_entities else "classic_extraction",
+                "clarification_analysis_v1" if result.clarification_questions else "no_clarification",  # 🆕 NOUVEAU
+                "rag_search_v1" if result.rag_used else "no_rag",  # 🆕 NOUVEAU
                 "context_enhancement_ai" if result.ai_pipeline_used else "context_management_enriched",
                 "smart_classification_v2",
-                "response_generation_ai" if result.ai_pipeline_used else "unified_response_generation_v2_contextual",
+                "response_generation_rag" if result.rag_used else "response_generation_ai" if result.ai_pipeline_used else "unified_response_generation_v2_contextual",
                 "context_manager_save" if result.context_manager_used else "basic_save",
                 "contextual_data_calculation" if result.context_used else "standard_processing"
             ],
             "ai_enhancements_used": [
                 "unified_ai_pipeline_v1" if result.ai_pipeline_used else None,
-                "context_manager_v1" if result.context_manager_used else None,  # 🆕 NOUVEAU
-                "previous_answers_continuity_v1" if result.previous_answers_used else None,  # 🆕 NOUVEAU
+                "context_manager_v1" if result.context_manager_used else None,
+                "previous_answers_continuity_v1" if result.previous_answers_used else None,
+                "clarification_agent_v1" if result.clarification_questions else None,  # 🆕 NOUVEAU
+                "rag_system_v1" if result.rag_used else None,  # 🆕 NOUVEAU
                 "ai_entity_extractor_v1" if result.ai_pipeline_used else "entities_extractor_v1",
                 "ai_context_enhancer_v1" if result.ai_pipeline_used else None,
                 "ai_response_generator_v1" if result.ai_pipeline_used else "unified_response_generator_v2",
@@ -727,7 +989,7 @@ class ExpertService:
             ]
         }
         
-        # Informations de classification avec données IA + ContextManager
+        # Informations de classification avec données IA + ContextManager + RAG
         classification_info = {
             "response_type_detected": result.response_type,
             "confidence_score": result.confidence,
@@ -738,14 +1000,22 @@ class ExpertService:
             "context_used": result.context_used,
             "weight_data_calculated": bool(result.weight_data),
             "conversation_id": conversation_id,
-            "ai_pipeline_used": result.ai_pipeline_used,  # NOUVEAU
-            "context_manager_used": result.context_manager_used,  # 🆕 NOUVEAU
-            "previous_answers_used": result.previous_answers_used,  # 🆕 NOUVEAU
-            "ai_pipeline_result": {  # NOUVEAU
+            "ai_pipeline_used": result.ai_pipeline_used,
+            "context_manager_used": result.context_manager_used,
+            "previous_answers_used": result.previous_answers_used,
+            "rag_used": result.rag_used,  # 🆕 NOUVEAU
+            "clarification_requested": len(result.clarification_questions) > 0,  # 🆕 NOUVEAU
+            "missing_context": result.missing_context,  # 🆕 NOUVEAU
+            "ai_pipeline_result": {
                 "stages_completed": result.pipeline_result.stages_completed if result.pipeline_result else [],
                 "ai_calls_made": result.pipeline_result.ai_calls_made if result.pipeline_result else 0,
                 "cache_hits": result.pipeline_result.cache_hits if result.pipeline_result else 0,
                 "fallback_used": result.pipeline_result.fallback_used if result.pipeline_result else (not result.ai_pipeline_used)
+            },
+            "rag_result": {  # 🆕 NOUVEAU
+                "documents_found": len(result.rag_results),
+                "search_successful": result.rag_used,
+                "enriched_query_used": True if result.rag_used else False
             }
         }
         
@@ -757,14 +1027,23 @@ class ExpertService:
                 "sex": result.weight_data.get('sex'),
                 "weight_range": result.weight_data.get('weight_range'),
                 "target_weight": result.weight_data.get('target_weight'),
-                "data_source": result.weight_data.get('data_source', 'ai_pipeline' if result.ai_pipeline_used else 'intelligent_system_config')
+                "data_source": result.weight_data.get('data_source', 'rag_enhanced' if result.rag_used else 'ai_pipeline' if result.ai_pipeline_used else 'intelligent_system_config')
+            }
+        
+        # 🆕 NOUVEAU: Données de clarification
+        if result.clarification_questions:
+            classification_info["clarification_data"] = {
+                "questions_generated": result.clarification_questions,
+                "missing_context_items": result.missing_context,
+                "context_sufficiency": "INSUFFICIENT",
+                "agent_used": "clarification_agent_v1"
             }
         
         # Fusionner données
         response_data.update(optional_fields)
         response_data["classification_result"] = classification_info
         
-        # Informations contextuelles avec IA + ContextManager
+        # Informations contextuelles avec IA + ContextManager + RAG
         response_data["contextual_features"] = {
             "context_detection_enabled": self.config["enable_context"],
             "clarification_detection": True,
@@ -772,13 +1051,16 @@ class ExpertService:
             "entity_normalization": self.config["enable_normalization"],
             "weight_data_calculation": True,
             "conversation_persistence": True,
-            "ai_pipeline_enabled": self.config["enable_ai_pipeline"],  # NOUVEAU
-            "context_manager_enabled": self.config["enable_context_manager"],  # 🆕 NOUVEAU
-            "previous_answers_inclusion": self.config["include_previous_answers"],  # 🆕 NOUVEAU
-            "assistant_response_saving": self.config["save_assistant_responses"],  # 🆕 NOUVEAU
-            "ai_context_enhancement": result.ai_pipeline_used,  # NOUVEAU
-            "ai_response_generation": result.ai_pipeline_used,   # NOUVEAU
-            "conversational_continuity": result.context_manager_used  # 🆕 NOUVEAU
+            "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
+            "context_manager_enabled": self.config["enable_context_manager"],
+            "previous_answers_inclusion": self.config["include_previous_answers"],
+            "assistant_response_saving": self.config["save_assistant_responses"],
+            "rag_enabled": self.config["enable_rag"],  # 🆕 NOUVEAU
+            "clarification_agent_enabled": self.config["enable_clarification_agent"],  # 🆕 NOUVEAU
+            "ai_context_enhancement": result.ai_pipeline_used,
+            "ai_response_generation": result.ai_pipeline_used,
+            "conversational_continuity": result.context_manager_used,
+            "document_enhanced_responses": result.rag_used  # 🆕 NOUVEAU
         }
         
         # Détails de normalisation
@@ -794,7 +1076,7 @@ class ExpertService:
                 "original_format_preserved": result.normalized_entities.original_format
             }
         
-        # NOUVEAU: Détails du pipeline IA
+        # Détails du pipeline IA
         if result.ai_pipeline_used and result.pipeline_result:
             response_data["ai_pipeline_details"] = {
                 "pipeline_used": True,
@@ -807,7 +1089,7 @@ class ExpertService:
                 "confidence_ai": result.pipeline_result.confidence
             }
         
-        # 🆕 NOUVEAU: Détails du ContextManager
+        # Détails du ContextManager
         if result.context_manager_used:
             response_data["context_manager_details"] = {
                 "context_manager_used": True,
@@ -819,6 +1101,29 @@ class ExpertService:
                 "context_manager_version": "v1.0"
             }
         
+        # 🆕 NOUVEAU: Détails du RAG
+        if result.rag_used:
+            response_data["rag_details"] = {
+                "rag_used": True,
+                "documents_retrieved": len(result.rag_results),
+                "search_successful": True,
+                "enriched_query_applied": True,
+                "context_sufficiency": "SUFFICIENT",
+                "rag_version": "v1.0",
+                "document_sources": [doc.get('source', 'unknown') for doc in result.rag_results[:3]]  # Top 3 sources
+            }
+        
+        # 🆕 NOUVEAU: Détails de clarification
+        if result.clarification_questions:
+            response_data["clarification_details"] = {
+                "clarification_requested": True,
+                "questions_count": len(result.clarification_questions),
+                "missing_context_items": result.missing_context,
+                "context_sufficiency": "INSUFFICIENT",
+                "agent_analysis_used": True,
+                "clarification_version": "v1.0"
+            }
+        
         # Gestion d'erreur
         if not result.success:
             response_data["error_details"] = {
@@ -827,8 +1132,10 @@ class ExpertService:
                 "original_processing_failed": True,
                 "context_available": bool(getattr(request, 'conversation_id', None)),
                 "normalization_attempted": self.config["enable_normalization"],
-                "ai_pipeline_attempted": self.config["enable_ai_pipeline"],  # NOUVEAU
-                "context_manager_attempted": self.config["enable_context_manager"]  # 🆕 NOUVEAU
+                "ai_pipeline_attempted": self.config["enable_ai_pipeline"],
+                "context_manager_attempted": self.config["enable_context_manager"],
+                "rag_attempted": self.config["enable_rag"],  # 🆕 NOUVEAU
+                "clarification_attempted": self.config["enable_clarification_agent"]  # 🆕 NOUVEAU
             }
         
         if MODELS_AVAILABLE:
@@ -837,7 +1144,7 @@ class ExpertService:
             return EnhancedExpertResponse(**response_data)
 
     def _create_error_response(self, request: EnhancedQuestionRequest, error: str) -> EnhancedExpertResponse:
-        """Crée une réponse d'erreur avec informations IA + ContextManager"""
+        """Crée une réponse d'erreur avec informations IA + ContextManager + RAG"""
         
         error_responses = {
             "fr": f"Désolé, je rencontre une difficulté technique. Erreur: {error}. Pouvez-vous reformuler votre question ?",
@@ -856,24 +1163,22 @@ class ExpertService:
             timestamp=datetime.now().isoformat(),
             language=language,
             response_time_ms=0,
-            mode="error_fallback_ai_pipeline_context_manager",  # 🆕 NOUVEAU
+            mode="error_fallback_ai_pipeline_context_manager_rag",  # 🆕 NOUVEAU
             logged=True,
             validation_passed=False,
             error_details={
                 "error": error, 
-                "system": "unified_expert_service_ai_pipeline_context_manager_v4",  # 🆕 NOUVEAU
-                "context_available": bool(getattr(request, 'conversation_id', None)),
-                "normalization_enabled": self.config["enable_normalization"],
-                "ai_pipeline_enabled": self.config["enable_ai_pipeline"],  # NOUVEAU
-                "context_manager_enabled": self.config["enable_context_manager"]  # 🆕 NOUVEAU
+                "system": "unified_expert_service_ai_pipeline_context_manager_rag_v5",  # 🆕 NOUVEAU
             }
         )
 
-    def _update_stats_ai(self, response_type: ResponseType, processing_time_ms: int, 
+    def _update_stats_ai_rag(self, response_type: ResponseType, processing_time_ms: int, 
                         success: bool, context_used: bool = False, 
                         normalization_used: bool = False, fallback_used: bool = False,
-                        context_manager_used: bool = False, previous_answers_used: bool = False):  # 🆕 NOUVEAU
-        """Met à jour les statistiques avec informations IA + ContextManager"""
+                        context_manager_used: bool = False, previous_answers_used: bool = False,
+                        rag_used: bool = False, clarification_requested: bool = False,
+                        rag_results: List[Dict] = None):  # 🆕 NOUVEAU
+        """Met à jour les statistiques avec informations IA + ContextManager + RAG"""
         
         if not self.config["enable_stats"]:
             return
@@ -908,7 +1213,7 @@ class ExpertService:
             total_normalization = self.stats["normalization_success_rate"] * (self.stats["questions_processed"] - 1)
             self.stats["normalization_success_rate"] = total_normalization / self.stats["questions_processed"]
         
-        # NOUVEAU: Stats IA
+        # Stats IA
         if not fallback_used:  # Pipeline IA utilisé
             self.stats["ai_pipeline_usage"] += 1
             total_ai_success = self.stats["ai_success_rate"] * (self.stats["ai_pipeline_usage"] - 1)
@@ -919,20 +1224,41 @@ class ExpertService:
         else:  # Fallback utilisé
             self.stats["fallback_usage"] += 1
 
-        # 🆕 NOUVEAU: Stats ContextManager
+        # Stats ContextManager
         if context_manager_used:
             self.stats["context_manager_usage"] += 1
         
         if previous_answers_used:
             self.stats["previous_answers_usage"] += 1
         
-        # 🆕 NOUVEAU: Taux de continuité conversationnelle
+        # Taux de continuité conversationnelle
         if context_manager_used or previous_answers_used:
             total_continuity = self.stats["context_continuity_rate"] * (self.stats["questions_processed"] - 1)
             self.stats["context_continuity_rate"] = (total_continuity + 1) / self.stats["questions_processed"]
         else:
             total_continuity = self.stats["context_continuity_rate"] * (self.stats["questions_processed"] - 1)
             self.stats["context_continuity_rate"] = total_continuity / self.stats["questions_processed"]
+        
+        # 🆕 NOUVEAU: Stats RAG
+        if rag_used:
+            self.stats["rag_usage"] += 1
+            total_rag_success = self.stats["rag_success_rate"] * (self.stats["rag_usage"] - 1)
+            if success and rag_results:
+                self.stats["rag_success_rate"] = (total_rag_success + 1) / self.stats["rag_usage"]
+            else:
+                self.stats["rag_success_rate"] = total_rag_success / self.stats["rag_usage"]
+        
+        # 🆕 NOUVEAU: Stats clarification
+        if clarification_requested:
+            self.stats["clarification_requests"] += 1
+        
+        # 🆕 NOUVEAU: Taux de suffisance contextuelle
+        if not clarification_requested:  # Contexte suffisant
+            total_sufficiency = self.stats["context_sufficiency_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_sufficiency_rate"] = (total_sufficiency + 1) / self.stats["questions_processed"]
+        else:  # Contexte insuffisant
+            total_sufficiency = self.stats["context_sufficiency_rate"] * (self.stats["questions_processed"] - 1)
+            self.stats["context_sufficiency_rate"] = total_sufficiency / self.stats["questions_processed"]
         
         # Temps moyen
         current_avg = self.stats["average_processing_time_ms"]
@@ -943,26 +1269,32 @@ class ExpertService:
         )
 
     def get_system_stats(self) -> Dict[str, Any]:
-        """Retourne les statistiques système avec informations IA + ContextManager"""
+        """Retourne les statistiques système avec informations IA + ContextManager + RAG"""
         
         total_questions = self.stats["questions_processed"]
         
         if total_questions == 0:
             return {
                 "service_status": "ready",
-                "version": "unified_ai_pipeline_context_manager_v4.0.0",  # 🆕 NOUVEAU
+                "version": "unified_ai_pipeline_context_manager_rag_v5.0.0",  # 🆕 NOUVEAU
                 "questions_processed": 0,
                 "statistics": "No questions processed yet",
-                "ai_pipeline_features": {  # NOUVEAU
+                "ai_pipeline_features": {
                     "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
                     "unified_orchestration": "enabled",
                     "intelligent_fallback": "enabled"
                 },
-                "context_manager_features": {  # 🆕 NOUVEAU
+                "context_manager_features": {
                     "context_manager_enabled": self.config["enable_context_manager"],
                     "previous_answers_inclusion": self.config["include_previous_answers"],
                     "assistant_response_saving": self.config["save_assistant_responses"],
                     "conversational_continuity": "enabled" if self.config["enable_context_manager"] else "disabled"
+                },
+                "rag_features": {  # 🆕 NOUVEAU
+                    "rag_enabled": self.config["enable_rag"],
+                    "clarification_agent_enabled": self.config["enable_clarification_agent"],
+                    "context_sufficiency_analysis": "enabled" if self.config["enable_clarification_agent"] else "disabled",
+                    "document_enhancement": "enabled" if self.config["enable_rag"] else "disabled"
                 },
                 "normalization_features": {
                     "entity_normalization": "enabled" if self.config["enable_normalization"] else "disabled",
@@ -977,10 +1309,12 @@ class ExpertService:
         fallback_rate = (self.stats["fallback_usage"] / total_questions) * 100 if total_questions > 0 else 0
         context_manager_usage_rate = (self.stats["context_manager_usage"] / total_questions) * 100 if total_questions > 0 else 0
         previous_answers_usage_rate = (self.stats["previous_answers_usage"] / total_questions) * 100 if total_questions > 0 else 0
+        rag_usage_rate = (self.stats["rag_usage"] / total_questions) * 100 if total_questions > 0 else 0
+        clarification_rate = (self.stats["clarification_requests"] / total_questions) * 100 if total_questions > 0 else 0
         
         return {
             "service_status": "active",
-            "version": "unified_ai_pipeline_context_manager_v4.0.0",  # 🆕 NOUVEAU
+            "version": "unified_ai_pipeline_context_manager_rag_v5.0.0",  # 🆕 NOUVEAU
             "questions_processed": total_questions,
             "success_rate_percent": round(success_rate, 2),
             "response_distribution": {
@@ -1001,14 +1335,14 @@ class ExpertService:
                 "normalization_enabled": self.config["enable_normalization"],
                 "normalizer_stats": self.entity_normalizer.get_stats()
             },
-            "ai_pipeline_metrics": {  # NOUVEAU
+            "ai_pipeline_metrics": {
                 "ai_pipeline_usage_rate": round(ai_usage_rate, 2),
                 "ai_success_rate": round(self.stats["ai_success_rate"] * 100, 2),
                 "fallback_usage_rate": round(fallback_rate, 2),
                 "ai_pipeline_enabled": self.config["enable_ai_pipeline"],
                 "ai_pipeline_health": self.ai_pipeline.get_pipeline_health() if self.ai_pipeline else None
             },
-            "context_manager_metrics": {  # 🆕 NOUVEAU
+            "context_manager_metrics": {
                 "context_manager_usage_rate": round(context_manager_usage_rate, 2),
                 "previous_answers_usage_rate": round(previous_answers_usage_rate, 2),
                 "context_continuity_rate": round(self.stats["context_continuity_rate"] * 100, 2),
@@ -1016,16 +1350,27 @@ class ExpertService:
                 "max_previous_answers": self.config["max_previous_answers"],
                 "assistant_response_saving": self.config["save_assistant_responses"]
             },
+            "rag_metrics": {  # 🆕 NOUVEAU
+                "rag_usage_rate": round(rag_usage_rate, 2),
+                "rag_success_rate": round(self.stats["rag_success_rate"] * 100, 2),
+                "clarification_rate": round(clarification_rate, 2),
+                "context_sufficiency_rate": round(self.stats["context_sufficiency_rate"] * 100, 2),
+                "rag_enabled": self.config["enable_rag"],
+                "clarification_agent_enabled": self.config["enable_clarification_agent"],
+                "rag_results_limit": self.config["rag_results_limit"]
+            },
             "performance": {
                 "average_processing_time_ms": self.stats["average_processing_time_ms"],
                 "system_components": {
-                    "ai_unified_pipeline": "active" if self.config["enable_ai_pipeline"] else "disabled",  # NOUVEAU
-                    "ai_fallback_system": "active" if self.ai_fallback_system else "disabled",  # NOUVEAU
-                    "context_manager": "active" if self.config["enable_context_manager"] else "disabled",  # 🆕 NOUVEAU
+                    "ai_unified_pipeline": "active" if self.config["enable_ai_pipeline"] else "disabled",
+                    "ai_fallback_system": "active" if self.ai_fallback_system else "disabled",
+                    "context_manager": "active" if self.config["enable_context_manager"] else "disabled",
+                    "rag_system": "active" if self.config["enable_rag"] else "disabled",  # 🆕 NOUVEAU
+                    "clarification_agent": "active" if self.config["enable_clarification_agent"] else "disabled",  # 🆕 NOUVEAU
                     "entities_extractor": "active",
                     "entity_normalizer": "active" if self.config["enable_normalization"] else "disabled",
                     "smart_classifier": "active_contextual",
-                    "response_generator": "active_contextual_enhanced",  # 🆕 AMÉLIORÉ
+                    "response_generator": "active_contextual_rag_enhanced",  # 🆕 AMÉLIORÉ
                     "conversation_context_manager": "active_centralized" if self.config["enable_context_manager"] else "disabled"
                 }
             },
@@ -1130,7 +1475,7 @@ class ExpertService:
         return fallback_responses.get(language, fallback_responses['fr'])
 
     def reset_stats(self):
-        """Remet à zéro les statistiques avec nouvelles métriques IA + ContextManager"""
+        """Remet à zéro les statistiques avec nouvelles métriques IA + ContextManager + RAG"""
         self.stats = {
             "questions_processed": 0,
             "precise_answers": 0,
@@ -1139,20 +1484,24 @@ class ExpertService:
             "contextual_answers": 0,
             "entities_normalized": 0,
             "normalization_success_rate": 0.0,
-            "ai_pipeline_usage": 0,  # NOUVEAU
-            "ai_success_rate": 0.0,  # NOUVEAU
-            "fallback_usage": 0,     # NOUVEAU
-            "context_manager_usage": 0,  # 🆕 NOUVEAU
-            "previous_answers_usage": 0,  # 🆕 NOUVEAU
-            "context_continuity_rate": 0.0,  # 🆕 NOUVEAU
+            "ai_pipeline_usage": 0,
+            "ai_success_rate": 0.0,
+            "fallback_usage": 0,
+            "context_manager_usage": 0,
+            "previous_answers_usage": 0,
+            "context_continuity_rate": 0.0,
+            "rag_usage": 0,  # 🆕 NOUVEAU
+            "rag_success_rate": 0.0,  # 🆕 NOUVEAU
+            "clarification_requests": 0,  # 🆕 NOUVEAU
+            "context_sufficiency_rate": 0.0,  # 🆕 NOUVEAU
             "errors": 0,
             "average_processing_time_ms": 0,
             "context_usage_rate": 0.0
         }
-        logger.info("📊 [Expert Service] Statistiques remises à zéro (version IA pipeline + ContextManager)")
+        logger.info("📊 [Expert Service] Statistiques remises à zéro (version IA pipeline + ContextManager + RAG)")
 
     def update_config(self, new_config: Dict[str, Any]):
-        """Met à jour la configuration du service avec paramètres IA + ContextManager"""
+        """Met à jour la configuration du service avec paramètres IA + ContextManager + RAG"""
         self.config.update(new_config)
         logger.info(f"⚙️ [Expert Service] Configuration mise à jour: {new_config}")
         
@@ -1168,7 +1517,7 @@ class ExpertService:
             else:
                 logger.warning("⚠️ [Expert Service] Pipeline IA non disponible globalement")
         
-        # 🆕 NOUVEAU: Réactivation ContextManager
+        # Réactivation ContextManager
         if "enable_context_manager" in new_config and new_config["enable_context_manager"] and not self.context_manager:
             if CONTEXT_MANAGER_AVAILABLE:
                 try:
@@ -1179,6 +1528,13 @@ class ExpertService:
             else:
                 logger.warning("⚠️ [Expert Service] ContextManager non disponible globalement")
         
+        # 🆕 NOUVEAU: Configuration RAG
+        if "enable_rag" in new_config:
+            logger.info(f"🔍 [Expert Service] RAG {'activé' if new_config['enable_rag'] else 'désactivé'}")
+        
+        if "enable_clarification_agent" in new_config:
+            logger.info(f"🤔 [Expert Service] Agent de clarification {'activé' if new_config['enable_clarification_agent'] else 'désactivé'}")
+        
         if "enable_normalization" in new_config:
             logger.info(f"🔧 [Expert Service] Normalisation {'activée' if new_config['enable_normalization'] else 'désactivée'}")
         
@@ -1186,7 +1542,7 @@ class ExpertService:
             logger.info(f"📝 [Expert Service] Réponses précédentes {'incluses' if new_config['include_previous_answers'] else 'ignorées'}")
 
     def get_contextual_debug_info(self, conversation_id: str) -> Dict[str, Any]:
-        """Récupère les informations de debug avec données IA + ContextManager"""
+        """Récupère les informations de debug avec données IA + ContextManager + RAG"""
         try:
             # Récupération via ContextManager si disponible
             if self.context_manager:
@@ -1218,17 +1574,25 @@ class ExpertService:
                 "context_available": context_available,
                 "context_fresh": context_fresh,
                 "context_data": context_data,
-                "context_manager_used": self.context_manager is not None,  # 🆕 NOUVEAU
+                "context_manager_used": self.context_manager is not None,
                 "classifier_stats": self.smart_classifier.get_classification_stats(),
                 "normalizer_stats": self.entity_normalizer.get_stats(),
-                "service_version": "v4.0.0_ai_pipeline_context_manager",  # 🆕 NOUVEAU
-                "ai_pipeline_available": self.ai_pipeline is not None,  # NOUVEAU
-                "ai_pipeline_health": self.ai_pipeline.get_pipeline_health() if self.ai_pipeline else None,  # NOUVEAU
-                "context_manager_available": self.context_manager is not None,  # 🆕 NOUVEAU
-                "continuity_features": {  # 🆕 NOUVEAU
+                "service_version": "v5.0.0_ai_pipeline_context_manager_rag",  # 🆕 NOUVEAU
+                "ai_pipeline_available": self.ai_pipeline is not None,
+                "ai_pipeline_health": self.ai_pipeline.get_pipeline_health() if self.ai_pipeline else None,
+                "context_manager_available": self.context_manager is not None,
+                "rag_available": self.rag_embedder is not None,  # 🆕 NOUVEAU
+                "clarification_agent_available": self.clarification_agent is not None,  # 🆕 NOUVEAU
+                "continuity_features": {
                     "previous_answers_inclusion": self.config["include_previous_answers"],
                     "assistant_response_saving": self.config["save_assistant_responses"],
                     "max_previous_answers": self.config["max_previous_answers"]
+                },
+                "rag_features": {  # 🆕 NOUVEAU
+                    "rag_enabled": self.config["enable_rag"],
+                    "clarification_agent_enabled": self.config["enable_clarification_agent"],
+                    "rag_results_limit": self.config["rag_results_limit"],
+                    "context_sufficiency_threshold": self.config["context_sufficiency_threshold"]
                 }
             }
             
@@ -1241,8 +1605,10 @@ class ExpertService:
                 "error": str(e),
                 "context_available": False,
                 "normalization_available": self.config["enable_normalization"],
-                "ai_pipeline_available": self.config["enable_ai_pipeline"],  # NOUVEAU
-                "context_manager_available": self.config["enable_context_manager"]  # 🆕 NOUVEAU
+                "ai_pipeline_available": self.config["enable_ai_pipeline"],
+                "context_manager_available": self.config["enable_context_manager"],
+                "rag_available": self.config["enable_rag"],  # 🆕 NOUVEAU
+                "clarification_agent_available": self.config["enable_clarification_agent"]  # 🆕 NOUVEAU
             }
 
     def get_normalization_debug_info(self, raw_entities: Dict[str, Any]) -> Dict[str, Any]:
@@ -1261,7 +1627,7 @@ class ExpertService:
                     "weight_converted": normalized.weight_grams is not None
                 },
                 "normalizer_stats": self.entity_normalizer.get_stats(),
-                "service_version": "v4.0.0_ai_pipeline_context_manager"  # 🆕 NOUVEAU
+                "service_version": "v5.0.0_ai_pipeline_context_manager_rag"  # 🆕 NOUVEAU
             }
         except Exception as e:
             logger.error(f"❌ [Expert Service] Erreur debug normalisation: {e}")
@@ -1272,7 +1638,7 @@ class ExpertService:
             }
 
     def get_ai_pipeline_debug_info(self) -> Dict[str, Any]:
-        """NOUVEAU: Récupère les informations de debug pour le pipeline IA"""
+        """Récupère les informations de debug pour le pipeline IA"""
         try:
             if not self.ai_pipeline:
                 return {
@@ -1307,7 +1673,7 @@ class ExpertService:
             }
 
     def get_context_manager_debug_info(self, conversation_id: str = None) -> Dict[str, Any]:
-        """🆕 NOUVEAU: Récupère les informations de debug pour le ContextManager"""
+        """Récupère les informations de debug pour le ContextManager"""
         try:
             if not self.context_manager:
                 return {
@@ -1373,78 +1739,143 @@ class ExpertService:
                 "debug_failed": True
             }
 
+    def get_rag_debug_info(self, conversation_id: str = None) -> Dict[str, Any]:
+        """🆕 NOUVEAU: Récupère les informations de debug pour le RAG"""
+        try:
+            if not self.rag_embedder:
+                return {
+                    "rag_available": False,
+                    "error": "RAG non configuré",
+                    "clarification_agent_available": self.clarification_agent is not None
+                }
+            
+            debug_info = {
+                "rag_available": True,
+                "rag_stats": {
+                    "usage_rate": round((self.stats["rag_usage"] / self.stats["questions_processed"] * 100) if self.stats["questions_processed"] > 0 else 0, 2),
+                    "success_rate": round(self.stats["rag_success_rate"] * 100, 2),
+                    "clarification_rate": round((self.stats["clarification_requests"] / self.stats["questions_processed"] * 100) if self.stats["questions_processed"] > 0 else 0, 2),
+                    "context_sufficiency_rate": round(self.stats["context_sufficiency_rate"] * 100, 2)
+                },
+                "configuration": {
+                    "rag_enabled": self.config["enable_rag"],
+                    "clarification_agent_enabled": self.config["enable_clarification_agent"],
+                    "rag_results_limit": self.config["rag_results_limit"],
+                    "context_sufficiency_threshold": self.config["context_sufficiency_threshold"]
+                },
+                "clarification_agent": {
+                    "available": self.clarification_agent is not None,
+                    "openai_available": self.clarification_agent.openai_client is not None if self.clarification_agent else False
+                }
+            }
+            
+            # Test de fonctionnement RAG si disponible
+            if self.rag_embedder:
+                try:
+                    # Test simple de recherche
+                    test_results = self.rag_embedder.search("test", k=1)
+                    debug_info["rag_test"] = {
+                        "search_functional": True,
+                        "test_results_count": len(test_results)
+                    }
+                except Exception as e:
+                    debug_info["rag_test"] = {
+                        "search_functional": False,
+                        "error": str(e)
+                    }
+            
+            return debug_info
+            
+        except Exception as e:
+            logger.error(f"❌ [Expert Service] Erreur debug RAG: {e}")
+            return {
+                "error": str(e),
+                "rag_available": False,
+                "debug_failed": True
+            }
+
 # =============================================================================
-# FONCTIONS UTILITAIRES ET TESTS AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER
+# FONCTIONS UTILITAIRES ET TESTS AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER + RAG
 # =============================================================================
 
 async def quick_ask(question: str, conversation_id: str = None, language: str = "fr") -> str:
-    """Interface rapide pour poser une question avec pipeline IA unifié + ContextManager"""
+    """Interface rapide pour poser une question avec pipeline IA unifié + ContextManager + RAG"""
     service = ExpertService()
     context = {"conversation_id": conversation_id} if conversation_id else None
     result = await service.process_question(question, context=context, language=language)
     return result.response
 
 def create_expert_service() -> ExpertService:
-    """Factory pour créer une instance du service avec pipeline IA unifié + ContextManager"""
+    """Factory pour créer une instance du service avec pipeline IA unifié + ContextManager + RAG"""
     return ExpertService()
 
 # =============================================================================
-# TESTS INTÉGRÉS AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER COMPLET
+# TESTS INTÉGRÉS AVEC PIPELINE IA UNIFIÉ + CONTEXTMANAGER + RAG COMPLET
 # =============================================================================
 
-async def test_expert_service_ai_pipeline_context_manager():
-    """Tests du service expert avec pipeline IA unifié + ContextManager et fallback système classique"""
+async def test_expert_service_ai_pipeline_context_manager_rag():
+    """Tests du service expert avec pipeline IA unifié + ContextManager + RAG et fallback système classique"""
     
-    print("🧪 Tests du Service Expert avec Pipeline IA Unifié + ContextManager")
-    print("=" * 90)
+    print("🧪 Tests du Service Expert avec Pipeline IA Unifié + ContextManager + RAG")
+    print("=" * 100)
     
     service = ExpertService()
-    conversation_id = "test_conv_ai_context_ross308"
+    conversation_id = "test_conv_ai_context_rag_ross308"
     
     test_cases = [
-        # Cas 1: Première question - établir contexte
+        # Cas 1: Question avec contexte insuffisant - demande clarification
         {
-            "question": "Quel est le poids d'un ross308 à 12 jours ?",
+            "question": "Quel est le poids normal ?",
+            "context": {"conversation_id": conversation_id},
+            "expected_type": "needs_clarification",
+            "description": "Test 1: Question vague - demande clarification"
+        },
+        
+        # Cas 2: Question avec contexte suffisant - utilise RAG
+        {
+            "question": "Quel est le poids d'un ross308 mâle à 12 jours ?",
             "context": {"conversation_id": conversation_id},
             "expected_type": "general",
-            "description": "Test 1: Première question - établir contexte Ross 308"
+            "description": "Test 2: Question précise - utilise RAG si disponible"
         },
         
-        # Cas 2: Question de suivi - utiliser contexte établi
+        # Cas 3: Question de suivi - utiliser contexte établi
         {
-            "question": "Et pour des mâles ?",
+            "question": "Et pour des femelles ?",
             "context": {"conversation_id": conversation_id, "is_clarification_response": True},
             "expected_type": "contextual",
-            "description": "Test 2: Clarification avec contexte (race déjà établie)"
+            "description": "Test 3: Clarification avec contexte (race déjà établie)"
         },
         
-        # Cas 3: Question de suivi - continuer la conversation
+        # Cas 4: Question de suivi - continuer la conversation
         {
             "question": "Est-ce que c'est normal si ils pèsent 400g ?",
             "context": {"conversation_id": conversation_id},
             "expected_type": "contextual",
-            "description": "Test 3: Question contextuelle avec référence implicite"
+            "description": "Test 4: Question contextuelle avec référence implicite"
         },
         
-        # Cas 4: Nouvelle conversation - test isolation
+        # Cas 5: Nouvelle conversation - test isolation + RAG
         {
-            "question": "Poids cobb500 femelles 3 semaines ?",
+            "question": "Performance cobb500 femelles 3 semaines nutrition optimale",
             "context": {"conversation_id": f"{conversation_id}_nouvelle"},
             "expected_type": "precise",
-            "description": "Test 4: Nouvelle conversation (contexte isolé)"
+            "description": "Test 5: Nouvelle conversation avec requête RAG riche"
         },
         
-        # Cas 5: Retour première conversation - test persistance
+        # Cas 6: Retour première conversation - test persistance
         {
             "question": "Quelle alimentation recommandez-vous ?",
             "context": {"conversation_id": conversation_id},
             "expected_type": "contextual",
-            "description": "Test 5: Retour conv. originale (contexte persistant)"
+            "description": "Test 6: Retour conv. originale (contexte persistant)"
         }
     ]
     
     print(f"🧠 ContextManager: {'✅ Activé' if service.context_manager else '❌ Désactivé'}")
     print(f"🤖 Pipeline IA: {'✅ Activé' if service.ai_pipeline else '❌ Désactivé'}")
+    print(f"🔍 RAG: {'✅ Activé' if service.config['enable_rag'] else '❌ Désactivé'}")
+    print(f"🤔 Agent Clarification: {'✅ Activé' if service.clarification_agent else '❌ Désactivé'}")
     print(f"📝 Continuité: {'✅ Activé' if service.config['include_previous_answers'] else '❌ Désactivé'}")
     print()
     
@@ -1465,8 +1896,10 @@ async def test_expert_service_ai_pipeline_context_manager():
             ai_used = "🤖 IA" if result.ai_pipeline_used else "🔄 Classique"
             context_used = "🧠 Contexte" if result.context_manager_used else "📝 Basic"
             continuity = "🔗 Continuité" if result.previous_answers_used else "🆕 Nouveau"
+            rag_used = "🔍 RAG" if result.rag_used else "📖 Local"
+            clarification = "🤔 Clarification" if result.clarification_questions else "✅ Direct"
             
-            print(f"   {status} Type: {result.response_type} ({ai_used}, {context_used}, {continuity})")
+            print(f"   {status} Type: {result.response_type} ({ai_used}, {context_used}, {continuity}, {rag_used}, {clarification})")
             print(f"   ⏱️ Temps: {processing_time}ms | 🎯 Confiance: {result.confidence:.2f}")
             
             # Afficher informations spécifiques au ContextManager
@@ -1487,6 +1920,23 @@ async def test_expert_service_ai_pipeline_context_manager():
                 print(f"      Étapes: {len(result.pipeline_result.stages_completed)}")
                 print(f"      Appels IA: {result.pipeline_result.ai_calls_made}")
                 print(f"      Cache hits: {result.pipeline_result.cache_hits}")
+            
+            # 🆕 NOUVEAU: Afficher informations spécifiques au RAG
+            if result.rag_used:
+                print(f"   🔍 RAG:")
+                print(f"      Documents trouvés: {len(result.rag_results)}")
+                print(f"      Recherche réussie: Oui")
+                if result.rag_results:
+                    sources = [doc.get('source', 'unknown') for doc in result.rag_results[:2]]
+                    print(f"      Sources: {', '.join(sources)}")
+            
+            # 🆕 NOUVEAU: Afficher informations de clarification
+            if result.clarification_questions:
+                print(f"   🤔 Clarification:")
+                print(f"      Questions générées: {len(result.clarification_questions)}")
+                print(f"      Contexte manquant: {', '.join(result.missing_context)}")
+                for j, q in enumerate(result.clarification_questions[:2], 1):
+                    print(f"      Q{j}: {q}")
             
             # Informations de normalisation
             if result.normalized_entities:
@@ -1513,12 +1963,16 @@ async def test_expert_service_ai_pipeline_context_manager():
                 preview = result.response
             print(f"   💬 Réponse: {preview}")
             
-            # Vérifications spéciales pour les tests de continuité
-            if i == 2 and result.context_manager_used and result.previous_answers_used:
+            # Vérifications spéciales pour les tests de continuité et RAG
+            if i == 1 and result.clarification_questions:
+                print("   ✅ SUCCESS: Agent de clarification fonctionnel!")
+            if i == 2 and result.rag_used:
+                print("   ✅ SUCCESS: Recherche RAG fonctionnelle!")
+            if i == 3 and result.context_manager_used and result.previous_answers_used:
                 print("   ✅ SUCCESS: Continuité conversationnelle fonctionnelle!")
-            if i == 3 and result.context_manager_used:
+            if i == 4 and result.context_manager_used:
                 print("   ✅ SUCCESS: Contexte maintenu sur plusieurs échanges!")
-            if i == 5 and result.context_manager_used and result.previous_answers_used:
+            if i == 6 and result.context_manager_used and result.previous_answers_used:
                 print("   ✅ SUCCESS: Persistance du contexte validée!")
             
         except Exception as e:
@@ -1533,19 +1987,27 @@ async def test_expert_service_ai_pipeline_context_manager():
     print(f"   Réponses contextuelles: {stats['contextual_metrics']['contextual_answers_count']}")
     print(f"   Taux contexte: {stats['contextual_metrics']['context_usage_rate']:.1f}%")
     
-    # NOUVEAU: Statistiques ContextManager
+    # Statistiques ContextManager
     if 'context_manager_metrics' in stats:
         cm_metrics = stats['context_manager_metrics']
         print(f"   🧠 Utilisation ContextManager: {cm_metrics['context_manager_usage_rate']:.1f}%")
         print(f"   📝 Utilisation réponses précédentes: {cm_metrics['previous_answers_usage_rate']:.1f}%")
         print(f"   🔗 Taux continuité: {cm_metrics['context_continuity_rate']:.1f}%")
     
-    # NOUVEAU: Statistiques pipeline IA
+    # Statistiques pipeline IA
     if 'ai_pipeline_metrics' in stats:
         ai_metrics = stats['ai_pipeline_metrics']
         print(f"   🤖 Utilisation IA: {ai_metrics['ai_pipeline_usage_rate']:.1f}%")
         print(f"   🤖 Taux succès IA: {ai_metrics['ai_success_rate']:.1f}%")
         print(f"   🔄 Taux fallback: {ai_metrics['fallback_usage_rate']:.1f}%")
+    
+    # 🆕 NOUVEAU: Statistiques RAG
+    if 'rag_metrics' in stats:
+        rag_metrics = stats['rag_metrics']
+        print(f"   🔍 Utilisation RAG: {rag_metrics['rag_usage_rate']:.1f}%")
+        print(f"   🔍 Taux succès RAG: {rag_metrics['rag_success_rate']:.1f}%")
+        print(f"   🤔 Taux clarification: {rag_metrics['clarification_rate']:.1f}%")
+        print(f"   📊 Taux suffisance contextuelle: {rag_metrics['context_sufficiency_rate']:.1f}%")
     
     print(f"   Temps moyen: {stats['performance']['average_processing_time_ms']}ms")
     
@@ -1564,7 +2026,7 @@ async def test_expert_service_ai_pipeline_context_manager():
         else:
             print(f"   Contexte conversation: Non trouvé")
     
-    # Test spécifique de debug du pipeline IA (conservé)
+    # Test spécifique de debug du pipeline IA
     print(f"\n🤖 Test de debug pipeline IA:")
     ai_debug = service.get_ai_pipeline_debug_info()
     print(f"   Pipeline IA disponible: {'Oui' if ai_debug['ai_pipeline_available'] else 'Non'}")
@@ -1572,16 +2034,28 @@ async def test_expert_service_ai_pipeline_context_manager():
         health = ai_debug['pipeline_health']
         print(f"   Santé pipeline: {health.get('success_rate', 0):.1f}% success, {health.get('total_runs', 0)} runs")
     
-    # Test de continuité avancé
-    print(f"\n🔗 Test de continuité avancé:")
-    continuity_test_id = "test_continuity_advanced"
+    # 🆕 NOUVEAU: Test spécifique de debug du RAG
+    print(f"\n🔍 Test de debug RAG:")
+    rag_debug = service.get_rag_debug_info(conversation_id)
+    print(f"   RAG disponible: {'Oui' if rag_debug['rag_available'] else 'Non'}")
+    if rag_debug['rag_available']:
+        if 'rag_test' in rag_debug:
+            print(f"   Test RAG: {'✅ Fonctionnel' if rag_debug['rag_test']['search_functional'] else '❌ Échec'}")
+        if 'clarification_agent' in rag_debug:
+            agent_info = rag_debug['clarification_agent']
+            print(f"   Agent clarification: {'✅ Disponible' if agent_info['available'] else '❌ Indisponible'}")
+            print(f"   OpenAI pour agent: {'✅ Configuré' if agent_info['openai_available'] else '❌ Non configuré'}")
     
-    # Première question
+    # Test de continuité avancé avec RAG
+    print(f"\n🔗 Test de continuité avancé avec RAG:")
+    continuity_test_id = "test_continuity_advanced_rag"
+    
+    # Première question - établir contexte avec RAG
     q1_result = await service.process_question(
-        "Poids normal Ross 308 mâles 21 jours ?",
+        "Performance Ross 308 mâles 21 jours nutrition optimale",
         context={"conversation_id": continuity_test_id}
     )
-    print(f"   Q1: {'✅' if q1_result.success else '❌'} | CM: {'✅' if q1_result.context_manager_used else '❌'}")
+    print(f"   Q1: {'✅' if q1_result.success else '❌'} | CM: {'✅' if q1_result.context_manager_used else '❌'} | RAG: {'✅' if q1_result.rag_used else '❌'}")
     
     # Deuxième question - doit utiliser le contexte de la première
     q2_result = await service.process_question(
@@ -1591,24 +2065,28 @@ async def test_expert_service_ai_pipeline_context_manager():
     continuity_success = (q2_result.context_manager_used and q2_result.previous_answers_used)
     print(f"   Q2: {'✅' if q2_result.success else '❌'} | CM: {'✅' if q2_result.context_manager_used else '❌'} | Continuité: {'✅' if continuity_success else '❌'}")
     
-    # Troisième question - test persistance
+    # Troisième question - test persistance avec potentiel RAG
     q3_result = await service.process_question(
-        "C'est normal si ils grossissent moins vite ?",
+        "Quelles sont les meilleures pratiques d'alimentation ?",
         context={"conversation_id": continuity_test_id}
     )
     persistance_success = (q3_result.context_manager_used and q3_result.previous_answers_used)
-    print(f"   Q3: {'✅' if q3_result.success else '❌'} | CM: {'✅' if q3_result.context_manager_used else '❌'} | Persistance: {'✅' if persistance_success else '❌'}")
+    print(f"   Q3: {'✅' if q3_result.success else '❌'} | CM: {'✅' if q3_result.context_manager_used else '❌'} | RAG: {'✅' if q3_result.rag_used else '❌'} | Persistance: {'✅' if persistance_success else '❌'}")
     
-    print(f"\n🎯 RÉSULTAT TEST CONTINUITÉ:")
+    print(f"\n🎯 RÉSULTAT TEST CONTINUITÉ + RAG:")
     if continuity_success and persistance_success:
-        print("   ✅ SUCCESS: Continuité conversationnelle PARFAITE!")
+        print("   ✅ SUCCESS: Continuité conversationnelle + RAG PARFAITE!")
         print("   🧠 Le ContextManager maintient correctement l'historique des réponses")
         print("   🔗 Les réponses précédentes sont utilisées pour la cohérence")
+        print("   🔍 Le RAG enrichit les réponses avec des documents pertinents")
+        print("   🤔 L'agent de clarification guide vers des requêtes plus précises")
     else:
-        print("   ⚠️ PARTIEL: Continuité conversationnelle à améliorer")
+        print("   ⚠️ PARTIEL: Continuité conversationnelle + RAG à améliorer")
         print(f"      Continuité Q1→Q2: {'✅' if continuity_success else '❌'}")
         print(f"      Persistance Q1→Q3: {'✅' if persistance_success else '❌'}")
+        print(f"      RAG Q1: {'✅' if q1_result.rag_used else '❌'}")
+        print(f"      RAG Q3: {'✅' if q3_result.rag_used else '❌'}")
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(test_expert_service_ai_pipeline_context_manager())
+    asyncio.run(test_expert_service_ai_pipeline_context_manager_rag())

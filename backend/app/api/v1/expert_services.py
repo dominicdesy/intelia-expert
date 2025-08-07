@@ -708,6 +708,20 @@ class ExpertService:
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities
             )
+
+            # 🔍 DEBUG CRITIQUE - AJOUTER CES LIGNES :
+            logger.info(f"🔍 [DEBUG CRITIQUE] Agent clarification appelé")
+            logger.info(f"🔍 [DEBUG CRITIQUE] Final entities: {final_entities}")
+            logger.info(f"🔍 [DEBUG CRITIQUE] Clarification agent exists: {self.clarification_agent is not None}")
+            logger.info(f"🔍 [DEBUG CRITIQUE] OpenAI client exists: {self.clarification_agent.openai_client is not None if self.clarification_agent else False}")
+            try:
+                logger.info(f"🔍 [DEBUG CRITIQUE] Analysis result type: {type(clarification_analysis)}")
+                logger.info(f"🔍 [DEBUG CRITIQUE] Analysis result: {clarification_analysis}")
+                logger.info(f"🔍 [DEBUG CRITIQUE] Status: {clarification_analysis.get('status', 'MISSING')}")
+                logger.info(f"🔍 [DEBUG CRITIQUE] Enriched query: {clarification_analysis.get('enriched_query', 'MISSING')}")
+            except Exception as e:
+                logger.error(f"❌ [DEBUG CRITIQUE] Erreur analyse clarification_analysis: {e}")
+                logger.error(f"❌ [DEBUG CRITIQUE] clarification_analysis = {clarification_analysis}")
             
             # 🆕 NOUVEAU: CONSULTATION RAG SI CONTEXTE SUFFISANT
             rag_results = []
