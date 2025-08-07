@@ -170,13 +170,25 @@ class UnifiedResponseGenerator:
         if not rag_results:
             import asyncio
             try:
-                loop = asyncio.get_event_loop()
-                return loop.run_until_complete(self.generate(question, entities, classification))
+                # Utiliser la boucle existante
+                loop = asyncio.get_running_loop()
+                # Créer une tâche dans la boucle courante
+                task = asyncio.create_task(self.generate(question, entities, classification))
+                return await task
             except RuntimeError:
-                return asyncio.run(self.generate(question, entities, classification))
-        
+                # Si pas de boucle, en créer une nouvelle
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(self.generate(question, entities, classification))
+                finally:
+                    loop.close()
+
+
         # Construire le contexte à partir des documents RAG
         rag_context = self._build_rag_context(rag_results)
+
+
         
         # Générer réponse avec contexte RAG
         try:
@@ -190,10 +202,20 @@ class UnifiedResponseGenerator:
             # Fallback vers génération classique
             import asyncio
             try:
-                loop = asyncio.get_event_loop()
-                return loop.run_until_complete(self.generate(question, entities, classification))
+                # Utiliser la boucle existante  
+                loop = asyncio.get_running_loop()
+                # Créer une tâche dans la boucle courante
+                task = asyncio.create_task(self.generate(question, entities, classification))
+                return await task
             except RuntimeError:
-                return asyncio.run(self.generate(question, entities, classification))
+                # Si pas de boucle, en créer une nouvelle
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(self.generate(question, entities, classification))
+                finally:
+                    loop.close()
+
 
     def _build_rag_context(self, rag_results: List[Dict]) -> str:
         """Construit le contexte à partir des documents RAG"""
@@ -275,10 +297,20 @@ CLASSIFICATION: {classification.response_type.value}"""
         # Utiliser génération classique mais mentionner les sources
         import asyncio
         try:
-            loop = asyncio.get_event_loop()
-            base_response = loop.run_until_complete(self.generate(question, entities, classification))
+            # Utiliser la boucle existante
+            loop = asyncio.get_running_loop()  
+            # Créer une tâche dans la boucle courante
+            task = asyncio.create_task(self.generate(question, entities, classification))
+            base_response = await task
         except RuntimeError:
-            base_response = asyncio.run(self.generate(question, entities, classification))
+            # Si pas de boucle, en créer une nouvelle
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                base_response = loop.run_until_complete(self.generate(question, entities, classification))
+            finally:
+                loop.close()
+
         
         # Enrichir avec mention des sources consultées
         enhanced_response = f"{base_response.response}\n\n💡 *Réponse basée sur {len(rag_results)} documents de la base de connaissances.*"
@@ -1132,13 +1164,26 @@ def quick_generate(question: str, entities: Dict[str, Any], response_type: str) 
     # 🆕 ADAPTATION: Appel async géré pour compatibilité
     import asyncio
     try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(generator.generate(question, entities, classification))
+        # Essayer d'utiliser la boucle existante
+        loop = asyncio.get_running_loop()
+        # Créer une tâche dans la boucle courante
+        task = asyncio.create_task(generator.generate(question, entities, classification))
+        result = await task
     except RuntimeError:
-        # Si pas de loop, créer un nouveau
-        result = asyncio.run(generator.generate(question, entities, classification))
-    
+        # Si pas de boucle, en créer une nouvelle
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(generator.generate(question, entities, classification))
+        finally:
+            loop.close()
+
+   
     return result.response
+
+
+
+
 
 # =============================================================================
 # ✅ CONSERVATION: Tests avec ajout de vérification maximisation + RAG
