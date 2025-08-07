@@ -37,7 +37,7 @@ class SystemBehavior:
     # ✅ CONSERVER: Fallback et récupération d'erreur
     FALLBACK_ENABLED = True
     FALLBACK_TO_GENERAL_ON_ERROR = True
-    MAX_PROCESSING_TIME_MS = 10000  # 10 secondes max
+    MAX_PROCESSING_TIME_MS = 30000  # 30 secondes max
     
     # ✅ CONSERVER: Logging et debugging
     ENABLE_DETAILED_LOGGING = True
@@ -47,7 +47,7 @@ class SystemBehavior:
     # ✅ NOUVEAU: Configuration IA selon le plan de transformation
     AI_SERVICES_ENABLED = True
     AI_FALLBACK_ENABLED = True
-    AI_RESPONSE_TIMEOUT = 10  # secondes
+    AI_RESPONSE_TIMEOUT = 20  # secondes
     AI_CACHE_ENABLED = True
     AI_CACHE_TTL = 3600  # 1 heure
     
@@ -59,7 +59,7 @@ class SystemBehavior:
     
     # Configuration du pipeline unifié IA
     UNIFIED_AI_PIPELINE_ENABLED = True
-    AI_PIPELINE_TIMEOUT = 15  # seconds pour pipeline complet
+    AI_PIPELINE_TIMEOUT = 45  # seconds pour pipeline complet
     AI_PARALLEL_PROCESSING = True  # Traitement parallèle des services IA
 
 class DecisionThresholds:
@@ -109,7 +109,7 @@ class AIServiceConfig:
     OPENAI_MODEL = "gpt-4o-mini"  # Modèle pour la production
     OPENAI_MAX_TOKENS = 2000
     OPENAI_TEMPERATURE = 0.1  # Peu de créativité, maximum de précision
-    OPENAI_TIMEOUT = 30  # Timeout par appel API
+    OPENAI_TIMEOUT = 45  # Timeout par appel API
     
     # Rate limiting
     OPENAI_MAX_REQUESTS_PER_MINUTE = 100
@@ -125,28 +125,28 @@ class AIServiceConfig:
         "model": "gpt-4o-mini",
         "temperature": 0.0,  # Maximum de précision pour l'extraction
         "max_tokens": 500,
-        "timeout": 10
+        "timeout": 15
     }
     
     CONTEXT_ENHANCER_CONFIG = {
         "model": "gpt-4o-mini", 
         "temperature": 0.2,  # Légère créativité pour l'amélioration
         "max_tokens": 800,
-        "timeout": 15
+        "timeout": 25
     }
     
     RESPONSE_GENERATOR_CONFIG = {
         "model": "gpt-4o-mini",
         "temperature": 0.3,  # Créativité modérée pour les réponses
         "max_tokens": 1500,
-        "timeout": 20
+        "timeout": 30
     }
     
     VALIDATION_SERVICE_CONFIG = {
         "model": "gpt-4o-mini",
         "temperature": 0.0,  # Maximum de précision pour la validation
         "max_tokens": 300,
-        "timeout": 8
+        "timeout": 12
     }
 
 class AIFallbackConfig:
@@ -155,7 +155,7 @@ class AIFallbackConfig:
     # Stratégies de fallback
     FALLBACK_STRATEGY = "graceful"  # graceful, immediate, hybrid
     MAX_AI_RETRIES = 2  # Nombre de tentatives avant fallback
-    FALLBACK_TIMEOUT = 5  # Timeout avant activation fallback
+    FALLBACK_TIMEOUT = 10  # Timeout avant activation fallback
     
     # Monitoring et récupération
     AI_HEALTH_CHECK_INTERVAL = 60  # Vérification santé services (secondes)
