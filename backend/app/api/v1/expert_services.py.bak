@@ -280,9 +280,13 @@ Réponds en JSON :
         if not has_sex and has_age:
             missing_context.append("sexe")
             clarification_questions.append("Sexe des animaux ? (mâles, femelles, mixte)")
-        
-        status = "SUFFISANT" if len(missing_context) <= 1 else "INSUFFISANT"
-        
+
+        # ✅ LOGIQUE SIMPLE : Si on a l'âge, c'est suffisant pour réponse générale
+        if has_age:
+            status = "SUFFISANT"  # Permettre réponse générale + clarifications
+        else:
+            status = "INSUFFISANT"  # Questions de clarification seulement
+  
         # Enrichir la requête pour RAG
         enriched_query = self._build_enriched_query(question, entities)
         
@@ -563,10 +567,8 @@ class ExpertService:
             if conversation_id and self.context_manager and self.config["enable_context_manager"]:
                 try:
                     logger.info("🧠 [Expert Service] Récupération contexte unifié...")
-                    unified_context = self.context_manager.get_unified_context(
-                        conversation_id, context_type="general"
-                    )
-                    
+                    unified_context = self.context_manager.get_unified_context(conversation_id)                    
+                
                     if unified_context:
                         context_manager_used = True
                         previous_answers = unified_context.previous_answers or []
@@ -769,6 +771,28 @@ class ExpertService:
                 
             except Exception as e:
                 logger.error(f"   ❌ Erreur classification: {e}")
+                # Fallback simple sans ContextManager
+                try:
+                    classification = await self.smart_classifier.classify_question(
+                        question, 
+                        entities_for_processing
+                    )
+                except Exception as e2:
+                    logger.error(f"   ❌ Erreur classification fallback: {e2}")
+                    # Fallback vers classification simple
+                    classification = ClassificationResult(
+                        response_type=ResponseType.GENERAL_ANSWER,
+                        confidence=0.5,
+                        reasoning=f"Fallback après erreur: {str(e)}",
+                        fallback_used=True,
+                        context_source="error"
+                    )
+
+               
+                logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
+                
+            except Exception as e:
+                logger.error(f"   ❌ Erreur classification: {e}")
                 # Fallback vers classification simple
                 classification = ClassificationResult(
                     response_type=ResponseType.GENERAL_ANSWER,
@@ -786,6 +810,8 @@ class ExpertService:
             # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
             # =============================================================
             final_entities = getattr(classification, 'merged_entities', entities_for_processing)
+            if not final_entities:  # ✅ AJOUTER CETTE VÉRIFICATION
+                final_entities = entities_for_processing
             
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities
@@ -822,7 +848,7 @@ class ExpertService:
                 except Exception as e:
                     logger.error(f"❌ [Expert Service] Erreur RAG: {e}")
                     rag_results = []
-            
+
             # 4️⃣ GÉNÉRATION DE LA RÉPONSE ENRICHIE
             if clarification_analysis["status"] == "INSUFFISANT":
                 # Retourner questions de clarification
@@ -841,11 +867,13 @@ class ExpertService:
             else:
                 # Générer réponse avec RAG si disponible
                 if hasattr(self.response_generator, 'generate_with_rag') and rag_results:
-                    response_data = self.response_generator.generate_with_rag(
+                    # ✅ CORRECTION 1 - Ajouter await
+                    response_data = await self.response_generator.generate_with_rag(
                         question, final_entities, classification, rag_results
                     )
                 else:
-                    response_data = self.response_generator.generate(question, final_entities, classification)
+                    # ✅ CORRECTION 2 - Ajouter await
+                    response_data = await self.response_generator.generate(question, final_entities, classification)
                 
                 response_data.rag_used = rag_used
                 response_data.clarification_questions = []
