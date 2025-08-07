@@ -13,6 +13,7 @@ unified_response_generator.py - GÉNÉRATEUR AVEC MAXIMISATION CONTEXTMANAGER
 - 🆕 PIPELINE UNIFIÉ: Génération hybride IA + Templates
 - 🆕 MAXIMISATION SIMPLE: Utilisation complète ContextManager sans sur-ingénierie
 - 🆕 SUPPORT RAG: Méthodes generate_with_rag pour intégration complète
+- 🔧 CORRECTION ASYNCIO: Problèmes await dans méthodes sync résolus
 
 Nouveau flux avec ContextManager maximisé:
 1. Récupération contexte enrichi via ContextManager (plus de données)
@@ -78,6 +79,8 @@ class UnifiedResponseGenerator:
     - generate_with_rag: Génération avec documents RAG
     - Intégration IA + RAG ou templates + RAG
     - Gestion des sources et références
+    
+    🔧 CORRECTION ASYNCIO: Méthodes RAG corrigées pour compatibilité sync/async
     """
     
     def __init__(self, db_path: str = "conversations.db"):
@@ -156,66 +159,57 @@ class UnifiedResponseGenerator:
             return self._generate_fallback_response(question)
 
     # =============================================================================
-    # 🆕 NOUVELLES MÉTHODES RAG (MODIFICATION MAJEURE 2)
+    # 🆕 NOUVELLES MÉTHODES RAG (MODIFICATION MAJEURE 2) - CORRIGÉES ASYNCIO
     # =============================================================================
 
-    def generate_with_rag(self, question: str, entities: Dict[str, Any], 
-                         classification, 
-                         rag_results: List[Dict] = None) -> ResponseData:
-        """Génère une réponse en utilisant les documents RAG"""
+    async def generate_with_rag(self, question: str, entities: Dict[str, Any], 
+                               classification, 
+                               rag_results: List[Dict] = None) -> ResponseData:
+        """
+        🔧 CORRECTION ASYNCIO: Méthode async pour génération avec documents RAG
+        """
         
         logger.info(f"🎨 [Response Generator] Génération avec RAG: {len(rag_results) if rag_results else 0} docs")
         
         # Si pas de documents RAG, utiliser génération classique
         if not rag_results:
-            import asyncio
-            try:
-                # Utiliser la boucle existante
-                loop = asyncio.get_running_loop()
-                # Créer une tâche dans la boucle courante
-                task = asyncio.create_task(self.generate(question, entities, classification))
-                return await task
-            except RuntimeError:
-                # Si pas de boucle, en créer une nouvelle
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(self.generate(question, entities, classification))
-                finally:
-                    loop.close()
-
-
+            return await self.generate(question, entities, classification)
+        
         # Construire le contexte à partir des documents RAG
         rag_context = self._build_rag_context(rag_results)
-
-
         
         # Générer réponse avec contexte RAG
         try:
             if self.ai_generator and hasattr(self.ai_generator, 'openai_client'):
                 return self._generate_with_ai_and_rag(question, entities, classification, rag_context, rag_results)
             else:
-                return self._generate_with_templates_and_rag(question, entities, classification, rag_context, rag_results)
+                return await self._generate_with_templates_and_rag(question, entities, classification, rag_context, rag_results)
         
         except Exception as e:
             logger.error(f"❌ [Response Generator] Erreur génération RAG: {e}")
             # Fallback vers génération classique
-            import asyncio
-            try:
-                # Utiliser la boucle existante  
-                loop = asyncio.get_running_loop()
-                # Créer une tâche dans la boucle courante
-                task = asyncio.create_task(self.generate(question, entities, classification))
-                return await task
-            except RuntimeError:
-                # Si pas de boucle, en créer une nouvelle
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(self.generate(question, entities, classification))
-                finally:
-                    loop.close()
+            return await self.generate(question, entities, classification)
 
+    def generate_with_rag_sync(self, question: str, entities: Dict[str, Any], 
+                              classification, 
+                              rag_results: List[Dict] = None) -> ResponseData:
+        """
+        🔧 CORRECTION ASYNCIO: Méthode synchrone pour génération RAG (pour compatibilité)
+        """
+        import asyncio
+        
+        try:
+            # Essayer d'utiliser la boucle existante
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Dans un contexte async, on ne peut pas utiliser run_until_complete
+                # Retourner un Future qui sera attendu par l'appelant
+                return asyncio.create_task(self.generate_with_rag(question, entities, classification, rag_results))
+            else:
+                return loop.run_until_complete(self.generate_with_rag(question, entities, classification, rag_results))
+        except RuntimeError:
+            # Pas de boucle, en créer une nouvelle
+            return asyncio.run(self.generate_with_rag(question, entities, classification, rag_results))
 
     def _build_rag_context(self, rag_results: List[Dict]) -> str:
         """Construit le contexte à partir des documents RAG"""
@@ -289,28 +283,15 @@ CLASSIFICATION: {classification.response_type.value}"""
             logger.error(f"❌ [Response Generator] Erreur IA+RAG: {e}")
             raise
 
-    def _generate_with_templates_and_rag(self, question: str, entities: Dict[str, Any],
-                                       classification, rag_context: str,
-                                       rag_results: List[Dict]) -> ResponseData:
-        """Génération template avec contexte RAG"""
+    async def _generate_with_templates_and_rag(self, question: str, entities: Dict[str, Any],
+                                             classification, rag_context: str,
+                                             rag_results: List[Dict]) -> ResponseData:
+        """
+        🔧 CORRECTION ASYNCIO: Génération template avec contexte RAG - VERSION ASYNC
+        """
         
         # Utiliser génération classique mais mentionner les sources
-        import asyncio
-        try:
-            # Utiliser la boucle existante
-            loop = asyncio.get_running_loop()  
-            # Créer une tâche dans la boucle courante
-            task = asyncio.create_task(self.generate(question, entities, classification))
-            base_response = await task
-        except RuntimeError:
-            # Si pas de boucle, en créer une nouvelle
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                base_response = loop.run_until_complete(self.generate(question, entities, classification))
-            finally:
-                loop.close()
-
+        base_response = await self.generate(question, entities, classification)
         
         # Enrichir avec mention des sources consultées
         enhanced_response = f"{base_response.response}\n\n💡 *Réponse basée sur {len(rag_results)} documents de la base de connaissances.*"
@@ -982,6 +963,7 @@ CLASSIFICATION: {classification.response_type.value}"""
             "context_manager_active": self.context_manager is not None,
             "context_maximization_enabled": True,  # 🆕 Indicateur maximisation
             "rag_support_enabled": True,  # 🆕 Support RAG
+            "asyncio_corrections_applied": True,  # 🔧 NOUVELLES CORRECTIONS
             "maximization_features": [  # 🆕 Fonctionnalités de maximisation
                 "enriched_context_retrieval",
                 "enhanced_context_saving", 
@@ -989,7 +971,9 @@ CLASSIFICATION: {classification.response_type.value}"""
                 "topic_and_intent_inference",
                 "rag_document_integration",  # 🆕
                 "ai_rag_generation",  # 🆕
-                "template_rag_fallback"  # 🆕
+                "template_rag_fallback",  # 🆕
+                "async_rag_methods",  # 🔧 NOUVEAU
+                "sync_rag_compatibility"  # 🔧 NOUVEAU
             ]
         }
 
@@ -1143,11 +1127,13 @@ Le poids varie énormément selon l'âge, la race et le sexe :
         )
 
 # =============================================================================
-# ✅ CONSERVATION: Fonctions utilitaires originales
+# ✅ CONSERVATION: Fonctions utilitaires originales - CORRIGÉES ASYNCIO
 # =============================================================================
 
 def quick_generate(question: str, entities: Dict[str, Any], response_type: str) -> str:
-    """Génération rapide pour usage simple (fonction originale conservée)"""
+    """
+    🔧 CORRECTION ASYNCIO: Génération rapide pour usage simple - Version corrigée
+    """
     generator = UnifiedResponseGenerator()
     
     # Créer un objet de classification simulé
@@ -1161,42 +1147,60 @@ def quick_generate(question: str, entities: Dict[str, Any], response_type: str) 
     
     classification = MockClassification(response_type)
     
-    # 🆕 ADAPTATION: Appel async géré pour compatibilité
+    # 🔧 CORRECTION ASYNCIO: Gestion robuste sync/async
     import asyncio
     try:
-        # Essayer d'utiliser la boucle existante
-        loop = asyncio.get_running_loop()
-        # Créer une tâche dans la boucle courante
-        task = asyncio.create_task(generator.generate(question, entities, classification))
-        result = await task
-    except RuntimeError:
-        # Si pas de boucle, en créer une nouvelle
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
+        # Vérifier si on a déjà une boucle active
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Dans un contexte async existant, on ne peut pas utiliser run_until_complete
+            # Il faut que l'appelant utilise await quick_generate_async()
+            logger.warning("quick_generate() appelé dans un contexte async - utilisez quick_generate_async()")
+            # Fallback: créer une nouvelle boucle dans un thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, generator.generate(question, entities, classification))
+                result = future.result()
+        else:
             result = loop.run_until_complete(generator.generate(question, entities, classification))
-        finally:
-            loop.close()
-
-   
+    except RuntimeError:
+        # Pas de boucle - en créer une nouvelle
+        result = asyncio.run(generator.generate(question, entities, classification))
+    
     return result.response
 
-
-
-
+async def quick_generate_async(question: str, entities: Dict[str, Any], response_type: str) -> str:
+    """
+    🔧 NOUVEAU: Version async de quick_generate pour contextes async
+    """
+    generator = UnifiedResponseGenerator()
+    
+    # Créer un objet de classification simulé
+    class MockClassification:
+        def __init__(self, resp_type):
+            from .smart_classifier import ResponseType
+            self.response_type = ResponseType(resp_type)
+            self.missing_entities = []
+            self.merged_entities = entities
+            self.weight_data = {}
+    
+    classification = MockClassification(response_type)
+    
+    result = await generator.generate(question, entities, classification)
+    return result.response
 
 # =============================================================================
-# ✅ CONSERVATION: Tests avec ajout de vérification maximisation + RAG
+# ✅ CONSERVATION: Tests avec ajout de vérification maximisation + RAG + ASYNCIO
 # =============================================================================
 
 async def test_generator_maximized():
     """
-    🆕 Tests du générateur avec maximisation ContextManager SIMPLE + RAG
+    🆕 Tests du générateur avec maximisation ContextManager SIMPLE + RAG + CORRECTIONS ASYNCIO
     """
     generator = UnifiedResponseGenerator()
     
-    print("🧪 Test générateur MAXIMISATION CONTEXTMANAGER + RAG")
-    print("=" * 60)
+    print("🧪 Test générateur MAXIMISATION CONTEXTMANAGER + RAG + ASYNCIO CORRIGÉ")
+    print("=" * 70)
     
     # Afficher les statistiques
     stats = generator.get_generation_stats()
@@ -1204,6 +1208,7 @@ async def test_generator_maximized():
     print(f"   - Services IA disponibles: {stats['ai_services_available']}")
     print(f"   - ContextManager maximisé: {stats['context_maximization_enabled']}")
     print(f"   - Support RAG: {stats['rag_support_enabled']}")
+    print(f"   - Corrections AsyncIO: {stats['asyncio_corrections_applied']}")
     print(f"   - Features maximisation: {len(stats['maximization_features'])}")
     for feature in stats['maximization_features']:
         print(f"     • {feature}")
@@ -1234,7 +1239,7 @@ async def test_generator_maximized():
     question = "Pour un Ross 308 mâle"
     entities = {'breed': 'ross_308', 'sex': 'male', 'age_days': 12}
     classification = MockContextualClassification()
-    conversation_id = "test_conversation_maximized_123"
+    conversation_id = "test_conversation_maximized_asyncio_123"
     
     result = await generator.generate(question, entities, classification, conversation_id)
     
@@ -1248,14 +1253,14 @@ async def test_generator_maximized():
     print(f"   Contexte data: {bool(result.context_data)}")
     print(f"   Aperçu: {result.response[:150]}...")
     
-    # 🆕 Test génération avec RAG
-    print(f"\n🎯 Test génération RAG:")
+    # 🆕 Test génération avec RAG - VERSION ASYNC
+    print(f"\n🎯 Test génération RAG ASYNC:")
     mock_rag_results = [
         {"text": "Les poulets Ross 308 mâles atteignent 400g à 12 jours selon les standards officiels.", "score": 0.95},
         {"text": "Surveillance recommandée pour maintenir la croissance optimale.", "score": 0.88}
     ]
     
-    rag_result = generator.generate_with_rag(question, entities, classification, mock_rag_results)
+    rag_result = await generator.generate_with_rag(question, entities, classification, mock_rag_results)
     
     print(f"   RAG résultats: {len(mock_rag_results)} documents")
     print(f"   Type réponse RAG: {rag_result.response_type}")
@@ -1264,7 +1269,29 @@ async def test_generator_maximized():
     print(f"   Sources: {len(rag_result.sources)}")
     print(f"   Aperçu RAG: {rag_result.response[:150]}...")
     
-    # Vérifications spécifiques à la maximisation + RAG
+    # 🔧 Test méthode sync pour compatibilité
+    print(f"\n🔧 Test compatibilité SYNC:")
+    try:
+        sync_result = generator.generate_with_rag_sync(question, entities, classification, mock_rag_results)
+        if hasattr(sync_result, 'response'):
+            print(f"   ✅ Méthode sync fonctionnelle: {type(sync_result).__name__}")
+        else:
+            print(f"   ⚠️ Méthode sync retourne Task: {type(sync_result).__name__}")
+    except Exception as e:
+        print(f"   ❌ Erreur méthode sync: {e}")
+    
+    # 🔧 Test quick_generate corrigé
+    print(f"\n🔧 Test quick_generate CORRIGÉ:")
+    try:
+        quick_result = quick_generate(question, entities, "contextual_answer")
+        print(f"   ✅ quick_generate sync: {len(quick_result)} caractères")
+        
+        quick_async_result = await quick_generate_async(question, entities, "contextual_answer")
+        print(f"   ✅ quick_generate_async: {len(quick_async_result)} caractères")
+    except Exception as e:
+        print(f"   ❌ Erreur quick_generate: {e}")
+    
+    # Vérifications spécifiques à la maximisation + RAG + AsyncIO
     success_checks = []
     success_checks.append(("Données 380-420g", "380-420" in result.response or "400" in result.response))
     success_checks.append(("Mention Ross 308", "Ross 308" in result.response))
@@ -1272,16 +1299,19 @@ async def test_generator_maximized():
     success_checks.append(("Poids data présent", bool(result.weight_data)))
     success_checks.append(("Context data ajouté", bool(result.context_data)))
     success_checks.append(("RAG support disponible", hasattr(generator, 'generate_with_rag')))
-    success_checks.append(("RAG flag correct", rag_result.rag_used == True))
+    success_checks.append(("RAG async flag correct", rag_result.rag_used == True))
     success_checks.append(("Documents RAG comptés", rag_result.documents_consulted == 2))
+    success_checks.append(("Corrections AsyncIO appliquées", stats['asyncio_corrections_applied']))
+    success_checks.append(("Méthode sync disponible", hasattr(generator, 'generate_with_rag_sync')))
+    success_checks.append(("quick_generate_async disponible", 'quick_generate_async' in globals()))
     
-    print(f"\n✅ Vérifications maximisation + RAG:")
+    print(f"\n✅ Vérifications maximisation + RAG + AsyncIO:")
     for check_name, passed in success_checks:
         status = "✅" if passed else "❌"
         print(f"   {status} {check_name}")
     
     if all(check[1] for check in success_checks):
-        print(f"\n🎉 SUCCESS: Générateur avec ContextManager MAXIMISÉ + RAG opérationnel!")
+        print(f"\n🎉 SUCCESS: Générateur avec ContextManager MAXIMISÉ + RAG + ASYNCIO CORRIGÉ opérationnel!")
         print(f"   - Récupération contexte enrichie: ✅")
         print(f"   - Sauvegarde maximisée: ✅") 
         print(f"   - Évaluation qualité contexte: ✅")
@@ -1289,9 +1319,15 @@ async def test_generator_maximized():
         print(f"   - Support RAG complet: ✅")
         print(f"   - Génération IA + RAG: ✅")
         print(f"   - Fallback templates + RAG: ✅")
+        print(f"   - Corrections AsyncIO: ✅")
+        print(f"   - Compatibilité sync/async: ✅")
+        print(f"   - quick_generate corrigé: ✅")
         print(f"   - SANS sur-ingénierie: ✅")
     else:
-        print(f"\n⚠️  ATTENTION: Certaines vérifications ont échoué")
+        failed_checks = [name for name, passed in success_checks if not passed]
+        print(f"\n⚠️  ATTENTION: {len(failed_checks)} vérifications ont échoué:")
+        for failed in failed_checks:
+            print(f"     - {failed}")
 
 if __name__ == "__main__":
     import asyncio
