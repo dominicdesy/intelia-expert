@@ -204,99 +204,171 @@ class ClarificationAgent:
                 logger.warning("⚠️ [Clarification Agent] OpenAI non configuré")
         except Exception as e:
             logger.warning(f"⚠️ [Clarification Agent] OpenAI non disponible: {e}")
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # 🔧 MODIFICATION CHIRURGICALE : ClarificationAgent Prompt Intelligent
+    # Dans expert_services.py → ClarificationAgent → analyze_context_sufficiency()
+    # REMPLACER SEULEMENT le prompt analysis_prompt par ce nouveau prompt intelligent
+
     def analyze_context_sufficiency(self, question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
         """Analyse si le contexte est suffisant pour une requête RAG efficace"""
         
-        # Votre prompt d'analyse
-        analysis_prompt = f"""Tu es un agent de clarification spécialisé en aviculture. Ta mission : analyser la question utilisateur et déterminer si elle contient assez de contexte pour une recherche documentaire efficace.
+        # 🆕 NOUVEAU PROMPT INTELLIGENT - RESPECTE LA LOGIQUE MÉTIER CORRECTE
+        analysis_prompt = f"""Tu es un agent de clarification intelligent spécialisé en aviculture.
 
-**Analyse requise :**
-- Espèce (broiler/pondeuse/reproducteur)
-- Phase (démarrage/croissance/ponte/finition) 
-- Contexte métier (performance/santé/nutrition/logement)
-- Précisions techniques nécessaires
+    **LOGIQUE MÉTIER À RESPECTER:**
+    - Si contexte SUFFISANT → Retourne "SUFFISANT" pour consultation RAG précise
+    - Si contexte INSUFFISANT → Retourne "INSUFFISANT" pour RAG général + questions clarification
 
-**Instructions :**
-- Si contexte SUFFISANT pour recherche documentaire → Retourne : "CONTEXTE_SUFFISANT"
-- Si contexte INSUFFISANT → Pose 1-3 questions précises pour enrichir
-- Ne jamais répondre à la question principale
+    **CONTEXTE CONSIDÉRÉ SUFFISANT (examples) :**
+    ✅ "Poids normal Ross 308 mâle 21 jours" → SUFFISANT (race + sexe + âge précis)
+    ✅ "Température optimale démarrage poussins" → SUFFISANT (question technique claire)
+    ✅ "Problème croissance mes poulets 3 semaines" → SUFFISANT (âge + problème défini)
+    ✅ "Mortalité élevée pondeuses 25 semaines" → SUFFISANT (type + âge + problème)
+    ✅ "Alimentation broiler finition" → SUFFISANT (type + phase précise)
 
-**Question utilisateur :** {question}
-**Entités détectées :** {entities}
+    **CONTEXTE CONSIDÉRÉ INSUFFISANT (examples) :**
+    ❌ "Poids poulet normal ?" → INSUFFISANT (trop vague, pas d'âge ni race)
+    ❌ "Combien pèse un poulet ?" → INSUFFISANT (aucune précision)
+    ❌ "Mon poulet va bien ?" → INSUFFISANT (question trop générale)
+    ❌ "Problème avec mes poules" → INSUFFISANT (problème non défini)
 
-Réponds en JSON :
-{{
-    "status": "SUFFISANT" ou "INSUFFISANT",
-    "missing_context": ["race", "age", "sexe"],
-    "clarification_questions": ["Question 1?", "Question 2?"],
-    "enriched_query": "version enrichie pour RAG"
-}}"""
+    **RÈGLES DE DÉCISION :**
+    1. **Questions techniques spécialisées** → TOUJOURS SUFFISANT
+    2. **Questions avec âge OU race OU problème défini** → GÉNÉRALEMENT SUFFISANT  
+    3. **Questions avec âge ET race** → TOUJOURS SUFFISANT
+    4. **Questions ultra-vagues sans contexte** → INSUFFISANT
+
+    **Question utilisateur :** {question}
+    **Entités détectées :** {entities}
+
+    **INSTRUCTIONS CRITIQUES :**
+    - Sois GÉNÉREUX dans l'évaluation SUFFISANT
+    - Le RAG peut donner des réponses générales même avec peu de contexte
+    - Ne marque INSUFFISANT QUE si vraiment trop vague pour toute réponse utile
+
+    Réponds UNIQUEMENT en JSON :
+    {{
+        "status": "SUFFISANT" ou "INSUFFISANT",
+        "reasoning": "courte explication de ta décision",
+        "missing_context": ["contexte manquant si INSUFFISANT"],
+        "clarification_questions": ["Question 1?", "Question 2?"] ou [],
+        "enriched_query": "version optimisée pour RAG"
+    }}"""
 
         if not self.openai_client:
-            # Fallback simple sans IA
-            return self._fallback_analysis(question, entities)
+            # Fallback simple mais plus intelligent
+            return self._smart_fallback_analysis(question, entities)
         
         try:
             response = self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "Tu es un expert en clarification de questions avicoles."},
+                    {"role": "system", "content": "Tu es un expert en clarification avicole INTELLIGENT et GÉNÉREUX dans tes évaluations."},
                     {"role": "user", "content": analysis_prompt}
                 ],
-                temperature=0.3,
-                max_tokens=500
+                max_tokens=400,
+                temperature=0.1
             )
             
-            import json
-            result = json.loads(response.choices[0].message.content)
-            logger.info(f"✅ [Clarification Agent] Analyse: {result['status']}")
-            return result
+            result_text = response.choices[0].message.content.strip()
+            logger.info(f"🧠 [ClarificationAgent] Analyse IA: {result_text[:100]}...")
+            
+            # Parser le JSON
+            try:
+                analysis_result = json.loads(result_text)
+            except json.JSONDecodeError:
+                # Fallback en cas d'erreur parsing
+                logger.warning("⚠️ [ClarificationAgent] Erreur parsing JSON, utilisation fallback")
+                return self._smart_fallback_analysis(question, entities)
+            
+            # Validation et enrichissement du résultat
+            if "status" not in analysis_result:
+                analysis_result["status"] = "SUFFISANT"  # Par défaut généreux
+            
+            if "enriched_query" not in analysis_result:
+                analysis_result["enriched_query"] = question
+                
+            if "reasoning" not in analysis_result:
+                analysis_result["reasoning"] = "Analyse automatique"
+                
+            logger.info(f"🎯 [ClarificationAgent] Décision: {analysis_result['status']} - {analysis_result['reasoning']}")
+            
+            return analysis_result
             
         except Exception as e:
-            logger.error(f"❌ [Clarification Agent] Erreur IA: {e}")
-            return self._fallback_analysis(question, entities)
-    
-    def _fallback_analysis(self, question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyse de fallback sans IA"""
-        
-        # Logique simple de détection
-        has_age = entities.get('age_days') or entities.get('age_weeks')
-        has_breed = entities.get('breed_specific') or entities.get('breed_generic')
-        has_sex = entities.get('sex')
-        has_context = entities.get('context_type')
-        
-        missing_context = []
-        clarification_questions = []
-        
-        if not has_breed:
-            missing_context.append("race")
-            clarification_questions.append("Quelle race/souche ? (Ross 308, Cobb 500, pondeuses...)")
-        
-        if not has_age:
-            missing_context.append("age")
-            clarification_questions.append("Quel âge ont vos animaux ? (en jours ou semaines)")
-        
-        if not has_sex and has_age:
-            missing_context.append("sexe")
-            clarification_questions.append("Sexe des animaux ? (mâles, femelles, mixte)")
+            logger.error(f"❌ [ClarificationAgent] Erreur OpenAI: {e}")
+            return self._smart_fallback_analysis(question, entities)
 
-        # ✅ LOGIQUE SIMPLE : Si on a l'âge, c'est suffisant pour réponse générale
-        if has_age:
-            status = "SUFFISANT"  # Permettre réponse générale + clarifications
-        else:
-            status = "INSUFFISANT"  # Questions de clarification seulement
-  
-        # Enrichir la requête pour RAG
-        enriched_query = self._build_enriched_query(question, entities)
+    def _smart_fallback_analysis(self, question: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        🆕 NOUVEAU: Fallback intelligent au lieu du fallback trop restrictif
+        """
+        question_lower = question.lower()
         
-        return {
-            "status": status,
-            "missing_context": missing_context,
-            "clarification_questions": clarification_questions,
-            "enriched_query": enriched_query
-        }
-    
+        # Patterns pour contexte SUFFISANT (règles simples mais efficaces)
+        sufficient_patterns = [
+            # Questions techniques spécialisées
+            r'\b(température|alimentation|vaccination|prophylaxie|éclairage|densité)\b',
+            # Questions avec âge
+            r'\b(\d+\s*(jour|semaine|mois|j|sem))\b',
+            # Questions avec race/type
+            r'\b(ross|cobb|hubbard|broiler|pondeuse|reproducteur)\b',
+            # Questions avec problème défini
+            r'\b(mortalité|croissance|ponte|maladie|stress|digestif)\b',
+        ]
+        
+        # Patterns pour contexte INSUFFISANT (vraiment vague)
+        vague_patterns = [
+            r'^\s*(combien|quel|comment)\s+[^?]*\?\s*$',  # Questions ultra-courtes
+            r'^\s*(poids|normal|bien)\s*\?\s*$',          # Mots seuls
+        ]
+        
+        import re
+        
+        # Vérifier si vraiment trop vague
+        is_too_vague = any(re.search(pattern, question_lower) for pattern in vague_patterns)
+        
+        # Vérifier si contexte suffisant
+        has_context = any(re.search(pattern, question_lower) for pattern in sufficient_patterns)
+        
+        if has_context or not is_too_vague:
+            # Contexte SUFFISANT - permettre RAG
+            return {
+                "status": "SUFFISANT",
+                "reasoning": "Question avec contexte technique ou spécifique détecté",
+                "missing_context": [],
+                "clarification_questions": [],
+                "enriched_query": question
+            }
+        else:
+            # Contexte INSUFFISANT - demander clarification
+            return {
+                "status": "INSUFFISANT", 
+                "reasoning": "Question trop générale, clarification nécessaire",
+                "missing_context": ["race/type", "âge", "contexte spécifique"],
+                "clarification_questions": [
+                    "De quel type de volaille parlez-vous ? (broilers, pondeuses, etc.)",
+                    "Quel âge ont vos animaux ?",
+                    "Quel est votre objectif ou problème spécifique ?"
+                ],
+                "enriched_query": question
+            }
+
+  
     def _build_enriched_query(self, question: str, entities: Dict[str, Any]) -> str:
         """Construit une requête enrichie pour le RAG"""
         
