@@ -483,7 +483,9 @@ class ExpertService:
             if conversation_id and self.context_manager and self.config["enable_context_manager"]:
                 try:
                     logger.info("🧠 [Expert Service] Récupération contexte unifié...")
-                    unified_context = self.context_manager.get_unified_context(conversation_id)
+                    unified_context = self.context_manager.get_unified_context(
+                        conversation_id, type="general"
+                    )
                     
                     if unified_context:
                         context_manager_used = True
