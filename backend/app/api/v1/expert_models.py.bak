@@ -1137,47 +1137,6 @@ def merge_enhancement_results(contextualizer_result: Dict, rag_enhancer_result: 
         fallback_used=contextualizer_result.get('fallback_used', False) or rag_enhancer_result.get('fallback_used', False)
     )
 
-
-# =============================================================================
-# 🆕 NOUVEAUX MODÈLES RAG v3.9.11 - AJOUT ICI
-# =============================================================================
-
-class RAGDocument(BaseModel):
-    """Document RAG avec métadonnées"""
-    text: str = Field(..., description="Contenu du document")
-    score: float = Field(..., ge=0.0, le=1.0, description="Score de pertinence")
-    source: Optional[str] = Field(default=None, description="Source du document")
-    index: Optional[int] = Field(default=None, description="Index du document")
-
-    model_config = ConfigDict(extra="ignore")
-
-class ClarificationResponse(BaseModel):
-    """Réponse avec questions de clarification"""
-    questions: List[str] = Field(..., description="Questions de clarification")
-    missing_context: List[str] = Field(default_factory=list, description="Contexte manquant")
-    status: str = Field(..., description="Statut: SUFFISANT ou INSUFFISANT")
-
-    @field_validator('status')
-    @classmethod
-    def validate_status(cls, v):
-        if v not in ['SUFFISANT', 'INSUFFISANT']:
-            raise ValueError('status must be "SUFFISANT" or "INSUFFISANT"')
-        return v
-
-    model_config = ConfigDict(extra="ignore")
-
-class RAGEnhancedResponse(BaseModel):
-    """Réponse enrichie avec RAG"""
-    response: str = Field(..., description="Réponse générée")
-    rag_used: bool = Field(default=False, description="RAG utilisé")
-    documents_consulted: int = Field(default=0, ge=0, description="Nombre de documents consultés")
-    sources: List[Dict] = Field(default_factory=list, description="Sources utilisées")
-    clarification_questions: List[str] = Field(default_factory=list, description="Questions de clarification")
-    missing_context: List[str] = Field(default_factory=list, description="Contexte manquant")
-
-    model_config = ConfigDict(extra="ignore")
-
-
 # =============================================================================
 # CONFIGURATION ET LOGGING
 # =============================================================================
