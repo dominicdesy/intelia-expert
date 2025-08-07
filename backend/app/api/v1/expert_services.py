@@ -1,4 +1,12 @@
-"""
+def _generate_fallback_response(self, question: str, entities: ExtractedEntities) -> str:
+        """Génère une réponse de secours basique"""
+        question_lower = question.lower()
+        
+        if 'poids' in question_lower or 'weight' in question_lower:
+            if entities.age_days:
+                return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
+            else:
+                return "**Poids des"""
 expert_services.py - SERVICE EXPERT SIMPLIFIÉ ET EFFICACE
 
 🎯 PHILOSOPHIE SIMPLE:
@@ -124,7 +132,13 @@ class SimpleExpertService:
             
             # 1️⃣ EXTRACTION D'ENTITÉS
             entities = await self._safe_extract_entities(question)
-            logger.info(f"   🔍 Entités: âge={entities.age_days}, race={entities.breed_specific or entities.breed_generic}, sexe={entities.sex}")
+            
+            # Détecter le type d'entités retourné et s'adapter
+            breed = getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None) or getattr(entities, 'breed_generic', None)
+            age = getattr(entities, 'age_days', None)
+            sex = getattr(entities, 'sex', None)
+            
+            logger.info(f"   🔍 Entités: âge={age}, race={breed}, sexe={sex}")
             
             # 2️⃣ RÉCUPÉRATION DU CONTEXTE CONVERSATIONNEL SIMPLE
             conversation_context = self._get_simple_context(conversation_id)
@@ -162,12 +176,24 @@ class SimpleExpertService:
             return self._create_error_result(str(e), start_time, conversation_id)
 
     async def _safe_extract_entities(self, question: str) -> ExtractedEntities:
-        """Extraction d'entités sécurisée"""
+        """Extraction d'entités sécurisée avec détection async/sync"""
         try:
-            return await self.entity_extractor.extract(question)
+            # Essayer la méthode async d'abord
+            import asyncio
+            if asyncio.iscoroutinefunction(self.entity_extractor.extract):
+                return await self.entity_extractor.extract(question)
+            else:
+                # Méthode synchrone
+                return self.entity_extractor.extract(question)
         except Exception as e:
             logger.warning(f"⚠️ [Simple Expert] Erreur extraction: {e}")
-            # Fallback vers entités vides mais valides
+            # Fallback vers patterns basiques
+            try:
+                if hasattr(self.entity_extractor, '_raw_extract_with_patterns'):
+                    return self.entity_extractor._raw_extract_with_patterns(question)
+            except:
+                pass
+            # Dernier recours: entités vides
             return ExtractedEntities()
 
     def _get_simple_context(self, conversation_id: str) -> Dict[str, Any]:
@@ -181,49 +207,51 @@ class SimpleExpertService:
             'established_entities': {}
         })
 
-    def _enrich_entities_with_context(self, current_entities: ExtractedEntities, 
-                                    established_entities: Dict[str, Any]) -> ExtractedEntities:
-        """Enrichit les entités actuelles avec le contexte établi"""
+    def _enrich_entities_with_context(self, current_entities, established_entities: Dict[str, Any]):
+        """Enrichit les entités actuelles avec le contexte établi - Version flexible"""
         
         # Si pas d'entités établies, retourner les entités actuelles
         if not established_entities:
             return current_entities
         
-        # Créer une copie enrichie
-        enriched = ExtractedEntities()
-        
-        # Copier les entités actuelles
-        for attr in ['age_days', 'age_weeks', 'breed_specific', 'breed_generic', 
-                    'sex', 'weight_grams', 'weight_mentioned', 'symptoms', 'context_type']:
-            setattr(enriched, attr, getattr(current_entities, attr))
-        
+        # Travailler avec l'objet tel qu'il est (flexible)
         # Enrichir avec le contexte établi si l'entité actuelle est manquante
-        if not enriched.age_days and established_entities.get('age_days'):
-            enriched.age_days = established_entities['age_days']
-            logger.info(f"   🔗 [Enrichissement] Âge du contexte: {enriched.age_days}j")
+        age = getattr(current_entities, 'age_days', None)
+        if not age and established_entities.get('age_days'):
+            if hasattr(current_entities, 'age_days'):
+                current_entities.age_days = established_entities['age_days']
+            logger.info(f"   🔗 [Enrichissement] Âge du contexte: {established_entities['age_days']}j")
         
-        if not enriched.breed_specific and established_entities.get('breed'):
-            enriched.breed_specific = established_entities['breed']
-            logger.info(f"   🔗 [Enrichissement] Race du contexte: {enriched.breed_specific}")
+        breed = (getattr(current_entities, 'breed_specific', None) or 
+                getattr(current_entities, 'breed', None) or 
+                getattr(current_entities, 'breed_generic', None))
+        if not breed and established_entities.get('breed'):
+            # Essayer de setter sur l'attribut qui existe
+            for attr in ['breed_specific', 'breed', 'breed_generic']:
+                if hasattr(current_entities, attr):
+                    setattr(current_entities, attr, established_entities['breed'])
+                    break
+            logger.info(f"   🔗 [Enrichissement] Race du contexte: {established_entities['breed']}")
         
-        if not enriched.sex and established_entities.get('sex'):
-            enriched.sex = established_entities['sex']
-            logger.info(f"   🔗 [Enrichissement] Sexe du contexte: {enriched.sex}")
+        sex = getattr(current_entities, 'sex', None)
+        if not sex and established_entities.get('sex'):
+            if hasattr(current_entities, 'sex'):
+                current_entities.sex = established_entities['sex']
+            logger.info(f"   🔗 [Enrichissement] Sexe du contexte: {established_entities['sex']}")
         
-        return enriched
+        return current_entities
 
-    def _has_enough_context(self, entities: ExtractedEntities, question: str) -> bool:
+    def _has_enough_context(self, entities, question: str) -> bool:
         """
         Décision simple: a-t-on assez de contexte pour une réponse directe ?
-        
-        Critères simples et clairs:
-        - Âge ET (race OU question technique) = Suffisant
-        - Question technique spécialisée = Suffisant
-        - Sinon = Clarification nécessaire
+        Compatible avec ExtractedEntities ET NormalizedEntities
         """
         
-        has_age = entities.age_days is not None
-        has_breed = entities.breed_specific is not None or entities.breed_generic is not None
+        # Extraction flexible des attributs selon le type d'entités
+        has_age = getattr(entities, 'age_days', None) is not None
+        has_breed = (getattr(entities, 'breed_specific', None) is not None or 
+                    getattr(entities, 'breed', None) is not None or
+                    getattr(entities, 'breed_generic', None) is not None)
         is_technical = self._is_technical_question(question)
         
         # Règles simples
@@ -284,18 +312,26 @@ class SimpleExpertService:
                 logger.warning(f"   ⚠️ [RAG] Erreur recherche: {e}")
         
         # Générer la réponse
-        if rag_used and hasattr(self.response_generator, 'generate_with_rag'):
-            # Avec RAG
-            response_data = await self.response_generator.generate_with_rag(
-                question, self._entities_to_dict(entities), 
-                self._create_mock_classification("contextual_answer"), rag_results
-            )
-        else:
-            # Sans RAG - réponse classique
-            response_data = await self.response_generator.generate(
-                question, self._entities_to_dict(entities),
-                self._create_mock_classification("precise_answer")
-            )
+        try:
+            if rag_used and hasattr(self.response_generator, 'generate_with_rag'):
+                # Avec RAG
+                response_data = self.response_generator.generate_with_rag(
+                    question, self._entities_to_dict(entities), 
+                    self._create_mock_classification("contextual_answer"), rag_results
+                )
+            else:
+                # Sans RAG - réponse classique
+                response_data = self.response_generator.generate(
+                    question, self._entities_to_dict(entities),
+                    self._create_mock_classification("precise_answer")
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ [Simple Expert] Erreur génération: {e}")
+            # Fallback simple
+            response_data = type('MockResponse', (), {
+                'response': self._generate_fallback_response(question, entities),
+                'confidence': 0.6
+            })()
         
         return SimpleProcessingResult(
             success=True,
@@ -517,19 +553,22 @@ Le poids varie énormément selon l'âge, la race et le sexe :
             error=error_msg
         )
 
-    def _entities_to_dict(self, entities: ExtractedEntities) -> Dict[str, Any]:
-        """Convertit les entités en dictionnaire"""
-        return {
-            'age_days': entities.age_days,
-            'age_weeks': entities.age_weeks,
-            'breed_specific': entities.breed_specific,
-            'breed_generic': entities.breed_generic,
-            'sex': entities.sex,
-            'weight_mentioned': entities.weight_mentioned,
-            'weight_grams': entities.weight_grams,
-            'symptoms': entities.symptoms or [],
-            'context_type': entities.context_type
-        }
+    def _entities_to_dict(self, entities) -> Dict[str, Any]:
+        """Convertit les entités en dictionnaire - Version flexible"""
+        result = {}
+        
+        # Extraction flexible selon le type d'entités
+        result['age_days'] = getattr(entities, 'age_days', None)
+        result['age_weeks'] = getattr(entities, 'age_weeks', None)
+        result['breed_specific'] = getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None)
+        result['breed_generic'] = getattr(entities, 'breed_generic', None)
+        result['sex'] = getattr(entities, 'sex', None)
+        result['weight_mentioned'] = getattr(entities, 'weight_mentioned', False)
+        result['weight_grams'] = getattr(entities, 'weight_grams', None)
+        result['symptoms'] = getattr(entities, 'symptoms', []) or []
+        result['context_type'] = getattr(entities, 'context_type', None)
+        
+        return result
 
     def _create_mock_classification(self, response_type: str):
         """Crée une classification mock pour la compatibilité"""
