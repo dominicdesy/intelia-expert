@@ -7,26 +7,26 @@ def _generate_fallback_response(self, question: str, entities: ExtractedEntities
                 return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
             else:
                 return "**Poids des"""
-expert_services.py - SERVICE EXPERT SIMPLIFIÉ ET EFFICACE
+expert_services.py - SERVICE EXPERT SIMPLIFIE ET EFFICACE
 
-🎯 PHILOSOPHIE SIMPLE:
-1. Question → Peut répondre directement ? → Réponse avec RAG
-2. Question → Trop vague ? → Réponse générale + demande clarification  
-3. Clarification → Réponse finale précise avec RAG
+PHILOSOPHIE SIMPLE:
+1. Question -> Peut repondre directement ? -> Reponse avec RAG
+2. Question -> Trop vague ? -> Reponse generale + demande clarification  
+3. Clarification -> Reponse finale precise avec RAG
 
-✅ COMPOSANTS CONSERVÉS:
+COMPOSANTS CONSERVES:
 - RAG pour recherche documentaire
-- Extraction d'entités basique
-- Génération de réponses
+- Extraction d'entites basique
+- Generation de reponses
 - Contexte conversationnel simple
 
-❌ SUPPRIMÉ (trop complexe):
+SUPPRIME (trop complexe):
 - ClarificationAgent avec IA
 - Pipeline IA complexe
 - ContextManager lourd
-- Logique de classification compliquée
+- Logique de classification compliquee
 
-🚀 RÉSULTAT: ~200 lignes au lieu de 1500+, fiable et prévisible
+RESULTAT: ~200 lignes au lieu de 1500+, fiable et previsible
 """
 
 import logging
@@ -92,37 +92,37 @@ class SimpleExpertService:
             "errors": 0
         }
         
-        logger.info("✅ [Simple Expert Service] Initialisé - Version épurée et efficace")
-        logger.info(f"   🔧 Extracteur d'entités: Actif")
-        logger.info(f"   🎨 Générateur de réponses: Actif")
-        logger.info(f"   🔍 RAG: En attente de configuration")
-        logger.info(f"   💾 Contexte: Mémoire simple activée")
+        logger.info("Service Expert Simplifie initialise - Version epuree et efficace")
+        logger.info(f"   Extracteur d'entites: Actif")
+        logger.info(f"   Generateur de reponses: Actif")
+        logger.info(f"   RAG: En attente de configuration")
+        logger.info(f"   Contexte: Memoire simple activee")
 
     def set_rag_embedder(self, rag_embedder):
         """Configure l'accès au RAG (appelé par expert.py)"""
         self.rag_embedder = rag_embedder
         self.config["enable_rag"] = rag_embedder is not None
-        logger.info(f"✅ [Simple Expert Service] RAG configuré: {self.config['enable_rag']}")
+        logger.info(f"RAG configure: {self.config['enable_rag']}")
 
     async def process_question(self, question: str, context: Dict[str, Any] = None, 
                              language: str = "fr") -> SimpleProcessingResult:
         """
-        POINT D'ENTRÉE PRINCIPAL - Logique simple et efficace
+        POINT D'ENTREE PRINCIPAL - Logique simple et efficace
         
-        Flux simplifié:
-        1. Extraire entités
-        2. Récupérer contexte conversationnel si disponible
-        3. Décider: suffisant pour réponse directe OU clarification nécessaire
-        4. Générer réponse appropriée avec RAG si possible
+        Flux simplifie:
+        1. Extraire entites
+        2. Recuperer contexte conversationnel si disponible
+        3. Decider: suffisant pour reponse directe OU clarification necessaire
+        4. Generer reponse appropriee avec RAG si possible
         5. Sauvegarder dans historique simple
         """
         start_time = time.time()
         conversation_id = context.get('conversation_id') if context else None
         
         try:
-            logger.info(f"🚀 [Simple Expert] Question: '{question[:50]}...'")
+            logger.info(f"[Simple Expert] Question: '{question[:50]}...'")
             if conversation_id:
-                logger.info(f"🔗 [Simple Expert] Conversation: {conversation_id}")
+                logger.info(f"[Simple Expert] Conversation: {conversation_id}")
             
             self.stats["questions_processed"] += 1
             
@@ -130,44 +130,44 @@ class SimpleExpertService:
             if not question or len(question.strip()) < 2:
                 return self._create_error_result("Question trop courte", start_time, conversation_id)
             
-            # 1️⃣ EXTRACTION D'ENTITÉS
+            # 1. EXTRACTION D'ENTITES
             entities = await self._safe_extract_entities(question)
             
-            # Détecter le type d'entités retourné et s'adapter
+            # Detecter le type d'entites retourne et s'adapter
             breed = getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None) or getattr(entities, 'breed_generic', None)
             age = getattr(entities, 'age_days', None)
             sex = getattr(entities, 'sex', None)
             
-            logger.info(f"   🔍 Entités: âge={age}, race={breed}, sexe={sex}")
+            logger.info(f"   Entites: age={age}, race={breed}, sexe={sex}")
             
-            # 2️⃣ RÉCUPÉRATION DU CONTEXTE CONVERSATIONNEL SIMPLE
+            # 2. RECUPERATION DU CONTEXTE CONVERSATIONNEL SIMPLE
             conversation_context = self._get_simple_context(conversation_id)
             established_entities = conversation_context.get('established_entities', {})
             
-            # 3️⃣ ENRICHISSEMENT DES ENTITÉS AVEC CONTEXTE
+            # 3. ENRICHISSEMENT DES ENTITES AVEC CONTEXTE
             enriched_entities = self._enrich_entities_with_context(entities, established_entities)
             
-            # 4️⃣ DÉCISION SIMPLE: Suffisant pour réponse directe ?
+            # 4. DECISION SIMPLE: Suffisant pour reponse directe ?
             context_sufficient = self._has_enough_context(enriched_entities, question)
             
             if context_sufficient:
-                # ✅ RÉPONSE DIRECTE AVEC RAG
-                logger.info("   ✅ [Simple Expert] Contexte suffisant → Réponse directe")
+                # REPONSE DIRECTE AVEC RAG
+                logger.info("   [Simple Expert] Contexte suffisant -> Reponse directe")
                 result = await self._generate_direct_answer(question, enriched_entities, conversation_id)
                 self.stats["direct_answers"] += 1
             else:
-                # 📝 RÉPONSE GÉNÉRALE + CLARIFICATION
-                logger.info("   📝 [Simple Expert] Contexte insuffisant → Clarification")
+                # REPONSE GENERALE + CLARIFICATION
+                logger.info("   [Simple Expert] Contexte insuffisant -> Clarification")
                 result = self._generate_clarification_response(question, enriched_entities, conversation_id)
                 self.stats["clarifications_requested"] += 1
             
-            # 5️⃣ SAUVEGARDER DANS HISTORIQUE SIMPLE
+            # 5. SAUVEGARDER DANS HISTORIQUE SIMPLE
             self._save_to_simple_history(conversation_id, question, result, enriched_entities)
             
             processing_time = int((time.time() - start_time) * 1000)
             result.processing_time_ms = processing_time
             
-            logger.info(f"✅ [Simple Expert] Réponse: {result.response_type} en {processing_time}ms")
+            logger.info(f"[Simple Expert] Reponse: {result.response_type} en {processing_time}ms")
             return result
             
         except Exception as e:
@@ -652,4 +652,4 @@ def create_simple_expert_service() -> SimpleExpertService:
 ExpertService = SimpleExpertService
 ProcessingResult = SimpleProcessingResult
 quick_ask = simple_ask
-create_expert_service = create_simple_expert_service
+create_expert_service = create_simple_expert_servicesw
