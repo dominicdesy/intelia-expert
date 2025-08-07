@@ -98,12 +98,14 @@ INSTRUCTIONS:
 1. **UTILISE les données de poids** pour donner des valeurs précises
 2. **RÉPONDS de manière directe** - l'utilisateur a déjà précisé sa question
 3. **INCLUS des fourchettes** avec les seuils d'alerte
-4. **RESTE concis** mais complet (150-250 mots)
+4. **DONNE des conseils pratiques** de surveillance
+5. **RESTE concis** mais complet (150-250 mots)
 
 STRUCTURE ATTENDUE:
 - Réponse directe à la question
 - Fourchette de poids normale avec seuils
 - Conseils de surveillance pratiques
+- Recommandations si nécessaire
 
 EXEMPLE DE RÉPONSE:
 "🎯 **Ross 308 mâle à 10 jours : 187-235g**
@@ -157,6 +159,11 @@ EXEMPLE:
 • **Mâles** : +10-15% par rapport aux moyennes
 • **Femelles** : -10-15% par rapport aux moyennes
 
+🎯 **Surveillance recommandée** :
+• Pesée hebdomadaire d'échantillon représentatif
+• Contrôle homogénéité du troupeau
+• Ajustement alimentaire selon évolution
+
 💡 **Pour une réponse plus précise**, précisez la race et le sexe de vos animaux."
 
 Génère maintenant ta réponse:""",
@@ -208,6 +215,7 @@ INSTRUCTIONS:
 2. **DÉTAILS TECHNIQUES** - mécanismes, causes, solutions
 3. **DONNÉES PRÉCISES** - chiffres, standards, protocoles
 4. **RÉFÉRENCES** - mention de bonnes pratiques
+5. **RECOMMANDATIONS** - actions concrètes
 
 STRUCTURE:
 - Analyse technique du problème/question
