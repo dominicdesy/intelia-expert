@@ -37,19 +37,25 @@ class SystemBehavior:
     # ✅ CONSERVER: Fallback et récupération d'erreur
     FALLBACK_ENABLED = True
     FALLBACK_TO_GENERAL_ON_ERROR = True
-    MAX_PROCESSING_TIME_MS = 30000  # 30 secondes max
+    MAX_PROCESSING_TIME_MS = 60000  # 60 secondes max
     
     # ✅ CONSERVER: Logging et debugging
     ENABLE_DETAILED_LOGGING = True
     ENABLE_PERFORMANCE_MONITORING = True
     ENABLE_STATS_COLLECTION = True
+
+    # ✅ FORCER LE RAG EN PRIORITÉ
+    RAG_PRIORITY_ENABLED = True
+    RAG_CONFIDENCE_THRESHOLD = 0.3  # Seuil bas pour utiliser RAG
+    RAG_FALLBACK_ENABLED = True
     
     # ✅ NOUVEAU: Configuration IA selon le plan de transformation
     AI_SERVICES_ENABLED = True
     AI_FALLBACK_ENABLED = True
-    AI_RESPONSE_TIMEOUT = 20  # secondes
+    AI_RESPONSE_TIMEOUT = 30  # secondes
     AI_CACHE_ENABLED = True
-    AI_CACHE_TTL = 3600  # 1 heure
+    AI_CACHE_TTL = 7200  # 2 heures
+    CACHE_AGGRESSIVE_MODE = True
     
     # Configuration des services IA individuels
     AI_ENTITY_EXTRACTION_ENABLED = True
@@ -59,8 +65,9 @@ class SystemBehavior:
     
     # Configuration du pipeline unifié IA
     UNIFIED_AI_PIPELINE_ENABLED = True
-    AI_PIPELINE_TIMEOUT = 45  # seconds pour pipeline complet
-    AI_PARALLEL_PROCESSING = True  # Traitement parallèle des services IA
+    AI_PIPELINE_TIMEOUT = 90  # seconds pour pipeline complet
+    AI_PARALLEL_PROCESSING = False  # Traitement parallèle des services IA
+    AI_MAX_CONCURRENT_CALLS = 1
 
 class DecisionThresholds:
     """Seuils pour les décisions de classification"""

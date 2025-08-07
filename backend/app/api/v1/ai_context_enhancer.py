@@ -15,6 +15,11 @@ Architecture:
 - Enhancement automatique des questions pour RAG
 - Fusion intelligente des entités contextuelles
 - Optimisation des requêtes de recherche
+
+🔧 CORRECTIONS v3.5.5:
+- ✅ Prompt entity_fusion corrigé pour héritage intelligent
+- ✅ Modèles optimisés (gpt-3.5-turbo) pour réduire les timeouts
+- ✅ Logique de fusion simplifiée et plus claire
 """
 
 import json
@@ -58,12 +63,12 @@ class AIContextEnhancer:
     """Enhancer contextuel avec IA - Remplace les patterns pronominaux"""
     
     def __init__(self):
-        # Configuration des modèles
+        # Configuration des modèles - OPTIMISÉE pour réduire les timeouts
         self.models = {
-            "context_analysis": "gpt-4",      # Analyse contextuelle complexe
-            "question_enhancement": "gpt-4",   # Enhancement de questions
-            "entity_fusion": "gpt-3.5-turbo", # Fusion d'entités
-            "rag_optimization": "gpt-4"        # Optimisation pour RAG
+            "context_analysis": "gpt-3.5-turbo",      # Changé de gpt-4 → plus rapide
+            "question_enhancement": "gpt-3.5-turbo",   # Changé de gpt-4 → plus rapide
+            "entity_fusion": "gpt-3.5-turbo",         # Fusion d'entités
+            "rag_optimization": "gpt-3.5-turbo"       # Changé de gpt-4 → plus rapide
         }
         
         # Prompts spécialisés
@@ -144,12 +149,7 @@ Réponds en JSON:
 }}
 ```""",
 
-# =============================================================================
-# CORRECTION UNIQUE dans ai_context_enhancer.py
-# Ligne ~178 : Remplacer SEULEMENT le prompt "entity_fusion"
-# =============================================================================
-
-"entity_fusion": """Fusionne intelligemment les entités actuelles avec le contexte conversationnel.
+            "entity_fusion": """Fusionne intelligemment les entités actuelles avec le contexte conversationnel.
 
 ENTITÉS ACTUELLES:
 {current_entities}
@@ -159,24 +159,26 @@ CONTEXTE CONVERSATIONNEL:
 
 TÂCHE: Combine les entités pour créer une vue complète et cohérente.
 
-RÈGLES DE FUSION:
+RÈGLES DE FUSION SIMPLIFIÉES:
 1. **PRIORITÉ**: Entités actuelles > contexte (sauf si actuelles vides)
-2. **HÉRITAGE CONDITIONNEL**: Hérite du contexte SEULEMENT si entités actuelles incomplètes ET question fait référence au contexte
+2. **HÉRITAGE INTELLIGENT**: Hérite du contexte si entités actuelles incomplètes
 3. **COHÉRENCE**: Vérifie compatibilité des combinaisons
-4. **COMPLÉTION CONTEXTUELLE**: Comble les manques avec le contexte
+4. **COMPLÉTION**: Comble les manques avec le contexte
 
-⚠️ RÈGLE CRITIQUE POUR QUESTIONS COURTES:
-- Si la question actuelle contient déjà des informations spécifiques (race, âge, sexe), NE PAS hériter d'autres entités du contexte
-- Exemple: "Ross 308 male" contient race + sexe → NE PAS ajouter l'âge du contexte
-- Exemple: "Leur poids ?" → question incomplète → hériter race/âge du contexte
+LOGIQUE D'HÉRITAGE:
+- Si breed actuel vide ET breed contexte présent → hérite breed contexte
+- Si age actuel vide ET age contexte présent → hérite age contexte  
+- Si sex actuel vide ET sex contexte présent → hérite sex contexte
+- Si context_type actuel vague ET contexte précis → hérite contexte précis
 
-LOGIQUE DÉTAILLÉE:
-- Si breed actuel présent → garder breed actuel, ne pas hériter
-- Si age actuel présent → garder age actuel, ne pas hériter  
-- Si sex actuel présent → garder sex actuel, ne pas hériter
-- Si breed actuel vide ET question fait référence à une race → hériter breed contexte
-- Si age actuel vide ET question fait référence à un âge → hériter age contexte
-- Si sex actuel vide ET question fait référence à un sexe → hériter sex contexte
+EXEMPLES PRATIQUES:
+- Actuelles: {{"breed": "Ross 308", "sex": "male"}} + Contexte: {{"age": 11}} → Résultat: {{"breed": "Ross 308", "sex": "male", "age_days": 11}}
+- Actuelles: {{}} + Contexte: {{"breed": "Ross 308", "age": 21}} → Résultat: hérite tout du contexte
+- Actuelles: {{"age": 14}} + Contexte: {{"breed": "Cobb 500"}} → Résultat: combine les deux
+
+⚠️ RÈGLE SPÉCIALE:
+Si la question actuelle semble faire référence au contexte précédent (pronoms, références implicites), 
+TOUJOURS hériter les éléments manquants du contexte.
 
 Réponds en JSON:
 ```json
@@ -187,14 +189,12 @@ Réponds en JSON:
     "sex": "male"|"female"|"mixed"|null,
     "context_type": "performance"|"santé"|"alimentation",
     "weight_mentioned": true|false,
-    "inherited_from_context": ["liste des champs hérités avec justification"]
+    "inherited_from_context": ["liste des champs hérités du contexte avec justification simple"]
   }},
   "fusion_confidence": 0.0-1.0,
-  "fusion_notes": "explication détaillée de pourquoi chaque entité a été gardée ou héritée"
+  "fusion_notes": "explication simple de la fusion effectuée"
 }}
 ```""",
-
-
 
             "rag_optimization": """Optimise cette question pour la recherche documentaire (RAG) dans une base de connaissances avicoles.
 
