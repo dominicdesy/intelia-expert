@@ -1,4 +1,4 @@
-f"""
+"""
 ai_context_enhancer.py - ENHANCEMENT CONTEXTUEL AVEC IA
 
 🎯 REMPLACE: 200+ lignes de patterns pronominaux rigides par compréhension IA
@@ -192,7 +192,7 @@ Réponds en JSON:
   "fusion_confidence": 0.0-1.0,
   "fusion_notes": "explication détaillée de pourquoi chaque entité a été gardée ou héritée"
 }}
-```"""
+```""",
 
 
 
