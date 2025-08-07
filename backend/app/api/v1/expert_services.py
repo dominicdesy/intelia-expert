@@ -280,9 +280,13 @@ Réponds en JSON :
         if not has_sex and has_age:
             missing_context.append("sexe")
             clarification_questions.append("Sexe des animaux ? (mâles, femelles, mixte)")
-        
-        status = "SUFFISANT" if len(missing_context) <= 1 else "INSUFFISANT"
-        
+
+        # ✅ LOGIQUE SIMPLE : Si on a l'âge, c'est suffisant pour réponse générale
+        if has_age:
+            status = "SUFFISANT"  # Permettre réponse générale + clarifications
+        else:
+            status = "INSUFFISANT"  # Questions de clarification seulement
+  
         # Enrichir la requête pour RAG
         enriched_query = self._build_enriched_query(question, entities)
         
@@ -563,10 +567,8 @@ class ExpertService:
             if conversation_id and self.context_manager and self.config["enable_context_manager"]:
                 try:
                     logger.info("🧠 [Expert Service] Récupération contexte unifié...")
-                    unified_context = self.context_manager.get_unified_context(
-                        conversation_id, context_type="general"
-                    )
-                    
+                    unified_context = self.context_manager.get_unified_context(conversation_id)                    
+                
                     if unified_context:
                         context_manager_used = True
                         previous_answers = unified_context.previous_answers or []
@@ -769,14 +771,23 @@ class ExpertService:
                 
             except Exception as e:
                 logger.error(f"   ❌ Erreur classification: {e}")
-                # Fallback vers classification simple
-                classification = ClassificationResult(
-                    response_type=ResponseType.GENERAL_ANSWER,
-                    confidence=0.5,
-                    reasoning=f"Fallback après erreur: {str(e)}",
-                    fallback_used=True,
-                    context_source="error"
-                )
+                # Fallback simple sans ContextManager
+                try:
+                    classification = await self.smart_classifier.classify_question(
+                        question, 
+                        entities_for_processing
+                    )
+                except Exception as e2:
+                    logger.error(f"   ❌ Erreur classification fallback: {e2}")
+                    # Fallback vers classification simple
+                    classification = ClassificationResult(
+                        response_type=ResponseType.GENERAL_ANSWER,
+                        confidence=0.5,
+                        reasoning=f"Fallback après erreur: {str(e)}",
+                        fallback_used=True,
+                        context_source="error"
+                    )
+
             
             context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
             if context_used:
@@ -786,6 +797,8 @@ class ExpertService:
             # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
             # =============================================================
             final_entities = getattr(classification, 'merged_entities', entities_for_processing)
+            if not final_entities:  # ✅ AJOUTER CETTE VÉRIFICATION
+                final_entities = entities_for_processing
             
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities
