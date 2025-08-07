@@ -759,7 +759,7 @@ class ExpertService:
             
             # 3️⃣ CLASSIFICATION INTELLIGENTE AVEC CONTEXTE (classique enrichi)
             try:
-                classification = self.smart_classifier.classify_question(
+                classification = await self.smart_classifier.classify_question(
                     question, 
                     entities_for_processing,
                     conversation_id=conversation_id
@@ -773,9 +773,9 @@ class ExpertService:
                 classification = ClassificationResult(
                     response_type=ResponseType.GENERAL_ANSWER,
                     confidence=0.5,
-                    entities=entities_for_processing,
-                    weight_data={},
-                    merged_entities=entities_for_processing
+                    reasoning=f"Fallback après erreur: {str(e)}",
+                    fallback_used=True,
+                    context_source="error"
                 )
             
             context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
@@ -785,7 +785,7 @@ class ExpertService:
             # =============================================================
             # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
             # =============================================================
-            final_entities = classification.merged_entities if classification.merged_entities else entities_for_processing
+            final_entities = getattr(classification, 'merged_entities', entities_for_processing)
             
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities
