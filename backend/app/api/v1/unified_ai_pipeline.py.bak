@@ -106,7 +106,18 @@ class UnifiedAIPipeline:
             "cache_intermediate_results": True,
             "fallback_on_ai_failure": True,
             "min_confidence_threshold": 0.3,
-            "individual_stage_timeout_ms": 10000  # ✅ NOUVEAU: Timeout par étape
+            "total_pipeline_timeout_ms": 90000,
+            "individual_stage_timeout_ms": 20000  # ✅ NOUVEAU: Timeout par étape
+            
+            # ✅ RAG PRIORITAIRE
+            "rag_priority": True,
+            "rag_timeout_ms": 5000,  # RAG rapide
+            "force_rag_usage": True,
+            
+            # ✅ FALLBACKS AGRESSIFS
+            "aggressive_fallbacks": True,
+            "fallback_after_timeout": True,
+            "max_ai_attempts": 2  # Limiter tentatives
         }
         
         # Métriques du pipeline
