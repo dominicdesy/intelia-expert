@@ -788,19 +788,6 @@ class ExpertService:
                         context_source="error"
                     )
 
-               
-                logger.info(f"   🧠 Classification: {classification.response_type.value} (confiance: {classification.confidence})")
-                
-            except Exception as e:
-                logger.error(f"   ❌ Erreur classification: {e}")
-                # Fallback vers classification simple
-                classification = ClassificationResult(
-                    response_type=ResponseType.GENERAL_ANSWER,
-                    confidence=0.5,
-                    reasoning=f"Fallback après erreur: {str(e)}",
-                    fallback_used=True,
-                    context_source="error"
-                )
             
             context_used = classification.response_type == ResponseType.CONTEXTUAL_ANSWER
             if context_used:
