@@ -588,17 +588,18 @@ class ExpertService:
                             previous_answers_used=len(previous_answers) > 0,  # 🆕 NOUVEAU
                             context_manager_used=context_manager_used  # 🆕 NOUVEAU
                         )
-                        
-                        # 🆕 NOUVEAU: SAUVEGARDER LA NOUVELLE RÉPONSE ASSISTANT
+
+                        # 🆕 NOUVEAU: SAUVEGARDER LA NOUVELLE RÉPONSE ASSISTANT AVEC ENTITÉS
                         if conversation_id and self.context_manager and self.config["save_assistant_responses"]:
                             try:
-                                # Ajouter la question utilisateur
+                                # Ajouter la question utilisateur AVEC LES ENTITÉS EXTRAITES
                                 self.context_manager.update_context(
                                     conversation_id=conversation_id,
                                     new_message={
                                         'role': 'user',
                                         'content': question
-                                    }
+                                    },
+                                    entities=self._entities_to_dict(pipeline_result.extracted_entities or ExtractedEntities())  # ✅ CORRECT
                                 )
                                 
                                 # Ajouter la réponse assistant
@@ -614,7 +615,8 @@ class ExpertService:
                                 
                             except Exception as e:
                                 logger.error(f"❌ [Expert Service] Erreur sauvegarde contexte: {e}")
-                        
+
+                                                
                         # Statistiques IA
                         self._update_stats_ai_rag(pipeline_result.response_type, processing_time_ms, True, 
                                             pipeline_result.enhanced_context is not None, True, False,
