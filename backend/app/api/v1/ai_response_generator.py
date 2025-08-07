@@ -129,7 +129,7 @@ QUESTION: "{question}"
 ENTITÉS DISPONIBLES:
 {entities}
 
-CONTEXTE: Question générale nécessitant informations pratiques avec standards.
+CONTEXTE: Question générale nécessitant informations pratiques avec standards.ç
 
 INSTRUCTIONS:
 1. **FOURNIS des informations pratiques** avec fourchettes de valeurs
@@ -146,7 +146,7 @@ STRUCTURE:
 - Offre de précision si plus d'infos
 
 EXEMPLE:
-"**Poids des poulets à 10 jours :**
+**Poids des poulets à 10 jours :**
 
 📊 **Fourchettes générales** :
 • **Races lourdes** (Ross 308, Cobb 500) : 170-210g
@@ -157,7 +157,7 @@ EXEMPLE:
 • **Mâles** : +10-15% par rapport aux moyennes
 • **Femelles** : -10-15% par rapport aux moyennes
 
-💡 **Pour une réponse plus précise**, précisez la race et le sexe de vos animaux."
+💡 **Pour une réponse plus précise**, précisez la race et le sexe de vos animaux.
 
 Génère maintenant ta réponse:""",
 
