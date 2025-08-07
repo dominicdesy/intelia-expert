@@ -785,7 +785,7 @@ class ExpertService:
             # =============================================================
             # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
             # =============================================================
-            final_entities = getattr(classification, 'merged_entities', entities_for_processing)
+            final_entities = classification.merged_entities if classification.merged_entities else entities_for_processing
             
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities

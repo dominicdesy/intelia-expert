@@ -281,8 +281,12 @@ Réponds en JSON :
             missing_context.append("sexe")
             clarification_questions.append("Sexe des animaux ? (mâles, femelles, mixte)")
         
-        status = "SUFFISANT" if len(missing_context) <= 1 else "INSUFFISANT"
-        
+        # Nouvelle logique : si on a l'âge, donner réponse générale + clarifications
+        if has_age:
+            status = "GENERAL_WITH_CLARIFICATION"
+        else:
+            status = "INSUFFISANT"
+    
         # Enrichir la requête pour RAG
         enriched_query = self._build_enriched_query(question, entities)
         
@@ -786,7 +790,9 @@ class ExpertService:
             # 🆕 NOUVEAU: ANALYSE DE CLARIFICATION ET RAG
             # =============================================================
             final_entities = getattr(classification, 'merged_entities', entities_for_processing)
-            
+            if not final_entities:
+                    final_entities = entities_for_processing
+                
             clarification_analysis = self.clarification_agent.analyze_context_sufficiency(
                 question, final_entities
             )
@@ -822,19 +828,35 @@ class ExpertService:
                 except Exception as e:
                     logger.error(f"❌ [Expert Service] Erreur RAG: {e}")
                     rag_results = []
-            
-            # 4️⃣ GÉNÉRATION DE LA RÉPONSE ENRICHIE
-            if clarification_analysis["status"] == "INSUFFISANT":
-                # Retourner questions de clarification
-                response_data = ResponseData(
-                    response=self._format_clarification_questions(clarification_analysis["clarification_questions"]),
-                    response_type="needs_clarification",
-                    confidence=0.8,
-                    precision_offer=None,
-                    examples=[],
-                    weight_data={},
-                    ai_generated=False
-                )
+
+                # 4️⃣ GÉNÉRATION DE LA RÉPONSE ENRICHIE
+                if clarification_analysis["status"] == "INSUFFISANT":
+                    # Questions de clarification seulement
+                    response_data = ResponseData(
+                        response=self._format_clarification_questions(clarification_analysis["clarification_questions"]),
+                        response_type="needs_clarification",
+                        confidence=0.8,
+                        precision_offer=None,
+                        examples=[],
+                        weight_data={},
+                        ai_generated=False
+                    )
+                elif clarification_analysis["status"] == "GENERAL_WITH_CLARIFICATION":
+                    # Réponse générale + clarifications
+                    general_response = self.response_generator.generate(question, final_entities, classification)
+                    clarification_text = self._format_clarification_questions(clarification_analysis["clarification_questions"])
+                    
+                    combined_response = f"{general_response.response}\n\n💡 **Pour une réponse plus précise, précisez** :\n{clarification_text}"
+                    response_data = ResponseData(
+                        response=combined_response,
+                        response_type="general_answer",
+                        confidence=0.8,
+                        precision_offer=None,
+                        examples=[],
+                        weight_data=classification.weight_data or {},
+                        ai_generated=False
+                    )
+                
                 response_data.clarification_questions = clarification_analysis["clarification_questions"]
                 response_data.missing_context = clarification_analysis["missing_context"]
                 response_data.rag_used = False
