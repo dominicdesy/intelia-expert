@@ -174,33 +174,41 @@ QUESTION INCOMPLÈTE: "{question}"
 
 ENTITÉS MANQUANTES: {missing_entities}
 
-CONTEXTE: L'utilisateur a posé une question où je peux donner une réponse utile même partielle.
+CONTEXTE: L'utilisateur a posé une question trop vague pour donner une réponse précise.
 
 INSTRUCTIONS:
-1. **DONNE D'ABORD UNE RÉPONSE UTILE** basée sur les informations disponibles
-2. **PUIS DEMANDE précisions** pour affiner la réponse
+1. **RESTE POSITIF** - ne dis pas "je ne peux pas"
+2. **EXPLIQUE POURQUOI** les précisions sont importantes  
 3. **GUIDE CONCRÈTEMENT** avec exemples
-4. **RESTE POSITIF** et professionnel
-5. **STRUCTURE CLAIRE** : réponse utile + demande précisions
+4. **DONNE UN APERÇU** des réponses possibles
+5. **FACILITE** la reformulation
 
-STRUCTURE OBLIGATOIRE:
-- Réponse informative générale basée sur la question
-- Fourchettes ou conseils généraux applicables
-- Puis demande de précisions pour affiner
-- Exemples concrets de précisions utiles
+STRUCTURE:
+- Reconnaissance de la question
+- Explication de l'importance des précisions
+- Guide concret avec exemples
+- Aperçu des réponses possibles
+- Invitation à préciser
 
 EXEMPLE:
-"**Poids des poulets à 6 jours :**
+"Excellente question sur les performances des poulets ! 
 
-Pour un poulet de 6 jours, le poids varie généralement entre 80-120g selon la race et le sexe. Les races de chair (Ross 308, Cobb 500) sont plus lourdes (90-130g) que les races pondeuses (70-100g).
+**Pour vous donner la réponse la plus précise**, j'aurais besoin de quelques précisions :
 
-**Pour une réponse plus précise**, précisez :
+🔍 **Informations clés** :
 • **Race/souche** : Ross 308, Cobb 500, Hubbard, etc.
+• **Âge exact** : En jours ou semaines
 • **Sexe** : Mâles, femelles, ou troupeau mixte
 
-Ces informations me permettront de vous donner des fourchettes de poids spécifiques à votre situation."
+📊 **Pourquoi c'est important** :
+Les standards varient significativement - un Ross 308 mâle de 21 jours (800-1000g) vs une pondeuse femelle (600-750g).
 
-Génère maintenant ta réponse avec information utile + demande précisions:""",
+💡 **Exemple de question précise** :
+'Quel est le poids normal d'un Ross 308 mâle à 21 jours ?'
+
+En attendant vos précisions, sachez que [aperçu général pertinent]."
+
+Génère maintenant ta clarification:""",
 
             "technical_detailed": """Tu es un vétérinaire avicole expert fournissant une réponse technique approfondie.
 
