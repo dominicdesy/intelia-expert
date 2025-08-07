@@ -1,4 +1,4 @@
-"""
+f"""
 ai_context_enhancer.py - ENHANCEMENT CONTEXTUEL AVEC IA
 
 🎯 REMPLACE: 200+ lignes de patterns pronominaux rigides par compréhension IA
@@ -144,7 +144,12 @@ Réponds en JSON:
 }}
 ```""",
 
-            "entity_fusion": """Fusionne intelligemment les entités actuelles avec le contexte conversationnel.
+# =============================================================================
+# CORRECTION UNIQUE dans ai_context_enhancer.py
+# Ligne ~178 : Remplacer SEULEMENT le prompt "entity_fusion"
+# =============================================================================
+
+"entity_fusion": """Fusionne intelligemment les entités actuelles avec le contexte conversationnel.
 
 ENTITÉS ACTUELLES:
 {current_entities}
@@ -156,15 +161,22 @@ TÂCHE: Combine les entités pour créer une vue complète et cohérente.
 
 RÈGLES DE FUSION:
 1. **PRIORITÉ**: Entités actuelles > contexte (sauf si actuelles vides)
-2. **HÉRITAGE**: Hérite du contexte si entités actuelles incomplètes
+2. **HÉRITAGE CONDITIONNEL**: Hérite du contexte SEULEMENT si entités actuelles incomplètes ET question fait référence au contexte
 3. **COHÉRENCE**: Vérifie compatibilité des combinaisons
-4. **COMPLÉTION**: Comble les manques avec le contexte
+4. **COMPLÉTION CONTEXTUELLE**: Comble les manques avec le contexte
 
-LOGIQUE:
-- Si breed actuel vide et breed contexte présent → hérite
-- Si age actuel vide et age contexte présent → hérite  
-- Si sex actuel vide et sex contexte présent → hérite
-- Si context_type actuel vague et contexte précis → hérite
+⚠️ RÈGLE CRITIQUE POUR QUESTIONS COURTES:
+- Si la question actuelle contient déjà des informations spécifiques (race, âge, sexe), NE PAS hériter d'autres entités du contexte
+- Exemple: "Ross 308 male" contient race + sexe → NE PAS ajouter l'âge du contexte
+- Exemple: "Leur poids ?" → question incomplète → hériter race/âge du contexte
+
+LOGIQUE DÉTAILLÉE:
+- Si breed actuel présent → garder breed actuel, ne pas hériter
+- Si age actuel présent → garder age actuel, ne pas hériter  
+- Si sex actuel présent → garder sex actuel, ne pas hériter
+- Si breed actuel vide ET question fait référence à une race → hériter breed contexte
+- Si age actuel vide ET question fait référence à un âge → hériter age contexte
+- Si sex actuel vide ET question fait référence à un sexe → hériter sex contexte
 
 Réponds en JSON:
 ```json
@@ -175,12 +187,14 @@ Réponds en JSON:
     "sex": "male"|"female"|"mixed"|null,
     "context_type": "performance"|"santé"|"alimentation",
     "weight_mentioned": true|false,
-    "inherited_from_context": ["liste des champs hérités"]
+    "inherited_from_context": ["liste des champs hérités avec justification"]
   }},
   "fusion_confidence": 0.0-1.0,
-  "fusion_notes": "explication de la fusion"
+  "fusion_notes": "explication détaillée de pourquoi chaque entité a été gardée ou héritée"
 }}
-```""",
+```"""
+
+
 
             "rag_optimization": """Optimise cette question pour la recherche documentaire (RAG) dans une base de connaissances avicoles.
 
