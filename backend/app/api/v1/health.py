@@ -1,9 +1,3 @@
-"""
-app/api/health.py
-Module de santé système - Version corrigée
-CORRECTION: Ajout de l'endpoint /health manquant pour résoudre l'erreur 404
-"""
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 from datetime import datetime
@@ -11,82 +5,44 @@ import os
 
 router = APIRouter(prefix="/health", tags=["health"])
 
-# Modèle de réponse simplifié
 class HealthResponse(BaseModel):
     status: str
-    timestamp: str
     version: str
-    services: dict
+    timestamp: str
+
+class DetailedHealthResponse(BaseModel):
+    api_status: str
+    memory_usage: str
+    cpu_usage: str
+    disk_space: str
+    openai_configured: bool
+    rag_configured: bool
+    timestamp: str
 
 @router.get("/", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint corrigé."""
-    try:
-        return HealthResponse(
-            status="healthy",
-            timestamp=datetime.now().isoformat(),
-            version="2.1.0",
-            services={
-                "api": True,
-                "rag": True,
-                "database": False,
-                "openai": bool(os.getenv("OPENAI_API_KEY"))
-            }
-        )
-    except Exception as e:
-        return HealthResponse(
-            status="unhealthy", 
-            timestamp=datetime.now().isoformat(),
-            version="2.1.0",
-            services={
-                "api": False,
-                "rag": False,
-                "database": False,
-                "openai": False
-            }
-        )
+async def health():
+    """
+    Simple health check endpoint.
+    """
+    return HealthResponse(
+        status="running",
+        version=os.getenv("API_VERSION", "1.0"),
+        timestamp=datetime.utcnow().isoformat()
+    )
 
-# ============================================================================
-# CORRECTION: AJOUT DE L'ENDPOINT MANQUANT /health (résout erreur 404)
-# ============================================================================
-
-@router.get("/health")
-async def detailed_health_check():
-    """Health check détaillé - ENDPOINT MANQUANT AJOUTÉ pour corriger 404"""
-    try:
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "version": "3.4.0",
-            "services": {
-                "api": "running",
-                "rag": "checking",
-                "database": "checking",
-                "openai": "configured" if os.getenv("OPENAI_API_KEY") else "not_configured"
-            },
-            "system": {
-                "memory_usage": "N/A",
-                "cpu_usage": "N/A",
-                "disk_space": "N/A",
-                "uptime": "N/A"
-            },
-            "environment": os.getenv('ENV', 'production')
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-@router.get("/detailed")
+@router.get("/detailed", response_model=DetailedHealthResponse)
 async def detailed_health():
-    """Health check détaillé."""
-    return {
-        "api_status": "running",
-        "memory_usage": "unknown",
-        "cpu_usage": "unknown", 
-        "disk_space": "unknown",
-        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "timestamp": datetime.now().isoformat()
-    }
+    """
+    Detailed health check with configuration diagnostics.
+    """
+    vector_url = os.getenv("VECTOR_STORE_URL")
+    vector_key = os.getenv("VECTOR_STORE_KEY")
+    return DetailedHealthResponse(
+        api_status="running",
+        memory_usage="unknown",
+        cpu_usage="unknown",
+        disk_space="unknown",
+        openai_configured=bool(os.getenv("OPENAI_API_KEY")),
+        rag_configured=bool(vector_url and vector_key and os.getenv("OPENAI_API_KEY")),
+        timestamp=datetime.utcnow().isoformat()
+    )
