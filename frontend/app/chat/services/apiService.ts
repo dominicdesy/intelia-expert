@@ -206,7 +206,7 @@ export const generateAIResponse = async (
 
     // 🔧 BODY MODIFIÉ : Compatible avec le nouveau backend unifié
     const requestBody = {
-      text: finalQuestion,
+      question: finalQuestion,
       language: language,
       // 🚀 NOUVEAU : Paramètres concision pour le backend unifié
       concision_level: concisionLevel,

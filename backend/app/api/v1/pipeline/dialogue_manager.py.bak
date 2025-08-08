@@ -1,0 +1,47 @@
+import os
+import threading
+import time
+import logging
+from typing import Dict, Any
+from app.api.v1.pipeline.context_extractor import ContextExtractor
+from app.api.v1.pipeline.clarification_manager import ClarificationManager
+from app.api.v1.pipeline.postgres_memory import PostgresMemory as ConversationMemory
+from app.api.v1.pipeline.rag_engine import RAGEngine
+from app.api.v1.utils.config import COMPLETENESS_THRESHOLD
+from app.api.v1.utils.response_generator import format_response
+
+class DialogueManager:
+    """
+    Simplified orchestration:
+      1. Extract context
+      2. Clarify missing info
+      3. Retrieve & generate answer via RAG
+    """
+    def __init__(self):
+        self.extractor = ContextExtractor()
+        self.clarifier = ClarificationManager()
+        # Use managed Postgres for session memory
+        self.memory = ConversationMemory(dsn=os.getenv("DATABASE_URL"))
+        self.rag = RAGEngine()
+        
+        # ✅ AJOUTÉ : Démarrage automatique nettoyage
+        self._start_cleanup_task()
+
+    def handle(self, session_id: str, question: str) -> Dict[str, Any]:
+        # 1. Load and update context
+        context = self.memory.get(session_id) or {}
+        extracted, score, missing = self.extractor.extract(question)
+        context.update(extracted)
+
+        # 2. If incomplete, ask for clarification
+        if score < COMPLETENESS_THRESHOLD:
+            questions = self.clarifier.generate(missing)
+            self.memory.update(session_id, context)
+            return {"type": "clarification", "questions": questions}
+
+        # 3. Otherwise, generate final answer
+        answer = self.rag.generate_answer(question, context)
+        response = format_response(answer)
+        # Clear session
+        self.memory.clear(session_id)
+        return {"type": "answer", "response": response}
