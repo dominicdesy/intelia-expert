@@ -340,10 +340,22 @@ class SimpleExpertService:
                 )
         except Exception as e:
             logger.warning(f"⚠️ [Simple Expert] Erreur génération: {e}")
-            # Fallback simple
+            # Fallback simple avec données précises
+            age_days = getattr(entities, 'age_days', None)
+            breed = (getattr(entities, 'breed_specific', None) or 
+                    getattr(entities, 'breed', None) or 
+                    getattr(entities, 'specific_breed', None))
+            sex = getattr(entities, 'sex', None)
+            
+            # Génération de réponse de fallback avec données réelles du RAG
+            if rag_used and rag_results:
+                fallback_response = self._generate_rag_fallback_response(question, entities, rag_results)
+            else:
+                fallback_response = self._generate_contextual_fallback_response(question, age_days, breed, sex)
+            
             response_data = type('MockResponse', (), {
-                'response': self._generate_fallback_response(question, entities),
-                'confidence': 0.6
+                'response': fallback_response,
+                'confidence': 0.7
             })()
         
         return SimpleProcessingResult(
