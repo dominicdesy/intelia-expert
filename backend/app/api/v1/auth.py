@@ -1,270 +1,112 @@
 ﻿import os
-import jwt
 import logging
+import jwt
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Request, status
+from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr
 
-# Imports Supabase
+# Optional Supabase import
 try:
     from supabase import create_client, Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
 
+router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
-# Configuration
-SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
-SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
+# JWT configuration
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-# ✅ DIAGNOSTIC: Vérification variables d'environnement
-logger.info("=" * 50)
-logger.info("🔍 DIAGNOSTIC AUTH.PY")
-logger.info(f"📍 SUPABASE_URL: {'✅ Définie' if SUPABASE_URL else '❌ Manquante'}")
-logger.info(f"📍 SUPABASE_ANON_KEY: {'✅ Définie' if SUPABASE_ANON_KEY else '❌ Manquante'}")
-logger.info(f"📍 SUPABASE_JWT_SECRET: {'✅ Définie' if SUPABASE_JWT_SECRET else '❌ MANQUANTE - CRITIQUE'}")
-logger.info(f"📍 SUPABASE_AVAILABLE: {SUPABASE_AVAILABLE}")
+security = HTTPBearer()
 
-if SUPABASE_JWT_SECRET:
-    logger.info(f"📍 JWT Secret length: {len(SUPABASE_JWT_SECRET)} chars")
-    logger.info(f"📍 JWT Secret preview: {SUPABASE_JWT_SECRET[:10]}...{SUPABASE_JWT_SECRET[-10:]}")
-else:
-    logger.error("❌ SUPABASE_JWT_SECRET manquant - Authentification impossible!")
-    logger.error("💡 Ajoutez SUPABASE_JWT_SECRET dans vos variables d'environnement DigitalOcean")
 
-# Client Supabase
-supabase_client = None
-if SUPABASE_AVAILABLE and SUPABASE_URL and SUPABASE_ANON_KEY:
-    try:
-        supabase_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-        logger.info("✅ Client Supabase créé avec succès")
-    except Exception as e:
-        logger.error(f"❌ Erreur création client Supabase: {e}")
-else:
-    logger.error("❌ Configuration Supabase incomplète - Client non créé")
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    token = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return token
 
-logger.info(f"📍 supabase_client: {'✅ Créé' if supabase_client else '❌ Échec'}")
-logger.info("=" * 50)
 
-# JWT Validation
-security = HTTPBearer(auto_error=False)
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: datetime
 
-def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
-    """Valide un token JWT Supabase"""
-    logger.info(f"🔍 Vérification JWT token: {token[:20]}...{token[-10:]}")
-    
-    if not SUPABASE_JWT_SECRET:
-        logger.error("❌ SUPABASE_JWT_SECRET manquant - Impossible de vérifier le token")
-        return None
-    
-    try:
-        logger.info("🔐 Décodage JWT avec SUPABASE_JWT_SECRET...")
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated"
-        )
-        
-        user_data = {
-            "user_id": payload.get("sub"),
-            "email": payload.get("email"),
-            "role": payload.get("role", "authenticated")
-        }
-        
-        logger.info(f"✅ JWT token valide: {user_data}")
-        return user_data
-        
-    except jwt.ExpiredSignatureError:
-        logger.error("❌ JWT token expiré")
-        return None
-    except jwt.InvalidAudienceError:
-        logger.error("❌ JWT audience invalide (doit être 'authenticated')")
-        return None
-    except jwt.InvalidSignatureError:
-        logger.error("❌ JWT signature invalide - Vérifiez SUPABASE_JWT_SECRET")
-        return None
-    except jwt.DecodeError:
-        logger.error("❌ JWT format invalide")
-        return None
-    except Exception as e:
-        logger.error(f"❌ Erreur JWT inattendue: {e}")
-        return None
 
-async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
-    """Dependency pour utilisateur authentifié"""
-    logger.info("🔍 get_current_user appelé")
-    
-    if not credentials:
-        logger.error("❌ Pas de credentials Authorization header")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token d'authentification requis"
-        )
-    
-    logger.info(f"📋 Credentials reçues: Bearer {credentials.credentials[:20]}...")
-    
-    user = verify_jwt_token(credentials.credentials)
-    if not user:
-        logger.error("❌ Token JWT invalide")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide"
-        )
-    
-    logger.info(f"✅ Utilisateur authentifié: {user['email']}")
-    request.state.user = user
-    return user
-
-# Test JWT Secret au démarrage
-def test_jwt_secret():
-    """Test du JWT secret au démarrage"""
-    logger.info("🧪 TEST JWT SECRET AU DÉMARRAGE")
-    
-    if not SUPABASE_JWT_SECRET:
-        logger.error("❌ Impossible de tester - SUPABASE_JWT_SECRET manquant")
-        return False
-    
-    try:
-        # Créer un token de test
-        test_payload = {
-            "sub": "test-user-id",
-            "email": "test@example.com", 
-            "role": "authenticated",
-            "aud": "authenticated",
-            "exp": int(datetime.now().timestamp()) + 3600  # Expire dans 1h
-        }
-        
-        test_token = jwt.encode(test_payload, SUPABASE_JWT_SECRET, algorithm="HS256")
-        logger.info(f"✅ Token de test créé: {test_token[:30]}...")
-        
-        # Décoder le token de test
-        decoded = jwt.decode(test_token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
-        logger.info(f"✅ Token de test décodé avec succès: {decoded['email']}")
-        
-        logger.info("✅ JWT SECRET FONCTIONNE CORRECTEMENT")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Test JWT échoué: {e}")
-        logger.error("❌ JWT SECRET INVALIDE OU INCORRECT")
-        return False
-
-# Exécuter le test au chargement
-test_jwt_secret()
-
-# Modèles
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-# Router
-router = APIRouter(prefix="/auth")
 
-@router.get("/debug")
-async def debug_auth():
-    """Endpoint de diagnostic pour l'authentification"""
-    return {
-        "supabase_url_defined": bool(SUPABASE_URL),
-        "supabase_anon_key_defined": bool(SUPABASE_ANON_KEY),
-        "supabase_jwt_secret_defined": bool(SUPABASE_JWT_SECRET),
-        "supabase_available": SUPABASE_AVAILABLE,
-        "supabase_client_created": bool(supabase_client),
-        "jwt_secret_length": len(SUPABASE_JWT_SECRET) if SUPABASE_JWT_SECRET else 0,
-        "jwt_test_passed": test_jwt_secret() if SUPABASE_JWT_SECRET else False
-    }
-
-# Reste du code inchangé...
-@router.post("/login")
+@router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
-    """User login avec Supabase"""
-    if not supabase_client:
-        raise HTTPException(status_code=500, detail="Service d'authentification indisponible")
-    
-    try:
-        response = supabase_client.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
-        
-        if response.user and response.session:
-            return {
-                "success": True,
-                "user": {
-                    "id": response.user.id,
-                    "email": response.user.email
-                },
-                "session": {
-                    "access_token": response.session.access_token,
-                    "refresh_token": response.session.refresh_token,
-                    "expires_at": response.session.expires_at
-                }
-            }
-        else:
-            raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur login: {e}")
-        raise HTTPException(status_code=401, detail="Erreur de connexion")
+    """
+    Authenticate user and return a JWT access token.
+    """
+    if not SUPABASE_AVAILABLE:
+        logger.error("Supabase client not available")
+        raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
-@router.post("/logout")
-async def logout(current_user: Dict = Depends(get_current_user)):
-    """User logout"""
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    supabase: Client = create_client(supabase_url, supabase_key)
     try:
-        if supabase_client:
-            supabase_client.auth.sign_out()
-        return {"success": True, "message": "Déconnexion réussie"}
+        result = supabase.auth.sign_in(email=request.email, password=request.password)
     except Exception as e:
-        logger.error(f"Erreur logout: {e}")
-        return {"success": True, "message": "Déconnexion locale réussie"}
+        logger.error("Supabase sign-in error: %s", e)
+        raise HTTPException(status_code=500, detail="Authentication error")
 
-@router.get("/profile")
-async def get_profile(current_user: Dict = Depends(get_current_user)):
-    """Get user profile"""
+    user = result.user
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token = create_access_token({"user_id": user.id, "email": request.email}, expires)
+    return {"access_token": token, "expires_at": datetime.utcnow() + expires}
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    """
+    Decode JWT and return current user info.
+    """
+    token = credentials.credentials
     try:
-        if supabase_client:
-            user_response = supabase_client.auth.get_user()
-            if user_response.user:
-                return {
-                    "id": user_response.user.id,
-                    "email": user_response.user.email,
-                    "created_at": user_response.user.created_at
-                }
-        
-        # Fallback avec données du token
-        return {
-            "id": current_user.get("user_id"),
-            "email": current_user.get("email"),
-            "created_at": "Non disponible"
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur profile: {e}")
-        return {
-            "id": current_user.get("user_id"),
-            "email": current_user.get("email"),
-            "created_at": "Non disponible"
-        }
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return {"user_id": payload.get("user_id"), "email": payload.get("email")}
+    except jwt.ExpiredSignatureError:
+        logger.warning("Expired JWT token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.PyJWTError:
+        logger.warning("Invalid JWT token")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid authentication credentials")
 
-@router.post("/delete-data")
-async def delete_user_data(current_user: Dict = Depends(get_current_user)):
-    """Delete user data for GDPR compliance"""
-    user_id = current_user.get("user_id")
-    user_email = current_user.get("email")
-    
-    # Log pour traitement RGPD manuel
-    logger.warning(f"Demande suppression RGPD: {user_email} ({user_id})")
-    
+
+class DeleteDataResponse(BaseModel):
+    success: bool
+    message: str
+    note: Optional[str]
+    timestamp: datetime
+
+
+@router.post("/delete-data", response_model=DeleteDataResponse)
+async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Request data deletion for GDPR compliance.
+    """
+    user_id = current_user["user_id"]
+    user_email = current_user["email"]
+    logger.info("GDPR deletion requested for %s (%s)", user_email, user_id)
+    # Here enqueue deletion job or log for manual process
     return {
         "success": True,
         "message": "Demande de suppression enregistrée",
         "note": "Vos données seront supprimées sous 30 jours",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.utcnow()
     }
