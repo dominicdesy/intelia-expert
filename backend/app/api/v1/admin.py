@@ -1,384 +1,108 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from typing import Dict, Any
+import os
 from datetime import datetime
+from typing import Dict, Any
 
 router = APIRouter(prefix="/admin")
 logger = logging.getLogger(__name__)
 
 @router.get("/dashboard")
-async def get_dashboard():
-    """Get admin dashboard with comprehensive status."""
+async def get_dashboard() -> Dict[str, Any]:
+    """
+    Get admin dashboard with comprehensive status.
+    Checks OpenAI and Vector Store configuration.
+    """
     try:
-        from app.services.expert_service import expert_service
-        
-        # Get service status safely
-        try:
-            service_status = expert_service.get_status()
-        except Exception as e:
-            logger.error(f"Error getting service status: {e}")
-            service_status = {
-                "openai_configured": bool(expert_service.openai_client),
-                "secrets_loaded": bool(expert_service.secrets.secrets),
-                "rag_available": False,
-                "rag_configured": False,
-                "method": "error"
-            }
-        
-        # Get RAG diagnostics safely
-        try:
-            rag_diagnostics = expert_service.get_rag_diagnostics()
-        except Exception as e:
-            logger.error(f"Error getting RAG diagnostics: {e}")
-            rag_diagnostics = {
-                "rag_available": False,
-                "rag_configured": False,
-                "rag_method": "error",
-                "diagnostics": {"errors": [str(e)]}
-            }
-        
+        openai_configured = bool(os.getenv("OPENAI_API_KEY"))
+        vector_url = os.getenv("VECTOR_STORE_URL")
+        vector_key = os.getenv("VECTOR_STORE_KEY")
+        rag_available = bool(vector_url and vector_key)
+        rag_configured = rag_available and openai_configured
+
+        diagnostics = {
+            "openai_configured": openai_configured,
+            "rag_available": rag_available,
+            "rag_configured": rag_configured,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
         return {
-            "status": "active",
-            "timestamp": expert_service._get_timestamp(),
-            "services": {
-                "openai": "✅ configured" if service_status.get("openai_configured", False) else "❌ not_configured",
-                "secrets": "✅ loaded" if service_status.get("secrets_loaded", False) else "❌ not_loaded",
-                "rag": _get_rag_status_icon(rag_diagnostics),
-                "expert_service": "✅ operational"
-            },
-            "rag_detailed_status": rag_diagnostics,
-            "metrics": {
-                "total_questions": "N/A",
-                "satisfaction_rate": "N/A", 
-                "average_response_time": "N/A",
-                "rag_usage_rate": "0%" if not rag_diagnostics.get("rag_configured") else "N/A"
-            },
-            "preferred_method": service_status.get("method", "unknown"),
-            "recommendations": _get_recommendations(rag_diagnostics)
+            "status": "success",
+            "diagnostics": diagnostics
         }
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
-        return {
-            "status": "error",
-            "error": str(e),
-            "timestamp": expert_service._get_timestamp() if 'expert_service' in locals() else "unknown"
-        }
-
-# ============================================================================
-# CORRECTION: AJOUT DE L'ENDPOINT MANQUANT /users (résout erreur 404)
-# ============================================================================
+        raise HTTPException(status_code=500, detail="Failed to retrieve dashboard status")
 
 @router.get("/users")
-async def get_users():
-    """Gestion des utilisateurs - ENDPOINT MANQUANT AJOUTÉ pour corriger 404"""
+async def get_users() -> Dict[str, Any]:
+    """
+    Management endpoint for user overview.
+    Placeholder implementation that tracks active sessions.
+    """
     try:
-        # Import du système de logging pour récupérer les utilisateurs
-        try:
-            from app.api.v1.logging import logger_instance
-            import sqlite3
-            
-            with sqlite3.connect(logger_instance.db_path) as conn:
-                # Statistiques utilisateurs
-                users_stats = conn.execute("""
-                    SELECT 
-                        user_id,
-                        COUNT(*) as question_count,
-                        MAX(timestamp) as last_activity,
-                        AVG(CASE WHEN feedback = 1 THEN 1.0 WHEN feedback = -1 THEN 0.0 END) as satisfaction
-                    FROM conversations
-                    GROUP BY user_id
-                    ORDER BY question_count DESC
-                    LIMIT 50
-                """).fetchall()
-                
-                users_list = []
-                for user_stat in users_stats:
-                    users_list.append({
-                        "user_id": user_stat[0][:10] + "..." if len(user_stat[0]) > 10 else user_stat[0],
-                        "question_count": user_stat[1],
-                        "last_activity": user_stat[2],
-                        "satisfaction": round(user_stat[3], 3) if user_stat[3] else None,
-                        "status": "active" if user_stat[1] > 5 else "low_activity"
-                    })
-                
-                return {
-                    "users": users_list,
-                    "total_users": len(users_list),
-                    "active_users": len([u for u in users_list if u["status"] == "active"]),
-                    "timestamp": datetime.now().isoformat(),
-                    "message": "Gestion utilisateurs basée sur les conversations"
-                }
-                
-        except Exception as db_error:
-            # Fallback si pas de base de données
-            return {
-                "users": [],
-                "total_users": 0,
-                "active_users": 0,
-                "message": "Système de gestion utilisateurs en cours d'initialisation",
-                "error": str(db_error),
-                "timestamp": datetime.now().isoformat()
-            }
-            
-    except Exception as e:
-        logger.error(f"Admin users error: {e}")
+        # Example: retrieve active session count from memory store
+        from app.api.v1.pipeline.memory import ConversationMemory
+        memory = ConversationMemory()
+        # For demo, assume memory.store keys are user sessions
+        sessions = list(memory.store.keys())
+        total_users = len(sessions)
         return {
-            "users": [],
-            "total_users": 0,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "users": sessions,
+            "total_users": total_users,
+            "timestamp": datetime.utcnow().isoformat()
         }
+    except Exception as e:
+        logger.error(f"Get users error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve users list")
 
 @router.get("/rag/diagnostics")
-async def get_rag_diagnostics():
-    """Get comprehensive RAG system diagnostics."""
+async def get_rag_diagnostics() -> Dict[str, Any]:
+    """
+    Get comprehensive RAG system diagnostics.
+    """
     try:
-        from app.services.expert_service import expert_service
-        
-        diagnostics = expert_service.get_rag_diagnostics()
-        
+        openai_configured = bool(os.getenv("OPENAI_API_KEY"))
+        vector_url = os.getenv("VECTOR_STORE_URL")
+        vector_key = os.getenv("VECTOR_STORE_KEY")
+        rag_available = bool(vector_url and vector_key)
+        rag_configured = rag_available and openai_configured
         return {
-            "timestamp": expert_service._get_timestamp(),
-            "rag_diagnostics": diagnostics,
-            "status_summary": _analyze_rag_status(diagnostics),
-            "troubleshooting_steps": _get_troubleshooting_steps(diagnostics)
+            "openai_configured": openai_configured,
+            "rag_available": rag_available,
+            "rag_configured": rag_configured,
+            "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
         logger.error(f"RAG diagnostics error: {e}")
-        return {
-            "error": str(e),
-            "timestamp": "unknown",
-            "rag_diagnostics": {
-                "rag_available": False,
-                "rag_configured": False,
-                "error": str(e)
-            }
-        }
-
-@router.post("/rag/force-configure")
-async def force_configure_rag():
-    """Force RAG reconfiguration with detailed feedback."""
-    try:
-        from app.services.expert_service import expert_service
-        
-        logger.info("🔄 Force configuring RAG system...")
-        
-        # Force reconfiguration
-        result = expert_service.force_configure_rag()
-        
-        # Get updated diagnostics
-        try:
-            diagnostics = expert_service.get_rag_diagnostics()
-        except Exception as e:
-            diagnostics = {"error": str(e)}
-        
-        return {
-            "message": "RAG force configuration completed",
-            "timestamp": expert_service._get_timestamp(),
-            "configuration_result": result,
-            "updated_diagnostics": diagnostics,
-            "success": result.get("success", False)
-        }
-    except Exception as e:
-        logger.error(f"RAG force configuration error: {e}")
-        return {
-            "error": str(e),
-            "message": "RAG force configuration failed",
-            "timestamp": "unknown",
-            "success": False
-        }
+        raise HTTPException(status_code=500, detail="Failed to retrieve RAG diagnostics")
 
 @router.get("/rag/test")
-async def test_rag_comprehensive():
-    """Comprehensive RAG system test."""
+async def test_rag_end_to_end() -> Dict[str, Any]:
+    """
+    Test the RAG pipeline end-to-end with a sample question.
+    """
     try:
-        from app.services.expert_service import expert_service
-        
+        from app.api.v1.pipeline.rag_engine import RAGEngine
+        rag = RAGEngine()
         test_question = "What is the optimal temperature for Ross 308 broilers?"
-        
-        try:
-            result = await expert_service.ask_expert(test_question, "en")
-            
-            return {
-                "timestamp": expert_service._get_timestamp(),
-                "test_question": test_question,
-                "test_result": result,
-                "rag_working": result.get("rag_used", False),
-                "success": result.get("success", False),
-                "summary": "✅ RAG test completed" if result.get("success") else "❌ RAG test failed"
-            }
-        except Exception as e:
-            return {
-                "timestamp": expert_service._get_timestamp(),
-                "test_question": test_question,
-                "error": str(e),
-                "rag_working": False,
-                "success": False,
-                "summary": f"❌ RAG test failed: {str(e)}"
-            }
-            
+        # Use empty context for a basic test
+        answer = rag.generate_answer(test_question, {})
+        return {
+            "test_question": test_question,
+            "test_answer": answer,
+            "timestamp": datetime.utcnow().isoformat()
+        }
     except Exception as e:
         logger.error(f"RAG test error: {e}")
-        return {
-            "error": str(e),
-            "timestamp": "unknown",
-            "rag_working": False,
-            "success": False
-        }
-
-@router.get("/rag/status")
-async def get_rag_status():
-    """Get detailed RAG system status."""
-    try:
-        from app.services.expert_service import expert_service
-        
-        diagnostics = expert_service.get_rag_diagnostics()
-        
-        return {
-            "timestamp": expert_service._get_timestamp(),
-            "rag_available": diagnostics.get("rag_available", False),
-            "rag_configured": diagnostics.get("rag_configured", False),
-            "rag_method": diagnostics.get("rag_method", "none"),
-            "detailed_diagnostics": diagnostics.get("diagnostics", {}),
-            "status_icon": _get_rag_status_icon(diagnostics),
-            "human_readable_status": _get_human_readable_status(diagnostics)
-        }
-    except Exception as e:
-        logger.error(f"RAG status error: {e}")
-        return {
-            "error": str(e),
-            "timestamp": "unknown",
-            "rag_available": False,
-            "rag_configured": False
-        }
+        raise HTTPException(status_code=500, detail="RAG end-to-end test failed")
 
 @router.get("/analytics")
-async def get_analytics():
-    """Get usage analytics."""
+async def get_analytics() -> Dict[str, Any]:
+    """
+    Get usage analytics. Not implemented yet.
+    """
     return {
-        "status": "not_implemented",
-        "message": "Detailed analytics coming soon",
-        "available_metrics": [
-            "question_volume_by_hour",
-            "response_methods_distribution",
-            "rag_usage_percentage", 
-            "satisfaction_scores_trend",
-            "response_times_distribution",
-            "language_preference_distribution"
-        ]
+        "status": "not_implemented"
     }
-
-@router.get("/documents")
-async def get_documents_status():
-    """Get RAG documents status."""
-    try:
-        from app.services.expert_service import expert_service
-        
-        try:
-            diagnostics = expert_service.get_rag_diagnostics()
-        except Exception as e:
-            diagnostics = {"error": str(e), "rag_configured": False}
-        
-        return {
-            "timestamp": expert_service._get_timestamp(),
-            "rag_system": "✅ configured" if diagnostics.get("rag_configured") else "❌ not_configured",
-            "documents_indexed": "N/A",
-            "index_size": "N/A", 
-            "last_update": "N/A",
-            "embedding_method": diagnostics.get("diagnostics", {}).get("embedding_method", "unknown"),
-            "full_diagnostics": diagnostics
-        }
-    except Exception as e:
-        logger.error(f"Documents status error: {e}")
-        return {
-            "error": str(e),
-            "timestamp": "unknown",
-            "rag_system": "❌ error"
-        }
-
-@router.post("/documents/upload")
-async def upload_document():
-    """Upload document to RAG system."""
-    return {
-        "status": "not_implemented", 
-        "message": "Document upload interface coming soon",
-        "supported_formats": ["pdf", "txt", "docx", "md"],
-        "max_file_size": "10MB"
-    }
-
-def _get_rag_status_icon(diagnostics: Dict[str, Any]) -> str:
-    """Get visual status icon for RAG."""
-    if diagnostics.get("rag_configured"):
-        return "✅ fully_configured"
-    elif diagnostics.get("rag_available"):
-        return "⚠️ available_not_configured"
-    else:
-        return "❌ not_available"
-
-def _analyze_rag_status(diagnostics: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze RAG status and provide summary."""
-    diag_details = diagnostics.get("diagnostics", {})
-    
-    return {
-        "overall_status": "configured" if diagnostics.get("rag_configured") else "not_configured",
-        "availability": "available" if diagnostics.get("rag_available") else "not_available",
-        "key_issues": [error for error in diag_details.get("errors", [])],
-        "working_components": [
-            component for component, status in diag_details.items() 
-            if isinstance(status, bool) and status
-        ]
-    }
-
-def _get_troubleshooting_steps(diagnostics: Dict[str, Any]) -> list:
-    """Get troubleshooting steps based on diagnostics."""
-    steps = []
-    diag_details = diagnostics.get("diagnostics", {})
-    
-    if not diag_details.get("rag_config_manager_import", False):
-        steps.append({
-            "step": 1,
-            "issue": "RAG config manager import failed",
-            "action": "Check if core.config.rag_config_manager module exists",
-            "solution": "Verify core/ directory structure"
-        })
-    
-    if not diag_details.get("secrets_rag_config", False):
-        steps.append({
-            "step": 2,
-            "issue": "No RAG configuration in secrets.toml",
-            "action": "Add [rag] section to .streamlit/secrets.toml",
-            "solution": 'Add: embedding_method = "OpenAI"'
-        })
-    
-    if not diag_details.get("rag_index_path_exists", False):
-        steps.append({
-            "step": 3,
-            "issue": "RAG index path doesn't exist",
-            "action": "Create RAG index directory",
-            "solution": "mkdir C:/broiler_agent/rag_index"
-        })
-    
-    return steps
-
-def _get_recommendations(diagnostics: Dict[str, Any]) -> list:
-    """Generate recommendations based on RAG diagnostics."""
-    recommendations = []
-    
-    if not diagnostics.get("rag_configured"):
-        recommendations.append({
-            "priority": "high",
-            "title": "Activate RAG System",
-            "description": "RAG system needs configuration",
-            "action": "Use POST /admin/rag/force-configure"
-        })
-    
-    return recommendations
-
-def _get_human_readable_status(diagnostics: Dict[str, Any]) -> str:
-    """Get human-readable status description."""
-    if diagnostics.get("rag_configured"):
-        return f"✅ RAG system operational with {diagnostics.get('rag_method', 'unknown')} method"
-    elif diagnostics.get("rag_available"):
-        return "⚠️ RAG available but needs configuration"
-    else:
-        return "❌ RAG system not available"
