@@ -200,13 +200,13 @@ class SimpleExpertService:
         })
 
     def _enrich_entities_with_context(self, current_entities, established_entities: Dict[str, Any]):
-        """Enrichit les entités actuelles avec le contexte établi - Version flexible"""
+        """Enrichit les entités actuelles avec le contexte établi - Compatible avec tous types d'entités"""
         
         # Si pas d'entités établies, retourner les entités actuelles
         if not established_entities:
             return current_entities
         
-        # Travailler avec l'objet tel qu'il est (flexible)
+        # Travailler avec l'objet tel qu'il est (flexible pour ExtractedEntities ET NormalizedEntities)
         # Enrichir avec le contexte établi si l'entité actuelle est manquante
         age = getattr(current_entities, 'age_days', None)
         if not age and established_entities.get('age_days'):
@@ -214,12 +214,15 @@ class SimpleExpertService:
                 current_entities.age_days = established_entities['age_days']
             logger.info(f"   🔗 [Enrichissement] Âge du contexte: {established_entities['age_days']}j")
         
+        # Gestion flexible des races selon le type d'entités
         breed = (getattr(current_entities, 'breed_specific', None) or 
                 getattr(current_entities, 'breed', None) or 
-                getattr(current_entities, 'breed_generic', None))
+                getattr(current_entities, 'breed_generic', None) or
+                getattr(current_entities, 'specific_breed', None) or
+                getattr(current_entities, 'generic_breed', None))
         if not breed and established_entities.get('breed'):
             # Essayer de setter sur l'attribut qui existe
-            for attr in ['breed_specific', 'breed', 'breed_generic']:
+            for attr in ['breed_specific', 'breed', 'breed_generic', 'specific_breed', 'generic_breed']:
                 if hasattr(current_entities, attr):
                     setattr(current_entities, attr, established_entities['breed'])
                     break
@@ -237,26 +240,44 @@ class SimpleExpertService:
         """
         Décision simple: a-t-on assez de contexte pour une réponse directe ?
         Compatible avec ExtractedEntities ET NormalizedEntities
+        
+        RÈGLES AJUSTÉES pour réponses générales + clarification :
+        - Âge ET race ET sexe (pour questions de poids) = Suffisant pour RAG précis
+        - Question technique spécialisée = Suffisant  
+        - Tout autre cas = Réponse générale + clarification
         """
         
         # Extraction flexible des attributs selon le type d'entités
         has_age = getattr(entities, 'age_days', None) is not None
+        
+        # Gestion flexible des races selon le type d'entités  
         has_breed = (getattr(entities, 'breed_specific', None) is not None or 
                     getattr(entities, 'breed', None) is not None or
-                    getattr(entities, 'breed_generic', None) is not None)
+                    getattr(entities, 'breed_generic', None) is not None or
+                    getattr(entities, 'specific_breed', None) is not None or
+                    getattr(entities, 'generic_breed', None) is not None)
+        
+        has_sex = getattr(entities, 'sex', None) is not None
         is_technical = self._is_technical_question(question)
+        is_weight_question = self._mentions_weight_or_growth(question)
         
-        # Règles simples
+        # NOUVELLES RÈGLES AJUSTÉES :
+        
+        # 1. Questions techniques spécialisées = toujours suffisant
         if is_technical:
-            return True  # Questions techniques = toujours suffisant
+            return True  
         
+        # 2. Questions de poids/croissance = besoin de TOUS les détails pour réponse précise
+        if is_weight_question:
+            # Pour une réponse RAG précise, il faut âge ET race ET sexe
+            return has_age and has_breed and has_sex
+        
+        # 3. Autres questions = âge + race suffisant
         if has_age and has_breed:
-            return True  # Âge + race = suffisant
+            return True
         
-        if has_age and self._mentions_weight_or_growth(question):
-            return True  # Âge + question sur poids/croissance = suffisant
-        
-        return False  # Sinon = clarification
+        # 4. Sinon = réponse générale + clarification
+        return False
 
     def _is_technical_question(self, question: str) -> bool:
         """Détecte les questions techniques spécialisées"""
@@ -282,9 +303,9 @@ class SimpleExpertService:
         
         return any(keyword in question_lower for keyword in weight_growth_keywords)
 
-    async def _generate_direct_answer(self, question: str, entities: ExtractedEntities,
+    async def _generate_direct_answer(self, question: str, entities,
                                     conversation_id: str) -> SimpleProcessingResult:
-        """Génère une réponse directe avec RAG si possible"""
+        """Génère une réponse directe avec RAG si possible - Compatible avec tous types d'entités"""
         
         rag_used = False
         rag_results = []
@@ -306,14 +327,14 @@ class SimpleExpertService:
         # Générer la réponse
         try:
             if rag_used and hasattr(self.response_generator, 'generate_with_rag'):
-                # Avec RAG
-                response_data = self.response_generator.generate_with_rag(
+                # Avec RAG - Méthode asynchrone
+                response_data = await self.response_generator.generate_with_rag(
                     question, self._entities_to_dict(entities), 
                     self._create_mock_classification("contextual_answer"), rag_results
                 )
             else:
-                # Sans RAG - réponse classique
-                response_data = self.response_generator.generate(
+                # Sans RAG - Méthode asynchrone
+                response_data = await self.response_generator.generate(
                     question, self._entities_to_dict(entities),
                     self._create_mock_classification("precise_answer")
                 )
@@ -336,31 +357,59 @@ class SimpleExpertService:
             conversation_id=conversation_id
         )
 
-    def _generate_clarification_response(self, question: str, entities: ExtractedEntities,
+    def _generate_clarification_response(self, question: str, entities,
                                        conversation_id: str) -> SimpleProcessingResult:
-        """Génère une réponse générale + demande de clarification"""
+        """Génère une réponse générale + demande de clarification - Compatible avec tous types d'entités"""
         
-        # Analyser ce qui manque
+        # Analyser ce qui manque (gestion flexible des types d'entités)
         missing = []
-        if not entities.age_days:
+        age_days = getattr(entities, 'age_days', None)
+        
+        # Gestion flexible des races
+        breed_specific = (getattr(entities, 'breed_specific', None) or 
+                         getattr(entities, 'breed', None) or 
+                         getattr(entities, 'specific_breed', None))
+        breed_generic = (getattr(entities, 'breed_generic', None) or 
+                        getattr(entities, 'generic_breed', None))
+        
+        sex = getattr(entities, 'sex', None)
+        is_weight_question = self._mentions_weight_or_growth(question)
+        
+        # Analyser ce qui manque selon le type de question
+        if not age_days:
             missing.append("l'âge de vos animaux (en jours ou semaines)")
-        if not entities.breed_specific and not entities.breed_generic:
+        
+        if not breed_specific and not breed_generic:
             missing.append("la race ou le type (Ross 308, Cobb 500, pondeuses, etc.)")
-        if not entities.sex and self._mentions_weight_or_growth(question):
+        
+        if is_weight_question and not sex:
             missing.append("le sexe (mâles, femelles, ou mixte)")
         
         # Réponse générale basique
         general_response = self._generate_general_context_response(question, entities)
         
-        # Demande de clarification
+        # Demande de clarification adaptée
         if missing:
-            if len(missing) == 1:
-                clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez {missing[0]}."
+            if is_weight_question:
+                if age_days and not breed_specific and not sex:
+                    # Cas comme votre exemple : âge connu, mais manque race ET sexe
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, veuillez préciser la race et le sexe de vos poulets."
+                elif len(missing) == 1:
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez {missing[0]}."
+                else:
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez :\n"
+                    for item in missing:
+                        clarification += f"• {item.capitalize()}\n"
+                    clarification = clarification.rstrip()
             else:
-                clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez :\n"
-                for item in missing:
-                    clarification += f"• {item.capitalize()}\n"
-                clarification = clarification.rstrip()
+                # Questions non-poids
+                if len(missing) == 1:
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez {missing[0]}."
+                else:
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez :\n"
+                    for item in missing:
+                        clarification += f"• {item.capitalize()}\n"
+                    clarification = clarification.rstrip()
         else:
             clarification = "\n\n💡 **Pour une réponse plus précise**, donnez plus de détails sur votre situation."
         
@@ -377,8 +426,8 @@ class SimpleExpertService:
             conversation_id=conversation_id
         )
 
-    def _generate_general_context_response(self, question: str, entities: ExtractedEntities) -> str:
-        """Génère une réponse générale contextuelle"""
+    def _generate_general_context_response(self, question: str, entities) -> str:
+        """Génère une réponse générale contextuelle - Compatible avec tous types d'entités"""
         
         question_lower = question.lower()
         
@@ -394,17 +443,25 @@ class SimpleExpertService:
         else:
             return self._get_general_default_response(entities)
 
-    def _get_general_weight_response(self, entities: ExtractedEntities) -> str:
-        """Réponse générale sur le poids"""
-        if entities.age_days:
-            return f"""**Poids des poulets à {entities.age_days} jours :**
-
-Les fourchettes de poids varient selon la race et le sexe :
+    def _get_general_weight_response(self, entities) -> str:
+        """Réponse générale sur le poids - Compatible avec tous types d'entités"""
+        age_days = getattr(entities, 'age_days', None)
+        if age_days:
+            return f"""**Poids des poulets à {age_days} jours :**
 
 📊 **Fourchettes générales** :
-• Ross 308 : 300-800g (selon sexe)
-• Cobb 500 : 290-780g (selon sexe)  
-• Hubbard : 280-760g (selon sexe)
+• **Races lourdes** (Ross 308, Cobb 500) : 120-360g
+• **Races standard** : 100-145g  
+• **Races pondeuses** : 80-120g
+
+🐓 **Différences moyennes** :
+• **Mâles** : +10-15% par rapport aux moyennes
+• **Femelles** : -10-15% par rapport aux moyennes
+
+🔍 **Surveillance recommandée** :
+• Pesée quotidienne d'échantillon représentatif
+• Contrôle de l'homogénéité du troupeau
+• Ajustement alimentaire selon l'évolution du poids
 
 ⚠️ **Important** : Ces valeurs sont indicatives."""
         else:
@@ -419,7 +476,7 @@ Le poids varie énormément selon l'âge, la race et le sexe :
 • 28 jours : 1200-1700g
 • 35 jours : 1800-2400g"""
 
-    def _get_general_feeding_response(self, entities: ExtractedEntities) -> str:
+    def _get_general_feeding_response(self, entities) -> str:
         """Réponse générale sur l'alimentation"""
         return """**Alimentation des poulets de chair :**
 
@@ -430,7 +487,7 @@ Le poids varie énormément selon l'âge, la race et le sexe :
 
 💧 **Eau** : Accès permanent, 1,8-2,2L par kg d'aliment"""
 
-    def _get_general_health_response(self, entities: ExtractedEntities) -> str:
+    def _get_general_health_response(self, entities) -> str:
         """Réponse générale sur la santé"""
         return """**Santé des poulets de chair :**
 
@@ -444,7 +501,7 @@ Le poids varie énormément selon l'âge, la race et le sexe :
 • Baisse d'appétit ou de croissance
 • Symptômes respiratoires ou digestifs"""
 
-    def _get_general_environment_response(self, entities: ExtractedEntities) -> str:
+    def _get_general_environment_response(self, entities) -> str:
         """Réponse générale sur l'environnement"""
         return """**Conditions d'ambiance :**
 
@@ -455,7 +512,7 @@ Le poids varie énormément selon l'âge, la race et le sexe :
 
 💨 **Ventilation** : 0,8-4 m³/h/kg selon saison"""
 
-    def _get_general_default_response(self, entities: ExtractedEntities) -> str:
+    def _get_general_default_response(self, entities) -> str:
         """Réponse générale par défaut"""
         return """**Élevage de poulets de chair :**
 
@@ -465,23 +522,32 @@ Le poids varie énormément selon l'âge, la race et le sexe :
 • Alimentation adaptée aux phases
 • Conditions d'ambiance optimales"""
 
-    def _build_rag_query(self, question: str, entities: ExtractedEntities) -> str:
-        """Construit une requête optimisée pour le RAG"""
+    def _build_rag_query(self, question: str, entities) -> str:
+        """Construit une requête optimisée pour le RAG - Compatible avec tous types d'entités"""
         base_query = question
         
-        # Enrichir avec les entités disponibles
+        # Enrichir avec les entités disponibles (gestion flexible)
         enrichments = []
         
-        if entities.breed_specific:
-            enrichments.append(entities.breed_specific)
-        elif entities.breed_generic:
-            enrichments.append(entities.breed_generic)
+        # Gestion flexible des races
+        breed_specific = (getattr(entities, 'breed_specific', None) or 
+                         getattr(entities, 'breed', None) or 
+                         getattr(entities, 'specific_breed', None))
+        breed_generic = (getattr(entities, 'breed_generic', None) or 
+                        getattr(entities, 'generic_breed', None))
         
-        if entities.age_days:
-            enrichments.append(f"{entities.age_days} jours")
+        if breed_specific:
+            enrichments.append(breed_specific)
+        elif breed_generic:
+            enrichments.append(breed_generic)
         
-        if entities.sex:
-            enrichments.append(entities.sex)
+        age_days = getattr(entities, 'age_days', None)
+        if age_days:
+            enrichments.append(f"{age_days} jours")
+        
+        sex = getattr(entities, 'sex', None)
+        if sex:
+            enrichments.append(sex)
         
         if enrichments:
             return f"{base_query} {' '.join(enrichments)}"
@@ -489,8 +555,8 @@ Le poids varie énormément selon l'âge, la race et le sexe :
             return base_query
 
     def _save_to_simple_history(self, conversation_id: str, question: str, 
-                              result: SimpleProcessingResult, entities: ExtractedEntities):
-        """Sauvegarde simple dans l'historique conversationnel"""
+                              result: SimpleProcessingResult, entities):
+        """Sauvegarde simple dans l'historique conversationnel - Compatible avec tous types d'entités"""
         
         if not conversation_id or not self.config["enable_context"]:
             return
@@ -515,15 +581,26 @@ Le poids varie énormément selon l'âge, la race et le sexe :
             history['questions'] = history['questions'][-max_history:]
             history['responses'] = history['responses'][-max_history:]
         
-        # Mettre à jour les entités établies
-        if entities.age_days:
-            history['established_entities']['age_days'] = entities.age_days
-        if entities.breed_specific:
-            history['established_entities']['breed'] = entities.breed_specific
-        elif entities.breed_generic:
-            history['established_entities']['breed'] = entities.breed_generic
-        if entities.sex:
-            history['established_entities']['sex'] = entities.sex
+        # Mettre à jour les entités établies (gestion flexible)
+        age_days = getattr(entities, 'age_days', None)
+        if age_days:
+            history['established_entities']['age_days'] = age_days
+        
+        # Gestion flexible des races
+        breed_specific = (getattr(entities, 'breed_specific', None) or 
+                         getattr(entities, 'breed', None) or 
+                         getattr(entities, 'specific_breed', None))
+        breed_generic = (getattr(entities, 'breed_generic', None) or 
+                        getattr(entities, 'generic_breed', None))
+        
+        if breed_specific:
+            history['established_entities']['breed'] = breed_specific
+        elif breed_generic:
+            history['established_entities']['breed'] = breed_generic
+        
+        sex = getattr(entities, 'sex', None)
+        if sex:
+            history['established_entities']['sex'] = sex
         
         logger.debug(f"   💾 [Historique] Sauvegardé pour {conversation_id}")
 
@@ -546,14 +623,23 @@ Le poids varie énormément selon l'âge, la race et le sexe :
         )
 
     def _entities_to_dict(self, entities) -> Dict[str, Any]:
-        """Convertit les entités en dictionnaire - Version flexible"""
+        """Convertit les entités en dictionnaire - Version flexible compatible avec NormalizedEntities"""
         result = {}
         
-        # Extraction flexible selon le type d'entités
+        # Extraction flexible selon le type d'entités (ExtractedEntities OU NormalizedEntities)
         result['age_days'] = getattr(entities, 'age_days', None)
         result['age_weeks'] = getattr(entities, 'age_weeks', None)
-        result['breed_specific'] = getattr(entities, 'breed_specific', None) or getattr(entities, 'breed', None)
-        result['breed_generic'] = getattr(entities, 'breed_generic', None)
+        
+        # Gestion flexible des races selon le type d'entités
+        breed_specific = (getattr(entities, 'breed_specific', None) or 
+                         getattr(entities, 'breed', None) or 
+                         getattr(entities, 'specific_breed', None))
+        result['breed_specific'] = breed_specific
+        
+        breed_generic = (getattr(entities, 'breed_generic', None) or 
+                        getattr(entities, 'generic_breed', None))
+        result['breed_generic'] = breed_generic
+        
         result['sex'] = getattr(entities, 'sex', None)
         result['weight_mentioned'] = getattr(entities, 'weight_mentioned', False)
         result['weight_grams'] = getattr(entities, 'weight_grams', None)
@@ -573,13 +659,15 @@ Le poids varie énormément selon l'âge, la race et le sexe :
         
         return MockClassification(response_type)
 
-    def _generate_fallback_response(self, question: str, entities: ExtractedEntities) -> str:
-        """Génère une réponse de secours basique"""
+    def _generate_fallback_response(self, question: str, entities) -> str:
+        """Génère une réponse de secours basique - Compatible avec tous types d'entités"""
         question_lower = question.lower()
         
+        age_days = getattr(entities, 'age_days', None)
+        
         if 'poids' in question_lower or 'weight' in question_lower:
-            if entities.age_days:
-                return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
+            if age_days:
+                return f"**Poids indicatif à {age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
             else:
                 return "**Poids des poulets de chair :** Les valeurs varient selon l'âge, la race et le sexe. Précisez ces informations pour une réponse personnalisée."
         
