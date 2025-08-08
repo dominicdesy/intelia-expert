@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 
 def format_response(answer: str, sources: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
