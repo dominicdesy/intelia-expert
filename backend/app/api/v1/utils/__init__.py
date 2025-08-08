@@ -6,4 +6,6 @@ __all__ = [
     "validation_pipeline",
     "response_generator",
     "integrations",
+    "openai_utils",
+    "question_classifier"
 ]
