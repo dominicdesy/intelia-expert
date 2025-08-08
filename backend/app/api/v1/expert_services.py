@@ -242,7 +242,7 @@ class SimpleExpertService:
         Compatible avec ExtractedEntities ET NormalizedEntities
         
         RÈGLES AJUSTÉES pour réponses générales + clarification :
-        - Âge ET race ET sexe (pour questions de poids) = Suffisant pour RAG précis
+        - Âge ET race spécifique ET sexe (pour questions de poids) = Suffisant pour RAG précis
         - Question technique spécialisée = Suffisant  
         - Tout autre cas = Réponse générale + clarification
         """
@@ -250,12 +250,19 @@ class SimpleExpertService:
         # Extraction flexible des attributs selon le type d'entités
         has_age = getattr(entities, 'age_days', None) is not None
         
-        # Gestion flexible des races selon le type d'entités  
-        has_breed = (getattr(entities, 'breed_specific', None) is not None or 
-                    getattr(entities, 'breed', None) is not None or
-                    getattr(entities, 'breed_generic', None) is not None or
-                    getattr(entities, 'specific_breed', None) is not None or
-                    getattr(entities, 'generic_breed', None) is not None)
+        # CORRECTION: Gestion plus stricte des races - ignorer les races génériques
+        breed_specific = (getattr(entities, 'breed_specific', None) or 
+                         getattr(entities, 'breed', None) or 
+                         getattr(entities, 'specific_breed', None))
+        breed_generic = (getattr(entities, 'breed_generic', None) or 
+                        getattr(entities, 'generic_breed', None))
+        
+        # Ne considérer que les vraies races spécifiques
+        has_real_breed = False
+        if breed_specific and not any(generic in breed_specific.lower() for generic in ['poulet', 'générique', 'chicken', 'generic']):
+            has_real_breed = True
+        elif breed_generic and not any(generic in breed_generic.lower() for generic in ['poulet', 'générique', 'chicken', 'generic']):
+            has_real_breed = True
         
         has_sex = getattr(entities, 'sex', None) is not None
         is_technical = self._is_technical_question(question)
@@ -269,11 +276,11 @@ class SimpleExpertService:
         
         # 2. Questions de poids/croissance = besoin de TOUS les détails pour réponse précise
         if is_weight_question:
-            # Pour une réponse RAG précise, il faut âge ET race ET sexe
-            return has_age and has_breed and has_sex
+            # Pour une réponse RAG précise, il faut âge ET race spécifique ET sexe
+            return has_age and has_real_breed and has_sex
         
-        # 3. Autres questions = âge + race suffisant
-        if has_age and has_breed:
+        # 3. Autres questions = âge + race spécifique suffisant
+        if has_age and has_real_breed:
             return True
         
         # 4. Sinon = réponse générale + clarification
@@ -377,12 +384,19 @@ class SimpleExpertService:
         missing = []
         age_days = getattr(entities, 'age_days', None)
         
-        # Gestion flexible des races
+        # Gestion flexible des races - CORRECTION: ignorer les races génériques
         breed_specific = (getattr(entities, 'breed_specific', None) or 
                          getattr(entities, 'breed', None) or 
                          getattr(entities, 'specific_breed', None))
         breed_generic = (getattr(entities, 'breed_generic', None) or 
                         getattr(entities, 'generic_breed', None))
+        
+        # CORRECTION CRITIQUE: Ne pas considérer "Poulet générique" comme une vraie race
+        has_real_breed = False
+        if breed_specific and not any(generic in breed_specific.lower() for generic in ['poulet', 'générique', 'chicken', 'generic']):
+            has_real_breed = True
+        elif breed_generic and not any(generic in breed_generic.lower() for generic in ['poulet', 'générique', 'chicken', 'generic']):
+            has_real_breed = True
         
         sex = getattr(entities, 'sex', None)
         is_weight_question = self._mentions_weight_or_growth(question)
@@ -391,7 +405,8 @@ class SimpleExpertService:
         if not age_days:
             missing.append("l'âge de vos animaux (en jours ou semaines)")
         
-        if not breed_specific and not breed_generic:
+        # CORRECTION: Toujours demander la race si ce n'est pas une race spécifique
+        if not has_real_breed:
             missing.append("la race ou le type (Ross 308, Cobb 500, pondeuses, etc.)")
         
         if is_weight_question and not sex:
@@ -403,9 +418,15 @@ class SimpleExpertService:
         # Demande de clarification adaptée
         if missing:
             if is_weight_question:
-                if age_days and not breed_specific and not sex:
+                if age_days and not has_real_breed and not sex:
                     # Cas comme votre exemple : âge connu, mais manque race ET sexe
                     clarification = f"\n\n💡 **Pour une réponse plus précise**, veuillez préciser la race et le sexe de vos poulets."
+                elif age_days and not has_real_breed and sex:
+                    # Âge + sexe mais pas de race spécifique
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, veuillez préciser la race (Ross 308, Cobb 500, etc.)."
+                elif age_days and has_real_breed and not sex:
+                    # Âge + race mais pas de sexe  
+                    clarification = f"\n\n💡 **Pour une réponse plus précise**, veuillez préciser le sexe (mâles, femelles, ou mixte)."
                 elif len(missing) == 1:
                     clarification = f"\n\n💡 **Pour une réponse plus précise**, précisez {missing[0]}."
                 else:
