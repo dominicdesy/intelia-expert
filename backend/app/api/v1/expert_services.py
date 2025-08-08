@@ -6,7 +6,9 @@ def _generate_fallback_response(self, question: str, entities: ExtractedEntities
             if entities.age_days:
                 return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
             else:
-                return "**Poids des"""
+                return "**Poids des poulets de chair :** Les valeurs varient selon l'âge, la race et le sexe. Précisez ces informations pour une réponse personnalisée."
+
+"""
 expert_services.py - SERVICE EXPERT SIMPLIFIE ET EFFICACE
 
 PHILOSOPHIE SIMPLE:
@@ -580,6 +582,28 @@ Le poids varie énormément selon l'âge, la race et le sexe :
                 self.confidence = 0.8
         
         return MockClassification(response_type)
+
+    def _generate_fallback_response(self, question: str, entities: ExtractedEntities) -> str:
+        """Génère une réponse de secours basique"""
+        question_lower = question.lower()
+        
+        if 'poids' in question_lower or 'weight' in question_lower:
+            if entities.age_days:
+                return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
+            else:
+                return "**Poids des poulets de chair :** Les valeurs varient selon l'âge, la race et le sexe. Précisez ces informations pour une réponse personnalisée."
+        
+        elif 'alimentation' in question_lower or 'nutrition' in question_lower:
+            return "**Alimentation des poulets :** Adaptez selon l'âge (starter, grower, finisher) et la race. Précisez votre situation pour des recommandations spécifiques."
+        
+        elif 'température' in question_lower or 'chauffage' in question_lower:
+            return "**Température d'élevage :** Varie selon l'âge des animaux. Démarrage à 32-35°C puis diminution progressive. Précisez l'âge pour des valeurs exactes."
+        
+        elif 'santé' in question_lower or 'maladie' in question_lower:
+            return "**Santé des poulets :** Surveillez quotidiennement le comportement, l'appétit et les signes cliniques. Décrivez les symptômes observés pour un conseil adapté."
+        
+        else:
+            return "**Élevage de poulets de chair :** Je peux vous aider avec des questions sur le poids, l'alimentation, la santé, l'ambiance, etc. Précisez votre question avec l'âge et la race si possible."
 
     def get_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques simples"""
