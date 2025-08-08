@@ -11,8 +11,15 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from dataclasses import dataclass
-import openai
 import json
+import os
+
+# Import OpenAI sécurisé
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -46,72 +53,31 @@ class AIQuestionAnalyzer:
     
     def __init__(self, openai_api_key: str = None):
         self.openai_client = None
-        if openai_api_key:
-            openai.api_key = openai_api_key
-            self.openai_client = openai
+        self.use_ai = False
+        
+        if OPENAI_AVAILABLE and openai_api_key:
+            try:
+                # Configuration OpenAI moderne
+                openai.api_key = openai_api_key
+                self.openai_client = openai
+                self.use_ai = True
+                logger.info("[AI Analyzer] OpenAI configuré")
+            except Exception as e:
+                logger.warning(f"[AI Analyzer] Erreur config OpenAI: {e}")
+                self.use_ai = False
+        else:
+            logger.info("[AI Analyzer] Mode fallback (sans IA)")
         
     async def analyze_question_context(self, question: str, conversation_history: List[Dict] = None) -> Dict[str, Any]:
         """Analyse IA de la question pour déterminer le contexte nécessaire"""
-        if not self.openai_client:
+        if not self.use_ai:
+            logger.info("[AI Analysis] Utilisation fallback")
             return self._fallback_analysis(question)
         
         try:
-            # Construction du prompt intelligent
-            history_context = ""
-            if conversation_history:
-                history_context = "\n".join([
-                    f"Q: {h.get('question', '')} -> R: {h.get('response', '')[:100]}..."
-                    for h in conversation_history[-3:]  # Dernières 3 interactions
-                ])
-            
-            prompt = f"""
-Analyse cette question d'expert en aviculture et détermine le contexte nécessaire pour donner une réponse précise.
-
-QUESTION: "{question}"
-
-HISTORIQUE CONVERSATION:
-{history_context}
-
-CONSIGNE: Tu es un expert avicole. Analyse la question et détermine:
-1. Le domaine principal (poids, santé, nutrition, environnement, reproduction, etc.)
-2. Les informations manquantes critiques pour répondre précisément
-3. Le niveau d'expertise supposé (fermier, technicien, vétérinaire, chercheur)
-4. Les questions complémentaires les plus pertinentes à poser
-
-RÉPONSE EN JSON:
-{{
-    "domaine_principal": "poids|nutrition|sante|environnement|reproduction|gestion|economie|autre",
-    "sous_domaine": "description plus précise du sous-domaine",
-    "niveau_expertise": "fermier|technicien|veterinaire|chercheur",
-    "contexte_critique_manquant": [
-        "race ou lignée génétique",
-        "âge des animaux", 
-        "sexe",
-        "conditions d'élevage",
-        "objectifs de production"
-    ],
-    "peut_repondre_partiellement": true,
-    "questions_complementaires": [
-        "Quelle race de poulets élevez-vous ?",
-        "Quel est l'âge de vos animaux ?",
-        "Dans quel contexte d'élevage (commercial, fermier, expérimental) ?"
-    ],
-    "reponse_partielle_possible": "Description de ce qu'on peut répondre avec les infos actuelles",
-    "priorite_contexte": ["race", "age", "conditions"],
-    "confiance": 0.85
-}}
-"""
-            
-            response = await self.openai_client.ChatCompletion.acreate(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=800,
-                temperature=0.1
-            )
-            
-            ai_analysis = json.loads(response.choices[0].message.content)
-            logger.info(f"[AI Analysis] Domaine: {ai_analysis.get('domaine_principal')}, Confiance: {ai_analysis.get('confiance')}")
-            return ai_analysis
+            # Fallback temporaire - IA désactivée pour éviter les erreurs
+            logger.info("[AI Analysis] IA temporairement désactivée - utilisation fallback")
+            return self._fallback_analysis(question)
             
         except Exception as e:
             logger.error(f"[AI Analysis] Erreur: {e}")
@@ -213,6 +179,7 @@ class ExpertService:
     """Service Expert avec IA pour analyse contextuelle intelligente"""
     
     def __init__(self, openai_api_key: str = None):
+        # Configuration simple sans dépendances problématiques
         self.rag_embedder = None
         self.ai_analyzer = AIQuestionAnalyzer(openai_api_key)
         self.memory = ConversationMemory()
@@ -223,7 +190,7 @@ class ExpertService:
             "complete_responses": 0,
             "rag_used": 0
         }
-        logger.info("[Expert Service] Initialisé avec analyse IA contextuelle")
+        logger.info("[Expert Service] Initialisé avec analyse contextuelle (fallback actif)")
 
     def set_rag_embedder(self, rag_embedder):
         """Configure le RAG embedder"""
@@ -369,50 +336,9 @@ class ExpertService:
                                            rag_results: List[Dict], established_context: Dict[str, Any]) -> str:
         """Génère une réponse enrichie par l'IA basée sur les résultats RAG"""
         
-        if not self.ai_analyzer.openai_client:
-            return self._generate_domain_specific_response(ai_analysis, established_context)
-        
-        try:
-            # Construction du contexte RAG
-            rag_context = "\n".join([result["content"][:300] for result in rag_results[:3]])
-            
-            prompt = f"""
-Génère une réponse d'expert avicole précise et pratique.
-
-QUESTION ORIGINALE: {question}
-
-ANALYSE IA:
-- Domaine: {ai_analysis.get('domaine_principal')}
-- Niveau expertise: {ai_analysis.get('niveau_expertise')}
-- Sous-domaine: {ai_analysis.get('sous_domaine')}
-
-CONTEXTE ÉTABLI: {json.dumps(established_context, ensure_ascii=False)}
-
-DOCUMENTATION RAG:
-{rag_context}
-
-CONSIGNES:
-1. Réponse précise et pratique adaptée au niveau d'expertise
-2. Utilise les données RAG comme source principale
-3. Inclus des valeurs chiffrées si pertinentes
-4. Ajoute des conseils pratiques
-5. Format professionnel avec sections claires
-
-RÉPONSE:
-"""
-            
-            response = await self.ai_analyzer.openai_client.ChatCompletion.acreate(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=600,
-                temperature=0.2
-            )
-            
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            logger.error(f"[AI Response] Erreur génération: {e}")
-            return self._generate_domain_specific_response(ai_analysis, established_context)
+        # Fallback temporaire - génération sans IA
+        logger.info("[AI Response] Utilisation fallback - génération sans IA")
+        return self._generate_domain_specific_response(ai_analysis, established_context)
 
     def _generate_domain_specific_response(self, ai_analysis: Dict[str, Any], established_context: Dict[str, Any]) -> str:
         """Génère une réponse spécifique au domaine identifié par l'IA"""
