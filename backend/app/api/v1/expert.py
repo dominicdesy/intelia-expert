@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from pydantic import BaseModel
+import uuid
 from app.api.v1.pipeline.dialogue_manager import DialogueManager
 
 router = APIRouter(prefix="", tags=["expert"])
@@ -27,7 +28,7 @@ def get_session_id(request: Request) -> str:
     """
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
-        session_id = request.client.host
+        session_id = f"session_{uuid.uuid4().hex[:12]}"  # ← MODIFIÉ
     return session_id
 
 @router.post("/ask", response_model=ResponseModel)

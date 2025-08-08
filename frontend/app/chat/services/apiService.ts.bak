@@ -1,4 +1,4 @@
-// ==================== API SERVICE COMPLET - CONSERVATION CODE ORIGINAL + CORRECTIONS CONVERSATION_ID ====================
+// ==================== API SERVICE UNIFIÉ - COMPATIBLE NOUVEAU BACKEND ====================
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -147,7 +147,7 @@ interface APIError {
 }
 
 /**
- * 🚀 FONCTION PRINCIPALE CORRIGÉE : conversation_id toujours généré
+ * 🔧 FONCTION PRINCIPALE CORRIGÉE : Utilise endpoint unifié /ask
  */
 export const generateAIResponse = async (
   question: string,
@@ -172,16 +172,17 @@ export const generateAIResponse = async (
   // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🎯 [apiService] Envoi question vers ask-enhanced-v2:', {
+  console.log('🎯 [apiService] Envoi question vers endpoint unifié /ask:', {
     question: question.substring(0, 50) + '...',
-    conversation_id: finalConversationId, // 🔧 NOUVEAU : Log de l'ID généré
+    conversation_id: finalConversationId,
     concisionLevel,
     isClarificationResponse,
     originalQuestion: originalQuestion?.substring(0, 30) + '...'
   })
 
   try {
-    let endpoint = `${API_BASE_URL}/expert/ask-enhanced-v2`
+    // 🔧 ENDPOINT CORRIGÉ : Utilise le nouvel endpoint unifié
+    let endpoint = `${API_BASE_URL}/expert/ask`
     
     // ✅ ENRICHISSEMENT CLARIFICATION INCHANGÉ
     let finalQuestion = question.trim()
@@ -203,16 +204,16 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🔧 BODY CORRIGÉ : conversation_id toujours présent
+    // 🔧 BODY MODIFIÉ : Compatible avec le nouveau backend unifié
     const requestBody = {
       text: finalQuestion,
       language: language,
-      // 🚀 NOUVEAU : Paramètres concision
+      // 🚀 NOUVEAU : Paramètres concision pour le backend unifié
       concision_level: concisionLevel,
       generate_all_versions: true,
       // 🔧 FIX CRITIQUE : Toujours inclure conversation_id
       conversation_id: finalConversationId,
-      // ✅ CLARIFICATIONS INCHANGÉES
+      // ✅ CLARIFICATIONS INCHANGÉES mais adaptées au nouveau format
       ...(isClarificationResponse && {
         is_clarification_response: true,
         original_question: originalQuestion
@@ -221,9 +222,9 @@ export const generateAIResponse = async (
 
     const headers = getAuthHeaders()
 
-    console.log('📤 [apiService] Body pour ask-enhanced-v2 (CORRIGÉ):', {
+    console.log('📤 [apiService] Body pour endpoint unifié /ask:', {
       ...requestBody,
-      conversation_id: `${finalConversationId.substring(0, 8)}...` // Log partiel pour sécurité
+      conversation_id: `${finalConversationId.substring(0, 8)}...`
     })
 
     const response = await fetch(endpoint, {
@@ -232,11 +233,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut réponse ask-enhanced-v2:', response.status)
+    console.log('📡 [apiService] Statut réponse endpoint unifié:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur ask-enhanced-v2:', errorText)
+      console.error('❌ [apiService] Erreur endpoint unifié:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -258,7 +259,7 @@ export const generateAIResponse = async (
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-enhanced-v2 reçue (CORRIGÉE):', {
+    console.log('✅ [apiService] Réponse endpoint unifié reçue:', {
       conversation_id: data.conversation_id,
       language: data.language,
       mode: data.mode,
@@ -267,13 +268,12 @@ export const generateAIResponse = async (
       // 🚀 NOUVEAU : Log versions reçues
       versions_received: Object.keys(data.response_versions || {}),
       clarification_requested: data.clarification_result?.clarification_requested || false,
-      // 🔧 NOUVEAU : Confirmation que conversation_id a été traité
       conversation_id_sent: finalConversationId,
       conversation_id_received: data.conversation_id,
       ids_match: finalConversationId === data.conversation_id
     })
 
-    // 🚀 FALLBACK : Si backend pas encore modifié
+    // 🚀 FALLBACK : Si backend pas encore modifié pour response_versions
     if (!data.response_versions) {
       console.warn('⚠️ [apiService] Backend n\'a pas fourni response_versions - utilisation fallback')
       data.response_versions = {
@@ -316,20 +316,18 @@ export const generateAIResponse = async (
       vague_entities: data.clarification_result?.missing_information || []
     }
 
-    console.log('🎯 [apiService] Données traitées avec mapping clarification (CORRIGÉES):', {
+    console.log('🎯 [apiService] Données traitées avec mapping clarification:', {
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
       clarification_result_exists: !!processedData.clarification_result,
-      // 🚀 NOUVEAU
       versions_available: Object.keys(processedData.response_versions || {}),
-      // 🔧 CORRECTION CONFIRMÉE
       conversation_id_final: processedData.conversation_id
     })
 
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur complète ask-enhanced-v2:', error)
+    console.error('❌ [apiService] Erreur complète endpoint unifié:', error)
     
     if (error instanceof Error) {
       throw error
@@ -340,7 +338,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🚀 VERSION PUBLIQUE CORRIGÉE : conversation_id toujours généré
+ * 🔧 VERSION PUBLIQUE CORRIGÉE : Utilise endpoint unifié /ask-public
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -356,14 +354,14 @@ export const generateAIResponsePublic = async (
   // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌐 [apiService] Question publique vers ask-enhanced-v2-public (CORRIGÉE):', {
+  console.log('🌐 [apiService] Question publique vers endpoint unifié /ask-public:', {
     question: question.substring(0, 50) + '...',
-    conversation_id: finalConversationId, // 🔧 NOUVEAU
+    conversation_id: finalConversationId,
     concisionLevel
   })
 
   try {
-    // 🔧 BODY CORRIGÉ : conversation_id toujours présent
+    // 🔧 BODY CORRIGÉ : Compatible avec endpoint unifié
     const requestBody = {
       text: question.trim(),
       language: language,
@@ -373,7 +371,8 @@ export const generateAIResponsePublic = async (
       conversation_id: finalConversationId
     }
 
-    const response = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2-public`, {
+    // 🔧 ENDPOINT CORRIGÉ : Utilise le nouvel endpoint unifié public
+    const response = await fetch(`${API_BASE_URL}/expert/ask-public`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -383,21 +382,20 @@ export const generateAIResponsePublic = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur ask-enhanced-v2-public:', errorText)
+      console.error('❌ [apiService] Erreur endpoint unifié public:', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
     const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse ask-enhanced-v2-public reçue (CORRIGÉE):', {
+    console.log('✅ [apiService] Réponse endpoint unifié public reçue:', {
       conversation_id: data.conversation_id,
       mode: data.mode,
       rag_used: data.rag_used,
-      // 🔧 NOUVEAU : Confirmation conversation_id
       conversation_id_sent: finalConversationId,
       conversation_id_received: data.conversation_id
     })
 
-    // 🚀 FALLBACK : Si backend pas modifié
+    // 🚀 FALLBACK : Si backend pas modifié pour response_versions
     if (!data.response_versions) {
       data.response_versions = {
         ultra_concise: data.response,
@@ -425,7 +423,7 @@ export const generateAIResponsePublic = async (
     }
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur ask-enhanced-v2-public:', error)
+    console.error('❌ [apiService] Erreur endpoint unifié public:', error)
     throw error
   }
 }
@@ -442,7 +440,7 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('👍👎 [apiService] Envoi feedback enhanced:', feedback, 'pour conversation:', conversationId)
+  console.log('👍👎 [apiService] Envoi feedback:', feedback, 'pour conversation:', conversationId)
 
   try {
     const requestBody = {
@@ -459,11 +457,11 @@ export const sendFeedback = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Feedback enhanced statut:', response.status)
+    console.log('📡 [apiService] Feedback statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur feedback enhanced:', errorText)
+      console.error('❌ [apiService] Erreur feedback:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -472,10 +470,10 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('✅ [apiService] Feedback enhanced envoyé avec succès')
+    console.log('✅ [apiService] Feedback envoyé avec succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur feedback enhanced:', error)
+    console.error('❌ [apiService] Erreur feedback:', error)
     throw error
   }
 }
@@ -572,7 +570,7 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
 }
 
 /**
- * ✅ FONCTION HEALTH CHECK INCHANGÉE
+ * ✅ FONCTION HEALTH CHECK MISE À JOUR
  */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
@@ -637,23 +635,24 @@ export const buildClarificationEntities = (
 }
 
 /**
- * ✅ FONCTION DEBUG MISE À JOUR avec corrections
+ * 🔧 FONCTION DEBUG MISE À JOUR - Compatible nouveau backend
  */
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration ask-enhanced-v2 + RESPONSE_VERSIONS + CORRECTIONS')
+  console.group('🔧 [apiService] Configuration API unifiée + RESPONSE_VERSIONS')
   console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('Endpoints:')
-  console.log('- Ask enhanced v2 (auth):', `${API_BASE_URL}/expert/ask-enhanced-v2`)
-  console.log('- Ask enhanced v2 (public):', `${API_BASE_URL}/expert/ask-enhanced-v2-public`)
-  console.log('- Feedback enhanced:', `${API_BASE_URL}/expert/feedback`)
+  console.log('Endpoints nouveaux (backend unifié):')
+  console.log('- Ask unifié (auth):', `${API_BASE_URL}/expert/ask`)
+  console.log('- Ask unifié (public):', `${API_BASE_URL}/expert/ask-public`)
+  console.log('- Feedback:', `${API_BASE_URL}/expert/feedback`)
   console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
   console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
-  console.log('🔧 CORRECTIONS APPLIQUÉES:')
+  console.log('🔧 CORRECTIONS BACKEND UNIFIÉ:')
+  console.log('  ✅ Plus d\'endpoint /ask-enhanced-v2 (supprimé)')
+  console.log('  ✅ Nouvel endpoint /ask unifié (authentifié)')
+  console.log('  ✅ Nouvel endpoint /ask-public unifié (public)')
   console.log('  ✅ conversation_id toujours généré automatiquement')
-  console.log('  ✅ Fonction generateUUID() compatible tous navigateurs')
-  console.log('  ✅ Logs détaillés conversation_id envoyé/reçu')
-  console.log('  ✅ Fix appliqué aux versions auth ET publique')
-  console.log('NOUVELLES FEATURES:')
+  console.log('  ✅ Logs détaillés pour debugging')
+  console.log('NOUVELLES FEATURES PRÉSERVÉES:')
   console.log('  🚀 concision_level dans body request')
   console.log('  🚀 generate_all_versions: true')
   console.log('  🚀 response_versions dans réponse')
@@ -668,7 +667,7 @@ export const debugEnhancedAPI = () => {
 }
 
 /**
- * ✅ FONCTION TEST CORRIGÉE
+ * 🔧 FONCTION TEST CORRIGÉE - Compatible backend unifié
  */
 export const testEnhancedConversationContinuity = async (
   user: any,
@@ -681,7 +680,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité conversation ask-enhanced-v2 (CORRIGÉ)...')
+    console.log('🧪 [apiService] Test continuité conversation backend unifié...')
     
     const firstResponse = await generateAIResponse(
       "Test question 1: Qu'est-ce que les poulets de chair ?",
@@ -700,13 +699,12 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test ask-enhanced-v2 résultat (CORRIGÉ):', {
+    console.log('🧪 [apiService] Test backend unifié résultat:', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
       first_enhancements: firstResponse.ai_enhancements_used,
       second_enhancements: secondResponse.ai_enhancements_used,
-      // 🔧 NOUVEAU : Confirmation que les IDs ne sont plus None
       both_ids_present: !!(firstResponse.conversation_id && secondResponse.conversation_id)
     })
     
@@ -722,7 +720,7 @@ export const testEnhancedConversationContinuity = async (
     }
     
   } catch (error) {
-    console.error('❌ [apiService] Erreur test ask-enhanced-v2 continuité:', error)
+    console.error('❌ [apiService] Erreur test backend unifié continuité:', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
@@ -749,8 +747,8 @@ export const handleEnhancedNetworkError = (error: any): string => {
     return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
   }
   
-  if (error?.message?.includes('ask-enhanced-v2')) {
-    return 'Erreur du système expert amélioré. Veuillez réessayer.'
+  if (error?.message?.includes('endpoint unifié') || error?.message?.includes('ask')) {
+    return 'Erreur du système expert. Veuillez réessayer.'
   }
   
   return error?.message || 'Une erreur inattendue s\'est produite.'
@@ -762,32 +760,37 @@ export const debugEnhancedConversationFlow = (
   additionalInfo?: any
 ) => {
   console.log(`🔍 [Enhanced Conversation Debug] ${step}:`, {
-    conversation_id: conversationId || 'GÉNÉRÉ_AUTO', // 🔧 CORRIGÉ
-    endpoint: 'ask-enhanced-v2',
+    conversation_id: conversationId || 'GÉNÉRÉ_AUTO',
+    endpoint: 'ask (unifié)',
     timestamp: new Date().toISOString(),
     ...additionalInfo
   })
 }
 
-export const detectAPIVersion = async (): Promise<'clarification' | 'legacy' | 'error'> => {
+/**
+ * 🔧 DÉTECTION API MISE À JOUR - Compatible backend unifié
+ */
+export const detectAPIVersion = async (): Promise<'unified' | 'legacy' | 'error'> => {
   try {
-    const enhancedResponse = await fetch(`${API_BASE_URL}/expert/ask-enhanced-v2`, {
+    // Test du nouvel endpoint unifié
+    const unifiedResponse = await fetch(`${API_BASE_URL}/expert/ask`, {
       method: 'OPTIONS',
       headers: { 'Content-Type': 'application/json' }
     })
     
-    if (enhancedResponse.ok || enhancedResponse.status === 405) {
-      console.log('✅ [detectAPIVersion] ask-enhanced-v2 disponible')
-      return 'clarification'
+    if (unifiedResponse.ok || unifiedResponse.status === 405) {
+      console.log('✅ [detectAPIVersion] Backend unifié /ask disponible')
+      return 'unified'
     }
     
-    const legacyResponse = await fetch(`${API_BASE_URL}/expert/ask`, {
+    // Fallback vers l'ancien système si besoin
+    const legacyResponse = await fetch(`${API_BASE_URL}/expert/ask-enhanced`, {
       method: 'OPTIONS', 
       headers: { 'Content-Type': 'application/json' }
     })
     
     if (legacyResponse.ok || legacyResponse.status === 405) {
-      console.log('⚠️ [detectAPIVersion] Seul ask legacy disponible')
+      console.log('⚠️ [detectAPIVersion] Fallback vers ask-enhanced legacy')
       return 'legacy'
     }
     
@@ -811,7 +814,7 @@ export const generateAIResponseSmart = async (
   console.log(`🤖 [generateAIResponseSmart] Utilisation API: ${apiVersion}`)
   
   switch (apiVersion) {
-    case 'clarification':
+    case 'unified':
       return await generateAIResponse(question, user, language, conversationId)
       
     case 'legacy':
@@ -825,31 +828,32 @@ export const generateAIResponseSmart = async (
 }
 
 /**
- * 🚀 NOUVELLE FONCTION : Information configuration avec corrections
+ * 🚀 NOUVELLE FONCTION : Information configuration backend unifié
  */
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] Configuration Ask-Enhanced-v2 + Response Versions + CORRECTIONS')
-  console.log('Version:', 'Enhanced v2 avec response_versions + conversation_id fix')
+  console.group('🚀 [apiService] Configuration Backend Unifié + Response Versions')
+  console.log('Version:', 'Backend Unifié v2.0 avec response_versions')
   console.log('Base URL:', API_BASE_URL)
-  console.log('🔧 CORRECTIONS CRITIQUES:')
-  console.log('  - 🔧 conversation_id: TOUJOURS généré automatiquement (UUID)')
-  console.log('  - 🔧 generateUUID(): Compatible tous navigateurs')
-  console.log('  - 🔧 Logs conversation_id envoyé/reçu pour debugging')
-  console.log('  - 🔧 Fix appliqué versions auth ET publique')
-  console.log('NOUVELLES FONCTIONNALITÉS:')
+  console.log('🔧 CHANGEMENTS MAJEURS BACKEND:')
+  console.log('  - 🔧 Endpoint /ask-enhanced-v2: SUPPRIMÉ (404)')
+  console.log('  - 🚀 Nouvel endpoint /ask: UNIFIÉ et sécurisé')
+  console.log('  - 🚀 Nouvel endpoint /ask-public: UNIFIÉ et public')
+  console.log('  - 🔧 conversation_id: TOUJOURS généré automatiquement')
+  console.log('  - 🔧 Compatible avec l\'ancien frontend')
+  console.log('NOUVELLES FONCTIONNALITÉS BACKEND:')
   console.log('  - 🚀 concision_level: ultra_concise|concise|standard|detailed')
   console.log('  - 🚀 generate_all_versions: true (backend génère toutes versions)')
   console.log('  - 🚀 response_versions: object avec toutes les versions')
-  console.log('  - 🚀 Sélection version dynamique côté frontend')
+  console.log('  - 🚀 Système expert unifié et simplifié')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
   console.log('  - ✅ Détection automatique questions vagues')
   console.log('  - ✅ Clarification intelligente race/sexe')
   console.log('  - ✅ Enrichissement automatique questions')
   console.log('  - ✅ Traitement réponses clarification')
   console.log('  - ✅ Toutes fonctions existantes (feedback, conversations, etc.)')
-  console.log('Endpoints:')
-  console.log('  - POST /expert/ask-enhanced-v2 (authentifié)')
-  console.log('  - POST /expert/ask-enhanced-v2-public (public)')
+  console.log('Endpoints (NOUVEAUX):')
+  console.log('  - POST /expert/ask (authentifié, unifié)')
+  console.log('  - POST /expert/ask-public (public, unifié)')
   console.log('  - POST /expert/feedback')
   console.log('  - GET /expert/topics')
   console.log('  - GET /conversations/user/{userId}')
