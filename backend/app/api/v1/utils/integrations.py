@@ -1,5 +1,5 @@
 import os
-from typing import Any, List
+from typing import Any, Dict, List
 from supabase import create_client, Client
 
 
