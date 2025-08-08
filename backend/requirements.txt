@@ -103,7 +103,7 @@ typing-extensions>=4.8.0
 # 🆕 AJOUTS POUR PINECONE ET TENACITY
 # =============================================================================
 tenacity>=8.2.2
-+ pinecone>=3.0.0
+pinecone>=3.0.0
 
 
 
