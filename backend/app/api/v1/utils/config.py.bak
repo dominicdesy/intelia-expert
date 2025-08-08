@@ -1,6 +1,6 @@
 import os
 
 # Seuil minimal pour considérer le contexte comme complet (0.0 - 1.0)
-COMPLETENESS_THRESHOLD: float = float(os.getenv("COMPLETENESS_THRESHOLD", "0.3"))
+COMPLETENESS_THRESHOLD: float = float(os.getenv("COMPLETENESS_THRESHOLD", "0.8"))
 # Nombre max de tours de clarification
 MAX_CLARIFICATION_ROUNDS: int = int(os.getenv("MAX_CLARIFICATION_ROUNDS", "2"))

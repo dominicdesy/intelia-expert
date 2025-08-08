@@ -1,3 +1,8 @@
+"""
+DialogueManager - Version corrigée avec fallback intelligent
+CONSERVE: Structure originale + tous les composants existants
+CORRIGE: Logique de clarification trop stricte → fallback intelligent
+"""
 import os
 import threading
 import time
@@ -10,11 +15,15 @@ from app.api.v1.pipeline.rag_engine import RAGEngine
 from app.api.v1.utils.config import COMPLETENESS_THRESHOLD
 from app.api.v1.utils.response_generator import format_response
 
+# ✅ AJOUTÉ: Configuration logging pour debug
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class DialogueManager:
     """
     Simplified orchestration:
       1. Extract context
-      2. Clarify missing info
+      2. CORRIGÉ: Fallback intelligent au lieu de clarification systématique
       3. Retrieve & generate answer via RAG
     """
     def __init__(self):
@@ -24,27 +33,71 @@ class DialogueManager:
         self.memory = ConversationMemory(dsn=os.getenv("DATABASE_URL"))
         self.rag = RAGEngine()
         
-        # ✅ AJOUTÉ : Démarrage automatique nettoyage
+        # ✅ CONSERVATION: Démarrage automatique nettoyage
         self._start_cleanup_task()
 
     def handle(self, session_id: str, question: str) -> Dict[str, Any]:
-        # 1. Load and update context
+        """
+        CORRIGÉ: Orchestration avec fallback intelligent au lieu de clarification systématique
+        """
+        # 1. CONSERVATION: Load and update context (logique identique)
         context = self.memory.get(session_id) or {}
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
-
-        # 2. If incomplete, ask for clarification
-        if score < COMPLETENESS_THRESHOLD:
-            questions = self.clarifier.generate(missing)
-            # ✅ AJOUTÉ : Timestamp pour persistance
-            context['last_interaction'] = time.time()
-            self.memory.update(session_id, context)
-            return {"type": "clarification", "questions": questions}
-
-        # 3. Otherwise, generate final answer
-        answer_data = self.rag.generate_answer(question, context)  # ← MODIFIÉ : maintenant un dict
         
-        # ✅ AJOUTÉ : Extraire la réponse du dict
+        # ✅ AJOUTÉ: Logging pour debug
+        logger.info(f"Question: {question[:50]}...")
+        logger.info(f"Score de complétude: {score:.2f}, seuil: {COMPLETENESS_THRESHOLD}")
+        logger.info(f"Champs manquants: {missing}")
+        logger.info(f"Contexte extrait: {extracted}")
+
+        # 2. ✅ CORRIGÉ: Logique de fallback intelligent
+        if score < COMPLETENESS_THRESHOLD:
+            logger.info(f"Score {score:.2f} < seuil {COMPLETENESS_THRESHOLD}")
+            
+            # Si score très bas (< 0.2), vraiment demander clarification
+            if score < 0.2:
+                logger.info("Score très bas (< 0.2), demande de clarification nécessaire")
+                questions = self.clarifier.generate(missing)
+                # ✅ CONSERVATION: Timestamp pour persistance
+                context['last_interaction'] = time.time()
+                self.memory.update(session_id, context)
+                return {"type": "clarification", "questions": questions}
+            
+            # Si score moyen (0.2 à seuil), répondre avec avertissement
+            else:
+                logger.info(f"Score moyen ({score:.2f}), génération réponse avec avertissement")
+                answer_data = self.rag.generate_answer(question, context)
+                
+                # ✅ CONSERVATION: Extraire la réponse du dict (logique identique)
+                if isinstance(answer_data, dict):
+                    response = format_response(answer_data.get("response", ""))
+                    source_info = {
+                        "source": answer_data.get("source"),
+                        "documents_used": answer_data.get("documents_used", 0),
+                        "warning": f"Réponse générale - précisez {', '.join(missing[:2])} pour plus de précision"
+                    }
+                else:
+                    # Fallback si ancien format
+                    response = format_response(answer_data)
+                    source_info = {"warning": "Réponse générale"}
+                
+                # ✅ CONSERVATION: NE PAS effacer, marquer comme complété
+                context['completed_at'] = time.time()
+                context['last_interaction'] = time.time()
+                self.memory.update(session_id, context)
+                
+                # ✅ CONSERVATION: Retourner info source
+                result = {"type": "answer", "response": response}
+                result.update(source_info)
+                logger.info("Réponse générée avec avertissement")
+                return result
+
+        # 3. CONSERVATION: Si score >= seuil, générer réponse complète (logique identique)
+        logger.info(f"Score suffisant ({score:.2f}), génération réponse complète")
+        answer_data = self.rag.generate_answer(question, context)
+        
+        # ✅ CONSERVATION: Extraire la réponse du dict (logique identique)
         if isinstance(answer_data, dict):
             response = format_response(answer_data.get("response", ""))
             source_info = {
@@ -57,17 +110,18 @@ class DialogueManager:
             response = format_response(answer_data)
             source_info = {}
         
-        # ✅ MODIFIÉ : NE PAS effacer, marquer comme complété
+        # ✅ CONSERVATION: NE PAS effacer, marquer comme complété
         context['completed_at'] = time.time()
         context['last_interaction'] = time.time()
         self.memory.update(session_id, context)
         
-        # ✅ MODIFIÉ : Retourner info source
+        # ✅ CONSERVATION: Retourner info source
         result = {"type": "answer", "response": response}
         result.update(source_info)
+        logger.info("Réponse complète générée")
         return result
 
-    # ✅ AJOUTÉ : Méthodes de nettoyage
+    # ✅ CONSERVATION: Méthodes de nettoyage (code identique)
     def _start_cleanup_task(self):
         """Démarre le nettoyage en arrière-plan (POC)"""
         def cleanup_sessions():
