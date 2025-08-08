@@ -1,31 +1,29 @@
 import os
 from typing import Dict, Any, List
-import openai
 from app.api.v1.utils.integrations import VectorStoreClient
+from app.api.v1.utils.openai_utils import safe_chat_completion
 
 class RAGEngine:
     """
-    Wraps the retrieval-augmented generation call.
+    Wraps the Retrieval-Augmented Generation call.
     """
     def __init__(self):
-        openai.api_key = os.getenv("OPENAI_API_KEY")
         self.vector_client = VectorStoreClient(
             url=os.getenv("VECTOR_STORE_URL"),
             key=os.getenv("VECTOR_STORE_KEY")
         )
 
     def generate_answer(self, question: str, context: Dict[str, Any]) -> str:
-        # Retrieve relevant documents from the vector store
+        # 1. Retrieval
         docs: List[Any] = self.vector_client.query(question)
-        # Construct prompt
+        # 2. Prompt construction
         prompt = (
             f"Contexte: {context}\n"
             f"Documents: {docs}\n"
-            f"Question: {question}\n"
-            "Réponse:"  
+            f"Question: {question}\nRéponse:"
         )
-        # Call OpenAI ChatCompletion
-        response = openai.ChatCompletion.create(
+        # 3. ChatCompletion with retry
+        response = safe_chat_completion(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
