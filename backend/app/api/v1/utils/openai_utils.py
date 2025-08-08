@@ -1,30 +1,16 @@
-import os
 import openai
-from typing import Any, Dict, List
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from openai.error import RateLimitError, APIError, Timeout
+import os
 
-# Configure OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-@retry(
-    retry=retry_if_exception_type((RateLimitError, APIError, Timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10)
-)
-def safe_chat_completion(**kwargs: Any) -> Dict[str, Any]:
+def safe_chat_completion(**kwargs):
     """
-    Wrapper for openai.ChatCompletion.create with retry/backoff.
+    Wrapper for OpenAI chat completions.
+    Checks for API key and uses the modern API signature.
     """
-    return openai.ChatCompletion.create(**kwargs)
-
-@retry(
-    retry=retry_if_exception_type((RateLimitError, APIError, Timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10)
-)
-def safe_embedding_create(**kwargs: Any) -> Dict[str, Any]:
-    """
-    Wrapper for openai.Embedding.create with retry/backoff.
-    """
-    return openai.Embedding.create(**kwargs)
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is not configured in environment variables.")
+    openai.api_key = key
+    try:
+        return openai.chat.completions.create(**kwargs)
+    except Exception as e:
+        raise RuntimeError(f"OpenAI API call failed: {e}")
