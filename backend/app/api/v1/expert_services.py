@@ -93,13 +93,13 @@ class SimpleExpertService:
         }
         
         logger.info("Service Expert Simplifie initialise - Version epuree et efficace")
-        logger.info(f"   Extracteur d'entites: Actif")
-        logger.info(f"   Generateur de reponses: Actif")
-        logger.info(f"   RAG: En attente de configuration")
-        logger.info(f"   Contexte: Memoire simple activee")
+        logger.info("   Extracteur d'entites: Actif")
+        logger.info("   Generateur de reponses: Actif")
+        logger.info("   RAG: En attente de configuration")
+        logger.info("   Contexte: Memoire simple activee")
 
     def set_rag_embedder(self, rag_embedder):
-        """Configure l'accès au RAG (appelé par expert.py)"""
+        """Configure l'acces au RAG (appele par expert.py)"""
         self.rag_embedder = rag_embedder
         self.config["enable_rag"] = rag_embedder is not None
         logger.info(f"RAG configure: {self.config['enable_rag']}")
@@ -652,4 +652,4 @@ def create_simple_expert_service() -> SimpleExpertService:
 ExpertService = SimpleExpertService
 ProcessingResult = SimpleProcessingResult
 quick_ask = simple_ask
-create_expert_service = create_simple_expert_servicesw
+create_expert_service = create_simple_expert_service
