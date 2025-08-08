@@ -2,6 +2,7 @@
 Expert Router - Version corrigée avec fallback RAG
 CONSERVE: Structure originale + DialogueManager
 CORRIGE: Ajoute fallback vers système RAG quand clarification demandée
+FIXE: Erreur syntaxe dans l'ordre des paramètres
 """
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
@@ -41,12 +42,12 @@ def get_session_id(request: Request) -> str:
         session_id = f"session_{uuid.uuid4().hex[:12]}"
     return session_id
 
-# ==================== CORRECTION: Endpoint principal avec fallback ====================
+# ==================== CORRECTION: Endpoint principal avec fallback ET syntaxe corrigée ====================
 @router.post("/ask", response_model=ResponseModel)
 async def ask(
-    payload: AskRequest = Body(...),
-    request: Request,  # AJOUTÉ pour accès au système RAG
-    session_id: str = Depends(get_session_id)
+    request: Request,  # CORRIGÉ: Mis en premier (pas de valeur par défaut)
+    payload: AskRequest = Body(...),  # Paramètre avec valeur par défaut en second
+    session_id: str = Depends(get_session_id)  # Dependency en dernier
 ) -> ResponseModel:
     """
     Handle user questions via the DialogueManager pipeline.
@@ -151,14 +152,14 @@ async def ask(
 
 @router.post("/ask-public", response_model=ResponseModel)
 async def ask_public(
-    payload: AskRequest = Body(...),
-    request: Request
+    request: Request,  # CORRIGÉ: Même ordre ici
+    payload: AskRequest = Body(...)
 ) -> ResponseModel:
     """
     Version publique - même logique que ask() mais sans session
     """
     public_session = f"public_{uuid.uuid4().hex[:8]}"
-    return await ask(payload, request, public_session)
+    return await ask(request, payload, public_session)
 
 @router.get("/status")
 async def expert_status():
