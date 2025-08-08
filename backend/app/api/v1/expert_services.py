@@ -178,7 +178,7 @@ class SimpleExpertService:
                 # Méthode synchrone
                 return self.entity_extractor.extract(question)
         except Exception as e:
-            logger.warning(f⚠️ [Simple Expert] Erreur extraction: {e}")
+            logger.warning(f"⚠️ [Simple Expert] Erreur extraction: {e}")
             # Fallback vers patterns basiques
             try:
                 if hasattr(self.entity_extractor, '_raw_extract_with_patterns'):
@@ -329,7 +329,7 @@ class SimpleExpertService:
                     self.stats["rag_searches"] += 1
                 
             except Exception as e:
-                logger.warning(f"   ⚠️ [RAG] Erreur recherche: {e}")
+                logger.warning(f"⚠️ [RAG] Erreur recherche: {e}")
         
         # Générer la réponse
         try:
