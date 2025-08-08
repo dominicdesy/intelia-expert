@@ -8,10 +8,8 @@ class RAGEngine:
     Wraps the Retrieval-Augmented Generation call.
     """
     def __init__(self):
-        self.vector_client = VectorStoreClient(
-            url=os.getenv("VECTOR_STORE_URL"),
-            key=os.getenv("VECTOR_STORE_KEY")
-        )
+        # Initialize the vector store client without placeholder params
+        self.vector_client = VectorStoreClient()
 
     def generate_answer(self, question: str, context: Dict[str, Any]) -> str:
         # 1. Retrieval
@@ -24,7 +22,7 @@ class RAGEngine:
         )
         # 3. ChatCompletion with retry
         response = safe_chat_completion(
-            model="gpt-4o",
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
