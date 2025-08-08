@@ -23,6 +23,7 @@ class ContextExtractor:
     - Validation JSON stricte avec fallback
     - Logging détaillé pour debug
     - Configuration flexible via fichiers externes
+    - ✅ AMÉLIORATION: Meilleure extraction race/sexe pour questions nutrition
     """
     
     def __init__(self, use_gpt: bool = True, patterns_config_path: str = None):
@@ -37,13 +38,13 @@ class ContextExtractor:
 
     def _get_gpt_fields(self) -> List[str]:
         """
-        ✅ AMÉLIORATION: Champs GPT configurables
-        Peut être étendu pour charger depuis la configuration
+        ✅ AMÉLIORATION: Champs GPT configurables avec ajouts pour nutrition
         """
         return [
-            "age_jours", "production_type", "age_phase", "sex_category",
+            "age_jours", "production_type", "age_phase", "sexe", "race",
             "site_type", "housing_type", "activity", "parameter", 
-            "numeric_value", "issue", "user_role", "objective", "breed"
+            "numeric_value", "issue", "user_role", "objective", "breed",
+            "symptomes", "type_aliment"  # ✅ AJOUTS pour classification améliorée
         ]
 
     def _load_extraction_patterns(self, config_path: str = None) -> Dict[str, str]:
@@ -89,13 +90,15 @@ class ContextExtractor:
 
     def _get_default_patterns(self) -> Dict[str, str]:
         """
-        ✅ AMÉLIORATION: Patterns par défaut séparés en méthode
-        Facilite la maintenance et les tests
+        ✅ AMÉLIORATION MAJEURE: Patterns améliorés pour race et sexe
         """
         return {
             "production_type": r"\b(?:broiler|layer|breeder|pullet)s?\b",
             "age_phase": r"\b(?:day|d|week|wk|wks|month|mo)s?[-\s]*old\b|\b(?:at|from|on)?\s?\b(?:day\s?\d{1,2}|week\s?\d{1,2})\b",
-            "sex_category": r"\b(?:male|female|mixed flock|pullets?|cockerels?)\b",
+            
+            # ✅ AMÉLIORATION MAJEURE: Pattern sexe plus complet
+            "sexe": r"\b(?:male|mâle|males|mâles|female|femelle|females|femelles|mixed\s+flock|pullets?|cockerels?|coq|poule|hen|rooster|cock)\b",
+            
             "site_type": r"\b(?:hatchery|barn|house|processing plant|feed mill)\b",
             "housing_type": r"\b(?:tunnel-ventilated|open-sided|enriched cage|aviary|floor|slatted floor)\b",
             "activity": r"\b(?:feeding|vaccination|beak trimming|culling|catching|lighting|ventilation|weighing|sampling)\b",
@@ -136,7 +139,14 @@ class ContextExtractor:
             ]) + r")\b",
             "user_role": r"\b(?:farmer|grower|veterinarian|nutritionist|technician|supervisor|consultant)\b",
             "objective": r"\b(?:optimize|improve|detect|prevent|reduce|increase|adjust|monitor)\b",
-            "breed": r"\b(ross\s?\d{3}|ross|cobb\s?\d{3}|cobb|hubbard|dekalb|hy-?line|lohmann|isa\s?brown|isa)\b",
+            
+            # ✅ AMÉLIORATION MAJEURE: Pattern race/breed plus complet
+            "race": r"\b(ross\s?(?:308|508|708|ap95)?|cobb\s?(?:500|700|avian\s?48)?|hubbard\s?(?:flex|classic)?|arbor\s?acres\s?plus?|dekalb|hy-?line|lohmann|isa\s?brown|isa|poulet\s?de\s?chair|broiler|layer|pondeuse)\b",
+            "breed": r"\b(ross\s?(?:308|508|708|ap95)?|cobb\s?(?:500|700|avian\s?48)?|hubbard\s?(?:flex|classic)?|arbor\s?acres\s?plus?|dekalb|hy-?line|lohmann|isa\s?brown|isa|poulet\s?de\s?chair|broiler|layer|pondeuse)\b",
+            
+            # ✅ NOUVEAUX: Patterns pour symptômes et alimentation
+            "symptomes": r"\b(?:toux|cough|éternuements|sneezing|diarrhée|diarrhea|fièvre|fever|léthargie|lethargy|boiterie|lameness|mortalité|mortality|perte\s+de\s+poids|weight\s+loss)\b",
+            "type_aliment": r"\b(?:starter|grower|finisher|pré-starter|pre-starter|aliment\s+de\s+démarrage|aliment\s+de\s+croissance|aliment\s+de\s+finition)\b",
         }
 
     def reload_patterns(self, config_path: str = None) -> bool:
@@ -183,7 +193,8 @@ class ContextExtractor:
             logger.debug("📝 Extraction directe par regex (GPT désactivé)")
             context = self._regex_extract(question)
 
-        # Normalisation et validation (conservé)
+        # ✅ AMÉLIORATION: Normalisation spécialisée pour race/sexe
+        context = self._normalize_race_sexe(context)
         context = self.normalizer.normalize(context)
         score, missing = validate_and_score(context, question)
         
@@ -191,15 +202,45 @@ class ContextExtractor:
         
         return context, score, missing
 
+    def _normalize_race_sexe(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        ✅ NOUVELLE MÉTHODE: Normalisation spécialisée pour race et sexe
+        """
+        # Normalisation race/breed
+        if "breed" in context and "race" not in context:
+            context["race"] = context["breed"]
+        elif "race" in context and "breed" not in context:
+            context["breed"] = context["race"]
+        
+        # Normalisation sexe
+        if "sexe" in context:
+            sexe = str(context["sexe"]).lower()
+            if any(word in sexe for word in ["male", "mâle", "coq", "rooster", "cock"]):
+                context["sexe"] = "male"
+            elif any(word in sexe for word in ["female", "femelle", "poule", "hen"]):
+                context["sexe"] = "female"
+            elif any(word in sexe for word in ["mixed", "mixte"]):
+                context["sexe"] = "mixed"
+        
+        # Si sex_category existe mais pas sexe
+        if "sex_category" in context and "sexe" not in context:
+            context["sexe"] = context["sex_category"]
+        
+        return context
+
     def _extract_with_gpt(self, question: str) -> Dict[str, Any]:
         """
-        ✅ AMÉLIORATION: Extraction GPT séparée avec gestion d'erreurs robuste
+        ✅ AMÉLIORATION: Extraction GPT avec prompt amélioré pour race/sexe
         """
         
         fields_str = ", ".join(self.gpt_fields)
         prompt = (
             "Vous êtes un assistant avicole expert. À partir de la question utilisateur, "
             f"extrayez les champs suivants si présents: {fields_str}. "
+            "IMPORTANT: "
+            "- 'race' peut être Ross, Cobb, Hubbard, Arbor Acres, etc. ou 'broiler' si générique "
+            "- 'sexe' peut être 'male', 'female', ou 'mixed' "
+            "- 'age_jours' doit être un nombre (convertir semaines en jours si nécessaire) "
             "Répondez UNIQUEMENT au format JSON valide avec ces clés si trouvées. "
             "Ne pas ajouter de texte avant ou après le JSON. "
             "Si un champ n'est pas présent, ne pas l'inclure dans la réponse."
