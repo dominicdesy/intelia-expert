@@ -1,109 +1,61 @@
-# 🚀 REQUIREMENTS.TXT - DIGITAL OCEAN APP PLATFORM OPTIMIZED - VERSION FINALE CORRIGÉE
-# 🔧 CONFLIT HTTPX/SUPABASE/OPENAI RÉSOLU
+# Requirements for Intelia Expert API - Digital Ocean App Platform
 
-# =============================================================================
-# CORE FASTAPI - Versions stables testées
-# =============================================================================
+# Core FastAPI Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
 email-validator==2.1.0.post1
 
-
-
+# Database
 psycopg2-binary>=2.9
 
-
-
-
-# =============================================================================
-# 🔧 SUPABASE - VERSION COMPATIBLE AVEC HTTPX 0.26+
-# =============================================================================
-# ✅ CORRECTION CRITIQUE: Utiliser version Supabase compatible
+# Supabase - Compatible with httpx 0.26+
 supabase==2.9.1
-# Version 2.9.1 requiert httpx>=0.26,<0.28 (compatible avec la résolution)
 
-# =============================================================================
-# AUTH & SECURITY - Versions éprouvées
-# =============================================================================
+# Authentication & Security
 PyJWT==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
-# =============================================================================
-# 🔧 OPENAI - CORRECTION CRITIQUE APPLIQUÉE
-# =============================================================================
-# ✅ CORRECTION: Version compatible sans paramètre 'proxies'
+# OpenAI - Compatible version
 openai==1.51.0
-# OpenAI 1.51.0 accepte httpx<1,>=0.23.0 (compatible avec 0.26+)
 
-# =============================================================================
-# 🔧 HTTPX - RÉSOLUTION DU CONFLIT SUPABASE/OPENAI
-# =============================================================================
-# ✅ CORRECTION CRITIQUE: Version qui satisfait tous les requirements
+# HTTP Client - Resolves Supabase/OpenAI compatibility
 httpx>=0.26.0,<0.28.0
-# Résout le conflit:
-# - Supabase 2.9.1 requiert httpx>=0.26,<0.28
-# - OpenAI 1.51.0 accepte httpx<1,>=0.23.0
-# - Notre choix: httpx 0.26.x (compatible avec les deux)
 
-# =============================================================================
-# RAG SYSTEM - Versions optimisées et compatibles
-# =============================================================================
+# RAG System
 torch==2.2.2
 torchvision==0.17.2
 transformers==4.40.0
 sentence-transformers==2.7.0
 faiss-cpu==1.8.0
 numpy==1.26.4
-
-# 🔧 CORRECTION WARNINGS HUGGING FACE
 huggingface_hub>=0.24.0
-# Résout: FutureWarning resume_download deprecated
 safetensors==0.4.3
 
-# =============================================================================
-# 🔧 PARSERS DOCUMENTS - CORRECTION WARNINGS CRITIQUES
-# =============================================================================
-# ✅ CORRECTION: Ajouter langchain-community pour parseurs complets
+# Document Processing
 langchain==0.2.16
 langchain-community==0.2.16
-
-# ✅ DATA PROCESSING - Requis pour parseurs avancés
 pandas==2.2.2
 
-# =============================================================================
-# UTILS - Versions stables
-# =============================================================================
+# Utilities
 python-dotenv==1.0.0
 aiofiles==23.2.1
 toml==0.10.2
 
-# =============================================================================
-# ML LIBS - Versions compatibles RAG
-# =============================================================================
+# Machine Learning
 scikit-learn==1.4.2
 scipy==1.13.0
 tqdm==4.66.1
 pillow==10.3.0
 
-# =============================================================================
-# HTTP REQUESTS
-# =============================================================================
+# HTTP Requests
 requests==2.31.0
 
-# =============================================================================
-# 🔧 CORRECTIONS FINALES DIGITAL OCEAN APP PLATFORM
-# =============================================================================
-# ✅ TYPING EXTENSIONS - Pour compatibilité Python 3.11
+# Compatibility
 typing-extensions>=4.8.0
 
-# =============================================================================
-# 🆕 AJOUTS POUR PINECONE ET TENACITY
-# =============================================================================
+# Vector Database & Retry Logic
 tenacity>=8.2.2
 pinecone>=3.0.0
-
-
-
