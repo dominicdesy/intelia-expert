@@ -178,7 +178,7 @@ class SimpleExpertService:
                 # Méthode synchrone
                 return self.entity_extractor.extract(question)
         except Exception as e:
-            logger.warning(f"⚠️ [Simple Expert] Erreur extraction: {e}")
+            logger.warning(f⚠️ [Simple Expert] Erreur extraction: {e}")
             # Fallback vers patterns basiques
             try:
                 if hasattr(self.entity_extractor, '_raw_extract_with_patterns'):
@@ -347,22 +347,31 @@ class SimpleExpertService:
                 )
         except Exception as e:
             logger.warning(f"⚠️ [Simple Expert] Erreur génération: {e}")
-            # Fallback simple avec données précises
-            age_days = getattr(entities, 'age_days', None)
-            breed = (getattr(entities, 'breed_specific', None) or 
-                    getattr(entities, 'breed', None) or 
-                    getattr(entities, 'specific_breed', None))
-            sex = getattr(entities, 'sex', None)
-            
-            # Génération de réponse de fallback avec données réelles du RAG
+            # PRIORITÉ: Utiliser notre fallback RAG intelligent si on a des données RAG
             if rag_used and rag_results:
+                logger.info(f"🔧 [Simple Expert] Utilisation fallback RAG intelligent avec {len(rag_results)} documents")
                 fallback_response = self._generate_rag_fallback_response(question, entities, rag_results)
+                confidence = 0.8  # Confiance élevée car on a des données RAG
             else:
-                fallback_response = self._generate_contextual_fallback_response(question, age_days, breed, sex)
+                # Fallback contextuel sans RAG
+                age_days = getattr(entities, 'age_days', None)
+                breed = (getattr(entities, 'breed_specific', None) or 
+                        getattr(entities, 'breed', None) or 
+                        getattr(entities, 'specific_breed', None))
+                sex = getattr(entities, 'sex', None)
+                
+                if age_days and breed and sex:
+                    logger.info(f"🔧 [Simple Expert] Utilisation fallback contextuel: {breed} {sex} {age_days}j")
+                    fallback_response = self._generate_contextual_fallback_response(question, age_days, breed, sex)
+                    confidence = 0.7
+                else:
+                    logger.info(f"🔧 [Simple Expert] Utilisation fallback basique")
+                    fallback_response = self._generate_fallback_response(question, entities)
+                    confidence = 0.6
             
             response_data = type('MockResponse', (), {
                 'response': fallback_response,
-                'confidence': 0.7
+                'confidence': confidence
             })()
         
         return SimpleProcessingResult(
