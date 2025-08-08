@@ -268,9 +268,11 @@ export const generateAIResponse = async (
       timestamp: new Date().toISOString(),
       type: data.type,
       
+      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
+      response: data.type === 'answer' ? (data.response || '') : '',
+      
       // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
-        response: '',
         requires_clarification: true,
         clarification_questions: data.questions || [],
         clarification_type: 'missing_info',
@@ -281,18 +283,23 @@ export const generateAIResponse = async (
           missing_information: ['breed', 'sex'],
           confidence: 0.5
         }
-      } : {}),
+      } : {
+        requires_clarification: false
+      }),
       
       // 🔧 GESTION RÉPONSE : Format DialogueManager
       ...(data.type === 'answer' ? {
-        response: data.response || '',
-        requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_dialoguemanager',
         note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {})
+      } : {
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager',
+        note: 'Clarification requise'
+      })
     }
 
     // 🚀 GÉNÉRATION AUTOMATIQUE response_versions (comme avant)
@@ -392,8 +399,11 @@ export const generateAIResponsePublic = async (
       timestamp: new Date().toISOString(),
       type: data.type,
       
+      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
+      response: data.type === 'answer' ? (data.response || '') : '',
+      
+      // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
-        response: '',
         requires_clarification: true,
         clarification_questions: data.questions || [],
         clarification_type: 'missing_info',
@@ -404,17 +414,23 @@ export const generateAIResponsePublic = async (
           missing_information: ['breed', 'sex'],
           confidence: 0.5
         }
-      } : {}),
+      } : {
+        requires_clarification: false
+      }),
       
+      // 🔧 GESTION RÉPONSE
       ...(data.type === 'answer' ? {
-        response: data.response || '',
-        requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_dialoguemanager_public',
         note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {})
+      } : {
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager_public',
+        note: 'Clarification requise'
+      })
     }
 
     // 🚀 GÉNÉRATION response_versions
