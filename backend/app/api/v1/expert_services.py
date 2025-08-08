@@ -1,4 +1,23 @@
-"""
+def _has_sufficient_context(self, entities: Dict[str, Any]) -> bool:
+        """Vérifie si on a assez de contexte pour une réponse précise - LOGIQUE AJUSTÉE"""
+        
+        question_type = entities.get("question_type", "general")
+        has_race = entities.get("race") is not None
+        has_age = entities.get("age_days") is not None
+        has_sex = entities.get("sexe") is not None
+        
+        if question_type == "poids":
+            # Pour le poids, il faut race + âge pour une réponse précise
+            # Si seulement âge → réponse générale avec clarification
+            sufficient = has_race and has_age
+            logger.info(f"🎯 [Context Check] Poids - suffisant pour réponse précise: {sufficient} (race={has_race}, âge={has_age})")
+            return sufficient
+        
+        # Pour les autres questions, race seule peut suffire
+        sufficient = has_race
+        logger.info(f"🎯 [Context Check] Général - suffisant: {sufficient} (race={has_race})")
+        return sufficient
+            #"""
 expert_services.py - CONTEXTE CONVERSATIONNEL + API RAG CORRIGÉE
 🎯 SOLUTION DOUBLE: Mémoire conversation + API RAG native
 
@@ -187,10 +206,16 @@ class ExpertService:
                 confidence = 0.8
                 self.stats["direct_answers"] += 1
             else:
-                # DEMANDE DE CLARIFICATION CIBLÉE
-                response = self._generate_smart_clarification(merged_entities, previous_context)
-                response_type = "general_with_clarification"
-                confidence = 0.5
+                # RÉPONSE GÉNÉRALE + CLARIFICATION (pour questions poids avec âge seulement)
+                if merged_entities.get("question_type") == "poids" and merged_entities.get("age_days"):
+                    response = self._generate_general_weight_response_with_clarification(merged_entities)
+                    response_type = "general_with_clarification"
+                    confidence = 0.7
+                else:
+                    # DEMANDE DE CLARIFICATION SIMPLE
+                    response = self._generate_smart_clarification(merged_entities, previous_context)
+                    response_type = "general_with_clarification"
+                    confidence = 0.5
             
             processing_time = int((time.time() - start_time) * 1000)
             
@@ -518,15 +543,72 @@ Pour des données plus spécifiques, consultez les guides techniques officiels."
 
 **Exemple :** "Ross 308 mâle" → réponse avec poids cible exact"""
 
-    def _generate_general_rag_response(self, entities: Dict[str, Any], rag_results: List[Dict]) -> str:
-        """Réponse générale avec données RAG"""
-        race = entities.get("race", "race spécifiée")
-        question_type = entities.get("question_type", "votre question")
+    def _generate_general_weight_response_with_clarification(self, entities: Dict[str, Any]) -> str:
+        """Génère une réponse générale de poids + demande clarification"""
+        age_days = entities.get("age_days")
         
-        return f"""**Informations {race} - {question_type} :**
+        if not age_days:
+            return self._generate_smart_clarification(entities, {})
+        
+        # Calcul des fourchettes générales par race
+        ross_308_range = self._calculate_general_weight_range("Ross 308", age_days)
+        cobb_500_range = self._calculate_general_weight_range("Cobb 500", age_days)
+        
+        return f"""**Poids des poulets à {age_days} jours :**
 
-🔍 **Données techniques trouvées**
-📚 **Sources :** Documentation spécialisée
-💡 **Contexte :** Standards d'élevage commercial
+📊 **Fourchettes générales :**
+• **Races lourdes** (Ross 308, Cobb 500) : {ross_308_range}
+• **Races standard** : {cobb_500_range}
+• **Races pondeuses** : {self._calculate_general_weight_range("pondeuses", age_days)}
 
-Pour une réponse plus précise, spécifiez l'âge exact et le contexte d'élevage."""
+💡 **Variations importantes :**
+• **Mâles :** +10-15% par rapport aux moyennes
+• **Femelles :** -10-15% par rapport aux moyennes
+
+🔍 **Surveillance recommandée :**
+• Pesée quotidienne d'échantillon représentatif
+• Contrôle de l'homogénéité du troupeau
+• Ajustement alimentaire selon l'évolution du poids
+
+💡 **Pour une réponse plus précise**, veuillez préciser la race et le sexe de vos poulets."""
+
+    def _calculate_general_weight_range(self, race_type: str, age_days: int) -> str:
+        """Calcule les fourchettes de poids générales"""
+        if race_type == "Ross 308":
+            if age_days <= 7:
+                base = 45 + age_days * 9
+                return f"{base-15}-{base+20}g"
+            elif age_days <= 14:
+                base = 165 + (age_days-7) * 45
+                return f"{base-30}-{base+40}g"
+            elif age_days <= 21:
+                base = 480 + (age_days-14) * 65
+                return f"{base-50}-{base+70}g"
+            else:
+                base = 935 + (age_days-21) * 85
+                return f"{base-100}-{base+120}g"
+        
+        elif race_type == "Cobb 500":
+            # Cobb 500 légèrement inférieur à Ross 308
+            if age_days <= 7:
+                base = 40 + age_days * 8
+                return f"{base-15}-{base+20}g"
+            elif age_days <= 14:
+                base = 150 + (age_days-7) * 42
+                return f"{base-30}-{base+40}g"
+            elif age_days <= 21:
+                base = 444 + (age_days-14) * 60
+                return f"{base-50}-{base+70}g"
+            else:
+                base = 864 + (age_days-21) * 80
+                return f"{base-100}-{base+120}g"
+        
+        elif race_type == "pondeuses":
+            # Races pondeuses plus légères
+            base = 30 + age_days * 6
+            return f"{base-10}-{base+15}g"
+        
+        else:
+            # Fallback générique
+            base = 40 + age_days * 8
+            return f"{base-20}-{base+25}g"
