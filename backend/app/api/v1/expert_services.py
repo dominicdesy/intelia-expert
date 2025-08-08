@@ -1,13 +1,3 @@
-def _generate_fallback_response(self, question: str, entities: ExtractedEntities) -> str:
-        """Génère une réponse de secours basique"""
-        question_lower = question.lower()
-        
-        if 'poids' in question_lower or 'weight' in question_lower:
-            if entities.age_days:
-                return f"**Poids indicatif à {entities.age_days} jours :** 300-800g selon la race et le sexe. Pour des valeurs précises, spécifiez la race (Ross 308, Cobb 500...) et le sexe."
-            else:
-                return "**Poids des poulets de chair :** Les valeurs varient selon l'âge, la race et le sexe. Précisez ces informations pour une réponse personnalisée."
-
 """
 expert_services.py - SERVICE EXPERT SIMPLIFIE ET EFFICACE
 
