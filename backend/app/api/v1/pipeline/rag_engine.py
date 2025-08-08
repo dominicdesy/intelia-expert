@@ -1,7 +1,10 @@
 """
-RAGEngine - Version corrigée avec format de retour standardisé
-CONSERVE: Structure originale + logique RAG + prompts
-CORRIGE: Retourne un dict au lieu d'une string pour compatibilité DialogueManager
+RAGEngine - Version corrigée avec prompt amélioré pour utiliser effectivement les documents
+CONSERVE: Structure originale + logique RAG
+CORRIGE: 
+- Retourne un dict au lieu d'une string pour compatibilité DialogueManager
+- ✅ AMÉLIORATION MAJEURE: Prompt RAG restructuré pour utiliser les documents trouvés
+- ✅ AMÉLIORATION: Mention des informations manquantes (race, sexe) pour précision
 """
 import os
 from app.api.v1.utils.integrations import VectorStoreClient
@@ -11,6 +14,7 @@ class RAGEngine:
     """
     Retrieval-Augmented Generation engine with fallback if no vector results.
     CORRIGÉ: Retourne maintenant un dict standardisé au lieu d'une string.
+    ✅ AMÉLIORATION: Prompt RAG amélioré pour utiliser les documents et mentionner ce qui manque
     """
     def __init__(self):
         self.vector_client = VectorStoreClient()
@@ -18,6 +22,7 @@ class RAGEngine:
     def generate_answer(self, question, context):
         """
         CORRIGÉ: Retourne un dict avec métadonnées au lieu d'une string simple
+        ✅ AMÉLIORATION: Prompt restructuré pour utiliser les documents trouvés
         Format de retour: {
             "response": str,
             "source": str,
@@ -37,15 +42,8 @@ class RAGEngine:
         docs = self.vector_client.query(question)
         
         if not docs:
-            # ✅ CONSERVATION: Fallback GPT sans documents (prompt amélioré)
-            fallback_prompt = (
-                "Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale. "
-                "Bien que je n'aie pas trouvé de documentation spécifique, répondez de manière "
-                "professionnelle et précise en vous basant sur vos connaissances générales.\n\n"
-                f"Question: {question}\n"
-                f"Contexte disponible: {context}\n\n"
-                "Donnez une réponse pratique et utile, en mentionnant que c'est une réponse générale."
-            )
+            # ✅ AMÉLIORATION: Fallback GPT sans documents avec prompt plus intelligent
+            fallback_prompt = self._build_fallback_prompt(question, context)
             
             try:
                 resp = safe_chat_completion(
@@ -73,18 +71,8 @@ class RAGEngine:
                 })
         
         else:
-            # ✅ CONSERVATION: RAG avec documents (prompt amélioré)
-            doc_content = "\n".join(str(d) for d in docs)
-            rag_prompt = (
-                "Vous êtes un expert vétérinaire spécialisé en aviculture. "
-                "Utilisez UNIQUEMENT les informations documentaires suivantes pour répondre "
-                "de façon précise, factuelle et professionnelle. "
-                "Ne vous basez que sur ces documents.\n\n"
-                f"DOCUMENTS SPÉCIALISÉS:\n{doc_content}\n\n"
-                f"QUESTION: {question}\n"
-                f"CONTEXTE: {context}\n\n"
-                "Réponse basée strictement sur la documentation:"
-            )
+            # ✅ AMÉLIORATION MAJEURE: RAG avec documents - prompt restructuré
+            rag_prompt = self._build_rag_prompt(question, context, docs)
             
             try:
                 resp = safe_chat_completion(
@@ -112,3 +100,91 @@ class RAGEngine:
                 })
         
         return result
+
+    def _build_rag_prompt(self, question: str, context: dict, docs: list) -> str:
+        """
+        ✅ NOUVELLE MÉTHODE: Construction du prompt RAG amélioré
+        """
+        doc_content = "\n".join(str(d) for d in docs)
+        
+        # ✅ AMÉLIORATION: Analyser le contexte pour identifier ce qui manque
+        missing_info = self._identify_missing_context(context)
+        
+        prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
+
+QUESTION: {question}
+
+CONTEXTE DISPONIBLE: {context if context else "Aucun contexte spécifique fourni"}
+
+DOCUMENTS SPÉCIALISÉS TROUVÉS:
+{doc_content}
+
+INSTRUCTIONS:
+1. Utilisez PRIORITAIREMENT les informations des documents spécialisés ci-dessus
+2. Donnez une réponse pratique et précise basée sur ces documents
+3. Si les documents contiennent des informations pertinentes (même partielles), utilisez-les
+4. Complétez avec vos connaissances générales si nécessaire
+5. Mentionnez clairement les sources (documents vs connaissances générales)
+
+{missing_info}
+
+Répondez de manière professionnelle et pratique en utilisant les documents fournis."""
+
+        return prompt
+
+    def _build_fallback_prompt(self, question: str, context: dict) -> str:
+        """
+        ✅ NOUVELLE MÉTHODE: Construction du prompt fallback amélioré
+        """
+        missing_info = self._identify_missing_context(context)
+        
+        prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
+
+QUESTION: {question}
+
+CONTEXTE DISPONIBLE: {context if context else "Aucun contexte spécifique fourni"}
+
+SITUATION: Aucun document spécialisé trouvé dans la base de données.
+
+INSTRUCTIONS:
+1. Répondez en vous basant sur vos connaissances générales en aviculture
+2. Donnez des informations pratiques et utiles
+3. Restez professionnel et précis
+4. Mentionnez que c'est une réponse générale
+
+{missing_info}
+
+Répondez de manière professionnelle en indiquant qu'il s'agit d'une réponse générale."""
+
+        return prompt
+
+    def _identify_missing_context(self, context: dict) -> str:
+        """
+        ✅ NOUVELLE MÉTHODE: Identifie les informations manquantes importantes
+        """
+        missing_parts = []
+        
+        # Vérifier les informations clés pour les questions de nutrition/poids
+        if not context.get("race") and not context.get("breed"):
+            missing_parts.append("la race/lignée génétique (Ross, Cobb, Hubbard, etc.)")
+        
+        if not context.get("sexe") and not context.get("sex_category"):
+            missing_parts.append("le sexe (mâle, femelle, mixte)")
+        
+        if not context.get("age_jours") and not context.get("age_phase"):
+            missing_parts.append("l'âge précis")
+        
+        if missing_parts:
+            missing_text = f"""
+INFORMATIONS MANQUANTES POUR PLUS DE PRÉCISION:
+Pour une réponse plus précise, il serait utile de connaître : {', '.join(missing_parts)}.
+
+CONSIGNE SPÉCIALE:
+- Donnez quand même une réponse générale utile
+- Mentionnez que la réponse serait plus précise avec ces informations
+- Expliquez pourquoi ces informations sont importantes (ex: les mâles grandissent plus vite que les femelles, les différentes lignées ont des courbes de croissance différentes)
+"""
+        else:
+            missing_text = "CONTEXTE: Informations suffisantes pour une réponse précise."
+        
+        return missing_text
