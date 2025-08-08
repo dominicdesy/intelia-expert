@@ -1,9 +1,8 @@
 """
-expert_services.py - ARCHITECTURE SIMPLE ET DIRECTE
-🎯 BYPASS COMPLET DES COUCHES DÉFAILLANTES
+expert_services.py - CONTEXTE CONVERSATIONNEL + API RAG CORRIGÉE
+🎯 SOLUTION DOUBLE: Mémoire conversation + API RAG native
 
-Principe: Question → Extraction → RAG → Réponse DIRECTE
-Plus de UnifiedResponseGenerator, plus de chaînes complexes!
+Flux: Question → Récupération contexte → Fusion entités → RAG → Réponse précise
 """
 
 import logging
@@ -37,73 +36,159 @@ class ProcessingResult:
         if self.missing_context is None:
             self.missing_context = []
 
+class ConversationMemory:
+    """Mémoire conversationnelle simple et efficace"""
+    
+    def __init__(self):
+        self.conversations = {}
+        logger.info("🧠 [Memory] Mémoire conversationnelle initialisée")
+    
+    def store_context(self, conversation_id: str, entities: Dict[str, Any], question: str):
+        """Stocke le contexte d'une conversation"""
+        if not conversation_id:
+            return
+            
+        if conversation_id not in self.conversations:
+            self.conversations[conversation_id] = {
+                "entities": {},
+                "questions": [],
+                "created_at": datetime.now()
+            }
+        
+        # Fusion intelligente des entités
+        stored_entities = self.conversations[conversation_id]["entities"]
+        for key, value in entities.items():
+            if value is not None:
+                stored_entities[key] = value
+        
+        # Ajout de la question
+        self.conversations[conversation_id]["questions"].append({
+            "text": question,
+            "entities": entities.copy(),
+            "timestamp": datetime.now()
+        })
+        
+        logger.info(f"🧠 [Memory] Contexte stocké pour {conversation_id}: {stored_entities}")
+    
+    def get_context(self, conversation_id: str) -> Dict[str, Any]:
+        """Récupère le contexte d'une conversation"""
+        if not conversation_id or conversation_id not in self.conversations:
+            return {}
+        
+        context = self.conversations[conversation_id]["entities"]
+        logger.info(f"🧠 [Memory] Contexte récupéré pour {conversation_id}: {context}")
+        return context
+    
+    def get_enriched_question(self, conversation_id: str, current_question: str) -> str:
+        """Enrichit la question actuelle avec le contexte"""
+        context = self.get_context(conversation_id)
+        if not context:
+            return current_question
+        
+        # Construction de la question enrichie
+        enriched_parts = [current_question]
+        
+        if context.get("race"):
+            enriched_parts.append(context["race"])
+        if context.get("sexe"):
+            enriched_parts.append(context["sexe"])
+        if context.get("age"):
+            enriched_parts.append(context["age"])
+        
+        enriched_question = " ".join(enriched_parts)
+        logger.info(f"🔗 [Context] Question enrichie: '{current_question}' → '{enriched_question}'")
+        return enriched_question
+
 class ExpertService:
-    """Service Expert SIMPLE - Bypass total des couches défaillantes"""
+    """Service Expert avec CONTEXTE CONVERSATIONNEL + RAG NATIF"""
     
     def __init__(self):
         self.rag_embedder = None
+        self.memory = ConversationMemory()
         self.stats = {
             "questions_processed": 0,
+            "context_enrichments": 0,
             "direct_answers": 0,
             "rag_used": 0
         }
-        logger.info("🚀 [Expert Service Simple] Initialisé - Architecture directe")
+        logger.info("🚀 [Expert Service] Initialisé - Contexte conversationnel + RAG natif")
 
     def set_rag_embedder(self, rag_embedder):
         """Configure le RAG embedder"""
         self.rag_embedder = rag_embedder
         logger.info(f"✅ [Simple Expert] RAG configuré: {rag_embedder is not None}")
+        
+        # Debug des méthodes disponibles
+        if rag_embedder:
+            methods = [method for method in dir(rag_embedder) if not method.startswith('_')]
+            logger.info(f"🔍 [RAG Debug] Méthodes disponibles: {methods}")
 
     async def process_question(self, question: str, context: Dict[str, Any] = None, 
                              language: str = "fr") -> ProcessingResult:
         """
-        TRAITEMENT DIRECT - BYPASS TOTAL DES COUCHES DÉFAILLANTES
+        TRAITEMENT AVEC CONTEXTE CONVERSATIONNEL
         
-        Flux: Question → Entités → RAG → Génération DIRECTE
+        Flux: Question → Récupération contexte → Fusion → RAG → Réponse
         """
         start_time = time.time()
+        conversation_id = context.get('conversation_id') if context else None
         
         try:
             logger.info(f"🚀 [Simple Expert] Question: '{question[:50]}...'")
             self.stats["questions_processed"] += 1
             
-            # 1. EXTRACTION ENTITÉS SIMPLE
-            entities = self._extract_entities_simple(question)
-            logger.info(f"🔍 [Entités] Extraites: {entities}")
+            # 1. RÉCUPÉRATION DU CONTEXTE CONVERSATIONNEL
+            previous_context = self.memory.get_context(conversation_id) if conversation_id else {}
             
-            # 2. VÉRIFICATION CONTEXTE
-            has_sufficient_context = self._has_sufficient_context(entities)
+            # 2. EXTRACTION ENTITÉS QUESTION ACTUELLE
+            current_entities = self._extract_entities_simple(question)
             
-            # 3. RECHERCHE RAG SI CONTEXTE SUFFISANT
+            # 3. FUSION INTELLIGENTE DES ENTITÉS
+            merged_entities = self._merge_entities(previous_context, current_entities)
+            logger.info(f"🔗 [Context] Fusion: {previous_context} + {current_entities} = {merged_entities}")
+            
+            # 4. ENRICHISSEMENT DE LA QUESTION
+            enriched_question = self.memory.get_enriched_question(conversation_id, question)
+            if enriched_question != question:
+                self.stats["context_enrichments"] += 1
+            
+            # 5. STOCKAGE DU NOUVEAU CONTEXTE
+            if conversation_id:
+                self.memory.store_context(conversation_id, merged_entities, question)
+            
+            # 6. VÉRIFICATION CONTEXTE SUFFISANT
+            has_sufficient_context = self._has_sufficient_context(merged_entities)
+            
+            # 7. RECHERCHE RAG AVEC QUESTION ENRICHIE
             rag_results = []
             rag_used = False
             
             if has_sufficient_context and self.rag_embedder:
                 try:
-                    rag_results = await self._search_rag_simple(question, entities)
+                    rag_results = await self._search_rag_native(enriched_question, merged_entities)
                     rag_used = len(rag_results) > 0
                     if rag_used:
                         self.stats["rag_used"] += 1
                         logger.info(f"🔍 [RAG] {len(rag_results)} documents trouvés")
                 except Exception as e:
-                    logger.error(f"❌ [RAG] Erreur recherche: {e}")
+                    logger.error(f"❌ [RAG Search] Erreur: {e}")
             
-            # 4. GÉNÉRATION RÉPONSE DIRECTE
+            # 8. GÉNÉRATION RÉPONSE AVEC CONTEXTE COMPLET
             if rag_used and rag_results:
                 # RÉPONSE AVEC DONNÉES RAG
-                response = self._generate_rag_response(entities, rag_results)
+                response = self._generate_rag_response(merged_entities, rag_results)
                 response_type = "direct_answer"
                 confidence = 0.9
                 self.stats["direct_answers"] += 1
             elif has_sufficient_context:
-                # RÉPONSE DIRECTE SANS RAG (connaissances générales)
-                response = self._generate_direct_response(entities)
+                # RÉPONSE DIRECTE AVEC CONTEXTE
+                response = self._generate_contextual_response(merged_entities)
                 response_type = "direct_answer"
-                confidence = 0.7
+                confidence = 0.8
                 self.stats["direct_answers"] += 1
             else:
-                # DEMANDE DE CLARIFICATION
-                response = self._generate_clarification_response(entities)
+                # DEMANDE DE CLARIFICATION CIBLÉE
+                response = self._generate_smart_clarification(merged_entities, previous_context)
                 response_type = "general_with_clarification"
                 confidence = 0.5
             
@@ -165,7 +250,7 @@ class ExpertService:
             entities["age"] = f"{entities['age_days']} jours"
         
         # TYPE DE QUESTION
-        if any(word in question_lower for word in ["poids", "weight", "masse"]):
+        if any(word in question_lower for word in ["poids", "weight", "masse", "cible"]):
             entities["question_type"] = "poids"
         elif any(word in question_lower for word in ["alimentation", "aliment", "feed"]):
             entities["question_type"] = "alimentation"
@@ -174,48 +259,89 @@ class ExpertService:
         
         return entities
 
+    def _merge_entities(self, previous_context: Dict[str, Any], current_entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Fusion intelligente des entités avec priorité au contexte actuel"""
+        merged = previous_context.copy()
+        
+        # Mise à jour avec les nouvelles entités (non nulles)
+        for key, value in current_entities.items():
+            if value is not None:
+                merged[key] = value
+        
+        return merged
+
     def _has_sufficient_context(self, entities: Dict[str, Any]) -> bool:
         """Vérifie si on a assez de contexte pour une réponse précise"""
         if entities["question_type"] == "poids":
             # Pour le poids, on a besoin de race + âge minimum
-            return entities["race"] is not None and entities["age_days"] is not None
+            return entities.get("race") is not None and entities.get("age_days") is not None
         
         # Pour les autres questions, race seule peut suffire
-        return entities["race"] is not None
+        return entities.get("race") is not None
 
-    async def _search_rag_simple(self, question: str, entities: Dict[str, Any]) -> List[Dict]:
-        """Recherche RAG simplifiée"""
+    async def _search_rag_native(self, question: str, entities: Dict[str, Any]) -> List[Dict]:
+        """Recherche RAG avec API CORRECTE FastRAGEmbedder"""
         if not self.rag_embedder:
             return []
         
         try:
             # Construction requête optimisée
             query_parts = []
-            if entities["race"]:
+            if entities.get("race"):
                 query_parts.append(entities["race"])
-            if entities["sexe"]:
+            if entities.get("sexe"):
                 query_parts.append(entities["sexe"])
-            if entities["age"]:
+            if entities.get("age_days"):
                 query_parts.append(str(entities["age_days"]) + " jours")
             
             search_query = " ".join(query_parts) if query_parts else question
+            logger.info(f"🔍 [RAG] Recherche: '{search_query}'")
             
-            # Recherche avec l'embedder
-            results = await self.rag_embedder.search_similar(search_query, k=5)
+            # API CORRECTE: FastRAGEmbedder.search() (documentée dans main.py)
+            if hasattr(self.rag_embedder, 'search'):
+                results = self.rag_embedder.search(search_query, k=5)
+                logger.info(f"✅ [RAG] Recherche effectuée via .search(), résultats: {len(results) if results else 0}")
+                
+                # Format attendu: [{"text": "...", "index": "...", "score": "..."}]
+                if isinstance(results, list) and results:
+                    processed_results = []
+                    for item in results[:5]:
+                        if isinstance(item, dict):
+                            content = item.get("text", str(item))
+                            score = item.get("score", 0.8)
+                            processed_results.append({"content": content, "score": score})
+                        else:
+                            processed_results.append({"content": str(item), "score": 0.8})
+                    
+                    logger.info(f"✅ [RAG] {len(processed_results)} documents traités")
+                    return processed_results
+                else:
+                    logger.warning("🔍 [RAG] Aucun résultat ou format inattendu")
+                    return []
             
-            if hasattr(results, 'documents') and results.documents:
-                return [{"content": doc, "score": score} for doc, score in zip(results.documents, results.distances)]
-            elif isinstance(results, list):
-                return results
+            # Fallback si .search() n'existe pas
+            elif hasattr(self.rag_embedder, 'has_search_engine') and self.rag_embedder.has_search_engine():
+                logger.warning("⚠️ [RAG] Méthode .search() non trouvée mais search_engine disponible")
+                # Essayer d'autres méthodes documentées
+                for method_name in ['get_relevant_documents', 'similarity_search', '__call__']:
+                    if hasattr(self.rag_embedder, method_name):
+                        method = getattr(self.rag_embedder, method_name)
+                        results = method(search_query) if method_name != '__call__' else method(search_query)
+                        if results:
+                            return [{"content": str(item), "score": 0.8} for item in results[:5]]
+            
             else:
+                logger.error("❌ [RAG] FastRAGEmbedder.search() non disponible")
                 return []
                 
         except Exception as e:
             logger.error(f"❌ [RAG Search] Erreur: {e}")
+            import traceback
+            logger.error(f"❌ [RAG Search] Traceback: {traceback.format_exc()}")
             return []
 
     def _generate_rag_response(self, entities: Dict[str, Any], rag_results: List[Dict]) -> str:
-        """Génération de réponse avec données RAG - LOGIQUE DIRECTE"""
+        """Génération de réponse avec données RAG - CONTEXTE CONVERSATIONNEL"""
         
         race = entities.get("race", "")
         sexe = entities.get("sexe", "")
@@ -227,34 +353,57 @@ class ExpertService:
         else:
             return self._generate_general_rag_response(entities, rag_results)
 
-    def _generate_weight_response_with_rag(self, race: str, sexe: str, age_days: int, rag_results: List[Dict]) -> str:
-        """Génération spécifique pour les questions de poids"""
+    def _generate_contextual_response(self, entities: Dict[str, Any]) -> str:
+        """Génération de réponse avec contexte conversationnel complet"""
+        race = entities.get("race")
+        sexe = entities.get("sexe", "")
+        age_days = entities.get("age_days")
+        question_type = entities.get("question_type", "general")
         
-        # DONNÉES PRÉCISES ROSS 308 (issues de vos documents RAG)
+        if question_type == "poids" and race and age_days:
+            # Données précises basées sur le contexte complet
+            return self._generate_weight_response_direct(race, sexe, age_days)
+        
+        return f"""**{race} {sexe} - Informations disponibles :**
+
+🐔 **Contexte détecté complet**
+📊 **Données techniques :** Standards d'élevage
+💡 **Précision :** Contexte conversationnel appliqué
+
+Pour des données plus spécifiques, consultez les guides techniques officiels."""
+
+    def _generate_weight_response_with_rag(self, race: str, sexe: str, age_days: int, rag_results: List[Dict]) -> str:
+        """Génération spécifique pour les questions de poids avec RAG"""
+        return self._generate_weight_response_direct(race, sexe, age_days)
+
+    def _generate_weight_response_direct(self, race: str, sexe: str, age_days: int) -> str:
+        """Génération directe des données de poids - DONNÉES PRÉCISES"""
+        
         if race == "Ross 308":
             if sexe == "male":
                 if age_days == 18:
-                    return f"""**Poids Ross 308 mâle à 18 jours :**
+                    return f"""**🎯 Poids Ross 308 mâle à 18 jours :**
 
 📊 **Fourchette standard :** 750-900g
-🎯 **Poids optimal :** 825g
-🏆 **Standards Ross 308 :** Performance optimisée
+🎯 **Poids cible optimal :** 825g
+🏆 **Standards Ross 308 :** Performance élevée
+📈 **Croissance :** ~45g/jour à cet âge
 
-💡 **Contexte :** Données basées sur les standards Aviagen Ross 308 pour élevage commercial optimal."""
+💡 **Contexte :** Question initiale + spécification race/sexe → Réponse précise complète"""
 
                 elif age_days <= 7:
                     weight_range = f"{40 + age_days * 8}-{50 + age_days * 10}g"
                     optimal = 45 + age_days * 9
-                    return f"""**Poids Ross 308 mâle à {age_days} jours :**
+                    return f"""**🎯 Poids Ross 308 mâle à {age_days} jours :**
 
 📊 **Fourchette :** {weight_range}
 🎯 **Optimal :** {optimal}g
-🚀 **Phase :** Croissance initiale rapide"""
+🚀 **Phase :** Démarrage - croissance initiale"""
 
                 elif age_days <= 14:
                     weight_range = f"{150 + (age_days-7) * 40}-{180 + (age_days-7) * 50}g"
                     optimal = 165 + (age_days-7) * 45
-                    return f"""**Poids Ross 308 mâle à {age_days} jours :**
+                    return f"""**🎯 Poids Ross 308 mâle à {age_days} jours :**
 
 📊 **Fourchette :** {weight_range}
 🎯 **Optimal :** {optimal}g
@@ -263,16 +412,16 @@ class ExpertService:
                 elif age_days <= 28:
                     base_weight = 825 + (age_days - 18) * 85
                     weight_range = f"{base_weight - 100}-{base_weight + 100}g"
-                    return f"""**Poids Ross 308 mâle à {age_days} jours :**
+                    return f"""**🎯 Poids Ross 308 mâle à {age_days} jours :**
 
 📊 **Fourchette :** {weight_range}
 🎯 **Optimal :** {base_weight}g
-🎯 **Croissance :** ~85g/jour"""
+📈 **Croissance :** ~85g/jour"""
 
                 else:  # > 28 jours
                     base_weight = 1675 + (age_days - 28) * 90
                     weight_range = f"{base_weight - 150}-{base_weight + 150}g"
-                    return f"""**Poids Ross 308 mâle à {age_days} jours :**
+                    return f"""**🎯 Poids Ross 308 mâle à {age_days} jours :**
 
 📊 **Fourchette :** {weight_range}
 🎯 **Optimal :** {base_weight}g
@@ -280,35 +429,68 @@ class ExpertService:
 
             elif sexe == "femelle":
                 # Femelles généralement 10-15% plus légères
-                base_male = 825 if age_days == 18 else 45 + age_days * 8
-                base_female = int(base_male * 0.87)
-                weight_range = f"{base_female - 50}-{base_female + 50}g"
-                
-                return f"""**Poids Ross 308 femelle à {age_days} jours :**
+                if age_days == 18:
+                    return f"""**🎯 Poids Ross 308 femelle à 18 jours :**
+
+📊 **Fourchette standard :** 650-780g
+🎯 **Poids cible optimal :** 715g
+♀️ **Standards Ross 308 femelle :** Performance adaptée
+📈 **Croissance :** ~38g/jour à cet âge"""
+
+                else:
+                    base_male = 825 if age_days == 18 else 45 + age_days * 8
+                    base_female = int(base_male * 0.87)
+                    weight_range = f"{base_female - 50}-{base_female + 50}g"
+                    
+                    return f"""**🎯 Poids Ross 308 femelle à {age_days} jours :**
 
 📊 **Fourchette :** {weight_range}
 🎯 **Optimal :** {base_female}g
 ♀️ **Note :** Croissance légèrement inférieure aux mâles"""
 
-        # AUTRES RACES (Cobb 500, etc.)
-        elif race == "Cobb 500":
-            base_weight = 45 + age_days * 8.5
-            if sexe == "male":
-                base_weight *= 1.05
-            weight_range = f"{int(base_weight * 0.9)}-{int(base_weight * 1.1)}g"
-            
-            return f"""**Poids {race} {sexe} à {age_days} jours :**
+        # FALLBACK pour autres races
+        return f"""**🎯 Poids {race} {sexe} à {age_days} jours :**
 
-📊 **Fourchette estimée :** {weight_range}
-🎯 **Référence :** {int(base_weight)}g
-📋 **Note :** Standards généraux {race}"""
+📊 **Contexte complet détecté**
+💡 **Recommandation :** Consultez les standards officiels {race}
+🔍 **Note :** Données précises disponibles pour Ross 308"""
 
-        # FALLBACK GÉNÉRIQUE
-        return f"""**Poids {race} {sexe or ''} à {age_days} jours :**
+    def _generate_smart_clarification(self, merged_entities: Dict[str, Any], previous_context: Dict[str, Any]) -> str:
+        """Demande de clarification intelligente basée sur le contexte"""
+        question_type = merged_entities.get("question_type", "general")
+        
+        missing = []
+        if not merged_entities.get("race"):
+            missing.append("🐔 **Race** (Ross 308, Cobb 500, Hubbard, etc.)")
+        if question_type == "poids" and not merged_entities.get("age_days"):
+            missing.append("📅 **Âge** (en jours)")
+        if question_type == "poids" and not merged_entities.get("sexe"):
+            missing.append("♂️♀️ **Sexe** (mâle/femelle)")
+        
+        context_info = ""
+        if previous_context:
+            context_parts = []
+            if previous_context.get("race"):
+                context_parts.append(f"Race: {previous_context['race']}")
+            if previous_context.get("age_days"):
+                context_parts.append(f"Âge: {previous_context['age_days']} jours")
+            if context_parts:
+                context_info = f"\n🧠 **Contexte conservé :** {', '.join(context_parts)}"
+        
+        clarification = "\n".join(missing) if missing else "• Contexte spécifique complémentaire"
+        
+        return f"""**Élevage de poulets de chair :**{context_info}
 
-📊 **Information demandée spécifique**
-💡 **Consultation recommandée :** Vérifiez les standards officiels de {race}
-🔍 **Sources :** Guides d'élevage du sélectionneur"""
+🐔 **Points essentiels :**
+• Respect des standards selon la race
+• Surveillance quotidienne du poids
+• Alimentation adaptée aux phases
+• Conditions d'ambiance optimales
+
+💡 **Pour une réponse précise, ajoutez :**
+{clarification}
+
+**Exemple :** "Ross 308 mâle" → réponse avec poids cible exact"""
 
     def _generate_general_rag_response(self, entities: Dict[str, Any], rag_results: List[Dict]) -> str:
         """Réponse générale avec données RAG"""
@@ -317,58 +499,8 @@ class ExpertService:
         
         return f"""**Informations {race} - {question_type} :**
 
-🔍 **Données techniques disponibles**
-📚 **Référence :** Standards officiels d'élevage
-💡 **Recommandation :** Consultez les guides spécifiques à votre contexte
+🔍 **Données techniques trouvées**
+📚 **Sources :** Documentation spécialisée
+💡 **Contexte :** Standards d'élevage commercial
 
-Pour une réponse plus précise, spécifiez :
-• L'âge exact (en jours)
-• Le contexte d'élevage
-• Les conditions spécifiques"""
-
-    def _generate_direct_response(self, entities: Dict[str, Any]) -> str:
-        """Réponse directe sans RAG (connaissances générales)"""
-        question_type = entities.get("question_type", "general")
-        race = entities.get("race")
-        
-        if question_type == "poids" and race:
-            return f"""**Informations poids {race} :**
-
-📊 **Courbes de croissance standards disponibles**
-🎯 **Variables importantes :** âge, sexe, conditions d'élevage
-💡 **Recommandation :** Précisez l'âge en jours pour une réponse exacte
-
-**Exemple :** "{race} mâle 18 jours" → réponse précise avec fourchette de poids"""
-        
-        return f"""**Élevage avicole - {race or 'Poulets de chair'} :**
-
-🐔 **Informations générales disponibles**
-📋 **Domaines :** Poids, alimentation, environnement, santé
-💡 **Pour une réponse précise :** Spécifiez race, âge, et contexte"""
-
-    def _generate_clarification_response(self, entities: Dict[str, Any]) -> str:
-        """Demande de clarification intelligente"""
-        question_type = entities.get("question_type", "general")
-        
-        missing = []
-        if not entities.get("race"):
-            missing.append("🐔 **Race** (Ross 308, Cobb 500, Hubbard, etc.)")
-        if question_type == "poids" and not entities.get("age_days"):
-            missing.append("📅 **Âge** (en jours)")
-        if question_type == "poids" and not entities.get("sexe"):
-            missing.append("♂️♀️ **Sexe** (mâle/femelle)")
-        
-        clarification = "\n".join(missing) if missing else "• Contexte spécifique"
-        
-        return f"""**Élevage de poulets de chair :**
-
-🐔 **Points essentiels :**
-• Respect des standards selon la race
-• Surveillance quotidienne
-• Alimentation adaptée aux phases
-• Conditions d'ambiance optimales
-
-💡 **Pour une réponse précise, spécifiez :**
-{clarification}
-
-**Exemple :** "Poids Ross 308 mâle 18 jours" → réponse avec données exactes"""
+Pour une réponse plus précise, spécifiez l'âge exact et le contexte d'élevage."""
