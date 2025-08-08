@@ -5,6 +5,7 @@ CORRIGE:
 - Logique de clarification trop stricte → fallback intelligent (CONSERVÉ)
 - Nettoyage temporel fragile → utilisation des fonctionnalités PostgreSQL natives
 - ✅ CORRECTION CRITIQUE: PostgreSQL timestamp format error "invalid input syntax for type timestamp"
+- ✅ NOUVELLE CORRECTION: Gestion proper des réponses RAG dict format
 """
 import os
 import threading
@@ -35,6 +36,7 @@ class DialogueManager:
     - Conservation de toute la logique métier originale
     - Gestion d'erreurs améliorée pour le nettoyage
     - ✅ CORRECTION CRITIQUE: Gestion proper des timestamps Unix vs PostgreSQL
+    - ✅ NOUVELLE CORRECTION: Gestion proper des réponses RAG dict format
     """
     def __init__(self):
         self.extractor = ContextExtractor()
@@ -50,6 +52,7 @@ class DialogueManager:
         """
         CORRIGÉ: Orchestration avec fallback intelligent au lieu de clarification systématique
         CONSERVÉ: Toute la logique métier originale
+        ✅ NOUVELLE CORRECTION: Gestion proper du format dict des réponses RAG
         """
         # 1. CONSERVATION: Load and update context (logique identique)
         context = self.memory.get(session_id) or {}
@@ -80,16 +83,18 @@ class DialogueManager:
                 logger.info(f"Score moyen ({score:.2f}), génération réponse avec avertissement")
                 answer_data = self.rag.generate_answer(question, context)
                 
-                # CONSERVATION: Extraire la réponse du dict (logique identique)
+                # ✅ CORRECTION CRITIQUE: Gestion proper du format dict RAG
                 if isinstance(answer_data, dict):
-                    response = format_response(answer_data.get("response", ""))
+                    # RAG retourne maintenant un dict avec "response", "source", etc.
+                    response_text = answer_data.get("response", "")
+                    response = format_response(response_text)  # format_response attend une string
                     source_info = {
                         "source": answer_data.get("source"),
                         "documents_used": answer_data.get("documents_used", 0),
                         "warning": f"Réponse générale - précisez {', '.join(missing[:2])} pour plus de précision"
                     }
                 else:
-                    # Fallback si ancien format
+                    # Fallback si ancien format (string directe)
                     response = format_response(answer_data)
                     source_info = {"warning": "Réponse générale"}
                 
@@ -108,16 +113,18 @@ class DialogueManager:
         logger.info(f"Score suffisant ({score:.2f}), génération réponse complète")
         answer_data = self.rag.generate_answer(question, context)
         
-        # CONSERVATION: Extraire la réponse du dict (logique identique)
+        # ✅ CORRECTION CRITIQUE: Gestion proper du format dict RAG
         if isinstance(answer_data, dict):
-            response = format_response(answer_data.get("response", ""))
+            # RAG retourne maintenant un dict avec "response", "source", etc.
+            response_text = answer_data.get("response", "")
+            response = format_response(response_text)  # format_response attend une string
             source_info = {
                 "source": answer_data.get("source"),
                 "documents_used": answer_data.get("documents_used", 0),
                 "warning": answer_data.get("warning")
             }
         else:
-            # Fallback si ancien format
+            # Fallback si ancien format (string directe)
             response = format_response(answer_data)
             source_info = {}
         
@@ -362,7 +369,8 @@ class DialogueManager:
                             "timestamp_format_handling": "✅ Gestion Unix et ISO 8601",
                             "postgresql_compatibility": "✅ TO_TIMESTAMP() pour Unix",
                             "regex_validation": "✅ Validation format avant conversion",
-                            "simple_fallback": "✅ Nettoyage simple en cas d'erreur"
+                            "simple_fallback": "✅ Nettoyage simple en cas d'erreur",
+                            "rag_dict_format": "✅ Gestion proper format dict RAG"
                         }
                     }
                     
@@ -381,7 +389,7 @@ class DialogueManager:
                 "status": "success",
                 "message": "Nettoyage forcé exécuté",
                 "timestamp": datetime.utcnow().isoformat(),
-                "fix_applied": "PostgreSQL timestamp format error corrigé"
+                "fix_applied": "PostgreSQL timestamp format error + RAG dict format corrigés"
             }
         except Exception as e:
             logger.error(f"❌ Erreur nettoyage forcé: {e}")
