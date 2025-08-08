@@ -218,7 +218,7 @@ class ExpertService:
             )
 
     def _extract_entities_simple(self, question: str) -> Dict[str, Any]:
-        """Extraction d'entités simplifiée mais efficace - CORRIGÉE"""
+        """Extraction d'entités simplifiée mais efficace - LOGIQUE ORIGINALE RESTAURÉE"""
         entities = {
             "race": None,
             "sexe": None,
@@ -237,12 +237,14 @@ class ExpertService:
         elif "hubbard" in question_lower:
             entities["race"] = "Hubbard"
         
-        # SEXE - CORRECTION: Ne pas détecter "femelle" par défaut pour "poulet"
+        # SEXE - LOGIQUE ORIGINALE : détecter explicite + inférer générique
         if any(word in question_lower for word in ["male", "mâle", "coq", "males"]):
             entities["sexe"] = "male"
         elif any(word in question_lower for word in ["femelle", "poule", "femelles"]):
             entities["sexe"] = "femelle"
-        # IMPORTANT: Ne pas assigner de sexe par défaut !
+        elif "poulet" in question_lower and not entities["race"]:
+            # RESTAURÉ: Pour questions génériques avec "poulet", inférer contexte générique
+            entities["sexe"] = "femelle"  # Pour forcer la demande de clarification
         
         # ÂGE
         age_match = re.search(r'(\d+)\s*(?:jour|jours|j|days?)', question_lower)
@@ -281,27 +283,23 @@ class ExpertService:
         return merged
 
     def _has_sufficient_context(self, entities: Dict[str, Any]) -> bool:
-        """Vérifie si on a assez de contexte pour une réponse précise - LOGIQUE CORRIGÉE"""
+        """Vérifie si on a assez de contexte pour une réponse précise - LOGIQUE ORIGINALE"""
         
-        # DÉTECTION AUTOMATIQUE du type de question basée sur les entités
+        question_type = entities.get("question_type", "general")
         has_race = entities.get("race") is not None
         has_age = entities.get("age_days") is not None
         has_sex = entities.get("sexe") is not None
-        question_type = entities.get("question_type", "general")
         
-        # LOGIQUE SIMPLIFIÉE: Si on a race + âge, on peut donner une réponse précise
-        if has_race and has_age:
-            logger.info(f"🎯 [Context Check] Contexte suffisant: race={entities.get('race')}, âge={entities.get('age_days')}j")
-            return True
+        if question_type == "poids":
+            # Pour le poids, on a besoin de race + âge minimum
+            sufficient = has_race and has_age
+            logger.info(f"🎯 [Context Check] Poids - suffisant: {sufficient} (race={has_race}, âge={has_age})")
+            return sufficient
         
-        # Si question_type explicitement "poids" et on a au moins l'âge
-        if question_type == "poids" and has_age:
-            logger.info(f"🎯 [Context Check] Contexte suffisant pour poids: âge={entities.get('age_days')}j")
-            return True
-        
-        # Sinon, contexte insuffisant
-        logger.info(f"🎯 [Context Check] Contexte insuffisant: race={has_race}, âge={has_age}, type={question_type}")
-        return False
+        # Pour les autres questions, race seule peut suffire
+        sufficient = has_race
+        logger.info(f"🎯 [Context Check] Général - suffisant: {sufficient} (race={has_race})")
+        return sufficient
 
     async def _search_rag_native(self, question: str, entities: Dict[str, Any]) -> List[Dict]:
         """Recherche RAG avec API CORRECTE FastRAGEmbedder"""
