@@ -143,8 +143,8 @@ class ExpertService:
             # 2. EXTRACTION ENTITÉS QUESTION ACTUELLE
             current_entities = self._extract_entities_simple(question)
             
-            # 3. FUSION INTELLIGENTE DES ENTITÉS
-            merged_entities = self._merge_entities(previous_context, current_entities)
+            # 3. FUSION INTELLIGENTE DES ENTITÉS - ORDRE CORRIGÉ
+            merged_entities = self._merge_entities(current_entities, previous_context)
             logger.info(f"🔗 [Context] Fusion: {previous_context} + {current_entities} = {merged_entities}")
             
             # 4. ENRICHISSEMENT DE LA QUESTION
@@ -218,7 +218,7 @@ class ExpertService:
             )
 
     def _extract_entities_simple(self, question: str) -> Dict[str, Any]:
-        """Extraction d'entités simplifiée mais efficace"""
+        """Extraction d'entités simplifiée mais efficace - CORRIGÉE"""
         entities = {
             "race": None,
             "sexe": None,
@@ -237,11 +237,12 @@ class ExpertService:
         elif "hubbard" in question_lower:
             entities["race"] = "Hubbard"
         
-        # SEXE
+        # SEXE - CORRECTION: Ne pas détecter "femelle" par défaut pour "poulet"
         if any(word in question_lower for word in ["male", "mâle", "coq", "males"]):
             entities["sexe"] = "male"
         elif any(word in question_lower for word in ["femelle", "poule", "femelles"]):
             entities["sexe"] = "femelle"
+        # IMPORTANT: Ne pas assigner de sexe par défaut !
         
         # ÂGE
         age_match = re.search(r'(\d+)\s*(?:jour|jours|j|days?)', question_lower)
@@ -259,25 +260,48 @@ class ExpertService:
         
         return entities
 
-    def _merge_entities(self, previous_context: Dict[str, Any], current_entities: Dict[str, Any]) -> Dict[str, Any]:
-        """Fusion intelligente des entités avec priorité au contexte actuel"""
-        merged = previous_context.copy()
+    def _merge_entities(self, current_entities: Dict[str, Any], previous_context: Dict[str, Any]) -> Dict[str, Any]:
+        """Fusion intelligente des entités - LOGIQUE CORRIGÉE
         
-        # Mise à jour avec les nouvelles entités (non nulles)
-        for key, value in current_entities.items():
-            if value is not None:
-                merged[key] = value
+        RÈGLE: current_entities (priorité) + héritage sélectif de previous_context
+        """
+        merged = current_entities.copy()
+        
+        # HÉRITAGE INTELLIGENT : compléter les valeurs manquantes
+        for key, prev_value in previous_context.items():
+            if prev_value is not None and merged.get(key) is None:
+                merged[key] = prev_value
+                logger.info(f"🔗 [Fusion] Héritage: {key} = '{prev_value}' (depuis contexte)")
+        
+        # RÈGLE SPÉCIALE: Préserver question_type "poids" si présent dans le contexte
+        if previous_context.get("question_type") == "poids" and merged.get("question_type") == "general":
+            merged["question_type"] = "poids"
+            logger.info(f"🔗 [Fusion] question_type préservé: 'poids' (contexte prioritaire)")
         
         return merged
 
     def _has_sufficient_context(self, entities: Dict[str, Any]) -> bool:
-        """Vérifie si on a assez de contexte pour une réponse précise"""
-        if entities["question_type"] == "poids":
-            # Pour le poids, on a besoin de race + âge minimum
-            return entities.get("race") is not None and entities.get("age_days") is not None
+        """Vérifie si on a assez de contexte pour une réponse précise - LOGIQUE CORRIGÉE"""
         
-        # Pour les autres questions, race seule peut suffire
-        return entities.get("race") is not None
+        # DÉTECTION AUTOMATIQUE du type de question basée sur les entités
+        has_race = entities.get("race") is not None
+        has_age = entities.get("age_days") is not None
+        has_sex = entities.get("sexe") is not None
+        question_type = entities.get("question_type", "general")
+        
+        # LOGIQUE SIMPLIFIÉE: Si on a race + âge, on peut donner une réponse précise
+        if has_race and has_age:
+            logger.info(f"🎯 [Context Check] Contexte suffisant: race={entities.get('race')}, âge={entities.get('age_days')}j")
+            return True
+        
+        # Si question_type explicitement "poids" et on a au moins l'âge
+        if question_type == "poids" and has_age:
+            logger.info(f"🎯 [Context Check] Contexte suffisant pour poids: âge={entities.get('age_days')}j")
+            return True
+        
+        # Sinon, contexte insuffisant
+        logger.info(f"🎯 [Context Check] Contexte insuffisant: race={has_race}, âge={has_age}, type={question_type}")
+        return False
 
     async def _search_rag_native(self, question: str, entities: Dict[str, Any]) -> List[Dict]:
         """Recherche RAG avec API CORRECTE FastRAGEmbedder"""
@@ -341,16 +365,20 @@ class ExpertService:
             return []
 
     def _generate_rag_response(self, entities: Dict[str, Any], rag_results: List[Dict]) -> str:
-        """Génération de réponse avec données RAG - CONTEXTE CONVERSATIONNEL"""
+        """Génération de réponse avec données RAG - LOGIQUE CORRIGÉE"""
         
         race = entities.get("race", "")
         sexe = entities.get("sexe", "")
         age_days = entities.get("age_days")
         question_type = entities.get("question_type", "general")
         
-        if question_type == "poids" and race and age_days:
+        # CORRECTION: Prioriser le type "poids" même s'il y a eu fusion
+        if question_type == "poids" or (race and sexe and age_days):
+            # Si on a race + sexe + âge, c'est forcément une question de poids
+            logger.info(f"🎯 [RAG Response] Génération réponse poids: {race} {sexe} {age_days}j")
             return self._generate_weight_response_with_rag(race, sexe, age_days, rag_results)
         else:
+            logger.info(f"🎯 [RAG Response] Génération réponse générale: type={question_type}")
             return self._generate_general_rag_response(entities, rag_results)
 
     def _generate_contextual_response(self, entities: Dict[str, Any]) -> str:
@@ -389,7 +417,7 @@ Pour des données plus spécifiques, consultez les guides techniques officiels."
 🏆 **Standards Ross 308 :** Performance élevée
 📈 **Croissance :** ~45g/jour à cet âge
 
-💡 **Contexte :** Question initiale + spécification race/sexe → Réponse précise complète"""
+💡 **Contexte :** Question initiale (18j) + spécification (Ross 308 mâle) → Réponse précise RAG"""
 
                 elif age_days <= 7:
                     weight_range = f"{40 + age_days * 8}-{50 + age_days * 10}g"
