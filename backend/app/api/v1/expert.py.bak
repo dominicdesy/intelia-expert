@@ -32,7 +32,6 @@ def get_session_id(request: Request) -> str:
     return session_id
 
 @router.post("/ask", response_model=ResponseModel)
-
 async def ask(
     payload: AskRequest = Body(...),
     session_id: str = Depends(get_session_id)
