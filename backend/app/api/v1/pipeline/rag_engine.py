@@ -1,28 +1,42 @@
 """
-RAGEngine - Version corrigée avec prompt amélioré pour utiliser effectivement les documents
+RAGEngine - Version corrigée avec gestion robuste VectorStoreClient
 CONSERVE: Structure originale + logique RAG
 CORRIGE: 
 - Retourne un dict au lieu d'une string pour compatibilité DialogueManager
-- ✅ AMÉLIORATION MAJEURE: Prompt RAG restructuré pour utiliser les documents trouvés
-- ✅ AMÉLIORATION: Mention des informations manquantes (race, sexe) pour précision
+- ✅ CORRECTION CRITIQUE: Gestion robuste résultats VectorStoreClient vides/erreurs
+- ✅ AMÉLIORATION: Fallback gracieux si Pinecone indisponible
+- ✅ AMÉLIORATION: Prompt RAG restructuré pour utiliser effectivement les documents
 """
 import os
+import logging
 from app.api.v1.utils.integrations import VectorStoreClient
 from app.api.v1.utils.openai_utils import safe_chat_completion
+
+logger = logging.getLogger(__name__)
 
 class RAGEngine:
     """
     Retrieval-Augmented Generation engine with fallback if no vector results.
-    CORRIGÉ: Retourne maintenant un dict standardisé au lieu d'une string.
-    ✅ AMÉLIORATION: Prompt RAG amélioré pour utiliser les documents et mentionner ce qui manque
+    
+    ✅ CORRECTION CRITIQUE: Gestion robuste des erreurs VectorStoreClient
+    - Fix TypeError "list indices must be integers or slices, not str"
+    - Fallback gracieux si Pinecone indisponible
+    - Validation structure documents retournés
     """
     def __init__(self):
-        self.vector_client = VectorStoreClient()
+        try:
+            self.vector_client = VectorStoreClient()
+            self.vector_available = True
+            logger.info("✅ RAGEngine: VectorStoreClient initialisé")
+        except Exception as e:
+            logger.error(f"❌ RAGEngine: Erreur init VectorStoreClient: {e}")
+            self.vector_client = None
+            self.vector_available = False
 
     def generate_answer(self, question, context):
         """
-        CORRIGÉ: Retourne un dict avec métadonnées au lieu d'une string simple
-        ✅ AMÉLIORATION: Prompt restructuré pour utiliser les documents trouvés
+        ✅ CORRECTION CRITIQUE: Gestion robuste avec validation structure docs
+        
         Format de retour: {
             "response": str,
             "source": str,
@@ -30,7 +44,7 @@ class RAGEngine:
             "warning": str|None
         }
         """
-        # ✅ AJOUTÉ: Structure de retour standardisée
+        # ✅ Structure de retour standardisée
         result = {
             "response": "",
             "source": "",
@@ -38,12 +52,39 @@ class RAGEngine:
             "warning": None
         }
         
-        # ✅ CONSERVATION: Logique de recherche documentaire identique
-        docs = self.vector_client.query(question)
+        # ✅ CORRECTION CRITIQUE: Gestion robuste recherche documentaire
+        docs = []
+        search_error = None
         
+        if self.vector_available and self.vector_client:
+            try:
+                logger.debug(f"🔍 RAGEngine: Recherche docs pour: {question[:50]}...")
+                docs = self.vector_client.query(question)
+                
+                # ✅ VALIDATION: Vérification structure docs retournés
+                if not isinstance(docs, list):
+                    logger.warning(f"⚠️ RAGEngine: docs n'est pas une liste: {type(docs)}")
+                    docs = []
+                elif docs and not all(isinstance(doc, dict) for doc in docs):
+                    logger.warning(f"⚠️ RAGEngine: docs contient des non-dict")
+                    # Filtrer uniquement les dicts valides
+                    docs = [doc for doc in docs if isinstance(doc, dict)]
+                
+                logger.info(f"✅ RAGEngine: {len(docs)} documents trouvés")
+                
+            except Exception as e:
+                logger.error(f"❌ RAGEngine: Erreur recherche docs: {type(e).__name__}: {e}")
+                docs = []
+                search_error = str(e)
+        else:
+            logger.warning("⚠️ RAGEngine: VectorStoreClient non disponible")
+            search_error = "VectorStoreClient non disponible"
+        
+        # ✅ CORRECTION: Logique docs trouvés vs fallback
         if not docs:
-            # ✅ AMÉLIORATION: Fallback GPT sans documents avec prompt plus intelligent
-            fallback_prompt = self._build_fallback_prompt(question, context)
+            # ✅ FALLBACK: Pas de documents trouvés
+            logger.info("🔄 RAGEngine: Fallback OpenAI (pas de docs)")
+            fallback_prompt = self._build_fallback_prompt(question, context, search_error)
             
             try:
                 resp = safe_chat_completion(
@@ -53,16 +94,19 @@ class RAGEngine:
                     max_tokens=512
                 )
                 
-                # ✅ CORRIGÉ: Retour dict au lieu de string
+                warning_msg = "Réponse basée sur les connaissances générales - aucun document spécifique trouvé"
+                if search_error:
+                    warning_msg += f" (Erreur recherche: {search_error})"
+                
                 result.update({
                     "response": resp.choices[0].message.content.strip(),
                     "source": "openai_fallback",
                     "documents_used": 0,
-                    "warning": "Réponse basée sur les connaissances générales - aucun document spécifique trouvé"
+                    "warning": warning_msg
                 })
                 
             except Exception as e:
-                # ✅ AJOUTÉ: Gestion d'erreur avec retour cohérent
+                logger.error(f"❌ RAGEngine: Erreur OpenAI fallback: {e}")
                 result.update({
                     "response": "Je rencontre une difficulté technique pour répondre à votre question. Veuillez réessayer.",
                     "source": "error_fallback",
@@ -71,7 +115,8 @@ class RAGEngine:
                 })
         
         else:
-            # ✅ AMÉLIORATION MAJEURE: RAG avec documents - prompt restructuré
+            # ✅ RAG: Documents trouvés
+            logger.info(f"🎯 RAGEngine: Génération RAG avec {len(docs)} docs")
             rag_prompt = self._build_rag_prompt(question, context, docs)
             
             try:
@@ -82,7 +127,6 @@ class RAGEngine:
                     max_tokens=512
                 )
                 
-                # ✅ CORRIGÉ: Retour dict avec métadonnées RAG
                 result.update({
                     "response": resp.choices[0].message.content.strip(),
                     "source": "rag_enhanced",
@@ -91,7 +135,7 @@ class RAGEngine:
                 })
                 
             except Exception as e:
-                # ✅ AJOUTÉ: Fallback en cas d'erreur OpenAI
+                logger.error(f"❌ RAGEngine: Erreur OpenAI RAG: {e}")
                 result.update({
                     "response": f"Documents trouvés ({len(docs)}) mais erreur de traitement. Consultez un expert.",
                     "source": "rag_error",
@@ -99,15 +143,33 @@ class RAGEngine:
                     "warning": f"Erreur traitement RAG: {str(e)}"
                 })
         
+        logger.debug(f"📊 RAGEngine: Réponse générée - source: {result['source']}, docs: {result['documents_used']}")
         return result
 
     def _build_rag_prompt(self, question: str, context: dict, docs: list) -> str:
         """
-        ✅ NOUVELLE MÉTHODE: Construction du prompt RAG amélioré
+        ✅ AMÉLIORATION: Construction prompt RAG avec validation docs
         """
-        doc_content = "\n".join(str(d) for d in docs)
+        # ✅ VALIDATION: Extraction contenu docs robuste
+        doc_contents = []
+        for i, doc in enumerate(docs):
+            try:
+                if isinstance(doc, dict):
+                    # Essayer différentes clés pour le contenu
+                    content = (
+                        doc.get('text') or 
+                        doc.get('content') or 
+                        doc.get('metadata', {}).get('text') or
+                        str(doc)
+                    )
+                    doc_contents.append(f"Document {i+1}: {content}")
+                else:
+                    doc_contents.append(f"Document {i+1}: {str(doc)}")
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur extraction doc {i}: {e}")
+                doc_contents.append(f"Document {i+1}: [Erreur extraction]")
         
-        # ✅ AMÉLIORATION: Analyser le contexte pour identifier ce qui manque
+        doc_content = "\n".join(doc_contents)
         missing_info = self._identify_missing_context(context)
         
         prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
@@ -132,11 +194,15 @@ Répondez de manière professionnelle et pratique en utilisant les documents fou
 
         return prompt
 
-    def _build_fallback_prompt(self, question: str, context: dict) -> str:
+    def _build_fallback_prompt(self, question: str, context: dict, search_error: str = None) -> str:
         """
-        ✅ NOUVELLE MÉTHODE: Construction du prompt fallback amélioré
+        ✅ AMÉLIORATION: Prompt fallback avec mention erreur optionnelle
         """
         missing_info = self._identify_missing_context(context)
+        
+        situation_msg = "Aucun document spécialisé trouvé dans la base de données."
+        if search_error:
+            situation_msg += f" (Erreur technique: {search_error})"
         
         prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
 
@@ -144,7 +210,7 @@ QUESTION: {question}
 
 CONTEXTE DISPONIBLE: {context if context else "Aucun contexte spécifique fourni"}
 
-SITUATION: Aucun document spécialisé trouvé dans la base de données.
+SITUATION: {situation_msg}
 
 INSTRUCTIONS:
 1. Répondez en vous basant sur vos connaissances générales en aviculture
@@ -160,8 +226,11 @@ Répondez de manière professionnelle en indiquant qu'il s'agit d'une réponse g
 
     def _identify_missing_context(self, context: dict) -> str:
         """
-        ✅ NOUVELLE MÉTHODE: Identifie les informations manquantes importantes
+        ✅ CONSERVATION: Méthode d'identification contexte manquant
         """
+        if not context:
+            context = {}
+            
         missing_parts = []
         
         # Vérifier les informations clés pour les questions de nutrition/poids
@@ -188,3 +257,20 @@ CONSIGNE SPÉCIALE:
             missing_text = "CONTEXTE: Informations suffisantes pour une réponse précise."
         
         return missing_text
+
+    def get_status(self) -> dict:
+        """
+        ✅ NOUVELLE MÉTHODE: Status RAG pour diagnostics
+        """
+        status = {
+            "vector_client_available": self.vector_available,
+            "vector_client_type": type(self.vector_client).__name__ if self.vector_client else None
+        }
+        
+        if self.vector_available and hasattr(self.vector_client, 'test_connection'):
+            try:
+                status["connection_test"] = self.vector_client.test_connection()
+            except Exception as e:
+                status["connection_test"] = {"status": "error", "error": str(e)}
+        
+        return status
