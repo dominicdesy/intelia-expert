@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import logging
 import threading
 from typing import Any, Dict, List, Optional
@@ -9,11 +10,11 @@ from uuid import uuid4
 from datetime import datetime
 
 try:
-    import anyio  # pour offloader sync -> thread
-except Exception:  # fallback léger si anyio n'est pas dispo
+    import anyio
+except Exception:
     anyio = None  # type: ignore
 
-from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD  # peut lever si absent
+from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD
 from ..utils.response_generator import format_response
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
@@ -22,55 +23,31 @@ from .rag_engine import RAGEngine
 
 logger = logging.getLogger(__name__)
 
-# --- Sécuriser un défaut si l'import du seuil échoue dans certains environnements
 COMPLETENESS_THRESHOLD: float = 0.6
 try:
     COMPLETENESS_THRESHOLD = float(_THRESHOLD)
 except Exception:
     logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
 
+CRITICAL_FIELDS = {"race", "sexe"}  # ✅ utilisé par le mode hybride
 
 def _utc_iso() -> str:
     return datetime.utcnow().isoformat()
 
-
 def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
-    """
-    Normalise différentes formes de 'sources' en une liste de dicts.
-    Accepte:
-      - list[dict|str]
-      - str|dict (unique)
-      - None
-    """
     if raw is None:
         return []
     if isinstance(raw, list):
-        out: List[Dict[str, Any]] = []
-        for s in raw:
-            if isinstance(s, dict):
-                out.append(s)
-            else:
-                out.append({"source": str(s)})
-        return out
+        return [s if isinstance(s, dict) else {"source": str(s)} for s in raw]
     if isinstance(raw, dict):
         return [raw]
     return [{"source": str(raw)}]
 
-
 class DialogueManager:
     """
-    Orchestrateur:
-      1) Extraction de contexte
-      2) Clarification si score << seuil, sinon fallback avec avertissement
-      3) Appel RAG et mise en forme de la réponse (dict: {'answer', 'sources'})
-      4) Persistance légère du contexte (mémoire Postgres)
-
-    Compatible avec expert.py:
-      - @classmethod get_instance()
-      - async handle(session_id, question, language=None, user_id=None)
-      - async system_status()
+    Orchestrateur principal (extraction -> clarification -> RAG -> mémoire)
+    Compatible expert.py
     """
-
     _instance: Optional["DialogueManager"] = None
     _lock = threading.Lock()
 
@@ -83,14 +60,10 @@ class DialogueManager:
         return cls._instance
 
     def __init__(self) -> None:
-        # Dépendances "légères" (pas de heavy load à l'import du module)
         self.extractor = ContextExtractor()
         self.clarifier = ClarificationManager()
         self.memory = ConversationMemory(dsn=os.getenv("DATABASE_URL"))
         self.rag = RAGEngine()
-
-        # Optionnel: démarrage d’une tâche de nettoyage si la mémoire l’expose
-        # (aucun crash si non supporté)
         try:
             self._maybe_start_cleanup()
         except Exception as e:
@@ -107,10 +80,9 @@ class DialogueManager:
         language: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        # Session
         sid = session_id or str(uuid4())
 
-        # Charger contexte existant (robuste)
+        # mémoire (tolérante)
         try:
             context: Dict[str, Any] = self.memory.get(sid) or {}
         except Exception as e:
@@ -125,6 +97,9 @@ class DialogueManager:
         # 1) Extraction
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
+
+        # ✅ BONUS : heuristique “fallback broiler”
+        self._apply_broiler_fallback(question, context)
 
         logger.info("Q: %s", question[:120])
         logger.info("Completeness=%.2f / seuil=%.2f", score, COMPLETENESS_THRESHOLD)
@@ -145,8 +120,20 @@ class DialogueManager:
                     "missing_fields": missing,
                 }
 
-            # 3) Fallback avec avertissement
+            # ✅ MODE HYBRIDE : réponse générale + questions ciblées (race/sexe prioritaire)
             answer_text, sources = await self._generate_with_rag(question, context)
+
+            follow_up: List[str] = []
+            critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
+            if critical_missing:
+                follow_up = self.clarifier.generate(critical_missing, round_number=1)
+                if follow_up:
+                    answer_text = (
+                        f"{answer_text}\n\n"
+                        "Pour affiner la recommandation, précisez :\n"
+                        + "\n".join(f"- {q}" for q in follow_up)
+                    )
+
             context["completed_at"] = _utc_iso()
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
@@ -160,10 +147,11 @@ class DialogueManager:
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
+                "follow_up_questions": follow_up,  # ✅ exposé à l’API
                 "metadata": {"warning": warn},
             }
 
-        # 4) Réponse complète
+        # 3) Réponse complète
         answer_text, sources = await self._generate_with_rag(question, context)
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
@@ -184,9 +172,7 @@ class DialogueManager:
             return {
                 "status": "ok" if rag_ready else "degraded",
                 "rag_ready": rag_ready,
-                "details": {
-                    "cleanup_enabled": bool(getattr(self, "_cleanup_enabled", False)),
-                },
+                "details": {"cleanup_enabled": bool(getattr(self, "_cleanup_enabled", False))},
             }
         except Exception as e:
             logger.exception("system_status error: %s", e)
@@ -196,29 +182,45 @@ class DialogueManager:
     #       INTERNALS
     # -----------------------
 
+    def _apply_broiler_fallback(self, question: str, context: Dict[str, Any]) -> None:
+        """
+        ✅ BONUS : Si la question concerne le poids et qu'on est <30 jours, 
+        et qu'aucune espèce/production_type n'est fournie, on force l'index Broiler.
+        """
+        prod = (context.get("production_type") or context.get("species") or "").lower()
+        has_species = prod in {"broiler", "layer", "breeder", "pullet"}
+
+        # détecter notion de poids
+        text = f"{question} {context}".lower()
+        weight_like = bool(re.search(r"\b(poids|weight|body\s*weight)\b", text))
+
+        age_days = None
+        try:
+            if "age_jours" in context:
+                age_days = int(float(str(context["age_jours"]).replace(",", ".")))
+        except Exception:
+            age_days = None
+
+        if not has_species and weight_like and (age_days is not None and age_days < 30):
+            context["production_type"] = "broiler"
+            context["species"] = "broiler"
+            context.setdefault("hints", {})["species_inferred"] = "broiler"
+            logger.debug("🐤 BONUS: species fallback → broiler (poids + <30j)")
+
     async def _generate_with_rag(self, question: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
-        """
-        Appelle le moteur RAG. Tolère les deux formats:
-          - str (ancien)
-          - dict {"response": str, "sources": list|dict|str}
-        Offload en thread si anyio est dispo, pour ne pas bloquer l’event loop.
-        """
         def _call() -> Any:
             return self.rag.generate_answer(question, context)
-
         try:
             raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
         except Exception as e:
             logger.exception("RAG generate_answer error: %s", e)
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
-
         if isinstance(raw, dict):
             answer_text = str(raw.get("response", "")).strip()
             sources = _normalize_sources(raw.get("sources") or raw.get("source"))
         else:
             answer_text = str(raw).strip()
             sources = []
-
         return (answer_text, sources)
 
     def _safe_mem_update(self, session_id: str, context: Dict[str, Any]) -> None:
@@ -228,26 +230,18 @@ class DialogueManager:
             logger.warning("Échec update mémoire (sid=%s): %s", session_id, e)
 
     def _maybe_start_cleanup(self) -> None:
-        """
-        Démarre un thread léger de nettoyage **uniquement** si la mémoire expose une API sûre.
-        On évite psycopg2 direct ici pour ne pas lier le DM à une implémentation précise.
-        """
         cleanup_fn = getattr(self.memory, "cleanup_expired", None)
         if not callable(cleanup_fn):
             self._cleanup_enabled = False
             return
-
         interval_min = int(os.getenv("CLEANUP_INTERVAL_MINUTES", "30"))
         self._cleanup_enabled = True
-
         def _loop():
             import time
             while True:
                 try:
-                    cleanup_fn()  # la classe mémoire décide quoi purger
+                    cleanup_fn()
                 except Exception as e:
                     logger.debug("Cleanup mémoire: %s", e)
-                time.sleep(max(300, interval_min * 60))  # au moins 5 min
-
-        t = threading.Thread(target=_loop, daemon=True)
-        t.start()
+                time.sleep(max(300, interval_min * 60))
+        threading.Thread(target=_loop, daemon=True).start()
