@@ -3,71 +3,97 @@ from __future__ import annotations
 
 import os
 import logging
-from datetime import datetime
-from typing import Any, Dict, Optional
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# .env (optionnel)
+# .env facultatif
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
 
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-# --- Globals (exposés via app.state) ---
-_supabase: Optional[Any] = None
-_rag: Optional[Any] = None
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+def _rag_status(obj: Optional[Any]) -> str:
+    if not obj:
+        return "not_available"
+    try:
+        return "optimized" if obj.has_search_engine() else "fallback"
+    except Exception:
+        return "fallback"
+
+def _try_load_rag_indexes(embedder) -> bool:
+    """
+    Ordre de recherche des index :
+      1) Variables d'env (RAG_INDEX_GLOBAL / RAG_INDEX_DIR)
+      2) DO Buildpack: /workspace/rag_index/global
+      3) Dockerfile:   /app/rag_index/global
+    """
+    # 1) ENV
+    if embedder.load_from_env() and embedder.has_search_engine():
+        return True
+
+    # 2) DigitalOcean Buildpack path
+    ws_path = "/workspace/rag_index/global"
+    if os.path.exists(ws_path):
+        logger.info("🔎 Trying DO path: %s", ws_path)
+        if embedder.load_index(ws_path) and embedder.has_search_engine():
+            return True
+
+    # 3) Docker image path
+    app_path = "/app/rag_index/global"
+    if os.path.exists(app_path):
+        logger.info("🔎 Trying Docker path: %s", app_path)
+        if embedder.load_index(app_path) and embedder.has_search_engine():
+            return True
+
+    return False
 
 # -----------------------------------------------------------------------------
-# Lifespan (startup/shutdown)
+# Lifespan (startup / shutdown)
 # -----------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _supabase, _rag
-
-    # 1) Supabase (optionnel)
+    # Supabase (optionnel)
     try:
         from supabase import create_client
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_ANON_KEY")
+        url, key = os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_ANON_KEY")
         if url and key:
-            _supabase = create_client(url, key)
+            app.state.supabase = create_client(url, key)
             logger.info("✅ Supabase prêt")
         else:
-            logger.info("ℹ️ Supabase non configuré")
+            app.state.supabase = None
+            logger.info("ℹ️ Supabase non configuré (SUPABASE_URL / SUPABASE_ANON_KEY manquants)")
     except Exception as e:
-        _supabase = None
+        app.state.supabase = None
         logger.info("ℹ️ Supabase indisponible: %s", e)
 
-    # 2) RAG Embedder
+    # RAG
     try:
         from rag.embedder import FastRAGEmbedder
-        embedder = FastRAGEmbedder(
-            debug=True,               # mets False quand tout est stable
-            cache_embeddings=True,
-            max_workers=2,
-        )
-        ready = embedder.load_from_env()  # lit RAG_INDEX_* (Dockerfile)
-        _rag = embedder
-        logger.info("✅ RAG prêt" if (ready and embedder.has_search_engine()) else "⚠️ RAG en mode fallback")
+        embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
+        ready = _try_load_rag_indexes(embedder)
+        app.state.rag = embedder
+        logger.info("✅ RAG prêt" if ready else "⚠️ RAG en mode fallback (index introuvable)")
     except Exception as e:
-        _rag = None
+        app.state.rag = None
         logger.error("❌ RAG non initialisé: %s", e)
 
-    # Expose state pour autres modules/routers
-    app.state.supabase = _supabase
-    app.state.rag = _rag
-
     yield
-
-    # (shutdown) — rien de spécial pour l’instant
+    # (aucun shutdown spécial)
 
 # -----------------------------------------------------------------------------
 # FastAPI app
@@ -75,7 +101,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Intelia Expert API",
     version="3.5.5",
-    root_path="/api",
+    root_path="/api",        # docs: /api/docs
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -97,51 +123,38 @@ app.add_middleware(
 )
 
 # -----------------------------------------------------------------------------
-# Routers (montage concis)
+# Routers (montage unique via app.api.v1)
 # -----------------------------------------------------------------------------
-def _mount_router(module_path: str, prefix: str, tag: str):
-    try:
-        module = __import__(module_path, fromlist=["router"])
-        app.include_router(module.router, prefix=prefix, tags=[tag])
-        logger.info("✅ %s monté sur %s", module_path, prefix)
-    except Exception as e:
-        logger.warning("⚠️ %s non monté: %s", module_path, e)
-
-routers = [
-    ("api.v1.expert", "/v1/expert", "Expert"),
-    ("api.v1.logging", "/v1", "Logging"),
-    ("api.v1.auth", "/v1", "Auth"),
-    ("api.v1.admin", "/v1", "Admin"),
-    ("api.v1.health", "/v1", "Health"),
-    ("api.v1.system", "/v1", "System"),
-    ("api.v1.invitations", "/v1", "Invitations"),
-]
-for mod, prefix, tag in routers:
-    _mount_router(mod, prefix, tag)
+from app.api.v1 import router as api_v1_router
+app.include_router(api_v1_router)
 
 # -----------------------------------------------------------------------------
-# Health/root
+# Root & Health
 # -----------------------------------------------------------------------------
 @app.get("/", tags=["Root"])
 async def root():
-    def rag_status() -> str:
-        if not getattr(app.state, "rag", None):
-            return "not_available"
-        try:
-            return "optimized" if app.state.rag.has_search_engine() else "fallback"
-        except Exception:
-            return "fallback"
-
     return {
         "status": "running",
         "version": "3.5.5",
         "environment": os.getenv("ENV", "production"),
-        "database": bool(getattr(app.state, "supabase", None)),
-        "rag": rag_status(),
+        "database": "connected" if getattr(app.state, "supabase", None) else "disconnected",
+        "rag": _rag_status(getattr(app.state, "rag", None)),
+    }
+
+@app.get("/health", tags=["Health"])
+async def health():
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "services": {
+            "api": "running",
+            "database": "connected" if getattr(app.state, "supabase", None) else "disconnected",
+            "rag": _rag_status(getattr(app.state, "rag", None)),
+        },
     }
 
 # -----------------------------------------------------------------------------
-# Error handlers (sobres)
+# Error handlers (simples & UTF-8)
 # -----------------------------------------------------------------------------
 @app.exception_handler(HTTPException)
 async def http_exc_handler(_: Request, exc: HTTPException):
@@ -161,7 +174,7 @@ async def generic_exc_handler(_: Request, exc: Exception):
     )
 
 # -----------------------------------------------------------------------------
-# Entrée locale (uvicorn)
+# Entry point local
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
