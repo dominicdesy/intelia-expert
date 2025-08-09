@@ -55,11 +55,8 @@ except Exception:
 CRITICAL_FIELDS = {"race", "sexe"}
 
 # Présentation UI
-MAX_BULLET_LEN = 220  # puces moins tronquées
-CLARIF_TEXT = (
-    "Pour affiner : quelle est la lignée (Ross, Cobb, Hubbard, etc.) "
-    "et le sexe du lot (mâles, femelles ou mixte) ?"
-)
+MAX_BULLET_LEN = 220  # coupe douce pour l’UI card
+CLARIF_QUESTION = "Peux-tu préciser la lignée (Ross, Cobb, Hubbard…) et le sexe du lot (mâles, femelles, mixte) ?"
 
 # --------- Utils locaux ---------
 def _utc_iso() -> str:
@@ -74,9 +71,47 @@ def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
         return [raw]
     return [{"source": str(raw)}]
 
-def _short(txt: Any, n: int = 140) -> str:
+def _short(txt: Any, n: int = 160) -> str:
     s = str(txt or "")
     return s if len(s) <= n else (s[: n - 1] + "…")
+
+def _mk_bullets_from_text(text: str, limit: int = MAX_BULLET_LEN, max_items: int = 3) -> List[str]:
+    if not text:
+        return []
+    lines = [l.strip("•- ").strip() for l in text.split("\n") if l.strip()]
+    bullets: List[str] = []
+    for l in lines:
+        bullets.append(l if len(l) <= limit else (l[:limit] + "…"))
+        if len(bullets) >= max_items:
+            break
+    if not bullets:
+        bullets = [text if len(text) <= limit else (text[:limit] + "…")]
+    return bullets
+
+def _compose_markdown(answer_core: str, context_note: Optional[str], clarif_lines: List[str]) -> str:
+    """
+    Construit une réponse Markdown en 3 blocs :
+    - Réponse actuelle
+    - Contexte / hypothèses
+    - Pour être plus précis (si clarifications)
+    """
+    parts: List[str] = []
+    # Bloc 1 — Réponse actuelle
+    core = answer_core.strip() if answer_core else ""
+    if not core:
+        core = "Je n’ai pas pu formuler une réponse exploitable pour l’instant."
+    parts.append("### 📌 Réponse actuelle\n" + core)
+
+    # Bloc 2 — Contexte / hypothèses
+    if context_note:
+        parts.append("### 🧭 Contexte / hypothèses\n" + context_note.strip())
+
+    # Bloc 3 — Clarification demandée
+    if clarif_lines:
+        ask = "\n".join(f"- {l}" for l in clarif_lines)
+        parts.append("### ❓ Pour être plus précis\n" + ask)
+
+    return "\n\n".join(parts)
 
 
 class DialogueManager:
@@ -130,29 +165,30 @@ class DialogueManager:
         if user_id:
             context.setdefault("user_id", user_id)
 
-        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, _short(question, 200))
+        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, _short(question, 260))
 
         # 1) Extraction de contexte
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # Préférences UI (ne force rien sauf si l'utilisateur parle de poids)
+        # Déterminer si la question parle de poids → format en puces utile
         ui = context.setdefault("ui_prefs", {})
         ui["weight_only"] = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
         ui["format"] = "bullets" if ui["weight_only"] else ui.get("format", "auto")
 
-        # BONUS : heuristique “broiler” si <30j & question poids
+        # BONUS : heuristique “broiler” si <30j & question poids (conserve comportement)
         self._apply_broiler_fallback(question, context)
 
         logger.info(
             "🟩 DM.extract | score=%.2f (seuil=%.2f) | missing=%s",
             score, COMPLETENESS_THRESHOLD, missing,
         )
-        logger.debug("🟩 DM.context=%s", _short(context, 800))
+        logger.debug("🟩 DM.context=%s", _short(context, 900))
         logger.debug("🟩 DM.ui_prefs=%s", ui)
 
         # 2) Très incomplet → demander directement des clarifications
         if score < 0.2:
+            # Questions de clarification (toutes les manquantes)
             questions = self.clarifier.generate(missing)
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
@@ -170,54 +206,50 @@ class DialogueManager:
             answer_text, sources = await self._generate_with_rag(
                 question, context, style="minimal"
             )
+
+            # Clarifications prioritaires (race/sexe)
             follow_up: List[str] = []
             critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
             if critical_missing:
-                follow_up = self.clarifier.generate(critical_missing, round_number=1)[:2]
+                # On force un wording unique et clair
+                follow_up = [CLARIF_QUESTION]
 
-            # Injecter la question de clarification dans le TEXTE (visible même si le front ignore follow_up)
-            if critical_missing:
-                if answer_text and not answer_text.strip().endswith("?"):
-                    answer_text = answer_text.strip() + "\n\n" + CLARIF_TEXT
-                elif not answer_text:
-                    answer_text = CLARIF_TEXT
+            # Contexte / hypothèses résumé
+            context_note = None
+            if missing:
+                human_missing = ", ".join(missing)
+                context_note = f"Estimation générale (informations manquantes : {human_missing})."
 
-            # Mise en page card : 3 puces max, coupe douce
-            raw_lines = [l.strip("-• ").strip() for l in (answer_text or "").split("\n") if l.strip()]
-            bullets: List[str] = []
-            for l in raw_lines:
-                bullets.append(l if len(l) <= MAX_BULLET_LEN else (l[:MAX_BULLET_LEN] + "…"))
-                if len(bullets) >= 3:
-                    break
-            if not bullets and answer_text:
-                bullets = [answer_text if len(answer_text) <= MAX_BULLET_LEN else (answer_text[:MAX_BULLET_LEN] + "…")]
+            # Markdown structuré
+            md = _compose_markdown(answer_text, context_note, follow_up)
 
-            footnote = "Précisez les champs manquants pour une cible plus précise." if missing else None
+            # UI card compacte
+            bullets = _mk_bullets_from_text(answer_text or "", MAX_BULLET_LEN, max_items=3)
             card = build_card(
                 headline="Réponse générale (à affiner)",
                 bullets=bullets,
-                footnote=footnote,
+                footnote="Ajoute les précisions demandées pour une cible plus précise.",
                 followups=follow_up,
                 sources=sources,
             )
 
-            # ✅ Toujours renvoyer un texte dans response.answer
-            resp_payload = format_response(answer_text, sources)
+            # Payload classique + card
+            resp_payload = format_response(md, sources)
 
             context["completed_at"] = _utc_iso()
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
 
             logger.info(
-                "🟨 DM.flow=hybrid | answer_len=%d | sources=%d | followups=%d",
-                len(answer_text or ""), len(sources or []), len(follow_up or []),
+                "🟨 DM.flow=hybrid | text_len=%d | sources=%d | followups=%d",
+                len(md or ""), len(sources or []), len(follow_up or []),
             )
             logger.debug("🟨 DM.ui_card.bullets=%s", bullets)
 
             return {
                 "type": "answer",
-                "response": resp_payload,  # ← texte classique attendu
-                "ui_card": card,           # ← rendu UI “card”
+                "response": resp_payload,    # ← markdown structuré
+                "ui_card": card,             # ← card UI
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
@@ -230,41 +262,50 @@ class DialogueManager:
             question, context, style="standard"
         )
 
-        # Mise en page card (précise)
-        headline = (answer_text.split("\n", 1)[0] if answer_text else "Réponse")[:90]
-        raw_lines = [l.strip("-• ").strip() for l in (answer_text or "").split("\n") if l.strip()]
-        bullets: List[str] = []
-        for l in raw_lines:
-            if len(bullets) >= 3:
-                break
-            bullets.append(l if len(l) <= MAX_BULLET_LEN else (l[:MAX_BULLET_LEN] + "…"))
-        if not bullets and answer_text:
-            bullets = [answer_text if len(answer_text) <= MAX_BULLET_LEN else (answer_text[:MAX_BULLET_LEN] + "…")]
+        # Contexte/hypothèses (optionnel)
+        context_note = None
+        if extracted:
+            # Petit résumé contextuel humain
+            snippets = []
+            if context.get("race") or context.get("breed"):
+                snippets.append(f"lignée : {context.get('race') or context.get('breed')}")
+            if context.get("sexe"):
+                snippets.append(f"sexe : {context.get('sexe')}")
+            if context.get("age_jours"):
+                snippets.append(f"âge : {context.get('age_jours')} j")
+            if snippets:
+                context_note = "Contexte pris en compte : " + ", ".join(snippets) + "."
 
+        # Markdown final (sans bloc “clarification”)
+        md = _compose_markdown(answer_text, context_note, [])
+
+        # UI card
+        headline = (answer_text.split("\n", 1)[0] if answer_text else "Réponse").strip()[:90]
+        bullets = _mk_bullets_from_text(answer_text or "", MAX_BULLET_LEN, max_items=3)
         card = build_card(
-            headline=headline,
+            headline=headline or "Réponse",
             bullets=bullets,
             footnote=None,
             followups=[],
             sources=sources,
         )
 
-        resp_payload = format_response(answer_text, sources)
+        resp_payload = format_response(md, sources)
 
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
 
         logger.info(
-            "🟦 DM.flow=final | answer_len=%d | sources=%d",
-            len(answer_text or ""), len(sources or []),
+            "🟦 DM.flow=final | text_len=%d | sources=%d",
+            len(md or ""), len(sources or []),
         )
         logger.debug("🟦 DM.ui_card.bullets=%s", bullets)
 
         return {
             "type": "answer",
-            "response": resp_payload,  # ← texte classique attendu
-            "ui_card": card,           # ← rendu UI “card”
+            "response": resp_payload,  # ← markdown structuré
+            "ui_card": card,           # ← card UI
             "session_id": sid,
             "completeness_score": score,
             "missing_fields": missing,
@@ -336,7 +377,6 @@ class DialogueManager:
 
         if isinstance(raw, dict):
             answer_text = str(raw.get("response", "")).strip()
-            # compat: rag_engine renvoie "sources" normalisées; sinon on récupère "source"
             sources = raw.get("sources") or _normalize_sources(raw.get("source"))
             logger.debug(
                 "🔧 RAG.ok | text_len=%d | sources=%d | source_flag=%s",
