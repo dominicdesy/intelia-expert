@@ -29,7 +29,8 @@ try:
 except Exception:
     logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
 
-CRITICAL_FIELDS = {"race", "sexe"}  # ✅ utilisé par le mode hybride
+# Champs critiques pour passer en mode hybride (réponse courte + questions)
+CRITICAL_FIELDS = {"race", "sexe"}
 
 def _utc_iso() -> str:
     return datetime.utcnow().isoformat()
@@ -98,7 +99,13 @@ class DialogueManager:
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # ✅ BONUS : heuristique “fallback broiler”
+        # 🎯 Détection "mode poids" (focus poids + format bullets)
+        weight_mode = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
+        ui_prefs = context.setdefault("ui_prefs", {})
+        ui_prefs["weight_only"] = weight_mode
+        ui_prefs["format"] = "bullets" if weight_mode else ui_prefs.get("format", "auto")
+
+        # ✅ BONUS : heuristique “fallback broiler” (poids < 30 jours → broiler)
         self._apply_broiler_fallback(question, context)
 
         logger.info("Q: %s", question[:120])
@@ -120,14 +127,19 @@ class DialogueManager:
                     "missing_fields": missing,
                 }
 
-            # ✅ MODE HYBRIDE : réponse générale courte + questions ciblées (race/sexe)
-            answer_text, sources = await self._generate_with_rag(question, context, style="minimal")
+            # ✅ MODE HYBRIDE : réponse courte + questions ciblées (race/sexe)
+            answer_text, sources = await self._generate_with_rag(
+                question,
+                context,
+                style="minimal",
+            )
 
             follow_up: List[str] = []
             critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
             if critical_missing:
                 follow_up = self.clarifier.generate(critical_missing, round_number=1)
                 if follow_up:
+                    # format court + questions
                     answer_text = f"{answer_text}\n\nPour affiner :\n" + "\n".join(f"- {q}" for q in follow_up)
 
             context["completed_at"] = _utc_iso()
@@ -143,12 +155,16 @@ class DialogueManager:
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
-                "follow_up_questions": follow_up,  # ✅ exposé à l’API
+                "follow_up_questions": follow_up,
                 "metadata": {"warning": warn},
             }
 
-        # 3) Réponse complète (style standard, toujours compacte)
-        answer_text, sources = await self._generate_with_rag(question, context, style="standard")
+        # 3) Réponse complète (style standard, compacte)
+        answer_text, sources = await self._generate_with_rag(
+            question,
+            context,
+            style="standard",
+        )
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
@@ -180,7 +196,7 @@ class DialogueManager:
 
     def _apply_broiler_fallback(self, question: str, context: Dict[str, Any]) -> None:
         """
-        ✅ BONUS : Si la question concerne le poids et qu'on est <30 jours, 
+        ✅ BONUS : Si la question concerne le poids et qu'on est <30 jours,
         et qu'aucune espèce/production_type n'est fournie, on force l'index Broiler.
         """
         prod = (context.get("production_type") or context.get("species") or "").lower()
@@ -205,8 +221,15 @@ class DialogueManager:
 
     async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
-            # ⚠️ on passe le style au moteur RAG
-            return self.rag.generate_answer(question, context, style=style)
+            # ⚠️ on passe le style + préférences UI (poids/bullets) au RAG
+            ui = (context or {}).get("ui_prefs") or {}
+            return self.rag.generate_answer(
+                question,
+                context,
+                style=style,
+                output_format=ui.get("format", "auto"),
+                weight_only=bool(ui.get("weight_only", False)),
+            )
         try:
             raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
         except Exception as e:
@@ -214,7 +237,7 @@ class DialogueManager:
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
         if isinstance(raw, dict):
             answer_text = str(raw.get("response", "")).strip()
-            # on passe de préférence la clé "sources" (citations) si fournie
+            # de préférence, utiliser "sources" si présent (citations normalisées)
             sources = raw.get("sources") or _normalize_sources(raw.get("source"))
         else:
             answer_text = str(raw).strip()
