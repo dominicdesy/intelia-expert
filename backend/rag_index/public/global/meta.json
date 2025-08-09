@@ -1,0 +1,10 @@
+{
+  "tenant": "public",
+  "species": "global",
+  "chunks": 463,
+  "files": 23,
+  "model": "all-MiniLM-L6-v2",
+  "chunk_size": 1000,
+  "overlap": 200,
+  "built_at": "2025-08-08 21:24:08"
+}

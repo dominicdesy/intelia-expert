@@ -1,604 +1,158 @@
-"""
-Expert Router - Version améliorée avec gestion d'exceptions spécifiques
-CONSERVE: Structure originale + DialogueManager + tous les endpoints
-AMÉLIORATIONS MAJEURES:
-- Gestion d'exceptions spécifiques au lieu de catch-all
-- Ordre des paramètres FastAPI corrigé
-- Fallback RAG robuste avec retry
-- Logging détaillé et structuré
-- Validation renforcée des inputs
-- Métriques et monitoring
-"""
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Body, status
-from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ValidationError
-import uuid
+# app/api/v1/expert.py
+from __future__ import annotations
+
 import logging
-import traceback
-import time
-from datetime import datetime
+from typing import Any, Dict, Optional, List
 
-# Imports spécifiques pour gestion d'erreurs ciblée
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field, ValidationError
+
+# ⚠️ conservez vos dépendances/DI existantes
 from app.api.v1.pipeline.dialogue_manager import DialogueManager
+from app.api.v1.utils.auth import get_current_user_optional  # si vous avez un JWT optionnel
+from app.api.v1.utils.config import get_language_from_text  # si vous avez cette util
+from app.api.v1.utils.types import SystemStatus  # si défini chez vous
 
-# Configuration du logging structuré
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("api.v1.expert")
 router = APIRouter(prefix="", tags=["expert"])
 
-# ==================== AMÉLIORATION: Gestion d'erreurs personnalisées ====================
-class ExpertSystemError(Exception):
-    """Exception de base pour le système expert"""
-    pass
+# --- Modèles de requête/réponse (compatibles Pydantic v2) ---
 
-class DialogueManagerError(ExpertSystemError):
-    """Erreur liée au DialogueManager"""
-    pass
-
-class RAGSystemError(ExpertSystemError):
-    """Erreur liée au système RAG"""
-    pass
-
-class ValidationError(ExpertSystemError):
-    """Erreur de validation des données"""
-    pass
-
-# ==================== AMÉLIORATION: Initialisation robuste ====================
-_dialogue_manager_instance = None
-_initialization_errors = []
-
-def _initialize_dialogue_manager() -> DialogueManager:
-    """
-    ✅ AMÉLIORATION: Initialisation centralisée avec gestion d'erreurs spécifique
-    """
-    global _dialogue_manager_instance, _initialization_errors
-    
-    if _dialogue_manager_instance is None:
-        try:
-            _dialogue_manager_instance = DialogueManager()
-            logger.info("✅ DialogueManager initialisé avec succès")
-        except Exception as e:
-            error_msg = f"Erreur initialisation DialogueManager: {type(e).__name__}: {str(e)}"
-            _initialization_errors.append(error_msg)
-            logger.error(f"❌ {error_msg}")
-            raise DialogueManagerError(error_msg) from e
-    
-    return _dialogue_manager_instance
-
-# Initialisation au chargement du module
-try:
-    _initialize_dialogue_manager()
-except DialogueManagerError:
-    logger.warning("⚠️ DialogueManager non disponible au démarrage")
-
-# ==================== CONSERVATION: Modèles Pydantic enrichis ====================
 class AskRequest(BaseModel):
-    question: str
-    context: Optional[Dict[str, Any]] = None
-    language: Optional[str] = "fr"
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "question": "Quel est le poids optimal pour des poulets de 6 semaines ?",
-                "context": {"breed": "ross", "housing_type": "barn"},
-                "language": "fr"
-            }
-        }
-
-class ClarificationResponse(BaseModel):
-    type: str = "clarification"
-    questions: List[str]
-    session_id: str
-    metadata: Dict[str, Any] = {}
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "type": "clarification",
-                "questions": [
-                    "Quelle est la race des poulets ?",
-                    "Dans quel type d'élevage ?"
-                ],
-                "session_id": "session_abc123",
-                "metadata": {"completeness_score": 0.3}
-            }
-        }
+    question: str = Field(..., min_length=2, description="User question")
+    session_id: Optional[str] = Field(None, description="Existing session id to continue a conversation")
+    language: Optional[str] = Field(None, description="Language hint (fr|en|es)")
 
 class AnswerResponse(BaseModel):
-    type: str = "answer"
-    response: str
-    session_id: str
-    metadata: Dict[str, Any] = {}
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "type": "answer",
-                "response": "Pour des poulets de 6 semaines...",
-                "session_id": "session_abc123",
-                "metadata": {
-                    "source": "rag_enhanced",
-                    "confidence": "high",
-                    "processing_time": 1.23
-                }
-            }
-        }
+    type: str = Field("answer", description="answer | answer_with_warning | clarification | error")
+    response: str = Field(..., description="Plain text answer rendered to the user")
+    session_id: Optional[str] = Field(None, description="Server-side session id")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class ErrorResponse(BaseModel):
-    """✅ NOUVEAU: Modèle pour les réponses d'erreur standardisées"""
-    type: str = "error"
-    error_code: str
-    message: str
-    details: Optional[str] = None
-    timestamp: str
+class ClarificationResponse(BaseModel):
+    type: str = Field("clarification", const=True)
+    questions: List[str]
     session_id: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-# Generic response model for Swagger
-ResponseModel = Dict[str, Any]
+# ---- Instances globales (réutilisez vos singletons / DI) ----
+# DialogueManager doit être initialisé au startup dans main.py; ici on récupère l’instance
+dlg: DialogueManager = DialogueManager.get_instance()
 
-# ==================== AMÉLIORATION: Validation et session renforcées ====================
-def validate_question(question: str) -> str:
+# ---- Helpers internes ----
+
+def _extract_answer_and_sources(result: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
     """
-    ✅ AMÉLIORATION: Validation spécialisée des questions
+    Normalise le format renvoyé par DialogueManager:
+      - result["response"] peut être str OU dict {"answer": str, "sources": [...]}
+    Retourne (answer_text, sources[])
     """
-    if not question:
-        raise ValidationError("La question ne peut pas être vide")
-    
-    question = question.strip()
-    
-    if len(question) < 5:
-        raise ValidationError("La question doit contenir au moins 5 caractères")
-    
-    if len(question) > 2000:
-        raise ValidationError("La question ne peut pas dépasser 2000 caractères")
-    
-    # Détection de contenu potentiellement problématique
-    suspicious_patterns = ['<script', 'javascript:', 'data:']
-    if any(pattern in question.lower() for pattern in suspicious_patterns):
-        raise ValidationError("Question contient du contenu non autorisé")
-    
-    return question
+    response_content = result.get("response", "")
+    answer_text = ""
+    sources: List[Dict[str, Any]] = []
 
-def get_session_id(request: Request) -> str:
+    if isinstance(response_content, dict):
+        # format structuré
+        answer_text = str(response_content.get("answer", "")).strip()
+        raw_sources = response_content.get("sources", [])
+        if isinstance(raw_sources, list):
+            # on tolère des éléments non-dict, ils seront convertis en str
+            normalized = []
+            for s in raw_sources:
+                if isinstance(s, dict):
+                    normalized.append(s)
+                else:
+                    normalized.append({"source": str(s)})
+            sources = normalized
+    else:
+        # format texte simple
+        answer_text = str(response_content).strip()
+
+    return answer_text, sources
+
+def _default_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
+    md = dict(result.get("metadata") or {})
+    # toujours expliciter la stratégie si fournie par le pipeline
+    if "strategy" not in md and "type" in result:
+        md["strategy"] = result["type"]
+    return md
+
+# ---- Endpoints ----
+
+@router.post("/ask", response_model=AnswerResponse)
+async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
     """
-    Session ID avec validation renforcée
-    CONSERVÉ: Logique originale + validation
-    """
-    session_id = request.headers.get("X-Session-ID")
-    
-    if session_id:
-        # Validation du format session ID
-        if not session_id.replace('_', '').replace('-', '').isalnum():
-            logger.warning(f"⚠️ Session ID invalide reçu: {session_id[:20]}...")
-            session_id = None
-    
-    if not session_id:
-        session_id = f"session_{uuid.uuid4().hex[:12]}"
-    
-    logger.debug(f"🆔 Session: {session_id}")
-    return session_id
-
-# ==================== AMÉLIORATION: Métriques et monitoring ====================
-class RequestMetrics:
-    """✅ NOUVEAU: Collecte de métriques pour monitoring"""
-    
-    def __init__(self):
-        self.start_time = time.time()
-        self.steps = []
-    
-    def add_step(self, step_name: str, duration: float = None):
-        if duration is None:
-            duration = time.time() - self.start_time
-        self.steps.append({"step": step_name, "duration": duration})
-    
-    def get_total_time(self) -> float:
-        return time.time() - self.start_time
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "total_time": self.get_total_time(),
-            "steps": self.steps,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-# ==================== CORRECTION MAJEURE: Endpoint principal avec gestion d'exceptions spécifiques ====================
-@router.post("/ask", response_model=ResponseModel)
-async def ask(
-    request: Request,                           # ✅ CORRIGÉ: Paramètre sans défaut en premier
-    payload: AskRequest = Body(...),            # ✅ CORRIGÉ: Paramètre avec défaut en second
-    session_id: str = Depends(get_session_id)   # ✅ CORRIGÉ: Dependency en dernier
-) -> ResponseModel:
-    """
-    Handle user questions via the DialogueManager pipeline.
-    
-    AMÉLIORATIONS MAJEURES:
-    - Gestion d'exceptions spécifiques (plus de catch-all générique)
-    - Métriques de performance détaillées
-    - Validation renforcée des inputs
-    - Fallback RAG avec retry intelligent
-    - Logging structuré
-    """
-    
-    metrics = RequestMetrics()
-    
-    try:
-        # ✅ AMÉLIORATION: Validation spécialisée au lieu de générique
-        try:
-            question = validate_question(payload.question)
-        except ValidationError as e:
-            logger.warning(f"⚠️ Validation échouée: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
-        
-        logger.info(f"🔍 Question validée (session: {session_id}): {question[:100]}...")
-        metrics.add_step("validation")
-        
-        # ✅ AMÉLIORATION: Gestion DialogueManager avec exception spécifique
-        try:
-            dialogue_manager = _initialize_dialogue_manager()
-        except DialogueManagerError as e:
-            logger.error(f"❌ DialogueManager indisponible: {e}")
-            # Fallback direct vers RAG
-            return await _handle_rag_fallback(request, question, session_id, metrics, "dialogue_manager_unavailable")
-        
-        # Appel DialogueManager avec gestion d'erreurs ciblée
-        try:
-            logger.debug("📞 Appel DialogueManager.handle()")
-            
-            # Enrichir le contexte si fourni
-            if payload.context:
-                logger.debug(f"📝 Contexte additionnel fourni: {payload.context}")
-            
-            result = dialogue_manager.handle(session_id, question)
-            resp_type = result.get("type")
-            
-            logger.info(f"📋 DialogueManager → {resp_type}")
-            metrics.add_step("dialogue_manager")
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur DialogueManager: {type(e).__name__}: {str(e)}")
-            # Fallback vers RAG en cas d'erreur DialogueManager
-            return await _handle_rag_fallback(request, question, session_id, metrics, "dialogue_manager_error")
-
-        # ✅ AMÉLIORATION: Gestion des clarifications avec fallback intelligent
-        if resp_type == "clarification":
-            logger.info("❓ Clarification demandée, évaluation fallback RAG...")
-            
-            # Essayer RAG avec gestion d'erreurs spécifique
-            try:
-                rag_response = await _try_rag_fallback(request, question, session_id, metrics)
-                if rag_response:
-                    logger.info("✅ Fallback RAG réussi, bypass clarification")
-                    return rag_response
-                    
-            except RAGSystemError as e:
-                logger.warning(f"⚠️ RAG fallback échoué: {e}")
-            
-            # Retourner clarifications si RAG échoue
-            logger.info("📝 Retour aux questions de clarification")
-            questions = result.get("questions", ["Pouvez-vous préciser votre question ?"])
-            
-            return ClarificationResponse(
-                type="clarification",
-                questions=questions,
-                session_id=session_id,
-                metadata={
-                    "completeness_score": result.get("completeness_score", 0),
-                    "missing_fields": result.get("missing_fields", []),
-                    "metrics": metrics.to_dict()
-                }
-            ).dict()
-
-        # ✅ AMÉLIORATION: Gestion des réponses avec enrichissement métadonnées
-        elif resp_type == "answer":
-            logger.info("✅ Réponse directe du DialogueManager")
-            
-            response_content = result.get("response", "")
-            metadata = {
-                "source": result.get("source", "dialogue_manager"),
-                "documents_used": result.get("documents_used", 0),
-                "warning": result.get("warning"),
-                "metrics": metrics.to_dict()
-            }
-            
-            # Nettoyer les métadonnées
-            metadata = {k: v for k, v in metadata.items() if v is not None}
-            
-            return AnswerResponse(
-                type="answer",
-                response=response_content,
-                session_id=session_id,
-                metadata=metadata
-            ).dict()
-
-        else:
-            # Type de réponse inattendu
-            logger.error(f"❌ Type de réponse inattendu: {resp_type}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Type de réponse système inattendu: {resp_type}"
-            )
-    
-    # ✅ AMÉLIORATION MAJEURE: Gestion d'exceptions spécifiques au lieu de catch-all
-    except HTTPException:
-        # Re-raise HTTPException sans modification
-        raise
-    
-    except RequestValidationError as e:
-        logger.warning(f"⚠️ Erreur validation Pydantic: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Données de requête invalides"
-        )
-    
-    except ValidationError as e:
-        logger.warning(f"⚠️ Erreur validation métier: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    
-    except DialogueManagerError as e:
-        logger.error(f"❌ Erreur DialogueManager critique: {e}")
-        return await _handle_rag_fallback(request, question, session_id, metrics, "dialogue_manager_critical_error")
-    
-    except RAGSystemError as e:
-        logger.error(f"❌ Erreur système RAG: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Système de réponse temporairement indisponible"
-        )
-    
-    except TimeoutError as e:
-        logger.error(f"⏰ Timeout traitement: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Traitement trop long, veuillez réessayer"
-        )
-    
-    except Exception as e:
-        # ✅ AMÉLIORATION: Catch-all réduit au minimum avec logging détaillé
-        logger.error(f"❌ Erreur inattendue: {type(e).__name__}: {str(e)}")
-        logger.error(f"🔍 Traceback: {traceback.format_exc()}")
-        
-        # Tentative de fallback ultime si possible
-        if 'question' in locals() and 'session_id' in locals():
-            try:
-                return await _handle_rag_fallback(request, question, session_id, metrics, "unexpected_error")
-            except Exception as fallback_error:
-                logger.error(f"❌ Fallback ultime échoué: {fallback_error}")
-        
-        # Erreur finale si tout échoue
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Service temporairement indisponible. Veuillez réessayer dans quelques instants."
-        )
-
-# ==================== AMÉLIORATION: Fonctions de fallback spécialisées ====================
-async def _try_rag_fallback(request: Request, question: str, session_id: str, metrics: RequestMetrics) -> Optional[Dict[str, Any]]:
-    """
-    ✅ AMÉLIORATION: Tentative RAG avec gestion d'erreurs spécifique
+    Route principale — renvoie TOUJOURS un AnswerResponse JSON-valid.
+    Garantit que 'response' est une string (évite les ValidationError).
     """
     try:
-        if not hasattr(request.app.state, 'process_question_with_rag'):
-            raise RAGSystemError("Système RAG non disponible dans app.state")
-        
-        process_question_func = request.app.state.process_question_with_rag
-        
-        logger.debug("🔄 Appel système RAG...")
-        rag_result = await process_question_func(
+        # Validation & langue
+        question = payload.question.strip()
+        if not question or len(question) < 2:
+            raise HTTPException(status_code=400, detail="Question invalide")
+        lang = payload.language or get_language_from_text(question) or "fr"
+
+        # Laisser le DialogueManager orchestrer
+        result = await dlg.handle(
+            session_id=payload.session_id,
             question=question,
-            user=None,
-            language="fr",
-            speed_mode="balanced"
+            language=lang,
+            user_id=(user["id"] if user else None)
         )
-        
-        if not rag_result or "response" not in rag_result:
-            raise RAGSystemError("Réponse RAG vide ou malformée")
-        
-        metrics.add_step("rag_fallback")
-        
-        enhanced_response = rag_result["response"]
-        metadata = {
-            "source": rag_result.get("mode", "rag_fallback"),
-            "processing_time": rag_result.get("processing_time", 0),
-            "sources_count": len(rag_result.get("sources", [])),
-            "fallback_reason": "clarification_bypassed",
-            "metrics": metrics.to_dict()
-        }
-        
-        if rag_result.get("mode") == "fallback_openai":
-            enhanced_response += "\n\n💡 *Pour une réponse plus précise, précisez la race, l'âge exact, ou le contexte d'élevage.*"
-            metadata["note"] = "Réponse générale - informations spécifiques recommandées"
-        
-        return AnswerResponse(
-            type="answer",
-            response=enhanced_response,
+        # result attendu: dict avec au minimum {"type": "...", "response": str|dict}
+
+        # Normalisation pour Pydantic (response: str)
+        answer_text, sources = _extract_answer_and_sources(result)
+        metadata = _default_metadata(result)
+
+        # exposer les sources (si fourni par le pipeline)
+        if sources:
+            metadata["sources"] = sources
+
+        # champs utiles de debug/transparence
+        if "completeness_score" in result:
+            metadata.setdefault("scores", {})["completeness"] = result["completeness_score"]
+        if "missing_fields" in result:
+            metadata["missing_fields"] = result["missing_fields"]
+
+        # id de session retourné par le DM si géré côté serveur
+        session_id = result.get("session_id") or payload.session_id
+
+        # Construction de la réponse finale (string only)
+        resp = AnswerResponse(
+            type=str(result.get("type") or "answer"),
+            response=answer_text or "Réponse vide.",
             session_id=session_id,
             metadata=metadata
-        ).dict()
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur _try_rag_fallback: {type(e).__name__}: {str(e)}")
-        raise RAGSystemError(f"Fallback RAG échoué: {str(e)}") from e
-
-async def _handle_rag_fallback(request: Request, question: str, session_id: str, metrics: RequestMetrics, reason: str) -> Dict[str, Any]:
-    """
-    ✅ AMÉLIORATION: Gestion de fallback RAG d'urgence
-    """
-    try:
-        logger.info(f"🆘 Fallback RAG d'urgence (raison: {reason})")
-        
-        if not hasattr(request.app.state, 'process_question_with_rag'):
-            raise RAGSystemError("Système RAG non disponible pour fallback d'urgence")
-        
-        process_question_func = request.app.state.process_question_with_rag
-        rag_result = await process_question_func(
-            question=question,
-            user=None,
-            language="fr",
-            speed_mode="fast"  # Mode rapide pour fallback d'urgence
         )
-        
-        metrics.add_step("emergency_rag_fallback")
-        
+        # Pydantic v2: model_dump() ; v1: dict()
+        return resp.model_dump()
+
+    except ValidationError as ve:
+        logger.error("❌ Validation error in AnswerResponse: %s", ve)
+        raise HTTPException(status_code=500, detail="unexpected_error")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("❌ Erreur inattendue dans /ask: %s", e)
+        # Fallback d'urgence – on garde un format *valide* pour le front, pas d’exception crue
         return AnswerResponse(
-            type="answer",
-            response=rag_result["response"] + f"\n\n⚠️ *Réponse générée en mode fallback d'urgence (raison: {reason}).*",
-            session_id=session_id,
-            metadata={
-                "source": "emergency_fallback",
-                "fallback_reason": reason,
-                "metrics": metrics.to_dict()
-            }
-        ).dict()
-        
-    except Exception as e:
-        logger.error(f"❌ Fallback d'urgence échoué: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Tous les systèmes de réponse sont temporairement indisponibles"
-        )
+            type="answer_with_warning",
+            response=(
+                "Réponse générée en mode fallback d'urgence. "
+                "Nous avons rencontré une erreur inattendue, réessayez plus tard."
+            ),
+            session_id=payload.session_id,
+            metadata={"reason": "unexpected_error", "sources": []}
+        ).model_dump()
 
-# ==================== CONSERVATION: Endpoints avec améliorations ====================
-@router.post("/ask-public", response_model=ResponseModel)
-async def ask_public(
-    request: Request,
-    payload: AskRequest = Body(...)
-) -> ResponseModel:
-    """
-    Version publique avec métriques
-    CONSERVÉ: Logique originale + améliorations
-    """
-    public_session = f"public_{uuid.uuid4().hex[:8]}"
-    logger.info(f"🌐 Requête publique (session: {public_session})")
-    
-    return await ask(request, payload, public_session)
 
-@router.post("/ask-enhanced", response_model=ResponseModel)
-async def ask_enhanced(
-    request: Request,
-    payload: AskRequest = Body(...),
-    session_id: str = Depends(get_session_id)
-) -> ResponseModel:
-    """Version enrichie avec métadonnées étendues"""
-    result = await ask(request, payload, session_id)
-    
-    # Enrichir les métadonnées
-    if isinstance(result, dict) and "metadata" in result:
-        result["metadata"]["enhanced"] = True
-        result["metadata"]["endpoint"] = "ask-enhanced"
-    
-    return result
-
-@router.post("/ask-enhanced-public", response_model=ResponseModel)
-async def ask_enhanced_public(
-    request: Request,
-    payload: AskRequest = Body(...)
-) -> ResponseModel:
-    """Version enrichie publique"""
-    public_session = f"enhanced_public_{uuid.uuid4().hex[:8]}"
-    return await ask_enhanced(request, payload, public_session)
-
-@router.post("/feedback", response_model=Dict[str, Any])
-async def submit_feedback(
-    feedback_data: Dict[str, Any] = Body(...)
-) -> Dict[str, Any]:
-    """Endpoint pour le feedback utilisateur avec validation"""
-    
+@router.get("/system-status", response_model=SystemStatus)
+async def system_status():
+    # Conservez votre implémentation, ci-dessous un squelette:
     try:
-        # Validation basique avec exceptions spécifiques
-        required_fields = ["session_id", "rating"]
-        missing = [field for field in required_fields if field not in feedback_data]
-        
-        if missing:
-            raise ValidationError(f"Champs manquants: {missing}")
-        
-        # Validation du rating
-        rating = feedback_data.get("rating")
-        if not isinstance(rating, (int, float)) or not (1 <= rating <= 5):
-            raise ValidationError("Le rating doit être un nombre entre 1 et 5")
-        
-        return {
-            "status": "success",
-            "message": "Feedback enregistré avec succès",
-            "feedback_id": str(uuid.uuid4()),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-@router.get("/topics", response_model=Dict[str, Any])
-async def get_topics() -> Dict[str, Any]:
-    """Liste des sujets supportés"""
-    return {
-        "status": "success",
-        "topics": [
-            "Nutrition des poulets de chair",
-            "Santé et maladies aviaires", 
-            "Gestion de l'élevage",
-            "Performance et croissance",
-            "Conditions d'élevage",
-            "Alimentation et formulation"
-        ],
-        "examples": [
-            "Quel est le poids optimal pour des poulets de 6 semaines ?",
-            "Comment traiter la coccidiose chez les poussins ?",
-            "Quelle température maintenir dans le poulailler ?"
-        ]
-    }
-
-@router.get("/system-status", response_model=Dict[str, Any])
-async def get_system_status() -> Dict[str, Any]:
-    """Status détaillé du système expert avec diagnostics"""
-    
-    # Test DialogueManager
-    try:
-        _initialize_dialogue_manager()
-        dlg_status = "operational"
-        dlg_errors = []
+        status = await dlg.system_status()
+        return status
     except Exception as e:
-        dlg_status = "error"
-        dlg_errors = [str(e)]
-    
-    return {
-        "status": "operational" if dlg_status == "operational" else "degraded",
-        "components": {
-            "dialogue_manager": {
-                "status": dlg_status,
-                "errors": dlg_errors,
-                "initialization_errors": _initialization_errors
-            },
-            "rag_system": "checking",
-            "context_extractor": "operational",
-            "clarification_manager": "operational"
-        },
-        "endpoints": [
-            "/ask", "/ask-public", "/ask-enhanced", 
-            "/ask-enhanced-public", "/feedback", "/topics", "/system-status"
-        ],
-        "version": "3.5.5-improved",
-        "improvements_applied": [
-            "Gestion d'exceptions spécifiques",
-            "Ordre paramètres FastAPI corrigé",
-            "Validation renforcée", 
-            "Métriques de performance",
-            "Fallback RAG robuste",
-            "Logging structuré"
-        ]
-    }
-
-@router.get("/status")
-async def expert_status():
-    """Status simple (compatibilité)"""
-    return {
-        "status": "active",
-        "dialogue_manager": "initialized" if _dialogue_manager_instance else "error",
-        "fallback_rag": "available",
-        "version": "3.5.5-improved"
-    }
+        logger.exception("system-status error: %s", e)
+        raise HTTPException(status_code=500, detail="status_unavailable")

@@ -1,0 +1,10 @@
+{
+  "tenant": "public",
+  "species": "broiler",
+  "chunks": 2572,
+  "files": 21,
+  "model": "all-MiniLM-L6-v2",
+  "chunk_size": 1000,
+  "overlap": 200,
+  "built_at": "2025-08-08 21:26:41"
+}

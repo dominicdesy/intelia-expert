@@ -1,39 +1,45 @@
+# rag/embedder.py
 """
-RAG Embedder - VERSION OPTIMISÉE POUR MEILLEURS SCORES
-Améliorations pour scores de similarité et normalisation des requêtes
-MODIFICATION: Seuils adaptatifs pour éviter "aucun résultat trouvé"
+FastRAGEmbedder - Version corrigée et renforcée
+- Normalisation non-destructive (ne remplace plus "poulet" par "volaille")
+- Détection d'espèce (broiler/layer) et filtrage des résultats par métadonnées/chemin
+- Seuils adaptatifs légèrement plus stricts pour réduire les faux positifs
+- API compatible : search(query, k=5, species: Optional[str] = None)
 """
+
+from __future__ import annotations
 
 import os
 import time
 import pickle
 import logging
 import re
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
+
 import numpy as np
 
-# Configure logging
 logger = logging.getLogger(__name__)
+
 
 class FastRAGEmbedder:
     """
-    RAG Embedder optimisé avec normalisation et meilleurs scores
-    NOUVEAU: Seuils adaptatifs pour éviter l'absence de résultats
+    Moteur RAG basé FAISS + sentence-transformers
+    - Chargement d'un index FAISS + documents normalisés
+    - Recherche vectorielle avec score amélioré et boosting exact-match
+    - Seuils adaptatifs (strict/normal/permissive/fallback)
+    - Détection et filtrage d'espèce (broiler/layer)
     """
-    
+
     def __init__(
-        self, 
+        self,
         api_key: Optional[str] = None,
         model_name: str = "all-MiniLM-L6-v2",
         cache_embeddings: bool = True,
         max_workers: int = 2,
         debug: bool = True,
-        similarity_threshold: float = 0.15,  # ✅ MODIFIÉ: Abaissé de 0.25 à 0.15
-        normalize_queries: bool = True       # Nouvelle option de normalisation
-    ):
-        """
-        Initialize FastRAGEmbedder with improved scoring and adaptive thresholds
-        """
+        similarity_threshold: float = 0.20,  # normal
+        normalize_queries: bool = True,
+    ) -> None:
         self.api_key = api_key
         self.model_name = model_name
         self.cache_embeddings = cache_embeddings
@@ -41,613 +47,539 @@ class FastRAGEmbedder:
         self.debug = debug
         self.similarity_threshold = similarity_threshold
         self.normalize_queries = normalize_queries
-        
-        # ✅ NOUVEAU: Configuration des seuils adaptatifs
+
+        # Seuils adaptatifs (un peu plus stricts que la version précédente)
         self.threshold_config = {
-            "strict": 0.25,      # Pour questions très spécifiques
-            "normal": 0.15,      # Seuil par défaut (modifié de 0.25 à 0.15)
-            "permissive": 0.10,  # Pour questions générales
-            "fallback": 0.05     # En dernier recours
+            "strict": 0.25,
+            "normal": max(0.0, min(1.0, similarity_threshold)),  # par défaut 0.20
+            "permissive": 0.15,
+            "fallback": 0.10,
         }
-        
-        # Initialize storage
-        self.embedding_cache = {} if cache_embeddings else None
-        self.documents = []
-        self.embeddings = None
+
+        # État
+        self.embedding_cache: Dict[str, np.ndarray] = {} if cache_embeddings else {}
+        self.documents: List[Dict[str, Any]] = []
         self.index = None
         self.search_engine_available = False
-        
-        # Query normalization patterns
+
+        # Normalisation
         self._init_normalization_patterns()
-        
-        # Initialize dependencies
+
+        # Dépendances
         self._init_dependencies()
-        
+
         if self.debug:
             logger.info("🚀 Initializing FastRAGEmbedder (Adaptive Thresholds)...")
             logger.info(f"   Model: {self.model_name}")
-            logger.info(f"   Dimension: 384")
+            logger.info("   Dimension: 384")
             logger.info(f"   Dependencies available: {self._check_dependencies()}")
             logger.info(f"   Cache enabled: {self.cache_embeddings}")
             logger.info(f"   Max workers: {self.max_workers}")
-            logger.info(f"   Default similarity threshold: {self.similarity_threshold}")
-            logger.info(f"   Adaptive thresholds: {self.threshold_config}")
+            logger.info(f"   Thresholds: {self.threshold_config}")
             logger.info(f"   Query normalization: {self.normalize_queries}")
             logger.info(f"   Debug enabled: {self.debug}")
-    
-    def _init_normalization_patterns(self):
-        """Initialize patterns for query normalization"""
+
+    # -------------------------------------------------------------------------
+    # Initialisation / dépendances
+    # -------------------------------------------------------------------------
+    def _init_dependencies(self) -> None:
+        try:
+            from sentence_transformers import SentenceTransformer  # noqa: F401
+            self.SentenceTransformer = SentenceTransformer
+            import faiss  # noqa: F401
+            self.faiss = faiss
+            self.np = np
+            logger.info("✅ sentence-transformers available")
+            logger.info("✅ faiss available")
+            logger.info("✅ numpy available")
+            self.dependencies_available = True
+        except Exception as e:
+            logger.error("❌ Missing dependencies: %s", e)
+            self.dependencies_available = False
+
+    def _check_dependencies(self) -> bool:
+        return hasattr(self, "SentenceTransformer") and hasattr(self, "faiss") and hasattr(self, "np")
+
+    # -------------------------------------------------------------------------
+    # Normalisation / heuristiques
+    # -------------------------------------------------------------------------
+    def _init_normalization_patterns(self) -> None:
         self.normalization_patterns = {
-            # Conversions d'unités temporelles
-            'temporal_conversions': [
-                (r'(\d+)\s*semaines?', lambda m: f"{int(m.group(1)) * 7} jours"),
-                (r'(\d+)\s*mois', lambda m: f"{int(m.group(1)) * 30} jours"),
-                (r'(\d+)j\b', r'\1 jours'),
-                (r'(\d+)s\b', r'\1 semaines'),
+            # Conversions temporelles
+            "temporal_conversions": [
+                (r"(\d+)\s*semaines?", lambda m: f"{int(m.group(1)) * 7} jours"),
+                (r"(\d+)\s*mois", lambda m: f"{int(m.group(1)) * 30} jours"),
+                (r"(\d+)j\b", r"\1 jours"),
+                (r"(\d+)s\b", r"\1 semaines"),
             ],
-            
-            # Normalisation des termes agricoles
-            'agricultural_terms': [
-                (r'\bpoulets?\b', 'volaille'),
-                (r'\bpoules?\b', 'volaille'),
-                (r'\bcoqs?\b', 'volaille'),
-                (r'\bgallines?\b', 'volaille'),
-                (r'\bRoss\s*308\b', 'poulet de chair Ross 308'),
-                (r'\bCobb\s*500\b', 'poulet de chair Cobb 500'),
-                (r'\bbroilers?\b', 'poulet de chair'),
+            # Termes agro — **conserver** l'intention d'espèce !
+            "agricultural_terms": [
+                (r"\bbroilers?\b", "poulet de chair"),
+                (r"\bpoulets?\b", "poulet de chair"),
+                (r"\bpoules?\b", "poule pondeuse"),
+                (r"\bcoqs?\b", "poule pondeuse"),
+                (r"\bgallines?\b", "poule pondeuse"),
+                (r"\bRoss\s*308\b", "poulet de chair Ross 308"),
+                (r"\bCobb\s*500\b", "poulet de chair Cobb 500"),
             ],
-            
-            # Normalisation des unités de poids
-            'weight_conversions': [
-                (r'(\d+)\s*kg\b', lambda m: f"{int(m.group(1)) * 1000} grammes"),
-                (r'(\d+)\s*g\b', r'\1 grammes'),
-                (r'(\d+)\s*lbs?\b', lambda m: f"{int(float(m.group(1)) * 453.592)} grammes"),
+            # Poids
+            "weight_conversions": [
+                (r"(\d+)\s*kg\b", lambda m: f"{int(m.group(1)) * 1000} grammes"),
+                (r"(\d+)\s*g\b", r"\1 grammes"),
+                (r"(\d+)\s*lbs?\b", lambda m: f"{int(float(m.group(1)) * 453.592)} grammes"),
             ],
-            
-            # Normalisation des températures
-            'temperature_conversions': [
-                (r'(\d+)°?C\b', r'\1 degrés Celsius'),
-                (r'(\d+)°?F\b', lambda m: f"{round((int(m.group(1)) - 32) * 5/9)} degrés Celsius"),
+            # Températures
+            "temperature_conversions": [
+                (r"(\d+)°?C\b", r"\1 degrés Celsius"),
+                (r"(\d+)°?F\b", lambda m: f"{round((int(m.group(1)) - 32) * 5/9)} degrés Celsius"),
             ],
-            
-            # Synonymes et termes équivalents
-            'synonyms': [
-                (r'\bmort[ea]lité\b', 'mortalité taux de mortalité'),
-                (r'\bcroissance\b', 'croissance développement poids'),
-                (r'\balimentation\b', 'alimentation nutrition nourriture'),
-                (r'\bvaccination\b', 'vaccination immunisation vaccin'),
-                (r'\benvironnement\b', 'environnement conditions température humidité'),
-                (r'\bdiagnostic\b', 'diagnostic symptômes maladie problème'),
-            ]
+            # Synonymes
+            "synonyms": [
+                (r"\bmort[ea]lité\b", "mortalité taux de mortalité"),
+                (r"\bcroissance\b", "croissance développement poids"),
+                (r"\balimentation\b", "alimentation nutrition nourriture"),
+                (r"\bvaccination\b", "vaccination immunisation vaccin"),
+                (r"\benvironnement\b", "environnement conditions température humidité"),
+                (r"\bdiagnostic\b", "diagnostic symptômes maladie problème"),
+            ],
         }
-    
+
     def _normalize_query(self, query: str) -> str:
-        """
-        Normalize query to improve matching
-        """
         if not self.normalize_queries:
             return query
-        
-        original_query = query
+        original = query
         normalized = query.lower()
-        
         try:
-            # Apply all normalization patterns
-            for category, patterns in self.normalization_patterns.items():
-                for pattern, replacement in patterns:
-                    if callable(replacement):
-                        # Handle lambda functions for complex conversions
-                        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
-                    else:
-                        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
-            
-            # Clean up extra spaces
-            normalized = re.sub(r'\s+', ' ', normalized).strip()
-            
-            if self.debug and normalized != original_query.lower():
-                logger.info(f"🔄 Query normalized:")
-                logger.info(f"   Original: {original_query}")
+            for _, patterns in self.normalization_patterns.items():
+                for pattern, repl in patterns:
+                    normalized = re.sub(pattern, repl, normalized, flags=re.IGNORECASE)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            if self.debug and normalized != original.lower():
+                logger.info("🔄 Query normalized:")
+                logger.info(f"   Original: {original}")
                 logger.info(f"   Normalized: {normalized}")
-            
             return normalized
-            
         except Exception as e:
-            logger.error(f"❌ Error normalizing query: {e}")
+            logger.error("❌ Error normalizing query: %s", e)
             return query.lower()
-    
-    def _improved_similarity_score(self, distance: float) -> float:
+
+    def _infer_species(self, query: str) -> Optional[str]:
         """
-        Calculate improved similarity score from distance
+        Essaye de deviner 'broiler' ou 'layer' à partir de la requête.
+        Retourne None si indéterminé / ambigu.
         """
-        # Nouvelle formule pour de meilleurs scores
-        # Utilise une transformation logarithmique pour étaler les scores
-        if distance <= 0:
-            return 1.0
-        
-        # Formule améliorée qui donne de meilleurs scores
-        # Utilise une courbe exponentielle inverse
-        similarity = np.exp(-distance * 1.5)  # Facteur ajustable
-        
-        # Assure un minimum raisonnable
-        similarity = max(0.0, min(1.0, similarity))
-        
-        return similarity
-    
-    def _boost_score_for_exact_matches(self, query: str, text: str, base_score: float) -> float:
+        q = query.lower()
+        # indices layer
+        if any(w in q for w in ["pondeuse", "layer", "lohmann", "hy-line", "w36", "w-36", "w80", "w-80", "ponte"]):
+            return "layer"
+        # indices broiler (éviter si la requête parle explicitement d'œufs/pondeuse)
+        if any(w in q for w in ["broiler", "poulet de chair", "ross 308", "cobb 500", "croissance", "poids"]):
+            if any(w in q for w in ["pondeuse", "layer", "œuf", "oeuf", "ponte", "lohmann", "hy-line"]):
+                return None
+            return "broiler"
+        return None
+
+    def _doc_matches_species(self, doc: Dict[str, Any], species: str) -> bool:
         """
-        Boost score for exact keyword matches
+        Vérifie si un doc correspond à l'espèce (via metadata/chemin).
         """
-        query_words = set(query.lower().split())
-        text_words = set(text.lower().split())
-        
-        # Calculate overlap
-        overlap = len(query_words.intersection(text_words))
-        total_query_words = len(query_words)
-        
-        if total_query_words == 0:
-            return base_score
-        
-        overlap_ratio = overlap / total_query_words
-        
-        # Boost based on overlap
-        boost_factor = 1.0 + (overlap_ratio * 0.3)  # Jusqu'à 30% de boost
-        boosted_score = min(1.0, base_score * boost_factor)
-        
-        if self.debug and boost_factor > 1.1:
-            logger.info(f"   📈 Score boosted: {base_score:.3f} → {boosted_score:.3f} (overlap: {overlap_ratio:.2f})")
-        
-        return boosted_score
-    
-    def _init_dependencies(self):
-        """Initialize required dependencies"""
-        try:
-            # Import sentence transformers
-            from sentence_transformers import SentenceTransformer
-            self.sentence_model = SentenceTransformer(self.model_name)
-            logger.info("✅ sentence-transformers available")
-            
-            # Import FAISS
-            import faiss
-            self.faiss = faiss
-            logger.info("✅ faiss available")
-            
-            # Import numpy
-            import numpy as np
-            self.np = np
-            logger.info("✅ numpy available")
-            
-            self.dependencies_available = True
-            
-        except ImportError as e:
-            logger.error(f"❌ Missing dependencies: {e}")
-            self.dependencies_available = False
-    
-    def _check_dependencies(self) -> bool:
-        """Check if all required dependencies are available"""
-        return hasattr(self, 'sentence_model') and hasattr(self, 'faiss') and hasattr(self, 'np')
-    
+        if not species:
+            return True
+        species = species.lower()
+        md = doc.get("metadata", {}) or {}
+        candidates = [
+            md.get("source", ""),
+            md.get("file_path", ""),
+            md.get("path", ""),
+            doc.get("id", ""),
+        ]
+        joined = " ".join([c for c in candidates if isinstance(c, str)]).lower()
+
+        # Arborescence connue : /species/broiler/ ou /species/layer/
+        if f"/species/{species}/" in joined or f"\\species\\{species}\\" in joined:
+            return True
+
+        # Heuristiques
+        if species == "broiler" and any(w in joined for w in ["broiler", "ross", "cobb"]):
+            return True
+        if species == "layer" and any(w in joined for w in ["layer", "lohmann", "hy-line"]):
+            return True
+        return False
+
+    # -------------------------------------------------------------------------
+    # Chargement index
+    # -------------------------------------------------------------------------
     def load_index(self, index_path: str) -> bool:
-        """
-        Load existing FAISS index and documents
-        """
         if not self._check_dependencies():
             logger.error("❌ Dependencies not available for loading index")
             return False
-        
         try:
-            faiss_file = os.path.join(index_path, 'index.faiss')
-            pkl_file = os.path.join(index_path, 'index.pkl')
-            
+            faiss_file = os.path.join(index_path, "index.faiss")
+            pkl_file = os.path.join(index_path, "index.pkl")
+
             if not os.path.exists(faiss_file) or not os.path.exists(pkl_file):
-                logger.error(f"❌ Index files not found in {index_path}")
+                logger.error("❌ Index files not found in %s", index_path)
                 return False
-            
-            # Load FAISS index
-            logger.info(f"🔄 Loading FAISS index from {faiss_file}")
-            start_time = time.time()
+
+            logger.info("🔄 Loading FAISS index from %s", faiss_file)
+            t0 = time.time()
             self.index = self.faiss.read_index(faiss_file)
-            load_time = time.time() - start_time
-            
-            logger.info(f"✅ FAISS index loaded in {load_time:.2f}s")
-            logger.info(f"🔍 FAISS index info: ntotal={self.index.ntotal}, d={self.index.d}")
-            
-            # Load documents
-            logger.info(f"🔄 Loading documents from {pkl_file}")
-            start_time = time.time()
-            with open(pkl_file, 'rb') as f:
+            logger.info("✅ FAISS index loaded in %.2fs", time.time() - t0)
+            logger.info("🔍 FAISS index info: ntotal=%s, d=%s", self.index.ntotal, self.index.d)
+
+            logger.info("🔄 Loading documents from %s", pkl_file)
+            t1 = time.time()
+            with open(pkl_file, "rb") as f:
                 raw_documents = pickle.load(f)
-            
-            # Normalize documents
             self.documents = self._normalize_documents(raw_documents)
-            doc_load_time = time.time() - start_time
-            
-            logger.info(f"✅ Documents loaded in {doc_load_time:.2f}s")
-            logger.info(f"🔍 Total documents: {len(self.documents)}")
-            
-            # Validate consistency
+            logger.info("✅ Documents loaded in %.2fs", time.time() - t1)
+            logger.info("🔍 Total documents: %d", len(self.documents))
+
             if self.index.ntotal != len(self.documents):
-                logger.warning(f"⚠️ Index mismatch: FAISS has {self.index.ntotal} vectors, but {len(self.documents)} documents")
-            
+                logger.warning(
+                    "⚠️ Index mismatch: FAISS has %d vectors, but %d documents",
+                    self.index.ntotal,
+                    len(self.documents),
+                )
+
             self.search_engine_available = True
             logger.info("✅ Index loaded successfully - Search engine ready")
-            
             return True
-            
         except Exception as e:
-            logger.error(f"❌ Error loading index: {e}")
+            logger.error("❌ Error loading index: %s", e)
             return False
-    
+
     def _normalize_documents(self, raw_documents: Any) -> List[Dict[str, Any]]:
-        """
-        Normalize documents to consistent format
-        """
         if self.debug:
             logger.info("🔍 DEBUG: Normalizing documents...")
-            logger.info(f"   Raw type: {type(raw_documents)}")
-            
-        normalized = []
-        
+            logger.info("   Raw type: %s", type(raw_documents))
+
+        normalized: List[Dict[str, Any]] = []
         try:
             if isinstance(raw_documents, dict):
-                logger.info(f"   Raw length/size: {len(raw_documents)}")
-                
                 for key, value in raw_documents.items():
                     if isinstance(value, dict):
                         doc = {
-                            'id': value.get('id', key),
-                            'text': value.get('text', value.get('content', str(value))),
-                            'metadata': value.get('metadata', {}),
-                            'index': len(normalized)
+                            "id": value.get("id", key),
+                            "text": value.get("text", value.get("content", str(value))),
+                            "metadata": value.get("metadata", {}),
                         }
                         normalized.append(doc)
                     elif isinstance(value, str):
-                        doc = {
-                            'id': key,
-                            'text': value,
-                            'metadata': {},
-                            'index': len(normalized)
-                        }
-                        normalized.append(doc)
-                        
+                        normalized.append({"id": key, "text": value, "metadata": {}})
             elif isinstance(raw_documents, list):
-                logger.info(f"   Raw length/size: {len(raw_documents)}")
-                
                 for i, item in enumerate(raw_documents):
                     if isinstance(item, dict):
                         doc = {
-                            'id': item.get('id', f'doc_{i}'),
-                            'text': item.get('text', item.get('content', str(item))),
-                            'metadata': item.get('metadata', {}),
-                            'index': i
+                            "id": item.get("id", f"doc_{i}"),
+                            "text": item.get("text", item.get("content", str(item))),
+                            "metadata": item.get("metadata", {}),
                         }
                         normalized.append(doc)
                     elif isinstance(item, str):
-                        doc = {
-                            'id': f'doc_{i}',
-                            'text': item,
-                            'metadata': {},
-                            'index': i
-                        }
-                        normalized.append(doc)
-            
+                        normalized.append({"id": f"doc_{i}", "text": item, "metadata": {}})
+
             if self.debug:
-                logger.info(f"🔍 DEBUG: Normalized {len(normalized)} documents")
+                logger.info("🔍 DEBUG: Normalized %d documents", len(normalized))
                 if normalized:
-                    logger.info(f"   First document preview: {normalized[0]['text'][:100]}...")
-                    
+                    preview = normalized[0]["text"][:100].replace("\n", " ")
+                    logger.info("   First document preview: %s...", preview)
         except Exception as e:
-            logger.error(f"❌ Error normalizing documents: {e}")
-            
+            logger.error("❌ Error normalizing documents: %s", e)
+
         return normalized
-    
-    def _search_with_threshold(self, query: str, k: int, threshold: float) -> List[Dict[str, Any]]:
-        """
-        ✅ NOUVEAU: Recherche avec un seuil spécifique
-        Méthode interne pour la recherche adaptive
-        """
+
+    # -------------------------------------------------------------------------
+    # Similarité / scoring
+    # -------------------------------------------------------------------------
+    def _improved_similarity_score(self, distance: float) -> float:
+        if distance <= 0:
+            return 1.0
+        # courbe exponentielle inverse
+        similarity = float(np.exp(-distance * 1.5))
+        return max(0.0, min(1.0, similarity))
+
+    def _boost_score_for_exact_matches(self, query: str, text: str, base_score: float) -> float:
+        qw = set(query.lower().split())
+        tw = set(text.lower().split())
+        if not qw:
+            return base_score
+        overlap_ratio = len(qw.intersection(tw)) / len(qw)
+        boosted = min(1.0, base_score * (1.0 + overlap_ratio * 0.3))
+        if self.debug and boosted > base_score * 1.1:
+            logger.info("   📈 Score boosted: %.3f → %.3f (overlap: %.2f)", base_score, boosted, overlap_ratio)
+        return boosted
+
+    # -------------------------------------------------------------------------
+    # Recherche
+    # -------------------------------------------------------------------------
+    def has_search_engine(self) -> bool:
+        ok = self.search_engine_available and self.index is not None and len(self.documents) > 0 and self._check_dependencies()
+        if not ok and self.debug:
+            logger.warning("🔍 Search engine not ready:")
+            logger.warning("   search_engine_available: %s", self.search_engine_available)
+            logger.warning("   index is not None: %s", self.index is not None)
+            logger.warning("   documents > 0: %s", len(self.documents) > 0)
+            logger.warning("   dependencies_ok: %s", self._check_dependencies())
+        return ok
+
+    def _search_with_threshold(
+        self,
+        query: str,
+        k: int,
+        threshold: float,
+        species: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         if not self.has_search_engine():
             return []
 
         try:
-            # Normalize query for better matching
             normalized_query = self._normalize_query(query)
-            
-            # Generate query embedding (use normalized query)
-            search_query = normalized_query
-            
-            if self.cache_embeddings and search_query in self.embedding_cache:
-                query_embedding = self.embedding_cache[search_query]
+            species_hint = species or self._infer_species(query)
+
+            # Embedding requête (avec cache)
+            key = f"{normalized_query}|{species_hint or 'any'}"
+            if self.cache_embeddings and key in self.embedding_cache:
+                q_emb = self.embedding_cache[key]
             else:
-                query_embedding = self.sentence_model.encode([search_query])
+                model = self.SentenceTransformer(self.model_name)
+                q_emb = model.encode([normalized_query])  # shape (1, d)
                 if self.cache_embeddings:
-                    self.embedding_cache[search_query] = query_embedding
-            
-            # Ensure proper shape for FAISS
-            if query_embedding.ndim == 1:
-                query_embedding = query_embedding.reshape(1, -1)
-            
-            # Search with more candidates to get better results
-            k_search = min(k * 3, len(self.documents), self.index.ntotal)
-            
-            # Perform FAISS search
-            distances, indices = self.index.search(
-                query_embedding.astype('float32'), 
-                k_search
-            )
-            
-            # Process results with specified threshold
-            results = []
-            
+                    self.embedding_cache[key] = q_emb
+
+            if q_emb.ndim == 1:
+                q_emb = q_emb.reshape(1, -1)
+
+            # Chercher plus large puis filtrer
+            k_search = min(max(k * 3, k), len(self.documents), self.index.ntotal)
+            distances, indices = self.index.search(q_emb.astype("float32"), k_search)
+
+            results: List[Dict[str, Any]] = []
             for i in range(len(distances[0])):
-                distance = distances[0][i]
-                idx = indices[0][i]
-                
-                # Validation
+                idx = int(indices[0][i])
                 if idx < 0 or idx >= len(self.documents):
                     continue
-                
-                # Calculate improved similarity score
-                base_similarity = self._improved_similarity_score(distance)
-                
-                # Get document for boosting
+
                 doc = self.documents[idx]
-                
-                # Boost score for exact matches
-                final_similarity = self._boost_score_for_exact_matches(
-                    query, doc['text'], base_similarity
-                )
-                
-                # Apply threshold filter (use provided threshold)
-                if final_similarity < threshold:
+
+                # Filtre d'espèce (si déduite/forcée)
+                if species_hint and not self._doc_matches_species(doc, species_hint):
                     continue
-                
-                result = {
-                    'text': doc['text'],
-                    'score': round(final_similarity, 4),
-                    'index': int(idx),
-                    'metadata': doc.get('metadata', {}),
-                    'rank': len(results) + 1,
-                    'distance': float(distance),
-                    'base_score': round(base_similarity, 4),
-                    'threshold_used': threshold  # ✅ NOUVEAU: Track du seuil utilisé
-                }
-                
-                results.append(result)
-                
-                # Stop when we have enough good results
+
+                dist = float(distances[0][i])
+                base = self._improved_similarity_score(dist)
+                final = self._boost_score_for_exact_matches(query, doc.get("text", ""), base)
+
+                if final < threshold:
+                    continue
+
+                results.append(
+                    {
+                        "text": doc.get("text", ""),
+                        "score": round(final, 4),
+                        "index": idx,
+                        "metadata": doc.get("metadata", {}),
+                        "distance": dist,
+                        "base_score": round(base, 4),
+                        "threshold_used": threshold,
+                    }
+                )
                 if len(results) >= k:
                     break
-            
-            # Sort by score (descending)
-            results.sort(key=lambda x: x['score'], reverse=True)
-            
-            # Update ranks
-            for i, result in enumerate(results):
-                result['rank'] = i + 1
-            
+
+            results.sort(key=lambda x: x["score"], reverse=True)
             return results[:k]
-            
         except Exception as e:
-            logger.error(f"❌ Search error with threshold {threshold}: {e}")
+            logger.error("❌ Search error with threshold %.3f: %s", threshold, e)
             return []
-    
-    def search_with_adaptive_threshold(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
-        """
-        ✅ NOUVEAU: Recherche avec seuil adaptatif
-        Essaie différents seuils jusqu'à obtenir des résultats
-        """
+
+    def search_with_adaptive_threshold(
+        self, query: str, k: int = 5, species: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         if not self.has_search_engine():
             logger.error("❌ Search engine not available")
             return []
 
-        start_time = time.time()
-        
-        logger.info(f"🔍 [Adaptive] Starting adaptive threshold search")
-        logger.info(f"   Query: {query[:100]}...")
-        logger.info(f"   Requested k: {k}")
-        
-        # Essayer d'abord avec le seuil normal
-        results = self._search_with_threshold(query, k, self.threshold_config["normal"])
+        t0 = time.time()
+        if self.debug:
+            logger.info("🔍 [Adaptive] Starting adaptive threshold search")
+            logger.info("   Query: %s...", query[:120])
+            logger.info("   Requested k: %d", k)
+            if species:
+                logger.info("   Species (forced): %s", species)
+
+        tried = []
+        # 1) normal
+        tried.append("normal")
+        results = self._search_with_threshold(query, k, self.threshold_config["normal"], species)
         threshold_used = "normal"
-        
-        if len(results) == 0:
-            logger.info("🔍 [Adaptive] Aucun résultat avec seuil normal, essai permissif")
-            results = self._search_with_threshold(query, k, self.threshold_config["permissive"])
+
+        # 2) permissive
+        if not results:
+            tried.append("permissive")
+            if self.debug:
+                logger.info("🔍 [Adaptive] Aucun résultat avec seuil normal, essai permissif")
+            results = self._search_with_threshold(query, k, self.threshold_config["permissive"], species)
             threshold_used = "permissive"
-        
-        if len(results) == 0:
-            logger.info("🔍 [Adaptive] Aucun résultat avec seuil permissif, essai fallback")
-            results = self._search_with_threshold(query, k, self.threshold_config["fallback"])
+
+        # 3) fallback
+        if not results:
+            tried.append("fallback")
+            if self.debug:
+                logger.info("🔍 [Adaptive] Aucun résultat avec seuil permissif, essai fallback")
+            results = self._search_with_threshold(query, k, self.threshold_config["fallback"], species)
             threshold_used = "fallback"
-        
-        # Si toujours aucun résultat, essayer sans seuil (prendre les meilleurs scores)
-        if len(results) == 0:
-            logger.info("🔍 [Adaptive] Aucun résultat avec fallback, recherche sans seuil")
-            results = self._search_with_threshold(query, k, 0.0)
+
+        # 4) sans seuil (dernier recours, tri par score)
+        if not results:
+            tried.append("no_threshold")
+            if self.debug:
+                logger.info("🔍 [Adaptive] Aucun résultat avec fallback, recherche sans seuil")
+            results = self._search_with_threshold(query, k, 0.0, species)
             threshold_used = "no_threshold"
-        
-        search_time = time.time() - start_time
-        
-        logger.info(f"✅ [Adaptive] Search completed in {search_time:.3f}s")
-        logger.info(f"   Threshold used: {threshold_used} ({self.threshold_config.get(threshold_used, 0.0)})")
-        logger.info(f"   Results found: {len(results)}")
-        if results:
-            logger.info(f"   Score range: {results[0]['score']:.3f} - {results[-1]['score']:.3f}")
-            
-            # Log top results
-            for i, result in enumerate(results[:3]):
-                logger.info(f"   #{i+1}: Score {result['score']:.3f} - {result['text'][:80]}...")
-        
+
+        if self.debug:
+            dt = time.time() - t0
+            logger.info("✅ [Adaptive] Search completed in %.3fs", dt)
+            logger.info("   Threshold used: %s (tried: %s)", threshold_used, " → ".join(tried))
+            logger.info("   Results found: %d", len(results))
+            if results:
+                logger.info("   Score range: %.3f - %.3f", results[0]["score"], results[-1]["score"])
+                for i, r in enumerate(results[:3], 1):
+                    preview = r["text"][:80].replace("\n", " ")
+                    logger.info("   #%d: Score %.3f - %s...", i, r["score"], preview)
+
         return results
-    
-    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+
+    def search(self, query: str, k: int = 5, species: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        ✅ MODIFIÉ: Search for relevant documents avec fallback adaptatif
-        Utilise maintenant la recherche adaptive par défaut
+        Recherche publique (compatible). Ajout d'un paramètre optionnel species:
+        - None (auto) | "broiler" | "layer"
         """
-        return self.search_with_adaptive_threshold(query, k)
-    
-    def has_search_engine(self) -> bool:
-        """Check if search engine is available and ready"""
-        available = (
-            self.search_engine_available and 
-            self.index is not None and 
-            len(self.documents) > 0 and
-            self._check_dependencies()
-        )
-        
-        if not available:
-            logger.warning(f"🔍 Search engine not ready:")
-            logger.warning(f"   search_engine_available: {self.search_engine_available}")
-            logger.warning(f"   index is not None: {self.index is not None}")
-            logger.warning(f"   documents > 0: {len(self.documents) > 0}")
-            logger.warning(f"   dependencies_ok: {self._check_dependencies()}")
-        
-        return available
-    
+        return self.search_with_adaptive_threshold(query, k, species)
+
+    # -------------------------------------------------------------------------
+    # Utilitaires
+    # -------------------------------------------------------------------------
     def get_stats(self) -> Dict[str, Any]:
-        """Get embedder statistics"""
         return {
-            'documents_loaded': len(self.documents),
-            'search_available': self.has_search_engine(),
-            'cache_enabled': self.cache_embeddings,
-            'cache_size': len(self.embedding_cache) if self.embedding_cache else 0,
-            'model': self.model_name,
-            'max_workers': self.max_workers,
-            'dependencies_ok': self._check_dependencies(),
-            'faiss_total': self.index.ntotal if self.index else 0,
-            'similarity_threshold': self.similarity_threshold,
-            'threshold_config': self.threshold_config,  # ✅ NOUVEAU
-            'normalize_queries': self.normalize_queries
+            "documents_loaded": len(self.documents),
+            "search_available": self.has_search_engine(),
+            "cache_enabled": bool(self.embedding_cache),
+            "cache_size": len(self.embedding_cache) if self.embedding_cache is not None else 0,
+            "model": self.model_name,
+            "max_workers": self.max_workers,
+            "dependencies_ok": self._check_dependencies(),
+            "faiss_total": self.index.ntotal if self.index is not None else 0,
+            "similarity_threshold": self.similarity_threshold,
+            "threshold_config": self.threshold_config,
+            "normalize_queries": self.normalize_queries,
         }
-    
-    def clear_cache(self):
-        """Clear embedding cache"""
-        if self.embedding_cache:
-            cache_size = len(self.embedding_cache)
+
+    def clear_cache(self) -> None:
+        if self.embedding_cache is not None:
+            n = len(self.embedding_cache)
             self.embedding_cache.clear()
-            logger.info(f"🗑️ Cleared {cache_size} cached embeddings")
-    
-    def adjust_similarity_threshold(self, new_threshold: float):
-        """Adjust similarity threshold dynamically"""
-        old_threshold = self.similarity_threshold
+            logger.info("🗑️ Cleared %d cached embeddings", n)
+
+    def adjust_similarity_threshold(self, new_threshold: float) -> None:
+        old = self.similarity_threshold
         self.similarity_threshold = max(0.0, min(1.0, new_threshold))
-        # ✅ NOUVEAU: Mise à jour du seuil normal dans la config
         self.threshold_config["normal"] = self.similarity_threshold
-        logger.info(f"🎯 Similarity threshold adjusted: {old_threshold:.3f} → {self.similarity_threshold:.3f}")
-    
-    def update_threshold_config(self, **kwargs):
-        """
-        ✅ NOUVEAU: Mettre à jour la configuration des seuils
-        """
-        for threshold_name, value in kwargs.items():
-            if threshold_name in self.threshold_config:
-                old_value = self.threshold_config[threshold_name]
-                self.threshold_config[threshold_name] = max(0.0, min(1.0, value))
-                logger.info(f"🎯 {threshold_name} threshold: {old_value:.3f} → {self.threshold_config[threshold_name]:.3f}")
+        logger.info("🎯 Similarity threshold adjusted: %.3f → %.3f", old, self.similarity_threshold)
+
+    def update_threshold_config(self, **kwargs: float) -> None:
+        for name, value in kwargs.items():
+            if name in self.threshold_config:
+                old = self.threshold_config[name]
+                self.threshold_config[name] = max(0.0, min(1.0, float(value)))
+                logger.info("🎯 %s threshold: %.3f → %.3f", name, old, self.threshold_config[name])
             else:
-                logger.warning(f"⚠️ Unknown threshold config: {threshold_name}")
-    
+                logger.warning("⚠️ Unknown threshold config: %s", name)
+
     def debug_search(self, query: str) -> Dict[str, Any]:
-        """
-        Debug method to understand search issues
-        """
-        debug_info = {
-            'query': query,
-            'normalized_query': self._normalize_query(query),
-            'has_search_engine': self.has_search_engine(),
-            'documents_count': len(self.documents),
-            'faiss_total': self.index.ntotal if self.index else 0,
-            'model_name': self.model_name,
-            'cache_enabled': self.cache_embeddings,
-            'similarity_threshold': self.similarity_threshold,
-            'threshold_config': self.threshold_config,  # ✅ NOUVEAU
-            'normalize_queries': self.normalize_queries
+        info: Dict[str, Any] = {
+            "query": query,
+            "normalized_query": self._normalize_query(query),
+            "has_search_engine": self.has_search_engine(),
+            "documents_count": len(self.documents),
+            "faiss_total": self.index.ntotal if self.index is not None else 0,
+            "model_name": self.model_name,
+            "cache_enabled": bool(self.embedding_cache),
+            "threshold_config": self.threshold_config,
+            "normalize_queries": self.normalize_queries,
         }
-        
         if self.has_search_engine():
             try:
-                normalized_query = self._normalize_query(query)
-                
-                # Test embedding generation
-                embedding = self.sentence_model.encode([normalized_query])
-                debug_info['embedding_shape'] = embedding.shape
-                debug_info['embedding_generated'] = True
-                
-                # Test FAISS search
-                if embedding.ndim == 1:
-                    embedding = embedding.reshape(1, -1)
-                
-                distances, indices = self.index.search(embedding.astype('float32'), 5)
-                debug_info['faiss_search_success'] = True
-                
-                # ✅ NOUVEAU: Tester avec tous les seuils
-                threshold_results = {}
-                for threshold_name, threshold_value in self.threshold_config.items():
-                    results = self._search_with_threshold(query, 3, threshold_value)
-                    threshold_results[threshold_name] = {
-                        'threshold': threshold_value,
-                        'results_count': len(results),
-                        'top_scores': [r['score'] for r in results[:3]]
+                norm = self._normalize_query(query)
+                model = self.SentenceTransformer(self.model_name)
+                emb = model.encode([norm])
+                info["embedding_shape"] = getattr(emb, "shape", None)
+                if emb.ndim == 1:
+                    emb = emb.reshape(1, -1)
+                distances, indices = self.index.search(emb.astype("float32"), 5)
+                info["faiss_search_success"] = True
+
+                # Tester tous les seuils
+                thr_results = {}
+                for name, val in self.threshold_config.items():
+                    res = self._search_with_threshold(query, 3, val)
+                    thr_results[name] = {
+                        "threshold": val,
+                        "results_count": len(res),
+                        "top_scores": [r["score"] for r in res[:3]],
                     }
-                
-                debug_info['threshold_results'] = threshold_results
-                
-                # Analyze top 5 results without threshold
-                top_results = []
+                info["threshold_results"] = thr_results
+
+                # Top bruts sans filtrage (5)
+                top = []
                 for i in range(min(5, len(distances[0]))):
-                    distance = distances[0][i]
-                    idx = indices[0][i]
-                    
-                    if idx >= 0 and idx < len(self.documents):
-                        base_score = self._improved_similarity_score(distance)
-                        boosted_score = self._boost_score_for_exact_matches(
-                            query, self.documents[idx]['text'], base_score
-                        )
-                        
-                        # ✅ NOUVEAU: Check contre tous les seuils
-                        threshold_checks = {}
-                        for name, value in self.threshold_config.items():
-                            threshold_checks[name] = boosted_score >= value
-                        
-                        top_results.append({
-                            'index': int(idx),
-                            'distance': float(distance),
-                            'base_score': round(base_score, 4),
-                            'boosted_score': round(boosted_score, 4),
-                            'threshold_checks': threshold_checks,
-                            'text_preview': self.documents[idx]['text'][:100]
-                        })
-                
-                debug_info['top_results'] = top_results
-                    
+                    idx = int(indices[0][i])
+                    if idx < 0 or idx >= len(self.documents):
+                        continue
+                    d = float(distances[0][i])
+                    doc = self.documents[idx]
+                    base = self._improved_similarity_score(d)
+                    boosted = self._boost_score_for_exact_matches(query, doc.get("text", ""), base)
+                    top.append(
+                        {
+                            "index": idx,
+                            "distance": d,
+                            "base_score": round(base, 4),
+                            "boosted_score": round(boosted, 4),
+                            "text_preview": doc.get("text", "")[:100],
+                        }
+                    )
+                info["top_results"] = top
             except Exception as e:
-                debug_info['error'] = str(e)
-        
-        return debug_info
+                info["error"] = str(e)
+        return info
+
 
 # =============================================================================
-# COMPATIBILITY FUNCTIONS WITH IMPROVED DEFAULTS
+# Factories / compat
 # =============================================================================
 
 def create_optimized_embedder(**kwargs) -> FastRAGEmbedder:
-    """Create an optimized embedder instance with better scoring and adaptive thresholds"""
+    """
+    Factory avec bons défauts.
+    """
     return FastRAGEmbedder(
         cache_embeddings=True,
         max_workers=2,
-        debug=kwargs.get('debug', True),
-        similarity_threshold=kwargs.get('similarity_threshold', 0.15),  # ✅ MODIFIÉ: 0.25 → 0.15
-        normalize_queries=kwargs.get('normalize_queries', True),
-        **kwargs
+        debug=kwargs.get("debug", True),
+        similarity_threshold=kwargs.get("similarity_threshold", 0.20),
+        normalize_queries=kwargs.get("normalize_queries", True),
+        model_name=kwargs.get("model_name", "all-MiniLM-L6-v2"),
+        api_key=kwargs.get("api_key"),
     )
 
-# Legacy compatibility
-def FastRAGEmbedder_v1(*args, **kwargs):
-    """Backward compatibility wrapper with improved defaults"""
-    # Apply improved defaults if not specified
-    if 'similarity_threshold' not in kwargs:
-        kwargs['similarity_threshold'] = 0.15  # ✅ MODIFIÉ: 0.25 → 0.15
-    if 'normalize_queries' not in kwargs:
-        kwargs['normalize_queries'] = True
-    
+
+def FastRAGEmbedder_v1(*args, **kwargs) -> FastRAGEmbedder:
+    """
+    Alias compatibilité avec defaults améliorés.
+    """
+    kwargs.setdefault("similarity_threshold", 0.20)
+    kwargs.setdefault("normalize_queries", True)
+    kwargs.setdefault("model_name", "all-MiniLM-L6-v2")
     return FastRAGEmbedder(*args, **kwargs)

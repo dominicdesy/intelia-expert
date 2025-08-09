@@ -1,0 +1,334 @@
+"""
+RAGEngine - Version 2 (FAISS local + filtrage espèce)
+- Remplace l'usage direct de VectorStoreClient par le FastRAGEmbedder local
+- Passe l'espèce (broiler/layer) déduite du contexte/la question à l'embedder pour filtrer les docs
+- Fallback propre vers OpenAI si aucun document pertinent
+- Sortie standardisée: dict avec 'response' (str), 'source', 'documents_used', 'warning', 'citations'
+"""
+
+from __future__ import annotations
+
+import os
+import logging
+from typing import Any, Dict, List, Optional
+
+from app.api.v1.utils.openai_utils import safe_chat_completion
+
+# ⚠️ Importe l'embedder local (FAISS) — chemin 'rag/embedder.py'
+try:
+    # Chemin absolu vs relatif selon ta structure de projet
+    from rag.embedder import FastRAGEmbedder, create_optimized_embedder
+except Exception as e:
+    FastRAGEmbedder = None  # type: ignore
+    create_optimized_embedder = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+
+class RAGEngine:
+    """
+    Retrieval-Augmented Generation avec FAISS local et filtrage par espèce.
+    - Charge l'index FAISS présent dans RAG_INDEX_PATH (def: 'rag_index')
+    - Déduit l'espèce (broiler/layer) à partir du contexte + question
+    - Appelle embedder.search(query, k, species=...) pour récupérer des chunks filtrés
+    - Construit un prompt RAG et appelle OpenAI
+    - Fallback OpenAI si aucun document pertinent
+    """
+
+    def __init__(self, index_path: Optional[str] = None, k: int = 4) -> None:
+        self.index_path = index_path or os.getenv("RAG_INDEX_PATH", "rag_index")
+        self.k = int(os.getenv("RAG_TOP_K", str(k)))
+        self.embedder: Optional[FastRAGEmbedder] = None
+        self.rag_available = False
+
+        # Init embedder + index
+        self._init_local_rag()
+
+    # --------------------------------------------------------------------- #
+    # Initialisation FAISS local
+    # --------------------------------------------------------------------- #
+    def _init_local_rag(self) -> None:
+        if FastRAGEmbedder is None or create_optimized_embedder is None:
+            logger.error("❌ RAGEngine: FastRAGEmbedder indisponible (import).")
+            self.rag_available = False
+            return
+
+        try:
+            # Paramètres par défaut alignés avec notre embedder corrigé
+            self.embedder = create_optimized_embedder(
+                model_name=os.getenv("RAG_EMBED_MODEL", "all-MiniLM-L6-v2"),
+                similarity_threshold=float(os.getenv("RAG_SIM_THRESHOLD", "0.20")),
+                normalize_queries=True,
+                debug=True,
+            )
+
+            loaded = self.embedder.load_index(self.index_path)
+            self.rag_available = bool(loaded)
+
+            if self.rag_available:
+                stats = self.embedder.get_stats()
+                logger.info("✅ RAGEngine: Index FAISS chargé (%s)", self.index_path)
+                logger.info("📊 RAG stats: %s", stats)
+            else:
+                logger.warning("⚠️ RAGEngine: Impossible de charger l'index FAISS (%s)", self.index_path)
+
+        except Exception as e:
+            logger.error("❌ RAGEngine: Erreur init embedder/index: %s", e)
+            self.rag_available = False
+
+    # --------------------------------------------------------------------- #
+    # Inférence de l'espèce (contexte + question)
+    # --------------------------------------------------------------------- #
+    def _infer_species_from_context(self, question: str, context: Optional[Dict[str, Any]]) -> Optional[str]:
+        """
+        Essaie de déterminer 'broiler' ou 'layer' à partir du contexte ET de la question.
+        L'embedder possède déjà une inférence interne, mais passer l'info ici verrouille le filtre.
+        """
+        # 1) Contexte structuré
+        species_ctx = (context or {}).get("species") or (context or {}).get("espece")
+        if isinstance(species_ctx, str) and species_ctx.strip():
+            s = species_ctx.lower()
+            if "broiler" in s or "chair" in s:
+                return "broiler"
+            if "layer" in s or "pondeuse" in s:
+                return "layer"
+
+        breed = ((context or {}).get("breed") or (context or {}).get("race") or "").lower()
+        if any(x in breed for x in ["ross", "cobb", "broiler"]):
+            return "broiler"
+        if any(x in breed for x in ["lohmann", "hy-line", "w36", "w-36", "w80", "w-80", "layer"]):
+            return "layer"
+
+        # 2) Question (sécurité)
+        q = (question or "").lower()
+        if any(x in q for x in ["pondeuse", "layer", "lohmann", "hy-line", "w36", "w-36", "w80", "w-80", "ponte"]):
+            return "layer"
+        if any(x in q for x in ["broiler", "poulet de chair", "ross 308", "cobb 500"]):
+            return "broiler"
+
+        return None  # on laissera l’embedder deviner
+
+    # --------------------------------------------------------------------- #
+    # API publique: génération de réponse
+    # --------------------------------------------------------------------- #
+    def generate_answer(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Retourne:
+        {
+            "response": str,
+            "source": "rag_enhanced" | "openai_fallback" | "rag_error" | "error_fallback",
+            "documents_used": int,
+            "warning": Optional[str],
+            "citations": List[Dict[str, str]]   # [{"source": ".../path/file.pdf", "snippet": "..."}]
+        }
+        """
+        result: Dict[str, Any] = {
+            "response": "",
+            "source": "",
+            "documents_used": 0,
+            "warning": None,
+            "citations": [],
+        }
+
+        # 1) Recherche documentaire locale (FAISS)
+        docs: List[Dict[str, Any]] = []
+        species_hint = self._infer_species_from_context(question, context)
+
+        if self.rag_available and self.embedder is not None:
+            try:
+                logger.info("🔎 RAGEngine: recherche locale (k=%d, species=%s)", self.k, species_hint or "auto")
+                search_hits = self.embedder.search(question, k=self.k, species=species_hint)
+
+                # search_hits est une liste de dicts: {"text", "metadata", "score", ...}
+                # On la traduit en liste minimale de docs homogènes pour le prompt
+                for hit in search_hits:
+                    if not isinstance(hit, dict):
+                        continue
+                    text = hit.get("text") or ""
+                    md = hit.get("metadata") or {}
+                    source = (
+                        md.get("file_path")
+                        or md.get("source")
+                        or md.get("path")
+                        or md.get("filename")
+                        or "unknown_source"
+                    )
+                    docs.append({"content": text, "source": str(source)})
+                logger.info("✅ RAGEngine: %d documents retenus", len(docs))
+
+            except Exception as e:
+                logger.error("❌ RAGEngine: erreur pendant la recherche locale: %s", e)
+                docs = []
+
+        else:
+            logger.warning("⚠️ RAGEngine: FAISS local indisponible (index non chargé).")
+
+        # 2) Génération: avec RAG ou fallback
+        if not docs:
+            # Fallback OpenAI (connaissances générales)
+            prompt = self._build_fallback_prompt(question, context)
+            try:
+                resp = safe_chat_completion(
+                    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=700,
+                )
+                result.update(
+                    {
+                        "response": (resp.choices[0].message.content or "").strip(),
+                        "source": "openai_fallback",
+                        "documents_used": 0,
+                        "warning": "Réponse générale : aucun document spécialisé pertinent n'a été trouvé.",
+                        "citations": [],
+                    }
+                )
+            except Exception as e:
+                logger.error("❌ RAGEngine: erreur fallback OpenAI: %s", e)
+                result.update(
+                    {
+                        "response": "Je rencontre un problème technique pour répondre. Veuillez réessayer.",
+                        "source": "error_fallback",
+                        "documents_used": 0,
+                        "warning": f"Erreur technique: {e}",
+                        "citations": [],
+                    }
+                )
+            return result
+
+        # RAG prompt avec docs
+        prompt = self._build_rag_prompt(question, context, docs)
+        try:
+            resp = safe_chat_completion(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=900,
+            )
+
+            result.update(
+                {
+                    "response": (resp.choices[0].message.content or "").strip(),
+                    "source": "rag_enhanced",
+                    "documents_used": len(docs),
+                    "warning": None,
+                    "citations": self._build_citations(docs),
+                }
+            )
+        except Exception as e:
+            logger.error("❌ RAGEngine: erreur OpenAI sur RAG: %s", e)
+            result.update(
+                {
+                    "response": f"Documents trouvés ({len(docs)}) mais erreur de génération. Réessayez plus tard.",
+                    "source": "rag_error",
+                    "documents_used": len(docs),
+                    "warning": f"Erreur traitement RAG: {e}",
+                    "citations": self._build_citations(docs),
+                }
+            )
+
+        return result
+
+    # --------------------------------------------------------------------- #
+    # Prompts
+    # --------------------------------------------------------------------- #
+    def _build_rag_prompt(self, question: str, context: Optional[Dict[str, Any]], docs: List[Dict[str, str]]) -> str:
+        """
+        Construit un prompt RAG propre et orienté 'utiliser d'abord les documents'.
+        """
+        doc_lines: List[str] = []
+        for i, d in enumerate(docs, 1):
+            content = (d.get("content") or "").strip()
+            if len(content) > 600:
+                content = content[:600] + "..."
+            source = d.get("source") or "unknown_source"
+            doc_lines.append(f"[Doc {i} | {source}]\n{content}")
+        docs_block = "\n\n".join(doc_lines)
+
+        missing_info = self._identify_missing_context(context)
+
+        prompt = f"""Tu es un expert vétérinaire spécialisé en aviculture (poulets de chair et pondeuses).
+
+QUESTION
+{question}
+
+CONTEXTE DISPONIBLE
+{context if context else "—"}
+
+DOCUMENTS SPÉCIALISÉS (à utiliser en priorité)
+{docs_block}
+
+CONSIGNE
+1) Utilise d'abord les documents ci-dessus (ne les ignore pas).
+2) Si une info manque, complète prudemment par les bonnes pratiques reconnues.
+3) Sois clair, pratique et précis. Mentionne les hypothèses si besoin.
+4) Distingue les recommandations générales de celles basées sur les documents.
+
+{missing_info}
+
+Réponds en français, de façon professionnelle et opérationnelle.
+"""
+        return prompt
+
+    def _build_fallback_prompt(self, question: str, context: Optional[Dict[str, Any]]) -> str:
+        missing_info = self._identify_missing_context(context)
+        prompt = f"""Tu es un expert vétérinaire spécialisé en aviculture.
+
+QUESTION
+{question}
+
+CONTEXTE DISPONIBLE
+{context if context else "—"}
+
+SITUATION
+Aucun document spécialisé n'a été trouvé/retourné par le moteur RAG.
+
+CONSIGNE
+1) Donne une réponse générale, utile et prudente (bonnes pratiques standard).
+2) Explique les éventuelles variations selon la lignée, le sexe, l'âge, etc.
+3) Propose 2-3 questions de clarification si pertinent.
+
+{missing_info}
+
+Réponds en français et indique clairement qu'il s'agit d'une réponse générale (sans source documentaire)."""
+        return prompt
+
+    # --------------------------------------------------------------------- #
+    # Utilitaires
+    # --------------------------------------------------------------------- #
+    def _identify_missing_context(self, context: Optional[Dict[str, Any]]) -> str:
+        ctx = context or {}
+        missing = []
+
+        if not (ctx.get("race") or ctx.get("breed")):
+            missing.append("la lignée (Ross, Cobb, Hubbard...)")
+        if not (ctx.get("sexe") or ctx.get("sex_category")):
+            missing.append("le sexe (mâle, femelle, mixte)")
+        if not (ctx.get("age_jours") or ctx.get("age_phase")):
+            missing.append("l'âge précis (en jours/semaine)")
+
+        if missing:
+            return (
+                "INFORMATIONS MANQUANTES POUR PLUS DE PRÉCISION\n"
+                f"- Données manquantes: {', '.join(missing)}.\n"
+                "- Donne quand même une réponse utile.\n"
+                "- Explique pourquoi ces infos sont importantes (ex: différences selon lignée/âge/sexe)."
+            )
+        return "CONTEXTE: suffisant pour une réponse pertinente."
+
+    def _build_citations(self, docs: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        cites: List[Dict[str, str]] = []
+        for d in docs:
+            source = d.get("source") or "unknown_source"
+            snippet = (d.get("content") or "").strip()[:120].replace("\n", " ")
+            cites.append({"source": source, "snippet": snippet})
+        return cites
+
+    # Diagnostic/status
+    def get_status(self) -> Dict[str, Any]:
+        return {
+            "faiss_loaded": bool(self.rag_available),
+            "index_path": self.index_path,
+            "top_k": self.k,
+            "embedder_ok": bool(self.embedder is not None),
+        }
