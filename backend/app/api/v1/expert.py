@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import Any, Dict, Optional, List, Literal
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -50,11 +51,15 @@ class SystemStatus(BaseModel):
 
 
 # ---------------------------
-#     INSTANCES / SINGLETONS
+#     INSTANCES / FACTORY
 # ---------------------------
 
-# DialogueManager doit être initialisé au startup dans main.py
-dlg: DialogueManager = DialogueManager.get_instance()
+# 💡 Ne pas instancier à l'import: on utilise un getter mémoïsé,
+#    appelé dans chaque handler (ou une fois puis caché).
+@lru_cache
+def get_dialogue_manager() -> DialogueManager:
+    # TODO: Injecter ici des dépendances/paramètres si nécessaires
+    return DialogueManager()
 
 
 # ---------------------------
@@ -114,6 +119,9 @@ async def ask(payload: AskRequest, user=Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Question invalide")
 
         lang = payload.language or get_language_from_text(question) or "fr"
+
+        # Récupérer le DialogueManager (mémoïsé)
+        dlg = get_dialogue_manager()
 
         # Laisser le DialogueManager orchestrer
         result = await dlg.handle(
@@ -175,6 +183,7 @@ async def system_status():
     mais on le re-map dans SystemStatus si possible.
     """
     try:
+        dlg = get_dialogue_manager()
         raw = await dlg.system_status()
         if isinstance(raw, dict):
             return SystemStatus(
