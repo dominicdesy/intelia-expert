@@ -362,4 +362,4 @@ async def system_status():
             "status": "error", 
             "rag_ready": False,
             "details": {"error": str(e)}
-        }sw
+        }
