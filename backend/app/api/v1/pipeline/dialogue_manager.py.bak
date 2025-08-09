@@ -1,370 +1,253 @@
-"""
-DialogueManager - Version corrigée avec fallback intelligent + nettoyage temporel robuste
-CONSERVE: Structure originale + tous les composants existants
-CORRIGE: 
-- Logique de clarification trop stricte → fallback intelligent (CONSERVÉ)
-- Nettoyage temporel fragile → utilisation des fonctionnalités PostgreSQL natives
-- ✅ CORRECTION CRITIQUE: PostgreSQL timestamp format error "invalid input syntax for type timestamp"
-- ✅ CORRECTION CRITIQUE: Gestion proper des réponses RAG dict format
-"""
+# app/api/v1/pipeline/dialogue_manager.py
+from __future__ import annotations
+
 import os
-import threading
-import time
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any
+import threading
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+from datetime import datetime
+
+try:
+    import anyio  # pour offloader sync -> thread
+except Exception:  # fallback léger si anyio n'est pas dispo
+    anyio = None  # type: ignore
+
+from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD  # peut lever si absent
+from ..utils.response_generator import format_response
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
 from .postgres_memory import PostgresMemory as ConversationMemory
 from .rag_engine import RAGEngine
-from ..utils.config import COMPLETENESS_THRESHOLD
-from ..utils.response_generator import format_response
 
-# Configuration logging pour debug
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- Sécuriser un défaut si l'import du seuil échoue dans certains environnements
+COMPLETENESS_THRESHOLD: float = 0.6
+try:
+    COMPLETENESS_THRESHOLD = float(_THRESHOLD)
+except Exception:
+    logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
+
+
+def _utc_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
+    """
+    Normalise différentes formes de 'sources' en une liste de dicts.
+    Accepte:
+      - list[dict|str]
+      - str|dict (unique)
+      - None
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        out: List[Dict[str, Any]] = []
+        for s in raw:
+            if isinstance(s, dict):
+                out.append(s)
+            else:
+                out.append({"source": str(s)})
+        return out
+    if isinstance(raw, dict):
+        return [raw]
+    return [{"source": str(raw)}]
+
 
 class DialogueManager:
     """
-    Simplified orchestration:
-      1. Extract context
-      2. CORRIGÉ: Fallback intelligent au lieu de clarification systématique
-      3. Retrieve & generate answer via RAG
-      
-    AMÉLIORATIONS APPLIQUÉES:
-    - Nettoyage temporel robuste avec PostgreSQL natif
-    - Conservation de toute la logique métier originale
-    - Gestion d'erreurs améliorée pour le nettoyage
-    - ✅ CORRECTION CRITIQUE: Gestion proper des timestamps Unix vs PostgreSQL
-    - ✅ CORRECTION CRITIQUE: Gestion proper des réponses RAG dict format
+    Orchestrateur:
+      1) Extraction de contexte
+      2) Clarification si score << seuil, sinon fallback avec avertissement
+      3) Appel RAG et mise en forme de la réponse (dict: {'answer', 'sources'})
+      4) Persistance légère du contexte (mémoire Postgres)
+
+    Compatible avec expert.py:
+      - @classmethod get_instance()
+      - async handle(session_id, question, language=None, user_id=None)
+      - async system_status()
     """
-    def __init__(self):
+
+    _instance: Optional["DialogueManager"] = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls) -> "DialogueManager":
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    def __init__(self) -> None:
+        # Dépendances "légères" (pas de heavy load à l'import du module)
         self.extractor = ContextExtractor()
         self.clarifier = ClarificationManager()
-        # Use managed Postgres for session memory
         self.memory = ConversationMemory(dsn=os.getenv("DATABASE_URL"))
         self.rag = RAGEngine()
-        
-        # ✅ CONSERVATION: Démarrage automatique nettoyage (avec améliorations)
-        self._start_cleanup_task()
 
-    def handle(self, session_id: str, question: str) -> Dict[str, Any]:
-        """
-        CORRIGÉ: Orchestration avec fallback intelligent au lieu de clarification systématique
-        CONSERVÉ: Toute la logique métier originale
-        ✅ CORRECTION CRITIQUE: Gestion proper du format dict des réponses RAG
-        """
-        # 1. CONSERVATION: Load and update context (logique identique)
-        context = self.memory.get(session_id) or {}
+        # Optionnel: démarrage d’une tâche de nettoyage si la mémoire l’expose
+        # (aucun crash si non supporté)
+        try:
+            self._maybe_start_cleanup()
+        except Exception as e:
+            logger.warning("Nettoyage de sessions non démarré: %s", e)
+
+    # -----------------------
+    #         PUBLIC
+    # -----------------------
+
+    async def handle(
+        self,
+        session_id: Optional[str],
+        question: str,
+        language: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        # Session
+        sid = session_id or str(uuid4())
+
+        # Charger contexte existant (robuste)
+        try:
+            context: Dict[str, Any] = self.memory.get(sid) or {}
+        except Exception as e:
+            logger.warning("Lecture mémoire échouée (sid=%s): %s", sid, e)
+            context = {}
+
+        if language:
+            context.setdefault("language", language)
+        if user_id:
+            context.setdefault("user_id", user_id)
+
+        # 1) Extraction
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
-        
-        # Logging pour debug (conservé)
-        logger.info(f"Question: {question[:50]}...")
-        logger.info(f"Score de complétude: {score:.2f}, seuil: {COMPLETENESS_THRESHOLD}")
-        logger.info(f"Champs manquants: {missing}")
-        logger.info(f"Contexte extrait: {extracted}")
 
-        # 2. ✅ CORRIGÉ: Logique de fallback intelligent (conservée intégralement)
+        logger.info("Q: %s", question[:120])
+        logger.info("Completeness=%.2f / seuil=%.2f", score, COMPLETENESS_THRESHOLD)
+        if missing:
+            logger.info("Champs manquants: %s", missing)
+
+        # 2) Clarification si score très bas
         if score < COMPLETENESS_THRESHOLD:
-            logger.info(f"Score {score:.2f} < seuil {COMPLETENESS_THRESHOLD}")
-            
-            # Si score très bas (< 0.2), vraiment demander clarification
             if score < 0.2:
-                logger.info("Score très bas (< 0.2), demande de clarification nécessaire")
                 questions = self.clarifier.generate(missing)
-                # ✅ AMÉLIORATION: Timestamp ISO 8601 au lieu de Unix pour compatibilité PostgreSQL
-                context['last_interaction'] = datetime.utcnow().isoformat()
-                self.memory.update(session_id, context)
-                return {"type": "clarification", "questions": questions}
-            
-            # Si score moyen (0.2 à seuil), répondre avec avertissement
-            else:
-                logger.info(f"Score moyen ({score:.2f}), génération réponse avec avertissement")
-                answer_data = self.rag.generate_answer(question, context)
-                
-                # ✅ CORRECTION CRITIQUE: Gestion proper du format dict RAG
-                if isinstance(answer_data, dict):
-                    # RAG retourne maintenant un dict avec "response", "source", etc.
-                    response_text = answer_data.get("response", "")
-                    response = format_response(response_text)  # format_response attend une string
-                    source_info = {
-                        "source": answer_data.get("source"),
-                        "documents_used": answer_data.get("documents_used", 0),
-                        "warning": f"Réponse générale - précisez {', '.join(missing[:2])} pour plus de précision"
-                    }
-                else:
-                    # Fallback si ancien format (string directe)
-                    response = format_response(answer_data)
-                    source_info = {"warning": "Réponse générale"}
-                
-                # ✅ AMÉLIORATION: Timestamps ISO 8601 pour compatibilité PostgreSQL
-                context['completed_at'] = datetime.utcnow().isoformat()
-                context['last_interaction'] = datetime.utcnow().isoformat()
-                self.memory.update(session_id, context)
-                
-                # CONSERVATION: Retourner info source
-                result = {"type": "answer", "response": response}
-                result.update(source_info)
-                logger.info("Réponse générée avec avertissement")
-                return result
+                context["last_interaction"] = _utc_iso()
+                self._safe_mem_update(sid, context)
+                return {
+                    "type": "clarification",
+                    "questions": questions,
+                    "session_id": sid,
+                    "completeness_score": score,
+                    "missing_fields": missing,
+                }
 
-        # 3. CONSERVATION: Si score >= seuil, générer réponse complète (logique identique)
-        logger.info(f"Score suffisant ({score:.2f}), génération réponse complète")
-        answer_data = self.rag.generate_answer(question, context)
-        
-        # ✅ CORRECTION CRITIQUE: Gestion proper du format dict RAG
-        if isinstance(answer_data, dict):
-            # RAG retourne maintenant un dict avec "response", "source", etc.
-            response_text = answer_data.get("response", "")
-            response = format_response(response_text)  # format_response attend une string
-            source_info = {
-                "source": answer_data.get("source"),
-                "documents_used": answer_data.get("documents_used", 0),
-                "warning": answer_data.get("warning")
+            # 3) Fallback avec avertissement
+            answer_text, sources = await self._generate_with_rag(question, context)
+            context["completed_at"] = _utc_iso()
+            context["last_interaction"] = _utc_iso()
+            self._safe_mem_update(sid, context)
+            warn = (
+                f"Réponse générale — précisez {', '.join(missing[:2])} pour plus de précision"
+                if missing else "Réponse générale"
+            )
+            return {
+                "type": "answer",
+                "response": {"answer": format_response(answer_text), "sources": sources},
+                "session_id": sid,
+                "completeness_score": score,
+                "missing_fields": missing,
+                "metadata": {"warning": warn},
             }
-        else:
-            # Fallback si ancien format (string directe)
-            response = format_response(answer_data)
-            source_info = {}
-        
-        # ✅ AMÉLIORATION: Timestamps ISO 8601 pour compatibilité PostgreSQL
-        context['completed_at'] = datetime.utcnow().isoformat()
-        context['last_interaction'] = datetime.utcnow().isoformat()
-        self.memory.update(session_id, context)
-        
-        # CONSERVATION: Retourner info source
-        result = {"type": "answer", "response": response}
-        result.update(source_info)
-        logger.info("Réponse complète générée")
-        return result
 
-    # ✅ CONSERVATION: Méthodes de nettoyage avec améliorations
-    def _start_cleanup_task(self):
+        # 4) Réponse complète
+        answer_text, sources = await self._generate_with_rag(question, context)
+        context["completed_at"] = _utc_iso()
+        context["last_interaction"] = _utc_iso()
+        self._safe_mem_update(sid, context)
+        return {
+            "type": "answer",
+            "response": {"answer": format_response(answer_text), "sources": sources},
+            "session_id": sid,
+            "completeness_score": score,
+            "missing_fields": missing,
+        }
+
+    async def system_status(self) -> Dict[str, Any]:
+        try:
+            rag_ready = True
+            if hasattr(self.rag, "is_ready"):
+                rag_ready = bool(self.rag.is_ready())
+            return {
+                "status": "ok" if rag_ready else "degraded",
+                "rag_ready": rag_ready,
+                "details": {
+                    "cleanup_enabled": bool(getattr(self, "_cleanup_enabled", False)),
+                },
+            }
+        except Exception as e:
+            logger.exception("system_status error: %s", e)
+            return {"status": "error", "rag_ready": False, "details": {"error": str(e)}}
+
+    # -----------------------
+    #       INTERNALS
+    # -----------------------
+
+    async def _generate_with_rag(self, question: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
         """
-        Démarre le nettoyage en arrière-plan
-        CONSERVÉ: Structure originale
-        AMÉLIORÉ: Gestion d'erreurs et configuration flexible
+        Appelle le moteur RAG. Tolère les deux formats:
+          - str (ancien)
+          - dict {"response": str, "sources": list|dict|str}
+        Offload en thread si anyio est dispo, pour ne pas bloquer l’event loop.
         """
-        def cleanup_sessions():
-            # ✅ AMÉLIORATION: Intervalle configurable
-            cleanup_interval = int(os.getenv('CLEANUP_INTERVAL_MINUTES', '30')) * 60
-            
+        def _call() -> Any:
+            return self.rag.generate_answer(question, context)
+
+        try:
+            raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
+        except Exception as e:
+            logger.exception("RAG generate_answer error: %s", e)
+            return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
+
+        if isinstance(raw, dict):
+            answer_text = str(raw.get("response", "")).strip()
+            sources = _normalize_sources(raw.get("sources") or raw.get("source"))
+        else:
+            answer_text = str(raw).strip()
+            sources = []
+
+        return (answer_text, sources)
+
+    def _safe_mem_update(self, session_id: str, context: Dict[str, Any]) -> None:
+        try:
+            self.memory.update(session_id, context)
+        except Exception as e:
+            logger.warning("Échec update mémoire (sid=%s): %s", session_id, e)
+
+    def _maybe_start_cleanup(self) -> None:
+        """
+        Démarre un thread léger de nettoyage **uniquement** si la mémoire expose une API sûre.
+        On évite psycopg2 direct ici pour ne pas lier le DM à une implémentation précise.
+        """
+        cleanup_fn = getattr(self.memory, "cleanup_expired", None)
+        if not callable(cleanup_fn):
+            self._cleanup_enabled = False
+            return
+
+        interval_min = int(os.getenv("CLEANUP_INTERVAL_MINUTES", "30"))
+        self._cleanup_enabled = True
+
+        def _loop():
+            import time
             while True:
                 try:
-                    self._robust_cleanup()
+                    cleanup_fn()  # la classe mémoire décide quoi purger
                 except Exception as e:
-                    logger.error(f"Erreur nettoyage sessions: {e}")
-                    # ✅ AMÉLIORATION: Attendre moins longtemps en cas d'erreur
-                    time.sleep(min(cleanup_interval, 300))  # Max 5 minutes en cas d'erreur
-                    continue
-                
-                time.sleep(cleanup_interval)
-        
-        cleanup_thread = threading.Thread(target=cleanup_sessions, daemon=True)
-        cleanup_thread.start()
-        logger.info(f"✅ Nettoyage sessions activé (intervalle: {os.getenv('CLEANUP_INTERVAL_MINUTES', '30')}min)")
+                    logger.debug("Cleanup mémoire: %s", e)
+                time.sleep(max(300, interval_min * 60))  # au moins 5 min
 
-    def _robust_cleanup(self):
-        """
-        ✅ AMÉLIORATION MAJEURE: Nettoyage robuste utilisant les fonctionnalités PostgreSQL natives
-        
-        PROBLÈME RÉSOLU: 
-        - Ancien code mélangeait timestamps Unix (time.time()) et comparaisons PostgreSQL
-        - Risque d'incompatibilité de format de dates
-        
-        SOLUTION:
-        - Utilisation des fonctions de date PostgreSQL natives
-        - Intervalles PostgreSQL au lieu de calculs manuels
-        - Support des formats ISO 8601 et Unix timestamp
-        """
-        if not self.memory.dsn:
-            logger.warning("⚠️ DSN de base non configuré, nettoyage impossible")
-            return
-        
-        try:
-            import psycopg2
-            
-            # ✅ AMÉLIORATION: Configuration flexible des délais
-            cleanup_hours = int(os.getenv('SESSION_CLEANUP_HOURS', '2'))
-            completed_hours = int(os.getenv('COMPLETED_SESSION_CLEANUP_HOURS', '1'))
-            
-            with psycopg2.connect(self.memory.dsn) as conn:
-                with conn.cursor() as cur:
-                    
-                    # ✅ AMÉLIORATION MAJEURE: Utilisation des fonctions PostgreSQL natives
-                    # Au lieu de comparer avec time.time(), utiliser INTERVAL PostgreSQL
-                    
-                    cleanup_query = """
-                        DELETE FROM conversation_memory 
-                        WHERE 
-                            -- Sessions inactives depuis X heures (format ISO 8601)
-                            (context->>'last_interaction' IS NOT NULL 
-                             AND (context->>'last_interaction')::timestamp < (NOW() - INTERVAL '%s hours'))
-                        OR
-                            -- Sessions inactives depuis X heures (format Unix timestamp - fallback)
-                            (context->>'last_interaction' IS NOT NULL 
-                             AND context->>'last_interaction' ~ '^[0-9]+\.?[0-9]*$'
-                             AND TO_TIMESTAMP((context->>'last_interaction')::double precision) < (NOW() - INTERVAL '%s hours'))
-                        OR
-                            -- Sessions complétées depuis X heures (format ISO 8601)
-                            (context->>'completed_at' IS NOT NULL 
-                             AND (context->>'completed_at')::timestamp < (NOW() - INTERVAL '%s hours'))
-                        OR
-                            -- Sessions complétées depuis X heures (format Unix timestamp - fallback)
-                            (context->>'completed_at' IS NOT NULL 
-                             AND context->>'completed_at' ~ '^[0-9]+\.?[0-9]*$'
-                             AND TO_TIMESTAMP((context->>'completed_at')::double precision) < (NOW() - INTERVAL '%s hours'))
-                        OR
-                            -- Sessions très anciennes sans timestamp (sécurité)
-                            (created_at IS NOT NULL AND created_at < (NOW() - INTERVAL '24 hours'))
-                    """
-                    
-                    # Exécuter avec paramètres pour éviter l'injection SQL
-                    cur.execute(cleanup_query, (
-                        cleanup_hours, cleanup_hours,  # last_interaction
-                        completed_hours, completed_hours  # completed_at
-                    ))
-                    
-                    deleted = cur.rowcount
-                    
-                    if deleted > 0:
-                        logger.info(f"🧹 Nettoyage PostgreSQL: {deleted} sessions supprimées")
-                        
-                        # ✅ AMÉLIORATION: Statistiques détaillées
-                        cur.execute("""
-                            SELECT 
-                                COUNT(*) as total_remaining,
-                                COUNT(CASE WHEN context->>'last_interaction' IS NOT NULL THEN 1 END) as with_interaction,
-                                COUNT(CASE WHEN context->>'completed_at' IS NOT NULL THEN 1 END) as completed
-                            FROM conversation_memory
-                        """)
-                        
-                        stats = cur.fetchone()
-                        if stats:
-                            logger.info(f"📊 Sessions restantes: {stats[0]} total, {stats[1]} avec interaction, {stats[2]} complétées")
-                    
-                    else:
-                        logger.debug("🧹 Nettoyage PostgreSQL: aucune session à supprimer")
-                    
-                    # ✅ AMÉLIORATION: Optimisation de la base (optionnel)
-                    if deleted > 100:
-                        logger.debug("🔧 Optimisation table après nettoyage important...")
-                        cur.execute("VACUUM ANALYZE conversation_memory")
-                        logger.debug("✅ Optimisation terminée")
-                        
-        except psycopg2.Error as e:
-            logger.error(f"❌ Erreur PostgreSQL lors du nettoyage: {e}")
-            # ✅ AMÉLIORATION: Fallback vers ancien système en cas d'erreur PostgreSQL
-            logger.info("🔄 Tentative fallback vers nettoyage manuel...")
-            self._manual_cleanup_fallback()
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur inattendue lors du nettoyage robuste: {e}")
-
-    def _manual_cleanup_fallback(self):
-        """
-        ✅ NOUVEAU: Fallback vers l'ancien système en cas d'erreur
-        CONSERVÉ: Logique originale comme plan de secours
-        """
-        try:
-            import psycopg2
-            
-            with psycopg2.connect(self.memory.dsn) as conn:
-                with conn.cursor() as cur:
-                    # ✅ AMÉLIORATION: Utiliser Unix timestamp mais avec conversion appropriée
-                    cutoff_time = time.time() - 7200  # 2 heures
-                    completed_cutoff = time.time() - 3600  # 1 heure pour complétées
-                    
-                    # Requête originale conservée mais améliorée
-                    cur.execute("""
-                        DELETE FROM conversation_memory 
-                        WHERE 
-                            -- Format Unix timestamp (ancien format)
-                            (context->>'last_interaction' ~ '^[0-9]+\.?[0-9]*$'
-                             AND (context->>'last_interaction')::double precision < %s)
-                        OR 
-                            (context->>'completed_at' ~ '^[0-9]+\.?[0-9]*$'
-                             AND (context->>'completed_at')::double precision < %s)
-                    """, (cutoff_time, completed_cutoff))
-                    
-                    deleted = cur.rowcount
-                    if deleted > 0:
-                        logger.info(f"🧹 Nettoyage fallback: {deleted} sessions supprimées")
-                        
-        except Exception as e:
-            logger.warning(f"⚠️ Nettoyage fallback échoué: {e}")
-
-    def get_cleanup_stats(self) -> Dict[str, Any]:
-        """
-        ✅ NOUVELLE FONCTIONNALITÉ: Statistiques de nettoyage pour monitoring
-        """
-        try:
-            import psycopg2
-            
-            with psycopg2.connect(self.memory.dsn) as conn:
-                with conn.cursor() as cur:
-                    
-                    # Statistiques générales
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total_sessions,
-                            COUNT(CASE WHEN context->>'last_interaction' IS NOT NULL THEN 1 END) as with_last_interaction,
-                            COUNT(CASE WHEN context->>'completed_at' IS NOT NULL THEN 1 END) as completed_sessions,
-                            MIN(created_at) as oldest_session,
-                            MAX(updated_at) as most_recent_update
-                        FROM conversation_memory
-                    """)
-                    
-                    general_stats = cur.fetchone()
-                    
-                    # Sessions par âge
-                    cur.execute("""
-                        SELECT 
-                            COUNT(CASE WHEN created_at > (NOW() - INTERVAL '1 hour') THEN 1 END) as last_hour,
-                            COUNT(CASE WHEN created_at > (NOW() - INTERVAL '1 day') THEN 1 END) as last_day,
-                            COUNT(CASE WHEN created_at > (NOW() - INTERVAL '7 days') THEN 1 END) as last_week
-                        FROM conversation_memory
-                    """)
-                    
-                    age_stats = cur.fetchone()
-                    
-                    return {
-                        "total_sessions": general_stats[0],
-                        "with_last_interaction": general_stats[1],
-                        "completed_sessions": general_stats[2],
-                        "oldest_session": general_stats[3].isoformat() if general_stats[3] else None,
-                        "most_recent_update": general_stats[4].isoformat() if general_stats[4] else None,
-                        "sessions_last_hour": age_stats[0],
-                        "sessions_last_day": age_stats[1],
-                        "sessions_last_week": age_stats[2],
-                        "cleanup_config": {
-                            "cleanup_interval_minutes": os.getenv('CLEANUP_INTERVAL_MINUTES', '30'),
-                            "session_cleanup_hours": os.getenv('SESSION_CLEANUP_HOURS', '2'),
-                            "completed_session_cleanup_hours": os.getenv('COMPLETED_SESSION_CLEANUP_HOURS', '1')
-                        }
-                    }
-                    
-        except Exception as e:
-            logger.error(f"❌ Erreur récupération statistiques: {e}")
-            return {"error": str(e)}
-
-    def force_cleanup(self) -> Dict[str, Any]:
-        """
-        ✅ NOUVELLE FONCTIONNALITÉ: Nettoyage forcé pour administration
-        """
-        try:
-            logger.info("🧹 Nettoyage forcé demandé...")
-            self._robust_cleanup()
-            return {
-                "status": "success",
-                "message": "Nettoyage forcé exécuté",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        except Exception as e:
-            logger.error(f"❌ Erreur nettoyage forcé: {e}")
-            return {
-                "status": "error", 
-                "message": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            }
+        t = threading.Thread(target=_loop, daemon=True)
+        t.start()
