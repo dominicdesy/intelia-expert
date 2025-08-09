@@ -1,190 +1,124 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Direct Document Parser for RAG System
-Simple script to parse documents and build vector index
-Uses multiple configuration sources with intelligent fallback
+RAG Document Parser & Index Builder (Table-first ready)
+
+Fonctions clés :
+- Détection intelligente de la config (secrets.toml, .env, env var)
+- Recherche du dossier documents + création d'échantillons facultative
+- Construction de l’index via EnhancedDocumentEmbedder
+- Vérification explicite que metadata["chunk_type"] = "table" est préservé
+- Options CLI : chemins, verbosité, ratio minimal de tables, etc.
+
+Exemples :
+  python rag/parse_documents.py --require-table-chunks --min-table-ratio 0.05
+  python rag/parse_documents.py -d ./documents -i ./rag_index --verbose
 """
+
+from __future__ import annotations
 
 import os
+import re
 import sys
 import toml
+import json
+import argparse
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, List, Tuple
 
-# Add parent directory to path for imports
-current_dir = Path(__file__).parent
-parent_dir = current_dir.parent
-sys.path.insert(0, str(parent_dir))
+# --- Chemins d'import (assure import rag.* depuis ce script) ---
+CURRENT_DIR = Path(__file__).parent
+PARENT_DIR = CURRENT_DIR.parent
+if str(PARENT_DIR) not in sys.path:
+    sys.path.insert(0, str(PARENT_DIR))
 
-def load_config() -> Optional[str]:
-    """Load OpenAI API key from multiple sources with intelligent fallback"""
-    
-    # Method 1: Try Streamlit secrets from current directory
-    secrets_path = Path('.streamlit/secrets.toml')
-    if secrets_path.exists():
-        print(f"✅ Found Streamlit secrets at: {secrets_path.absolute()}")
-        return _load_from_streamlit_secrets(secrets_path)
-    
-    # Method 2: Try Streamlit secrets from parent directory (in case we're in rag/)
-    secrets_path_parent = Path('../.streamlit/secrets.toml')
-    if secrets_path_parent.exists():
-        print(f"✅ Found Streamlit secrets at: {secrets_path_parent.absolute()}")
-        return _load_from_streamlit_secrets(secrets_path_parent)
-    
-    # Method 3: Try .env file
-    env_path = Path('.env')
-    if env_path.exists():
-        print(f"✅ Found .env file at: {env_path.absolute()}")
-        return _load_from_env_file(env_path)
-    
-    # Method 4: Try environment variable
-    env_key = os.getenv('OPENAI_API_KEY')
-    if env_key:
-        print("✅ Found OpenAI key in environment variables")
-        return env_key
-    
-    # Method 5: Interactive input as last resort
-    print("❌ No configuration files found")
-    print("📍 Searched locations:")
-    print(f"   • {Path('.streamlit/secrets.toml').absolute()}")
-    print(f"   • {Path('../.streamlit/secrets.toml').absolute()}")
-    print(f"   • {Path('.env').absolute()}")
-    print("   • Environment variable OPENAI_API_KEY")
-    
+LOG = logging.getLogger("rag.parse_documents")
+
+
+# =============== CONFIG & LOGGING ===================
+
+def setup_logging(verbose: bool = False) -> None:
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    # Réduire le bruit
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def load_openai_key() -> Optional[str]:
+    """
+    Priorité :
+      1) ./.streamlit/secrets.toml (clé 'openai_key')
+      2) ../.streamlit/secrets.toml
+      3) ./.env (ligne OPENAI_API_KEY=...)
+      4) os.environ['OPENAI_API_KEY']
+    """
+    # 1-2) secrets.toml
+    for candidate in [Path(".streamlit/secrets.toml"), Path("../.streamlit/secrets.toml")]:
+        if candidate.exists():
+            try:
+                with candidate.open("r", encoding="utf-8") as f:
+                    data = toml.load(f)
+                key = data.get("openai_key")
+                if key:
+                    LOG.info("✅ OpenAI key loaded from %s", candidate)
+                    return key
+                LOG.warning("openai_key not found in %s", candidate)
+            except Exception as e:
+                LOG.warning("Cannot parse %s: %s", candidate, e)
+
+    # 3) .env
+    env_file = Path(".env")
+    if env_file.exists():
+        try:
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("OPENAI_API_KEY="):
+                    key = line.split("=", 1)[1].strip().strip('"\'')
+                    if key:
+                        LOG.info("✅ OpenAI key loaded from .env")
+                        return key
+            LOG.warning("OPENAI_API_KEY not found in .env")
+        except Exception as e:
+            LOG.warning("Cannot read .env: %s", e)
+
+    # 4) ENV
+    key = os.getenv("OPENAI_API_KEY")
+    if key:
+        LOG.info("✅ OpenAI key loaded from environment")
+        return key
+
+    LOG.error("❌ No OpenAI API key found (.streamlit/secrets.toml, .env, or env var)")
     return None
 
-def _load_from_streamlit_secrets(secrets_path: Path) -> Optional[str]:
-    """Load OpenAI key from Streamlit secrets file"""
-    try:
-        with open(secrets_path, 'r', encoding='utf-8') as f:
-            secrets = toml.load(f)
-        
-        openai_key = secrets.get('openai_key')
-        if openai_key:
-            print(f"✅ OpenAI API key loaded from Streamlit secrets: {openai_key[:8]}...")
-            return openai_key
-        else:
-            print("❌ openai_key not found in secrets.toml")
-            return None
-            
-    except ImportError:
-        print("⚠️ toml library not available, trying manual parsing...")
-        return _parse_toml_manually(secrets_path)
-    except Exception as e:
-        print(f"❌ Error loading Streamlit secrets: {e}")
-        return None
 
-def _load_from_env_file(env_path: Path) -> Optional[str]:
-    """Load OpenAI key from .env file"""
-    try:
-        with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('OPENAI_API_KEY='):
-                    key = line.split('=', 1)[1].strip().strip('"\'')
-                    if key:
-                        print(f"✅ OpenAI API key loaded from .env: {key[:8]}...")
-                        return key
-        
-        print("❌ OPENAI_API_KEY not found in .env file")
-        return None
-        
-    except Exception as e:
-        print(f"❌ Error loading .env file: {e}")
-        return None
+# =============== DOCS & INDEX HELPERS ===================
 
-def _parse_toml_manually(secrets_path: Path) -> Optional[str]:
-    """Manually parse TOML file when toml library is not available"""
-    try:
-        with open(secrets_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('openai_key') and '=' in line:
-                    key = line.split('=', 1)[1].strip().strip('"\'')
-                    if key:
-                        print(f"✅ OpenAI API key loaded (manual parsing): {key[:8]}...")
-                        return key
-        
-        print("❌ openai_key not found in secrets file")
-        return None
-        
-    except Exception as e:
-        print(f"❌ Error parsing secrets file manually: {e}")
-        return None
+def find_documents_path(explicit: Optional[str] = None) -> Optional[Path]:
+    if explicit:
+        p = Path(explicit).expanduser().resolve()
+        return p if p.exists() else None
+    for candidate in [Path("documents"), Path("../documents"), Path("docs"), Path("../docs")]:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
 
-def setup_logging():
-    """Setup logging configuration"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%H:%M:%S'
-    )
-    
-    # Reduce noise from external libraries
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('requests').setLevel(logging.WARNING)
 
-def check_documents() -> bool:
-    """Check if documents are available for processing"""
-    # Try multiple document locations
-    possible_docs_paths = [
-        Path('documents'),           # From root
-        Path('../documents'),        # From rag/ folder
-        Path('docs'),               # Alternative name
-        Path('../docs')             # Alternative from rag/
-    ]
-    
-    docs_path = None
-    for path in possible_docs_paths:
-        if path.exists():
-            docs_path = path
-            break
-    
-    if not docs_path:
-        print("❌ Documents folder not found")
-        print("📍 Searched locations:")
-        for path in possible_docs_paths:
-            print(f"   • {path.absolute()}")
-        return False
-    
-    print(f"📁 Using documents folder: {docs_path.absolute()}")
-    
-    # Count documents recursively
-    doc_count = 0
-    doc_types = {}
-    
-    for file_path in docs_path.rglob('*.*'):
-        if file_path.is_file() and not file_path.name.startswith('.'):
-            doc_count += 1
-            ext = file_path.suffix.lower()
-            doc_types[ext] = doc_types.get(ext, 0) + 1
-    
-    if doc_count == 0:
-        print(f"⚠️ No documents found in {docs_path}")
-        return False
-    
-    print(f"✅ Found {doc_count} documents")
-    if doc_types:
-        print("📋 Document types:")
-        for ext, count in sorted(doc_types.items()):
-            print(f"   • {ext}: {count} files")
-    
-    return True
-
-def create_sample_documents():
-    """Create sample documents for testing"""
-    # Determine best location for documents
-    docs_path = Path('documents')
-    if not docs_path.exists():
-        # Try relative to rag/ folder
-        docs_path = Path('../documents')
-    
+def ensure_sample_documents(docs_path: Path) -> None:
+    """
+    Crée 2 fichiers d’exemple si le dossier est vide, pour tests rapides.
+    """
     docs_path.mkdir(parents=True, exist_ok=True)
-    
-    print(f"📝 Creating sample documents in: {docs_path.absolute()}")
-    
-    # Sample Ross 308 data
+    if any(p.is_file() for p in docs_path.rglob("*")):
+        return
+
+    LOG.info("📝 Creating sample documents in %s", docs_path)
     sample_csv = """age,weight_g,daily_gain_g,temperature_c,feed_intake_g,fcr,humidity_pct
 0,42,0,35.0,0,0.0,65
 1,45,3,35.0,4,0.89,65
@@ -193,215 +127,310 @@ def create_sample_documents():
 21,820,58,26.0,125,1.28,55
 28,1450,90,23.0,180,1.35,52
 35,2100,93,21.0,220,1.42,50
-42,2800,100,19.0,260,1.48,50"""
-    
-    sample_guide = """Ross 308 Broiler Performance Guide
+42,2800,100,19.0,260,1.48,50
+"""
+    sample_md = """# Ross 308 Performance Targets
 
-WEEKLY TARGETS:
-- Week 1 (Day 7): 160g target weight
-- Week 2 (Day 14): 410g target weight  
-- Week 3 (Day 21): 820g target weight
-- Week 4 (Day 28): 1450g target weight
+| Week | Target BW (g) | FCR  |
+|-----:|---------------:|:----:|
+| 1    | 160            | 1.05 |
+| 2    | 410            | 1.25 |
+| 3    | 820            | 1.45 |
+| 4    | 1450           | 1.62 |
 
-TEMPERATURE MANAGEMENT:
-- Week 1: 32-35°C (critical establishment phase)
-- Week 2: 29-32°C (early development)
-- Week 3: 26-29°C (rapid growth phase)
-- Week 4: 23-26°C (optimization phase)
+Notes:
+- Verify temperature ramp (32–35°C week 1).
+- Increase water points if heat stress indicators appear.
+"""
 
-FEED CONVERSION TARGETS:
-- Week 1: 1.00-1.10 FCR
-- Week 2: 1.20-1.35 FCR
-- Week 3: 1.40-1.55 FCR
-- Week 4: 1.55-1.70 FCR
+    (docs_path / "ross308_sample_data.csv").write_text(sample_csv, encoding="utf-8")
+    (docs_path / "ross_308_targets.md").write_text(sample_md, encoding="utf-8")
+    LOG.info("✅ Sample docs created: ross308_sample_data.csv, ross_308_targets.md")
 
-TROUBLESHOOTING WEIGHT ISSUES:
-If birds are underweight:
-1. Check feed quality and availability
-2. Verify temperature is within target range
-3. Ensure adequate water access
-4. Monitor for disease signs
-5. Adjust feeder space if overcrowded
 
-HEAT STRESS INDICATORS:
-- Panting with open beaks
-- Wings spread from body
-- Reduced feed intake (>10% drop)
-- Increased water consumption
-- Birds gathering near water sources"""
-    
-    # Write sample files
-    with open(docs_path / 'ross308_sample_data.csv', 'w', encoding='utf-8') as f:
-        f.write(sample_csv)
-    
-    with open(docs_path / 'ross_308_sample_guide.txt', 'w', encoding='utf-8') as f:
-        f.write(sample_guide)
-    
-    print("✅ Sample documents created:")
-    print("   • ross308_sample_data.csv")
-    print("   • ross_308_sample_guide.txt")
+def determine_index_path(explicit: Optional[str] = None) -> Path:
+    if explicit:
+        p = Path(explicit).expanduser().resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    # Préfère ./rag_index
+    for candidate in [Path("rag_index"), Path("../rag_index"), Path("index"), Path("../index")]:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate.resolve()
+        except Exception:
+            continue
+    # Dernier recours
+    return Path("rag_index").resolve()
 
-def determine_index_path() -> Path:
-    """Determine the best path for the RAG index"""
-    possible_paths = [
-        Path('rag_index'),          # From root
-        Path('../rag_index'),       # From rag/ folder
-        Path('index'),              # Alternative name
-        Path('../index')            # Alternative from rag/
-    ]
-    
-    # Check if any index already exists
-    for path in possible_paths:
-        if path.exists() and any(path.iterdir()):
-            print(f"📁 Using existing index at: {path.absolute()}")
-            return path
-    
-    # Use the first viable option (prefer root level)
-    index_path = possible_paths[0]
-    print(f"📁 Will create index at: {index_path.absolute()}")
-    return index_path
 
-def main():
-    """Main parsing function with intelligent configuration detection"""
-    print("🚀 RAG DOCUMENT PARSER")
-    print("🔧 Intelligent Configuration Detection")
-    print("=" * 50)
-    
-    # Setup logging
-    setup_logging()
-    
-    # Load configuration with fallback
-    openai_key = load_config()
-    if not openai_key:
-        print("\n❌ Cannot proceed without OpenAI API key")
-        print("\n💡 Configuration options:")
-        print("1. Create .streamlit/secrets.toml with openai_key")
-        print("2. Create .env with OPENAI_API_KEY")
-        print("3. Set environment variable OPENAI_API_KEY")
-        print("\n📝 Example .env file:")
-        print("OPENAI_API_KEY=sk-your-key-here")
-        return
-    
-    # Check documents
-    if not check_documents():
-        print("\n📝 Creating sample documents for testing...")
-        create_sample_documents()
-        if not check_documents():
-            print("❌ Still no documents available")
-            return
-    
-    # Import and initialize embedder
+# =============== TABLE-FIRST VERIFICATION ===================
+
+def summarize_chunk_types(docs: List[Any]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for d in docs or []:
+        ct = (d.metadata or {}).get("chunk_type", "unset")
+        counts[ct] = counts.get(ct, 0) + 1
+    return counts
+
+
+def try_load_all_documents(embedder: Any, index_path: Path) -> List[Any]:
+    """
+    Tente plusieurs approches pour récupérer les documents indexés afin d’inspecter metadata.
+    - embedder.load_all_documents(index_path)
+    - embedder.vector_store.get_all() (si dispo)
+    - embedder.search_documents('*', k=N) (fallback limité)
+    """
+    docs: List[Any] = []
+
+    # 1) API directe
+    for fn_name in ("load_all_documents", "load_documents"):
+        fn = getattr(embedder, fn_name, None)
+        if callable(fn):
+            try:
+                loaded = fn(str(index_path))
+                if isinstance(loaded, list) and loaded:
+                    LOG.debug("Loaded %d docs via %s()", len(loaded), fn_name)
+                    return loaded
+            except Exception as e:
+                LOG.debug("Failure on %s(): %s", fn_name, e)
+
+    # 2) vector_store.get_all()
     try:
-        print(f"\n🔧 Initializing RAG system...")
-        from rag.embedder import EnhancedDocumentEmbedder
-        
+        vs = getattr(embedder, "vector_store", None)
+        if vs is not None:
+            get_all = getattr(vs, "get_all", None)
+            if callable(get_all):
+                loaded = get_all()
+                if isinstance(loaded, list) and loaded:
+                    LOG.debug("Loaded %d docs via vector_store.get_all()", len(loaded))
+                    return loaded
+    except Exception as e:
+        LOG.debug("vector_store.get_all() failed: %s", e)
+
+    # 3) Fallback : effectue quelques recherches pour ramener des docs (limité)
+    try:
+        search = getattr(embedder, "search_documents", None)
+        if callable(search):
+            seen_ids = set()
+            for q in ["table", "weight", "FCR", "Ross 308"]:
+                try:
+                    results = search(q, k=10) or []
+                    for res in results:
+                        # compat : (doc, score) ou dict
+                        if isinstance(res, tuple) and len(res) == 2:
+                            doc = res[0]
+                        elif isinstance(res, dict):
+                            doc = res.get("document") or res.get("doc")
+                        else:
+                            doc = None
+                        if doc is None:
+                            continue
+                        doc_id = (getattr(doc, "metadata", {}) or {}).get("source_file") or id(doc)
+                        if doc_id in seen_ids:
+                            continue
+                        seen_ids.add(doc_id)
+                        docs.append(doc)
+                except Exception:
+                    continue
+            if docs:
+                LOG.debug("Collected %d docs via search fallback", len(docs))
+                return docs
+    except Exception as e:
+        LOG.debug("Search fallback failed: %s", e)
+
+    return docs
+
+
+def check_table_flag_preserved(
+    embedder: Any,
+    index_path: Path,
+    require: bool = False,
+    min_ratio: float = 0.0
+) -> Tuple[int, int, Dict[str, int]]:
+    """
+    Charge les documents indexés et vérifie la conservation de chunk_type='table'.
+    - require=True : échoue si aucun doc 'table' détecté
+    - min_ratio : avertit/échoue si le ratio de 'table' < min_ratio
+    Retourne (total_docs, table_docs, counts_par_type)
+    """
+    docs = try_load_all_documents(embedder, index_path)
+    total = len(docs)
+    counts = summarize_chunk_types(docs)
+    table_count = counts.get("table", 0)
+
+    LOG.info("🔍 Table-first check → %s", json.dumps(counts, ensure_ascii=False))
+    LOG.info("   %d/%d documents ont chunk_type='table'", table_count, total)
+
+    if require and table_count == 0:
+        raise RuntimeError(
+            "Aucun document avec chunk_type='table'. "
+            "Vérifier table_parsers, metadata_enrichment et document_parsers."
+        )
+
+    if min_ratio > 0 and total > 0:
+        ratio = table_count / float(total)
+        if ratio < min_ratio:
+            msg = (
+                f"Ratio de documents 'table' {ratio:.2%} < seuil {min_ratio:.2%}. "
+                "Vérifiez que la détection table-first est bien active."
+            )
+            if require:
+                raise RuntimeError(msg)
+            else:
+                LOG.warning(msg)
+
+    return total, table_count, counts
+
+
+# =============== MAIN PIPELINE ===================
+
+def build_and_check(
+    documents_path: Path,
+    index_path: Path,
+    openai_key: str,
+    require_table_chunks: bool,
+    min_table_ratio: float,
+    chunk_size: int,
+    chunk_overlap: int,
+    hybrid: bool,
+    intelligent_routing: bool,
+) -> None:
+    LOG.info("🚀 Initializing EnhancedDocumentEmbedder")
+    try:
+        from rag.embedder import EnhancedDocumentEmbedder  # type: ignore
+    except Exception as e:
+        LOG.error("❌ Cannot import rag.embedder.EnhancedDocumentEmbedder: %s", e)
+        LOG.error("   Current working dir: %s", Path.cwd())
+        LOG.error("   Ensure you run from project root or adjust PYTHONPATH.")
+        sys.exit(1)
+
+    try:
         embedder = EnhancedDocumentEmbedder(
             openai_api_key=openai_key,
-            chunk_size=500,
-            chunk_overlap=50,
-            use_hybrid_search=True,
-            use_intelligent_routing=True
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            use_hybrid_search=hybrid,
+            use_intelligent_routing=intelligent_routing,
         )
-        print("✅ Enhanced Document Embedder initialized")
-        
-    except ImportError as e:
-        print(f"❌ Error importing embedder: {e}")
-        print("   Make sure you're running from the correct directory")
-        print(f"   Current directory: {Path.cwd()}")
-        print("   Expected: broiler_agent/ (project root)")
-        return
     except Exception as e:
-        print(f"❌ Error initializing embedder: {e}")
-        return
-    
-    # Determine paths
-    documents_path = None
-    for path in [Path('documents'), Path('../documents')]:
-        if path.exists():
-            documents_path = str(path)
-            break
-    
-    index_path = str(determine_index_path())
-    
-    # Parse documents and build vector store
+        LOG.error("❌ Error initializing EnhancedDocumentEmbedder: %s", e)
+        sys.exit(1)
+
+    LOG.info("📚 Documents: %s", documents_path)
+    LOG.info("💾 Index path: %s", index_path)
+
     try:
-        print(f"\n📚 Starting document processing...")
-        print(f"📂 Documents: {documents_path}")
-        print(f"💾 Index: {index_path}")
-        
         success = embedder.build_vector_store(
-            documents_path=documents_path,
-            index_path=index_path
+            documents_path=str(documents_path),
+            index_path=str(index_path),
         )
-        
-        if success:
-            print("\n🎉 SUCCESS!")
-            print("=" * 50)
-            print("✅ Documents processed and indexed")
-            print(f"✅ Vector store saved to {index_path}")
-            print("✅ System ready for searches")
-            
-            # Show processing statistics
-            try:
-                stats = embedder.get_routing_statistics()
-                if stats and isinstance(stats, dict):
-                    print(f"\n📊 Processing Statistics:")
-                    
-                    # Try to get parser usage
-                    parser_usage = None
-                    if 'processing_statistics' in stats:
-                        parser_usage = stats['processing_statistics'].get('parser_usage', {})
-                    elif 'parsers' in stats:
-                        parser_usage = {name: info.get('total_attempts', 0) 
-                                      for name, info in stats['parsers'].items() 
-                                      if info.get('total_attempts', 0) > 0}
-                    
-                    if parser_usage:
-                        for parser, count in parser_usage.items():
-                            print(f"   • {parser}: {count} documents")
-                    else:
-                        print(f"   • Total documents processed successfully")
-                        
-            except Exception as e:
-                print(f"   ⚠️ Could not retrieve detailed statistics: {e}")
-            
-            # Test search
-            print(f"\n🔍 Testing search functionality...")
-            test_queries = [
-                "Ross 308 weight targets",
-                "temperature management week 1",
-                "feed conversion ratio"
-            ]
-            
-            for query in test_queries:
-                try:
-                    results = embedder.search_documents(query, k=2)
-                    if results:
-                        doc, score = results[0]
-                        source = doc.metadata.get('source_file', 'unknown')
-                        print(f"   Query: '{query}'")
-                        print(f"   → Best result: {source} (score: {score:.3f})")
-                    else:
-                        print(f"   Query: '{query}' → No results")
-                except Exception as e:
-                    print(f"   Query: '{query}' → Error: {e}")
-            
-            print(f"\n🎯 Next Steps:")
-            print(f"1. Add more documents to {documents_path}")
-            print("2. Re-run this script to update the index")
-            print("3. Use the search functionality in your applications")
-            print(f"4. Check {index_path} for saved vector store")
-            print("5. Run Streamlit: python -m streamlit run apps/app_streamlit.py")
-            
-        else:
-            print("\n❌ Document processing failed")
-            print("   Check the error messages above")
-            
     except Exception as e:
-        print(f"\n❌ Error during processing: {e}")
-        import traceback
-        print("\n🔧 Full error details:")
-        traceback.print_exc()
+        LOG.error("❌ build_vector_store failed: %s", e)
+        sys.exit(1)
+
+    if not success:
+        LOG.error("❌ Document processing failed (build_vector_store returned False)")
+        sys.exit(1)
+
+    LOG.info("✅ Documents processed and index created at %s", index_path)
+
+    # Vérif table-first (conservation du champ dans l’index)
+    try:
+        total, table_count, _ = check_table_flag_preserved(
+            embedder=embedder,
+            index_path=index_path,
+            require=require_table_chunks,
+            min_ratio=min_table_ratio,
+        )
+        if total == 0:
+            LOG.warning("Aucun document détecté après indexation (total=0).")
+    except Exception as e:
+        LOG.error("❌ Table-first verification failed: %s", e)
+        sys.exit(1)
+
+    # Petits tests de recherche
+    LOG.info("🔎 Running smoke-test queries…")
+    for q in ["Ross 308 weight targets", "temperature management", "feed conversion ratio", "table"]:
+        try:
+            results = embedder.search_documents(q, k=2)
+            if results:
+                # compat : (doc, score) or dict
+                if isinstance(results[0], tuple) and len(results[0]) == 2:
+                    doc, score = results[0]
+                elif isinstance(results[0], dict):
+                    doc, score = results[0].get("document") or results[0].get("doc"), results[0].get("score", 0.0)
+                else:
+                    doc, score = None, 0.0
+                src = (getattr(doc, "metadata", {}) or {}).get("source_file", "unknown") if doc else "unknown"
+                LOG.info("   • '%s' → best: %s (score=%.3f)", q, src, float(score or 0.0))
+            else:
+                LOG.info("   • '%s' → no results", q)
+        except Exception as e:
+            LOG.debug("Search error on '%s': %s", q, e)
+
+    LOG.info("🎉 Success. RAG index ready.")
+
+
+# =============== CLI ===================
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Parse documents and build RAG index (Table-first).")
+    p.add_argument("-d", "--documents", type=str, default=None, help="Path to documents folder.")
+    p.add_argument("-i", "--index", type=str, default=None, help="Path to index folder.")
+    p.add_argument("--create-samples", action="store_true", help="Create sample docs if none found.")
+    p.add_argument("--require-table-chunks", action="store_true",
+                   help="Fail if no chunk has metadata['chunk_type']=='table'.")
+    p.add_argument("--min-table-ratio", type=float, default=float(os.getenv("MIN_TABLE_RATIO", "0.0")),
+                   help="Warn/fail if table chunks ratio < this threshold (0.0..1.0).")
+    p.add_argument("--chunk-size", type=int, default=500, help="Chunk size for embedder.")
+    p.add_argument("--chunk-overlap", type=int, default=50, help="Chunk overlap for embedder.")
+    p.add_argument("--no-hybrid", action="store_true", help="Disable hybrid search.")
+    p.add_argument("--no-intelligent-routing", action="store_true", help="Disable intelligent routing.")
+    p.add_argument("-v", "--verbose", action="store_true", help="Verbose logging.")
+    return p.parse_args(argv)
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    args = parse_args(argv)
+    setup_logging(args.verbose)
+
+    print("=" * 64)
+    print("📦 RAG DOCUMENT PARSER — Table-first")
+    print("=" * 64)
+
+    openai_key = load_openai_key()
+    if not openai_key:
+        print("\n💡 Configure your OpenAI key via .streamlit/secrets.toml, .env, or env var.")
+        sys.exit(1)
+
+    docs_path = find_documents_path(args.documents)
+    if not docs_path:
+        if args.create_samples:
+            # crée le dossier local ./documents
+            docs_path = Path("documents").resolve()
+            ensure_sample_documents(docs_path)
+        else:
+            print("❌ Documents folder not found. Use --documents or --create-samples.")
+            sys.exit(1)
+    else:
+        if args.create_samples:
+            ensure_sample_documents(docs_path)
+
+    index_path = determine_index_path(args.index)
+
+    build_and_check(
+        documents_path=docs_path,
+        index_path=index_path,
+        openai_key=openai_key,
+        require_table_chunks=args.require_table_chunks,
+        min_table_ratio=max(0.0, min(1.0, args.min_table_ratio)),
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
+        hybrid=not args.no_hybrid,
+        intelligent_routing=not args.no_intelligent_routing,
+    )
+
 
 if __name__ == "__main__":
     main()

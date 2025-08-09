@@ -2,9 +2,11 @@
   "tenant": "public",
   "species": "global",
   "chunks": 463,
+  "table_chunks": 9,
+  "table_ratio": 0.0194,
   "files": 23,
   "model": "all-MiniLM-L6-v2",
   "chunk_size": 1000,
   "overlap": 200,
-  "built_at": "2025-08-08 21:24:08"
+  "built_at": "2025-08-09 17:39:30"
 }

@@ -6,7 +6,6 @@ from typing import Iterable, List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Champs dont la clarification impacte fortement la précision
 CRITICAL_FIELDS = {"race", "sexe"}
 
 class ClarificationManager:
@@ -14,62 +13,22 @@ class ClarificationManager:
 
     def __init__(self, max_questions_per_round: int = 3) -> None:
         self.max_questions_per_round = max_questions_per_round
-
-        # Catalogue générique
         self._default_questions: Dict[str, str] = {
             "race": "Quelle est la race/génétique (Ross, Cobb, Hubbard, etc.) ?",
             "sexe": "Quel est le sexe du lot (mâles, femelles ou mixte) ?",
             "age_jours": "Quel est l’âge exact en jours ?",
             "type_aliment": "Starter, grower ou finisher ?",
             "pays": "Dans quel pays (ou label) s’applique la question ?",
-            "poids_moyen_g": "Quel est le poids moyen actuel (g/oiseau) ?",
-            "effectif": "Quel est l’effectif (nombre d’oiseaux) ?",
-            "temperature": "Quelle est la température ambiante (°C) ?",
         }
-
-        # Formulations spécifiques par intention (ciblage)
+        # Nouvelles formulations par intention (facultatif)
         self._by_intent: Dict[str, Dict[str, str]] = {
-            "weight": {
-                "age": "À quel âge (en jours) souhaites-tu la cible ?",
-                "sexe": "Lot mâles, femelles ou mixte ?",
-            },
+            "weight": {"age": "À quel âge (en jours) souhaites-tu la cible ?"},
             "fcr": {"age": "À quel âge (en jours) évalues-tu le FCR ?"},
-            "water_intake": {
-                "age": "Âge exact du lot (jours) ?",
-                "temperature": "Température ambiante (°C) ?",
-            },
+            "water_intake": {"age": "Âge exact du lot (jours) ?"},
             "nutrition_targets": {"type_aliment": "Starter, grower ou finisher ?"},
             "compliance": {"pays": "Quel pays/label (ex. Label Rouge France) ?"},
-            "iep": {
-                "age": "Âge du lot (jours) ?",
-                "poids_moyen_g": "Poids vif moyen (g/oiseau) ?",
-                "fcr": "Quel FCR observé ?",
-                "livability_pct": "Taux de survie à l’abattage (%) ?",
-            },
-            "costing": {
-                "fcr": "Quel FCR moyen ?",
-                "prix_aliment_tonne_eur": "Prix de l’aliment (€/t) ?",
-            },
-            "feeders": {
-                "age": "Âge (jours) ?",
-                "effectif": "Effectif (nombre d’oiseaux) ?",
-                "type": "Chaîne ou assiette (pan) ?",
-            },
-            "drinkers": {
-                "age": "Âge (jours) ?",
-                "effectif": "Effectif (nombre d’oiseaux) ?",
-                "type": "Nipple ou cloche ?",
-            },
-            "tunnel_airflow": {
-                "effectif": "Effectif (nombre d’oiseaux) ?",
-                "avg_weight_g": "Poids moyen (g) ?",
-                "deltaT_C": "ΔT souhaité entre extérieur et intérieur (°C) ?",
-            },
         }
 
-    # ------------------------------------------------------------------------------------
-    # PUBLIC
-    # ------------------------------------------------------------------------------------
     def generate(
         self,
         missing_fields: Iterable[str],
@@ -80,10 +39,7 @@ class ClarificationManager:
         fields = self._normalize_fields(missing_fields)
         if not fields:
             return []
-
-        # Prioriser race/sexe puis les champs propres à l’intention
         prioritized = self._prioritize(fields, CRITICAL_FIELDS)
-
         questions: List[str] = []
         for f in prioritized:
             q = self._question_for_field(f, language=language, intent=intent)
@@ -91,26 +47,19 @@ class ClarificationManager:
                 questions.append(q)
             if len(questions) >= self.max_questions_per_round:
                 break
-
         if not questions:
             questions = ["Pouvez-vous préciser quelques détails supplémentaires ?"]
-
         logger.debug("Clarification Qs (round=%s): %s", round_number, questions)
         return questions
 
-    # ------------------------------------------------------------------------------------
-    # INTERNALS
-    # ------------------------------------------------------------------------------------
+    # ---------------- INTERNALS ---------------- #
     def _normalize_fields(self, missing_fields: Iterable[str]) -> List[str]:
-        seen = set()
-        out: List[str] = []
+        seen = set(); out: List[str] = []
         for f in (missing_fields or []):
-            if not f:
-                continue
+            if not f: continue
             key = str(f).strip().lower()
             if key and key not in seen:
-                seen.add(key)
-                out.append(key)
+                seen.add(key); out.append(key)
         return out
 
     def _prioritize(self, fields: List[str], critical: set) -> List[str]:
@@ -119,21 +68,16 @@ class ClarificationManager:
         return crit + others
 
     def _question_for_field(self, field: str, language: Optional[str] = None, intent: Optional[str] = None) -> Optional[str]:
-        # Intent‑first
+        # intent-specific first
         if intent and intent in self._by_intent and field in self._by_intent[intent]:
             return self._by_intent[intent][field]
-
-        # Catalogue par défaut
+        # default catalogue
         if field in self._default_questions:
             return self._default_questions[field]
-
-        # Aliases courants
         if field in {"species", "production_type", "type_production"}:
-            return "S’agit‑il de poulets de chair, pondeuses, reproducteurs, etc. ?"
+            return "S’agit‑il de poulets de chair, pondeuses, reproducteurs, etc.?"
         if field in {"poids", "poids_cible"}:
             return "Quel est le poids cible souhaité (g) ?"
         if field in {"alimentation", "feed"}:
             return "Quel aliment est donné actuellement (type/protéine/énergie) ?"
-
-        # Fallback
         return f"Pouvez‑vous préciser « {field} » ?"

@@ -28,7 +28,7 @@ try:
         min_ventilation_m3h_per_kg,
     )
     from app.api.v1.utils.units import fmt_value_unit
-    from app.api.v1.pipeline.policy.safety_rules import requires_vet_redirect
+    from .policy.safety_rules import requires_vet_redirect
 except Exception:  # safe fallbacks if new modules not yet present
     def estimate_water_intake_l_per_1000(*args, **kwargs):
         return None, {}
