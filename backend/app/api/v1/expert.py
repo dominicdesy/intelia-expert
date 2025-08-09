@@ -98,15 +98,14 @@ def get_dialogue_manager() -> DialogueManager:
 
 def extract_answer_and_sources(result: Dict[str, Any]) -> tuple:
     """
-    ✅ CORRECTION: Syntaxe Python compatible
-    Extrait réponse et sources du résultat DialogueManager
+    ✅ CORRECTION: Extraction avec nettoyage format {'answer': '...'}
     """
     response_content = result.get("response", "")
     answer_text = ""
     sources = []
 
     if isinstance(response_content, dict):
-        # Format structuré
+        # Format structuré avec clé 'answer'
         answer_text = str(response_content.get("answer", "")).strip()
         raw_sources = response_content.get("sources", [])
         if isinstance(raw_sources, list):
@@ -119,6 +118,14 @@ def extract_answer_and_sources(result: Dict[str, Any]) -> tuple:
     else:
         # Format texte simple
         answer_text = str(response_content).strip()
+        
+        # ✅ CORRECTION: Nettoyer format {'answer': '...'} si présent
+        import re
+        match = re.match(r"^\{'answer':\s*\"(.+)\"\}$", answer_text, re.DOTALL)
+        if match:
+            answer_text = match.group(1)
+            # Nettoyer les caractères d'échappement
+            answer_text = answer_text.replace('\\"', '"').replace('\\n', '\n')
 
     return answer_text, sources
 

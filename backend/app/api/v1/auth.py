@@ -18,25 +18,19 @@ except ImportError:
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
-# ✅ CORRECTION: JWT configuration avec fallbacks robustes
-JWT_SECRET = os.getenv("JWT_SECRET")
-if not JWT_SECRET:
-    # Fallback 1: Utiliser Supabase JWT secret
-    JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+# ✅ CONFIGURATION JWT SUPABASE
+# Récupérer le JWT secret de Supabase depuis les variables d'environnement
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+if not SUPABASE_JWT_SECRET:
+    # Si pas de JWT secret spécifique, essayer la clé anon Supabase
+    SUPABASE_JWT_SECRET = os.getenv("SUPABASE_ANON_KEY")
     
-if not JWT_SECRET:
-    # Fallback 2: Utiliser Supabase anon key comme base
-    supabase_key = os.getenv("SUPABASE_ANON_KEY")
-    if supabase_key:
-        JWT_SECRET = f"fallback_{supabase_key[:32]}"
-        logger.warning("⚠️ Utilisation Supabase anon key comme JWT secret fallback")
-    
-if not JWT_SECRET:
-    # Fallback 3: Secret par défaut pour développement (UNIQUEMENT)
-    JWT_SECRET = "development-secret-change-in-production-12345"
-    logger.error("❌ Aucun JWT_SECRET configuré, utilisation secret de développement")
+if not SUPABASE_JWT_SECRET:
+    # Fallback pour développement
+    SUPABASE_JWT_SECRET = "development-secret-change-in-production-12345"
+    logger.error("❌ Aucun SUPABASE_JWT_SECRET configuré")
 
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_ALGORITHM = "HS256"  # Supabase utilise HS256
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 security = HTTPBearer()
@@ -45,7 +39,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    token = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    token = jwt.encode(to_encode, SUPABASE_JWT_SECRET, algorithm=JWT_ALGORITHM)
     return token
 
 class TokenResponse(BaseModel):
@@ -67,7 +61,7 @@ async def login(request: LoginRequest):
         raise HTTPException(status_code=500, detail="Authentication service unavailable")
 
     supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
     supabase: Client = create_client(supabase_url, supabase_key)
     try:
         result = supabase.auth.sign_in(email=request.email, password=request.password)
@@ -85,45 +79,110 @@ async def login(request: LoginRequest):
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
-    ✅ CORRECTION: Decode JWT avec gestion d'erreur améliorée
+    ✅ CORRECTION MAJEURE: Decode JWT tokens Supabase
     """
     token = credentials.credentials
     
-    # ✅ VÉRIFICATION: JWT_SECRET existe
-    if not JWT_SECRET:
-        logger.error("❌ JWT_SECRET non configuré")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="JWT configuration error")
+    if not token or not isinstance(token, str):
+        logger.warning("⚠️ Token vide ou invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
     
-    try:
-        # ✅ VÉRIFICATION: Token n'est pas vide
-        if not token or not isinstance(token, str):
-            logger.warning("⚠️ Token vide ou invalide")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
-        
-        # ✅ CORRECTION: Decode avec JWT_SECRET garanti non-None
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        
-        user_data = {
-            "user_id": payload.get("user_id") or payload.get("sub"),
-            "email": payload.get("email")
-        }
-        
-        # ✅ VÉRIFICATION: Données utilisateur valides
-        if not user_data.get("user_id"):
-            logger.warning("⚠️ Token sans user_id valide")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-        
-        return user_data
-        
-    except jwt.ExpiredSignatureError:
-        logger.warning("⚠️ Token expiré")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.InvalidTokenError:
-        logger.warning("⚠️ Token invalide")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    except Exception as e:
-        logger.error(f"❌ Erreur JWT inattendue: {e}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication error")
+    # ✅ STRATÉGIE MULTI-SECRET: Essayer plusieurs secrets dans l'ordre
+    secrets_to_try = []
+    
+    # 1. Secret JWT Supabase configuré
+    if SUPABASE_JWT_SECRET:
+        secrets_to_try.append(("SUPABASE_JWT_SECRET", SUPABASE_JWT_SECRET))
+    
+    # 2. Essayer avec la clé anon Supabase
+    supabase_anon = os.getenv("SUPABASE_ANON_KEY")
+    if supabase_anon and supabase_anon != SUPABASE_JWT_SECRET:
+        secrets_to_try.append(("SUPABASE_ANON_KEY", supabase_anon))
+    
+    # 3. Essayer avec d'autres secrets Supabase possibles
+    other_keys = [
+        ("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_SERVICE_KEY")),
+        ("SUPABASE_SECRET_KEY", os.getenv("SUPABASE_SECRET_KEY")),
+    ]
+    
+    for key_name, key_value in other_keys:
+        if key_value and key_value not in [s[1] for s in secrets_to_try]:
+            secrets_to_try.append((key_name, key_value))
+    
+    # ✅ ESSAYER CHAQUE SECRET
+    for secret_name, secret_value in secrets_to_try:
+        if not secret_value:
+            continue
+            
+        try:
+            logger.debug(f"🔑 Tentative décodage avec {secret_name}")
+            
+            # Décoder le token avec ce secret
+            payload = jwt.decode(
+                token, 
+                secret_value, 
+                algorithms=[JWT_ALGORITHM],
+                audience="authenticated"  # Supabase utilise cette audience
+            )
+            
+            logger.info(f"✅ Token décodé avec succès avec {secret_name}")
+            
+            # Extraire les informations utilisateur du payload Supabase
+            user_data = {
+                "user_id": payload.get("sub"),  # Supabase utilise 'sub' pour user_id
+                "email": payload.get("email"),
+                "iss": payload.get("iss"),  # Issuer pour vérification
+                "aud": payload.get("aud"),  # Audience
+                "exp": payload.get("exp"),  # Expiration
+                "jwt_secret_used": secret_name  # Pour debug
+            }
+            
+            # Vérification de base
+            if not user_data.get("user_id"):
+                logger.warning("⚠️ Token sans user_id (sub) valide")
+                continue
+                
+            if not user_data.get("email"):
+                logger.warning("⚠️ Token sans email valide")
+                continue
+            
+            # Vérifier que c'est bien un token Supabase
+            iss = payload.get("iss", "")
+            if "supabase" not in iss.lower():
+                logger.warning(f"⚠️ Token pas émis par Supabase: {iss}")
+                continue
+            
+            logger.info(f"✅ Utilisateur authentifié: {user_data['email']} (secret: {secret_name})")
+            return user_data
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"⚠️ Token expiré (testé avec {secret_name})")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+            
+        except jwt.InvalidAudienceError:
+            logger.debug(f"⚠️ Audience incorrecte avec {secret_name}")
+            continue
+            
+        except jwt.InvalidSignatureError:
+            logger.debug(f"⚠️ Signature invalide avec {secret_name}")
+            continue
+            
+        except jwt.InvalidTokenError as e:
+            logger.debug(f"⚠️ Token invalide avec {secret_name}: {e}")
+            continue
+            
+        except Exception as e:
+            logger.debug(f"⚠️ Erreur inattendue avec {secret_name}: {e}")
+            continue
+    
+    # Si aucun secret n'a fonctionné
+    logger.error("❌ Impossible de décoder le token avec tous les secrets disponibles")
+    logger.error(f"❌ Secrets essayés: {[s[0] for s in secrets_to_try]}")
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, 
+        detail="Invalid token - unable to verify signature"
+    )
 
 class DeleteDataResponse(BaseModel):
     success: bool
@@ -145,4 +204,22 @@ async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_us
         "message": "Demande de suppression enregistrée",
         "note": "Vos données seront supprimées sous 30 jours",
         "timestamp": datetime.utcnow()
+    }
+
+# ✅ ENDPOINT DE DEBUG
+@router.get("/debug/jwt-config")
+async def debug_jwt_config():
+    """Debug endpoint pour voir la configuration JWT"""
+    return {
+        "supabase_jwt_secret_configured": bool(SUPABASE_JWT_SECRET),
+        "supabase_anon_key_configured": bool(os.getenv("SUPABASE_ANON_KEY")),
+        "supabase_service_key_configured": bool(os.getenv("SUPABASE_SERVICE_KEY")),
+        "jwt_algorithm": JWT_ALGORITHM,
+        "secrets_available": [
+            name for name, value in [
+                ("SUPABASE_JWT_SECRET", os.getenv("SUPABASE_JWT_SECRET")),
+                ("SUPABASE_ANON_KEY", os.getenv("SUPABASE_ANON_KEY")),
+                ("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_SERVICE_KEY")),
+            ] if value
+        ]
     }
