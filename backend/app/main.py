@@ -1,4 +1,4 @@
-# app/main.py
+# app/main.py - VERSION 3 RAG COMPLETS
 from __future__ import annotations
 
 import os
@@ -22,16 +22,20 @@ logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 # -------------------------------------------------------------------
-# FONCTION RAG SIMPLIFIÉE
+# FONCTION RAG COMPLÈTE - 3 RAG
 # -------------------------------------------------------------------
 def get_rag_paths() -> Dict[str, str]:
-    """🎯 DIRECT: Seul le RAG Global existe selon les logs"""
+    """🎯 TOUS LES RAG : Global + Broiler + Layer"""
+    base_path = "/workspace/backend/rag_index"
+    
     return {
-        "global": "/workspace/backend/rag_index/global"
+        "global": f"{base_path}/global",
+        "broiler": f"{base_path}/broiler", 
+        "layer": f"{base_path}/layer"
     }
 
 # -------------------------------------------------------------------
-# Lifespan: init Supabase + RAG SIMPLIFIÉ
+# Lifespan: init Supabase + 3 RAG COMPLETS
 # -------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,32 +48,137 @@ async def lifespan(app: FastAPI):
             app.state.supabase = create_client(url, key)
             logger.info("✅ Supabase prêt")
         else:
-            logger.info("ℹ️ Supabase non configuré")
+            logger.info(ℹ️ Supabase non configuré")
     except Exception as e:
         logger.warning("ℹ️ Supabase indisponible: %s", e)
 
-    # RAG SIMPLE - UN SEUL RAG
+    # 🚀 CHARGEMENT DES 3 RAG
     app.state.rag = None
+    app.state.rag_broiler = None
+    app.state.rag_layer = None
+    
     try:
         from rag.embedder import FastRAGEmbedder
-        global_path = "/workspace/backend/rag_index/global"
         
-        logger.info(f"📁 Chargement RAG direct: {global_path}")
+        rag_paths = get_rag_paths()
+        logger.info(f"📁 Chargement des 3 RAG: {list(rag_paths.keys())}")
+        
+        # Variables d'environnement (override si définies)
+        env_override = {
+            "global": os.getenv("RAG_INDEX_GLOBAL"),
+            "broiler": os.getenv("RAG_INDEX_BROILER"), 
+            "layer": os.getenv("RAG_INDEX_LAYER"),
+        }
+        
+        # Appliquer les overrides ENV
+        for key, env_path in env_override.items():
+            if env_path and os.path.exists(env_path):
+                rag_paths[key] = env_path
+                logger.info(f"🔧 Override ENV pour {key}: {env_path}")
+
+        # 🚀 CHARGEMENT RAG GLOBAL (obligatoire)
+        global_path = rag_paths["global"]
+        logger.info(f"📁 Chargement RAG Global: {global_path}")
         
         if os.path.exists(global_path):
-            embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
-            if embedder.load_index(global_path) and embedder.has_search_engine():
-                app.state.rag = embedder
-                logger.info(f"✅ RAG chargé directement: {global_path}")
+            global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
+            if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
+                app.state.rag = global_embedder
+                
+                # Compter les documents
+                doc_count = "unknown"
+                try:
+                    if hasattr(global_embedder, 'get_document_count'):
+                        doc_count = global_embedder.get_document_count()
+                    elif hasattr(global_embedder, 'documents') and global_embedder.documents:
+                        doc_count = len(global_embedder.documents)
+                except Exception:
+                    pass
+                
+                logger.info(f"✅ RAG Global chargé: {global_path} ({doc_count} documents)")
             else:
-                logger.error(f"❌ Échec chargement RAG: {global_path}")
+                logger.error(f"❌ RAG Global: Échec chargement depuis {global_path}")
         else:
-            logger.error(f"❌ RAG inexistant: {global_path}")
-            
-    except Exception as e:
-        logger.error("❌ Erreur RAG: %s", e)
+            logger.error(f"❌ RAG Global: Chemin inexistant {global_path}")
 
-    yield  # --- shutdown: rien pour l'instant
+        # 🚀 CHARGEMENT RAG BROILER
+        broiler_path = rag_paths["broiler"]
+        logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
+        
+        if os.path.exists(broiler_path):
+            try:
+                broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
+                if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
+                    app.state.rag_broiler = broiler_embedder
+                    
+                    # Compter les documents
+                    doc_count = "unknown"
+                    try:
+                        if hasattr(broiler_embedder, 'get_document_count'):
+                            doc_count = broiler_embedder.get_document_count()
+                        elif hasattr(broiler_embedder, 'documents') and broiler_embedder.documents:
+                            doc_count = len(broiler_embedder.documents)
+                    except Exception:
+                        pass
+                    
+                    logger.info(f"✅ RAG Broiler chargé: {broiler_path} ({doc_count} documents)")
+                else:
+                    logger.warning(f"⚠️ RAG Broiler: Échec chargement depuis {broiler_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ RAG Broiler: Erreur {e}")
+        else:
+            logger.warning(f"⚠️ RAG Broiler: Chemin inexistant {broiler_path}")
+
+        # 🚀 CHARGEMENT RAG LAYER  
+        layer_path = rag_paths["layer"]
+        logger.info(f"📁 Chargement RAG Layer: {layer_path}")
+        
+        if os.path.exists(layer_path):
+            try:
+                layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
+                if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
+                    app.state.rag_layer = layer_embedder
+                    
+                    # Compter les documents
+                    doc_count = "unknown"
+                    try:
+                        if hasattr(layer_embedder, 'get_document_count'):
+                            doc_count = layer_embedder.get_document_count()
+                        elif hasattr(layer_embedder, 'documents') and layer_embedder.documents:
+                            doc_count = len(layer_embedder.documents)
+                    except Exception:
+                        pass
+                    
+                    logger.info(f"✅ RAG Layer chargé: {layer_path} ({doc_count} documents)")
+                else:
+                    logger.warning(f"⚠️ RAG Layer: Échec chargement depuis {layer_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ RAG Layer: Erreur {e}")
+        else:
+            logger.warning(f"⚠️ RAG Layer: Chemin inexistant {layer_path}")
+
+        # 📊 Résumé final des 3 RAG
+        total_rags = sum(1 for rag in [app.state.rag, app.state.rag_broiler, app.state.rag_layer] if rag)
+        
+        rag_summary = {
+            "global": "✅ Actif" if app.state.rag else "❌ CRITIQUE",
+            "broiler": "✅ Actif" if app.state.rag_broiler else "❌ Absent",
+            "layer": "✅ Actif" if app.state.rag_layer else "❌ Absent",
+            "total_loaded": total_rags
+        }
+        logger.info(f"📊 Status final des RAG: {rag_summary}")
+        
+        if total_rags == 3:
+            logger.info("🎉 PARFAIT: Les 3 RAG sont chargés (Global + Broiler + Layer)")
+        elif total_rags == 1:
+            logger.warning("⚠️ Seulement 1 RAG chargé - potentiel gâché")
+        else:
+            logger.warning(f"⚠️ Seulement {total_rags}/3 RAG chargés")
+
+    except Exception as e:
+        logger.error("❌ Erreur critique initialisation RAG: %s", e)
+
+    yield  # --- shutdown
 
 # -------------------------------------------------------------------
 # FastAPI
@@ -88,7 +197,6 @@ app = FastAPI(
 # CORS MIDDLEWARE
 # =============================================================================
 
-# Middleware pour forcer les headers CORS sur TOUTES les réponses
 @app.middleware("http")
 async def cors_handler(request: Request, call_next):
     response = await call_next(request)
@@ -110,7 +218,6 @@ async def cors_handler(request: Request, call_next):
     
     return response
 
-# Middleware CORS FastAPI (backup)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -125,15 +232,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =============================================================================
-# Gestionnaire OPTIONS global
-# =============================================================================
-
 @app.options("/{full_path:path}")
 async def options_handler(request: Request, full_path: str):
-    """Gestionnaire OPTIONS global pour toutes les routes"""
     origin = request.headers.get("Origin")
-    
     allowed_origins = [
         "https://expert.intelia.com",
         "https://expert-app-cngws.ondigitalocean.app",
@@ -166,7 +267,6 @@ def _mount(module_path: str, prefix: str, tag: str):
     except Exception as e:
         logger.warning("⚠️ %s non monté: %s", module_path, e)
 
-# Montage des routers
 _mount("app.api.v1.system",       "/v1",         "System")
 _mount("app.api.v1.auth",         "/v1",         "Auth")
 _mount("app.api.v1.admin",        "/v1",         "Admin")
@@ -176,11 +276,11 @@ _mount("app.api.v1.logging",      "/v1",         "Logging")
 _mount("app.api.v1.expert",       "/v1/expert",  "Expert")
 
 # -------------------------------------------------------------------
-# Debug RAG (simplifié)
+# Debug RAG - 3 RAG COMPLETS
 # -------------------------------------------------------------------
 @app.get("/rag/debug", tags=["Debug"])
 async def rag_debug():
-    """🔍 Debug RAG simplifié"""
+    """🔍 Debug des 3 RAG (Global + Broiler + Layer)"""
     
     rag_paths = get_rag_paths()
     
@@ -190,7 +290,7 @@ async def rag_debug():
         "RAG_INDEX_LAYER": os.getenv("RAG_INDEX_LAYER"),
     }
     
-    # Vérification du chemin unique
+    # Vérification des 3 chemins
     path_status = {}
     for name, path in rag_paths.items():
         try:
@@ -203,7 +303,11 @@ async def rag_debug():
                 "exists": exists,
                 "is_directory": is_dir,
                 "files_found": len(files),
-                "sample_files": files[:3]
+                "sample_files": files[:3],
+                "has_faiss": "index.faiss" in files,
+                "has_pkl": "index.pkl" in files,
+                "has_meta": "meta.json" in files,
+                "complete": exists and "index.faiss" in files and "index.pkl" in files
             }
         except Exception as e:
             path_status[name] = {
@@ -212,41 +316,55 @@ async def rag_debug():
                 "error": str(e)
             }
     
-    # Status de l'instance RAG
-    rag_instance = getattr(app.state, "rag", None)
-    instance_status = {
-        "loaded": rag_instance is not None,
-        "functional": False,
-        "documents": 0
-    }
+    # Status des 3 instances RAG
+    instances_status = {}
+    for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
+        embedder = getattr(app.state, attr, None)
+        instance_info = {
+            "loaded": embedder is not None,
+            "functional": False,
+            "documents": 0
+        }
+        
+        if embedder:
+            try:
+                instance_info["functional"] = embedder.has_search_engine()
+                if hasattr(embedder, 'get_document_count'):
+                    instance_info["documents"] = embedder.get_document_count()
+                elif hasattr(embedder, 'documents') and embedder.documents:
+                    instance_info["documents"] = len(embedder.documents)
+            except Exception as e:
+                instance_info["error"] = str(e)
+        
+        instances_status[name] = instance_info
     
-    if rag_instance:
-        try:
-            instance_status["functional"] = rag_instance.has_search_engine()
-            if hasattr(rag_instance, 'get_document_count'):
-                instance_status["documents"] = rag_instance.get_document_count()
-            elif hasattr(rag_instance, 'documents') and rag_instance.documents:
-                instance_status["documents"] = len(rag_instance.documents)
-        except Exception as e:
-            instance_status["error"] = str(e)
+    # Calculs totaux
+    total_available = sum(1 for info in path_status.values() if info.get("complete", False))
+    total_loaded = sum(1 for info in instances_status.values() if info.get("functional", False))
+    total_documents = sum(info.get("documents", 0) for info in instances_status.values() if isinstance(info.get("documents"), int))
     
     return {
-        "approach": "single_rag_direct",
+        "approach": "three_rag_system",
         "environment_variables": env_vars,
-        "rag_path": rag_paths,
+        "rag_paths": rag_paths,
         "path_verification": path_status,
-        "rag_instance": instance_status,
+        "rag_instances": instances_status,
+        "summary": {
+            "total_available_on_disk": total_available,
+            "total_loaded_in_memory": total_loaded,
+            "total_documents": total_documents,
+            "performance": "optimal" if total_loaded == 3 else "suboptimal"
+        },
         "optimization": {
-            "fallbacks_eliminated": True,
+            "all_three_rags_enabled": True,
             "direct_loading": True,
-            "failed_attempts": 0,
-            "performance": "optimal"
+            "failed_attempts": 0
         }
     }
 
 @app.get("/rag/test", tags=["Debug"])
 async def test_rag_access():
-    """🧪 Test complet d'accès au RAG unique"""
+    """🧪 Test complet des 3 RAG"""
     
     results = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -254,172 +372,122 @@ async def test_rag_access():
         "summary": {}
     }
     
-    # Test filesystem
-    base_path = "/workspace/backend/rag_index"
+    rag_paths = get_rag_paths()
+    
+    # Test filesystem pour les 3 RAG
     filesystem_test = {
-        "base_path": base_path,
-        "base_exists": os.path.exists(base_path),
-        "global_rag": {}
+        "base_path": "/workspace/backend/rag_index",
+        "base_exists": os.path.exists("/workspace/backend/rag_index"),
+        "rags": {}
     }
     
-    global_path = f"{base_path}/global"
-    global_info = {
-        "path": global_path,
-        "exists": os.path.exists(global_path),
-        "is_directory": os.path.isdir(global_path) if os.path.exists(global_path) else False,
-        "files": [],
-        "file_sizes": {}
-    }
+    for rag_type, rag_path in rag_paths.items():
+        rag_info = {
+            "path": rag_path,
+            "exists": os.path.exists(rag_path),
+            "is_directory": os.path.isdir(rag_path) if os.path.exists(rag_path) else False,
+            "files": [],
+            "file_sizes": {}
+        }
+        
+        if rag_info["exists"] and rag_info["is_directory"]:
+            try:
+                files = os.listdir(rag_path)
+                rag_info["files"] = sorted(files)
+                rag_info["has_faiss"] = "index.faiss" in files
+                rag_info["has_pkl"] = "index.pkl" in files
+                rag_info["has_meta"] = "meta.json" in files
+                rag_info["complete"] = rag_info["has_faiss"] and rag_info["has_pkl"]
+                
+                for file in files:
+                    try:
+                        file_path = os.path.join(rag_path, file)
+                        size = os.path.getsize(file_path)
+                        rag_info["file_sizes"][file] = f"{size / 1024 / 1024:.2f} MB"
+                    except Exception:
+                        rag_info["file_sizes"][file] = "unknown"
+                        
+            except Exception as e:
+                rag_info["error"] = str(e)
+        
+        filesystem_test["rags"][rag_type] = rag_info
     
-    if global_info["exists"] and global_info["is_directory"]:
-        try:
-            files = os.listdir(global_path)
-            global_info["files"] = sorted(files)
-            global_info["has_faiss"] = "index.faiss" in files
-            global_info["has_pkl"] = "index.pkl" in files
-            global_info["complete"] = global_info["has_faiss"] and global_info["has_pkl"]
-            
-            for file in files:
-                try:
-                    file_path = os.path.join(global_path, file)
-                    size = os.path.getsize(file_path)
-                    global_info["file_sizes"][file] = f"{size / 1024 / 1024:.2f} MB"
-                except Exception:
-                    global_info["file_sizes"][file] = "unknown"
-                    
-        except Exception as e:
-            global_info["error"] = str(e)
-    
-    filesystem_test["global_rag"] = global_info
     results["tests"]["filesystem"] = filesystem_test
     
-    # Test de chargement
-    loading_test = {
-        "attempted": False,
-        "success": False,
-        "has_search_engine": False,
-        "document_count": 0,
-        "error": None
-    }
-    
-    if os.path.exists(global_path):
-        try:
-            loading_test["attempted"] = True
-            from rag.embedder import FastRAGEmbedder
-            
-            test_embedder = FastRAGEmbedder(debug=False, cache_embeddings=False, max_workers=1)
-            
-            if test_embedder.load_index(global_path):
-                loading_test["success"] = True
-                loading_test["has_search_engine"] = test_embedder.has_search_engine()
+    # Test des instances actuelles
+    current_instances = {}
+    for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
+        embedder = getattr(app.state, attr, None)
+        instance_info = {
+            "exists": embedder is not None,
+            "functional": False,
+            "document_count": 0,
+            "search_ready": False
+        }
+        
+        if embedder:
+            try:
+                instance_info["functional"] = True
+                instance_info["search_ready"] = embedder.has_search_engine()
                 
-                try:
-                    if hasattr(test_embedder, 'get_document_count'):
-                        loading_test["document_count"] = test_embedder.get_document_count()
-                    elif hasattr(test_embedder, 'documents') and test_embedder.documents:
-                        loading_test["document_count"] = len(test_embedder.documents)
-                except Exception:
-                    loading_test["document_count"] = "unknown"
-            
-        except Exception as e:
-            loading_test["error"] = str(e)
+                if hasattr(embedder, 'get_document_count'):
+                    instance_info["document_count"] = embedder.get_document_count()
+                elif hasattr(embedder, 'documents') and embedder.documents:
+                    instance_info["document_count"] = len(embedder.documents)
+                    
+            except Exception as e:
+                instance_info["error"] = str(e)
+        
+        current_instances[name] = instance_info
     
-    results["tests"]["loading"] = loading_test
-    
-    # Test instance actuelle
-    current_instance = {
-        "exists": app.state.rag is not None,
-        "functional": False,
-        "document_count": 0,
-        "search_ready": False
-    }
-    
-    if app.state.rag:
-        try:
-            current_instance["functional"] = True
-            current_instance["search_ready"] = app.state.rag.has_search_engine()
-            
-            if hasattr(app.state.rag, 'get_document_count'):
-                current_instance["document_count"] = app.state.rag.get_document_count()
-            elif hasattr(app.state.rag, 'documents') and app.state.rag.documents:
-                current_instance["document_count"] = len(app.state.rag.documents)
-                
-        except Exception as e:
-            current_instance["error"] = str(e)
-    
-    results["tests"]["current_instance"] = current_instance
-    
-    # Test de recherche
-    search_test = {}
-    if app.state.rag:
-        try:
-            test_query = "broiler chicken weight"
-            search_results = app.state.rag.search(test_query, k=3)
-            
-            search_test = {
-                "query": test_query,
-                "results_count": len(search_results) if search_results else 0,
-                "success": len(search_results) > 0 if search_results else False,
-                "sample_scores": [r.get('score', 0) for r in search_results[:3]] if search_results else []
-            }
-        except Exception as e:
-            search_test = {
-                "query": test_query,
-                "error": str(e),
-                "success": False
-            }
-    
-    results["tests"]["search"] = search_test
+    results["tests"]["current_instances"] = current_instances
     
     # Résumé
-    rag_available = global_info.get("complete", False)
-    rag_loaded = current_instance.get("functional", False)
+    available_rags = sum(1 for info in filesystem_test["rags"].values() if info.get("complete", False))
+    loaded_rags = sum(1 for info in current_instances.values() if info.get("functional", False))
+    total_documents = sum(info.get("document_count", 0) for info in current_instances.values() if isinstance(info.get("document_count"), int))
     
     results["summary"] = {
-        "rag_available_on_disk": rag_available,
-        "rag_loaded_in_memory": rag_loaded,
-        "search_functional": current_instance.get("search_ready", False),
+        "available_on_disk": available_rags,
+        "loaded_in_memory": loaded_rags,
+        "total_documents": total_documents,
+        "functional_rags": [name for name, info in current_instances.items() if info.get("search_ready", False)],
+        "missing_rags": [name for name, info in filesystem_test["rags"].items() if not info.get("complete", False)],
         "recommendations": []
     }
     
-    if rag_available and rag_loaded:
-        results["summary"]["recommendations"].append("✅ Configuration parfaite: RAG disponible et fonctionnel")
-    elif rag_available and not rag_loaded:
-        results["summary"]["recommendations"].append("⚠️ RAG disponible sur disque mais non chargé")
-    elif not rag_available:
-        results["summary"]["recommendations"].append("❌ RAG non trouvé sur le disque")
-        
-    if not search_test.get("success", False):
-        results["summary"]["recommendations"].append("❌ Test de recherche échoué")
+    if available_rags == 3 and loaded_rags == 3:
+        results["summary"]["recommendations"].append("🎉 PARFAIT: Les 3 RAG sont disponibles et chargés!")
+    elif available_rags == 3 and loaded_rags < 3:
+        results["summary"]["recommendations"].append(f"⚠️ 3 RAG disponibles mais seulement {loaded_rags} chargé(s)")
+    elif available_rags < 3:
+        results["summary"]["recommendations"].append(f"❌ Seulement {available_rags}/3 RAG trouvés sur le disque")
     
     return results
 
-# =============================================================================
-# Endpoint de test CORS
-# =============================================================================
-
 @app.get("/cors-test", tags=["Debug"])
 async def cors_test(request: Request):
-    """Endpoint pour tester CORS"""
     return {
         "message": "CORS test successful",
         "origin": request.headers.get("Origin"),
-        "user_agent": request.headers.get("User-Agent"),
         "timestamp": datetime.utcnow().isoformat(),
-        "headers_received": dict(request.headers)
     }
 
-# -------------------------------------------------------------------
-# Root + error handlers
-# -------------------------------------------------------------------
 @app.get("/", tags=["Root"])
 async def root():
     def rag_status() -> str:
-        rag = getattr(app.state, "rag", None)
-        try:
-            return "optimized" if (rag and rag.has_search_engine()) else "fallback"
-        except Exception:
-            return "fallback"
+        total_rags = sum(1 for rag in [
+            getattr(app.state, "rag", None),
+            getattr(app.state, "rag_broiler", None), 
+            getattr(app.state, "rag_layer", None)
+        ] if rag and hasattr(rag, 'has_search_engine') and rag.has_search_engine())
+        
+        if total_rags == 3:
+            return "optimal_3_rags"
+        elif total_rags == 1:
+            return "suboptimal_1_rag"
+        else:
+            return f"partial_{total_rags}_rags"
 
     return {
         "status": "running",
@@ -428,10 +496,10 @@ async def root():
         "database": bool(getattr(app.state, "supabase", None)),
         "rag": rag_status(),
         "cors_fix": "applied",
-        "optimization": "single_rag_direct_loading"
+        "optimization": "three_rag_system_enabled"
     }
 
-# Exception handlers avec CORS
+# Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     response = JSONResponse(
@@ -482,9 +550,6 @@ async def generic_exc_handler(request: Request, exc: Exception):
     
     return response
 
-# -------------------------------------------------------------------
-# Local dev entry
-# -------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=os.getenv("HOST", "0.0.0.0"), port=int(os.getenv("PORT", "8000")))
