@@ -1,17 +1,12 @@
 # app/api/v1/pipeline/rag_engine.py
 """
-RAGEngine - Multi-index species routing (broiler/layer/global) + tenant-aware
+RAGEngine - Multi-index species routing (broiler/layer/global) + tenant-aware + UI style hints
 - Charge 3 index séparés: <RAG_INDEX_ROOT>/<tenant>/<species> (ou <RAG_INDEX_ROOT>/<species> sans tenant)
 - Détecte l'espèce à partir du contexte/question
 - Sélectionne l'index correspondant; fallback vers 'global' si doute
 - Option de mix (espèce + global) si rappel faible
 - Fallback OpenAI si aucun doc
-
-Extensions:
-- style: "minimal" | "standard" | "detailed"
-- output_format: "auto" | "bullets"  (force la réponse en puces)
-- weight_only: True pour ne parler QUE du poids (pas d'autres sujets)
-- 🔎 debug: logs détaillés des décisions & tailles de contenu
+- Prend en compte context["ui_style"] pour forcer un rendu (bullets/minimal/weight_only)
 """
 
 from __future__ import annotations
@@ -33,14 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class _IndexClient:
-    """Petit wrapper qui charge un index FAISS à un chemin donné et expose .search(query, k)."""
+    """Wrapper petit mais robuste: charge un index FAISS, expose .search(query, k)."""
 
     def __init__(self, index_path: str, model_name: str, sim_threshold: float, normalize_queries: bool, debug: bool):
         self.index_path = index_path
         self.embedder: Optional[FastRAGEmbedder] = None
         self.ok = False
 
-        # Crée un embedder optimisé si dispo; sinon fallback constructeur direct
         if create_optimized_embedder is not None:
             self.embedder = create_optimized_embedder(
                 model_name=model_name,
@@ -48,7 +42,6 @@ class _IndexClient:
                 normalize_queries=normalize_queries,
                 debug=debug,
             )
-            logger.debug("🔧 Embedder=create_optimized | model=%s | thr=%.3f | norm=%s", model_name, sim_threshold, normalize_queries)
         elif FastRAGEmbedder is not None:
             self.embedder = FastRAGEmbedder(
                 api_key=os.getenv("OPENAI_API_KEY"),
@@ -59,10 +52,9 @@ class _IndexClient:
                 similarity_threshold=sim_threshold,
                 normalize_queries=normalize_queries,
             )
-            logger.debug("🔧 Embedder=FastRAGEmbedder | model=%s | thr=%.3f | norm=%s", model_name, sim_threshold, normalize_queries)
 
         if self.embedder is None:
-            logger.error("❌ No embedder available.")
+            logger.error("No embedder available.")
             return
 
         try:
@@ -70,21 +62,18 @@ class _IndexClient:
             if self.ok:
                 logger.info("📦 Loaded index: %s", index_path)
             else:
-                logger.warning("⚠️ Failed to load index: %s", index_path)
+                logger.warning("Failed to load index: %s", index_path)
         except Exception as e:
-            logger.error("❌ Error loading index %s: %s", index_path, e)
+            logger.error("Error loading index %s: %s", index_path, e)
             self.ok = False
 
     def search(self, query: str, k: int) -> List[Dict[str, Any]]:
         if not self.ok or self.embedder is None:
-            logger.debug("🔎 Search skipped (index not ok) | path=%s", self.index_path)
             return []
         try:
-            res = self.embedder.search(query, k=k)
-            logger.debug("🔎 Search ok | path=%s | k=%d | hits=%d", self.index_path, k, len(res or []))
-            return res
+            return self.embedder.search(query, k=k)
         except Exception as e:
-            logger.error("❌ Search error on %s: %s", self.index_path, e)
+            logger.error("Search error on %s: %s", self.index_path, e)
             return []
 
 
@@ -99,38 +88,30 @@ class RAGEngine:
         self.index_root = Path(os.getenv("RAG_INDEX_ROOT", "rag_index"))
         self.mix_with_global = True  # mélange 70/30 si peu de résultats
         self.mix_min_docs = max(2, self.k // 3)
-        logger.debug(
-            "🧩 RAGEngine init | k=%d | embed_model=%s | thr=%.2f | index_root=%s | mix=%s",
-            self.k, self.model_name, self.sim_threshold, self.index_root, self.mix_with_global
-        )
+
+        # Statut interne (pour /system/status)
+        self._ready = True
 
     # ------------------ Species detection ------------------ #
     def _infer_species(self, question: str, context: Optional[Dict[str, Any]]) -> Optional[str]:
         ctx = context or {}
-        sp = (ctx.get("species") or ctx.get("espece") or "").lower()
+        sp = (ctx.get("species") or ctx.get("espece") or ctx.get("production_type") or "").lower()
         if any(x in sp for x in ["broiler", "chair"]):
-            logger.debug("🔮 infer_species via context.species=%s → broiler", sp)
             return "broiler"
         if any(x in sp for x in ["layer", "pondeuse"]):
-            logger.debug("🔮 infer_species via context.species=%s → layer", sp)
             return "layer"
 
         breed = (ctx.get("breed") or ctx.get("race") or "").lower()
-        if any(x in breed for x in ["ross", "cobb", "hubbard", "broiler"]):
-            logger.debug("🔮 infer_species via context.breed=%s → broiler", breed)
+        if any(x in breed for x in ["ross", "cobb", "hubbard", "broiler", "308", "500"]):
             return "broiler"
         if any(x in breed for x in ["lohmann", "hy-line", "w36", "w-36", "w80", "w-80", "layer"]):
-            logger.debug("🔮 infer_species via context.breed=%s → layer", breed)
             return "layer"
 
         q = (question or "").lower()
         if any(x in q for x in ["pondeuse", "layer", "lohmann", "hy-line", "ponte", "w36", "w80"]):
-            logger.debug("🔮 infer_species via question → layer")
             return "layer"
         if any(x in q for x in ["broiler", "poulet de chair", "ross 308", "cobb 500"]):
-            logger.debug("🔮 infer_species via question → broiler")
             return "broiler"
-        logger.debug("🔮 infer_species → None (default to global)")
         return None
 
     # ------------------ Index selection ------------------ #
@@ -146,7 +127,6 @@ class RAGEngine:
 
     def _load_index_client(self, species: str, tenant: Optional[str]) -> _IndexClient:
         idx_path = self._index_path(species, tenant)
-        logger.debug("📁 Load index client | species=%s | tenant=%s | path=%s", species, tenant, idx_path)
         return _IndexClient(
             index_path=str(idx_path),
             model_name=self.model_name,
@@ -157,11 +137,8 @@ class RAGEngine:
 
     # ------------------ Retrieval ------------------ #
     def _retrieve_from_species(self, question: str, tenant: Optional[str], species: str, k: int) -> List[Dict[str, Any]]:
-        logger.debug("🔎 Retrieve | species=%s | tenant=%s | k=%d", species, tenant, k)
         client = self._load_index_client(species, tenant)
-        hits = client.search(question, k) if client.ok else []
-        logger.info("🔎 Retrieved | species=%s | hits=%d", species, len(hits or []))
-        return hits
+        return client.search(question, k) if client.ok else []
 
     def _as_docs(self, hits: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         docs: List[Dict[str, str]] = []
@@ -170,26 +147,17 @@ class RAGEngine:
             src = md.get("file_path") or md.get("source") or md.get("path") or md.get("filename") or "unknown_source"
             text = (h.get("text") or "").strip()
             docs.append({"content": text, "source": str(src)})
-        logger.debug("📄 as_docs | in=%d | out=%d", len(hits or []), len(docs))
         return docs
 
     # ------------------ Public API ------------------ #
-    def generate_answer(
-        self,
-        question: str,
-        context: Optional[Dict[str, Any]] = None,
-        *,
-        style: str = "standard",
-        output_format: str = "auto",   # "bullets" | "auto"
-        weight_only: bool = False      # focus exclusif sur le poids
-    ) -> Dict[str, Any]:
-        """
-        style: "minimal" (2–3 phrases), "standard" (3–5 phrases), "detailed" (libre).
-        """
-        logger.info(
-            "▶️ RAG.generate_answer | style=%s | format=%s | weight_only=%s | Q.len=%d",
-            style, output_format, weight_only, len(question or "")
-        )
+    def generate_answer(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        ui = (context or {}).get("ui_style") or {}
+        style = str(ui.get("style") or "standard")
+        fmt = str(ui.get("format") or "auto")
+        weight_only = bool(ui.get("weight_only") or False)
+
+        logger.info("▶️ RAG.generate_answer | style=%s | format=%s | weight_only=%s | Q.len=%s",
+                    style, fmt, weight_only, len(question or ""))
 
         tenant = self._tenant_from_context(context)
         species = self._infer_species(question, context)  # may be None
@@ -199,115 +167,102 @@ class RAGEngine:
         # 1) Try primary index
         primary_hits = self._retrieve_from_species(question, tenant, primary, self.k)
         docs = self._as_docs(primary_hits)
-        logger.debug("📊 Primary docs=%d", len(docs))
+        if primary != "global":
+            logger.info("🔎 Retrieved | species=%s | hits=%s", primary, len(primary_hits))
 
         # 2) Optional mix with global if weak
         if self.mix_with_global and primary != "global" and len(docs) < self.mix_min_docs:
-            logger.info("➕ Mix with global (weak primary: %d < %d)", len(docs), self.mix_min_docs)
             global_hits = self._retrieve_from_species(question, tenant, "global", max(2, self.k // 2))
             docs = (docs or []) + self._as_docs(global_hits)
-            logger.debug("📊 After mix docs=%d", len(docs))
 
-        # 3) If still empty, try pure global as hard fallback
+        # 3) Hard fallback to global if still empty
         if not docs and primary != "global":
-            logger.info("🔁 Hard fallback → global only")
             global_hits2 = self._retrieve_from_species(question, tenant, "global", self.k)
             docs = self._as_docs(global_hits2)
-            logger.debug("📊 Global fallback docs=%d", len(docs))
 
-        # 4) If no docs at all -> OpenAI fallback
+        # 4) If no docs at all -> OpenAI fallback (général)
         if not docs:
-            logger.warning("📭 No documents found → OpenAI fallback")
-            return self._openai_fallback(
-                question, context, style=style, output_format=output_format, weight_only=weight_only
-            )
+            return self._openai_fallback(question, context, style=style, fmt=fmt, weight_only=weight_only)
 
-        # 5) RAG prompt (style/format/focus)
-        prompt = self._build_rag_prompt(
-            question, context, docs, style=style, output_format=output_format, weight_only=weight_only
-        )
-        logger.debug("✍️ RAG prompt | chars=%d | docs=%d", len(prompt or ""), len(docs))
-
+        # 5) RAG prompt
+        prompt = self._build_rag_prompt(question, context, docs, style=style, fmt=fmt, weight_only=weight_only)
         try:
             resp = safe_chat_completion(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=1100 if style == "minimal" else 1300,  # ↑ éviter les réponses tronquées
+                max_tokens=900 if style != "minimal" else 500,
             )
             content = (resp.choices[0].message.content or "").strip()
-            citations = self._build_citations(docs)
-            logger.info("✅ OpenAI RAG ok | content_len=%d | cites=%d", len(content or ""), len(citations or []))
-            return {
+            if not content:
+                content = "Aucune réponse exploitable n’a été générée à partir des documents — veuillez reformuler."
+
+            out = {
                 "response": content,
                 "source": "rag_enhanced",
-                "sources": citations,          # normalisé pour DialogueManager
                 "documents_used": len(docs),
                 "warning": None,
-                "citations": citations,
+                # on expose aussi "sources" pour l’API — mêmes infos que citations
+                "sources": self._build_citations(docs),
+                "citations": self._build_citations(docs),
             }
+            logger.info("✅ OpenAI RAG ok | content_len=%s | cites=%s", len(content), len(out["citations"]))
+            return out
         except Exception as e:
-            logger.error("❌ OpenAI error on RAG: %s", e)
-            citations = self._build_citations(docs)
+            logger.error("OpenAI error on RAG: %s", e)
             return {
                 "response": f"Documents trouvés ({len(docs)}) mais erreur de génération. Réessayez plus tard.",
                 "source": "rag_error",
-                "sources": citations,
                 "documents_used": len(docs),
                 "warning": f"Erreur traitement RAG: {e}",
-                "citations": citations,
+                "sources": self._build_citations(docs),
+                "citations": self._build_citations(docs),
             }
 
     # ------------------ Fallback & prompts ------------------ #
-    def _openai_fallback(
-        self,
-        question: str,
-        context: Optional[Dict[str, Any]],
-        *,
-        style: str = "standard",
-        output_format: str = "auto",
-        weight_only: bool = False
-    ) -> Dict[str, Any]:
-        prompt = self._build_fallback_prompt(
-            question, context, style=style, output_format=output_format, weight_only=weight_only
-        )
-        logger.debug("✍️ Fallback prompt | chars=%d", len(prompt or ""))
+    def _openai_fallback(self, question: str, context: Optional[Dict[str, Any]],
+                         style: str = "standard", fmt: str = "auto", weight_only: bool = False) -> Dict[str, Any]:
+        prompt = self._build_fallback_prompt(question, context, style=style, fmt=fmt, weight_only=weight_only)
         try:
             resp = safe_chat_completion(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=900 if style == "minimal" else 1100,  # ↑ marge de sécurité
+                max_tokens=700 if style != "minimal" else 400,
             )
             content = (resp.choices[0].message.content or "").strip()
-            logger.info("✅ OpenAI fallback ok | content_len=%d", len(content or ""))
-            return {
+            if not content:
+                content = "Réponse générale (sans source) indisponible pour le moment. Peux-tu préciser la lignée et l’âge ?"
+            out = {
                 "response": content,
                 "source": "openai_fallback",
-                "sources": [],
                 "documents_used": 0,
                 "warning": "Réponse générale : aucun document spécialisé pertinent n'a été trouvé.",
+                "sources": [],
                 "citations": [],
             }
+            logger.info("✅ OpenAI fallback ok | content_len=%s", len(content))
+            return out
         except Exception as e:
-            logger.error("❌ OpenAI fallback error: %s", e)
+            logger.error("OpenAI fallback error: %s", e)
             return {
                 "response": "Je rencontre un problème technique pour répondre. Veuillez réessayer.",
                 "source": "error_fallback",
-                "sources": [],
                 "documents_used": 0,
                 "warning": f"Erreur technique: {e}",
+                "sources": [],
                 "citations": [],
             }
 
+    # ------------------ Prompt builders ------------------ #
     def _build_rag_prompt(
         self,
         question: str,
         context: Optional[Dict[str, Any]],
         docs: List[Dict[str, str]],
         style: str = "standard",
-        output_format: str = "auto",
-        weight_only: bool = False
+        fmt: str = "auto",
+        weight_only: bool = False,
     ) -> str:
         doc_lines: List[str] = []
         for i, d in enumerate(docs, 1):
@@ -317,23 +272,13 @@ class RAGEngine:
             source = d.get("source") or "unknown_source"
             doc_lines.append(f"[Doc {i} | {source}]\n{content}")
         docs_block = "\n\n".join(doc_lines)
+
+        # Consigne de forme
+        form = self._format_preamble(style=style, fmt=fmt, weight_only=weight_only, context=context)
+
         missing_info = self._identify_missing_context(context)
 
-        style_instruction = {
-            "minimal": "Donne une réponse courte (2–3 phrases max), sans titres ni listes, avec une estimation chiffrée si possible. Évite les détails accessoires.",
-            "standard": "Donne une réponse compacte (3–5 phrases), claire, sans titres ni listes. Fournis des fourchettes chiffrées et précise les hypothèses si nécessaire.",
-            "detailed": "Tu peux utiliser des sous-titres et listes si utile et détailler davantage le contexte et les recommandations.",
-        }.get(style, "")
-
-        focus_instruction = (
-            "CONCENTRE-TOI EXCLUSIVEMENT sur le poids visé à l’âge demandé. "
-            "NE PARLE PAS d’autres sujets (température, éclairage, alimentation, biosécurité, etc.). "
-        ) if weight_only else ""
-        format_instruction = (
-            "Formate la réponse en puces (3 puces max), sans titres ni paragraphes."
-        ) if output_format == "bullets" else "Ne crée pas de titres."
-
-        prompt = f"""Tu es un expert avicole (broilers & pondeuses). Utilise en priorité les extraits fournis.
+        return f"""Tu es un expert avicole (broilers & pondeuses). Utilise en priorité les extraits fournis.
 
 QUESTION
 {question}
@@ -344,42 +289,30 @@ CONTEXTE DISPONIBLE
 DOCUMENTS SPÉCIALISÉS
 {docs_block}
 
-CONSIGNE
+CONSIGNE DE FOND
 1) Appuie-toi d'abord sur les documents ci-dessus.
 2) Si une info manque, complète prudemment par les bonnes pratiques reconnues et indique clairement ce qui vient des docs.
-3) {focus_instruction}{style_instruction}
-4) {format_instruction}
-5) Mentionne les hypothèses si nécessaire et donne une fourchette chiffrée si possible.
+3) Sois clair, précis, opérationnel. Mentionne les hypothèses si nécessaire.
 
 {missing_info}
 
+CONSIGNE DE FORME
+{form}
+
 Réponds en français.
 """
-        return prompt
 
     def _build_fallback_prompt(
         self,
         question: str,
         context: Optional[Dict[str, Any]],
-        *,
         style: str = "standard",
-        output_format: str = "auto",
-        weight_only: bool = False
+        fmt: str = "auto",
+        weight_only: bool = False,
     ) -> str:
+        form = self._format_preamble(style=style, fmt=fmt, weight_only=weight_only, context=context)
         missing_info = self._identify_missing_context(context)
-        style_instruction = {
-            "minimal": "Réponds en 2–3 phrases max, sans titres, avec une fourchette chiffrée si possible.",
-            "standard": "Réponds en 3–5 phrases, sans titres, de manière claire et opérationnelle.",
-            "detailed": "Réponds de manière détaillée, avec explications et contexte si utile.",
-        }.get(style, "")
-        focus_instruction = (
-            "CONCENTRE-TOI EXCLUSIVEMENT sur le poids visé à l’âge demandé. "
-            "NE PARLE PAS d’autres sujets (température, éclairage, alimentation, biosécurité, etc.). "
-        ) if weight_only else ""
-        format_instruction = (
-            "Formate la réponse en puces (3 puces max), sans titres ni paragraphes."
-        ) if output_format == "bullets" else "Ne crée pas de titres."
-        prompt = f"""Tu es un expert avicole.
+        return f"""Tu es un expert avicole.
 
 QUESTION
 {question}
@@ -390,18 +323,41 @@ CONTEXTE DISPONIBLE
 SITUATION
 Aucun document spécialisé n'a été retrouvé par le RAG.
 
-CONSIGNE
-1) Donne une réponse générale prudente.
-2) {focus_instruction}Explique uniquement les variations de poids possibles (lignée, sexe, âge).
-3) {style_instruction}
-4) {format_instruction}
+CONSIGNE DE FOND
+1) Donne une réponse générale prudente (bonnes pratiques).
+2) Explique les variations possibles (lignée, sexe, âge, etc.).
+3) Propose 1–2 questions de clarification si pertinent.
 
 {missing_info}
 
-Réponds en français et indique clairement qu'il s'agit d'une réponse générale (sans source documentaire)."""
-        return prompt
+CONSIGNE DE FORME
+{form}
+
+Réponds en français et indique clairement qu'il s'agit d'une réponse générale (sans source documentaire).
+"""
 
     # ------------------ Utils ------------------ #
+    def _format_preamble(self, style: str, fmt: str, weight_only: bool, context: Optional[Dict[str, Any]]) -> str:
+        """
+        Contraint la forme de la réponse (bullets/minimal, poids d’abord…)
+        """
+        bullets = (fmt == "bullets")
+        lines: List[str] = []
+        if style == "minimal" or bullets:
+            lines.append("- Réponds en 2–4 puces maximum.")
+        else:
+            lines.append("- Réponse courte et structurée.")
+        if weight_only:
+            # Si on cherche un poids, mettre la cible en premier
+            age = (context or {}).get("age_jours")
+            prefix_age = f" ({age} j)" if age else ""
+            lines.append(f"- Si la question concerne le poids: commence par **la fourchette cible{prefix_age}**.")
+            lines.append("- Pas de digression (température, lumière, repro, etc.).")
+            lines.append("- Si lignée/sexes/âge manquent, termine par une courte question de clarification.")
+        else:
+            lines.append("- Si des infos clés manquent, termine par 1 question de clarification.")
+        return "\n".join(lines)
+
     def _identify_missing_context(self, context: Optional[Dict[str, Any]]) -> str:
         ctx = context or {}
         missing = []
@@ -412,11 +368,8 @@ Réponds en français et indique clairement qu'il s'agit d'une réponse généra
         if not (ctx.get("age_jours") or ctx.get("age_phase")):
             missing.append("l'âge précis (jours/semaine)")
         if missing:
-            msg = "INFORMATIONS MANQUANTES\n- " + "\n- ".join(missing)
-        else:
-            msg = "CONTEXTE jugé suffisant."
-        logger.debug("ℹ️ MissingContext | %s", msg.replace("\n", " | "))
-        return msg
+            return "INFORMATIONS MANQUANTES\n- " + "\n- ".join(missing)
+        return "CONTEXTE jugé suffisant."
 
     def _build_citations(self, docs: List[Dict[str, str]]) -> List[Dict[str, str]]:
         cites: List[Dict[str, str]] = []
@@ -424,19 +377,8 @@ Réponds en français et indique clairement qu'il s'agit d'une réponse généra
             source = d.get("source") or "unknown_source"
             snippet = (d.get("content") or "").replace("\n", " ")[:120]
             cites.append({"source": source, "snippet": snippet})
-        logger.debug("🔗 Citations built | %d", len(cites))
         return cites
 
-    def get_status(self) -> Dict[str, Any]:
-        status = {
-            "index_root": str(self.index_root),
-            "k": self.k,
-            "embed_model": self.model_name,
-            "mix_with_global": self.mix_with_global,
-        }
-        logger.debug("📈 RAG status | %s", status)
-        return status
-
+    # Pour /system/status
     def is_ready(self) -> bool:
-        # simple indicateur (les index sont chargés à la volée)
-        return True
+        return self._ready
