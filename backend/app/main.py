@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("❌ RAG non initialisé: %s", e)
 
-    yield  # --- shutdown: rien pour l’instant
+    yield  # --- shutdown: rien pour l'instant
 
 
 # -------------------------------------------------------------------
@@ -89,7 +89,36 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# =============================================================================
+# 🔥 CORRECTION CORS CRITIQUE
+# =============================================================================
+
+# Middleware pour forcer les headers CORS sur TOUTES les réponses
+@app.middleware("http")
+async def cors_handler(request: Request, call_next):
+    # Traiter la requête
+    response = await call_next(request)
+    
+    # Ajouter les headers CORS à TOUTES les réponses
+    origin = request.headers.get("Origin")
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080",
+    ]
+    
+    # Vérifier si l'origin est autorisée ou autoriser tout en développement
+    if origin in allowed_origins or os.getenv("ENV") != "production":
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Max-Age"] = "3600"
+    
+    return response
+
+# Middleware CORS FastAPI (backup)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -97,11 +126,42 @@ app.add_middleware(
         "https://expert-app-cngws.ondigitalocean.app",
         "http://localhost:3000",
         "http://localhost:8080",
+        "*"  # TEMPORAIRE pour debug
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# Gestionnaire OPTIONS global pour preflight CORS
+# =============================================================================
+
+@app.options("/{full_path:path}")
+async def options_handler(request: Request, full_path: str):
+    """Gestionnaire OPTIONS global pour toutes les routes"""
+    origin = request.headers.get("Origin")
+    
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080",
+    ]
+    
+    if origin in allowed_origins or os.getenv("ENV") != "production":
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": origin or "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    else:
+        raise HTTPException(status_code=403, detail="Origin not allowed")
 
 # -------------------------------------------------------------------
 # Montage des routers — tous en /api/v1/... | expert en /api/v1/expert/...
@@ -151,8 +211,23 @@ async def rag_debug():
     status = "optimized" if getattr(app.state, "rag", None) and app.state.rag.has_search_engine() else "fallback"
     return {"env": env, "checks": checks, "rag_status": status}
 
+# =============================================================================
+# 🔧 CORRECTION: Endpoint de test CORS
+# =============================================================================
+
+@app.get("/cors-test", tags=["Debug"])
+async def cors_test(request: Request):
+    """Endpoint pour tester CORS"""
+    return {
+        "message": "CORS test successful",
+        "origin": request.headers.get("Origin"),
+        "user_agent": request.headers.get("User-Agent"),
+        "timestamp": datetime.utcnow().isoformat(),
+        "headers_received": dict(request.headers)
+    }
+
 # -------------------------------------------------------------------
-# Root + error handlers
+# Root + error handlers avec CORS
 # -------------------------------------------------------------------
 @app.get("/", tags=["Root"])
 async def root():
@@ -169,24 +244,66 @@ async def root():
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
         "rag": rag_status(),
+        "cors_fix": "applied",  # Indicateur que la correction CORS est active
     }
 
+# =============================================================================
+# Exception handlers avec CORS forcé
+# =============================================================================
+
 @app.exception_handler(HTTPException)
-async def http_exc_handler(_: Request, exc: HTTPException):
-    return JSONResponse(
+async def http_exc_handler(request: Request, exc: HTTPException):
+    # Créer la réponse d'erreur
+    response = JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "timestamp": datetime.utcnow().isoformat() + "Z"},
         headers={"content-type": "application/json; charset=utf-8"},
     )
+    
+    # Forcer les headers CORS même sur les erreurs
+    origin = request.headers.get("Origin")
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080",
+    ]
+    
+    if origin in allowed_origins or os.getenv("ENV") != "production":
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
 
 @app.exception_handler(Exception)
-async def generic_exc_handler(_: Request, exc: Exception):
+async def generic_exc_handler(request: Request, exc: Exception):
     logger.exception("Unhandled: %s", exc)
-    return JSONResponse(
+    
+    # Créer la réponse d'erreur
+    response = JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "timestamp": datetime.utcnow().isoformat() + "Z"},
         headers={"content-type": "application/json; charset=utf-8"},
     )
+    
+    # Forcer les headers CORS même sur les erreurs 500
+    origin = request.headers.get("Origin")
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080",
+    ]
+    
+    if origin in allowed_origins or os.getenv("ENV") != "production":
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
 
 # -------------------------------------------------------------------
 # Local dev entry
