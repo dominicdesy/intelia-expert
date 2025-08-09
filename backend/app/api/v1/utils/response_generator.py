@@ -1,10 +1,24 @@
+# app/api/v1/utils/response_generator.py
 from typing import Optional, List, Dict, Any
+from .units import normalize_unit_label
+
+def _normalize_units_text(answer: str) -> str:
+    """Nettoie quelques variantes d'unités dans le texte libre."""
+    if not answer:
+        return answer
+    out = answer
+    # normalisations fréquentes
+    out = out.replace(" m3/h/kg", " m³/h/kg").replace("m3/h/kg", "m³/h/kg")
+    out = out.replace("kcal.kg", "kcal/kg").replace("kcalkg", "kcal/kg")
+    out = out.replace(" / ", "/")
+    return out
 
 def format_response(answer: str, sources: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     """
     Compat: ancien format { "answer": "...", "sources": [...] }.
+    Post-traitement léger sur les unités.
     """
-    payload: Dict[str, Any] = {"answer": answer}
+    payload: Dict[str, Any] = {"answer": _normalize_units_text(answer)}
     if sources:
         payload["sources"] = sources
     return payload
@@ -18,22 +32,21 @@ def build_card(
     sources: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
     """
-    Nouveau format 'card' pour une belle mise en page côté UI.
-    - headline: une phrase très courte (≤ 90 caractères)
-    - bullets : 2–4 items courts (≤ 120 caractères chacun)
-    - footnote: petite note/disclaimer (facultatif)
-    - followups: 0–2 questions de clarification
-    - sources: citations abrégées [{source, snippet}]
+    'Card' pour une mise en page compacte.
+    - headline ≤ ~120 chars ; bullets: ≤4 items courts
     """
+    def _clean(s: str) -> str:
+        return _normalize_units_text(s.strip())
+
     card: Dict[str, Any] = {
         "type": "card",
-        "headline": headline.strip(),
-        "bullets": [b.strip() for b in bullets if b and b.strip()][:4],
+        "headline": _clean(headline)[:120],
+        "bullets": [_clean(b)[:160] for b in bullets if b and b.strip()][:4],
     }
     if footnote:
-        card["footnote"] = footnote.strip()
+        card["footnote"] = _clean(footnote)[:180]
     if followups:
-        card["followups"] = [q.strip() for q in followups if q and q.strip()][:2]
+        card["followups"] = [_clean(q)[:140] for q in followups if q and q.strip()][:2]
     if sources:
         card["sources"] = sources
     return card

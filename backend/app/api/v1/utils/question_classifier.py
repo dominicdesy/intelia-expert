@@ -1,72 +1,78 @@
-# /backend/app/api/v1/utils/question_classifier.py
-
+# app/api/v1/utils/question_classifier.py
 from typing import Dict, Any
 
-# ✅ CORRECTION MAJEURE: Champs requis adaptés aux questions réelles
+# Champs requis (étendus pour nouveaux intents)
 REQUIRED_FIELDS_BY_TYPE = {
-    "nutrition": ["race", "sexe", "age_jours"],           # ✅ NOUVEAU: Questions de nutrition/croissance
-    "poids_cible": ["race", "sexe", "age_jours"],        # ✅ NOUVEAU: Questions de poids cible spécifiques
-    "performance": ["race", "sexe", "age_jours"],        # ✅ CORRIGÉ: Champs plus pertinents
-    "sante": ["race", "age_jours", "symptomes"],         # ✅ NOUVEAU: Questions de santé
-    "alimentation": ["race", "age_jours", "type_aliment"], # ✅ NOUVEAU: Questions d'alimentation
-    "anomaly": ["race", "age_jours", "symptomes"],       # ✅ CORRIGÉ: Plus spécifique
-    "diagnosis": ["race", "age_jours", "symptomes"],     # ✅ CORRIGÉ: Plus spécifique
-    "general": [],                                        # ✅ CONSERVÉ: Pas de champs requis
+    "nutrition": ["race", "sexe", "age_jours"],
+    "poids_cible": ["race", "sexe", "age_jours"],
+    "performance": ["race", "sexe", "age_jours"],
+    "sante": ["race", "age_jours", "symptomes"],
+    "alimentation": ["race", "age_jours", "type_aliment"],
+    "anomaly": ["race", "age_jours", "symptomes"],
+    "diagnosis": ["race", "age_jours", "symptomes"],
+    # Nouveaux intents (calculs avancés)
+    "iep": ["race", "age_jours", "sexe"],
+    "costing": ["race", "age_jours"],
+    "feeders": ["race", "age_jours"],
+    "drinkers": ["race", "age_jours"],
+    "tunnel_airflow": ["race", "age_jours"],
+    "general": [],
 }
 
 def classify_question(question: Dict[str, Any]) -> str:
     """
-    ✅ AMÉLIORATION MAJEURE: Classification plus précise des questions
-    Tente de classifier la question selon sa structure ou des mots-clés.
-    Retourne un type (clé de REQUIRED_FIELDS_BY_TYPE).
+    Heuristiques légères sur texte libre, sinon par présence de champs.
     """
     if not question:
         return "general"
-    
-    # Si question est un texte brut, on peut faire une heuristique améliorée
+
     if isinstance(question, str):
-        text = question.lower()
-        
-        # ✅ NOUVEAU: Détection spécifique des questions de poids cible
-        if any(word in text for word in ["poids cible", "poids target", "target weight", "poids optimal", "poids recommandé"]):
+        t = question.lower()
+
+        # Poids cible
+        if any(w in t for w in ["poids cible", "target weight", "poids optimal", "poids recommandé"]):
             return "poids_cible"
-        
-        # ✅ AMÉLIORATION: Détection nutrition/croissance
-        if any(word in text for word in ["poids", "weight", "croissance", "growth", "gain", "gramme", "kg", "taille", "size"]):
+
+        # IEP / coût
+        if any(w in t for w in ["iep", "epef", "indice europe", "production efficiency"]):
+            return "iep"
+        if any(w in t for w in ["coût aliment", "cout aliment", "feed cost", "coût/kg vif", "cout/kg vif"]):
+            return "costing"
+
+        # Dimensionnement équipements
+        if any(w in t for w in ["mangeoire", "mangeoires", "feeder", "feeders", "assiette", "chaîne", "chaine"]):
+            return "feeders"
+        if any(w in t for w in ["abreuvoir", "abreuvoirs", "nipple", "cloche", "drinkers"]):
+            return "drinkers"
+
+        # Débit tunnel / chaleur
+        if any(w in t for w in ["tunnel", "débit d'air", "debit d'air", "airflow", "chaleur à extraire", "heat load"]):
+            return "tunnel_airflow"
+
+        # Nutrition/croissance générique
+        if any(w in t for w in ["poids", "weight", "croissance", "growth", "gain", "kg", "g"]):
             return "nutrition"
-        
-        # ✅ NOUVEAU: Détection questions de santé
-        if any(word in text for word in ["maladie", "malade", "symptôme", "symptom", "infection", "virus", "bactérie", "traitement", "vaccin"]):
+
+        # Santé / alim
+        if any(w in t for w in ["maladie", "symptôme", "symptom", "infection", "traitement", "vaccin"]):
             return "sante"
-        
-        # ✅ NOUVEAU: Détection questions d'alimentation
-        if any(word in text for word in ["aliment", "feed", "nourriture", "ration", "starter", "grower", "finisher", "protéine", "energie"]):
+        if any(w in t for w in ["aliment", "feed", "starter", "grower", "finisher", "protéine", "energie"]):
             return "alimentation"
-        
-        # ✅ AMÉLIORATION: Détection anomalies
-        if any(word in text for word in ["anomalie", "alert", "écart", "problème", "issue", "anormal", "inquiétant"]):
-            return "anomaly"
-        
-        # ✅ AMÉLIORATION: Détection diagnostic
-        if any(word in text for word in ["diagnostic", "diagnose", "identifier", "cause", "pourquoi", "que faire"]):
+
+        if any(w in t for w in ["diagnostic", "pourquoi", "que faire", "cause"]):
             return "diagnosis"
-        
-        # ✅ CONSERVATION: Fallback général
+
+        if any(w in t for w in ["anomalie", "anormal", "inquiétant", "écart"]):
+            return "anomaly"
+
         return "general"
-    
-    # Si c'est un dict (format JSON)
+
     if isinstance(question, dict):
-        # Champ explicite
         if "type" in question:
             return question["type"]
-        
-        # ✅ AMÉLIORATION: Essayer de deviner par présence de champs
         for type_, fields in REQUIRED_FIELDS_BY_TYPE.items():
-            if all(f in question for f in fields) and fields:
+            if fields and all(f in question for f in fields):
                 return type_
-        
-        # Fallback
         return "general"
-    
-    # Fallback absolu
+
     return "general"
