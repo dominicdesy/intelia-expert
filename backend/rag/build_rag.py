@@ -1,377 +1,262 @@
 #!/usr/bin/env python3
 """
-RAG Index Builder - Multi-Tenant Support
-Version corrigée pour utiliser FastRAGEmbedder
+RAG Index Builder — Multi-tenant + Multi-species
+Construit 3 index par tenant: global, broiler, layer
+- Filtrage par chemin: /species/broiler/ et /species/layer/
+- Index root: RAG_INDEX_ROOT (def: rag_index)
+- Documents root: DOCUMENTS_ROOT (def: documents)
 """
 
 import os
 import sys
 import json
 import time
+import shutil
+import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-# Suppress warnings for cleaner output
-import warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=FutureWarning)
+# ------------------------- Config ------------------------- #
+RAG_INDEX_ROOT = Path(os.getenv("RAG_INDEX_ROOT", "rag_index"))
+DOCUMENTS_ROOT = Path(os.getenv("DOCUMENTS_ROOT", "documents"))
 
-# Add project root to path
-PROJECT_ROOT = Path(__file__).parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SPECIES_DIR_HINTS = {
+    "broiler": "/species/broiler/",
+    "layer": "/species/layer/",
+}
+SPECIES_LIST = ["global", "broiler", "layer"]
 
-def setup_environment():
-    """Configure environment and paths."""
-    print(f"🔧 Configuring RAG environment...")
-    
-    # Get project root
-    current_path = Path.cwd()
-    if current_path.name == "rag" and (current_path.parent / "app").exists():
-        project_root = current_path.parent
-        print(f"📁 Detected execution from rag directory, moving to project root: {project_root}")
-        os.chdir(project_root)
-    else:
-        project_root = current_path
-    
-    # Add project root to Python path
+
+def setup_environment() -> Path:
+    """Ensure we run from project root and sys.path is set."""
+    project_root = Path.cwd()
+    # Allow running from subfolder (e.g., rag/)
+    if (project_root / "app").exists():
+        pass
+    elif (project_root.parent / "app").exists():
+        os.chdir(project_root.parent)
+        project_root = Path.cwd()
+
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    
-    print(f"✅ Project root: {project_root}")
-    
-    # Check OpenAI key
-    openai_key = os.environ.get('OPENAI_API_KEY')
-    if openai_key:
-        print(f"✅ OpenAI key configured")
-    else:
-        print(f"⚠️ No OpenAI key found - will use local models only")
-    
+    logger.info("Project root: %s", project_root)
     return project_root
 
-def discover_tenants(documents_directory: Path) -> List[str]:
-    """Discover available tenants from documents directory."""
-    print(f"\n🔍 Discovering tenants in: {documents_directory}")
-    
-    tenants = []
-    
-    # Look for tenant directories
-    if documents_directory.exists():
-        for item in documents_directory.iterdir():
-            if item.is_dir():
-                # Tenant directories start with "tenant_" or are "shared"
-                if item.name.startswith("tenant_") or item.name == "shared" or item.name == "public":
-                    tenants.append(item.name)
-                    print(f"   Found tenant: {item.name}")
-    
+
+def discover_tenants(doc_root: Path) -> List[str]:
+    """Discover tenants under DOCUMENTS_ROOT."""
+    tenants: List[str] = []
+    if not doc_root.exists():
+        logger.warning("Documents root not found: %s", doc_root)
+        return tenants
+
+    for p in doc_root.iterdir():
+        if p.is_dir() and (p.name.startswith("tenant_") or p.name in {"shared", "public"}):
+            tenants.append(p.name)
     if not tenants:
-        print("   No tenant directories found, using default structure")
-        # Check if documents exist directly
-        if documents_directory.exists() and any(documents_directory.iterdir()):
-            tenants = ["public"]  # Default tenant based on your structure
-    
-    print(f"✅ Discovered tenants: {len(tenants)} tenant(s): {tenants}")
+        # fallback: consider docs directly under DOCUMENTS_ROOT as "public"
+        any_file = any(doc_root.rglob("*"))
+        tenants = ["public"] if any_file else []
+
+    logger.info("Discovered %d tenant(s): %s", len(tenants), tenants)
     return tenants
 
-def build_tenant_index(tenant_id: str, documents_path: Path, embedder) -> Dict[str, Any]:
-    """Build RAG index for a specific tenant using FastRAGEmbedder."""
-    print(f"\n📄 Building index for tenant: {tenant_id}")
-    
-    tenant_documents_path = documents_path / tenant_id
-    
-    if not tenant_documents_path.exists():
-        error_message = f"Documents path not found: {tenant_documents_path}"
-        print(f"❌ {error_message}")
-        return {"success": False, "error": error_message}
-    
-    # Count documents
-    document_files = list(tenant_documents_path.rglob("*"))
-    document_files = [f for f in document_files if f.is_file() and not f.name.startswith('.')]
-    print(f"   📊 Found files: {len(document_files)}")
-    
-    if not document_files:
-        print(f"   ⚠️ No documents found for tenant: {tenant_id}")
-        return {"success": False, "error": "No documents found"}
-    
-    # Show sample files
-    for i, document_file in enumerate(document_files[:5]):
-        print(f"   📄 {document_file.relative_to(tenant_documents_path)}")
-    if len(document_files) > 5:
-        print(f"   📄 ... and {len(document_files) - 5} more files")
-    
+
+def iter_candidate_files(root: Path) -> List[Path]:
+    """List all files under root (non-hidden)."""
+    files = [p for p in root.rglob("*") if p.is_file() and not p.name.startswith(".")]
+    return files
+
+
+def filter_by_species(files: List[Path], species: str) -> List[Path]:
+    """Filter files by species using path hints. 'global' means no species restriction."""
+    if species == "global":
+        return files
+
+    hint = SPECIES_DIR_HINTS.get(species)
+    if not hint:
+        return []
+
+    norm = lambda s: str(s).replace("\\", "/")
+    return [f for f in files if hint in norm(f)]
+
+
+def make_temp_view(filtered_files: List[Path], tmp_dir: Path) -> None:
+    """
+    Create a temporary "view" of filtered files using hardlinks when possible, else copy.
+    Some vector builders expect a folder; this avoids duplicating big trees.
+    """
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    for src in filtered_files:
+        rel = src.name if src.is_file() else src.relative_to(src)
+        dst = tmp_dir / src.name  # keep flat structure; parsers typically embed path metadata anyway
+        try:
+            os.link(src, dst)  # hardlink (fast, space-efficient on same FS)
+        except Exception:
+            shutil.copy2(src, dst)  # fallback copy
+
+
+def build_species_index_for_tenant(tenant_id: str, tenant_docs_dir: Path, species: str, embedder) -> Dict[str, Any]:
+    """
+    Build an index for a single tenant + species.
+    Uses FastRAGEmbedder.build_vector_store(documents_path=<tmp_view>, index_path=<target_dir>).
+    """
+    all_files = iter_candidate_files(tenant_docs_dir)
+    species_files = filter_by_species(all_files, species)
+
+    # For 'global', we EXCLUDE species-tagged files to keep it truly generic (optional but cleaner):
+    if species == "global":
+        bro_hint = SPECIES_DIR_HINTS["broiler"]
+        lay_hint = SPECIES_DIR_HINTS["layer"]
+        norm = lambda s: str(s).replace("\\", "/")
+        species_files = [f for f in all_files if (bro_hint not in norm(f) and lay_hint not in norm(f))]
+
+    logger.info("Tenant '%s' — species '%s': %d files", tenant_id, species, len(species_files))
+    if not species_files:
+        return {"success": False, "tenant": tenant_id, "species": species, "error": "No files for species."}
+
+    # Create a temp view folder to feed the builder
+    tmp_view = Path(".rag_build_tmp") / tenant_id / species
+    make_temp_view(species_files, tmp_view)
+
+    # Target index dir: rag_index/<tenant>/<species>
+    index_dir = RAG_INDEX_ROOT / tenant_id / species
+    index_dir.mkdir(parents=True, exist_ok=True)
+
+    # Try preferred API(s)
     try:
-        # For FastRAGEmbedder, we need to build vector store differently
-        print(f"   🔄 Processing documents...")
-        
-        # Check if FastRAGEmbedder has the expected methods
-        if hasattr(embedder, 'process_documents'):
-            result = embedder.process_documents(
-                documents_path=str(tenant_documents_path),
-                tenant_id=tenant_id,
-                force_rebuild=True
-            )
-        elif hasattr(embedder, 'build_vector_store'):
-            # Alternative method if available
+        if hasattr(embedder, "build_vector_store"):
             result = embedder.build_vector_store(
-                documents_path=str(tenant_documents_path),
-                index_path=str(Path("rag_index") / tenant_id)
+                documents_path=str(tmp_view),
+                index_path=str(index_dir),
+            )
+        elif hasattr(embedder, "process_documents"):
+            # Some implementations accept a tenant_id and infer paths internally; store under our index_dir
+            result = embedder.process_documents(
+                documents_path=str(tmp_view),
+                tenant_id=f"{tenant_id}:{species}",
+                force_rebuild=True,
+                index_path=str(index_dir),
             )
         else:
-            # Manual processing for FastRAGEmbedder
-            print("   🔧 Using manual document processing for FastRAGEmbedder")
-            
-            # This is a simplified approach - you might need to adapt based on your needs
-            from rag.parse_documents import DocumentParser
-            
-            parser = DocumentParser()
-            documents = []
-            
-            for doc_file in document_files:
-                try:
-                    doc_content = parser.parse_file(str(doc_file))
-                    if doc_content:
-                        documents.extend(doc_content)
-                except Exception as e:
-                    print(f"     ⚠️ Failed to parse {doc_file.name}: {e}")
-            
-            if documents:
-                # Save to index format that FastRAGEmbedder can load
-                index_path = Path("rag_index")
-                index_path.mkdir(exist_ok=True)
-                
-                # Save documents in pickle format
-                import pickle
-                with open(index_path / "index.pkl", "wb") as f:
-                    pickle.dump(documents, f)
-                
-                result = {
-                    'status': 'success',
-                    'documents_processed': len(document_files),
-                    'total_chunks': len(documents),
-                    'processing_time': 0
-                }
+            # Fallback: try a generic ingest->save
+            if hasattr(embedder, "ingest_folder") and hasattr(embedder, "save_index"):
+                embedder.ingest_folder(str(tmp_view))
+                embedder.save_index(str(index_dir))
+                result = {"status": "success", "documents_processed": len(species_files), "total_chunks": None, "processing_time": 0}
             else:
-                result = {'status': 'failed', 'message': 'No documents processed'}
-        
-        if result.get('status') == 'success':
-            documents_processed = result.get('documents_processed', 0)
-            processing_time = result.get('processing_time', 0)
-            print(f"   ✅ Successfully processed documents: {documents_processed}")
-            print(f"   ⏱️ Processing time: {processing_time:.2f}s")
+                raise RuntimeError("Embedder has no supported build method (build_vector_store/process_documents/ingest_folder).")
+
+        status_ok = (result or {}).get("status") == "success"
+        if status_ok:
             return {
                 "success": True,
-                "tenant_id": tenant_id,
-                "documents_processed": documents_processed,
-                "processing_time": processing_time,
-                "total_chunks": result.get('total_chunks', 0)
+                "tenant": tenant_id,
+                "species": species,
+                "documents_processed": result.get("documents_processed", len(species_files)),
+                "total_chunks": result.get("total_chunks", None),
+                "processing_time": result.get("processing_time", None),
+                "index_path": str(index_dir),
             }
         else:
-            error_message = result.get('message', 'Unknown error')
-            print(f"   ❌ Processing failed: {error_message}")
-            return {"success": False, "error": error_message}
-    
-    except Exception as e:
-        print(f"   ❌ Exception during processing: {e}")
-        return {"success": False, "error": str(e)}
+            return {"success": False, "tenant": tenant_id, "species": species, "error": (result or {}).get("message", "Unknown error")}
+    finally:
+        # Clean temp view
+        try:
+            shutil.rmtree(tmp_view, ignore_errors=True)
+        except Exception:
+            pass
 
-def verify_index(tenant_id: str, embedder) -> bool:
-    """Verify that the index was created successfully."""
-    print(f"\n🧪 Verifying index for tenant: {tenant_id}")
-    
-    try:
-        # Check if embedder has required methods
-        if hasattr(embedder, 'has_search_engine') and embedder.has_search_engine():
-            print(f"   ✅ Search engine ready")
-            
-            # Try simple search test
-            if hasattr(embedder, 'search'):
-                try:
-                    test_results = embedder.search("Ross 308 temperature", k=3)
-                    if test_results and len(test_results) > 0:
-                        print(f"   ✅ Retrieval test passed - found {len(test_results)} results")
-                        # Show top result score
-                        print(f"   📊 Top result score: {test_results[0].get('score', 0):.3f}")
-                    else:
-                        print(f"   ⚠️ Retrieval test returned no results")
-                except Exception as e:
-                    print(f"   ⚠️ Retrieval test failed: {e}")
-            
-            return True
-        else:
-            # Check for index files
-            index_path = Path("rag_index")
-            if (index_path / "index.faiss").exists() and (index_path / "index.pkl").exists():
-                print(f"   ✅ Index files exist")
-                return True
-            else:
-                print(f"   ❌ Index files not found")
-                return False
-    
-    except Exception as e:
-        print(f"   ❌ Verification failed: {e}")
-        return False
 
-def create_build_summary(tenant_results: List[Dict], build_time: float, output_directory: Path):
-    """Create a summary of the build process."""
-    print(f"\n📝 Creating build summary...")
-    
+def verify_index(index_path: Path) -> bool:
+    """Basic verification: existence of a FAISS/PKL pair or embedder-reported availability."""
+    faiss_file = index_path / "index.faiss"
+    pkl_file = index_path / "index.pkl"
+    ok = faiss_file.exists() or pkl_file.exists() or any(index_path.glob("*.faiss")) or any(index_path.glob("*.pkl"))
+    if ok:
+        logger.info("Index looks present: %s", index_path)
+    else:
+        logger.warning("Index missing/invalid: %s", index_path)
+    return ok
+
+
+def create_build_summary(results: List[Dict[str, Any]], started_at: float, outfile: Path) -> Dict[str, Any]:
     summary = {
         "build_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "total_duration": build_time,
-        "tenants_processed": len(tenant_results),
-        "successful_tenants": len([r for r in tenant_results if r.get('success')]),
-        "failed_tenants": len([r for r in tenant_results if not r.get('success')]),
-        "total_documents": sum(r.get('documents_processed', 0) for r in tenant_results if r.get('success')),
-        "total_chunks": sum(r.get('total_chunks', 0) for r in tenant_results if r.get('success')),
-        "tenant_details": tenant_results
+        "total_duration_s": round(time.time() - started_at, 2),
+        "total_jobs": len(results),
+        "successes": len([r for r in results if r.get("success")]),
+        "failures": len([r for r in results if not r.get("success")]),
+        "details": results,
     }
-    
-    # Save summary
-    summary_file = output_directory / "build_summary.json"
-    with open(summary_file, 'w', encoding='utf-8') as f:
-        json.dump(summary, f, indent=2)
-    
-    print(f"✅ Build summary saved: {summary_file}")
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    outfile.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    logger.info("Build summary -> %s", outfile)
     return summary
 
-def main():
-    """Main function for RAG building."""
-    print("🚀 RAG INDEX BUILDER")
-    print("Multi-tenant support with FastRAGEmbedder")
-    print("=" * 70)
-    
-    start_time = time.time()
-    
+
+def main() -> bool:
+    start = time.time()
+    project_root = setup_environment()
+
+    # Import embedder
     try:
-        # Setup environment
-        project_root = setup_environment()
-        
-        # Import the RAG embedder
-        print(f"\n🔄 Initializing FastRAGEmbedder...")
-        
-        try:
-            from rag.embedder import FastRAGEmbedder
-            
-            # Create embedder with optimized configuration
-            embedder = FastRAGEmbedder(
-                api_key=os.environ.get('OPENAI_API_KEY'),
-                model_name='all-MiniLM-L6-v2',  # Fast and efficient
-                cache_embeddings=True,
-                max_workers=2,
-                debug=True,
-                similarity_threshold=0.15,  # Lowered threshold for better results
-                normalize_queries=True
-            )
-            
-            if not embedder._check_dependencies():
-                print("❌ RAG embedder not available - missing dependencies")
-                print("\n💡 Required packages:")
-                print("   pip install sentence-transformers faiss-cpu numpy")
-                return False
-            
-            print(f"✅ FastRAGEmbedder initialized")
-            
-            # Show embedder stats
-            stats = embedder.get_stats()
-            print(f"   📊 Model: {stats['model']}")
-            print(f"   🧠 Dependencies OK: {stats['dependencies_ok']}")
-            print(f"   🎯 Similarity threshold: {stats['similarity_threshold']}")
-            print(f"   🔄 Query normalization: {stats['normalize_queries']}")
-        
-        except ImportError as e:
-            print(f"❌ Failed to import FastRAGEmbedder: {e}")
-            print(f"   Make sure you're in the correct directory: {Path.cwd()}")
-            return False
-        
-        # Try to load existing index first
-        index_path = project_root / "rag_index"
-        if index_path.exists():
-            print(f"\n🔍 Checking for existing index...")
-            if embedder.load_index(str(index_path)):
-                print("✅ Existing index loaded successfully")
-            else:
-                print("⚠️ Could not load existing index, will rebuild")
-        
-        # Discover tenants
-        documents_directory = project_root / "documents"
-        tenants = discover_tenants(documents_directory)
-        
-        if not tenants:
-            print("❌ No tenants found")
-            return False
-        
-        # Build indexes for each tenant
-        tenant_results = []
-        
-        for tenant_id in tenants:
-            result = build_tenant_index(tenant_id, documents_directory, embedder)
-            tenant_results.append(result)
-            
-            # Verify the index
-            if result.get('success'):
-                verify_index(tenant_id, embedder)
-        
-        # Create build summary
-        build_time = time.time() - start_time
-        rag_index_directory = project_root / "rag_index"
-        rag_index_directory.mkdir(exist_ok=True)
-        
-        summary = create_build_summary(tenant_results, build_time, rag_index_directory)
-        
-        # Final summary
-        print("\n" + "=" * 70)
-        print(f"🎉 RAG INDEX BUILD COMPLETED!")
-        print("=" * 70)
-        
-        successful = [r for r in tenant_results if r.get('success')]
-        failed = [r for r in tenant_results if not r.get('success')]
-        
-        print(f"✅ Successful tenants: {len(successful)}")
-        for result in successful:
-            tenant = result['tenant_id']
-            documents = result.get('documents_processed', 0)
-            chunks = result.get('total_chunks', 0)
-            print(f"   📄 {tenant}: {documents} documents, {chunks} chunks")
-        
-        if failed:
-            print(f"❌ Failed tenants: {len(failed)}")
-            for result in failed:
-                tenant = result.get('tenant_id', 'unknown')
-                error = result.get('error', 'Unknown error')
-                print(f"   ❌ {tenant}: {error}")
-        
-        print(f"⏱️ Total time: {build_time:.1f} seconds")
-        print(f"📁 Index location: {rag_index_directory}")
-        
-        print(f"\n🚀 Next steps:")
-        print(f"1. Your RAG indexes are ready")
-        print(f"2. Test the system with your application")
-        print(f"3. Verify queries work correctly")
-        
-        return len(successful) > 0
-    
+        from rag.embedder import FastRAGEmbedder
     except Exception as e:
-        print(f"\n❌ Build error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Cannot import FastRAGEmbedder: %s", e)
         return False
+
+    embedder = FastRAGEmbedder(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model_name=os.getenv("RAG_EMBED_MODEL", "all-MiniLM-L6-v2"),
+        cache_embeddings=True,
+        max_workers=int(os.getenv("RAG_MAX_WORKERS", "2")),
+        debug=True,
+        similarity_threshold=float(os.getenv("RAG_SIM_THRESHOLD", "0.20")),
+        normalize_queries=True,
+    )
+
+    if hasattr(embedder, "_check_dependencies") and not embedder._check_dependencies():
+        logger.error("Missing dependencies. Try: pip install sentence-transformers faiss-cpu numpy")
+        return False
+
+    tenants = discover_tenants(DOCUMENTS_ROOT)
+    if not tenants:
+        logger.error("No tenants discovered under %s", DOCUMENTS_ROOT)
+        return False
+
+    jobs: List[Dict[str, Any]] = []
+    for tenant in tenants:
+        tenant_docs = DOCUMENTS_ROOT / tenant
+        if not tenant_docs.exists():
+            logger.warning("Skip tenant %s (no docs dir)", tenant)
+            continue
+
+        for species in SPECIES_LIST:
+            res = build_species_index_for_tenant(tenant, tenant_docs, species, embedder)
+            jobs.append(res)
+            if res.get("success"):
+                verify_index(Path(res["index_path"]))
+
+    # Write summary (one file for whole build)
+    summary_path = RAG_INDEX_ROOT / "build_summary.json"
+    create_build_summary(jobs, start, summary_path)
+
+    ok = any(r.get("success") for r in jobs)
+    logger.info("Build completed. Success=%s", ok)
+    return ok
+
 
 if __name__ == "__main__":
     try:
         success = main()
-        if not success:
-            print(f"\n❌ Build failed")
-            sys.exit(1)
-        else:
-            print(f"\n✅ Build successful")
+        sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        print(f"\n\n🛑 Build interrupted")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print("\nInterrupted.")
         sys.exit(1)

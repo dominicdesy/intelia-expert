@@ -1,162 +1,120 @@
-import os
-from pinecone import Pinecone, ServerlessSpec
-from typing import Any, Dict, List
-import logging
-from app.api.v1.utils.openai_utils import safe_embedding_create
+# app/api/v1/utils/integrations.py
+from __future__ import annotations
 
-logger = logging.getLogger(__name__)
+import os
+import logging
+from typing import Any, Dict, List, Optional, Union
+
+import httpx
+
+logger = logging.getLogger("app.api.v1.utils.integrations")
+
+# --------------------------------------------------------------------
+# Wrappers OpenAI (exemples; gardez vos propres fonctions si existantes)
+# --------------------------------------------------------------------
+
+async def safe_chat_create(**kwargs) -> Dict[str, Any]:
+    """
+    Wrapper chat completions. Conservez votre implémentation existante si elle gère
+    retries/timeouts. Ici on garde une version minimale asynchrone.
+    """
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY','')}",
+        "Content-Type": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(url, headers=headers, json=kwargs)
+        r.raise_for_status()
+        return r.json()
+
+async def safe_embedding_create(*, model: str, input: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+    """
+    Retourne directement la/les listes de floats (embedding(s)).
+
+    - Si input est str  -> retourne List[float]
+    - Si input est list -> retourne List[List[float]]
+    """
+    url = "https://api.openai.com/v1/embeddings"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY','')}",
+        "Content-Type": "application/json"
+    }
+    payload = {"model": model, "input": input}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(url, headers=headers, json=payload)
+        r.raise_for_status()
+        data = r.json()
+
+    # Normalisation en sortie:
+    if not data or "data" not in data or not data["data"]:
+        logger.error("❌ Embedding API returned empty data")
+        return []  # le caller gèrera
+
+    vectors = [item.get("embedding") for item in data["data"] if item.get("embedding") is not None]
+    if not vectors:
+        logger.error("❌ Embedding API: no embedding vectors found")
+        return []
+
+    # Simplifier si un seul input
+    return vectors[0] if isinstance(input, str) else vectors
+
+
+# --------------------------------------------------------------------
+# Client VectorStore (Faiss/Pinecone wrapper)
+# --------------------------------------------------------------------
 
 class VectorStoreClient:
     """
-    Client Pinecone pour la recherche vectorielle,
-    avec création automatique de l'index si besoin.
-    
-    ✅ CORRECTION CRITIQUE: Fix TypeError "list indices must be integers or slices, not str"
-    Le problème venait de l'accès incorrect aux résultats Pinecone
+    Client d’accès à l’index vectoriel. Le but ici est d’ACCEPTER 2 formats:
+      - Liste de floats renvoyée par safe_embedding_create (chemin normal)
+      - Réponse brute OpenAI (rare si on bypass le wrapper)
     """
-    def __init__(self):
-        api_key     = os.getenv("PINECONE_API_KEY")
-        environment = os.getenv("PINECONE_ENVIRONMENT")
-        index_name  = os.getenv("PINECONE_INDEX_NAME", "intelia-expert")
+    def __init__(self, index_backend: Any):
+        self.index = index_backend  # ex. votre wrapper FAISS/Pinecone
 
-        # ✅ CORRIGÉ: Initialisation Pinecone v3.x
-        self.pc = Pinecone(api_key=api_key)
-
-        # ✅ CORRIGÉ: Création de l'index si absent (nouvelle API)
-        existing_indexes = [index.name for index in self.pc.list_indexes()]
-        if index_name not in existing_indexes:
-            self.pc.create_index(
-                name=index_name,
-                dimension=1536,    # dimension pour text-embedding-ada-002
-                metric="cosine",
-                spec=ServerlessSpec(
-                    cloud='aws',
-                    region=environment or 'us-east-1'
-                )
-            )
-
-        # ✅ CORRIGÉ: Connexion à l'index (nouvelle API)
-        self.index = self.pc.Index(index_name)
-
-    def query(self, text: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    async def query(self, text: str, k: int = 3) -> List[Dict[str, Any]]:
         """
-        ✅ CORRECTION CRITIQUE: Gestion robuste des résultats Pinecone
+        Retourne une liste de documents: [{id, score, text, meta}, ...]
         """
         try:
-            # 1. Génération de l'embedding avec gestion d'erreurs
-            logger.debug(f"🔍 Génération embedding pour: {text[:50]}...")
-            
-            resp = safe_embedding_create(
-                model=os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002"),
-                input=text
-            )
-            
-            # ✅ CORRECTION: Vérification structure réponse OpenAI
-            if not resp or "data" not in resp or not resp["data"]:
+            model_name = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+            resp = await safe_embedding_create(model=model_name, input=text)
+
+            emb: Optional[List[float]] = None
+
+            # --- Cas 1: chemin normalisé (liste de floats)
+            if isinstance(resp, list) and resp and all(isinstance(x, (int, float)) for x in resp):
+                emb = resp
+
+            # --- Cas 2: “à tout hasard” si quelqu’un appelle encore l’API brute ailleurs
+            elif isinstance(resp, dict) and "data" in resp and resp["data"]:
+                maybe = resp["data"][0].get("embedding")
+                if isinstance(maybe, list):
+                    emb = maybe
+
+            # --- Cas 3: liste de listes (input = batch)
+            elif isinstance(resp, list) and resp and isinstance(resp[0], list):
+                emb = resp[0]
+
+            if emb is None or not emb:
                 logger.error("❌ Réponse OpenAI embedding vide ou malformée")
                 return []
-            
-            emb = resp["data"][0]["embedding"]
-            logger.debug(f"✅ Embedding généré: dimension {len(emb)}")
 
-            # 2. Requête dans Pinecone avec gestion d'erreurs
-            logger.debug(f"🔍 Requête Pinecone avec top_k={top_k}")
-            
-            results = self.index.query(
-                vector=emb,
-                top_k=top_k,
-                include_metadata=True
-            )
-            
-            # ✅ CORRECTION CRITIQUE: Debugging structure résultats
-            logger.debug(f"🔍 Type résultats Pinecone: {type(results)}")
-            logger.debug(f"🔍 Clés résultats: {list(results.keys()) if hasattr(results, 'keys') else 'Pas un dict'}")
-            
-            # ✅ CORRECTION CRITIQUE: Gestion robuste structure résultats
-            if hasattr(results, 'matches') and results.matches:
-                # Structure objet avec attribut matches
-                matches = results.matches
-                logger.debug(f"✅ Trouvé {len(matches)} matches via attribut")
-                
-            elif isinstance(results, dict) and "matches" in results:
-                # Structure dictionnaire avec clé matches
-                matches = results["matches"]
-                logger.debug(f"✅ Trouvé {len(matches)} matches via dict")
-                
-            elif isinstance(results, list):
-                # ✅ NOUVEAU: Cas où results est directement une liste
-                matches = results
-                logger.debug(f"✅ Résultats directement en liste: {len(matches)} items")
-                
-            else:
-                # Aucun résultat trouvé
-                logger.warning(f"⚠️ Structure résultats Pinecone inattendue: {type(results)}")
+            # À ce stade emb est une List[float] exploitable
+            # On interroge l’index (faiss/pinecone) – à adapter à votre backend
+            results = self.index.search(emb, k=k)  # attendu: List[Dict]
+            # Exemple attendu d’un item: {"id": "...", "score": 0.87, "text": "...", "meta": {...}}
+            if not isinstance(results, list):
+                logger.error("❌ Vector index returned a non-list result")
                 return []
 
-            # 3. ✅ CORRECTION CRITIQUE: Extraction métadonnées robuste
-            extracted_metadata = []
-            
-            for i, match in enumerate(matches):
-                try:
-                    # ✅ GESTION: Différents formats de match
-                    if hasattr(match, 'metadata') and match.metadata:
-                        # Format objet avec attribut metadata
-                        metadata = match.metadata
-                        
-                    elif isinstance(match, dict) and "metadata" in match:
-                        # Format dictionnaire avec clé metadata
-                        metadata = match["metadata"]
-                        
-                    elif isinstance(match, dict):
-                        # ✅ NOUVEAU: Match est directement la metadata
-                        metadata = match
-                        
-                    else:
-                        # ✅ FALLBACK: Conversion string si nécessaire
-                        logger.warning(f"⚠️ Match {i} format inattendu: {type(match)}")
-                        metadata = {"text": str(match)}
-                    
-                    extracted_metadata.append(metadata)
-                    
-                except Exception as e:
-                    logger.error(f"❌ Erreur extraction metadata match {i}: {e}")
-                    # Fallback sécurisé
-                    extracted_metadata.append({"text": str(match), "error": str(e)})
-            
-            logger.info(f"✅ Pinecone: {len(extracted_metadata)} métadonnées extraites")
-            return extracted_metadata
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur critique Pinecone query: {type(e).__name__}: {e}")
-            logger.error(f"🔍 Détails erreur: {str(e)}")
-            
-            # ✅ FALLBACK: Retourner liste vide au lieu de crasher
-            return []
+            return results
 
-    def test_connection(self) -> Dict[str, Any]:
-        """
-        ✅ NOUVELLE MÉTHODE: Test de connexion Pinecone pour diagnostics
-        """
-        try:
-            # Test simple avec embedding factice
-            test_vector = [0.1] * 1536  # Dimension text-embedding-ada-002
-            
-            results = self.index.query(
-                vector=test_vector,
-                top_k=1,
-                include_metadata=True
-            )
-            
-            return {
-                "status": "success",
-                "message": "Connexion Pinecone fonctionnelle",
-                "result_type": str(type(results)),
-                "has_matches": hasattr(results, 'matches') or (isinstance(results, dict) and "matches" in results)
-            }
-            
+        except httpx.HTTPStatusError as he:
+            logger.error("❌ OpenAI HTTP error (embeddings): %s", he)
+            return []
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Erreur connexion Pinecone: {e}",
-                "error_type": type(e).__name__
-            }
+            logger.exception("❌ VectorStoreClient.query unexpected error: %s", e)
+            return []
