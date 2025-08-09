@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
             app.state.supabase = create_client(url, key)
             logger.info("✅ Supabase prêt")
         else:
-            logger.info(ℹ️ Supabase non configuré")
+            logger.info("ℹ️ Supabase non configuré")
     except Exception as e:
         logger.warning("ℹ️ Supabase indisponible: %s", e)
 
