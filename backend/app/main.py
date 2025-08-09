@@ -111,34 +111,36 @@ async def lifespan(app: FastAPI):
             logger.error(f"❌ RAG Global: Chemin inexistant {global_path}")
 
         # 🚀 CHARGEMENT RAG BROILER (optionnel)
-        broiler_path = rag_paths["broiler"]
-        if os.path.exists(broiler_path):
-            try:
-                broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
-                if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
-                    app.state.rag_broiler = broiler_embedder
-                    logger.info(f"✅ RAG Broiler chargé directement: {broiler_path}")
-                else:
-                    logger.warning(f"⚠️ RAG Broiler: Échec chargement depuis {broiler_path}")
-            except Exception as e:
-                logger.warning(f"⚠️ RAG Broiler: Erreur {e}")
-        else:
-            logger.info(f"ℹ️ RAG Broiler: Chemin inexistant {broiler_path} (optionnel)")
+        if "broiler" in rag_paths:
+            broiler_path = rag_paths["broiler"]
+            if os.path.exists(broiler_path):
+                try:
+                    broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
+                    if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
+                        app.state.rag_broiler = broiler_embedder
+                        logger.info(f"✅ RAG Broiler chargé directement: {broiler_path}")
+                    else:
+                        logger.warning(f"⚠️ RAG Broiler: Échec chargement depuis {broiler_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ RAG Broiler: Erreur {e}")
+            else:
+                logger.info(f"ℹ️ RAG Broiler: Chemin inexistant {broiler_path} (optionnel)")
 
         # 🚀 CHARGEMENT RAG LAYER (optionnel)  
-        layer_path = rag_paths["layer"]
-        if os.path.exists(layer_path):
-            try:
-                layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
-                if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
-                    app.state.rag_layer = layer_embedder
-                    logger.info(f"✅ RAG Layer chargé directement: {layer_path}")
-                else:
-                    logger.warning(f"⚠️ RAG Layer: Échec chargement depuis {layer_path}")
-            except Exception as e:
-                logger.warning(f"⚠️ RAG Layer: Erreur {e}")
-        else:
-            logger.info(f"ℹ️ RAG Layer: Chemin inexistant {layer_path} (optionnel)")
+        if "layer" in rag_paths:
+            layer_path = rag_paths["layer"]
+            if os.path.exists(layer_path):
+                try:
+                    layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
+                    if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
+                        app.state.rag_layer = layer_embedder
+                        logger.info(f"✅ RAG Layer chargé directement: {layer_path}")
+                    else:
+                        logger.warning(f"⚠️ RAG Layer: Échec chargement depuis {layer_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ RAG Layer: Erreur {e}")
+            else:
+                logger.info(f"ℹ️ RAG Layer: Chemin inexistant {layer_path} (optionnel)")
 
         # 📊 Résumé final
         rag_summary = {
