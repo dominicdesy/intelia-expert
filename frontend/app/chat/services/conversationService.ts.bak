@@ -92,7 +92,7 @@ export class ConversationService {
         console.log('✅ [ConversationService] Données récupérées:', {
           id: data.conversation?.conversation_id,
           questionLength: data.conversation?.question?.length || 0,
-          responseLength: (data.conversation?.full_text ?? data.conversation?.response)?.length || 0
+          responseLength: data.conversation?.response?.length || 0
         })
         
         // ✅ CORRECTION: Passer data.conversation à la méthode transform
@@ -304,7 +304,7 @@ export class ConversationService {
     if (conversationData.question && conversationData.response) {
       // ✅ NOUVEAU: Parser les questions et réponses multiples
       const questions = conversationData.question.split('\n--- Question suivante ---\n')
-      const responses = (conversationData.full_text ?? conversationData.response).split('\n--- Réponse suivante ---\n')
+      const responses = conversationData.response.split('\n--- Réponse suivante ---\n')
       
       // Créer des messages alternés (question/réponse)
       for (let i = 0; i < Math.max(questions.length, responses.length); i++) {
@@ -380,8 +380,6 @@ export class ConversationService {
           user_id: data.user_id,
           question: data.question,
           response: data.response,
-          // ✅ plein texte non tronqué si disponible
-          full_text: data.full_text ?? undefined,
           conversation_id: data.conversation_id,
           confidence_score: data.confidence_score,
           response_time_ms: data.response_time_ms,

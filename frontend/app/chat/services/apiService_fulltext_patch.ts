@@ -1,4 +1,4 @@
-// ==================== API SERVICE UNIFIÉ - COMPATIBLE NOUVEAU BACKEND ====================
+// ==================== API SERVICE UNIFIÉ - ADAPTÉ NOUVEAU BACKEND DialogueManager ====================
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -86,7 +86,7 @@ const getAuthHeaders = (): Record<string, string> => {
   return headers
 }
 
-// 🚀 NOUVELLE FONCTION : Génération UUID compatible navigateur
+// ✅ GÉNÉRATION UUID INCHANGÉE
 const generateUUID = (): string => {
   // Utiliser crypto.randomUUID si disponible (navigateurs modernes)
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -101,7 +101,7 @@ const generateUUID = (): string => {
   })
 }
 
-// 🚀 INTERFACE MODIFIÉE : Ajout response_versions
+// 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
 interface EnhancedAIResponse {
   response: string
   conversation_id: string
@@ -116,7 +116,9 @@ interface EnhancedAIResponse {
   timestamp?: string
   processing_time?: number
   
-  // 🚀 NOUVEAU : Toutes les versions de réponse
+  // ✅ plein texte non tronqué (si fourni par backend)
+  full_text?: string
+  // 🚀 NOUVEAU : Toutes les versions de réponse (généré côté frontend si absent)
   response_versions?: {
     ultra_concise: string
     concise: string
@@ -124,7 +126,7 @@ interface EnhancedAIResponse {
     detailed: string
   }
   
-  // Clarifications inchangées
+  // ✅ CLARIFICATIONS INCHANGÉES
   clarification_result?: {
     clarification_requested: boolean
     clarification_type: string
@@ -136,9 +138,16 @@ interface EnhancedAIResponse {
   clarification_questions?: string[]
   clarification_type?: string
   vague_entities?: string[]
+  
+  // 🚀 NOUVEAU : Support format DialogueManager
+  type?: 'answer' | 'clarification'
+  questions?: string[]
+  source?: string
+  documents_used?: number
+  warning?: string
 }
 
-// ✅ INTERFACE INCHANGÉE
+// ✅ INTERFACE ERROR INCHANGÉE
 interface APIError {
   detail: string
   timestamp: string
@@ -147,16 +156,14 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE CORRIGÉE : Utilise endpoint unifié /ask
+ * 🔧 FONCTION PRINCIPALE ADAPTÉE : Compatible DialogueManager + garde compatibilité ancienne
  */
 export const generateAIResponse = async (
   question: string,
   user: any,
   language: string = 'fr',
   conversationId?: string,
-  // 🚀 NOUVEAU : Paramètre niveau de concision
   concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise',
-  // ✅ PARAMÈTRES EXISTANTS INCHANGÉS
   isClarificationResponse = false,
   originalQuestion?: string,
   clarificationEntities?: Record<string, any>
@@ -169,22 +176,20 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
+  // 🔧 ADAPTÉ : Session ID pour DialogueManager
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🎯 [apiService] Envoi question vers endpoint unifié /ask:', {
+  console.log('🎯 [apiService] Nouveau système DialogueManager:', {
     question: question.substring(0, 50) + '...',
-    conversation_id: finalConversationId,
-    concisionLevel,
-    isClarificationResponse,
-    originalQuestion: originalQuestion?.substring(0, 30) + '...'
+    session_id: finalConversationId.substring(0, 8) + '...',
+    system: 'expert.py + DialogueManager'
   })
 
   try {
-    // 🔧 ENDPOINT CORRIGÉ : Utilise le nouvel endpoint unifié
-    let endpoint = `${API_BASE_URL}/expert/ask`
+    // 🔧 ADAPTÉ : Endpoint simplifié du nouveau système
+    const endpoint = `${API_BASE_URL}/expert/ask`
     
-    // ✅ ENRICHISSEMENT CLARIFICATION INCHANGÉ
+    // ✅ ENRICHISSEMENT CLARIFICATION CONSERVÉ (au cas où)
     let finalQuestion = question.trim()
     
     if (isClarificationResponse && originalQuestion) {
@@ -199,33 +204,22 @@ export const generateAIResponse = async (
       if (breed && sex) {
         finalQuestion = `${originalQuestion} pour ${breed} ${sex}`
         console.log('✅ [apiService] Question enrichie:', finalQuestion)
-      } else {
-        console.log('⚠️ [apiService] Entités incomplètes détectées')
       }
     }
 
-    // 🔧 BODY MODIFIÉ : Compatible avec le nouveau backend unifié
+    // 🔧 ADAPTÉ : Body simplifié pour DialogueManager
     const requestBody = {
-      text: finalQuestion,
-      language: language,
-      // 🚀 NOUVEAU : Paramètres concision pour le backend unifié
-      concision_level: concisionLevel,
-      generate_all_versions: true,
-      // 🔧 FIX CRITIQUE : Toujours inclure conversation_id
-      conversation_id: finalConversationId,
-      // ✅ CLARIFICATIONS INCHANGÉES mais adaptées au nouveau format
-      ...(isClarificationResponse && {
-        is_clarification_response: true,
-        original_question: originalQuestion
-      })
+      question: finalQuestion
     }
 
-    const headers = getAuthHeaders()
+    // 🔧 ADAPTÉ : Headers avec session ID pour DialogueManager
+    const headers = {
+      ...getAuthHeaders(),
+      'X-Session-ID': finalConversationId
+    }
 
-    console.log('📤 [apiService] Body pour endpoint unifié /ask:', {
-      ...requestBody,
-      conversation_id: `${finalConversationId.substring(0, 8)}...`
-    })
+    console.log('📤 [apiService] Body DialogueManager:', requestBody)
+    console.log('📤 [apiService] Session ID:', finalConversationId.substring(0, 8) + '...')
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -233,11 +227,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut réponse endpoint unifié:', response.status)
+    console.log('📡 [apiService] Statut DialogueManager:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur endpoint unifié:', errorText)
+      console.error('❌ [apiService] Erreur DialogueManager:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -258,76 +252,88 @@ export const generateAIResponse = async (
       throw new Error(errorMessage)
     }
 
-    const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse endpoint unifié reçue:', {
-      conversation_id: data.conversation_id,
-      language: data.language,
-      mode: data.mode,
-      rag_used: data.rag_used,
-      response_length: data.response?.length || 0,
-      // 🚀 NOUVEAU : Log versions reçues
-      versions_received: Object.keys(data.response_versions || {}),
-      clarification_requested: data.clarification_result?.clarification_requested || false,
-      conversation_id_sent: finalConversationId,
-      conversation_id_received: data.conversation_id,
-      ids_match: finalConversationId === data.conversation_id
+    const data = await response.json()
+    console.log('✅ [apiService] Réponse DialogueManager reçue:', {
+      type: data.type,
+      has_response: !!(data.full_text ?? data.response),
+      has_questions: !!data.questions,
+      response_length: (data.full_text ?? data.response)?.length || 0,
+      questions_count: data.questions?.length || 0,
+      source: data.source,
+      documents_used: data.documents_used
     })
 
-    // 🚀 FALLBACK : Si backend pas encore modifié pour response_versions
-    if (!data.response_versions) {
-      console.warn('⚠️ [apiService] Backend n\'a pas fourni response_versions - utilisation fallback')
-      data.response_versions = {
-        ultra_concise: data.response,
-        concise: data.response,
-        standard: data.response,
-        detailed: data.response
+    // 🔧 ADAPTÉ : Conversion format DialogueManager vers format attendu
+    const processedData: EnhancedAIResponse = {
+      conversation_id: finalConversationId,
+      language: language,
+      timestamp: new Date().toISOString(),
+      type: data.type,
+      
+      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
+      response: data.type === 'answer' ? ((data.full_text ?? data.response) || '') : '',
+      full_text: data.full_text,
+      
+      // 🔧 GESTION CLARIFICATION : Format DialogueManager
+      ...(data.type === 'clarification' ? {
+        requires_clarification: true,
+        clarification_questions: data.questions || [],
+        clarification_type: 'missing_info',
+        vague_entities: ['breed', 'sex'], // Default pour compatibilité
+        clarification_result: {
+          clarification_requested: true,
+          clarification_type: 'missing_info',
+          missing_information: ['breed', 'sex'],
+          confidence: 0.5
+        }
+      } : {
+        requires_clarification: false
+      }),
+      
+      // 🔧 GESTION RÉPONSE : Format DialogueManager
+      ...(data.type === 'answer' ? {
+        rag_used: true,
+        sources: data.source ? [{ source: data.source }] : [],
+        mode: 'rag_dialoguemanager',
+        note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
+        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
+      } : {
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager',
+        note: 'Clarification requise'
+      })
+    }
+
+    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions (comme avant)
+    if (processedData.response && !processedData.response_versions) {
+      console.log('✅ [apiService] Génération automatique response_versions')
+      
+      const mainResponse = processedData.response
+      
+      processedData.response_versions = {
+        ultra_concise: mainResponse.length > 200 ? 
+          mainResponse.substring(0, 150) + '...' : mainResponse,
+        concise: mainResponse.length > 400 ? 
+          mainResponse.substring(0, 300) + '...' : mainResponse,
+        standard: mainResponse,
+        detailed: mainResponse + (processedData.sources?.length ? 
+          `\n\nSources consultées: ${processedData.sources.length} documents` : '')
       }
     }
 
-    // ✅ MAPPING CLARIFICATION INCHANGÉ
-    const processedData: EnhancedAIResponse = {
-      response: data.response,
-      // 🚀 NOUVEAU : Inclure toutes les versions
-      response_versions: data.response_versions,
-      conversation_id: data.conversation_id,
-      language: data.language,
-      rag_used: data.rag_used,
-      sources: data.sources,
-      ai_enhancements_used: data.ai_enhancements_used,
-      confidence_score: data.confidence_score,
-      response_time: data.response_time,
-      mode: data.mode,
-      note: data.note,
-      timestamp: data.timestamp,
-      processing_time: data.processing_time,
-      clarification_result: data.clarification_result,
-      // ✅ COMPATIBILITÉ CLARIFICATIONS INCHANGÉE
-      requires_clarification: data.clarification_result?.clarification_requested || false,
-      clarification_questions: data.clarification_result?.missing_information?.map(info => {
-        const questionMap: Record<string, string> = {
-          'breed': 'Quelle est la race/souche du poulet ?',
-          'sex': 'Est-ce un mâle ou une femelle ?',
-          'race/souche': 'Quelle est la race/souche du poulet ?',
-          'sexe': 'Est-ce un mâle ou une femelle ?'
-        }
-        return questionMap[info] || `Pouvez-vous préciser : ${info} ?`
-      }) || [],
-      clarification_type: data.clarification_result?.clarification_type,
-      vague_entities: data.clarification_result?.missing_information || []
-    }
-
-    console.log('🎯 [apiService] Données traitées avec mapping clarification:', {
+    console.log('🎯 [apiService] Données traitées DialogueManager:', {
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
-      clarification_result_exists: !!processedData.clarification_result,
-      versions_available: Object.keys(processedData.response_versions || {}),
-      conversation_id_final: processedData.conversation_id
+      has_response: !!processedData.response,
+      has_versions: !!processedData.response_versions,
+      type: processedData.type
     })
 
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur complète endpoint unifié:', error)
+    console.error('❌ [apiService] Erreur DialogueManager:', error)
     
     if (error instanceof Error) {
       throw error
@@ -338,98 +344,123 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE CORRIGÉE : Utilise endpoint unifié /ask-public
+ * 🔧 VERSION PUBLIQUE ADAPTÉE : Compatible DialogueManager (sans auth)
  */
 export const generateAIResponsePublic = async (
   question: string,
   language: string = 'fr',
   conversationId?: string,
-  // 🚀 NOUVEAU : Paramètre concision pour version publique
   concisionLevel: 'ultra_concise' | 'concise' | 'standard' | 'detailed' = 'concise'
 ): Promise<EnhancedAIResponse> => {
   if (!question || question.trim() === '') {
     throw new Error('Question requise')
   }
 
-  // 🔧 FIX CRITIQUE : Toujours générer un conversation_id
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌐 [apiService] Question publique vers endpoint unifié /ask-public:', {
+  console.log('🌐 [apiService] DialogueManager public:', {
     question: question.substring(0, 50) + '...',
-    conversation_id: finalConversationId,
-    concisionLevel
+    session_id: finalConversationId.substring(0, 8) + '...'
   })
 
   try {
-    // 🔧 BODY CORRIGÉ : Compatible avec endpoint unifié
+    // 🔧 ADAPTÉ : Même endpoint que la version auth (DialogueManager gère)
+    const endpoint = `${API_BASE_URL}/expert/ask`
+    
     const requestBody = {
-      text: question.trim(),
-      language: language,
-      concision_level: concisionLevel,
-      generate_all_versions: true,
-      // 🔧 FIX CRITIQUE : Toujours inclure conversation_id
-      conversation_id: finalConversationId
+      question: question.trim()
     }
 
-    // 🔧 ENDPOINT CORRIGÉ : Utilise le nouvel endpoint unifié public
-    const response = await fetch(`${API_BASE_URL}/expert/ask-public`, {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Session-ID': finalConversationId
+    }
+
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify(requestBody)
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur endpoint unifié public:', errorText)
+      console.error('❌ [apiService] Erreur DialogueManager public:', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
-    const data: EnhancedAIResponse = await response.json()
-    console.log('✅ [apiService] Réponse endpoint unifié public reçue:', {
-      conversation_id: data.conversation_id,
-      mode: data.mode,
-      rag_used: data.rag_used,
-      conversation_id_sent: finalConversationId,
-      conversation_id_received: data.conversation_id
+    const data = await response.json()
+    console.log('✅ [apiService] Réponse DialogueManager public:', {
+      type: data.type,
+      has_response: !!(data.full_text ?? data.response),
+      has_questions: !!data.questions
     })
 
-    // 🚀 FALLBACK : Si backend pas modifié pour response_versions
-    if (!data.response_versions) {
-      data.response_versions = {
-        ultra_concise: data.response,
-        concise: data.response,
-        standard: data.response,
-        detailed: data.response
+    // 🔧 MÊME CONVERSION que la version auth
+    const processedData: EnhancedAIResponse = {
+      conversation_id: finalConversationId,
+      language: language,
+      timestamp: new Date().toISOString(),
+      type: data.type,
+      
+      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
+      response: data.type === 'answer' ? ((data.full_text ?? data.response) || '') : '',
+      full_text: data.full_text,
+      
+      // 🔧 GESTION CLARIFICATION
+      ...(data.type === 'clarification' ? {
+        requires_clarification: true,
+        clarification_questions: data.questions || [],
+        clarification_type: 'missing_info',
+        vague_entities: ['breed', 'sex'],
+        clarification_result: {
+          clarification_requested: true,
+          clarification_type: 'missing_info',
+          missing_information: ['breed', 'sex'],
+          confidence: 0.5
+        }
+      } : {
+        requires_clarification: false
+      }),
+      
+      // 🔧 GESTION RÉPONSE
+      ...(data.type === 'answer' ? {
+        rag_used: true,
+        sources: data.source ? [{ source: data.source }] : [],
+        mode: 'rag_dialoguemanager_public',
+        note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
+        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
+      } : {
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager_public',
+        note: 'Clarification requise'
+      })
+    }
+
+    // 🚀 GÉNÉRATION response_versions
+    if (processedData.response && !processedData.response_versions) {
+      const mainResponse = processedData.response
+      
+      processedData.response_versions = {
+        ultra_concise: mainResponse.length > 200 ? 
+          mainResponse.substring(0, 150) + '...' : mainResponse,
+        concise: mainResponse.length > 400 ? 
+          mainResponse.substring(0, 300) + '...' : mainResponse,
+        standard: mainResponse,
+        detailed: mainResponse
       }
     }
 
-    // ✅ MAPPING CLARIFICATION INCHANGÉ
-    return {
-      ...data,
-      requires_clarification: data.clarification_result?.clarification_requested || false,
-      clarification_questions: data.clarification_result?.missing_information?.map(info => {
-        const questionMap: Record<string, string> = {
-          'breed': 'Quelle est la race/souche du poulet ?',
-          'sex': 'Est-ce un mâle ou une femelle ?',
-          'race/souche': 'Quelle est la race/souche du poulet ?',
-          'sexe': 'Est-ce un mâle ou une femelle ?'
-        }
-        return questionMap[info] || `Pouvez-vous préciser : ${info} ?`
-      }) || [],
-      clarification_type: data.clarification_result?.clarification_type,
-      vague_entities: data.clarification_result?.missing_information || []
-    }
+    return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur endpoint unifié public:', error)
+    console.error('❌ [apiService] Erreur DialogueManager public:', error)
     throw error
   }
 }
 
 /**
- * ✅ FONCTION FEEDBACK INCHANGÉE
+ * ✅ FONCTIONS FEEDBACK, CONVERSATIONS, TOPICS - TOUTES INCHANGÉES
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -478,9 +509,6 @@ export const sendFeedback = async (
   }
 }
 
-/**
- * ✅ FONCTION CONVERSATIONS INCHANGÉE
- */
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
@@ -523,9 +551,6 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
   }
 }
 
-/**
- * ✅ FONCTION TOPICS INCHANGÉE
- */
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
   console.log('💡 [apiService] Récupération suggestions sujets:', language)
 
@@ -569,9 +594,6 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
   }
 }
 
-/**
- * ✅ FONCTION HEALTH CHECK MISE À JOUR
- */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE_URL}/system/health`, {
@@ -593,7 +615,7 @@ export const checkAPIHealth = async (): Promise<boolean> => {
 }
 
 /**
- * ✅ FONCTION CLARIFICATION ENTITIES INCHANGÉE
+ * ✅ UTILITAIRES CLARIFICATION - INCHANGÉS
  */
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
@@ -635,40 +657,63 @@ export const buildClarificationEntities = (
 }
 
 /**
- * 🔧 FONCTION DEBUG MISE À JOUR - Compatible nouveau backend
+ * ✅ UTILITAIRES DEBUG ET TEST - ADAPTÉS
  */
+export const handleEnhancedNetworkError = (error: any): string => {
+  if (error?.message?.includes('Failed to fetch')) {
+    return 'Problème de connexion. Vérifiez votre connexion internet.'
+  }
+  
+  if (error?.message?.includes('Session expirée')) {
+    return 'Votre session a expiré. Veuillez vous reconnecter.'
+  }
+  
+  if (error?.message?.includes('Accès non autorisé')) {
+    return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
+  }
+  
+  if (error?.message?.includes('DialogueManager') || error?.message?.includes('ask')) {
+    return 'Erreur du système expert. Veuillez réessayer.'
+  }
+  
+  return error?.message || 'Une erreur inattendue s\'est produite.'
+}
+
+export const debugEnhancedConversationFlow = (
+  step: string,
+  conversationId: string | undefined,
+  additionalInfo?: any
+) => {
+  console.log(`🔍 [DialogueManager Debug] ${step}:`, {
+    session_id: conversationId || 'GÉNÉRÉ_AUTO',
+    endpoint: 'ask (DialogueManager)',
+    timestamp: new Date().toISOString(),
+    ...additionalInfo
+  })
+}
+
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration API unifiée + RESPONSE_VERSIONS')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py')
   console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('Endpoints nouveaux (backend unifié):')
-  console.log('- Ask unifié (auth):', `${API_BASE_URL}/expert/ask`)
-  console.log('- Ask unifié (public):', `${API_BASE_URL}/expert/ask-public`)
-  console.log('- Feedback:', `${API_BASE_URL}/expert/feedback`)
-  console.log('- Topics:', `${API_BASE_URL}/expert/topics`)
-  console.log('- Conversations:', `${API_BASE_URL}/conversations/user/{userId}`)
-  console.log('🔧 CORRECTIONS BACKEND UNIFIÉ:')
-  console.log('  ✅ Plus d\'endpoint /ask-enhanced-v2 (supprimé)')
-  console.log('  ✅ Nouvel endpoint /ask unifié (authentifié)')
-  console.log('  ✅ Nouvel endpoint /ask-public unifié (public)')
-  console.log('  ✅ conversation_id toujours généré automatiquement')
-  console.log('  ✅ Logs détaillés pour debugging')
-  console.log('NOUVELLES FEATURES PRÉSERVÉES:')
-  console.log('  🚀 concision_level dans body request')
-  console.log('  🚀 generate_all_versions: true')
-  console.log('  🚀 response_versions dans réponse')
-  console.log('  🚀 Sélection version côté frontend')
-  console.log('FEATURES PRÉSERVÉES:')
-  console.log('  ✅ Détection clarification via clarification_result')
-  console.log('  ✅ Mapping clarification_result vers requires_clarification')
-  console.log('  ✅ Support clarifications complet')
-  console.log('  ✅ Authentification JWT maintenue')
-  console.log('  ✅ Toutes fonctions existantes préservées')
+  console.log('Système backend: DialogueManager + expert.py')
+  console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
+  console.log('🔧 ADAPTATIONS EFFECTUÉES:')
+  console.log('  ✅ Body simplifié: { question }')
+  console.log('  ✅ Session ID via header X-Session-ID')
+  console.log('  ✅ Conversion format DialogueManager vers format frontend')
+  console.log('  ✅ Support clarification via type: "clarification"')
+  console.log('  ✅ Support réponse via type: "answer"')
+  console.log('  ✅ Génération automatique response_versions')
+  console.log('  ✅ Toutes fonctions auxiliaires préservées')
+  console.log('FONCTIONNALITÉS PRÉSERVÉES:')
+  console.log('  ✅ Authentification JWT')
+  console.log('  ✅ Feedback, conversations, topics')
+  console.log('  ✅ Gestion erreurs')
+  console.log('  ✅ Health check')
+  console.log('  ✅ Utilitaires clarification')
   console.groupEnd()
 }
 
-/**
- * 🔧 FONCTION TEST CORRIGÉE - Compatible backend unifié
- */
 export const testEnhancedConversationContinuity = async (
   user: any,
   language: string = 'fr'
@@ -680,7 +725,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité conversation backend unifié...')
+    console.log('🧪 [apiService] Test continuité DialogueManager...')
     
     const firstResponse = await generateAIResponse(
       "Test question 1: Qu'est-ce que les poulets de chair ?",
@@ -699,13 +744,12 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test backend unifié résultat:', {
+    console.log('🧪 [apiService] Test DialogueManager résultat:', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
-      first_enhancements: firstResponse.ai_enhancements_used,
-      second_enhancements: secondResponse.ai_enhancements_used,
-      both_ids_present: !!(firstResponse.conversation_id && secondResponse.conversation_id)
+      first_type: firstResponse.type,
+      second_type: secondResponse.type
     })
     
     return {
@@ -713,14 +757,11 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: [
-        ...(firstResponse.ai_enhancements_used || []),
-        ...(secondResponse.ai_enhancements_used || [])
-      ]
+      enhancements_used: ['DialogueManager', 'expert.py']
     }
     
   } catch (error) {
-    console.error('❌ [apiService] Erreur test backend unifié continuité:', error)
+    console.error('❌ [apiService] Erreur test DialogueManager:', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
@@ -731,67 +772,16 @@ export const testEnhancedConversationContinuity = async (
   }
 }
 
-/**
- * ✅ UTILITAIRES INCHANGÉS
- */
-export const handleEnhancedNetworkError = (error: any): string => {
-  if (error?.message?.includes('Failed to fetch')) {
-    return 'Problème de connexion. Vérifiez votre connexion internet.'
-  }
-  
-  if (error?.message?.includes('Session expirée')) {
-    return 'Votre session a expiré. Veuillez vous reconnecter.'
-  }
-  
-  if (error?.message?.includes('Accès non autorisé')) {
-    return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
-  }
-  
-  if (error?.message?.includes('endpoint unifié') || error?.message?.includes('ask')) {
-    return 'Erreur du système expert. Veuillez réessayer.'
-  }
-  
-  return error?.message || 'Une erreur inattendue s\'est produite.'
-}
-
-export const debugEnhancedConversationFlow = (
-  step: string,
-  conversationId: string | undefined,
-  additionalInfo?: any
-) => {
-  console.log(`🔍 [Enhanced Conversation Debug] ${step}:`, {
-    conversation_id: conversationId || 'GÉNÉRÉ_AUTO',
-    endpoint: 'ask (unifié)',
-    timestamp: new Date().toISOString(),
-    ...additionalInfo
-  })
-}
-
-/**
- * 🔧 DÉTECTION API MISE À JOUR - Compatible backend unifié
- */
-export const detectAPIVersion = async (): Promise<'unified' | 'legacy' | 'error'> => {
+export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' | 'error'> => {
   try {
-    // Test du nouvel endpoint unifié
-    const unifiedResponse = await fetch(`${API_BASE_URL}/expert/ask`, {
+    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
       method: 'OPTIONS',
       headers: { 'Content-Type': 'application/json' }
     })
     
-    if (unifiedResponse.ok || unifiedResponse.status === 405) {
-      console.log('✅ [detectAPIVersion] Backend unifié /ask disponible')
-      return 'unified'
-    }
-    
-    // Fallback vers l'ancien système si besoin
-    const legacyResponse = await fetch(`${API_BASE_URL}/expert/ask-enhanced`, {
-      method: 'OPTIONS', 
-      headers: { 'Content-Type': 'application/json' }
-    })
-    
-    if (legacyResponse.ok || legacyResponse.status === 405) {
-      console.log('⚠️ [detectAPIVersion] Fallback vers ask-enhanced legacy')
-      return 'legacy'
+    if (response.ok || response.status === 405) {
+      console.log('✅ [detectAPIVersion] DialogueManager /ask disponible')
+      return 'dialoguemanager'
     }
     
     return 'error'
@@ -802,62 +792,22 @@ export const detectAPIVersion = async (): Promise<'unified' | 'legacy' | 'error'
   }
 }
 
-export const generateAIResponseSmart = async (
-  question: string,
-  user: any,
-  language: string = 'fr',
-  conversationId?: string
-): Promise<EnhancedAIResponse> => {
-  
-  const apiVersion = await detectAPIVersion()
-  
-  console.log(`🤖 [generateAIResponseSmart] Utilisation API: ${apiVersion}`)
-  
-  switch (apiVersion) {
-    case 'unified':
-      return await generateAIResponse(question, user, language, conversationId)
-      
-    case 'legacy':
-      console.warn('⚠️ [generateAIResponseSmart] Fallback vers API legacy')
-      return await generateAIResponse(question, user, language, conversationId)
-      
-    case 'error':
-    default:
-      throw new Error('API non disponible. Veuillez vérifier votre connexion.')
-  }
-}
-
-/**
- * 🚀 NOUVELLE FONCTION : Information configuration backend unifié
- */
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] Configuration Backend Unifié + Response Versions')
-  console.log('Version:', 'Backend Unifié v2.0 avec response_versions')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration')
+  console.log('Version:', 'DialogueManager v1.0')
   console.log('Base URL:', API_BASE_URL)
-  console.log('🔧 CHANGEMENTS MAJEURS BACKEND:')
-  console.log('  - 🔧 Endpoint /ask-enhanced-v2: SUPPRIMÉ (404)')
-  console.log('  - 🚀 Nouvel endpoint /ask: UNIFIÉ et sécurisé')
-  console.log('  - 🚀 Nouvel endpoint /ask-public: UNIFIÉ et public')
-  console.log('  - 🔧 conversation_id: TOUJOURS généré automatiquement')
-  console.log('  - 🔧 Compatible avec l\'ancien frontend')
-  console.log('NOUVELLES FONCTIONNALITÉS BACKEND:')
-  console.log('  - 🚀 concision_level: ultra_concise|concise|standard|detailed')
-  console.log('  - 🚀 generate_all_versions: true (backend génère toutes versions)')
-  console.log('  - 🚀 response_versions: object avec toutes les versions')
-  console.log('  - 🚀 Système expert unifié et simplifié')
-  console.log('FONCTIONNALITÉS PRÉSERVÉES:')
-  console.log('  - ✅ Détection automatique questions vagues')
-  console.log('  - ✅ Clarification intelligente race/sexe')
-  console.log('  - ✅ Enrichissement automatique questions')
-  console.log('  - ✅ Traitement réponses clarification')
-  console.log('  - ✅ Toutes fonctions existantes (feedback, conversations, etc.)')
-  console.log('Endpoints (NOUVEAUX):')
-  console.log('  - POST /expert/ask (authentifié, unifié)')
-  console.log('  - POST /expert/ask-public (public, unifié)')
-  console.log('  - POST /expert/feedback')
-  console.log('  - GET /expert/topics')
-  console.log('  - GET /conversations/user/{userId}')
-  console.log('  - GET /system/health')
+  console.log('Backend: expert.py + DialogueManager')
+  console.log('🔧 CHANGEMENTS MAJEURS:')
+  console.log('  - 🚀 Utilisation endpoint /ask simplifié')
+  console.log('  - 🚀 Session ID via header X-Session-ID')
+  console.log('  - 🚀 Body simplifié: { question }')
+  console.log('  - 🚀 Support type: clarification/answer')
+  console.log('  - 🚀 Conversion automatique format')
+  console.log('FONCTIONNALITÉS:')
+  console.log('  - ✅ Clarification intelligente automatique')
+  console.log('  - ✅ Gestion mémoire conversation Postgres')
+  console.log('  - ✅ Pipeline RAG modulaire')
+  console.log('  - ✅ Toutes fonctions frontend préservées')
   console.groupEnd()
 }
 

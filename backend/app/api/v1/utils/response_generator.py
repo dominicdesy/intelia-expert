@@ -1,27 +1,66 @@
 # app/api/v1/utils/response_generator.py
 from typing import Optional, List, Dict, Any
-from .units import normalize_unit_label
+
+# Optionnel : si ce module est importé avec __all__, on expose les fonctions publiques.
+__all__ = ["format_response", "build_card"]
+
+# --- Helpers -----------------------------------------------------------------
 
 def _normalize_units_text(answer: str) -> str:
-    """Nettoie quelques variantes d'unités dans le texte libre."""
+    """
+    Nettoie quelques variantes d'unités dans le texte libre pour uniformiser l'affichage.
+    Exemple : 'm3/h/kg' -> 'm³/h/kg', 'kcal.kg' -> 'kcal/kg', etc.
+    """
     if not answer:
         return answer
     out = answer
-    # normalisations fréquentes
     out = out.replace(" m3/h/kg", " m³/h/kg").replace("m3/h/kg", "m³/h/kg")
     out = out.replace("kcal.kg", "kcal/kg").replace("kcalkg", "kcal/kg")
     out = out.replace(" / ", "/")
     return out
 
-def format_response(answer: str, sources: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+# --- Public API ---------------------------------------------------------------
+
+def format_response(
+    answer: str,
+    sources: Optional[List[Dict[str, str]]] = None
+) -> Dict[str, Any]:
     """
-    Compat: ancien format { "answer": "...", "sources": [...] }.
-    Post-traitement léger sur les unités.
+    Formate une réponse textuelle.
+
+    - Compatibilité conservée avec l'ancien format: {"answer": "...", "sources": [...]}
+    - Ajoute 'full_text' pour un affichage direct par le frontend (sans voir {'answer': ...})
+    - Laisse passer 'sources' si fourni, sinon l'omet (pas de clé vide).
+
+    Parameters
+    ----------
+    answer : str
+        Texte de la réponse (Markdown autorisé).
+    sources : Optional[List[Dict[str, str]]]
+        Métadonnées de sources (ex: [{"title": "...", "url": "..."}]).
+
+    Returns
+    -------
+    Dict[str, Any]
+        Payload prêt à l'API, ex:
+        {
+          "type": "text",
+          "answer": "...",
+          "full_text": "...",
+          "sources": [...]
+        }
     """
-    payload: Dict[str, Any] = {"answer": _normalize_units_text(answer)}
+    text = _normalize_units_text(answer)
+
+    payload: Dict[str, Any] = {
+        "type": "text",     # permet au frontend d'identifier un bloc de texte standard
+        "answer": text,     # rétro-compat
+        "full_text": text,  # à utiliser côté UI pour l'affichage standard
+    }
     if sources:
         payload["sources"] = sources
     return payload
+
 
 def build_card(
     *,
@@ -32,9 +71,22 @@ def build_card(
     sources: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
     """
-    'Card' pour une mise en page compacte.
-    - headline ≤ ~120 chars ; bullets: ≤4 items courts
+    Construit un objet 'card' pour une mise en page compacte dans l'UI.
+    - headline ≤ ~120 chars
+    - bullets : ≤ 4 éléments, courts
+    - followups : ≤ 2 propositions de relance
+
+    Returns un dict de forme:
+    {
+      "type": "card",
+      "headline": "...",
+      "bullets": ["...", "..."],
+      "footnote": "...",
+      "followups": ["...", "..."],
+      "sources": [...]
+    }
     """
+
     def _clean(s: str) -> str:
         return _normalize_units_text(s.strip())
 
