@@ -2,44 +2,64 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Literal
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, ValidationError
 
-# ⚠️ conservez vos dépendances/DI existantes
-from app.api.v1.pipeline.dialogue_manager import DialogueManager
-from app.api.v1.utils.auth import get_current_user_optional  # si vous avez un JWT optionnel
-from app.api.v1.utils.config import get_language_from_text  # si vous avez cette util
-from app.api.v1.utils.types import SystemStatus  # si défini chez vous
+# ✅ Imports RELATIFS (robustes entre dev local et DO)
+from .pipeline.dialogue_manager import DialogueManager
+from .auth import get_current_user
+try:
+    # si tu as bien cette utilitaire
+    from .utils.config import get_language_from_text  # type: ignore
+except Exception:
+    # fallback si la fonction n'existe pas
+    def get_language_from_text(_: str) -> str:
+        return "fr"
 
 logger = logging.getLogger("api.v1.expert")
+
+# NOTE:
+# - Dans main.py tu fais probablement: app.include_router(expert_router, prefix="/v1/expert")
+# - Ici on garde prefix="" pour obtenir les routes /v1/expert/...
 router = APIRouter(prefix="", tags=["expert"])
 
-# --- Modèles de requête/réponse (compatibles Pydantic v2) ---
+
+# ---------------------------
+#         MODELES
+# ---------------------------
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=2, description="User question")
     session_id: Optional[str] = Field(None, description="Existing session id to continue a conversation")
     language: Optional[str] = Field(None, description="Language hint (fr|en|es)")
 
-class AnswerResponse(BaseModel):
-    type: str = Field("answer", description="answer | answer_with_warning | clarification | error")
-    response: str = Field(..., description="Plain text answer rendered to the user")
-    session_id: Optional[str] = Field(None, description="Server-side session id")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class ClarificationResponse(BaseModel):
-    type: str = Field("clarification", const=True)
-    questions: List[str]
+class AnswerResponse(BaseModel):
+    type: Literal["answer", "answer_with_warning", "clarification", "error"] = "answer"
+    response: str = Field(..., description="Plain text answer rendered to the user")
     session_id: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-# ---- Instances globales (réutilisez vos singletons / DI) ----
-# DialogueManager doit être initialisé au startup dans main.py; ici on récupère l’instance
+
+class SystemStatus(BaseModel):
+    status: Literal["ok", "degraded", "error"] = "ok"
+    rag_ready: Optional[bool] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------
+#     INSTANCES / SINGLETONS
+# ---------------------------
+
+# DialogueManager doit être initialisé au startup dans main.py
 dlg: DialogueManager = DialogueManager.get_instance()
 
-# ---- Helpers internes ----
+
+# ---------------------------
+#          HELPERS
+# ---------------------------
 
 def _extract_answer_and_sources(result: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
     """
@@ -56,8 +76,7 @@ def _extract_answer_and_sources(result: Dict[str, Any]) -> tuple[str, List[Dict[
         answer_text = str(response_content.get("answer", "")).strip()
         raw_sources = response_content.get("sources", [])
         if isinstance(raw_sources, list):
-            # on tolère des éléments non-dict, ils seront convertis en str
-            normalized = []
+            normalized: List[Dict[str, Any]] = []
             for s in raw_sources:
                 if isinstance(s, dict):
                     normalized.append(s)
@@ -70,26 +89,30 @@ def _extract_answer_and_sources(result: Dict[str, Any]) -> tuple[str, List[Dict[
 
     return answer_text, sources
 
+
 def _default_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
     md = dict(result.get("metadata") or {})
-    # toujours expliciter la stratégie si fournie par le pipeline
     if "strategy" not in md and "type" in result:
         md["strategy"] = result["type"]
     return md
 
-# ---- Endpoints ----
+
+# ---------------------------
+#          ENDPOINTS
+# ---------------------------
 
 @router.post("/ask", response_model=AnswerResponse)
-async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
+async def ask(payload: AskRequest, user=Depends(get_current_user)):
     """
     Route principale — renvoie TOUJOURS un AnswerResponse JSON-valid.
     Garantit que 'response' est une string (évite les ValidationError).
     """
     try:
         # Validation & langue
-        question = payload.question.strip()
+        question = (payload.question or "").strip()
         if not question or len(question) < 2:
             raise HTTPException(status_code=400, detail="Question invalide")
+
         lang = payload.language or get_language_from_text(question) or "fr"
 
         # Laisser le DialogueManager orchestrer
@@ -97,7 +120,7 @@ async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
             session_id=payload.session_id,
             question=question,
             language=lang,
-            user_id=(user["id"] if user else None)
+            user_id=(user.get("user_id") if isinstance(user, dict) else None),
         )
         # result attendu: dict avec au minimum {"type": "...", "response": str|dict}
 
@@ -105,11 +128,11 @@ async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
         answer_text, sources = _extract_answer_and_sources(result)
         metadata = _default_metadata(result)
 
-        # exposer les sources (si fourni par le pipeline)
+        # Exposer les sources (si fournies par le pipeline)
         if sources:
             metadata["sources"] = sources
 
-        # champs utiles de debug/transparence
+        # Champs utiles de debug/transparence
         if "completeness_score" in result:
             metadata.setdefault("scores", {})["completeness"] = result["completeness_score"]
         if "missing_fields" in result:
@@ -123,9 +146,9 @@ async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
             type=str(result.get("type") or "answer"),
             response=answer_text or "Réponse vide.",
             session_id=session_id,
-            metadata=metadata
+            metadata=metadata,
         )
-        # Pydantic v2: model_dump() ; v1: dict()
+        # Pydantic v2: model_dump()
         return resp.model_dump()
 
     except ValidationError as ve:
@@ -135,24 +158,31 @@ async def ask(payload: AskRequest, user=Depends(get_current_user_optional)):
         raise
     except Exception as e:
         logger.exception("❌ Erreur inattendue dans /ask: %s", e)
-        # Fallback d'urgence – on garde un format *valide* pour le front, pas d’exception crue
+        # Fallback d'urgence – format *valide* pour le front
         return AnswerResponse(
             type="answer_with_warning",
-            response=(
-                "Réponse générée en mode fallback d'urgence. "
-                "Nous avons rencontré une erreur inattendue, réessayez plus tard."
-            ),
+            response=("Réponse générée en mode fallback d'urgence. "
+                      "Nous avons rencontré une erreur inattendue, réessayez plus tard."),
             session_id=payload.session_id,
-            metadata={"reason": "unexpected_error", "sources": []}
+            metadata={"reason": "unexpected_error", "sources": []},
         ).model_dump()
 
 
 @router.get("/system-status", response_model=SystemStatus)
 async def system_status():
-    # Conservez votre implémentation, ci-dessous un squelette:
+    """
+    Renvoie l’état du pipeline / RAG. On tolère un dict brut,
+    mais on le re-map dans SystemStatus si possible.
+    """
     try:
-        status = await dlg.system_status()
-        return status
+        raw = await dlg.system_status()
+        if isinstance(raw, dict):
+            return SystemStatus(
+                status=str(raw.get("status", "ok")),
+                rag_ready=bool(raw.get("rag_ready")) if "rag_ready" in raw else None,
+                details={k: v for k, v in raw.items() if k not in {"status", "rag_ready"}},
+            ).model_dump()
+        return SystemStatus().model_dump()
     except Exception as e:
         logger.exception("system-status error: %s", e)
         raise HTTPException(status_code=500, detail="status_unavailable")

@@ -43,7 +43,7 @@ async def get_users() -> Dict[str, Any]:
     """
     try:
         # Example: retrieve active session count from memory store
-        from .pipeline.postgres_memory import PostgresMemory as ConversationMemory
+        from app.api.v1.pipeline.memory import ConversationMemory
         memory = ConversationMemory()
         # For demo, assume memory.store keys are user sessions
         sessions = list(memory.store.keys())
@@ -84,7 +84,7 @@ async def test_rag_end_to_end() -> Dict[str, Any]:
     Test the RAG pipeline end-to-end with a sample question.
     """
     try:
-        from .pipeline.rag_engine import RAGEngine
+        from app.api.v1.pipeline.rag_engine import RAGEngine
         rag = RAGEngine()
         test_question = "What is the optimal temperature for Ross 308 broilers?"
         # Use empty context for a basic test
