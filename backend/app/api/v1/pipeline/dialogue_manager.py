@@ -5,7 +5,7 @@ import os
 import re
 import logging
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 from datetime import datetime
 
@@ -23,14 +23,17 @@ from .rag_engine import RAGEngine
 
 logger = logging.getLogger(__name__)
 
+# --------- Configuration ---------
 COMPLETENESS_THRESHOLD: float = 0.6
 try:
     COMPLETENESS_THRESHOLD = float(_THRESHOLD)
 except Exception:
     logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
 
+# Champs critiques pour la clarification ciblée
 CRITICAL_FIELDS = {"race", "sexe"}
 
+# --------- Utils locaux ---------
 def _utc_iso() -> str:
     return datetime.utcnow().isoformat()
 
@@ -42,6 +45,11 @@ def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
     if isinstance(raw, dict):
         return [raw]
     return [{"source": str(raw)}]
+
+def _short(txt: Any, n: int = 140) -> str:
+    s = str(txt or "")
+    return s if len(s) <= n else (s[: n - 1] + "…")
+
 
 class DialogueManager:
     """
@@ -69,6 +77,10 @@ class DialogueManager:
         except Exception as e:
             logger.warning("Nettoyage de sessions non démarré: %s", e)
 
+    # -----------------------
+    #         PUBLIC
+    # -----------------------
+
     async def handle(
         self,
         session_id: Optional[str],
@@ -78,7 +90,7 @@ class DialogueManager:
     ) -> Dict[str, Any]:
         sid = session_id or str(uuid4())
 
-        # mémoire
+        # Récup mémoire (tolérante)
         try:
             context: Dict[str, Any] = self.memory.get(sid) or {}
         except Exception as e:
@@ -90,29 +102,33 @@ class DialogueManager:
         if user_id:
             context.setdefault("user_id", user_id)
 
-        # Extraction
+        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, _short(question, 200))
+
+        # 1) Extraction de contexte
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # UI prefs neutres par défaut
+        # Préférences UI (ne force rien sauf si l'utilisateur demande le poids)
         ui = context.setdefault("ui_prefs", {})
-        # On force le mode bullets uniquement si l'utilisateur demande explicitement un "poids"
         ui["weight_only"] = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
         ui["format"] = "bullets" if ui["weight_only"] else ui.get("format", "auto")
 
-        # BONUS : heuristique broiler (inchangé)
+        # BONUS : heuristique “broiler” si <30j & question poids
         self._apply_broiler_fallback(question, context)
 
-        logger.info("Q: %s", question[:120])
-        logger.info("Completeness=%.2f / seuil=%.2f", score, COMPLETENESS_THRESHOLD)
-        if missing:
-            logger.info("Champs manquants: %s", missing)
+        logger.info(
+            "🟩 DM.extract | score=%.2f (seuil=%.2f) | missing=%s",
+            score, COMPLETENESS_THRESHOLD, missing,
+        )
+        logger.debug("🟩 DM.context=%s", _short(context, 800))
+        logger.debug("🟩 DM.ui_prefs=%s", ui)
 
-        # 1) Cas très incomplet → questions de clarification (pures)
+        # 2) Très incomplet → demander directement des clarifications
         if score < 0.2:
             questions = self.clarifier.generate(missing)
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
+            logger.info("🟨 DM.flow=clarification | questions=%d", len(questions or []))
             return {
                 "type": "clarification",
                 "questions": questions,
@@ -121,22 +137,20 @@ class DialogueManager:
                 "missing_fields": missing,
             }
 
-        # 2) Cas partiel (< seuil) → réponse générale courte + 2 questions ciblées
+        # 3) Partiel (< seuil) → réponse générale courte + questions ciblées
         if score < COMPLETENESS_THRESHOLD:
-            answer_text, sources = await self._generate_with_rag(question, context, style="minimal")
-            follow_up = []
+            answer_text, sources = await self._generate_with_rag(
+                question, context, style="minimal"
+            )
+            follow_up: List[str] = []
             critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
             if critical_missing:
                 follow_up = self.clarifier.generate(critical_missing, round_number=1)[:2]
 
             # Mise en page card (générale)
             headline = "Réponse générale (à affiner)"
-            bullets = [
-                answer_text.strip()[:180]
-            ]
-            footnote = None
-            if missing:
-                footnote = "Précisez les champs manquants pour une cible plus précise."
+            bullets = [answer_text.strip()[:180]] if answer_text else []
+            footnote = "Précisez les champs manquants pour une cible plus précise." if missing else None
             card = build_card(
                 headline=headline,
                 bullets=bullets,
@@ -145,13 +159,23 @@ class DialogueManager:
                 sources=sources,
             )
 
+            # ✅ Correctif: toujours fournir un texte dans response.answer
+            resp_payload = format_response(answer_text, sources)
+
             context["completed_at"] = _utc_iso()
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
+
+            logger.info(
+                "🟨 DM.flow=hybrid | answer_len=%d | sources=%d | followups=%d",
+                len(answer_text or ""), len(sources or []), len(follow_up or []),
+            )
+            logger.debug("🟨 DM.ui_card.headline=%s | bullets=%s", _short(headline), bullets)
+
             return {
                 "type": "answer",
-                "response": card,  # UI belle
-                "legacy": {"answer": format_response(answer_text), "sources": sources},  # compat
+                "response": resp_payload,  # ← texte classique attendu
+                "ui_card": card,           # ← rendu UI “card”
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
@@ -159,39 +183,46 @@ class DialogueManager:
                 "metadata": {"warning": "Réponse générale — précisions requises"},
             }
 
-        # 3) Cas complet → réponse précise (RAG si possible), toujours compacte
-        answer_text, sources = await self._generate_with_rag(question, context, style="standard")
+        # 4) Complet → réponse précise (RAG si possible), compacte
+        answer_text, sources = await self._generate_with_rag(
+            question, context, style="standard"
+        )
 
         # Mise en page card (précise)
-        headline = answer_text.split("\n", 1)[0][:90] if answer_text else "Réponse"
-        # Essaie d’extraire 2–3 puces courtes ; sinon tronquer la phrase
+        headline = (answer_text.split("\n", 1)[0] if answer_text else "Réponse")[:90]
         raw_lines = [l.strip("-• ").strip() for l in (answer_text or "").split("\n") if l.strip()]
-        bullets = []
+        bullets: List[str] = []
         for l in raw_lines:
             if len(bullets) >= 3:
                 break
-            if len(l) > 130:
-                bullets.append(l[:127] + "…")
-            else:
-                bullets.append(l)
-        if not bullets:
-            bullets = [answer_text[:130] + "…"] if answer_text else []
-        footnote = None
+            bullets.append(l[:127] + "…" if len(l) > 130 else l)
+        if not bullets and answer_text:
+            bullets = [answer_text[:130] + "…"]
+
         card = build_card(
             headline=headline,
             bullets=bullets,
-            footnote=footnote,
+            footnote=None,
             followups=[],
             sources=sources,
         )
 
+        resp_payload = format_response(answer_text, sources)
+
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
+
+        logger.info(
+            "🟦 DM.flow=final | answer_len=%d | sources=%d",
+            len(answer_text or ""), len(sources or []),
+        )
+        logger.debug("🟦 DM.ui_card.headline=%s | bullets=%s", _short(headline), bullets)
+
         return {
             "type": "answer",
-            "response": card,  # UI belle
-            "legacy": {"answer": format_response(answer_text), "sources": sources},  # compat
+            "response": resp_payload,  # ← texte classique attendu
+            "ui_card": card,           # ← rendu UI “card”
             "session_id": sid,
             "completeness_score": score,
             "missing_fields": missing,
@@ -211,11 +242,19 @@ class DialogueManager:
             logger.exception("system_status error: %s", e)
             return {"status": "error", "rag_ready": False, "details": {"error": str(e)}}
 
-    # ---------------- internals ---------------- #
+    # -----------------------
+    #       INTERNALS
+    # -----------------------
 
     def _apply_broiler_fallback(self, question: str, context: Dict[str, Any]) -> None:
+        """
+        BONUS : Si la question concerne le poids et qu'on est <30 jours,
+        et qu'aucune espèce/production_type n'est fournie, on force l'index Broiler.
+        (Conserve le comportement antérieur.)
+        """
         prod = (context.get("production_type") or context.get("species") or "").lower()
         has_species = prod in {"broiler", "layer", "breeder", "pullet"}
+
         text = f"{question} {context}".lower()
         weight_like = bool(re.search(r"\b(poids|weight|body\s*weight)\b", text))
 
@@ -232,9 +271,14 @@ class DialogueManager:
             context.setdefault("hints", {})["species_inferred"] = "broiler"
             logger.debug("🐤 BONUS: species fallback → broiler (poids + <30j)")
 
-    async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> tuple[str, List[Dict[str, Any]]]:
+    async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> Tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
             ui = (context or {}).get("ui_prefs") or {}
+            # On transmet les préférences au RAG (ne force rien si non pertinent)
+            logger.debug(
+                "🔧 RAG.call | style=%s | output_format=%s | weight_only=%s",
+                style, ui.get("format", "auto"), bool(ui.get("weight_only", False))
+            )
             return self.rag.generate_answer(
                 question,
                 context,
@@ -242,22 +286,37 @@ class DialogueManager:
                 output_format=ui.get("format", "auto"),
                 weight_only=bool(ui.get("weight_only", False)),
             )
+
         try:
             raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
         except Exception as e:
             logger.exception("RAG generate_answer error: %s", e)
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
+
         if isinstance(raw, dict):
+            # Compatibilité avec rag_engine (qui renvoie response + sources/citations)
             answer_text = str(raw.get("response", "")).strip()
             sources = raw.get("sources") or _normalize_sources(raw.get("source"))
+            logger.debug(
+                "🔧 RAG.ok | text_len=%d | sources=%d | source_flag=%s",
+                len(answer_text or ""), len(sources or []), raw.get("source"),
+            )
         else:
             answer_text = str(raw).strip()
             sources = []
+            logger.debug("🔧 RAG.ok(simple) | text_len=%d", len(answer_text or ""))
+
+        # Sécurité : éviter que la chaîne soit vide
+        if not answer_text:
+            answer_text = "Je n’ai pas pu formuler une réponse exploitable pour l’instant."
+            logger.warning("⚠️ RAG réponse vide — fallback message injecté.")
+
         return (answer_text, sources)
 
     def _safe_mem_update(self, session_id: str, context: Dict[str, Any]) -> None:
         try:
             self.memory.update(session_id, context)
+            logger.debug("💾 Mémoire mise à jour | sid=%s", session_id)
         except Exception as e:
             logger.warning("Échec update mémoire (sid=%s): %s", session_id, e)
 
@@ -265,15 +324,19 @@ class DialogueManager:
         cleanup_fn = getattr(self.memory, "cleanup_expired", None)
         if not callable(cleanup_fn):
             self._cleanup_enabled = False
+            logger.debug("♻️ Cleanup mémoire désactivé (no-op).")
             return
         interval_min = int(os.getenv("CLEANUP_INTERVAL_MINUTES", "30"))
         self._cleanup_enabled = True
+
         def _loop():
             import time
+            logger.debug("♻️ Cleanup mémoire démarré | interval=%d min", interval_min)
             while True:
                 try:
                     cleanup_fn()
                 except Exception as e:
                     logger.debug("Cleanup mémoire: %s", e)
                 time.sleep(max(300, interval_min * 60))
+
         threading.Thread(target=_loop, daemon=True).start()
