@@ -1,6 +1,6 @@
 from typing import List
-from app.api.v1.utils.config import MAX_CLARIFICATION_ROUNDS
-from app.api.v1.utils.openai_utils import safe_chat_completion
+from ..utils.config import MAX_CLARIFICATION_ROUNDS
+from ..utils.openai_utils import safe_chat_completion
 
 class ClarificationManager:
     """
