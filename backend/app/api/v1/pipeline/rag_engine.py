@@ -1,276 +1,317 @@
 """
-RAGEngine - Version corrigée avec gestion robuste VectorStoreClient
-CONSERVE: Structure originale + logique RAG
-CORRIGE: 
-- Retourne un dict au lieu d'une string pour compatibilité DialogueManager
-- ✅ CORRECTION CRITIQUE: Gestion robuste résultats VectorStoreClient vides/erreurs
-- ✅ AMÉLIORATION: Fallback gracieux si Pinecone indisponible
-- ✅ AMÉLIORATION: Prompt RAG restructuré pour utiliser effectivement les documents
+RAGEngine - Multi-index species routing (broiler/layer/global) + tenant-aware
+- Charge 3 index séparés: <RAG_INDEX_ROOT>/<tenant>/<species> (ou <RAG_INDEX_ROOT>/<species> sans tenant)
+- Détecte l'espèce à partir du contexte/question
+- Sélectionne l'index correspondant; fallback vers 'global' si doute
+- Option de mix (espèce + global) si rappel faible
+- Fallback OpenAI si aucun doc
 """
+
+from __future__ import annotations
+
 import os
 import logging
-from app.api.v1.utils.integrations import VectorStoreClient
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 from app.api.v1.utils.openai_utils import safe_chat_completion
+
+try:
+    from rag.embedder import FastRAGEmbedder, create_optimized_embedder  # type: ignore
+except Exception:
+    FastRAGEmbedder = None  # type: ignore
+    create_optimized_embedder = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-class RAGEngine:
-    """
-    Retrieval-Augmented Generation engine with fallback if no vector results.
-    
-    ✅ CORRECTION CRITIQUE: Gestion robuste des erreurs VectorStoreClient
-    - Fix TypeError "list indices must be integers or slices, not str"
-    - Fallback gracieux si Pinecone indisponible
-    - Validation structure documents retournés
-    """
-    def __init__(self):
-        try:
-            self.vector_client = VectorStoreClient()
-            self.vector_available = True
-            logger.info("✅ RAGEngine: VectorStoreClient initialisé")
-        except Exception as e:
-            logger.error(f"❌ RAGEngine: Erreur init VectorStoreClient: {e}")
-            self.vector_client = None
-            self.vector_available = False
 
-    def generate_answer(self, question, context):
-        """
-        ✅ CORRECTION CRITIQUE: Gestion robuste avec validation structure docs
-        
-        Format de retour: {
-            "response": str,
-            "source": str,
-            "documents_used": int,
-            "warning": str|None
-        }
-        """
-        # ✅ Structure de retour standardisée
-        result = {
+class _IndexClient:
+    """Petit wrapper qui charge un index FAISS à un chemin donné et expose .search(query, k)."""
+
+    def __init__(self, index_path: str, model_name: str, sim_threshold: float, normalize_queries: bool, debug: bool):
+        self.index_path = index_path
+        self.embedder: Optional[FastRAGEmbedder] = None
+        self.ok = False
+
+        # Crée un embedder optimisé si disponible; sinon fallback constructeur direct
+        if create_optimized_embedder is not None:
+            self.embedder = create_optimized_embedder(
+                model_name=model_name,
+                similarity_threshold=sim_threshold,
+                normalize_queries=normalize_queries,
+                debug=debug,
+            )
+        elif FastRAGEmbedder is not None:
+            self.embedder = FastRAGEmbedder(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model_name=model_name,
+                cache_embeddings=True,
+                max_workers=int(os.getenv("RAG_MAX_WORKERS", "2")),
+                debug=debug,
+                similarity_threshold=sim_threshold,
+                normalize_queries=normalize_queries,
+            )
+
+        if self.embedder is None:
+            logger.error("No embedder available.")
+            return
+
+        try:
+            self.ok = bool(self.embedder.load_index(index_path))
+            if self.ok:
+                logger.info("Loaded index: %s", index_path)
+            else:
+                logger.warning("Failed to load index: %s", index_path)
+        except Exception as e:
+            logger.error("Error loading index %s: %s", index_path, e)
+            self.ok = False
+
+    def search(self, query: str, k: int) -> List[Dict[str, Any]]:
+        if not self.ok or self.embedder is None:
+            return []
+        try:
+            # IMPORTANT: ici on NE passe PAS species=... car l’index est déjà spécifique
+            return self.embedder.search(query, k=k)
+        except Exception as e:
+            logger.error("Search error on %s: %s", self.index_path, e)
+            return []
+
+
+class RAGEngine:
+    def __init__(self, k: int = 6) -> None:
+        self.k = int(os.getenv("RAG_TOP_K", str(k)))
+        self.model_name = os.getenv("RAG_EMBED_MODEL", "all-MiniLM-L6-v2")
+        self.sim_threshold = float(os.getenv("RAG_SIM_THRESHOLD", "0.20"))
+        self.normalize_queries = True
+        self.debug = True
+
+        self.index_root = Path(os.getenv("RAG_INDEX_ROOT", "rag_index"))
+        self.mix_with_global = True  # mélange 70/30 si peu de résultats
+        self.mix_min_docs = max(2, self.k // 3)
+
+    # ------------------ Species detection ------------------ #
+    def _infer_species(self, question: str, context: Optional[Dict[str, Any]]) -> Optional[str]:
+        ctx = context or {}
+        sp = (ctx.get("species") or ctx.get("espece") or "").lower()
+        if any(x in sp for x in ["broiler", "chair"]):
+            return "broiler"
+        if any(x in sp for x in ["layer", "pondeuse"]):
+            return "layer"
+
+        breed = (ctx.get("breed") or ctx.get("race") or "").lower()
+        if any(x in breed for x in ["ross", "cobb", "hubbard", "broiler"]):
+            return "broiler"
+        if any(x in breed for x in ["lohmann", "hy-line", "w36", "w-36", "w80", "w-80", "layer"]):
+            return "layer"
+
+        q = (question or "").lower()
+        if any(x in q for x in ["pondeuse", "layer", "lohmann", "hy-line", "ponte", "w36", "w80"]):
+            return "layer"
+        if any(x in q for x in ["broiler", "poulet de chair", "ross 308", "cobb 500"]):
+            return "broiler"
+        return None
+
+    # ------------------ Index selection ------------------ #
+    def _tenant_from_context(self, context: Optional[Dict[str, Any]]) -> Optional[str]:
+        ctx = context or {}
+        t = ctx.get("tenant_id") or ctx.get("tenant") or ctx.get("organisation")
+        return str(t) if t else None
+
+    def _index_path(self, species: str, tenant: Optional[str]) -> Path:
+        if tenant:
+            return self.index_root / tenant / species
+        return self.index_root / species
+
+    def _load_index_client(self, species: str, tenant: Optional[str]) -> _IndexClient:
+        idx_path = self._index_path(species, tenant)
+        return _IndexClient(
+            index_path=str(idx_path),
+            model_name=self.model_name,
+            sim_threshold=self.sim_threshold,
+            normalize_queries=self.normalize_queries,
+            debug=self.debug,
+        )
+
+    # ------------------ Retrieval ------------------ #
+    def _retrieve_from_species(self, question: str, tenant: Optional[str], species: str, k: int) -> List[Dict[str, Any]]:
+        client = self._load_index_client(species, tenant)
+        return client.search(question, k) if client.ok else []
+
+    def _as_docs(self, hits: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+        docs: List[Dict[str, str]] = []
+        for h in hits or []:
+            md = (h.get("metadata") or {})
+            src = md.get("file_path") or md.get("source") or md.get("path") or md.get("filename") or "unknown_source"
+            text = (h.get("text") or "").strip()
+            docs.append({"content": text, "source": str(src)})
+        return docs
+
+    # ------------------ Public API ------------------ #
+    def generate_answer(self, question: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
             "response": "",
             "source": "",
             "documents_used": 0,
-            "warning": None
+            "warning": None,
+            "citations": [],
         }
-        
-        # ✅ CORRECTION CRITIQUE: Gestion robuste recherche documentaire
-        docs = []
-        search_error = None
-        
-        if self.vector_available and self.vector_client:
-            try:
-                logger.debug(f"🔍 RAGEngine: Recherche docs pour: {question[:50]}...")
-                docs = self.vector_client.query(question)
-                
-                # ✅ VALIDATION: Vérification structure docs retournés
-                if not isinstance(docs, list):
-                    logger.warning(f"⚠️ RAGEngine: docs n'est pas une liste: {type(docs)}")
-                    docs = []
-                elif docs and not all(isinstance(doc, dict) for doc in docs):
-                    logger.warning(f"⚠️ RAGEngine: docs contient des non-dict")
-                    # Filtrer uniquement les dicts valides
-                    docs = [doc for doc in docs if isinstance(doc, dict)]
-                
-                logger.info(f"✅ RAGEngine: {len(docs)} documents trouvés")
-                
-            except Exception as e:
-                logger.error(f"❌ RAGEngine: Erreur recherche docs: {type(e).__name__}: {e}")
-                docs = []
-                search_error = str(e)
-        else:
-            logger.warning("⚠️ RAGEngine: VectorStoreClient non disponible")
-            search_error = "VectorStoreClient non disponible"
-        
-        # ✅ CORRECTION: Logique docs trouvés vs fallback
+
+        tenant = self._tenant_from_context(context)
+        species = self._infer_species(question, context)  # may be None
+
+        primary = species if species in {"broiler", "layer"} else "global"
+
+        # 1) Try primary index
+        primary_hits = self._retrieve_from_species(question, tenant, primary, self.k)
+        docs = self._as_docs(primary_hits)
+
+        # 2) Optional mix with global if weak
+        if self.mix_with_global and primary != "global" and len(docs) < self.mix_min_docs:
+            global_hits = self._retrieve_from_species(question, tenant, "global", max(2, self.k // 2))
+            docs = (docs or []) + self._as_docs(global_hits)
+
+        # 3) If still empty, try pure global as hard fallback (in case species was mis-detected)
+        if not docs and primary != "global":
+            global_hits2 = self._retrieve_from_species(question, tenant, "global", self.k)
+            docs = self._as_docs(global_hits2)
+
+        # 4) If no docs at all -> OpenAI fallback
         if not docs:
-            # ✅ FALLBACK: Pas de documents trouvés
-            logger.info("🔄 RAGEngine: Fallback OpenAI (pas de docs)")
-            fallback_prompt = self._build_fallback_prompt(question, context, search_error)
-            
-            try:
-                resp = safe_chat_completion(
-                    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-                    messages=[{"role": "user", "content": fallback_prompt}],
-                    temperature=0.0,
-                    max_tokens=512
-                )
-                
-                warning_msg = "Réponse basée sur les connaissances générales - aucun document spécifique trouvé"
-                if search_error:
-                    warning_msg += f" (Erreur recherche: {search_error})"
-                
-                result.update({
-                    "response": resp.choices[0].message.content.strip(),
-                    "source": "openai_fallback",
-                    "documents_used": 0,
-                    "warning": warning_msg
-                })
-                
-            except Exception as e:
-                logger.error(f"❌ RAGEngine: Erreur OpenAI fallback: {e}")
-                result.update({
-                    "response": "Je rencontre une difficulté technique pour répondre à votre question. Veuillez réessayer.",
-                    "source": "error_fallback",
-                    "documents_used": 0,
-                    "warning": f"Erreur technique: {str(e)}"
-                })
-        
-        else:
-            # ✅ RAG: Documents trouvés
-            logger.info(f"🎯 RAGEngine: Génération RAG avec {len(docs)} docs")
-            rag_prompt = self._build_rag_prompt(question, context, docs)
-            
-            try:
-                resp = safe_chat_completion(
-                    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-                    messages=[{"role": "user", "content": rag_prompt}],
-                    temperature=0.0,
-                    max_tokens=512
-                )
-                
-                result.update({
-                    "response": resp.choices[0].message.content.strip(),
-                    "source": "rag_enhanced",
-                    "documents_used": len(docs),
-                    "warning": None  # Pas d'avertissement pour réponse RAG complète
-                })
-                
-            except Exception as e:
-                logger.error(f"❌ RAGEngine: Erreur OpenAI RAG: {e}")
-                result.update({
-                    "response": f"Documents trouvés ({len(docs)}) mais erreur de traitement. Consultez un expert.",
-                    "source": "rag_error",
-                    "documents_used": len(docs),
-                    "warning": f"Erreur traitement RAG: {str(e)}"
-                })
-        
-        logger.debug(f"📊 RAGEngine: Réponse générée - source: {result['source']}, docs: {result['documents_used']}")
-        return result
+            return self._openai_fallback(question, context)
 
-    def _build_rag_prompt(self, question: str, context: dict, docs: list) -> str:
-        """
-        ✅ AMÉLIORATION: Construction prompt RAG avec validation docs
-        """
-        # ✅ VALIDATION: Extraction contenu docs robuste
-        doc_contents = []
-        for i, doc in enumerate(docs):
-            try:
-                if isinstance(doc, dict):
-                    # Essayer différentes clés pour le contenu
-                    content = (
-                        doc.get('text') or 
-                        doc.get('content') or 
-                        doc.get('metadata', {}).get('text') or
-                        str(doc)
-                    )
-                    doc_contents.append(f"Document {i+1}: {content}")
-                else:
-                    doc_contents.append(f"Document {i+1}: {str(doc)}")
-            except Exception as e:
-                logger.warning(f"⚠️ Erreur extraction doc {i}: {e}")
-                doc_contents.append(f"Document {i+1}: [Erreur extraction]")
-        
-        doc_content = "\n".join(doc_contents)
+        # 5) RAG prompt
+        prompt = self._build_rag_prompt(question, context, docs)
+        try:
+            resp = safe_chat_completion(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=900,
+            )
+            return {
+                "response": (resp.choices[0].message.content or "").strip(),
+                "source": "rag_enhanced",
+                "documents_used": len(docs),
+                "warning": None,
+                "citations": self._build_citations(docs),
+            }
+        except Exception as e:
+            logger.error("OpenAI error on RAG: %s", e)
+            return {
+                "response": f"Documents trouvés ({len(docs)}) mais erreur de génération. Réessayez plus tard.",
+                "source": "rag_error",
+                "documents_used": len(docs),
+                "warning": f"Erreur traitement RAG: {e}",
+                "citations": self._build_citations(docs),
+            }
+
+    # ------------------ Fallback & prompts ------------------ #
+    def _openai_fallback(self, question: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        prompt = self._build_fallback_prompt(question, context)
+        try:
+            resp = safe_chat_completion(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=700,
+            )
+            return {
+                "response": (resp.choices[0].message.content or "").strip(),
+                "source": "openai_fallback",
+                "documents_used": 0,
+                "warning": "Réponse générale : aucun document spécialisé pertinent n'a été trouvé.",
+                "citations": [],
+            }
+        except Exception as e:
+            logger.error("OpenAI fallback error: %s", e)
+            return {
+                "response": "Je rencontre un problème technique pour répondre. Veuillez réessayer.",
+                "source": "error_fallback",
+                "documents_used": 0,
+                "warning": f"Erreur technique: {e}",
+                "citations": [],
+            }
+
+    def _build_rag_prompt(self, question: str, context: Optional[Dict[str, Any]], docs: List[Dict[str, str]]) -> str:
+        doc_lines: List[str] = []
+        for i, d in enumerate(docs, 1):
+            content = (d.get("content") or "").strip()
+            if len(content) > 600:
+                content = content[:600] + "..."
+            source = d.get("source") or "unknown_source"
+            doc_lines.append(f"[Doc {i} | {source}]\n{content}")
+        docs_block = "\n\n".join(doc_lines)
         missing_info = self._identify_missing_context(context)
-        
-        prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
 
-QUESTION: {question}
+        return f"""Tu es un expert avicole (broilers & pondeuses). Utilise en priorité les extraits fournis.
 
-CONTEXTE DISPONIBLE: {context if context else "Aucun contexte spécifique fourni"}
+QUESTION
+{question}
 
-DOCUMENTS SPÉCIALISÉS TROUVÉS:
-{doc_content}
+CONTEXTE DISPONIBLE
+{context if context else "—"}
 
-INSTRUCTIONS:
-1. Utilisez PRIORITAIREMENT les informations des documents spécialisés ci-dessus
-2. Donnez une réponse pratique et précise basée sur ces documents
-3. Si les documents contiennent des informations pertinentes (même partielles), utilisez-les
-4. Complétez avec vos connaissances générales si nécessaire
-5. Mentionnez clairement les sources (documents vs connaissances générales)
+DOCUMENTS SPÉCIALISÉS
+{docs_block}
+
+CONSIGNE
+1) Appuie-toi d'abord sur les documents ci-dessus.
+2) Si une info manque, complète prudemment par les bonnes pratiques reconnues et indique clairement ce qui vient des docs.
+3) Sois clair, précis, opérationnel. Mentionne les hypothèses si nécessaire.
 
 {missing_info}
 
-Répondez de manière professionnelle et pratique en utilisant les documents fournis."""
-
-        return prompt
-
-    def _build_fallback_prompt(self, question: str, context: dict, search_error: str = None) -> str:
-        """
-        ✅ AMÉLIORATION: Prompt fallback avec mention erreur optionnelle
-        """
-        missing_info = self._identify_missing_context(context)
-        
-        situation_msg = "Aucun document spécialisé trouvé dans la base de données."
-        if search_error:
-            situation_msg += f" (Erreur technique: {search_error})"
-        
-        prompt = f"""Vous êtes un expert vétérinaire spécialisé en aviculture et nutrition animale.
-
-QUESTION: {question}
-
-CONTEXTE DISPONIBLE: {context if context else "Aucun contexte spécifique fourni"}
-
-SITUATION: {situation_msg}
-
-INSTRUCTIONS:
-1. Répondez en vous basant sur vos connaissances générales en aviculture
-2. Donnez des informations pratiques et utiles
-3. Restez professionnel et précis
-4. Mentionnez que c'est une réponse générale
-
-{missing_info}
-
-Répondez de manière professionnelle en indiquant qu'il s'agit d'une réponse générale."""
-
-        return prompt
-
-    def _identify_missing_context(self, context: dict) -> str:
-        """
-        ✅ CONSERVATION: Méthode d'identification contexte manquant
-        """
-        if not context:
-            context = {}
-            
-        missing_parts = []
-        
-        # Vérifier les informations clés pour les questions de nutrition/poids
-        if not context.get("race") and not context.get("breed"):
-            missing_parts.append("la race/lignée génétique (Ross, Cobb, Hubbard, etc.)")
-        
-        if not context.get("sexe") and not context.get("sex_category"):
-            missing_parts.append("le sexe (mâle, femelle, mixte)")
-        
-        if not context.get("age_jours") and not context.get("age_phase"):
-            missing_parts.append("l'âge précis")
-        
-        if missing_parts:
-            missing_text = f"""
-INFORMATIONS MANQUANTES POUR PLUS DE PRÉCISION:
-Pour une réponse plus précise, il serait utile de connaître : {', '.join(missing_parts)}.
-
-CONSIGNE SPÉCIALE:
-- Donnez quand même une réponse générale utile
-- Mentionnez que la réponse serait plus précise avec ces informations
-- Expliquez pourquoi ces informations sont importantes (ex: les mâles grandissent plus vite que les femelles, les différentes lignées ont des courbes de croissance différentes)
+Réponds en français.
 """
-        else:
-            missing_text = "CONTEXTE: Informations suffisantes pour une réponse précise."
-        
-        return missing_text
 
-    def get_status(self) -> dict:
-        """
-        ✅ NOUVELLE MÉTHODE: Status RAG pour diagnostics
-        """
-        status = {
-            "vector_client_available": self.vector_available,
-            "vector_client_type": type(self.vector_client).__name__ if self.vector_client else None
+    def _build_fallback_prompt(self, question: str, context: Optional[Dict[str, Any]]) -> str:
+        missing_info = self._identify_missing_context(context)
+        return f"""Tu es un expert avicole.
+
+QUESTION
+{question}
+
+CONTEXTE DISPONIBLE
+{context if context else "—"}
+
+SITUATION
+Aucun document spécialisé n'a été retrouvé par le RAG.
+
+CONSIGNE
+1) Donne une réponse générale prudente (bonnes pratiques).
+2) Explique les variations possibles (lignée, sexe, âge, etc.).
+3) Propose 2-3 questions de clarification si pertinent.
+
+{missing_info}
+
+Réponds en français et indique clairement qu'il s'agit d'une réponse générale (sans source documentaire)."""
+
+    # ------------------ Utils ------------------ #
+    def _identify_missing_context(self, context: Optional[Dict[str, Any]]) -> str:
+        ctx = context or {}
+        missing = []
+        if not (ctx.get("race") or ctx.get("breed")):
+            missing.append("la lignée (Ross, Cobb, Lohmann, etc.)")
+        if not (ctx.get("sexe") or ctx.get("sex_category")):
+            missing.append("le sexe (mâle, femelle, mixte)")
+        if not (ctx.get("age_jours") or ctx.get("age_phase")):
+            missing.append("l'âge précis (jours/semaine)")
+        if missing:
+            return "INFORMATIONS MANQUANTES\n- " + "\n- ".join(missing)
+        return "CONTEXTE jugé suffisant."
+
+    def _build_citations(self, docs: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        cites: List[Dict[str, str]] = []
+        for d in docs:
+            source = d.get("source") or "unknown_source"
+            snippet = (d.get("content") or "").replace("\n", " ")[:120]
+            cites.append({"source": source, "snippet": snippet})
+        return cites
+
+    def get_status(self) -> Dict[str, Any]:
+        return {
+            "index_root": str(self.index_root),
+            "k": self.k,
+            "embed_model": self.model_name,
+            "mix_with_global": self.mix_with_global,
         }
-        
-        if self.vector_available and hasattr(self.vector_client, 'test_connection'):
-            try:
-                status["connection_test"] = self.vector_client.test_connection()
-            except Exception as e:
-                status["connection_test"] = {"status": "error", "error": str(e)}
-        
-        return status
