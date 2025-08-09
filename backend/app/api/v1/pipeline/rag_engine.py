@@ -6,6 +6,11 @@ RAGEngine - Multi-index species routing (broiler/layer/global) + tenant-aware
 - Sélectionne l'index correspondant; fallback vers 'global' si doute
 - Option de mix (espèce + global) si rappel faible
 - Fallback OpenAI si aucun doc
+
+Extensions:
+- style: "minimal" | "standard" | "detailed"
+- output_format: "auto" | "bullets"  (force la réponse en puces)
+- weight_only: True pour ne parler QUE du poids (pas d'autres sujets)
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ class _IndexClient:
         self.embedder: Optional[FastRAGEmbedder] = None
         self.ok = False
 
-        # Crée un embedder optimisé si disponible; sinon fallback constructeur direct
+        # Crée un embedder optimisé si dispo; sinon fallback constructeur direct
         if create_optimized_embedder is not None:
             self.embedder = create_optimized_embedder(
                 model_name=model_name,
@@ -148,9 +153,17 @@ class RAGEngine:
         return docs
 
     # ------------------ Public API ------------------ #
-    def generate_answer(self, question: str, context: Optional[Dict[str, Any]] = None, *, style: str = "standard") -> Dict[str, Any]:
+    def generate_answer(
+        self,
+        question: str,
+        context: Optional[Dict[str, Any]] = None,
+        *,
+        style: str = "standard",
+        output_format: str = "auto",   # "bullets" | "auto"
+        weight_only: bool = False      # focus exclusif sur le poids
+    ) -> Dict[str, Any]:
         """
-        style: "minimal" (2-3 phrases), "standard" (3-5 phrases), "detailed" (libre).
+        style: "minimal" (2–3 phrases), "standard" (3–5 phrases), "detailed" (libre).
         """
         tenant = self._tenant_from_context(context)
         species = self._infer_species(question, context)  # may be None
@@ -173,10 +186,14 @@ class RAGEngine:
 
         # 4) If no docs at all -> OpenAI fallback
         if not docs:
-            return self._openai_fallback(question, context, style=style)
+            return self._openai_fallback(
+                question, context, style=style, output_format=output_format, weight_only=weight_only
+            )
 
-        # 5) RAG prompt (style-aware)
-        prompt = self._build_rag_prompt(question, context, docs, style=style)
+        # 5) RAG prompt (style/format/focus)
+        prompt = self._build_rag_prompt(
+            question, context, docs, style=style, output_format=output_format, weight_only=weight_only
+        )
         try:
             resp = safe_chat_completion(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
@@ -189,7 +206,7 @@ class RAGEngine:
             return {
                 "response": content,
                 "source": "rag_enhanced",
-                "sources": citations,            # ✅ exposé pour DialogueManager
+                "sources": citations,          # normalisé pour DialogueManager
                 "documents_used": len(docs),
                 "warning": None,
                 "citations": citations,
@@ -207,8 +224,18 @@ class RAGEngine:
             }
 
     # ------------------ Fallback & prompts ------------------ #
-    def _openai_fallback(self, question: str, context: Optional[Dict[str, Any]], *, style: str = "standard") -> Dict[str, Any]:
-        prompt = self._build_fallback_prompt(question, context, style=style)
+    def _openai_fallback(
+        self,
+        question: str,
+        context: Optional[Dict[str, Any]],
+        *,
+        style: str = "standard",
+        output_format: str = "auto",
+        weight_only: bool = False
+    ) -> Dict[str, Any]:
+        prompt = self._build_fallback_prompt(
+            question, context, style=style, output_format=output_format, weight_only=weight_only
+        )
         try:
             resp = safe_chat_completion(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
@@ -236,7 +263,15 @@ class RAGEngine:
                 "citations": [],
             }
 
-    def _build_rag_prompt(self, question: str, context: Optional[Dict[str, Any]], docs: List[Dict[str, str]], style: str = "standard") -> str:
+    def _build_rag_prompt(
+        self,
+        question: str,
+        context: Optional[Dict[str, Any]],
+        docs: List[Dict[str, str]],
+        style: str = "standard",
+        output_format: str = "auto",
+        weight_only: bool = False
+    ) -> str:
         doc_lines: List[str] = []
         for i, d in enumerate(docs, 1):
             content = (d.get("content") or "").strip()
@@ -253,6 +288,15 @@ class RAGEngine:
             "detailed": "Tu peux utiliser des sous-titres et listes si utile et détailler davantage le contexte et les recommandations.",
         }.get(style, "")
 
+        # 🎯 Contraintes “poids uniquement” + format bullets
+        focus_instruction = (
+            "CONCENTRE-TOI EXCLUSIVEMENT sur le poids visé à l’âge demandé. "
+            "NE PARLE PAS d’autres sujets (température, éclairage, alimentation, biosécurité, etc.). "
+        ) if weight_only else ""
+        format_instruction = (
+            "Formate la réponse en puces (3 puces max), sans titres ni paragraphes."
+        ) if output_format == "bullets" else "Ne crée pas de titres."
+
         return f"""Tu es un expert avicole (broilers & pondeuses). Utilise en priorité les extraits fournis.
 
 QUESTION
@@ -267,21 +311,37 @@ DOCUMENTS SPÉCIALISÉS
 CONSIGNE
 1) Appuie-toi d'abord sur les documents ci-dessus.
 2) Si une info manque, complète prudemment par les bonnes pratiques reconnues et indique clairement ce qui vient des docs.
-3) {style_instruction}
-4) Mentionne les hypothèses si nécessaire.
+3) {focus_instruction}{style_instruction}
+4) {format_instruction}
+5) Mentionne les hypothèses si nécessaire et donne une fourchette chiffrée si possible.
 
 {missing_info}
 
 Réponds en français.
 """
 
-    def _build_fallback_prompt(self, question: str, context: Optional[Dict[str, Any]], style: str = "standard") -> str:
+    def _build_fallback_prompt(
+        self,
+        question: str,
+        context: Optional[Dict[str, Any]],
+        *,
+        style: str = "standard",
+        output_format: str = "auto",
+        weight_only: bool = False
+    ) -> str:
         missing_info = self._identify_missing_context(context)
         style_instruction = {
             "minimal": "Réponds en 2–3 phrases max, sans titres, avec une fourchette chiffrée si possible.",
             "standard": "Réponds en 3–5 phrases, sans titres, de manière claire et opérationnelle.",
             "detailed": "Réponds de manière détaillée, avec explications et contexte si utile.",
         }.get(style, "")
+        focus_instruction = (
+            "CONCENTRE-TOI EXCLUSIVEMENT sur le poids visé à l’âge demandé. "
+            "NE PARLE PAS d’autres sujets (température, éclairage, alimentation, biosécurité, etc.). "
+        ) if weight_only else ""
+        format_instruction = (
+            "Formate la réponse en puces (3 puces max), sans titres ni paragraphes."
+        ) if output_format == "bullets" else "Ne crée pas de titres."
         return f"""Tu es un expert avicole.
 
 QUESTION
@@ -295,8 +355,9 @@ Aucun document spécialisé n'a été retrouvé par le RAG.
 
 CONSIGNE
 1) Donne une réponse générale prudente.
-2) Explique les variations possibles (lignée, sexe, âge, etc.).
+2) {focus_instruction}Explique uniquement les variations de poids possibles (lignée, sexe, âge).
 3) {style_instruction}
+4) {format_instruction}
 
 {missing_info}
 
