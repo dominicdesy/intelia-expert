@@ -15,11 +15,29 @@ except Exception:
     anyio = None  # type: ignore
 
 from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD
-from ..utils.response_generator import format_response
+from ..utils.response_generator import format_response, build_card
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
 from .postgres_memory import PostgresMemory as ConversationMemory
 from .rag_engine import RAGEngine
+
+# NEW utils & policy (imports adaptés à votre arborescence)
+try:
+    from app.api.v1.utils.formulas import (
+        estimate_water_intake_l_per_1000,
+        min_ventilation_m3h_per_kg,
+    )
+    from app.api.v1.utils.units import fmt_value_unit
+    from app.api.v1.pipeline.policy.safety_rules import requires_vet_redirect
+except Exception:  # safe fallbacks if new modules not yet present
+    def estimate_water_intake_l_per_1000(*args, **kwargs):
+        return None, {}
+    def min_ventilation_m3h_per_kg(*args, **kwargs):
+        return None, {}
+    def fmt_value_unit(value, unit):
+        return (value, unit)
+    def requires_vet_redirect(text: str) -> Optional[str]:
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +48,40 @@ try:
 except Exception:
     logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
 
-# Champs critiques (utilisés conditionnellement selon l’intention)
+# Champs critiques communs
 BASE_CRITICAL_FIELDS = {"race", "sexe"}
+
+# ---------------- Intents ---------------- #
+_INTENTS = [
+    ("weight", r"\b(poids|weight|bw|cible|id[ée]al)\b"),
+    ("fcr", r"\b(fcr|feed\s*conversion|indice\s+de\s+consommation)\b"),
+    ("water_intake", r"\b(eau|water\s+intake|consommation\s+d['e]au)\b"),
+    ("environment", r"\b(temp[ée]rature|humidity|humidi|ventilation|nh3|ammoniac|co2)\b"),
+    ("lighting", r"\b(lumi[eè]re|photop[ée]riode|lux|lumens)\b"),
+    ("nutrition_targets", r"\b(prot[ée]ine|lysine|kcal\/kg|[ée]nergie|phosphore|calcium)\b"),
+    ("compliance", r"\b(label\s+rouge|plein\s+air|cahier\s+des\s+charges|cat[ée]gorie\s+a\+?)\b"),
+    ("diagnostic_triage", r"\b(baisse\s+ponte|mortalit[ée]|coquilles\s+molle|stress|picage|diarrh[ée]e)\b"),
+    ("costing", r"\b(co[uû]t|chauffage|aliment|feed\s+cost)\b"),
+]
+
+def _infer_intent(text: str) -> str:
+    t = (text or "").lower()
+    for name, rx in _INTENTS:
+        if re.search(rx, t, re.I):
+            return name
+    return "general"
+
+# Champs critiques par intention
+INTENT_CRITICALS = {
+    "weight": {"age"},
+    "fcr": {"age"},
+    "water_intake": {"age"},
+    "nutrition_targets": {"age", "type_aliment"},
+    "lighting": {"age"},
+    "diagnostic_triage": {"age"},
+    "compliance": {"pays"},
+    "costing": {"age"},
+}
 
 # --- Helpers temps ---
 def _utc_iso() -> str:
@@ -47,19 +97,10 @@ def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
         return [raw]
     return [{"source": str(raw)}]
 
-# --- Intention ---
-_WEIGHT_RX = re.compile(r"\b(poids|weight|body\s*weight|bw|cible|id[ée]al)\b", re.I)
-
-def _infer_intent(text: str) -> str:
-    t = (text or "").lower()
-    return "weight" if _WEIGHT_RX.search(t) else "general"
-
 
 class DialogueManager:
-    """
-    Orchestrateur principal (extraction -> clarification -> RAG -> mémoire)
-    Compatible expert.py
-    """
+    """Orchestrateur principal (extraction -> clarification -> compute/RAG -> mémoire)"""
+
     _instance: Optional["DialogueManager"] = None
     _lock = threading.Lock()
 
@@ -92,7 +133,7 @@ class DialogueManager:
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         sid = session_id or str(uuid4())
-        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, question[:120])
+        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, (question or "")[:120])
 
         # 0) mémoire (tolérante)
         try:
@@ -106,6 +147,18 @@ class DialogueManager:
         if user_id:
             context.setdefault("user_id", user_id)
 
+        # 🔒 Garde-fou santé/posologie
+        vet_msg = requires_vet_redirect(question)
+        if vet_msg:
+            logger.info("🛡️ Policy santé: redirection vétérinaire")
+            return {
+                "type": "policy_redirect",
+                "response": format_response(vet_msg),
+                "session_id": sid,
+                "completeness_score": 1.0,
+                "missing_fields": [],
+            }
+
         # 1) Extraction
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
@@ -115,54 +168,41 @@ class DialogueManager:
         context["last_intent"] = intent
 
         # 1c) Champs critiques dynamiques
-        critical_fields = set(BASE_CRITICAL_FIELDS)
-        if intent == "weight":
-            # Pour l’intention poids, l’âge est critique
-            critical_fields.add("age")
-            # Si pas d’âge explicite, déclarer manquant et forcer la clarification/hybride
-            has_age = bool(
-                context.get("age_jours")
-                or context.get("age")
-                or context.get("age_days")
-            )
-            if not has_age:
-                if "age" not in missing and "age_jours" not in missing:
-                    missing = list(missing) + ["age"]
-                score = min(score, 0.2)
+        critical_fields = set(BASE_CRITICAL_FIELDS) | INTENT_CRITICALS.get(intent, set())
+        has_age = bool(context.get("age_jours") or context.get("age") or context.get("age_days"))
+        if "age" in critical_fields and not has_age:
+            if "age" not in missing and "age_jours" not in missing:
+                missing = list(missing) + ["age"]
+            score = min(score, 0.2)
 
-        logger.info("🟩 DM.extract | score=%.2f (seuil=%.2f) | missing=%s", score, COMPLETENESS_THRESHOLD, missing)
+        logger.info("🟩 DM.extract | intent=%s | score=%.2f (seuil=%.2f) | missing=%s", intent, score, COMPLETENESS_THRESHOLD, missing)
 
-        # 1d) Réutilisation mémoire (âge) si intention poids et âge manquant
-        if intent == "weight":
-            age_present = bool(context.get("age_jours") or context.get("age") or context.get("age_days"))
-            if not age_present:
-                try:
-                    prev_ctx = self.memory.get(sid) or {}
-                except Exception:
-                    prev_ctx = {}
-                last_age = prev_ctx.get("age_jours") or prev_ctx.get("age_days") or prev_ctx.get("age")
-                if last_age:
-                    context.setdefault("age_jours", last_age)
-                    # si on a pu récupérer un âge, on peut remonter un peu le score
-                    score = max(score, 0.35)
+        # 1d) Réutilisation mémoire (âge) si manquant
+        if "age" in critical_fields and not has_age:
+            try:
+                prev_ctx = self.memory.get(sid) or {}
+            except Exception:
+                prev_ctx = {}
+            last_age = prev_ctx.get("age_jours") or prev_ctx.get("age_days") or prev_ctx.get("age")
+            if last_age:
+                context.setdefault("age_jours", last_age)
+                score = max(score, 0.35)
 
-        # 1e) Hints UI pour RAG (force le rendu)
+        # 1e) Hints UI
         context.setdefault("ui_style", {})
-        if intent == "weight":
-            context["ui_style"].update({"style": "minimal", "format": "bullets", "weight_only": True})
+        if intent in {"weight", "fcr", "nutrition_targets", "water_intake", "environment", "lighting"}:
+            context["ui_style"].update({"style": "minimal", "format": "bullets", "weight_only": intent == "weight"})
         else:
             context["ui_style"].update({"style": "standard", "format": "auto", "weight_only": False})
 
-        # 2) Clarification si score très bas
+        # 2) Si score trop bas → clarifs / mode hybride
         if score < COMPLETENESS_THRESHOLD:
-            # Cas très bas : on ne tente pas d’inférer, on clarifie d’abord
             if score < 0.2:
-                # Clarification ciblée (si poids → demander explicitement l’âge)
-                if intent == "weight" and ("age" in missing or "age_jours" in missing):
-                    questions = ["À quel âge (en jours) souhaites-tu la cible ? (ex. 12 j)"]
+                # clarifs directes
+                if "age" in critical_fields and ("age" in missing or "age_jours" in missing):
+                    questions = ["À quel âge (en jours) ? (ex. 21 j)"]
                 else:
-                    questions = self.clarifier.generate(missing)
-
+                    questions = self.clarifier.generate(missing, language=context.get("language"), intent=intent)
                 context["last_interaction"] = _utc_iso()
                 self._safe_mem_update(sid, context)
                 return {
@@ -173,27 +213,19 @@ class DialogueManager:
                     "missing_fields": missing,
                 }
 
-            # ✅ MODE HYBRIDE : réponse courte + questions critiques
-            answer_text, sources = await self._generate_with_rag(question, context)
+            # mode hybride: courte réponse + follow-ups essentiels
+            answer_text, sources = await self._answer_via_compute_or_rag(question, context, intent)
 
             follow_up: List[str] = []
-            # ne demander que l’essentiel
             to_check = {"race", "sexe"}
-            if intent == "weight":
+            if "age" in critical_fields:
                 to_check.add("age")
             critical_missing = [f for f in missing if (f in to_check or f in {"age_jours"})]
             if critical_missing:
-                if intent == "weight" and ("age" in critical_missing or "age_jours" in critical_missing):
-                    follow_up = ["À quel âge (en jours) souhaites-tu la cible ? (ex. 12 j)"]
-                else:
-                    follow_up = self.clarifier.generate(critical_missing, round_number=1)
+                follow_up = self.clarifier.generate(critical_missing, round_number=1, language=context.get("language"), intent=intent)
                 if follow_up:
                     if answer_text:
-                        answer_text = (
-                            f"{answer_text}\n\n"
-                            "❓ Pour être précis :\n"
-                            + "\n".join(f"- {q}" for q in follow_up)
-                        )
+                        answer_text = f"{answer_text}\n\n❓ Pour être précis :\n" + "\n".join(f"- {q}" for q in follow_up)
                     else:
                         answer_text = "❓ Pour être précis :\n" + "\n".join(f"- {q}" for q in follow_up)
 
@@ -201,11 +233,8 @@ class DialogueManager:
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
             warn = (
-                f"Réponse générale — précisez {', '.join(missing[:2])} pour plus de précision"
-                if missing else "Réponse générale"
+                f"Réponse générale — précisez {', '.join(missing[:2])} pour plus de précision" if missing else "Réponse générale"
             )
-            logger.info("🟨 DM.flow=hybrid | text_len=%s | sources=%s | followups=%s",
-                        len(answer_text or ""), len(sources or []), len(follow_up))
             return {
                 "type": "answer",
                 "response": {"answer": format_response(answer_text), "sources": sources},
@@ -217,11 +246,10 @@ class DialogueManager:
             }
 
         # 3) Réponse complète
-        answer_text, sources = await self._generate_with_rag(question, context)
+        answer_text, sources = await self._answer_via_compute_or_rag(question, context, intent)
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
-        logger.info("🟦 DM.flow=final | text_len=%s | sources=%s", len(answer_text or ""), len(sources or []))
         return {
             "type": "answer",
             "response": {"answer": format_response(answer_text), "sources": sources},
@@ -230,23 +258,44 @@ class DialogueManager:
             "missing_fields": missing,
         }
 
-    async def system_status(self) -> Dict[str, Any]:
-        try:
-            rag_ready = True
-            if hasattr(self.rag, "is_ready"):
-                rag_ready = bool(self.rag.is_ready())
-            return {
-                "status": "ok" if rag_ready else "degraded",
-                "rag_ready": rag_ready,
-                "details": {"cleanup_enabled": bool(getattr(self, "_cleanup_enabled", False))},
-            }
-        except Exception as e:
-            logger.exception("system_status error: %s", e)
-            return {"status": "error", "rag_ready": False, "details": {"error": str(e)}}
-
     # -----------------------
     #       INTERNALS
     # -----------------------
+    async def _answer_via_compute_or_rag(self, question: str, context: Dict[str, Any], intent: str) -> Tuple[str, List[Dict[str, Any]]]:
+        """Certaines intentions passent d'abord par un calcul natif, sinon RAG."""
+        try:
+            if intent == "water_intake":
+                age = context.get("age_jours")
+                ambient_c = context.get("ambient_c") or context.get("temperature")
+                value, details = estimate_water_intake_l_per_1000(age_days=age, ambient_c=ambient_c, species=context.get("species"))
+                if value is not None:
+                    v, u = fmt_value_unit(value, "L/j/1000")
+                    card = build_card(
+                        headline=f"~{int(round(v))} {u}",
+                        bullets=[
+                            f"Âge: {age} j" if age else "Âge estimé",
+                            f"Temp. ambiante: {ambient_c}°C" if ambient_c else "Température moyenne supposée",
+                            "Source: formules internes + guides (eau)"
+                        ],
+                        footnote="Affiner avec l'âge exact et la température réelle.",
+                    )
+                    return (card["headline"] + "\n- " + "\n- ".join(card["bullets"]) + ("\n" + card.get("footnote", "") if card.get("footnote") else ""), [])
+
+            if intent == "environment":
+                # Exemple: ventilation minimale générique (si poids/âge connus)
+                age = context.get("age_jours")
+                avg_bw_g = context.get("poids_moyen_g")
+                per_kg, details = min_ventilation_m3h_per_kg(age_days=age, avg_bw_g=avg_bw_g)
+                if per_kg is not None:
+                    v, u = fmt_value_unit(per_kg, "m³/h/kg")
+                    text = f"Ventilation minimale estimée: ~{v:.2f} {u} (à ajuster selon T°, NH₃/CO₂)."
+                    return (text, [])
+        except Exception as e:
+            logger.debug("compute-first error: %s", e)
+
+        # sinon RAG
+        return await self._generate_with_rag(question, context)
+
     async def _generate_with_rag(self, question: str, context: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
             return self.rag.generate_answer(question, context)
@@ -260,8 +309,7 @@ class DialogueManager:
         if isinstance(raw, dict):
             answer_text = (raw.get("response") or "").strip()
             if not answer_text:
-                # garde‑fou pour éviter “réponse vide”
-                answer_text = "Désolé, je n’ai pas pu formater la réponse. Peux-tu reformuler en précisant la lignée et l’âge ?"
+                answer_text = "Désolé, je n’ai pas pu formater la réponse. Peux-tu préciser la lignée et l’âge ?"
             sources = _normalize_sources(raw.get("sources") or raw.get("citations") or raw.get("source"))
         else:
             answer_text = str(raw).strip() or "Désolé, je n’ai pas pu formater la réponse."
