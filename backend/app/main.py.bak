@@ -792,7 +792,7 @@ async def root():
             "expert_feedback": "/api/v1/expert/feedback ← MAINTENANT 100% FONCTIONNEL + FALLBACK",
             "expert_topics": "/api/v1/expert/topics ← MAINTENANT 100% FONCTIONNEL + FALLBACK",
             "expert_system_status": "/api/v1/expert/system-status ← MAINTENANT 100% FONCTIONNEL + FALLBACK",
-            "conversations": "/api/v1/conversations/user/{user_id}",
+            "conversations": "/api/v1/logging/conversations/user/{user_id}",
             "health": "/api/v1/health",
             "system": "/api/v1/system"
         },
