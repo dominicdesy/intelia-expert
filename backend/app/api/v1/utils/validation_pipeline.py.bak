@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Tuple
-from .config import MAX_CLARIFICATION_ROUNDS
-from .question_classifier import classify_question, REQUIRED_FIELDS_BY_TYPE
+from app.api.v1.utils.config import MAX_CLARIFICATION_ROUNDS
+from app.api.v1.utils.question_classifier import classify_question, REQUIRED_FIELDS_BY_TYPE
 
 def validate_and_score(context: Dict[str, Any], question: str) -> Tuple[float, List[str]]:
     """

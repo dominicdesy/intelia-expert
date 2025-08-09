@@ -13,12 +13,12 @@ import time
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any
-from app.api.v1.pipeline.context_extractor import ContextExtractor
-from app.api.v1.pipeline.clarification_manager import ClarificationManager
-from app.api.v1.pipeline.postgres_memory import PostgresMemory as ConversationMemory
-from app.api.v1.pipeline.rag_engine import RAGEngine
-from app.api.v1.utils.config import COMPLETENESS_THRESHOLD
-from app.api.v1.utils.response_generator import format_response
+from .context_extractor import ContextExtractor
+from .clarification_manager import ClarificationManager
+from .postgres_memory import PostgresMemory as ConversationMemory
+from .rag_engine import RAGEngine
+from ..utils.config import COMPLETENESS_THRESHOLD
+from ..utils.response_generator import format_response
 
 # Configuration logging pour debug
 logging.basicConfig(level=logging.INFO)
