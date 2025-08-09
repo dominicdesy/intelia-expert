@@ -15,7 +15,7 @@ except Exception:
     anyio = None  # type: ignore
 
 from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD
-from ..utils.response_generator import format_response
+from ..utils.response_generator import format_response, build_card
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
 from .postgres_memory import PostgresMemory as ConversationMemory
@@ -29,7 +29,6 @@ try:
 except Exception:
     logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
 
-# Champs critiques pour passer en mode hybride (réponse courte + questions)
 CRITICAL_FIELDS = {"race", "sexe"}
 
 def _utc_iso() -> str:
@@ -70,10 +69,6 @@ class DialogueManager:
         except Exception as e:
             logger.warning("Nettoyage de sessions non démarré: %s", e)
 
-    # -----------------------
-    #         PUBLIC
-    # -----------------------
-
     async def handle(
         self,
         session_id: Optional[str],
@@ -83,7 +78,7 @@ class DialogueManager:
     ) -> Dict[str, Any]:
         sid = session_id or str(uuid4())
 
-        # mémoire (tolérante)
+        # mémoire
         try:
             context: Dict[str, Any] = self.memory.get(sid) or {}
         except Exception as e:
@@ -95,17 +90,17 @@ class DialogueManager:
         if user_id:
             context.setdefault("user_id", user_id)
 
-        # 1) Extraction
+        # Extraction
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # 🎯 Détection "mode poids" (focus poids + format bullets)
-        weight_mode = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
-        ui_prefs = context.setdefault("ui_prefs", {})
-        ui_prefs["weight_only"] = weight_mode
-        ui_prefs["format"] = "bullets" if weight_mode else ui_prefs.get("format", "auto")
+        # UI prefs neutres par défaut
+        ui = context.setdefault("ui_prefs", {})
+        # On force le mode bullets uniquement si l'utilisateur demande explicitement un "poids"
+        ui["weight_only"] = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
+        ui["format"] = "bullets" if ui["weight_only"] else ui.get("format", "auto")
 
-        # ✅ BONUS : heuristique “fallback broiler” (poids < 30 jours → broiler)
+        # BONUS : heuristique broiler (inchangé)
         self._apply_broiler_fallback(question, context)
 
         logger.info("Q: %s", question[:120])
@@ -113,64 +108,90 @@ class DialogueManager:
         if missing:
             logger.info("Champs manquants: %s", missing)
 
-        # 2) Clarification si score très bas
+        # 1) Cas très incomplet → questions de clarification (pures)
+        if score < 0.2:
+            questions = self.clarifier.generate(missing)
+            context["last_interaction"] = _utc_iso()
+            self._safe_mem_update(sid, context)
+            return {
+                "type": "clarification",
+                "questions": questions,
+                "session_id": sid,
+                "completeness_score": score,
+                "missing_fields": missing,
+            }
+
+        # 2) Cas partiel (< seuil) → réponse générale courte + 2 questions ciblées
         if score < COMPLETENESS_THRESHOLD:
-            if score < 0.2:
-                questions = self.clarifier.generate(missing)
-                context["last_interaction"] = _utc_iso()
-                self._safe_mem_update(sid, context)
-                return {
-                    "type": "clarification",
-                    "questions": questions,
-                    "session_id": sid,
-                    "completeness_score": score,
-                    "missing_fields": missing,
-                }
-
-            # ✅ MODE HYBRIDE : réponse courte + questions ciblées (race/sexe)
-            answer_text, sources = await self._generate_with_rag(
-                question,
-                context,
-                style="minimal",
-            )
-
-            follow_up: List[str] = []
+            answer_text, sources = await self._generate_with_rag(question, context, style="minimal")
+            follow_up = []
             critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
             if critical_missing:
-                follow_up = self.clarifier.generate(critical_missing, round_number=1)
-                if follow_up:
-                    # format court + questions
-                    answer_text = f"{answer_text}\n\nPour affiner :\n" + "\n".join(f"- {q}" for q in follow_up)
+                follow_up = self.clarifier.generate(critical_missing, round_number=1)[:2]
+
+            # Mise en page card (générale)
+            headline = "Réponse générale (à affiner)"
+            bullets = [
+                answer_text.strip()[:180]
+            ]
+            footnote = None
+            if missing:
+                footnote = "Précisez les champs manquants pour une cible plus précise."
+            card = build_card(
+                headline=headline,
+                bullets=bullets,
+                footnote=footnote,
+                followups=follow_up,
+                sources=sources,
+            )
 
             context["completed_at"] = _utc_iso()
             context["last_interaction"] = _utc_iso()
             self._safe_mem_update(sid, context)
-            warn = (
-                f"Réponse générale — précisez {', '.join(missing[:2])} pour plus de précision"
-                if missing else "Réponse générale"
-            )
             return {
                 "type": "answer",
-                "response": {"answer": format_response(answer_text), "sources": sources},
+                "response": card,  # UI belle
+                "legacy": {"answer": format_response(answer_text), "sources": sources},  # compat
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
                 "follow_up_questions": follow_up,
-                "metadata": {"warning": warn},
+                "metadata": {"warning": "Réponse générale — précisions requises"},
             }
 
-        # 3) Réponse complète (style standard, compacte)
-        answer_text, sources = await self._generate_with_rag(
-            question,
-            context,
-            style="standard",
+        # 3) Cas complet → réponse précise (RAG si possible), toujours compacte
+        answer_text, sources = await self._generate_with_rag(question, context, style="standard")
+
+        # Mise en page card (précise)
+        headline = answer_text.split("\n", 1)[0][:90] if answer_text else "Réponse"
+        # Essaie d’extraire 2–3 puces courtes ; sinon tronquer la phrase
+        raw_lines = [l.strip("-• ").strip() for l in (answer_text or "").split("\n") if l.strip()]
+        bullets = []
+        for l in raw_lines:
+            if len(bullets) >= 3:
+                break
+            if len(l) > 130:
+                bullets.append(l[:127] + "…")
+            else:
+                bullets.append(l)
+        if not bullets:
+            bullets = [answer_text[:130] + "…"] if answer_text else []
+        footnote = None
+        card = build_card(
+            headline=headline,
+            bullets=bullets,
+            footnote=footnote,
+            followups=[],
+            sources=sources,
         )
+
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
         return {
             "type": "answer",
-            "response": {"answer": format_response(answer_text), "sources": sources},
+            "response": card,  # UI belle
+            "legacy": {"answer": format_response(answer_text), "sources": sources},  # compat
             "session_id": sid,
             "completeness_score": score,
             "missing_fields": missing,
@@ -190,19 +211,11 @@ class DialogueManager:
             logger.exception("system_status error: %s", e)
             return {"status": "error", "rag_ready": False, "details": {"error": str(e)}}
 
-    # -----------------------
-    #       INTERNALS
-    # -----------------------
+    # ---------------- internals ---------------- #
 
     def _apply_broiler_fallback(self, question: str, context: Dict[str, Any]) -> None:
-        """
-        ✅ BONUS : Si la question concerne le poids et qu'on est <30 jours,
-        et qu'aucune espèce/production_type n'est fournie, on force l'index Broiler.
-        """
         prod = (context.get("production_type") or context.get("species") or "").lower()
         has_species = prod in {"broiler", "layer", "breeder", "pullet"}
-
-        # détecter notion de poids
         text = f"{question} {context}".lower()
         weight_like = bool(re.search(r"\b(poids|weight|body\s*weight)\b", text))
 
@@ -221,7 +234,6 @@ class DialogueManager:
 
     async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
-            # ⚠️ on passe le style + préférences UI (poids/bullets) au RAG
             ui = (context or {}).get("ui_prefs") or {}
             return self.rag.generate_answer(
                 question,
@@ -237,7 +249,6 @@ class DialogueManager:
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
         if isinstance(raw, dict):
             answer_text = str(raw.get("response", "")).strip()
-            # de préférence, utiliser "sources" si présent (citations normalisées)
             sources = raw.get("sources") or _normalize_sources(raw.get("source"))
         else:
             answer_text = str(raw).strip()
