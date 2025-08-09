@@ -31,13 +31,6 @@ except Exception:
 
 CRITICAL_FIELDS = {"race", "sexe"}  # ✅ utilisé par le mode hybride
 
-# 🔧 Nouveau : paramètres de concision pour le mode hybride
-HYBRID_CONCISE = {
-    "enabled": True,
-    "max_sentences": 2,   # 1–2 phrases max
-    "max_chars": 300,     # et ~300 caractères
-}
-
 def _utc_iso() -> str:
     return datetime.utcnow().isoformat()
 
@@ -127,29 +120,15 @@ class DialogueManager:
                     "missing_fields": missing,
                 }
 
-            # ✅ MODE HYBRIDE : réponse générale + questions ciblées (race/sexe prioritaire)
-            answer_text, sources = await self._generate_with_rag(question, context)
-
-            # 🔹 NOUVEAU : rendre le texte concis si des champs critiques manquent
-            critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
-            if HYBRID_CONCISE.get("enabled") and critical_missing:
-                answer_text = self._to_concise_hybrid(
-                    original=answer_text,
-                    question=question,
-                    context=context,
-                    max_sentences=int(HYBRID_CONCISE["max_sentences"]),
-                    max_chars=int(HYBRID_CONCISE["max_chars"]),
-                )
+            # ✅ MODE HYBRIDE : réponse générale courte + questions ciblées (race/sexe)
+            answer_text, sources = await self._generate_with_rag(question, context, style="minimal")
 
             follow_up: List[str] = []
+            critical_missing = [f for f in missing if f in CRITICAL_FIELDS]
             if critical_missing:
                 follow_up = self.clarifier.generate(critical_missing, round_number=1)
                 if follow_up:
-                    answer_text = (
-                        f"{answer_text}\n\n"
-                        "Pour affiner :\n"
-                        + "\n".join(f"- {q}" for q in follow_up)
-                    )
+                    answer_text = f"{answer_text}\n\nPour affiner :\n" + "\n".join(f"- {q}" for q in follow_up)
 
             context["completed_at"] = _utc_iso()
             context["last_interaction"] = _utc_iso()
@@ -168,8 +147,8 @@ class DialogueManager:
                 "metadata": {"warning": warn},
             }
 
-        # 3) Réponse complète
-        answer_text, sources = await self._generate_with_rag(question, context)
+        # 3) Réponse complète (style standard, toujours compacte)
+        answer_text, sources = await self._generate_with_rag(question, context, style="standard")
         context["completed_at"] = _utc_iso()
         context["last_interaction"] = _utc_iso()
         self._safe_mem_update(sid, context)
@@ -224,9 +203,10 @@ class DialogueManager:
             context.setdefault("hints", {})["species_inferred"] = "broiler"
             logger.debug("🐤 BONUS: species fallback → broiler (poids + <30j)")
 
-    async def _generate_with_rag(self, question: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
+    async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
-            return self.rag.generate_answer(question, context)
+            # ⚠️ on passe le style au moteur RAG
+            return self.rag.generate_answer(question, context, style=style)
         try:
             raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
         except Exception as e:
@@ -234,50 +214,12 @@ class DialogueManager:
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
         if isinstance(raw, dict):
             answer_text = str(raw.get("response", "")).strip()
-            sources = _normalize_sources(raw.get("sources") or raw.get("source"))
+            # on passe de préférence la clé "sources" (citations) si fournie
+            sources = raw.get("sources") or _normalize_sources(raw.get("source"))
         else:
             answer_text = str(raw).strip()
             sources = []
         return (answer_text, sources)
-
-    # 🔧 Nouveau : filtre “réponse courte” pour le mode hybride
-    def _to_concise_hybrid(
-        self,
-        original: str,
-        question: str,
-        context: Dict[str, Any],
-        max_sentences: int = 2,
-        max_chars: int = 300,
-    ) -> str:
-        """
-        Condense une réponse RAG en 1–2 phrases lisibles.
-        - Supprime les titres/listes/sections
-        - Garde les 1ères phrases informatives
-        - Coupe proprement à ~max_chars
-        """
-        text = original or ""
-        # 1) retirer markdown/sections lourdes
-        text = re.sub(r"^#{1,6}\s.*$", "", text, flags=re.MULTILINE)               # titres
-        text = re.sub(r"^\s*[-•*]\s+.*$", "", text, flags=re.MULTILINE)            # listes
-        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)                     # blocs code
-        text = re.sub(r"\n{2,}", "\n", text).strip()
-
-        # 2) extraire phrases
-        # split grossier sur . ! ? suivi d'espace/nouvelle ligne
-        parts = re.split(r"(?<=[\.\!\?])\s+", text)
-        parts = [p.strip() for p in parts if p.strip()]
-
-        if not parts:
-            return original
-
-        concise = " ".join(parts[:max_sentences]).strip()
-
-        # 3) si trop long, couper à une limite douce (sans casser un mot)
-        if len(concise) > max_chars:
-            cut = concise[:max_chars].rsplit(" ", 1)[0].rstrip(",;:")
-            concise = f"{cut}…"
-
-        return concise
 
     def _safe_mem_update(self, session_id: str, context: Dict[str, Any]) -> None:
         try:
