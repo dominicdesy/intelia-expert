@@ -1,68 +1,62 @@
-# Multi-stage Docker build for Intelia Expert API
-FROM python:3.11-slim as builder
+# ---- Builder stage -----------------------------------------------------------
+FROM python:3.11-slim AS builder
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+# build deps for some wheels
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ \
+ && rm -rf /var/lib/apt/lists/*
 
-# Create and set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt .
+# deps first for caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Production stage
+# ---- Runtime stage -----------------------------------------------------------
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PORT=8000
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000
 
-# Create non-root user
+# non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# runtime deps: curl for healthcheck, libgomp1 for faiss/sentence-transformers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder
+# copy python from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code INCLUDING RAG
-COPY backend/ ./backend/
-COPY core/ ./core/
+# copy app code
+COPY app/ ./app/
 COPY rag/ ./rag/
 COPY rag_index/ ./rag_index/
-COPY .streamlit/ ./.streamlit/
 
-# Create necessary directories and set permissions
+# RAG index envs (adaptées à ton arbo)
+ENV RAG_INDEX_DIR=/app/rag_index \
+    RAG_INDEX_BROILER=/app/rag_index/broiler \
+    RAG_INDEX_LAYER=/app/rag_index/layer \
+    RAG_INDEX_GLOBAL=/app/rag_index/global
+
+# permissions
 RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
 USER appuser
 
-# Expose port
 EXPOSE $PORT
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:$PORT/health || exit 1
+# healthcheck -> tes routes santé sont exposées via /api/v1/health
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+  CMD curl -fsS http://localhost:$PORT/api/v1/health || exit 1
 
-# Start command
-CMD ["sh", "-c", "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
+# start API
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
