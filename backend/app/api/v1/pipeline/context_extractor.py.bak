@@ -3,9 +3,9 @@ import re
 import json
 import logging
 from typing import Dict, List, Tuple, Any
-from ..utils.entity_normalizer import EntityNormalizer
-from ..utils.validation_pipeline import validate_and_score
-from ..utils.openai_utils import safe_chat_completion
+from app.api.v1.utils.entity_normalizer import EntityNormalizer
+from app.api.v1.utils.validation_pipeline import validate_and_score
+from app.api.v1.utils.openai_utils import safe_chat_completion
 
 # Configuration du logging
 logger = logging.getLogger(__name__)

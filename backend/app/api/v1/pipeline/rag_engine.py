@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.api.v1.utils.openai_utils import safe_chat_completion
+from ..utils.openai_utils import safe_chat_completion
 
 try:
     from rag.embedder import FastRAGEmbedder, create_optimized_embedder  # type: ignore
