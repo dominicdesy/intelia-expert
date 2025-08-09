@@ -15,7 +15,28 @@ except Exception:
     anyio = None  # type: ignore
 
 from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD
-from ..utils.response_generator import format_response, build_card
+
+# --- format_response + build_card (avec secours si build_card absent) ---
+try:
+    from ..utils.response_generator import format_response, build_card  # type: ignore
+except Exception:
+    from ..utils.response_generator import format_response  # type: ignore
+
+    def build_card(
+        headline: str,
+        bullets: List[str],
+        footnote: Optional[str] = None,
+        followups: Optional[List[str]] = None,
+        sources: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "headline": headline,
+            "bullets": bullets,
+            "footnote": footnote,
+            "followups": followups or [],
+            "sources": sources or [],
+        }
+
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
 from .postgres_memory import PostgresMemory as ConversationMemory
@@ -32,6 +53,13 @@ except Exception:
 
 # Champs critiques pour la clarification ciblée
 CRITICAL_FIELDS = {"race", "sexe"}
+
+# Présentation UI
+MAX_BULLET_LEN = 220  # puces moins tronquées
+CLARIF_TEXT = (
+    "Pour affiner : quelle est la lignée (Ross, Cobb, Hubbard, etc.) "
+    "et le sexe du lot (mâles, femelles ou mixte) ?"
+)
 
 # --------- Utils locaux ---------
 def _utc_iso() -> str:
@@ -108,7 +136,7 @@ class DialogueManager:
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # Préférences UI (ne force rien sauf si l'utilisateur demande le poids)
+        # Préférences UI (ne force rien sauf si l'utilisateur parle de poids)
         ui = context.setdefault("ui_prefs", {})
         ui["weight_only"] = bool(re.search(r"\b(poids|weight|body\s*weight)\b", (question or "").lower()))
         ui["format"] = "bullets" if ui["weight_only"] else ui.get("format", "auto")
@@ -147,19 +175,33 @@ class DialogueManager:
             if critical_missing:
                 follow_up = self.clarifier.generate(critical_missing, round_number=1)[:2]
 
-            # Mise en page card (générale)
-            headline = "Réponse générale (à affiner)"
-            bullets = [answer_text.strip()[:180]] if answer_text else []
+            # Injecter la question de clarification dans le TEXTE (visible même si le front ignore follow_up)
+            if critical_missing:
+                if answer_text and not answer_text.strip().endswith("?"):
+                    answer_text = answer_text.strip() + "\n\n" + CLARIF_TEXT
+                elif not answer_text:
+                    answer_text = CLARIF_TEXT
+
+            # Mise en page card : 3 puces max, coupe douce
+            raw_lines = [l.strip("-• ").strip() for l in (answer_text or "").split("\n") if l.strip()]
+            bullets: List[str] = []
+            for l in raw_lines:
+                bullets.append(l if len(l) <= MAX_BULLET_LEN else (l[:MAX_BULLET_LEN] + "…"))
+                if len(bullets) >= 3:
+                    break
+            if not bullets and answer_text:
+                bullets = [answer_text if len(answer_text) <= MAX_BULLET_LEN else (answer_text[:MAX_BULLET_LEN] + "…")]
+
             footnote = "Précisez les champs manquants pour une cible plus précise." if missing else None
             card = build_card(
-                headline=headline,
+                headline="Réponse générale (à affiner)",
                 bullets=bullets,
                 footnote=footnote,
                 followups=follow_up,
                 sources=sources,
             )
 
-            # ✅ Correctif: toujours fournir un texte dans response.answer
+            # ✅ Toujours renvoyer un texte dans response.answer
             resp_payload = format_response(answer_text, sources)
 
             context["completed_at"] = _utc_iso()
@@ -170,7 +212,7 @@ class DialogueManager:
                 "🟨 DM.flow=hybrid | answer_len=%d | sources=%d | followups=%d",
                 len(answer_text or ""), len(sources or []), len(follow_up or []),
             )
-            logger.debug("🟨 DM.ui_card.headline=%s | bullets=%s", _short(headline), bullets)
+            logger.debug("🟨 DM.ui_card.bullets=%s", bullets)
 
             return {
                 "type": "answer",
@@ -195,9 +237,9 @@ class DialogueManager:
         for l in raw_lines:
             if len(bullets) >= 3:
                 break
-            bullets.append(l[:127] + "…" if len(l) > 130 else l)
+            bullets.append(l if len(l) <= MAX_BULLET_LEN else (l[:MAX_BULLET_LEN] + "…"))
         if not bullets and answer_text:
-            bullets = [answer_text[:130] + "…"]
+            bullets = [answer_text if len(answer_text) <= MAX_BULLET_LEN else (answer_text[:MAX_BULLET_LEN] + "…")]
 
         card = build_card(
             headline=headline,
@@ -217,7 +259,7 @@ class DialogueManager:
             "🟦 DM.flow=final | answer_len=%d | sources=%d",
             len(answer_text or ""), len(sources or []),
         )
-        logger.debug("🟦 DM.ui_card.headline=%s | bullets=%s", _short(headline), bullets)
+        logger.debug("🟦 DM.ui_card.bullets=%s", bullets)
 
         return {
             "type": "answer",
@@ -274,7 +316,6 @@ class DialogueManager:
     async def _generate_with_rag(self, question: str, context: Dict[str, Any], style: str = "standard") -> Tuple[str, List[Dict[str, Any]]]:
         def _call() -> Any:
             ui = (context or {}).get("ui_prefs") or {}
-            # On transmet les préférences au RAG (ne force rien si non pertinent)
             logger.debug(
                 "🔧 RAG.call | style=%s | output_format=%s | weight_only=%s",
                 style, ui.get("format", "auto"), bool(ui.get("weight_only", False))
@@ -294,8 +335,8 @@ class DialogueManager:
             return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [])
 
         if isinstance(raw, dict):
-            # Compatibilité avec rag_engine (qui renvoie response + sources/citations)
             answer_text = str(raw.get("response", "")).strip()
+            # compat: rag_engine renvoie "sources" normalisées; sinon on récupère "source"
             sources = raw.get("sources") or _normalize_sources(raw.get("source"))
             logger.debug(
                 "🔧 RAG.ok | text_len=%d | sources=%d | source_flag=%s",
@@ -306,7 +347,6 @@ class DialogueManager:
             sources = []
             logger.debug("🔧 RAG.ok(simple) | text_len=%d", len(answer_text or ""))
 
-        # Sécurité : éviter que la chaîne soit vide
         if not answer_text:
             answer_text = "Je n’ai pas pu formuler une réponse exploitable pour l’instant."
             logger.warning("⚠️ RAG réponse vide — fallback message injecté.")

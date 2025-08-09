@@ -233,7 +233,7 @@ class RAGEngine:
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=650 if style == "minimal" else 900,
+                max_tokens=1100 if style == "minimal" else 1300,  # ↑ éviter les réponses tronquées
             )
             content = (resp.choices[0].message.content or "").strip()
             citations = self._build_citations(docs)
@@ -277,7 +277,7 @@ class RAGEngine:
                 model=os.getenv("OPENAI_MODEL", "gpt-4o"),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=550 if style == "minimal" else 700,
+                max_tokens=900 if style == "minimal" else 1100,  # ↑ marge de sécurité
             )
             content = (resp.choices[0].message.content or "").strip()
             logger.info("✅ OpenAI fallback ok | content_len=%d", len(content or ""))
@@ -325,7 +325,6 @@ class RAGEngine:
             "detailed": "Tu peux utiliser des sous-titres et listes si utile et détailler davantage le contexte et les recommandations.",
         }.get(style, "")
 
-        # 🎯 Contraintes “poids uniquement” + format bullets
         focus_instruction = (
             "CONCENTRE-TOI EXCLUSIVEMENT sur le poids visé à l’âge demandé. "
             "NE PARLE PAS d’autres sujets (température, éclairage, alimentation, biosécurité, etc.). "
