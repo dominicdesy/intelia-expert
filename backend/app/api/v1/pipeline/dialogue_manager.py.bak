@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 import logging
 import threading
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,14 +13,14 @@ try:
 except Exception:
     anyio = None  # type: ignore
 
-from ..utils.config import COMPLETENESS_THRESHOLD as _THRESHOLD
 from ..utils.response_generator import format_response, build_card
 from .context_extractor import ContextExtractor
 from .clarification_manager import ClarificationManager
 from .postgres_memory import PostgresMemory as ConversationMemory
 from .rag_engine import RAGEngine
+from .intent_registry import infer_intent, required_slots, derive_answer_mode, looks_numeric_first
 
-# --- Utils & Policy (aucune importation depuis __init__ pour éviter les cycles) ---
+# Compute utils (optionnels)
 try:
     from app.api.v1.utils.formulas import (
         estimate_water_intake_l_per_1000,
@@ -33,10 +32,7 @@ try:
         debit_tunnel_m3h,
         chaleur_a_extraire_w,
     )
-    from app.api.v1.utils.units import fmt_value_unit, round_sig, normalize_unit_label
-    from .policy.safety_rules import requires_vet_redirect
 except Exception:
-    # FallBacks sûrs si modules pas encore présents
     def estimate_water_intake_l_per_1000(*args, **kwargs): return (None, {})
     def min_ventilation_m3h_per_kg(*args, **kwargs): return (None, {})
     def iep_broiler(*args, **kwargs): return (None, {})
@@ -45,82 +41,20 @@ except Exception:
     def dimension_abreuvoirs(*args, **kwargs): return (None, {})
     def debit_tunnel_m3h(*args, **kwargs): return (None, {})
     def chaleur_a_extraire_w(*args, **kwargs): return (None, {})
-    def fmt_value_unit(v, u): return (v, u)
-    def round_sig(x, sig=3): return x
-    def normalize_unit_label(u): return u
+
+# Safety policy
+try:
+    from .policy.safety_rules import requires_vet_redirect
+except Exception:
     def requires_vet_redirect(text: str) -> Optional[str]: return None
 
 logger = logging.getLogger(__name__)
+COMPLETENESS_THRESHOLD: float = float(os.getenv("COMPLETENESS_THRESHOLD", "0.60"))
 
-# Seuil par défaut si non défini via config
-COMPLETENESS_THRESHOLD: float = 0.6
-try:
-    COMPLETENESS_THRESHOLD = float(_THRESHOLD)
-except Exception:
-    logger.warning("COMPLETENESS_THRESHOLD non défini, utilisation du défaut 0.6")
-
-# Champs critiques communs
-BASE_CRITICAL_FIELDS = {"race", "sexe"}
-
-# ---------------- Intents ---------------- #
-_INTENTS = [
-    ("weight", r"\b(poids|weight|bw|cible|id[ée]al)\b"),
-    ("fcr", r"\b(fcr|feed\s*conversion|indice\s+de\s+consommation)\b"),
-    ("water_intake", r"\b(eau|water\s*intake|consommation\s+d['e]au)\b"),
-    ("environment", r"\b(temp[ée]rature|humidity|humidi|ventilation|nh3|ammoniac|co2)\b"),
-    ("lighting", r"\b(lumi[eè]re|photop[ée]riode|lux|lumens)\b"),
-    ("nutrition_targets", r"\b(prot[ée]ine|lysine|kcal\/kg|[ée]nergie|phosphore|calcium)\b"),
-    ("compliance", r"\b(label\s+rouge|plein\s+air|cahier\s+des\s+charges|cat[ée]gorie\s*a\+?)\b"),
-    ("diagnostic_triage", r"\b(baisse\s+ponte|mortalit[ée]|coquilles\s+molle|stress|picage|diarrh[ée]e)\b"),
-    ("costing", r"\b(co[uû]t|chauffage|aliment|feed\s+cost)\b"),
-    # Nouveaux intents calculés
-    ("iep", r"\b(iep|epef|production\s+efficiency)\b"),
-    ("feeders", r"\b(mangeoir|assiette|pan|cha[iî]ne)\b"),
-    ("drinkers", r"\b(abreuvoir|nipple|cloche|drinker)\b"),
-    ("tunnel_airflow", r"\b(tunnel|airflow|débit\s*d['e]air|chaleur\s*à\s*extraire|heat\s*load)\b"),
-]
-
-def _infer_intent(text: str) -> str:
-    t = (text or "").lower()
-    for name, rx in _INTENTS:
-        if re.search(rx, t, re.I):
-            return name
-    return "general"
-
-# Champs critiques par intention
-INTENT_CRITICALS = {
-    "weight": {"age"},
-    "fcr": {"age"},
-    "water_intake": {"age"},
-    "nutrition_targets": {"age", "type_aliment"},
-    "lighting": {"age"},
-    "diagnostic_triage": {"age"},
-    "compliance": {"pays"},
-    "costing": {"age"},
-    "iep": {"age"},
-    "feeders": {"age", "effectif"},
-    "drinkers": {"age", "effectif"},
-    "tunnel_airflow": {"effectif", "deltaT_C"},
-}
-
-# --- Helpers temps ---
 def _utc_iso() -> str:
     return datetime.utcnow().isoformat()
 
-# --- Normalisation sources (tolérante) ---
-def _normalize_sources(raw: Any) -> List[Dict[str, Any]]:
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        return [s if isinstance(s, dict) else {"source": str(s)} for s in raw]
-    if isinstance(raw, dict):
-        return [raw]
-    return [{"source": str(raw)}]
-
-
 class DialogueManager:
-    """Orchestrateur principal (extraction -> clarification -> compute/RAG -> mémoire)"""
-
     _instance: Optional["DialogueManager"] = None
     _lock = threading.Lock()
 
@@ -140,11 +74,9 @@ class DialogueManager:
         try:
             self._maybe_start_cleanup()
         except Exception as e:
-            logger.warning("Nettoyage de sessions non démarré: %s", e)
+            logger.debug("Cleanup not started: %s", e)
 
-    # -----------------------
-    #         PUBLIC
-    # -----------------------
+    # ---------------- PUBLIC ---------------- #
     async def handle(
         self,
         session_id: Optional[str],
@@ -153,13 +85,12 @@ class DialogueManager:
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         sid = session_id or str(uuid4())
-        logger.info("🟦 DM.handle start | sid=%s | Q=%s", sid, (question or "")[:160])
+        logger.info("🟦 DM.handle | sid=%s | Q=%s", sid, (question or "")[:160])
 
-        # 0) mémoire (tolérante)
+        # mémoire
         try:
             context: Dict[str, Any] = self.memory.get(sid) or {}
-        except Exception as e:
-            logger.warning("Lecture mémoire échouée (sid=%s): %s", sid, e)
+        except Exception:
             context = {}
 
         if language:
@@ -167,10 +98,9 @@ class DialogueManager:
         if user_id:
             context.setdefault("user_id", user_id)
 
-        # 🔒 Garde-fou santé/posologie
+        # policy
         vet_msg = requires_vet_redirect(question)
         if vet_msg:
-            logger.info("🛡️ Policy santé: redirection vétérinaire")
             return {
                 "type": "policy_redirect",
                 "response": format_response(vet_msg),
@@ -179,104 +109,69 @@ class DialogueManager:
                 "missing_fields": [],
             }
 
-        # 1) Extraction
+        # extraction slots
         extracted, score, missing = self.extractor.extract(question)
         context.update(extracted)
 
-        # 1b) Intention
-        intent = _infer_intent(question)
+        # intention universelle
+        intent = infer_intent(question)
         context["last_intent"] = intent
+        answer_mode = derive_answer_mode(intent)
+        need_numeric = looks_numeric_first(intent)
 
-        # 1c) Champs critiques dynamiques
-        critical_fields = set(BASE_CRITICAL_FIELDS) | INTENT_CRITICALS.get(intent, set())
-        has_age = bool(context.get("age_jours") or context.get("age") or context.get("age_days"))
-        if "age" in critical_fields and not has_age:
-            if "age" not in missing and "age_jours" not in missing:
-                missing = list(missing) + ["age"]
-            score = min(score, 0.2)
+        # champs requis dynamiques
+        criticals = set(required_slots(intent))
+        # défauts universels utiles
+        if "sex" not in criticals:  # la plupart des réponses tolèrent 'sex' manquant
+            criticals |= {"race"}  # lignée aide beaucoup
+        if "age_days" in criticals and not any(context.get(k) for k in ["age_days", "age_jours"]):
+            missing = list(set(list(missing) + ["age_days"]))
+            score = min(score, 0.25)
 
-        logger.info("🟩 DM.extract | intent=%s | score=%.2f (seuil=%.2f) | missing=%s", intent, score, COMPLETENESS_THRESHOLD, missing)
+        logger.info("🟩 DM.extract | intent=%s | score=%.2f | missing=%s", intent, score, missing)
 
-        # 1d) Réutilisation mémoire (âge) si manquant
-        if "age" in critical_fields and not has_age:
-            try:
-                prev_ctx = self.memory.get(sid) or {}
-            except Exception:
-                prev_ctx = {}
-            last_age = prev_ctx.get("age_jours") or prev_ctx.get("age_days") or prev_ctx.get("age")
-            if last_age:
-                context.setdefault("age_jours", last_age)
-                score = max(score, 0.35)
-
-        # 1e) Hints UI & table-first
+        # forcing UI hints
         context.setdefault("ui_style", {})
-        if intent in {"weight", "fcr", "nutrition_targets", "water_intake", "environment", "lighting", "iep", "costing", "feeders", "drinkers", "tunnel_airflow"}:
-            context["ui_style"].update({"style": "minimal", "format": "bullets", "weight_only": intent == "weight"})
-        else:
-            context["ui_style"].update({"style": "standard", "format": "auto", "weight_only": False})
-        # Petite préférence table pour poids/FCR/référentiels
-        context["prefer_tables"] = intent in {"weight", "fcr", "nutrition_targets"}
+        context["ui_style"].update({
+            "style": "minimal" if need_numeric else "standard",
+            "format": "bullets" if need_numeric else "auto",
+            "weight_only": (intent == "targets.weight"),
+        })
+        context["prefer_tables"] = any(x in answer_mode for x in ["numeric", "numbers", "table"])
 
-        # 2) Si score trop bas → clarifs / mode hybride
-        if score < COMPLETENESS_THRESHOLD:
-            if score < 0.2:
-                # clarifs directes
-                if "age" in critical_fields and ("age" in missing or "age_jours" in missing):
-                    questions = ["À quel âge (en jours) ? (ex. 21 j)"]
-                else:
-                    questions = self.clarifier.generate(missing, language=context.get("language"), intent=intent)
-                context["last_interaction"] = _utc_iso()
-                self._safe_mem_update(sid, context)
-                return {
-                    "type": "clarification",
-                    "questions": questions,
-                    "session_id": sid,
-                    "completeness_score": score,
-                    "missing_fields": missing,
-                }
-
-            # mode hybride: courte réponse + follow-ups essentiels
-            answer_text, sources, metrics = await self._answer_via_compute_or_rag(question, context, intent)
-
-            follow_up: List[str] = []
-            to_check = {"race", "sexe"}
-            if "age" in critical_fields:
-                to_check.add("age")
-            critical_missing = [f for f in missing if (f in to_check or f in {"age_jours"})]
-            if critical_missing:
-                follow_up = self.clarifier.generate(critical_missing, round_number=1, language=context.get("language"), intent=intent)
-                if follow_up:
-                    appendix = "\n".join(f"- {q}" for q in follow_up)
-                    answer_text = (answer_text + "\n\n❓ Pour être précis :\n" + appendix) if answer_text else ("❓ Pour être précis :\n" + appendix)
-
-            # Monitoring minimal
-            logger.info("🟨 DM.hybrid | species=%s | docs=%s | followups=%s",
-                        metrics.get("inferred_species"), metrics.get("documents_used"), follow_up)
-
-            context["completed_at"] = _utc_iso()
-            context["last_interaction"] = _utc_iso()
-            self._safe_mem_update(sid, context)
-            warn = (
-                f"Réponse générale — précisez {', '.join(missing[:2])} pour plus de précision" if missing else "Réponse générale"
-            )
+        # si complétude faible → clarifications
+        if score < COMPLETENESS_THRESHOLD and score < 0.25:
+            questions = self._clarifications_for(intent, missing)
+            self._persist_context(sid, context)
             return {
-                "type": "answer",
-                "response": {"answer": format_response(answer_text), "sources": metrics.get("sources", [])},
+                "type": "clarification",
+                "questions": questions,
                 "session_id": sid,
                 "completeness_score": score,
                 "missing_fields": missing,
-                "follow_up_questions": follow_up,
-                "metadata": {"warning": warn, **metrics},
             }
 
-        # 3) Réponse complète
-        answer_text, sources, metrics = await self._answer_via_compute_or_rag(question, context, intent)
-        logger.info("🟦 DM.final | species=%s | docs=%s | score=%.2f",
-                    metrics.get("inferred_species"), metrics.get("documents_used"), score)
+        # réponse hybride si incomplet mais exploitable
+        if score < COMPLETENESS_THRESHOLD:
+            answer_text, sources, metrics = await self._answer(question, context, intent)
+            followups = self._clarifications_for(intent, missing, short=True)
+            if followups:
+                appendix = "\n".join(f"- {q}" for q in followups)
+                answer_text = (answer_text + "\n\n❓ Pour être précis :\n" + appendix) if answer_text else ("❓ Pour être précis :\n" + appendix)
+            self._persist_context(sid, context)
+            return {
+                "type": "answer",
+                "response": {"answer": format_response(answer_text), "sources": sources},
+                "session_id": sid,
+                "completeness_score": score,
+                "missing_fields": missing,
+                "follow_up_questions": followups,
+                "metadata": {"warning": "Réponse générale — informations partielles", **metrics},
+            }
 
-        context["completed_at"] = _utc_iso()
-        context["last_interaction"] = _utc_iso()
-        self._safe_mem_update(sid, context)
+        # réponse complète
+        answer_text, sources, metrics = await self._answer(question, context, intent)
+        self._persist_context(sid, context)
         return {
             "type": "answer",
             "response": {"answer": format_response(answer_text), "sources": sources},
@@ -286,126 +181,75 @@ class DialogueManager:
             "metadata": metrics,
         }
 
-    # -----------------------
-    #       INTERNALS
-    # -----------------------
-    async def _answer_via_compute_or_rag(self, question: str, context: Dict[str, Any], intent: str) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
-        """Certaines intentions passent d'abord par un calcul natif, sinon RAG."""
-        # 1) CALC-FIRST branches
+    # -------------- internals -------------- #
+    async def _answer(self, question: str, context: Dict[str, Any], intent: str) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+        # Compute-first pour certaines intentions
         try:
-            if intent == "water_intake":
-                age = context.get("age_jours")
-                ambient_c = context.get("ambient_c") or context.get("temperature")
-                value, _ = estimate_water_intake_l_per_1000(age_days=age, ambient_c=ambient_c, species=context.get("species"))
-                if value is not None:
-                    v = int(round(value))
-                    card = build_card(
-                        headline=f"~{v} L/j/1000",
-                        bullets=[
-                            f"Âge: {age} j" if age else "Âge estimé",
-                            f"T° amb.: {ambient_c}°C" if ambient_c is not None else "T° supposée: 20°C",
-                            "Formule interne (à affiner localement)",
-                        ],
-                        footnote="Adapter selon la lignée, la qualité d’eau et la T° réelle.",
-                    )
-                    return (card["headline"] + "\n- " + "\n- ".join(card["bullets"]) + ("\n" + card.get("footnote", "") if card.get("footnote") else ""), [], {"documents_used": 0, "inferred_species": context.get("species")})
+            if intent == "water.intake":
+                age = context.get("age_days") or context.get("age_jours")
+                amb = context.get("ambient_c") or context.get("temperature")
+                val, _ = estimate_water_intake_l_per_1000(age_days=age, ambient_c=amb, species=context.get("species"))
+                if val is not None:
+                    return (f"~{int(round(val))} L/j/1000 oiseaux\n- Âge: {age or 'n/a'} j\n- T° amb.: {amb if amb is not None else '20'}°C",
+                            [], {"documents_used": 0, "inferred_species": context.get("species")})
 
-            if intent == "environment":
-                age = context.get("age_jours")
+            if intent == "environment.min_vent":
+                age = context.get("age_days") or context.get("age_jours")
                 avg_bw_g = context.get("poids_moyen_g")
                 per_kg, _ = min_ventilation_m3h_per_kg(age_days=age, avg_bw_g=avg_bw_g)
                 if per_kg is not None:
-                    v = round_sig(float(per_kg), 2)
-                    text = f"Ventilation minimale estimée: ~{v:.2f} m³/h/kg (ajuster selon T°, NH₃/CO₂)."
-                    return (text, [], {"documents_used": 0, "inferred_species": context.get("species")})
+                    return (f"Ventilation minimale estimée: ~{per_kg:.2f} m³/h/kg (ajuster selon T°, NH₃/CO₂).",
+                            [], {"documents_used": 0, "inferred_species": context.get("species")})
 
-            if intent == "iep":
-                # attend livability_pct, avg_weight_kg, fcr, age_days
+            if intent == "kpi.iep":
                 liv = context.get("livability_pct")
                 bwkg = (context.get("poids_moyen_g") or 0) / 1000.0 if context.get("poids_moyen_g") else context.get("avg_weight_kg")
                 fcr = context.get("fcr")
-                age = context.get("age_jours")
-                val, _ = iep_broiler(livability_pct=liv, avg_weight_kg=bwkg, fcr=fcr, age_days=age)  # type: ignore
+                age = context.get("age_days") or context.get("age_jours")
+                val, _ = iep_broiler(livability_pct=liv, avg_weight_kg=bwkg, fcr=fcr, age_days=age)
                 if val is not None:
-                    val = round_sig(float(val), 3)
-                    card = build_card(
-                        headline=f"IEP ≈ {val}",
-                        bullets=[
-                            f"Âge: {age} j" if age else "Âge requis",
-                            f"BW: {round_sig(bwkg or 0,3)} kg" if bwkg else "BW requis",
-                            f"FCR: {fcr}" if fcr else "FCR requis",
-                            f"Survie: {liv}%" if liv is not None else "Survie (%) requise",
-                        ],
-                        footnote="Formule usuelle: (Survie% × BWkg × 100) / (FCR × Âge).",
-                    )
-                    return (card["headline"] + "\n- " + "\n- ".join(card["bullets"]) + ("\n" + card.get("footnote", "") if card.get("footnote") else ""), [], {"documents_used": 0, "inferred_species": "broiler"})
+                    return (f"IEP ≈ {val:.2f}\n- Âge: {age} j\n- BW: {bwkg or 'n/a'} kg\n- FCR: {fcr or 'n/a'}\n- Survie: {liv if liv is not None else 'n/a'}%",
+                            [], {"documents_used": 0, "inferred_species": "broiler"})
 
-            if intent == "costing":
-                # prix_aliment_tonne_eur, fcr
+            if intent == "cost.feed":
                 price = context.get("prix_aliment_tonne_eur")
                 fcr = context.get("fcr")
-                val, _ = cout_aliment_par_kg_vif(prix_aliment_tonne_eur=price, fcr=fcr)  # type: ignore
+                val, _ = cout_aliment_par_kg_vif(prix_aliment_tonne_eur=price, fcr=fcr)
                 if val is not None:
-                    val = round_sig(float(val), 3)
-                    text = f"Coût aliment estimé: ~{val} €/kg vif (avec FCR={fcr}, prix={price} €/t)."
-                    return (text, [], {"documents_used": 0, "inferred_species": context.get("species")})
+                    return (f"Coût aliment estimé: ~{val:.3f} €/kg vif (FCR={fcr}, prix={price} €/t).",
+                            [], {"documents_used": 0, "inferred_species": context.get("species")})
 
-            if intent == "feeders":
+            if intent == "feeding.chain.calibration":
                 eff = context.get("effectif")
-                age = context.get("age_jours")
-                typ = context.get("type") or context.get("type_mangeoire")
-                res, _ = dimension_mangeoires(effectif=eff, age_days=age, type_=typ)  # type: ignore
+                age = context.get("age_days") or context.get("age_jours")
+                typ = context.get("type_mangeoire") or "chaine"
+                res, _ = dimension_mangeoires(effectif=eff, age_days=age, type_=typ)
                 if res:
                     if res["type"] == "chaine":
-                        text = f"Mangeoires chaîne: {res['cm_per_bird']} cm/oiseau → total ~{int(round(res['total_cm_required']))} cm."
+                        txt = f"Mangeoires chaîne: {res['cm_per_bird']} cm/oiseau → total ~{int(round(res['total_cm_required']))} cm."
                     else:
-                        text = f"Assiettes: {res['birds_per_pan']} oiseaux/assiette → ~{res['pans_required']} assiettes."
-                    return (text, [], {"documents_used": 0, "inferred_species": context.get("species")})
+                        txt = f"Assiettes: {res['birds_per_pan']} oiseaux/assiette → ~{res['pans_required']} assiettes."
+                    return (txt, [], {"documents_used": 0, "inferred_species": context.get("species")})
 
-            if intent == "drinkers":
+            if intent == "equipment.nipples.setup":
                 eff = context.get("effectif")
-                age = context.get("age_jours")
-                typ = context.get("type") or context.get("type_abreuvoir")
-                res, _ = dimension_abreuvoirs(effectif=eff, age_days=age, type_=typ)  # type: ignore
+                age = context.get("age_days") or context.get("age_jours")
+                typ = context.get("type_abreuvoir") or "nipple"
+                res, _ = dimension_abreuvoirs(effectif=eff, age_days=age, type_=typ)
                 if res:
                     if res["type"] == "nipple":
-                        text = f"Nipples: {res['birds_per_point']} oiseaux/point → ~{res['points_required']} points d’eau."
+                        txt = f"Nipples: {res['birds_per_point']} oiseaux/point → ~{res['points_required']} points d’eau."
                     else:
-                        text = f"Cloches: {res['birds_per_bell']} oiseaux/cloche → ~{res['bells_required']} cloches."
-                    return (text, [], {"documents_used": 0, "inferred_species": context.get("species")})
+                        txt = f"Cloches: {res['birds_per_bell']} oiseaux/cloche → ~{res['bells_required']} cloches."
+                    return (txt, [], {"documents_used": 0, "inferred_species": context.get("species")})
 
-            if intent == "tunnel_airflow":
-                # On déduit kg_total = effectif * avg_weight_kg
-                eff = context.get("effectif")
-                avg_g = context.get("avg_weight_g") or context.get("poids_moyen_g")
-                deltaT = context.get("deltaT_C")
-                if eff and avg_g:
-                    kg_total = eff * (float(avg_g) / 1000.0)
-                else:
-                    kg_total = None
-                if kg_total and deltaT:
-                    q, _ = debit_tunnel_m3h(kg_total=kg_total, deltaT_C=deltaT)  # type: ignore
-                    if q is not None:
-                        q = int(round(q))
-                        heat, _ = chaleur_a_extraire_w(kg_total=kg_total)  # optionnel
-                        bullets = [f"ΔT visé: {deltaT}°C", f"Masse totale: ~{int(round(kg_total))} kg"]
-                        if heat is not None:
-                            bullets.append(f"Chaleur à extraire: ~{int(round(heat))} W")
-                        card = build_card(headline=f"Débit tunnel ≈ {q} m³/h", bullets=bullets, footnote="Affiner selon humidité, vitesse d’air et architecture.")
-                        return (card["headline"] + "\n- " + "\n- ".join(card["bullets"]) + ("\n" + card.get("footnote", "") if card.get("footnote") else ""), [], {"documents_used": 0, "inferred_species": "broiler"})
+            if intent == "stocking.density":
+                # se repose sur RAG (règles/labels). Pas de compute ici.
+                pass
         except Exception as e:
             logger.debug("compute-first error: %s", e)
 
-        # 2) Sinon → RAG
-        answer_text, sources, rag_meta = await self._generate_with_rag(question, context)
-        metrics = {
-            "documents_used": rag_meta.get("documents_used", 0),
-            "inferred_species": rag_meta.get("inferred_species"),
-            "sources": sources,
-        }
-        return (answer_text, sources, metrics)
-
-    async def _generate_with_rag(self, question: str, context: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+        # sinon RAG
         def _call() -> Any:
             return self.rag.generate_answer(question, context)
 
@@ -413,11 +257,11 @@ class DialogueManager:
             raw = await anyio.to_thread.run_sync(_call) if anyio else _call()
         except Exception as e:
             logger.exception("RAG generate_answer error: %s", e)
-            return ("Désolé, une erreur est survenue lors de la génération de la réponse.", [], {"documents_used": 0})
+            return ("Désolé, une erreur est survenue.", [], {"documents_used": 0})
 
         if isinstance(raw, dict):
             answer_text = (raw.get("response") or "").strip() or "Désolé, je n’ai pas pu formater la réponse."
-            sources = _normalize_sources(raw.get("sources") or raw.get("citations") or raw.get("source"))
+            sources = self._normalize_sources(raw.get("sources") or raw.get("citations") or raw.get("source"))
             meta = {
                 "documents_used": int(raw.get("documents_used") or 0),
                 "inferred_species": raw.get("inferred_species"),
@@ -428,27 +272,53 @@ class DialogueManager:
 
         return (answer_text, sources, meta)
 
-    def _safe_mem_update(self, session_id: str, context: Dict[str, Any]) -> None:
+    def _clarifications_for(self, intent: str, missing: List[str], short: bool = False) -> List[str]:
+        # Clarifications minimales génériques
+        q: List[str] = []
+        req = set(required_slots(intent))
+        # mapping simple FR
+        label = {
+            "species": "espèce (broiler, pondeuse)",
+            "line": "lignée/génétique (Ross, Cobb, Hubbard…)",
+            "sex": "sexe (mâle, femelle, mixte)",
+            "age_days": "âge en jours",
+            "phase": "phase (starter, grower, finisher)",
+            "temp_outside": "température extérieure (°C)",
+            "effectif": "effectif du lot",
+            "jurisdiction": "zone (FR/UE/…)",
+            "label": "label (Label Rouge, Bio…)",
+        }
+        for k in missing:
+            if k in req or (not short and k in label):
+                q.append(f"Quelle est {label.get(k, k)} ?")
+        return q[:2] if short else q[:4]
+
+    def _normalize_sources(self, raw: Any) -> List[Dict[str, Any]]:
+        if raw is None:
+            return []
+        if isinstance(raw, list):
+            return [s if isinstance(s, dict) else {"source": str(s)} for s in raw]
+        if isinstance(raw, dict):
+            return [raw]
+        return [{"source": str(raw)}]
+
+    def _persist_context(self, sid: str, ctx: Dict[str, Any]) -> None:
         try:
-            self.memory.update(session_id, context)
+            ctx["last_interaction"] = _utc_iso()
+            self.memory.update(sid, ctx)
         except Exception as e:
-            logger.warning("Échec update mémoire (sid=%s): %s", session_id, e)
+            logger.debug("Mem update failed: %s", e)
 
     def _maybe_start_cleanup(self) -> None:
         cleanup_fn = getattr(self.memory, "cleanup_expired", None)
         if not callable(cleanup_fn):
-            self._cleanup_enabled = False
             return
-        interval_min = int(os.getenv("CLEANUP_INTERVAL_MINUTES", "30"))
-        self._cleanup_enabled = True
-
+        import time
         def _loop():
-            import time
             while True:
                 try:
                     cleanup_fn()
                 except Exception as e:
                     logger.debug("Cleanup mémoire: %s", e)
-                time.sleep(max(300, interval_min * 60))
-
+                time.sleep(max(300, int(os.getenv("CLEANUP_INTERVAL_MINUTES", "30")) * 60))
         threading.Thread(target=_loop, daemon=True).start()
