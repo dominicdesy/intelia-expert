@@ -1,12 +1,4 @@
-export const InteliaLogo = ({ className = "w-8 h-8" }: IconProps) => (
-  <div className={`${className} flex items-center justify-center`}>
-    <svg viewBox="0 0 100 100" className="w-full h-full">
-      {/* Chaîne bleue supérieure */}
-      <path d="M20 25 Q30 15, 50 25 Q70 35, 80 25 Q85 20, 80 35 Q70 45, 50 35 Q30 25, 20 25 Z" 
-            fill="#3B82F6" 
-            className="drop-shadow-sm"/>
-      
-      {/* Chaîne bleue inférieure */'use client'
+'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -311,6 +303,46 @@ export default function ChatInterface() {
     )
   }
 
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('fr-FR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
+  const extractAnswerAndSources = (result: any): [string, any[]] => {
+    const responseContent = result?.response || ""
+    let answerText = ""
+    let sources: any[] = []
+
+    if (typeof responseContent === 'object' && responseContent !== null) {
+      answerText = String(responseContent.answer || "").trim()
+      if (!answerText) {
+        answerText = "Désolé, je n'ai pas pu formater la réponse. Peux-tu préciser la lignée et l'âge ?"
+      }
+      const rawSources = responseContent.sources || responseContent.citations || responseContent.source || []
+      sources = Array.isArray(rawSources) ? rawSources.map(s => typeof s === 'object' ? s : { source: String(s) }) : []
+    } else {
+      answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
+      
+      // ✅ CORRECTION: Nettoyer le JSON visible si présent
+      if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
+        const match = answerText.match(/'answer': "(.+?)"/)
+        if (match) {
+          answerText = match[1]
+            .replace(/\\"/g, '"')
+            .replace(/\\n/g, '\n')
+            .replace(/\\\\/g, '\\')
+        }
+      }
+      
+      sources = []
+    }
+    
+    return [answerText, sources]
+  }
+
   // 🚀 FONCTION MODIFIÉE : handleSendMessage avec niveau détecté automatiquement
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
@@ -559,46 +591,6 @@ export default function ChatInterface() {
     setIsUserScrolling(false)
     setShowScrollButton(false)
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('fr-FR', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    })
-  }
-
-  const extractAnswerAndSources = (result: any): [string, any[]] => {
-    const responseContent = result?.response || ""
-    let answerText = ""
-    let sources: any[] = []
-
-    if (typeof responseContent === 'object' && responseContent !== null) {
-      answerText = String(responseContent.answer || "").trim()
-      if (!answerText) {
-        answerText = "Désolé, je n'ai pas pu formater la réponse. Peux-tu préciser la lignée et l'âge ?"
-      }
-      const rawSources = responseContent.sources || responseContent.citations || responseContent.source || []
-      sources = Array.isArray(rawSources) ? rawSources.map(s => typeof s === 'object' ? s : { source: String(s) }) : []
-    } else {
-      answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
-      
-      // ✅ CORRECTION: Nettoyer le JSON visible si présent
-      if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
-        const match = answerText.match(/'answer': "(.+?)"/)
-        if (match) {
-          answerText = match[1]
-            .replace(/\\"/g, '"')
-            .replace(/\\n/g, '\n')
-            .replace(/\\\\/g, '\\')
-        }
-      }
-      
-      sources = []
-    }
-    
-    return [answerText, sources]
   }
 
   return (
