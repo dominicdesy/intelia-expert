@@ -1,32 +1,56 @@
 # app/api/v1/pipeline/__init__.py
 """
-Pipeline package: explicit exports without subpackage re-exports to avoid circular imports.
+Public API for the v1.pipeline package.
+
+We expose function-level entry points matching the current implementation:
+- handle(): main orchestrator (dialogue_manager)
+- compute_completeness(): completeness & clarifications (clarification_manager)
+- normalize(): entity normalization (context_extractor)
+- answer_with_rag(): RAG retrieval (rag_engine)
+
+Backward-compatibility shims:
+- DialogueManager.handle -> handle
+- ClarificationManager.compute -> compute_completeness
+- ContextExtractor.normalize -> normalize
+- RAGEngine.answer -> answer_with_rag
 """
 
-from .dialogue_manager import DialogueManager
-from .clarification_manager import ClarificationManager
-from .context_extractor import ContextExtractor
-from .rag_engine import RAGEngine
+from .dialogue_manager import handle as handle
+from .clarification_manager import compute_completeness as compute_completeness
+from .context_extractor import normalize as normalize
+from .rag_engine import answer_with_rag as answer_with_rag
 
-# Optional: module-level back-compat (ok)
-from . import dialogue_manager as dialogue_manager
-from . import clarification_manager as clarification_manager
-from . import context_extractor as context_extractor
-from . import rag_engine as rag_engine
-from . import memory as memory
-from . import postgres_memory as postgres_memory
-from . import sqlite_memory as sqlite_memory
+# --- Backward-compat shims (keep old imports working) ---
+
+class DialogueManager:
+    @staticmethod
+    def handle(session_id, question, lang: str = "fr"):
+        return handle(session_id, question, lang)
+
+class ClarificationManager:
+    @staticmethod
+    def compute(intent, entities):
+        return compute_completeness(intent, entities)
+
+class ContextExtractor:
+    @staticmethod
+    def normalize(context):
+        return normalize(context)
+
+class RAGEngine:
+    @staticmethod
+    def answer(question, entities, intent=None):
+        return answer_with_rag(question, entities, intent)
 
 __all__ = [
+    # New API (functions)
+    "handle",
+    "compute_completeness",
+    "normalize",
+    "answer_with_rag",
+    # Legacy API (shim classes)
     "DialogueManager",
     "ClarificationManager",
     "ContextExtractor",
     "RAGEngine",
-    "dialogue_manager",
-    "clarification_manager",
-    "context_extractor",
-    "rag_engine",
-    "memory",
-    "postgres_memory",
-    "sqlite_memory",
 ]
