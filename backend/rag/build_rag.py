@@ -1,31 +1,57 @@
-# -*- coding: utf-8 -*-
-"""
-Builds three separate indices: broiler, layer, global.
-Scans folders under RAG_INDEX_ROOT and writes meta.json manifests.
-Plug this with your actual embedding/index writer.
-"""
-import os, time, json
+# rag/build_rag.py
+import os
+from pathlib import Path
+from typing import List
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from rag.parser_router import route_and_parse
 
-INDEX_ROOT = os.environ.get("RAG_INDEX_ROOT", "public")
-SPECIES_DIRS = ["broiler","layer","global"]
+BASE_DIR = Path(__file__).resolve().parent.parent
+DOCS_DIR = BASE_DIR / "documents"
+INDEX_DIR = BASE_DIR / "public"
 
-def _scan_count_docs(path: str):
-    cnt = 0
-    for root, dirs, files in os.walk(path):
+EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+
+def build_index_for_species(species: str, files: List[str]):
+    print(f"🔹 Building index for {species} with {len(files)} files")
+    embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    all_docs = []
+
+    for f in files:
+        for chunk in route_and_parse(f):
+            splits = text_splitter.split_text(chunk["text"])
+            for s in splits:
+                meta = chunk["metadata"]
+                all_docs.append({"page_content": s, "metadata": meta})
+
+    if not all_docs:
+        print(f"⚠️ No documents found for {species}")
+        return
+
+    faiss_index = FAISS.from_documents(all_docs, embeddings)
+    species_dir = INDEX_DIR / species
+    species_dir.mkdir(parents=True, exist_ok=True)
+    faiss_index.save_local(str(species_dir))
+    print(f"✅ Index saved for {species} → {species_dir}")
+
+def build_all():
+    files_by_species = {"global": [], "broiler": [], "layer": []}
+
+    for root, _, files in os.walk(DOCS_DIR):
         for f in files:
-            if f.lower().endswith((".pdf", ".md", ".txt", ".html")):
-                cnt += 1
-    return cnt
+            fp = os.path.join(root, f)
+            low = fp.lower()
+            if "broiler" in low or "ross" in low or "cobb" in low:
+                files_by_species["broiler"].append(fp)
+            elif "layer" in low or "lohmann" in low or "hy-line" in low:
+                files_by_species["layer"].append(fp)
+            else:
+                files_by_species["global"].append(fp)
 
-def main():
-    os.makedirs(INDEX_ROOT, exist_ok=True)
-    for name in SPECIES_DIRS:
-        p = os.path.join(INDEX_ROOT, name)
-        os.makedirs(p, exist_ok=True)
-        meta = {"index_name": name, "updated_at": int(time.time()), "doc_count": _scan_count_docs(p), "table_chunks_count": None}
-        with open(os.path.join(p, "meta.json"), "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
-    print("Indexes initialized. Plug embedding/build logic.")
+    for sp, files in files_by_species.items():
+        build_index_for_species(sp, files)
 
 if __name__ == "__main__":
-    main()
+    build_all()
