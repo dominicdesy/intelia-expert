@@ -253,7 +253,7 @@ export const generateAIResponse = async (
     const data = await response.json()
     console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
-      has_response: !!data.response,
+      has_response: responseText,
       has_questions: !!data.questions,
       response_length: data.response?.length || 0,
       questions_count: data.questions?.length || 0,
@@ -269,7 +269,7 @@ export const generateAIResponse = async (
       type: data.type,
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: data.type === 'answer' ? (data.response || '') : '',
+      response: responseText,
       
       // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
@@ -322,7 +322,7 @@ export const generateAIResponse = async (
     console.log('🎯 [apiService] Données traitées DialogueManager:', {
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
-      has_response: !!processedData.response,
+      has_response: responseText,
       has_versions: !!processedData.response_versions,
       type: processedData.type
     })
@@ -388,7 +388,7 @@ export const generateAIResponsePublic = async (
     const data = await response.json()
     console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
-      has_response: !!data.response,
+      has_response: responseText,
       has_questions: !!data.questions
     })
 
@@ -400,7 +400,7 @@ export const generateAIResponsePublic = async (
       type: data.type,
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: data.type === 'answer' ? (data.response || '') : '',
+      response: responseText,
       
       // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
@@ -749,6 +749,7 @@ export const testEnhancedConversationContinuity = async (
     })
     
     return {
+      full_text: (typeof data?.full_text === 'string' ? data.full_text : null),
       first_conversation_id: firstResponse.conversation_id,
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
