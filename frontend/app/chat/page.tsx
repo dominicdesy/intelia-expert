@@ -9,6 +9,8 @@ import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 
 // 🚀 IMPORT MODIFIÉ : Hook simplifié avec sélection de versions
+// (concision disabled)
+
 import { 
   PaperAirplaneIcon, 
   UserIcon, 
@@ -16,11 +18,15 @@ import {
   InteliaLogo, 
   ArrowDownIcon,
   ThumbUpIcon,
-  ThumbDownIcon} from './utils/icons'
+  ThumbDownIcon,
+  /*CogIcon*/
+} from './utils/icons'
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
+// (concision disabled)
+
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
@@ -33,9 +39,13 @@ export default function ChatInterface() {
   const loadConversations = useChatStore(state => state.loadConversations)
   
   // 🚀 HOOK MODIFIÉ : Hook simplifié avec sélection de versions
+// (concision disabled)
+  
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
+  const [showConcisionSettings, setShowConcisionSettings] = useState(false)
+  
   // États existants inchangés
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
@@ -67,7 +77,7 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  console.log('🔍 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', 'standard')
+  console.log('🔍 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
   // 🚀 FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
   const reprocessAllMessages = () => {
@@ -81,10 +91,10 @@ export default function ChatInterface() {
           !message.content.includes('Mode clarification') &&
           !message.content.includes('💡 Répondez simplement')) {
         
-        // 🚀 SÉLECTION DE VERSION : Utiliser 
-        const selectedContent = (message.response_versions, 'standard')
+        // 🚀 SÉLECTION DE VERSION : Utiliser selectVersionFromResponse
+        const selectedContent = (message.response_versions?.standard || message.response_versions?.detailed || message.response_versions?.concise || Object.values(message.response_versions || {})[0] || '')
         
-        console.log(`📋 [reprocessAllMessages] Message ${message.id} - passage à ${'standard'}`, {
+        console.log(`📋 [reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
           original_length: message.content.length,
           new_length: selectedContent.length,
           versions_available: Object.keys(message.response_versions)
@@ -104,7 +114,7 @@ export default function ChatInterface() {
     }
 
     setCurrentConversation(updatedConversation)
-    console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', 'standard')
+    console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
   // Tous les useEffect existants restent identiques
@@ -303,7 +313,7 @@ export default function ChatInterface() {
     console.log('📤 [ChatInterface] Envoi message:', {
       text: text.substring(0, 50) + '...',
       hasClarificationState: !!clarificationState,
-      concisionLevel: 'standard'
+      concisionLevel: config.level
     })
 
     const userMessage: Message = {
@@ -332,7 +342,7 @@ export default function ChatInterface() {
       let response;
       
       // 🚀 DÉTECTION AUTOMATIQUE : Niveau optimal pour la question
-      const optimalLevel = undefined;)
+      const optimalLevel = undefined;
       console.log('🎯 [handleSendMessage] Niveau optimal détecté:', optimalLevel)
       
       if (clarificationState) {
@@ -379,7 +389,7 @@ export default function ChatInterface() {
         
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: response.response + "\n\n💡 Répondez simplement dans le chat avec les informations demandées.",
+          content: (response.full_text || response.response) + "\n\n💡 Répondez simplement dans le chat avec les informations demandées.",
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id
@@ -396,7 +406,17 @@ export default function ChatInterface() {
 
       } else {
         // 🚀 NOUVEAU : Stocker toutes les versions + afficher la réponse du niveau demandé
-        let displayContent = response.full_text || response.response || (response.response_versions?.standard || response.response_versions?.detailed || (response.response_versions ? Object.values(response.response_versions)[0] : ''));
+        let displayContent = response.full_text || response.response
+        
+        // Si on a des versions, utiliser la version appropriée au niveau actuel
+        if (response.response_versions) {
+          displayContent = (response.response_versions?.standard || response.response_versions?.detailed || response.response_versions?.concise || Object.values(response.response_versions || {})[0] || '')
+          console.log('📋 [handleSendMessage] Version sélectionnée:', {
+            level: config.level,
+            content_length: displayContent.length,
+            versions_available: Object.keys(response.response_versions)
+          })
+        }
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -563,42 +583,20 @@ export default function ChatInterface() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HistoryMenu />
-              <button
-                onClick={handleNewConversation}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title={t('nav.newConversation')}
-                aria-label={t('nav.newConversation')}
-              >
-                <PlusIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 flex justify-center items-center space-x-3">
-              <InteliaLogo className="w-8 h-8" />
-              <div className="text-center">
-                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
-                {currentConversation && currentConversation.id !== 'welcome' && (
-                  <p className="text-xs text-gray-500 truncate max-w-xs">
-                    {currentConversation.title}
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
+              <!-- concision settings removed -->
+              
               <UserMenuButton />
             </div>
           </div>
 
-          {showConcisionSettings && (
-            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-sm font-medium text-gray-900">
-                  Niveau de détail des réponses
-                </h3>
-                </div>
+          <!-- concision panel removed -->
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
               
-              <ConcisionControl />
+// (concision disabled)
               
               {hasMessages && (
                 <button
@@ -652,7 +650,33 @@ export default function ChatInterface() {
                          message.response_versions && 
                          Object.keys(message.response_versions).length > 0 && (
                           <div className="mt-2 ml-2">
-                            </div>
+                            <details className="text-xs">
+                              <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
+                                📋 Voir autres versions ({Object.keys(message.response_versions).length} disponibles)
+                              </summary>
+                              <div className="mt-2 space-y-2">
+                                {Object.entries(message.response_versions).map(([level, content]) => {
+                                  if (content && content !== message.content) {
+                                    const levelLabels = {
+                                      ultra_concise: '⚡ Minimal',
+                                      concise: '🎯 Concis', 
+                                      standard: '📝 Standard',
+                                      detailed: '📚 Détaillé'
+                                    }
+                                    return (
+                                      <div key={level} className="p-2 bg-gray-50 rounded border-l-2 border-gray-300">
+                                        <div className="text-xs font-medium text-gray-600 mb-1">
+                                          {levelLabels[level as keyof typeof levelLabels] || level}
+                                        </div>
+                                        <div className="text-gray-700 text-sm">{content}</div>
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })}
+                              </div>
+                            </details>
+                          </div>
                         )}
                         
                         {/* Feedback buttons existants inchangés */}
