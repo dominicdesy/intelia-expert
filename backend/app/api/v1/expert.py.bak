@@ -74,6 +74,7 @@ def system_status() -> Dict[str, Any]:
         "version": "1.0"
     }
 
+# Endpoint de debug pour tester l'import
 @router.get("/debug")
 def debug_imports() -> Dict[str, Any]:
     """
@@ -84,14 +85,13 @@ def debug_imports() -> Dict[str, Any]:
         "imports_tested": []
     }
     
-    # Test des imports individuels - CHEMINS CORRIGÉS
+    # Test des imports individuels
     imports_to_test = [
         "app.api.v1.utils.question_classifier",
         "app.api.v1.pipeline.context_extractor", 
         "app.api.v1.pipeline.clarification_manager",
-        "app.api.v1.pipeline.rag_engine",
-        "app.api.v1.utils.formulas",
-        "app.api.v1.pipeline.intent_registry"  # Ajouté pour tester
+        "app.api.v1.pipeline.rag_engine",  # CORRIGÉ: bon chemin
+        "app.api.v1.utils.formulas"
     ]
     
     for import_path in imports_to_test:
@@ -102,24 +102,3 @@ def debug_imports() -> Dict[str, Any]:
             debug_info["imports_tested"].append({"path": import_path, "status": f"❌ Error: {e}"})
     
     return debug_info
-
-@router.post("/force-import-test")
-def force_import_test():
-    """Test d'urgence pour diagnostiquer l'import dialogue_manager"""
-    import traceback
-    
-    try:
-        from .pipeline.dialogue_manager import handle
-        test_result = handle("test", "test question", "fr")
-        return {
-            "status": "✅ SUCCESS",
-            "result": test_result,
-            "import_successful": True
-        }
-    except Exception as e:
-        return {
-            "status": "❌ FAILED",
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-            "import_successful": False
-        }

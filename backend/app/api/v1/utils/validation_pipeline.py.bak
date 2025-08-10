@@ -1,13 +1,11 @@
-# app/api/v1/utils/validation_pipeline.py - VERSION CORRIGÉE
+# app/api/v1/utils/validation_pipeline.py - VERSION AMÉLIORÉE
 from __future__ import annotations
 
 from typing import Dict, Any, List, Tuple, Optional
 import logging
 
 from .config import MAX_CLARIFICATION_ROUNDS
-# CORRECTION: importer classify_question depuis le bon module
-from ..pipeline.intent_registry import classify_question
-from .question_classifier import REQUIRED_FIELDS_BY_TYPE
+from .question_classifier import classify_question, REQUIRED_FIELDS_BY_TYPE
 
 # Import avec fallback pour éviter les erreurs circulaires
 try:
