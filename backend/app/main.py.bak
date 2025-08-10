@@ -27,9 +27,10 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 def get_rag_paths() -> Dict[str, str]:
     """🎯 TOUS LES RAG : Global + Broiler + Layer"""
     base_path = "/workspace/backend/rag_index"
+    
     return {
         "global": f"{base_path}/global",
-        "broiler": f"{base_path}/broiler",
+        "broiler": f"{base_path}/broiler", 
         "layer": f"{base_path}/layer"
     }
 
@@ -55,20 +56,20 @@ async def lifespan(app: FastAPI):
     app.state.rag = None
     app.state.rag_broiler = None
     app.state.rag_layer = None
-
+    
     try:
         from rag.embedder import FastRAGEmbedder
-
+        
         rag_paths = get_rag_paths()
         logger.info(f"📁 Chargement des 3 RAG: {list(rag_paths.keys())}")
-
+        
         # Variables d'environnement (override si définies)
         env_override = {
             "global": os.getenv("RAG_INDEX_GLOBAL"),
-            "broiler": os.getenv("RAG_INDEX_BROILER"),
+            "broiler": os.getenv("RAG_INDEX_BROILER"), 
             "layer": os.getenv("RAG_INDEX_LAYER"),
         }
-
+        
         # Appliquer les overrides ENV
         for key, env_path in env_override.items():
             if env_path and os.path.exists(env_path):
@@ -78,12 +79,12 @@ async def lifespan(app: FastAPI):
         # 🚀 CHARGEMENT RAG GLOBAL (obligatoire)
         global_path = rag_paths["global"]
         logger.info(f"📁 Chargement RAG Global: {global_path}")
-
+        
         if os.path.exists(global_path):
             global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
                 app.state.rag = global_embedder
-
+                
                 # Compter les documents
                 doc_count = "unknown"
                 try:
@@ -93,7 +94,7 @@ async def lifespan(app: FastAPI):
                         doc_count = len(global_embedder.documents)
                 except Exception:
                     pass
-
+                
                 logger.info(f"✅ RAG Global chargé: {global_path} ({doc_count} documents)")
             else:
                 logger.error(f"❌ RAG Global: Échec chargement depuis {global_path}")
@@ -103,13 +104,13 @@ async def lifespan(app: FastAPI):
         # 🚀 CHARGEMENT RAG BROILER
         broiler_path = rag_paths["broiler"]
         logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
-
+        
         if os.path.exists(broiler_path):
             try:
                 broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
                     app.state.rag_broiler = broiler_embedder
-
+                    
                     # Compter les documents
                     doc_count = "unknown"
                     try:
@@ -119,7 +120,7 @@ async def lifespan(app: FastAPI):
                             doc_count = len(broiler_embedder.documents)
                     except Exception:
                         pass
-
+                    
                     logger.info(f"✅ RAG Broiler chargé: {broiler_path} ({doc_count} documents)")
                 else:
                     logger.warning(f"⚠️ RAG Broiler: Échec chargement depuis {broiler_path}")
@@ -128,16 +129,16 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning(f"⚠️ RAG Broiler: Chemin inexistant {broiler_path}")
 
-        # 🚀 CHARGEMENT RAG LAYER
+        # 🚀 CHARGEMENT RAG LAYER  
         layer_path = rag_paths["layer"]
         logger.info(f"📁 Chargement RAG Layer: {layer_path}")
-
+        
         if os.path.exists(layer_path):
             try:
                 layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
                     app.state.rag_layer = layer_embedder
-
+                    
                     # Compter les documents
                     doc_count = "unknown"
                     try:
@@ -147,7 +148,7 @@ async def lifespan(app: FastAPI):
                             doc_count = len(layer_embedder.documents)
                     except Exception:
                         pass
-
+                    
                     logger.info(f"✅ RAG Layer chargé: {layer_path} ({doc_count} documents)")
                 else:
                     logger.warning(f"⚠️ RAG Layer: Échec chargement depuis {layer_path}")
@@ -158,7 +159,7 @@ async def lifespan(app: FastAPI):
 
         # 📊 Résumé final des 3 RAG
         total_rags = sum(1 for rag in [app.state.rag, app.state.rag_broiler, app.state.rag_layer] if rag)
-
+        
         rag_summary = {
             "global": "✅ Actif" if app.state.rag else "❌ CRITIQUE",
             "broiler": "✅ Actif" if app.state.rag_broiler else "❌ Absent",
@@ -166,7 +167,7 @@ async def lifespan(app: FastAPI):
             "total_loaded": total_rags
         }
         logger.info(f"📊 Status final des RAG: {rag_summary}")
-
+        
         if total_rags == 3:
             logger.info("🎉 PARFAIT: Les 3 RAG sont chargés (Global + Broiler + Layer)")
         elif total_rags == 1:
@@ -195,9 +196,11 @@ app = FastAPI(
 # =============================================================================
 # CORS MIDDLEWARE
 # =============================================================================
+
 @app.middleware("http")
 async def cors_handler(request: Request, call_next):
     response = await call_next(request)
+    
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
@@ -205,15 +208,16 @@ async def cors_handler(request: Request, call_next):
         "http://localhost:3000",
         "http://localhost:8080",
     ]
+    
     if origin in allowed_origins or os.getenv("ENV") != "production":
         response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Max-Age"] = "3600"
+    
     return response
 
-from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware  # avoid shadowing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -237,6 +241,7 @@ async def options_handler(request: Request, full_path: str):
         "http://localhost:3000",
         "http://localhost:8080",
     ]
+    
     if origin in allowed_origins or os.getenv("ENV") != "production":
         return JSONResponse(
             content={},
@@ -252,10 +257,23 @@ async def options_handler(request: Request, full_path: str):
         raise HTTPException(status_code=403, detail="Origin not allowed")
 
 # -------------------------------------------------------------------
-# Montage des routers (agrégateur v1 unique)
+# Montage des routers
 # -------------------------------------------------------------------
-from app.api.v1 import router as api_v1_router
-app.include_router(api_v1_router)  # => expose /api/v1/* grâce à root_path="/api"
+def _mount(module_path: str, prefix: str, tag: str):
+    try:
+        module = __import__(module_path, fromlist=["router"])
+        app.include_router(module.router, prefix=prefix, tags=[tag])
+        logger.info("✅ %s monté sur %s", module_path, prefix)
+    except Exception as e:
+        logger.warning("⚠️ %s non monté: %s", module_path, e)
+
+_mount("app.api.v1.system",       "/v1",         "System")
+_mount("app.api.v1.auth",         "/v1",         "Auth")
+_mount("app.api.v1.admin",        "/v1",         "Admin")
+_mount("app.api.v1.health",       "/v1",         "Health")
+_mount("app.api.v1.invitations",  "/v1",         "Invitations")
+_mount("app.api.v1.logging",      "/v1",         "Logging")
+_mount("app.api.v1.expert",       "/v1/expert",  "Expert")
 
 # -------------------------------------------------------------------
 # Debug RAG - 3 RAG COMPLETS
@@ -263,13 +281,15 @@ app.include_router(api_v1_router)  # => expose /api/v1/* grâce à root_path="/a
 @app.get("/rag/debug", tags=["Debug"])
 async def rag_debug():
     """🔍 Debug des 3 RAG (Global + Broiler + Layer)"""
+    
     rag_paths = get_rag_paths()
+    
     env_vars = {
         "RAG_INDEX_GLOBAL": os.getenv("RAG_INDEX_GLOBAL"),
         "RAG_INDEX_BROILER": os.getenv("RAG_INDEX_BROILER"),
         "RAG_INDEX_LAYER": os.getenv("RAG_INDEX_LAYER"),
     }
-
+    
     # Vérification des 3 chemins
     path_status = {}
     for name, path in rag_paths.items():
@@ -277,7 +297,7 @@ async def rag_debug():
             exists = os.path.exists(path)
             is_dir = os.path.isdir(path) if exists else False
             files = sorted(os.listdir(path))[:10] if exists and is_dir else []
-
+            
             path_status[name] = {
                 "path": path,
                 "exists": exists,
@@ -295,7 +315,7 @@ async def rag_debug():
                 "exists": False,
                 "error": str(e)
             }
-
+    
     # Status des 3 instances RAG
     instances_status = {}
     for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
@@ -305,7 +325,7 @@ async def rag_debug():
             "functional": False,
             "documents": 0
         }
-
+        
         if embedder:
             try:
                 instance_info["functional"] = embedder.has_search_engine()
@@ -315,14 +335,14 @@ async def rag_debug():
                     instance_info["documents"] = len(embedder.documents)
             except Exception as e:
                 instance_info["error"] = str(e)
-
+        
         instances_status[name] = instance_info
-
+    
     # Calculs totaux
     total_available = sum(1 for info in path_status.values() if info.get("complete", False))
     total_loaded = sum(1 for info in instances_status.values() if info.get("functional", False))
     total_documents = sum(info.get("documents", 0) for info in instances_status.values() if isinstance(info.get("documents"), int))
-
+    
     return {
         "approach": "three_rag_system",
         "environment_variables": env_vars,
@@ -345,20 +365,22 @@ async def rag_debug():
 @app.get("/rag/test", tags=["Debug"])
 async def test_rag_access():
     """🧪 Test complet des 3 RAG"""
+    
     results = {
         "timestamp": datetime.utcnow().isoformat(),
         "tests": {},
         "summary": {}
     }
+    
     rag_paths = get_rag_paths()
-
+    
     # Test filesystem pour les 3 RAG
     filesystem_test = {
         "base_path": "/workspace/backend/rag_index",
         "base_exists": os.path.exists("/workspace/backend/rag_index"),
         "rags": {}
     }
-
+    
     for rag_type, rag_path in rag_paths.items():
         rag_info = {
             "path": rag_path,
@@ -367,7 +389,7 @@ async def test_rag_access():
             "files": [],
             "file_sizes": {}
         }
-
+        
         if rag_info["exists"] and rag_info["is_directory"]:
             try:
                 files = os.listdir(rag_path)
@@ -376,7 +398,7 @@ async def test_rag_access():
                 rag_info["has_pkl"] = "index.pkl" in files
                 rag_info["has_meta"] = "meta.json" in files
                 rag_info["complete"] = rag_info["has_faiss"] and rag_info["has_pkl"]
-
+                
                 for file in files:
                     try:
                         file_path = os.path.join(rag_path, file)
@@ -384,14 +406,14 @@ async def test_rag_access():
                         rag_info["file_sizes"][file] = f"{size / 1024 / 1024:.2f} MB"
                     except Exception:
                         rag_info["file_sizes"][file] = "unknown"
-
+                        
             except Exception as e:
                 rag_info["error"] = str(e)
-
+        
         filesystem_test["rags"][rag_type] = rag_info
-
+    
     results["tests"]["filesystem"] = filesystem_test
-
+    
     # Test des instances actuelles
     current_instances = {}
     for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
@@ -402,29 +424,29 @@ async def test_rag_access():
             "document_count": 0,
             "search_ready": False
         }
-
+        
         if embedder:
             try:
                 instance_info["functional"] = True
                 instance_info["search_ready"] = embedder.has_search_engine()
-
+                
                 if hasattr(embedder, 'get_document_count'):
                     instance_info["document_count"] = embedder.get_document_count()
                 elif hasattr(embedder, 'documents') and embedder.documents:
                     instance_info["document_count"] = len(embedder.documents)
-
+                    
             except Exception as e:
                 instance_info["error"] = str(e)
-
+        
         current_instances[name] = instance_info
-
+    
     results["tests"]["current_instances"] = current_instances
-
+    
     # Résumé
     available_rags = sum(1 for info in filesystem_test["rags"].values() if info.get("complete", False))
     loaded_rags = sum(1 for info in current_instances.values() if info.get("functional", False))
     total_documents = sum(info.get("document_count", 0) for info in current_instances.values() if isinstance(info.get("document_count"), int))
-
+    
     results["summary"] = {
         "available_on_disk": available_rags,
         "loaded_in_memory": loaded_rags,
@@ -433,14 +455,14 @@ async def test_rag_access():
         "missing_rags": [name for name, info in filesystem_test["rags"].items() if not info.get("complete", False)],
         "recommendations": []
     }
-
+    
     if available_rags == 3 and loaded_rags == 3:
         results["summary"]["recommendations"].append("🎉 PARFAIT: Les 3 RAG sont disponibles et chargés!")
     elif available_rags == 3 and loaded_rags < 3:
         results["summary"]["recommendations"].append(f"⚠️ 3 RAG disponibles mais seulement {loaded_rags} chargé(s)")
     elif available_rags < 3:
         results["summary"]["recommendations"].append(f"❌ Seulement {available_rags}/3 RAG trouvés sur le disque")
-
+    
     return results
 
 @app.get("/cors-test", tags=["Debug"])
@@ -456,10 +478,10 @@ async def root():
     def rag_status() -> str:
         total_rags = sum(1 for rag in [
             getattr(app.state, "rag", None),
-            getattr(app.state, "rag_broiler", None),
+            getattr(app.state, "rag_broiler", None), 
             getattr(app.state, "rag_layer", None)
         ] if rag and hasattr(rag, 'has_search_engine') and rag.has_search_engine())
-
+        
         if total_rags == 3:
             return "optimal_3_rags"
         elif total_rags == 1:
@@ -485,7 +507,7 @@ async def http_exc_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "timestamp": datetime.utcnow().isoformat() + "Z"},
         headers={"content-type": "application/json; charset=utf-8"},
     )
-
+    
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
@@ -493,25 +515,25 @@ async def http_exc_handler(request: Request, exc: HTTPException):
         "http://localhost:3000",
         "http://localhost:8080",
     ]
-
+    
     if origin in allowed_origins or os.getenv("ENV") != "production":
         response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
         response.headers["Access-Control-Allow-Credentials"] = "true"
-
+    
     return response
 
 @app.exception_handler(Exception)
 async def generic_exc_handler(request: Request, exc: Exception):
     logger.exception("Unhandled: %s", exc)
-
+    
     response = JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "timestamp": datetime.utcnow().isoformat() + "Z"},
         headers={"content-type": "application/json; charset=utf-8"},
     )
-
+    
     origin = request.headers.get("Origin")
     allowed_origins = [
         "https://expert.intelia.com",
@@ -519,13 +541,13 @@ async def generic_exc_handler(request: Request, exc: Exception):
         "http://localhost:3000",
         "http://localhost:8080",
     ]
-
+    
     if origin in allowed_origins or os.getenv("ENV") != "production":
         response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
         response.headers["Access-Control-Allow-Credentials"] = "true"
-
+    
     return response
 
 if __name__ == "__main__":
