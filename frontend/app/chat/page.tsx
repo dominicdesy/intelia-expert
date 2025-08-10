@@ -578,7 +578,7 @@ export default function ChatInterface() {
       
       // ✅ CORRECTION: Nettoyer le JSON visible si présent
       if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
-        const match = answerText.match(/'answer': "(.+?)"/s)
+        const match = answerText.match(/'answer': "(.+?)"/)
         if (match) {
           answerText = match[1]
             .replace(/\\"/g, '"')
