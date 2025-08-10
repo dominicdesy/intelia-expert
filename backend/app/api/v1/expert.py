@@ -90,7 +90,7 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.utils.question_classifier",
         "app.api.v1.pipeline.context_extractor", 
         "app.api.v1.pipeline.clarification_manager",
-        "app.rag_engine",
+        "app.api.v1.pipeline.rag_engine",  # CORRIGÉ: bon chemin
         "app.api.v1.utils.formulas"
     ]
     
