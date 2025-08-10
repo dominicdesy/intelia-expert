@@ -682,9 +682,6 @@ export default function ChatInterface() {
                               strong: ({node, ...props}) => (
                                 <strong className="font-semibold text-gray-900" {...props} />
                               ),
-                              blockquote: ({node, ...props}) => (
-                                <div className="border-l-4 border-blue-200 bg-blue-50 p-3 my-3 rounded-r" {...props} />
-                              ),
                             }}
                           >
                             {message.content}
