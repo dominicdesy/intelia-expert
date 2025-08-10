@@ -5,12 +5,6 @@ Construit 3 index par tenant: global, broiler, layer
 - Filtrage par chemin: /species/broiler/ et /species/layer/
 - Index root: RAG_INDEX_ROOT (def: rag_index)
 - Documents root: DOCUMENTS_ROOT (def: documents)
-
-AMÉLIORATIONS (non-intrusives, compatibles avec la version stable):
-- Enrichissement des métadonnées de index.pkl après build (optionnel):
-    * species, life_stage, document_type, chunk_type, section
-- Contrôlé par ENV: RAG_ENRICH_METADATA=1 (par défaut ON)
-- Journalisation accrue et robustesse accrue des erreurs
 """
 
 import os
@@ -34,9 +28,6 @@ SPECIES_DIR_HINTS = {
     "layer": "/species/layer/",
 }
 SPECIES_LIST = ["global", "broiler", "layer"]
-
-# Enrichissement des métadonnées post-build (sécurisé, optionnel)
-RAG_ENRICH_METADATA = os.getenv("RAG_ENRICH_METADATA", "1").strip() not in {"0", "false", "False", ""}
 
 
 def setup_environment() -> Path:
@@ -103,15 +94,12 @@ def make_temp_view(filtered_files: List[Path], tmp_dir: Path) -> None:
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     for src in filtered_files:
-        # Structure plate : le parser conserve généralement le chemin source dans les métadonnées
-        dst = tmp_dir / src.name
+        rel = src.name if src.is_file() else src.relative_to(src)
+        dst = tmp_dir / src.name  # keep flat structure; parsers typically embed path metadata anyway
         try:
             os.link(src, dst)  # hardlink (fast, space-efficient on same FS)
         except Exception:
-            try:
-                shutil.copy2(src, dst)  # fallback copy
-            except Exception as e:
-                logger.warning("Skip file (cannot link/copy): %s | %s", src, e)
+            shutil.copy2(src, dst)  # fallback copy
 
 
 def build_species_index_for_tenant(tenant_id: str, tenant_docs_dir: Path, species: str, embedder) -> Dict[str, Any]:
@@ -167,10 +155,6 @@ def build_species_index_for_tenant(tenant_id: str, tenant_docs_dir: Path, specie
 
         status_ok = (result or {}).get("status") == "success"
         if status_ok:
-            # Enrichissement post-build (optionnel et sécurisé)
-            if RAG_ENRICH_METADATA:
-                maybe_enrich_index_metadata(index_dir)
-
             return {
                 "success": True,
                 "tenant": tenant_id,
@@ -217,121 +201,6 @@ def create_build_summary(results: List[Dict[str, Any]], started_at: float, outfi
     return summary
 
 
-# ----------------------- Nouvel enrichisseur ----------------------- #
-def _load_index_pkl(index_dir: Path) -> Optional[List[Dict[str, Any]]]:
-    pkl = index_dir / "index.pkl"
-    if not pkl.exists():
-        return None
-    try:
-        import pickle  # local import pour minimiser l’empreinte
-        with open(pkl, "rb") as f:
-            data = pickle.load(f)
-        if isinstance(data, list):
-            return data
-        # cas dict {id: {text, metadata}}
-        if isinstance(data, dict):
-            out: List[Dict[str, Any]] = []
-            for key, val in data.items():
-                if isinstance(val, dict):
-                    out.append({"id": val.get("id", key), "text": val.get("text") or val.get("content", ""), "metadata": val.get("metadata", {})})
-                elif isinstance(val, str):
-                    out.append({"id": key, "text": val, "metadata": {}})
-            return out
-    except Exception as e:
-        logger.warning("Cannot load index.pkl for enrichment: %s", e)
-    return None
-
-
-def _save_index_pkl(index_dir: Path, docs: List[Dict[str, Any]]) -> bool:
-    pkl = index_dir / "index.pkl"
-    try:
-        import pickle
-        with open(pkl, "wb") as f:
-            pickle.dump(docs, f)
-        return True
-    except Exception as e:
-        logger.warning("Cannot save enriched index.pkl: %s", e)
-        return False
-
-
-def _safe_enrich_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Version inline de l'enrichisseur (copie sans dépendance externe).
-    Ajoute species, life_stage, document_type, chunk_type, section quand possible.
-    """
-    try:
-        m = dict(meta or {})
-        path = " ".join(str(m.get(k, "")) for k in ("file_path", "path", "source", "filename")).lower()
-
-        # species
-        if not m.get("species"):
-            if any(x in path for x in ("broiler", "ross", "cobb", "hubbard")):
-                m["species"] = "broiler"
-            elif any(x in path for x in ("layer", "lohmann", "hy-line", "isa")):
-                m["species"] = "layer"
-
-        # life_stage
-        if not m.get("life_stage"):
-            if "parent stock" in path or "breeder" in path:
-                m["life_stage"] = "parent_stock"
-            elif any(x in path for x in ("broiler", "growout", "fattening")):
-                m["life_stage"] = "broiler"
-
-        # document_type
-        if not m.get("document_type"):
-            if any(x in path for x in ("performance objectives", "performance_objectives", "objectifs de performance")):
-                m["document_type"] = "performance_objectives"
-            elif "handbook" in path or "guide" in path or "manual" in path:
-                # heuristique selon espèce
-                m["document_type"] = "broiler_handbook" if m.get("species") == "broiler" else "layer_handbook"
-            elif "regulation" in path or "reglement" in path or "cahier des charges" in path:
-                m["document_type"] = "regulations"
-
-        # chunk_type
-        if not m.get("chunk_type"):
-            m["chunk_type"] = "table" if "table" in path else "paragraph"
-
-        # section
-        if not m.get("section"):
-            import re
-            sec = re.findall(r"(section\s+\d+(?:\.\d+)?)", path)
-            if sec:
-                m["section"] = sec[0]
-
-        return m
-    except Exception:
-        return dict(meta or {})
-
-
-def maybe_enrich_index_metadata(index_dir: Path) -> None:
-    """
-    Post-traitement sans risque: si index.pkl existe, enrichit chaque chunk.metadata.
-    N'affecte pas FAISS; le RAG lira ces champs pour filtrer/réordonner.
-    """
-    docs = _load_index_pkl(index_dir)
-    if not docs:
-        logger.info("No index.pkl to enrich at %s (skipping).", index_dir)
-        return
-
-    changed = 0
-    for d in docs:
-        md = d.get("metadata") or {}
-        new_md = _safe_enrich_metadata(md)
-        if new_md != md:
-            d["metadata"] = new_md
-            changed += 1
-
-    if changed:
-        ok = _save_index_pkl(index_dir, docs)
-        if ok:
-            logger.info("Metadata enriched for %s: %d/%d chunks updated.", index_dir, changed, len(docs))
-        else:
-            logger.warning("Failed to persist enriched metadata for %s.", index_dir)
-    else:
-        logger.info("Metadata enrichment: nothing to change in %s.", index_dir)
-
-
-# ------------------------------ Main ------------------------------ #
 def main() -> bool:
     start = time.time()
     project_root = setup_environment()
@@ -353,8 +222,7 @@ def main() -> bool:
         normalize_queries=True,
     )
 
-    # Compat: certaines implémentations exposent _check_dependencies()
-    if hasattr(embedder, "_check_dependencies") and not embedder._check_dependencies():  # type: ignore[attr-defined]
+    if hasattr(embedder, "_check_dependencies") and not embedder._check_dependencies():
         logger.error("Missing dependencies. Try: pip install sentence-transformers faiss-cpu numpy")
         return False
 
