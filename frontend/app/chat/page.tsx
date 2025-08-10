@@ -580,13 +580,10 @@ export default function ChatInterface() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HistoryMenu />
-              {/* concision settings removed */}
-              
               <UserMenuButton />
             </div>
           </div>
 
-          {/* concision panel removed */}
           {showConcisionSettings && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
               <div className="flex items-center justify-between mb-3">
@@ -598,8 +595,6 @@ export default function ChatInterface() {
                   ✕
                 </button>
               </div>
-              
-              {/* concision content would go here */}
               
               {hasMessages && (
                 <button
@@ -641,121 +636,115 @@ export default function ChatInterface() {
                         </div>
                       )}
                       
-					<div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
-					  {message.isUser ? (
-						// 🧑 Messages utilisateur : texte simple (comme avant)
-						<p className="whitespace-pre-wrap leading-relaxed text-sm">
-						  {message.content}
-						</p>
-					  ) : (
-						// 🤖 Messages IA : rendu Markdown (titres, listes, gras, emojis)
-						<ReactMarkdown
-						  className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0 prose-strong:text-gray-900"
-						  components={{
-							h2: ({node, ...props}) => (
-							  <h2 className="text-base font-bold text-gray-900 mt-0 mb-2 flex items-center gap-1" {...props} />
-							),
-							p: ({node, ...props}) => (
-							  <p className="leading-relaxed text-gray-800 my-1" {...props} />
-							),
-							ul: ({node, ...props}) => (
-							  <ul className="list-disc list-inside space-y-1 text-gray-800 my-1" {...props} />
-							),
-							li: ({node, ...props}) => (
-							  <li className="leading-snug" {...props} />
-							),
-							strong: ({node, ...props}) => (
-							  <strong className="font-semibold text-gray-900" {...props} />
-							),
-						  }}
-						>
-						  {message.content}
-						</ReactMarkdown>
-					  )}
-					</div>
-
-                        
-                        {/* 🚀 NOUVEAU : Indicateur versions disponibles + sélecteur rapide */}
-                        {!message.isUser && 
-                         message.response_versions && 
-                         Object.keys(message.response_versions).length > 0 && (
-                          <div className="mt-2 ml-2">
-                            <details className="text-xs">
-                              <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
-                                📋 Voir autres versions ({Object.keys(message.response_versions).length} disponibles)
-                              </summary>
-                              <div className="mt-2 space-y-2">
-                                {Object.entries(message.response_versions).map(([level, content]) => {
-                                  if (content && content !== message.content) {
-                                    const levelLabels = {
-                                      ultra_concise: '⚡ Minimal',
-                                      concise: '🎯 Concis', 
-                                      standard: '📝 Standard',
-                                      detailed: '📚 Détaillé'
-                                    }
-                                    return (
-                                      <div key={level} className="p-2 bg-gray-50 rounded border-l-2 border-gray-300">
-                                        <div className="text-xs font-medium text-gray-600 mb-1">
-                                          {levelLabels[level as keyof typeof levelLabels] || level}
-                                        </div>
-										<div className="text-gray-700 text-sm">
-										  <ReactMarkdown
-											className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0"
-										  >
-											{content}
-										  </ReactMarkdown>
-										</div>
-                                      </div>
-                                    )
-                                  }
-                                  return null
-                                })}
-                              </div>
-                            </details>
-                          </div>
-                        )}
-                        
-                        {/* Feedback buttons existants inchangés */}
-                        {!message.isUser && 
-                         index > 0 && 
-                         message.conversation_id && (
-                          <div className="flex items-center space-x-2 mt-2 ml-2">
-                            <button
-                              onClick={() => handleFeedbackClick(message.id, 'positive')}
-                              className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                                message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
-                              }`}
-                              title={t('chat.helpfulResponse')}
-                              aria-label={t('chat.helpfulResponse')}
-                            >
-                              <ThumbUpIcon />
-                            </button>
-                            <button
-                              onClick={() => handleFeedbackClick(message.id, 'negative')}
-                              className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                                message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
-                              }`}
-                              title={t('chat.notHelpfulResponse')}
-                              aria-label={t('chat.notHelpfulResponse')}
-                            >
-                              <ThumbDownIcon />
-                            </button>
-                            
-                            {message.feedback && (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-500">
-                                  Merci pour votre retour !
-                                </span>
-                                {message.feedbackComment && (
-                                  <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                    💬
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                        {message.isUser ? (
+                          <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                            {message.content}
+                          </p>
+                        ) : (
+                          <ReactMarkdown
+                            className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0 prose-strong:text-gray-900"
+                            components={{
+                              h2: ({node, ...props}) => (
+                                <h2 className="text-base font-bold text-gray-900 mt-0 mb-2 flex items-center gap-1" {...props} />
+                              ),
+                              p: ({node, ...props}) => (
+                                <p className="leading-relaxed text-gray-800 my-1" {...props} />
+                              ),
+                              ul: ({node, ...props}) => (
+                                <ul className="list-disc list-inside space-y-1 text-gray-800 my-1" {...props} />
+                              ),
+                              li: ({node, ...props}) => (
+                                <li className="leading-snug" {...props} />
+                              ),
+                              strong: ({node, ...props}) => (
+                                <strong className="font-semibold text-gray-900" {...props} />
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                         )}
                       </div>
+
+                      {!message.isUser && 
+                       message.response_versions && 
+                       Object.keys(message.response_versions).length > 0 && (
+                        <div className="mt-2 ml-2">
+                          <details className="text-xs">
+                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
+                              📋 Voir autres versions ({Object.keys(message.response_versions).length} disponibles)
+                            </summary>
+                            <div className="mt-2 space-y-2">
+                              {Object.entries(message.response_versions).map(([level, content]) => {
+                                if (content && content !== message.content) {
+                                  const levelLabels = {
+                                    ultra_concise: '⚡ Minimal',
+                                    concise: '🎯 Concis', 
+                                    standard: '📝 Standard',
+                                    detailed: '📚 Détaillé'
+                                  }
+                                  return (
+                                    <div key={level} className="p-2 bg-gray-50 rounded border-l-2 border-gray-300">
+                                      <div className="text-xs font-medium text-gray-600 mb-1">
+                                        {levelLabels[level as keyof typeof levelLabels] || level}
+                                      </div>
+                                      <div className="text-gray-700 text-sm">
+                                        <ReactMarkdown
+                                          className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0"
+                                        >
+                                          {content}
+                                        </ReactMarkdown>
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              })}
+                            </div>
+                          </details>
+                        </div>
+                      )}
+                      
+                      {!message.isUser && 
+                       index > 0 && 
+                       message.conversation_id && (
+                        <div className="flex items-center space-x-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedbackClick(message.id, 'positive')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                              message.feedback === 'positive' ? 'text-green-600 bg-green-50' : 'text-gray-400'
+                            }`}
+                            title={t('chat.helpfulResponse')}
+                            aria-label={t('chat.helpfulResponse')}
+                          >
+                            <ThumbUpIcon />
+                          </button>
+                          <button
+                            onClick={() => handleFeedbackClick(message.id, 'negative')}
+                            className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                              message.feedback === 'negative' ? 'text-red-600 bg-red-50' : 'text-gray-400'
+                            }`}
+                            title={t('chat.notHelpfulResponse')}
+                            aria-label={t('chat.notHelpfulResponse')}
+                          >
+                            <ThumbDownIcon />
+                          </button>
+                          
+                          {message.feedback && (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-gray-500">
+                                Merci pour votre retour !
+                              </span>
+                              {message.feedbackComment && (
+                                <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
+                                  💬
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {message.isUser && (
                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
