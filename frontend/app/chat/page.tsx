@@ -1,4 +1,12 @@
-'use client'
+export const InteliaLogo = ({ className = "w-8 h-8" }: IconProps) => (
+  <div className={`${className} flex items-center justify-center`}>
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      {/* Chaîne bleue supérieure */}
+      <path d="M20 25 Q30 15, 50 25 Q70 35, 80 25 Q85 20, 80 35 Q70 45, 50 35 Q30 25, 20 25 Z" 
+            fill="#3B82F6" 
+            className="drop-shadow-sm"/>
+      
+      {/* Chaîne bleue inférieure */'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -665,22 +673,25 @@ export default function ChatInterface() {
                           </p>
                         ) : (
                           <ReactMarkdown
-                            className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0 prose-strong:text-gray-900"
+                            className="prose prose-sm max-w-none prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900"
                             components={{
                               h2: ({node, ...props}) => (
-                                <h2 className="text-base font-bold text-gray-900 mt-0 mb-2 flex items-center gap-1" {...props} />
+                                <h2 className="text-lg font-bold text-gray-900 mt-0 mb-3 flex items-center gap-2" {...props} />
                               ),
                               p: ({node, ...props}) => (
-                                <p className="leading-relaxed text-gray-800 my-1" {...props} />
+                                <p className="leading-relaxed text-gray-800 my-2" {...props} />
                               ),
                               ul: ({node, ...props}) => (
-                                <ul className="list-disc list-inside space-y-1 text-gray-800 my-1" {...props} />
+                                <ul className="list-disc list-inside space-y-2 text-gray-800 my-3 ml-2" {...props} />
                               ),
                               li: ({node, ...props}) => (
-                                <li className="leading-snug" {...props} />
+                                <li className="leading-relaxed pl-1" {...props} />
                               ),
                               strong: ({node, ...props}) => (
                                 <strong className="font-semibold text-gray-900" {...props} />
+                              ),
+                              blockquote: ({node, ...props}) => (
+                                <div className="border-l-4 border-blue-200 bg-blue-50 p-3 my-3 rounded-r" {...props} />
                               ),
                             }}
                           >
