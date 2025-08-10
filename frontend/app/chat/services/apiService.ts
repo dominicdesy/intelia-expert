@@ -116,8 +116,6 @@ interface EnhancedAIResponse {
   timestamp?: string
   processing_time?: number
   
-  // ✅ plein texte non tronqué (si fourni par backend)
-  full_text?: string
   // 🚀 NOUVEAU : Toutes les versions de réponse (généré côté frontend si absent)
   response_versions?: {
     ultra_concise: string
@@ -255,9 +253,9 @@ export const generateAIResponse = async (
     const data = await response.json()
     console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
-      has_response: !!(data.full_text ?? data.response),
+      has_response: !!data.response,
       has_questions: !!data.questions,
-      response_length: (data.full_text ?? data.response)?.length || 0,
+      response_length: data.response?.length || 0,
       questions_count: data.questions?.length || 0,
       source: data.source,
       documents_used: data.documents_used
@@ -271,8 +269,7 @@ export const generateAIResponse = async (
       type: data.type,
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: data.type === 'answer' ? ((data.full_text ?? data.response) || '') : '',
-      full_text: data.full_text,
+      response: data.type === 'answer' ? (data.response || '') : '',
       
       // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
@@ -391,7 +388,7 @@ export const generateAIResponsePublic = async (
     const data = await response.json()
     console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
-      has_response: !!(data.full_text ?? data.response),
+      has_response: !!data.response,
       has_questions: !!data.questions
     })
 
@@ -403,8 +400,7 @@ export const generateAIResponsePublic = async (
       type: data.type,
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: data.type === 'answer' ? ((data.full_text ?? data.response) || '') : '',
-      full_text: data.full_text,
+      response: data.type === 'answer' ? (data.response || '') : '',
       
       // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
