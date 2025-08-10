@@ -1,104 +1,83 @@
 # app/api/v1/utils/response_generator.py
-from typing import Optional, List, Dict, Any
+from __future__ import annotations
+from typing import Dict, Any, List
 
-# Optionnel : si ce module est importé avec __all__, on expose les fonctions publiques.
-__all__ = ["format_response", "build_card"]
+def build_card(headline: str, bullets: List[str] | None = None, footnote: str | None = None) -> Dict[str, Any]:
+    return {"headline": headline, "bullets": bullets or [], "footnote": footnote}
 
-# --- Helpers -----------------------------------------------------------------
+def _join_lines(lines: List[str]) -> str:
+    return "\n".join([l for l in lines if l])
 
-def _normalize_units_text(answer: str) -> str:
+def _format_numeric_first(payload: Dict[str, Any]) -> str:
+    # payload attendu: { "value": "XXX unité", "range": "Y–Z", "conditions": "...", "notes": [...] }
+    lines = []
+    v = payload.get("value")
+    if v:
+        lines.append(str(v))
+    rng = payload.get("range")
+    if rng:
+        lines.append(f"Plage: {rng}")
+    cond = payload.get("conditions")
+    if cond:
+        lines.append(cond)
+    notes = payload.get("notes") or []
+    lines += [f"- {n}" for n in notes]
+    return _join_lines(lines)
+
+def _format_procedure(payload: Dict[str, Any]) -> str:
+    steps = payload.get("steps") or []
+    params = payload.get("params") or []
+    lines = []
+    if steps:
+        lines.append("Procédure:")
+        for i, s in enumerate(steps[:8], 1):
+            lines.append(f"{i}. {s}")
+    if params:
+        lines.append("")
+        lines.append("Paramètres clés:")
+        for p in params[:8]:
+            lines.append(f"- {p}")
+    return _join_lines(lines)
+
+def _format_rules(payload: Dict[str, Any]) -> str:
+    main = payload.get("rule") or "Règle principale non disponible."
+    items = payload.get("details") or []
+    lines = [f"Règle: {main}"]
+    for d in items[:8]:
+        lines.append(f"- {d}")
+    return _join_lines(lines)
+
+def format_response(content: str | Dict[str, Any]) -> str:
     """
-    Nettoie quelques variantes d'unités dans le texte libre pour uniformiser l'affichage.
-    Exemple : 'm3/h/kg' -> 'm³/h/kg', 'kcal.kg' -> 'kcal/kg', etc.
+    Tolère soit une chaîne prête, soit un dict structuré {mode:..., payload:{...}}
     """
-    if not answer:
-        return answer
-    out = answer
-    out = out.replace(" m3/h/kg", " m³/h/kg").replace("m3/h/kg", "m³/h/kg")
-    out = out.replace("kcal.kg", "kcal/kg").replace("kcalkg", "kcal/kg")
-    out = out.replace(" / ", "/")
-    return out
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, dict):
+        return str(content)
 
-# --- Public API ---------------------------------------------------------------
+    mode = content.get("mode") or "standard"
+    payload = content.get("payload") or {}
 
-def format_response(
-    answer: str,
-    sources: Optional[List[Dict[str, str]]] = None
-) -> Dict[str, Any]:
-    """
-    Formate une réponse textuelle.
+    if "numeric" in mode or "numbers" in mode:
+        return _format_numeric_first(payload)
+    if "procedure" in mode:
+        return _format_procedure(payload)
+    if "rules" in mode:
+        return _format_rules(payload)
+    if "table" in mode:
+        # fallback texte court compatible
+        return _format_numeric_first(payload) or _format_rules(payload) or _format_procedure(payload)
 
-    - Compatibilité conservée avec l'ancien format: {"answer": "...", "sources": [...]}
-    - Ajoute 'full_text' pour un affichage direct par le frontend (sans voir {'answer': ...})
-    - Laisse passer 'sources' si fourni, sinon l'omet (pas de clé vide).
-
-    Parameters
-    ----------
-    answer : str
-        Texte de la réponse (Markdown autorisé).
-    sources : Optional[List[Dict[str, str]]]
-        Métadonnées de sources (ex: [{"title": "...", "url": "..."}]).
-
-    Returns
-    -------
-    Dict[str, Any]
-        Payload prêt à l'API, ex:
-        {
-          "type": "text",
-          "answer": "...",
-          "full_text": "...",
-          "sources": [...]
-        }
-    """
-    text = _normalize_units_text(answer)
-
-    payload: Dict[str, Any] = {
-        "type": "text",     # permet au frontend d'identifier un bloc de texte standard
-        "answer": text,     # rétro-compat
-        "full_text": text,  # à utiliser côté UI pour l'affichage standard
-    }
-    if sources:
-        payload["sources"] = sources
-    return payload
-
-
-def build_card(
-    *,
-    headline: str,
-    bullets: List[str],
-    footnote: Optional[str] = None,
-    followups: Optional[List[str]] = None,
-    sources: Optional[List[Dict[str, str]]] = None,
-) -> Dict[str, Any]:
-    """
-    Construit un objet 'card' pour une mise en page compacte dans l'UI.
-    - headline ≤ ~120 chars
-    - bullets : ≤ 4 éléments, courts
-    - followups : ≤ 2 propositions de relance
-
-    Returns un dict de forme:
-    {
-      "type": "card",
-      "headline": "...",
-      "bullets": ["...", "..."],
-      "footnote": "...",
-      "followups": ["...", "..."],
-      "sources": [...]
-    }
-    """
-
-    def _clean(s: str) -> str:
-        return _normalize_units_text(s.strip())
-
-    card: Dict[str, Any] = {
-        "type": "card",
-        "headline": _clean(headline)[:120],
-        "bullets": [_clean(b)[:160] for b in bullets if b and b.strip()][:4],
-    }
-    if footnote:
-        card["footnote"] = _clean(footnote)[:180]
-    if followups:
-        card["followups"] = [_clean(q)[:140] for q in followups if q and q.strip()][:2]
-    if sources:
-        card["sources"] = sources
-    return card
+    # standard
+    parts = []
+    head = payload.get("headline")
+    if head:
+        parts.append(str(head))
+    bullets = payload.get("bullets") or []
+    for b in bullets:
+        parts.append(f"- {b}")
+    foot = payload.get("footnote")
+    if foot:
+        parts.append(foot)
+    return _join_lines(parts)

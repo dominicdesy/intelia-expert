@@ -4,7 +4,7 @@ Automatic extraction of thematic tags and entities from document content
 """
 
 import re
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, List, Set, Optional, Any, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,7 @@ class MetadataEnricher:
     - Production phases
     - Topics and themes
     - Technical metrics
+    - Table structure detection  ✅ (markdown / HTML / CSV / whitespace-aligned)
     """
     
     # Breed detection patterns (standardized naming)
@@ -230,14 +231,23 @@ class MetadataEnricher:
             
         if metrics:
             enriched['metrics_types'] = metrics
-            
+        
+        # ✅ Table structure detection (force chunk_type="table" if detected)
+        is_table, table_format = enricher._detect_table_structure(text)
+        if is_table:
+            enriched['chunk_type'] = 'table'           # ✅ force as requested
+            enriched['table_format_detected'] = table_format
+        
         # Add derived classifications
         enriched['content_complexity'] = enricher._assess_complexity(text)
         enriched['technical_level'] = enricher._assess_technical_level(text, topics, metrics)
         enriched['species_type'] = enricher._infer_species(breeds, text)
         
         return enriched
-    
+
+    # -----------------------------
+    # Entity/topic/metric extractors
+    # -----------------------------
     def extract_breeds(self, text: str) -> List[str]:
         """Extract breed information from text"""
         text_lower = text.lower()
@@ -315,6 +325,9 @@ class MetadataEnricher:
         
         return detected_metrics
     
+    # -----------------------------
+    # Assessments / inference
+    # -----------------------------
     def _assess_complexity(self, text: str) -> str:
         """Assess content complexity level"""
         # Simple heuristics for complexity
@@ -386,6 +399,48 @@ class MetadataEnricher:
             return 'broiler'
         
         return 'unknown'
+
+    # -----------------------------
+    # Table detection (new)
+    # -----------------------------
+    def _detect_table_structure(self, text: str) -> Tuple[bool, Optional[str]]:
+        """
+        Detect if the text likely represents a table.
+        Returns (True/False, format) where format ∈ {"markdown","html","csv","whitespace",None}
+        """
+        lines = [ln for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return (False, None)
+
+        # Markdown table: at least 2 lines with pipes and a separator row like |---|
+        pipe_lines = [ln for ln in lines if '|' in ln.strip()]
+        if len(pipe_lines) >= 2:
+            # look for a separator row
+            if any(re.match(r'^\s*\|?[\s:\-\|\+]+\|?\s*$', ln) for ln in pipe_lines):
+                return (True, "markdown")
+
+        # HTML table
+        if re.search(r'<\s*table\b', text, flags=re.IGNORECASE) and re.search(r'<\s*\/\s*table\s*>', text, flags=re.IGNORECASE):
+            return (True, "html")
+
+        # CSV/TSV-like: many lines with consistent delimiter counts
+        for delim in [',', ';', '\t']:
+            delim_lines = [ln for ln in lines if ln.count(delim) >= 2]
+            if len(delim_lines) >= max(2, int(0.3 * len(lines))):
+                # check if column count is somewhat consistent
+                counts = [ln.count(delim) for ln in delim_lines[:20]]
+                if counts and (max(counts) - min(counts) <= 2):
+                    return (True, "csv" if delim in [',', ';'] else "tsv")
+
+        # Whitespace-aligned columns: multiple lines with 2+ groups of >=2 spaces between tokens
+        ws_lines = 0
+        for ln in lines:
+            if re.search(r'\S+\s{2,}\S+\s{2,}\S+', ln):  # 3+ columns separated by 2+ spaces
+                ws_lines += 1
+        if ws_lines >= max(2, int(0.3 * len(lines))):
+            return (True, "whitespace")
+
+        return (False, None)
 
 
 def extract_hierarchical_metadata(file_path: str) -> Dict[str, str]:
@@ -481,5 +536,11 @@ def infer_tags_from_text(text: str) -> Dict[str, str]:
         
     if 'diseases_mentioned' in enriched and enriched['diseases_mentioned']:
         tags['disease'] = enriched['diseases_mentioned'][0]
+    
+    # Propagate table detection in the simple tags too (optional)
+    if enriched.get('chunk_type') == 'table':
+        tags['chunk_type'] = 'table'
+        if 'table_format_detected' in enriched:
+            tags['table_format'] = enriched['table_format_detected']
     
     return tags
