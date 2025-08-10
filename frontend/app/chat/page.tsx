@@ -402,22 +402,12 @@ export default function ChatInterface() {
         console.log('🔄 [handleSendMessage] État clarification activé')
 
       } else {
-        // 🚀 NOUVEAU : Stocker toutes les versions + afficher la réponse du niveau demandé
-        let displayContent = response.full_text || response.response
-        
-        // Si on a des versions, utiliser la version appropriée au niveau actuel
-        if (response.response_versions) {
-          displayContent = (response.response_versions?.standard || response.response_versions?.detailed || response.response_versions?.concise || Object.values(response.response_versions || {})[0] || '')
-          console.log('📋 [handleSendMessage] Version sélectionnée:', {
-            level: config.level,
-            content_length: displayContent.length,
-            versions_available: Object.keys(response.response_versions)
-          })
-        }
+        // Extraction de la réponse avec nettoyage JSON
+        const [answerText, sources] = extractAnswerAndSources(response)
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: displayContent,
+          content: answerText,
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
@@ -667,45 +657,6 @@ export default function ChatInterface() {
                         )}
                       </div>
 
-                      {!message.isUser && 
-                       message.response_versions && 
-                       Object.keys(message.response_versions).length > 0 && (
-                        <div className="mt-2 ml-2">
-                          <details className="text-xs">
-                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
-                              📋 Voir autres versions ({Object.keys(message.response_versions).length} disponibles)
-                            </summary>
-                            <div className="mt-2 space-y-2">
-                              {Object.entries(message.response_versions).map(([level, content]) => {
-                                if (content && content !== message.content) {
-                                  const levelLabels = {
-                                    ultra_concise: '⚡ Minimal',
-                                    concise: '🎯 Concis', 
-                                    standard: '📝 Standard',
-                                    detailed: '📚 Détaillé'
-                                  }
-                                  return (
-                                    <div key={level} className="p-2 bg-gray-50 rounded border-l-2 border-gray-300">
-                                      <div className="text-xs font-medium text-gray-600 mb-1">
-                                        {levelLabels[level as keyof typeof levelLabels] || level}
-                                      </div>
-                                      <div className="text-gray-700 text-sm">
-                                        <ReactMarkdown
-                                          className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0"
-                                        >
-                                          {content}
-                                        </ReactMarkdown>
-                                      </div>
-                                    </div>
-                                  )
-                                }
-                                return null
-                              })}
-                            </div>
-                          </details>
-                        </div>
-                      )}
-                      
                       {!message.isUser && 
                        index > 0 && 
                        message.conversation_id && (
