@@ -561,6 +561,38 @@ export default function ChatInterface() {
     })
   }
 
+  const extractAnswerAndSources = (result: any) => {
+    const responseContent = result?.response || ""
+    let answerText = ""
+    let sources: any[] = []
+
+    if (typeof responseContent === 'object' && responseContent !== null) {
+      answerText = String(responseContent.answer || "").trim()
+      if (!answerText) {
+        answerText = "Désolé, je n'ai pas pu formater la réponse. Peux-tu préciser la lignée et l'âge ?"
+      }
+      const rawSources = responseContent.sources || responseContent.citations || responseContent.source || []
+      sources = Array.isArray(rawSources) ? rawSources.map(s => typeof s === 'object' ? s : { source: String(s) }) : []
+    } else {
+      answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
+      
+      // ✅ CORRECTION: Nettoyer le JSON visible si présent
+      if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
+        const match = answerText.match(/'answer': "(.+?)"/s)
+        if (match) {
+          answerText = match[1]
+            .replace(/\\"/g, '"')
+            .replace(/\\n/g, '\n')
+            .replace(/\\\\/g, '\\')
+        }
+      }
+      
+      sources = []
+    }
+    
+    return [answerText, sources]
+  }
+
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
