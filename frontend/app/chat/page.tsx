@@ -561,7 +561,7 @@ export default function ChatInterface() {
     })
   }
 
-  const extractAnswerAndSources = (result: any) => {
+  const extractAnswerAndSources = (result: any): [string, any[]] => {
     const responseContent = result?.response || ""
     let answerText = ""
     let sources: any[] = []
