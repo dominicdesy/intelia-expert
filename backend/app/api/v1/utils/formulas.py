@@ -1,217 +1,123 @@
-# app/api/v1/utils/formulas.py
-from __future__ import annotations
-from typing import Dict, Tuple, Optional
+# -*- coding: utf-8 -*-
+"""
+Compute-first helpers (generic baselines; tune constants to your standards).
+All functions return simple numeric outputs for quick guidance.
+"""
+from typing import Optional
 
-# ⚠️ Ces formules donnent des ordres de grandeur prudents.
-# Adaptez les coefficients à vos tables internes si nécessaire.
+# --- Production & economics ---
 
-# -----------------------------
-# Eau & ventilation (existant)
-# -----------------------------
-def estimate_water_intake_l_per_1000(
-    *, age_days: Optional[int], ambient_c: Optional[float], species: Optional[str] = None
-) -> Tuple[Optional[float], Dict]:
-    """Estimation consommation d'eau (L/j/1000 oiseaux) selon âge & T° (approx)."""
-    if not age_days:
-        return None, {"reason": "missing age"}
-    base = max(30.0, 8.0 + 1.8 * age_days)  # ~20°C
-    temp = ambient_c if ambient_c is not None else 20.0
-    factor = (1.0 + 0.03 * (temp - 20.0)) if temp >= 20 else (1.0 - 0.02 * (20.0 - temp))
-    est = base * max(0.6, min(factor, 1.6))
-    return est, {"age_days": age_days, "ambient_c": temp}
-
-
-def min_ventilation_m3h_per_kg(*, age_days: Optional[int], avg_bw_g: Optional[float]) -> Tuple[Optional[float], Dict]:
-    """Ventilation minimale (m³/h/kg) — règle conservatrice simple."""
-    if avg_bw_g:
-        kg = max(0.2, avg_bw_g / 1000.0)
-    elif age_days:
-        kg = max(0.2, 0.02 * (age_days ** 1.6) / 1000.0)  # approx
-    else:
-        return None, {"reason": "missing age and weight"}
-    val = 0.8 if kg < 1.5 else 1.0
-    return val, {"age_days": age_days, "avg_bw_kg": kg}
-
-# -----------------------------
-# Indices de production
-# -----------------------------
-def iep_broiler(
-    *, livability_pct: float, avg_weight_kg: float, fcr: float, age_days: int
-) -> Tuple[Optional[float], Dict]:
-    """
-    IEP / EPEF broiler (définition usuelle):
-        IEP = (Livability% × Poids vif moyen (kg) × 100) / (FCR × Âge (jours))
-    """
+def iep(ep: float, survie_pct: float, fcr: float, poids_vif_kg: float, age_jours: int) -> Optional[float]:
+    """Indice d'Efficacité de Production (variante générique)."""
     try:
-        if not all([livability_pct, avg_weight_kg, fcr, age_days]):
-            return None, {"reason": "missing params"}
-        if fcr <= 0 or age_days <= 0:
-            return None, {"reason": "invalid params"}
-        iep = (livability_pct * avg_weight_kg * 100.0) / (fcr * age_days)
-        return iep, {
-            "livability_pct": livability_pct,
-            "avg_weight_kg": avg_weight_kg,
-            "fcr": fcr,
-            "age_days": age_days,
-            "formula": "IEP=(Liv%*BWkg*100)/(FCR*Age)",
-        }
-    except Exception as e:
-        return None, {"error": str(e)}
+        return (ep * (survie_pct/100.0) * poids_vif_kg) / (fcr * max(1, age_jours)) * 100.0
+    except Exception:
+        return None
 
-
-def epd_layer_placeholder(
-    *, hen_day_production_pct: float, avg_egg_weight_g: float
-) -> Tuple[Optional[float], Dict]:
-    """
-    Placeholder (à ajuster à votre convention EPD locale si différente).
-    Ici on retourne la masse d'œufs pondus par poule et par jour (g/poule/j):
-        EPD ≈ Hen-day % × Poids œuf (g) / 100
-    """
+def cout_aliment_par_kg_vif(prix_aliment_tonne: float, fcr: float) -> Optional[float]:
+    """Feed cost per kg live weight = (€/t / 1000) * FCR"""
     try:
-        if hen_day_production_pct is None or avg_egg_weight_g is None:
-            return None, {"reason": "missing params"}
-        epd = (hen_day_production_pct * avg_egg_weight_g) / 100.0
-        return epd, {
-            "hen_day_production_pct": hen_day_production_pct,
-            "avg_egg_weight_g": avg_egg_weight_g,
-            "note": "Placeholder — définissez votre EPD exact si différent.",
-        }
-    except Exception as e:
-        return None, {"error": str(e)}
+        return (prix_aliment_tonne / 1000.0) * fcr
+    except Exception:
+        return None
 
-# -----------------------------
-# Coût alimentaire & économie
-# -----------------------------
-def cout_aliment_par_kg_vif(
-    *, prix_aliment_tonne_eur: float, fcr: float
-) -> Tuple[Optional[float], Dict]:
-    """
-    Coût aliment par kg vif (€ / kg vif):
-        coût = (prix €/t / 1000) × FCR
-    """
+def cout_total_aliment(effectif: int, poids_abattage_kg: float, fcr: float, prix_tonne: float, survie_pct: float = 95.0) -> Optional[float]:
+    """Total feed cost for the flock until slaughter (order of magnitude)."""
     try:
-        if prix_aliment_tonne_eur is None or fcr is None:
-            return None, {"reason": "missing params"}
-        if fcr <= 0 or prix_aliment_tonne_eur <= 0:
-            return None, {"reason": "invalid params"}
-        eur_per_kg_feed = prix_aliment_tonne_eur / 1000.0
-        cost = eur_per_kg_feed * fcr
-        return cost, {"prix_aliment_tonne_eur": prix_aliment_tonne_eur, "fcr": fcr}
-    except Exception as e:
-        return None, {"error": str(e)}
+        oiseaux_vivants = effectif * (survie_pct/100.0)
+        kg_vifs = oiseaux_vivants * poids_abattage_kg
+        kg_aliment = kg_vifs * fcr
+        return kg_aliment * (prix_tonne/1000.0)
+    except Exception:
+        return None
 
-# -----------------------------
-# Dimensionnement équipements
-# -----------------------------
-def dimension_mangeoires(
-    *, effectif: int, age_days: int, type_: str = "chaine"
-) -> Tuple[Optional[Dict], Dict]:
-    """
-    Dimension mangeoires.
-    - Chaine: espace par oiseau (cm/oiseau) selon âge.
-      <14 j: 2.0 cm ; 14–27 j: 2.5 cm ; >=28 j: 3.5 cm
-    - Assiette (pan): oiseaux par assiette.
-      <14 j: 45 ; 14–27 j: 20 ; >=28 j: 12
-    """
+# --- Environment setpoints ---
+
+def setpoint_temp_C_broiler(age_jours: int, housing: str = "tunnel") -> float:
+    """Generic broiler temp curve (°C)."""
+    if age_jours <= 1: return 32.0
+    if age_jours <= 7: return 30.0
+    if age_jours <= 14: return 27.0
+    if age_jours <= 21: return 24.0
+    if age_jours <= 28: return 22.0
+    return 21.0
+
+def setpoint_hr_pct(age_jours: int) -> float:
+    """Generic target RH% by age."""
+    if age_jours <= 7: return 65.0
+    if age_jours <= 21: return 60.0
+    return 55.0
+
+def co2_max_ppm() -> int:
+    """Max acceptable CO2 ppm (generic)."""
+    return 3000
+
+def nh3_max_ppm() -> int:
+    """Max acceptable NH3 ppm (generic)."""
+    return 20
+
+def lux_program_broiler(age_jours: int) -> float:
+    """Generic lux by age for broilers."""
+    if age_jours <= 7: return 30.0
+    if age_jours <= 21: return 10.0
+    return 5.0
+
+# --- Ventilation & heat ---
+
+def vent_min_m3h_par_kg(age_jours: int, saison: str = "hiver") -> float:
+    """Minimal ventilation guideline (m3/h/kg) by age & season (very generic)."""
+    base = 0.6 if saison == "hiver" else 1.0
+    if age_jours <= 7: return base * 0.3
+    if age_jours <= 21: return base * 0.8
+    return base * 1.2
+
+def vent_min_total_m3h(poids_moy_kg: float, effectif: int, age_jours: int, saison: str = "hiver") -> float:
+    """m3/h = m3/h/kg * kg_total"""
+    kg_total = max(0.0, poids_moy_kg) * max(0, effectif)
+    return vent_min_m3h_par_kg(age_jours, saison) * kg_total
+
+def debit_tunnel_m3h(kg_total: float, charge_thermique_w_kg: float=15.0, deltaT_C: float=5.0) -> Optional[float]:
+    """Rough tunnel airflow sizing from heat removal needs."""
     try:
-        if not effectif or effectif <= 0 or age_days is None:
-            return None, {"reason": "missing params"}
-        t = (type_ or "chaine").lower()
-        if "chai" in t:  # chaine
-            if age_days < 14:
-                cm_per_bird = 2.0
-            elif age_days < 28:
-                cm_per_bird = 2.5
-            else:
-                cm_per_bird = 3.5
-            total_cm = cm_per_bird * effectif
-            return (
-                {"type": "chaine", "cm_per_bird": cm_per_bird, "total_cm_required": total_cm},
-                {"effectif": effectif, "age_days": age_days},
-            )
-        else:  # assiette/pan
-            if age_days < 14:
-                birds_per_pan = 45
-            elif age_days < 28:
-                birds_per_pan = 20
-            else:
-                birds_per_pan = 12
-            pans = max(1, int(round(effectif / birds_per_pan + 0.499)))
-            return (
-                {"type": "assiette", "birds_per_pan": birds_per_pan, "pans_required": pans},
-                {"effectif": effectif, "age_days": age_days},
-            )
-    except Exception as e:
-        return None, {"error": str(e)}
+        heat_w = kg_total * charge_thermique_w_kg
+        return heat_w / (0.33 * max(1e-3, deltaT_C))
+    except Exception:
+        return None
 
-
-def dimension_abreuvoirs(
-    *, effectif: int, age_days: int, type_: str = "nipple"
-) -> Tuple[Optional[Dict], Dict]:
-    """
-    Dimension abreuvoirs.
-    - Nipple: oiseaux par nipple selon âge (démarrage strict).
-      <14 j: 10 ; 14–27 j: 12 ; >=28 j: 15
-    - Cloche: ~90 oiseaux par cloche (moyenne 80–100).
-    """
+def chaleur_a_extraire_w(kg_total: float, charge_thermique_w_kg: float=15.0) -> Optional[float]:
     try:
-        if not effectif or effectif <= 0 or age_days is None:
-            return None, {"reason": "missing params"}
-        t = (type_ or "nipple").lower()
-        if "nipp" in t:
-            if age_days < 14:
-                birds_per_point = 10
-            elif age_days < 28:
-                birds_per_point = 12
-            else:
-                birds_per_point = 15
-            points = max(1, int(round(effectif / birds_per_point + 0.499)))
-            return (
-                {"type": "nipple", "birds_per_point": birds_per_point, "points_required": points},
-                {"effectif": effectif, "age_days": age_days},
-            )
-        else:  # cloche
-            birds_per_bell = 90
-            bells = max(1, int(round(effectif / birds_per_bell + 0.499)))
-            return (
-                {"type": "cloche", "birds_per_bell": birds_per_bell, "bells_required": bells},
-                {"effectif": effectif, "age_days": age_days},
-            )
-    except Exception as e:
-        return None, {"error": str(e)}
+        return kg_total * charge_thermique_w_kg
+    except Exception:
+        return None
 
-# -----------------------------
-# Débit tunnel & chaleur
-# -----------------------------
-def chaleur_a_extraire_w(*, kg_total: float, charge_thermique_w_kg: float = 10.0) -> Tuple[Optional[float], Dict]:
-    """
-    Chaleur à extraire (W) ≈ kg_total × charge_thermique (W/kg).
-    Par défaut 10 W/kg (conservateur). Augmenter en stress (12–15+ W/kg).
-    """
-    try:
-        if kg_total is None or kg_total <= 0:
-            return None, {"reason": "invalid kg_total"}
-        heat_w = kg_total * max(5.0, charge_thermique_w_kg)
-        return heat_w, {"kg_total": kg_total, "charge_w_kg": charge_thermique_w_kg}
-    except Exception as e:
-        return None, {"error": str(e)}
+# --- Water & equipment ---
 
+def conso_eau_j(effectif: int, age_jours: int, temp_C: float=20.0) -> Optional[float]:
+    """Daily water consumption for the flock (L/day)."""
+    if effectif <= 0: return None
+    base_per_bird = 0.05 if age_jours < 7 else (0.12 if age_jours < 21 else 0.18)
+    temp_factor = 1.0 + max(0.0, (temp_C - 20.0)) * 0.03
+    return effectif * base_per_bird * temp_factor
 
-def debit_tunnel_m3h(
-    *, kg_total: float, deltaT_C: float, charge_thermique_w_kg: float = 10.0
-) -> Tuple[Optional[float], Dict]:
-    """
-    Débit d'air requis (m³/h) à partir de la chaleur à extraire et du ΔT:
-        Q(m³/h) = Heat(W) * 3600 / (ρ * Cp * ΔT)
-      Approximons (ρ*Cp) ≈ 1206 J/(m³·K) → Q ≈ Heat * 2.985 / ΔT
-    """
-    try:
-        if kg_total is None or kg_total <= 0 or deltaT_C is None or deltaT_C <= 0:
-            return None, {"reason": "invalid params"}
-        heat_w, _ = chaleur_a_extraire_w(kg_total=kg_total, charge_thermique_w_kg=charge_thermique_w_kg)
-        if heat_w is None:
-            return None, {"reason": "heat calc failed"}
-        q_m3h = heat_w * 2.985 / deltaT_C
-        return q_m3h, {"kg_total": kg_total, "deltaT_C": deltaT_C, "charge_w_kg": charge_thermique_w_kg}
-    except Exception as e:
-        return None, {"error": str(e)}
+def debit_eau_l_min(effectif: int, age_jours: int, nipples_par_ligne: int, lignes: int) -> Optional[float]:
+    """Total water flow needed (L/min) assuming nipples per line and lines available."""
+    if effectif <= 0 or nipples_par_ligne <= 0 or lignes <= 0: return None
+    # Take daily water, convert to L/min averaged on 12h drinking window
+    daily = conso_eau_j(effectif, age_jours) or 0.0
+    return daily / (12.0 * 60.0)
+
+def dimension_mangeoires(effectif: int, age_jours: int, type: str='chaîne') -> Optional[float]:
+    """Total required feeder space (cm)."""
+    if effectif <= 0: return None
+    per_bird = 2.0 if age_jours < 14 else (3.0 if age_jours < 28 else 4.0)
+    if type == 'assiette':
+        per_bird *= 0.8
+    return per_bird * effectif
+
+def dimension_abreuvoirs(effectif: int, age_jours: int, type: str='nipple') -> Optional[float]:
+    """#nipples (if nipple) or cm (if bell)."""
+    if effectif <= 0: return None
+    if type == 'nipple':
+        return round(effectif / 12.0, 1)
+    per_bird_cm = 1.0 if age_jours < 14 else 1.5
+    return per_bird_cm * effectif
