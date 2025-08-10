@@ -8,9 +8,6 @@ import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
 
-// 🚀 IMPORT MODIFIÉ : Hook simplifié avec sélection de versions
-// (concision disabled)
-
 import { 
   PaperAirplaneIcon, 
   UserIcon, 
@@ -25,7 +22,6 @@ import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
-// (concision disabled)
 
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
@@ -38,8 +34,8 @@ export default function ChatInterface() {
   const createNewConversation = useChatStore(state => state.createNewConversation)
   const loadConversations = useChatStore(state => state.loadConversations)
   
-  // 🚀 HOOK MODIFIÉ : Hook simplifié avec sélection de versions
-// (concision disabled)
+  // Default config for now since we can't see the original hook
+  const config = { level: 'standard' }
   
   const [inputMessage, setInputMessage] = useState('')
   const [isLoadingChat, setIsLoadingChat] = useState(false)
@@ -583,20 +579,26 @@ export default function ChatInterface() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HistoryMenu />
-              <!-- concision settings removed -->
+              {/* concision settings removed */}
               
               <UserMenuButton />
             </div>
           </div>
 
-          <!-- concision panel removed -->
+          {/* concision panel removed */}
+          {showConcisionSettings && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-700">Paramètres de concision</h3>
+                <button
+                  onClick={() => setShowConcisionSettings(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   ✕
                 </button>
               </div>
               
-// (concision disabled)
+              {/* concision content would go here */}
               
               {hasMessages && (
                 <button

@@ -118,10 +118,10 @@ interface EnhancedAIResponse {
   
   // 🚀 NOUVEAU : Toutes les versions de réponse (généré côté frontend si absent)
   response_versions?: {
-    ultra_concise: string
-    concise: string
-    standard: string
-    detailed: string
+    ultra_concise?: string
+    concise?: string
+    standard?: string
+    detailed?: string
   }
   
   // ✅ CLARIFICATIONS INCHANGÉES
@@ -143,6 +143,9 @@ interface EnhancedAIResponse {
   source?: string
   documents_used?: number
   warning?: string
+  
+  // 🚀 AJOUT : Champ pour compatibilité
+  full_text?: string
 }
 
 // ✅ INTERFACE ERROR INCHANGÉE
@@ -251,11 +254,26 @@ export const generateAIResponse = async (
     }
 
     const data = await response.json()
+    
+    // 🔧 CORRECTION : Extraire responseText de la réponse
+    let responseText = ''
+    if (data.response) {
+      // Si data.response est un objet avec answer
+      if (typeof data.response === 'object' && data.response.answer) {
+        responseText = data.response.answer
+      } else if (typeof data.response === 'string') {
+        responseText = data.response
+      }
+    } else if (data.questions && Array.isArray(data.questions)) {
+      // Mode clarification
+      responseText = data.questions.join('\n')
+    }
+    
     console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
-      has_response: responseText,
+      has_response: !!responseText,
       has_questions: !!data.questions,
-      response_length: data.response?.length || 0,
+      response_length: responseText.length,
       questions_count: data.questions?.length || 0,
       source: data.source,
       documents_used: data.documents_used
@@ -270,6 +288,7 @@ export const generateAIResponse = async (
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
       response: responseText,
+      full_text: responseText, // 🔧 AJOUT : Pour compatibilité
       
       // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
@@ -322,7 +341,7 @@ export const generateAIResponse = async (
     console.log('🎯 [apiService] Données traitées DialogueManager:', {
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
-      has_response: responseText,
+      has_response: !!responseText,
       has_versions: !!processedData.response_versions,
       type: processedData.type
     })
@@ -386,9 +405,22 @@ export const generateAIResponsePublic = async (
     }
 
     const data = await response.json()
+    
+    // 🔧 CORRECTION : Même extraction que version auth
+    let responseText = ''
+    if (data.response) {
+      if (typeof data.response === 'object' && data.response.answer) {
+        responseText = data.response.answer
+      } else if (typeof data.response === 'string') {
+        responseText = data.response
+      }
+    } else if (data.questions && Array.isArray(data.questions)) {
+      responseText = data.questions.join('\n')
+    }
+    
     console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
-      has_response: responseText,
+      has_response: !!responseText,
       has_questions: !!data.questions
     })
 
@@ -401,6 +433,7 @@ export const generateAIResponsePublic = async (
       
       // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
       response: responseText,
+      full_text: responseText,
       
       // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
@@ -749,7 +782,6 @@ export const testEnhancedConversationContinuity = async (
     })
     
     return {
-      full_text: (typeof data?.full_text === 'string' ? data.full_text : null),
       first_conversation_id: firstResponse.conversation_id,
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
