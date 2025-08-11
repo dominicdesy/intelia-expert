@@ -19,7 +19,7 @@ from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
 
-# ===== Import robuste du RAGRetriever =====
+# ===== Import robuste du RAGRetriever (code original conservé) =====
 RAG_AVAILABLE = False
 RAGRetrieverCls = None
 try:
@@ -63,8 +63,7 @@ def _get_retriever():
 
 # ===== Import table-first PerfStore =====
 try:
-    # lit rag_index/<species>/tables/<line>*.csv via manifest généré par build_rag
-    from .perf_store import PerfStore  # type: ignore
+    from .perf_store import PerfStore  # lit rag_index/<species>/tables via manifest
     PERF_AVAILABLE = True
 except Exception as e:
     logger.warning(f"⚠️ PerfStore indisponible: {e}")
@@ -77,13 +76,11 @@ _PERF_STORE: Optional["PerfStore"] = None
 def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]:
     """
     Instancie un PerfStore pointant vers ./rag_index/<species>/tables/.
-    species_hint: 'broiler' | 'layer' | 'global' ... (déduit des entités sinon)
     """
     if not PERF_AVAILABLE or PerfStore is None:
         return None
     global _PERF_STORE
     species = (species_hint or "broiler").strip().lower()
-    # si singleton déjà créé mais pour une autre espèce, on réinstancie
     if _PERF_STORE is None or getattr(_PERF_STORE, "species", "") != species:
         try:
             root = os.environ.get("RAG_INDEX_ROOT", "./rag_index")
@@ -94,11 +91,8 @@ def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]
             _PERF_STORE = None
     return _PERF_STORE
 
-# ===== Utilitaires RAG =====
+# ===== Utilitaires RAG (code original conservé) =====
 def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Compacte les infos sources (nom lisible + méta utiles).
-    """
     formatted = []
     for doc in source_documents[:5]:
         if not isinstance(doc, dict):
@@ -124,9 +118,6 @@ def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, An
     return formatted
 
 def _build_filters_from_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Construit un dict de filtres pour le RAGRetriever à partir des entités détectées.
-    """
     filters = {}
     if "species" in entities and entities["species"]:
         filters["species"] = entities["species"]
@@ -138,10 +129,6 @@ def _build_filters_from_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
     return filters
 
 def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Appelle le RAGRetriever avec filtres et retourne un dict standardisé:
-    { text, sources[], route, meta }
-    """
     retriever = _get_retriever()
     if retriever is None:
         return {
@@ -150,13 +137,12 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
             "route": "rag_unavailable",
             "meta": {}
         }
-    
+
     try:
         filters = _build_filters_from_entities(entities or {})
-        # 1er essai avec filtres complets
         result = retriever.get_contextual_diagnosis(question, k=k, filters=filters)
 
-        # NEW: si rien, on retente sans filtre 'sex' (souvent trop strict)
+        # === NEW: retry sans sex si vide (souvent trop strict)
         if not result and filters and "sex" in filters:
             f2 = dict(filters); f2.pop("sex", None)
             result = retriever.get_contextual_diagnosis(question, k=k, filters=f2)
@@ -168,7 +154,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
                 "route": "rag_no_results",
                 "meta": {"filters_applied": filters}
             }
-            
+
         text = result.get("answer") or "Résultats trouvés."
         sources = _format_sources(result.get("source_documents", []))
         meta = {
@@ -178,14 +164,14 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
             "tried": result.get("tried", []),
             "filters_applied": filters,
         }
-        
+
         return {
             "text": text,
             "sources": sources,
             "route": "rag_retriever",
             "meta": meta
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Erreur RAGRetriever: {e}")
         return {
@@ -195,78 +181,13 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
             "meta": {"error": str(e), "filters_applied": _build_filters_from_entities(entities or {})}
         }
 
-# ===== Règles compute =====
-def _should_compute(intent: Intention) -> bool:
-    return intent in {
-        Intention.WaterFeedIntake,
-        Intention.EquipmentSizing,
-        Intention.VentilationSizing,
-        Intention.EnvSetpoints,
-        Intention.Economics
-    }
-
-def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, Any]:
-    ans = {"text": "", "values": {}}
-    try:
-        if intent == Intention.WaterFeedIntake:
-            eff = entities.get("flock_size") or 1000
-            age = entities.get("age_days") or (entities.get("age_weeks", 0) * 7)
-            ans["values"]["water_L_per_day"] = formulas.conso_eau_j(eff, age or 0, 20.0)
-            ans["text"] = "Estimation de la consommation d'eau quotidienne (flock)."
-        elif intent == Intention.EquipmentSizing:
-            eff = entities.get("flock_size") or 1000
-            age = entities.get("age_days") or (entities.get("age_weeks", 0) * 7)
-            ans["values"]["feeder_space_cm"] = formulas.dimension_mangeoires(eff, age or 0, 'chaîne')
-            ans["values"]["drinkers"] = formulas.dimension_abreuvoirs(eff, age or 0, 'nipple')
-            ans["text"] = "Dimensionnement mangeoires/abreuvoirs (ordre de grandeur)."
-        elif intent == Intention.VentilationSizing:
-            eff = entities.get("flock_size") or 1000
-            age = entities.get("age_days") or (entities.get("age_weeks", 0) * 7)
-            poids_moy = entities.get("avg_weight_kg") or 1.5
-            saison = entities.get("season") or "hiver"
-            ans["values"]["vent_min_m3h_per_kg"] = formulas.vent_min_m3h_par_kg(age or 0, saison)
-            ans["values"]["vent_min_total_m3h"] = formulas.vent_min_total_m3h(poids_moy, eff, age or 0, saison)
-            ans["text"] = "Ventilation minimale recommandée (m³/h)."
-        elif intent == Intention.EnvSetpoints:
-            age = entities.get("age_days") or (entities.get("age_weeks", 0) * 7)
-            ans["values"]["temp_C"] = formulas.setpoint_temp_C_broiler(age or 0)
-            ans["values"]["rh_pct"] = formulas.setpoint_hr_pct(age or 0)
-            ans["values"]["co2_max_ppm"] = formulas.co2_max_ppm()
-            ans["values"]["nh3_max_ppm"] = formulas.nh3_max_ppm()
-            ans["values"]["lux"] = formulas.lux_program_broiler(age or 0)
-            ans["text"] = "Consignes environnementales génériques."
-        elif intent == Intention.Economics:
-            eff = entities.get("flock_size") or 1000
-            prix = entities.get("feed_price") or 450.0
-            fcr = entities.get("FCR") or 1.7
-            poids = entities.get("target_weight") or 2.2
-            ans["values"]["feed_cost_total"] = formulas.cout_total_aliment(eff, poids, fcr, prix, 95.0)
-            ans["values"]["feed_cost_per_kg"] = formulas.cout_aliment_par_kg_vif(prix, fcr)
-            ans["text"] = "Estimation des coûts d'aliment."
-        else:
-            ans["text"] = "Calcul effectué."
-    except Exception as e:
-        logger.error(f"❌ Error in _compute_answer: {e}")
-        ans["text"] = f"Erreur dans le calcul pour {intent}"
-        ans["error"] = str(e)
-    return ans
-
-# ===== NETTOYAGE RENFORCÉ =====
+# ===== NETTOYAGE & SYNTHÈSE (code original conservé) =====
 def _final_sanitize(text: str) -> str:
-    """
-    Sanitisation renforcée pour éliminer les fragments indésirables des PDFs.
-    """
     if not text:
         return ""
-    
-    # 1) Enlever toute mention de sources explicites
     text = re.sub(r'\*\*?source\s*:\s*[^*\n]+(\*\*)?', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\(?(source|src)\s*:\s*[^)\n]+?\)?', '', text, flags=re.IGNORECASE)
-    
-    # 2) Enlever noms de fichiers PDF/documents
     text = re.sub(r'[\w\-\s]+\.(pdf|docx?|xlsx)', '', text, flags=re.IGNORECASE)
-    
-    # 3) Patterns d'en-têtes à supprimer (étendus)
     headers_to_remove = [
         r'INTRODUCTION AND .+ CHARACTERISTICS',
         r'INTRODUCTION\s+AND\s+[\w\s]+\s+CHARACTERISTICS',
@@ -279,11 +200,8 @@ def _final_sanitize(text: str) -> str:
         r'BREEDING\s+GUIDE',
         r'PARENT\s+STOCK\s+GUIDE',
     ]
-    
     for pattern in headers_to_remove:
         text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-    
-    # 4) Tableaux mal formatés (patterns étendus)
     table_patterns = [
         r'Age \(days\)\s*Weight \(lb\)\s*Daily Gain[^|]+',
         r'Imperial \(Male\) C500[^|]+',
@@ -294,11 +212,8 @@ def _final_sanitize(text: str) -> str:
         r'\d+\s+\d+\.\d+\s+\d+\.\d+\s+\d+\.\d+\s*\n',
         r'Week\s+\d+\s+Week\s+\d+\s+Week\s+\d+',
     ]
-    
     for pattern in table_patterns:
         text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-    
-    # 5) Phrases techniques récurrentes à filtrer
     technical_phrases = [
         r'should be aware of local legislation[^.]+\.',
         r'Apply your knowledge and judgment[^.]+\.',
@@ -308,44 +223,31 @@ def _final_sanitize(text: str) -> str:
         r'Results may vary[^.]+\.',
         r'Contact your technical[^.]+\.',
     ]
-    
     for phrase in technical_phrases:
         text = re.sub(phrase, '', text, flags=re.IGNORECASE)
-    
-    # 6) Nettoyage des espaces et formatage
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
-    
-    # 7) Suppression des lignes très courtes (probablement des fragments)
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
         line = line.strip()
         if len(line) > 10 or line.startswith(('##', '**', '-', '•')):
             cleaned_lines.append(line)
-    
     return '\n'.join(cleaned_lines).strip()
 
-# ===== WRAPPER LLM =====
 def _maybe_synthesize(question: str, context_text: str) -> str:
-    """
-    Si ENABLE_SYNTH_PROMPT=1, tente d'appeler un wrapper LLM interne.
-    En cas d'échec ou si non configuré, retourne le texte tel quel (no-op).
-    """
     try:
         if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
             return context_text
-            
         try:
-            from ..utils.llm import complete  # Nouveau wrapper standardisé
+            from ..utils.llm import complete
         except ImportError:
             try:
-                from ..utils.openai_utils import complete  # Fallback
+                from ..utils.openai_utils import complete
             except ImportError:
                 logger.warning("⚠️ Aucun wrapper LLM trouvé pour la synthèse")
                 return context_text
-        
         synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
 
 RÈGLES IMPORTANTES :
@@ -362,100 +264,105 @@ Informations à synthétiser :
 {context}
 
 Réponse synthétique :""".format(question=question, context=_final_sanitize(context_text)[:2000])
-
         synthesized = complete(synthesis_prompt, temperature=0.2)
         return _final_sanitize(synthesized) if synthesized else context_text
-        
     except Exception as e:
         logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
         return context_text
 
-# ======= Normalisation additionnelle (robuste et locale) =======
+# ===== Mode hybride (code original conservé) =====
+def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
+    try:
+        age_days = None
+        if entities.get("age_days") is not None:
+            try: age_days = int(entities["age_days"])
+            except Exception: pass
+        elif entities.get("age_weeks") is not None:
+            try: age_days = int(entities["age_weeks"]) * 7
+            except Exception: pass
+        defaults = {"species": entities.get("species") or "broiler",
+                    "line": entities.get("line") or "ross308",
+                    "sex": entities.get("sex") or "mixed",
+                    "age_days": age_days}
+        species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
+        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
+        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte"}
+        sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
+        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
+        header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
+        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
+        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
+        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
+        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
+        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
+        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l’hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
+        text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
+        quick_replies = {
+            "species": ["broiler", "layer", "other"],
+            "line": ["ross308", "cobb500", "hubbard", "other"],
+            "sex": ["male", "female", "mixed"],
+            "one_click": defaults
+        }
+        return {"text": text, "source": "hybrid_ui", "confidence": 0.9,
+                "enriched": True, "suggested_defaults": defaults,
+                "quick_replies": quick_replies, "rag_meta": {}, "rag_sources": []}
+    except Exception as e:
+        logger.error(f"❌ Error generating hybrid UX answer: {e}")
+        return {"text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
+                "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
+
+# === NEW: normalisation douce pour table-first ===
 def _slug(s: Optional[str]) -> str:
     return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
 
 def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """Renforce la normalisation pour la table-first (sans casser normalize())."""
     species = (entities.get("species") or entities.get("production_type") or "broiler").lower().strip()
     line_raw = entities.get("line") or entities.get("breed") or ""
     line = _slug(line_raw)
-    # alias courants
     if line in {"cobb-500","cobb_500","cobb 500"}: line = "cobb500"
     if line in {"ross-308","ross_308","ross 308"}: line = "ross308"
-
     sex_raw = (entities.get("sex") or "").lower().strip()
     sex_map = {
-        "m": "male", "male": "male",
-        "f": "female", "female": "female",
-        "mixte": "as_hatched", "as hatched": "as_hatched",
-        "as_hatched": "as_hatched", "mixed": "as_hatched",
+        "m":"male","male":"male","f":"female","female":"female",
+        "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
     }
     sex = sex_map.get(sex_raw) or "as_hatched"
-
     age_days = entities.get("age_days")
     if age_days is None and entities.get("age_weeks") is not None:
-        try:
-            age_days = int(entities["age_weeks"]) * 7
-        except Exception:
-            age_days = None
-    try:
-        age_days = int(age_days) if age_days is not None else None
-    except Exception:
-        age_days = None
-
+        try: age_days = int(entities["age_weeks"]) * 7
+        except Exception: age_days = None
+    try: age_days = int(age_days) if age_days is not None else None
+    except Exception: age_days = None
     unit = (entities.get("unit") or "metric").lower().strip()
-    if unit not in ("metric", "imperial"):
-        unit = "metric"
-
+    if unit not in ("metric","imperial"): unit = "metric"
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
-# ======= Lookup nearest (sans modifier PerfStore) =======
+# === NEW: exact ou nearest (sans modifier perf_store.py) ===
 def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
-    """
-    1) essaie exact via store.get()
-    2) sinon, tente nearest sur l'âge en inspectant le DataFrame interne
-       (utilise store._load_df(line) sans modifier perf_store.py)
-    """
     debug = {"strategy": "exact_then_nearest", "norm": dict(norm), "nearest_used": False}
-
-    # 1) exact
+    # exact
     if norm.get("age_days") is not None:
-        rec = store.get(
-            line=norm["line"],
-            sex=norm["sex"],
-            unit=norm["unit"],
-            age_days=int(norm["age_days"]),
-        )
+        rec = store.get(line=norm["line"], sex=norm["sex"], unit=norm["unit"], age_days=int(norm["age_days"]))
         if rec:
             return rec, debug
-
-    # 2) nearest age (même sex/unit, avec fallback sex→as_hatched)
+    # nearest
     try:
-        df = store._load_df(norm["line"])  # type: ignore (accès interne assumé)
+        df = store._load_df(norm["line"])  # type: ignore (accès interne)
         if df is None or "age_days" not in df.columns:
             return None, debug
-
-        # Filtre primaire
         df_unit = df[df["unit"].eq(norm["unit"])]
-        # essai avec sex demandé
         df_sex = df_unit[df_unit["sex"].eq(norm["sex"])]
-        # si vide et sex male/female → fallback as_hatched
-        if df_sex.empty and norm["sex"] in ("male", "female"):
+        if df_sex.empty and norm["sex"] in ("male","female"):
             df_sex = df_unit[df_unit["sex"].eq("as_hatched")]
-
         if df_sex.empty:
             return None, debug
-
-        # trouver âge le plus proche
         target = int(norm.get("age_days") or 0)
         df_sex = df_sex.copy()
         df_sex["__delta__"] = (df_sex["age_days"] - target).abs()
-        df_sex = df_sex.sort_values(["__delta__", "age_days"])
-        row = df_sex.iloc[0].to_dict()
+        row = df_sex.sort_values(["__delta__", "age_days"]).iloc[0].to_dict()
         debug["nearest_used"] = True
         debug["nearest_age_days"] = int(row.get("age_days"))
-        debug["delta"] = int(abs(int(row.get("age_days")) - target))
-        # standardise la sortie
+        debug["delta"] = abs(int(row.get("age_days")) - target)
         rec = {
             "line": row.get("line", norm["line"]),
             "sex": row.get("sex", norm["sex"]),
@@ -473,90 +380,12 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
         logger.info(f"[PerfStore] nearest lookup failed: {e}")
         return None, debug
 
-# ===== MODE HYBRIDE AMÉLIORÉ =====
-def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
-    """
-    Mode hybride UX-first : message court + questions ciblées + defaults + quick replies.
-    Ne concatène aucun texte RAG. Pas de dépendance au wrapper LLM.
-    """
-    try:
-        # 1) Normaliser l'âge en jours
-        age_days = None
-        if entities.get("age_days") is not None:
-            try:
-                age_days = int(entities["age_days"])
-            except Exception:
-                pass
-        elif entities.get("age_weeks") is not None:
-            try:
-                age_days = int(entities["age_weeks"]) * 7
-            except Exception:
-                pass
-
-        # 2) Defaults intelligents (modifiables)
-        defaults = {
-            "species": entities.get("species") or "broiler",
-            "line": entities.get("line") or "ross308",
-            "sex": entities.get("sex") or "mixed",
-            "age_days": age_days,
-        }
-
-        # 3) Libellés conviviaux
-        species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
-        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
-        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte"}
-        sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
-        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
-
-        # 4) Message EXACT demandé
-        header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
-        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
-        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
-        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
-        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
-        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
-        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l’hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
-        text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
-
-        # 5) Quick replies pour le frontend
-        quick_replies = {
-            "species": ["broiler", "layer", "other"],
-            "line": ["ross308", "cobb500", "hubbard", "other"],
-            "sex": ["male", "female", "mixed"],
-            "one_click": {
-                "species": defaults["species"],
-                "line": defaults["line"],
-                "sex": defaults["sex"],
-                "age_days": defaults["age_days"],
-            }
-        }
-
-        return {
-            "text": text,
-            "source": "hybrid_ui",
-            "confidence": 0.9,
-            "enriched": True,
-            "suggested_defaults": defaults,
-            "quick_replies": quick_replies,
-            "rag_meta": {},
-            "rag_sources": []
-        }
-
-    except Exception as e:
-        logger.error(f"❌ Error generating hybrid UX answer: {e}")
-        return {
-            "text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
-            "source": "hybrid_ui_fallback",
-            "confidence": 0.4,
-            "enriched": False
-        }
-
-# ===== Entrée principale =====
+# ===== Entrée principale (ajouts balisés) =====
 def handle(
     session_id: str,
     question: str,
-    lang: str="fr",
-    # ==== NEW: overrides de test ====
+    lang: str = "fr",
+    # === NEW: overrides & debug provenant de expert.py ===
     debug: bool = False,
     force_perfstore: bool = False,
     intent_hint: Optional[str] = None,
@@ -566,17 +395,17 @@ def handle(
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
-        
+
         # Étape 1: Classification
         classification = classify(question)
         logger.debug(f"Classification: {classification}")
 
-        # Étape 2: Normalisation (pipe existant)
+        # Étape 2: Normalisation
         classification = normalize(classification)
         intent: Intention = classification["intent"]
         entities = classification["entities"]
 
-        # ==== NEW: hint manuel pour tests ====
+        # === NEW: hint manuel (tests console)
         if intent_hint and str(intent_hint).lower().startswith("perf"):
             intent = Intention.PerfTargets
 
@@ -604,6 +433,14 @@ def handle(
             }
 
         # Étape 4: Calcul direct si possible
+        def _should_compute(i: Intention) -> bool:
+            return i in {
+                Intention.WaterFeedIntake,
+                Intention.EquipmentSizing,
+                Intention.VentilationSizing,
+                Intention.EnvSetpoints,
+                Intention.Economics
+            }
         if _should_compute(intent):
             logger.info(f"🧮 Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)
@@ -617,42 +454,33 @@ def handle(
             }
 
         # ===== Étape 4bis: TABLE-FIRST pour PerfTargets =====
-        # ==== NEW: guard RELAXÉ + override + normalisation robuste ====
+        # === NEW: guard RELAXÉ + override + normalisation robuste ===
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
             logger.info("📊 Table-first (PerfTargets) avant RAG")
             try:
                 norm = _normalize_entities_soft(entities)
                 store = _get_perf_store(norm["species"])  # singleton
-
                 rec = None
                 dbg = None
                 if store and norm.get("age_days") is not None:
                     rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
 
                 if rec:
-                    # Libellés conviviaux + rendu court
                     line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
                     sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}
                     sex_label = sex_map.get(str(rec.get("sex","")).lower(), rec.get("sex",""))
                     unit_label = (rec.get("unit") or norm["unit"] or "metric").lower()
-                    v_g = rec.get("weight_g")
-                    v_lb = rec.get("weight_lb")
+                    v_g, v_lb = rec.get("weight_g"), rec.get("weight_lb")
                     if v_g is not None:
-                        try:
-                            val_txt = f"**{float(v_g):.0f} g**"
-                        except Exception:
-                            val_txt = f"**{v_g} g**"
+                        try: val_txt = f"**{float(v_g):.0f} g**"
+                        except Exception: val_txt = f"**{v_g} g**"
                     elif v_lb is not None:
-                        try:
-                            val_txt = f"**{float(v_lb):.2f} lb**"
-                        except Exception:
-                            val_txt = f"**{v_lb} lb**"
+                        try: val_txt = f"**{float(v_lb):.2f} lb**"
+                        except Exception: val_txt = f"**{v_lb} lb**"
                     else:
                         val_txt = "**n/a**"
-
                     age_disp = int(rec.get("age_days") or norm.get("age_days") or 0)
                     text = f"{line_label} · {sex_label} · {age_disp} j : {val_txt} (objectif {unit_label})."
-
                     source_item = []
                     if rec.get("source_doc"):
                         source_item.append({
@@ -664,7 +492,6 @@ def handle(
                                 "unit": rec.get("unit")
                             }
                         })
-
                     return {
                         "type": "answer",
                         "intent": Intention.PerfTargets,
@@ -692,12 +519,12 @@ def handle(
                 logger.warning(f"⚠️ Table-first lookup échoué: {e}")
                 # on continue vers RAG
 
-        # Étape 5: RAG complet via RAGRetriever avec filtres
+        # Étape 5: RAG complet via RAGRetriever avec filtres (code original)
         logger.info("📚 RAG via RAGRetriever avec filtres")
         rag = _rag_answer(question, k=5, entities=entities)
         rag_text = _final_sanitize(rag.get("text", ""))
         rag_text = _maybe_synthesize(question, rag_text)
-        
+
         return {
             "type": "answer",
             "intent": intent,

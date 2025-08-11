@@ -198,7 +198,7 @@ def _final_sanitize(text: str) -> str:
         r'NUTRITION\s+SPECIFICATIONS?',
         r'MANAGEMENT\s+GUIDE',
         r'BREEDING\s+GUIDE',
-        r'PARENT\s+STOCK\s+GUIDE',
+        r'PARENT\sTOCK\s+GUIDE',
     ]
     for pattern in headers_to_remove:
         text = re.sub(pattern, '', text, flags=re.IGNORECASE)
@@ -311,7 +311,7 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
         return {"text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
                 "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
 
-# === NEW: normalisation douce pour table-first ===
+# ▼▼▼ NEW: normalisation douce pour table-first ▼▼▼
 def _slug(s: Optional[str]) -> str:
     return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
 
@@ -337,7 +337,7 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     if unit not in ("metric","imperial"): unit = "metric"
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
-# === NEW: exact ou nearest (sans modifier perf_store.py) ===
+# ▼▼▼ NEW: exact ou nearest (sans modifier perf_store.py) ▼▼▼
 def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     debug = {"strategy": "exact_then_nearest", "norm": dict(norm), "nearest_used": False}
     # exact
@@ -385,7 +385,7 @@ def handle(
     session_id: str,
     question: str,
     lang: str = "fr",
-    # === NEW: overrides & debug provenant de expert.py ===
+    # ▼▼▼ NEW: overrides & debug provenant de expert.py ▼▼▼
     debug: bool = False,
     force_perfstore: bool = False,
     intent_hint: Optional[str] = None,
@@ -405,7 +405,7 @@ def handle(
         intent: Intention = classification["intent"]
         entities = classification["entities"]
 
-        # === NEW: hint manuel (tests console)
+        # ▼▼▼ NEW: hint manuel (tests console) ▼▼▼
         if intent_hint and str(intent_hint).lower().startswith("perf"):
             intent = Intention.PerfTargets
 
@@ -454,7 +454,7 @@ def handle(
             }
 
         # ===== Étape 4bis: TABLE-FIRST pour PerfTargets =====
-        # === NEW: guard RELAXÉ + override + normalisation robuste ===
+        # ▼▼▼ NEW: guard RELAXÉ + override + normalisation robuste ▼▼▼
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
             logger.info("📊 Table-first (PerfTargets) avant RAG")
             try:
