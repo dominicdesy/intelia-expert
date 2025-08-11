@@ -118,11 +118,28 @@ export default function ChatInterface() {
   const cleanResponseText = (text: string): string => {
     let cleaned = text
 
-    // 🚀 NOUVEAU : Retirer les références aux sources
+    // 🚀 NOUVEAU : Retirer toutes les références aux sources (patterns multiples)
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '') // Cas tronqué
+    cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '') // Cas génériques
+    cleaned = cleaned.replace(/Source:\s*[^\n]+/g, '') // Sans astérisques
     
-    // Retirer les fragments de texte brut des PDFs
+    // Retirer les longs passages de texte technique des PDFs (patterns étendus)
+    cleaned = cleaned.replace(/protection, regardless of the species involved[^.]+\./g, '')
+    cleaned = cleaned.replace(/bird ages, from the adverse effects[^.]+\./g, '')
+    cleaned = cleaned.replace(/oocyst production reaches a maximum[^.]+\./g, '')
+    cleaned = cleaned.replace(/oocyst production begins to diminish[^.]+\./g, '')
+    cleaned = cleaned.replace(/oocyst production ceases[^.]+\./g, '')
+    cleaned = cleaned.replace(/immunosuppressive response after[^.]+\./g, '')
+    cleaned = cleaned.replace(/Ecchymotic hemorrhages in muscles[^.]+\./g, '')
+    cleaned = cleaned.replace(/The virus is highly contagious[^.]+\./g, '')
+    cleaned = cleaned.replace(/Mice and darkling beetles[^.]+\./g, '')
+    cleaned = cleaned.replace(/IBD does not transmit[^.]+\./g, '')
+    
+    // Retirer les fragments de phrases coupées qui commencent sans majuscule
+    cleaned = cleaned.replace(/^[a-z][^.]+\.\.\./gm, '')
+    
+    // Retirer les fragments techniques génériques
     cleaned = cleaned.replace(/ould be aware of local legislation[^.]+\./g, '')
     cleaned = cleaned.replace(/Apply your knowledge and judgment[^.]+\./g, '')
     
@@ -132,9 +149,21 @@ export default function ChatInterface() {
     // Retirer les répétitions de mots coupés
     cleaned = cleaned.replace(/\b\w{1,3}\.\.\./g, '')
     
+    // Retirer les phrases qui se terminent abruptement par ---
+    cleaned = cleaned.replace(/[^.!?]+---\s*/g, '')
+    
+    // Nettoyer les numérotations orphelines (ex: "2. Gross and Microscopic Lesions:")
+    cleaned = cleaned.replace(/^\d+\.\s+[A-Z][^:]+:\s*$/gm, '')
+    cleaned = cleaned.replace(/^\w\.\s+[A-Z][^:]+:\s*$/gm, '')
+    
     // Normaliser les espaces multiples
     cleaned = cleaned.replace(/\s+/g, ' ')
+    cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n')
     cleaned = cleaned.replace(/\n\s*\n/g, '\n\n')
+    
+    // Retirer les lignes vides en début et fin
+    cleaned = cleaned.replace(/^\s*\n+/, '')
+    cleaned = cleaned.replace(/\n+\s*$/, '')
     
     return cleaned.trim()
   }

@@ -1,17 +1,27 @@
 {
   "species": "global",
-  "model": "sentence-transformers/all-MiniLM-L6-v2",
-  "build_time": "2025-08-10T22:08:37",
-  "num_files": 23,
-  "num_chunks": 140,
+  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "files_indexed": 21,
+  "chunks_indexed": 244,
   "files_sample": [
-    "C:\\intelia_gpt\\documents\\public\\common\\health\\ABVista _IPP_1-5_2015.pdf",
-    "C:\\intelia_gpt\\documents\\public\\common\\health\\ascites.pdf",
     "C:\\intelia_gpt\\documents\\public\\common\\health\\AviaTech_Staph.pdf",
-    "C:\\intelia_gpt\\documents\\public\\common\\health\\Ceva_IPP_2021_1-6.pdf",
-    "C:\\intelia_gpt\\documents\\public\\common\\health\\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf"
+    "C:\\intelia_gpt\\documents\\public\\common\\health\\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf",
+    "C:\\intelia_gpt\\documents\\public\\common\\health\\Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf",
+    "C:\\intelia_gpt\\documents\\public\\common\\health\\Drinking-Water-Management.pdf",
+    "C:\\intelia_gpt\\documents\\public\\common\\health\\TU COL ENG.pdf"
   ],
   "pdf_scan_summary": {
-    "RedactionAnnots": 23
-  }
+    "scanned": 21,
+    "copy_restricted": 0,
+    "redactions": 0
+  },
+  "quality_stats": {
+    "removed": 0,
+    "kept": 12
+  },
+  "enhanced_features": true,
+  "tables_found": 128,
+  "perf_targets_tables": 0,
+  "metadata_coverage": 0.0,
+  "version": "1.3+enhanced"
 }

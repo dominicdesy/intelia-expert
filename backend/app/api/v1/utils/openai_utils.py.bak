@@ -101,115 +101,6 @@ def openai_retry(max_retries: int = 2, delay: float = 1.0):
         return wrapper
     return decorator
 
-# ==================== 🆕 NOUVELLE FONCTION: complete() pour dialogue_manager ====================
-@openai_retry(max_retries=2, delay=1.0)
-def complete(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None, model: Optional[str] = None) -> str:
-    """
-    🆕 NOUVEAU: Wrapper simple pour completion de texte utilisé par dialogue_manager
-    
-    Fonction standardisée pour la synthèse et amélioration de texte dans le pipeline RAG.
-    
-    Args:
-        prompt: Prompt/question à envoyer au modèle
-        temperature: Contrôle de la créativité (0.0 = déterministe, 1.0 = créatif)
-        max_tokens: Limite de tokens pour la réponse (None = utilise défaut adaptatif)
-        model: Modèle à utiliser (None = utilise défaut)
-    
-    Returns:
-        str: Réponse générée par le modèle
-    
-    Raises:
-        RuntimeError: En cas d'erreur OpenAI
-        ValueError: Si les paramètres sont invalides
-    """
-    
-    # ✅ Validation des paramètres
-    if not prompt or not prompt.strip():
-        raise ValueError("Le prompt ne peut pas être vide")
-    
-    if not 0.0 <= temperature <= 2.0:
-        logger.warning(f"⚠️ Temperature {temperature} hors limite [0.0-2.0], ajusté à 0.2")
-        temperature = 0.2
-    
-    # ✅ Configuration intelligente du modèle
-    if model is None:
-        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o'))
-    
-    # ✅ Calcul adaptatif de max_tokens
-    if max_tokens is None:
-        # Estimation basée sur la longueur du prompt
-        prompt_length = len(prompt)
-        if prompt_length < 500:
-            max_tokens = 300
-        elif prompt_length < 1500:
-            max_tokens = 500
-        else:
-            max_tokens = 800
-        
-        # Vérification des limites du modèle
-        model_limit = get_model_max_tokens(model)
-        estimated_prompt_tokens = estimate_tokens(prompt, model)
-        available_tokens = model_limit - estimated_prompt_tokens - 100  # Marge de sécurité
-        
-        if available_tokens > 0:
-            max_tokens = min(max_tokens, available_tokens)
-        
-        logger.debug(f"🎯 max_tokens calculé: {max_tokens} (model_limit: {model_limit}, prompt_tokens: ~{estimated_prompt_tokens})")
-    
-    # ✅ Construction du message optimisé pour la synthèse
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Tu es un expert en synthèse de contenu technique avicole. "
-                "Réponds de manière concise, précise et professionnelle. "
-                "Utilise un français clair et structure ton texte avec du Markdown si approprié."
-            )
-        },
-        {
-            "role": "user", 
-            "content": prompt.strip()
-        }
-    ]
-    
-    logger.debug(f"🤖 Appel complete(): model={model}, temp={temperature}, max_tokens={max_tokens}")
-    
-    try:
-        # ✅ Appel via safe_chat_completion avec configuration optimisée
-        response = safe_chat_completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=0.9,  # Améliore la cohérence
-            frequency_penalty=0.1,  # Réduit les répétitions
-            presence_penalty=0.1   # Encourage la diversité
-        )
-        
-        # ✅ Extraction robuste du contenu
-        if not response or not response.choices:
-            raise RuntimeError("Réponse OpenAI vide")
-        
-        content = response.choices[0].message.content
-        if not content:
-            raise RuntimeError("Contenu de réponse vide")
-        
-        # ✅ Post-traitement de la réponse
-        content = content.strip()
-        
-        # Logging des métriques pour monitoring
-        if hasattr(response, 'usage') and response.usage:
-            logger.debug(f"📊 Complete tokens: {response.usage.total_tokens} "
-                        f"(prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
-        
-        logger.debug(f"✅ Complete terminé: {len(content)} caractères générés")
-        return content
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur dans complete(): {type(e).__name__}: {e}")
-        # Re-raise avec contexte pour le dialogue_manager
-        raise RuntimeError(f"Erreur lors de la synthèse LLM: {e}")
-
 # ==================== FONCTION AMÉLIORÉE: safe_chat_completion ====================
 @openai_retry(max_retries=2, delay=1.0)
 def safe_chat_completion(**kwargs) -> Any:
@@ -394,93 +285,6 @@ def safe_embedding_create(input: Any, model: str = "text-embedding-ada-002", **k
         logger.error(f"❌ Erreur inattendue OpenAI Embeddings: {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors de l'appel à OpenAI Embedding: {e}")
 
-# ==================== 🆕 NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER ====================
-
-def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
-    """
-    🆕 NOUVEAU: Synthèse spécialisée pour le contenu RAG du dialogue_manager
-    
-    Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
-    
-    Args:
-        question: Question originale de l'utilisateur
-        raw_content: Contenu brut à synthétiser
-        max_length: Longueur approximative souhaitée pour la réponse
-    
-    Returns:
-        str: Contenu synthétisé et nettoyé
-    """
-    
-    if not raw_content or not raw_content.strip():
-        return "Informations techniques disponibles."
-    
-    # Prompt spécialisé pour le contenu avicole
-    synthesis_prompt = f"""Synthétise ces informations techniques avicoles de manière claire et professionnelle.
-
-INSTRUCTIONS CRITIQUES :
-- NE JAMAIS mentionner de sources, fichiers PDF ou références dans ta réponse
-- NE JAMAIS inclure de fragments de tableaux mal formatés
-- Utiliser du Markdown pour la structure (##, **, -)
-- Réponse concise (~{max_length} mots maximum)
-- Si données incertaines, donner une fourchette
-- Garder uniquement les informations pertinentes à la question
-
-Question utilisateur : {question}
-
-Contenu technique à synthétiser :
-{raw_content[:1500]}
-
-Réponse synthétique (format Markdown, sans sources) :"""
-
-    try:
-        return complete(
-            prompt=synthesis_prompt, 
-            temperature=0.2,  # Peu de créativité pour info technique
-            max_tokens=min(400, max_length + 100)  # Marge pour le formatage
-        )
-    except Exception as e:
-        logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
-        # Fallback simple : nettoyage basique
-        cleaned = raw_content.strip()[:max_length]
-        if len(raw_content) > max_length:
-            cleaned += "..."
-        return cleaned
-
-def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
-    """
-    🆕 NOUVEAU: Génère des réponses de clarification intelligentes
-    
-    Args:
-        intent: Intention détectée (ex: "PerfTargets")
-        missing_fields: Champs manquants détectés
-        general_info: Information générale disponible
-    
-    Returns:
-        str: Réponse de clarification structurée
-    """
-    
-    prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
-
-CONTEXTE :
-- Intention détectée : {intent}
-- Informations manquantes : {', '.join(missing_fields)}
-- Info générale disponible : {general_info[:200] if general_info else 'Aucune'}
-
-INSTRUCTIONS :
-- Réponse en 2-3 phrases maximum
-- Expliquer pourquoi ces infos sont importantes
-- Ton professionnel mais accessible
-- Pas de mention de sources
-
-Réponse de clarification :"""
-
-    try:
-        return complete(prompt=prompt, temperature=0.3, max_tokens=150)
-    except Exception as e:
-        logger.warning(f"⚠️ Échec génération clarification: {e}")
-        # Fallback générique
-        return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."
-
 # ==================== NOUVELLES FONCTIONNALITÉS UTILITAIRES ====================
 def test_openai_connection() -> Dict[str, Any]:
     """
@@ -546,16 +350,14 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
 # ✅ AMÉLIORATION: Constantes configurables
 DEFAULT_MODELS = {
     "chat": os.getenv('OPENAI_DEFAULT_CHAT_MODEL', 'gpt-4o'),
-    "embedding": os.getenv('OPENAI_DEFAULT_EMBEDDING_MODEL', 'text-embedding-ada-002'),
-    "synthesis": os.getenv('OPENAI_SYNTHESIS_MODEL', 'gpt-4o')  # 🆕 Nouveau pour synthèse
+    "embedding": os.getenv('OPENAI_DEFAULT_EMBEDDING_MODEL', 'text-embedding-ada-002')
 }
 
 MAX_TOKENS_LIMITS = {
     "gpt-3.5-turbo": 4096,
     "gpt-4": 8192,
     "gpt-4o": 4096,
-    "gpt-4-turbo": 128000,
-    "gpt-4o-mini": 4096
+    "gpt-4-turbo": 128000
 }
 
 def get_model_max_tokens(model: str) -> int:
@@ -579,49 +381,5 @@ def get_openai_status() -> Dict[str, Any]:
         },
         "batch_config": {
             "embedding_batch_size": os.getenv('OPENAI_EMBEDDING_BATCH_SIZE', '100')
-        },
-        "synthesis_config": {  # 🆕 Nouveau pour dialogue_manager
-            "synthesis_model": DEFAULT_MODELS["synthesis"],
-            "default_temperature": 0.2,
-            "max_synthesis_tokens": 500
         }
     }
-
-def test_synthesis_pipeline() -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Test complet du pipeline de synthèse pour dialogue_manager
-    """
-    try:
-        # Test de la fonction complete()
-        test_response = complete(
-            prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
-            temperature=0.2,
-            max_tokens=50
-        )
-        
-        # Test de synthèse RAG
-        rag_test = synthesize_rag_content(
-            question="Poids idéal poule?",
-            raw_content="Les poules Ross 308 atteignent un poids optimal de 2.2kg à 42 jours selon les standards techniques...",
-            max_length=100
-        )
-        
-        return {
-            "status": "success",
-            "complete_test": {
-                "success": True,
-                "response": test_response[:100] + "..." if len(test_response) > 100 else test_response
-            },
-            "rag_synthesis_test": {
-                "success": True,
-                "response": rag_test[:100] + "..." if len(rag_test) > 100 else rag_test
-            },
-            "message": "Pipeline de synthèse fonctionnel"
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec test pipeline synthèse: {str(e)}",
-            "error_type": type(e).__name__
-        }

@@ -21,6 +21,14 @@ except Exception:
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
+# 🆕 ACTIVATION SYNTHÈSE LLM AU DÉMARRAGE
+synthesis_enabled = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
+if synthesis_enabled:
+    logger.info("✅ Synthèse LLM activée (ENABLE_SYNTH_PROMPT=1)")
+else:
+    logger.info("ℹ️ Synthèse LLM désactivée (ENABLE_SYNTH_PROMPT=0)")
+
+ 
 # -------------------------------------------------------------------
 # FONCTION RAG COMPLÈTE - 3 RAG
 # -------------------------------------------------------------------
@@ -473,6 +481,7 @@ async def root():
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
         "rag": rag_status(),
+        "synthesis_enabled": synthesis_enabled,
         "cors_fix": "applied",
         "optimization": "three_rag_system_enabled"
     }

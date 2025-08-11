@@ -1,15 +1,14 @@
 """
-RAG Retriever - Enhanced Species-aware, table-first, multi-index with Advanced Detection and Metadata Filtering
+RAG Retriever - Enhanced Species-aware, table-first, multi-index with Advanced Detection
 
 Améliorations clés vs. version précédente :
 - Enhanced species detection avec scoring de confiance
 - Multi-index par espèce (broiler/layer/global) avec détection auto et fallback intelligent
 - Priorité table-first (re-ranking quand la requête contient des chiffres/unités)  
-- **NOUVEAU: Filtrage avancé des métadonnées (species/line/sex/document_type)**
 - Cache des index FAISS par espèce (évite les rechargements)
 - Modèle SentenceTransformer paresseux et réutilisable
 - Gestion des ambiguïtés avec fallbacks adaptatifs
-- Integration des métadonnées enrichies avec priorités intelligentes
+- Integration des métadonnées enrichies
 
 ENV pris en charge (si présents) :
 - RAG_INDEX_DIR (racine contenant /global, /broiler, /layer)
@@ -150,126 +149,8 @@ def _query_has_numbers_or_units(q: str) -> bool:
     
     return has_numbers or has_units or has_performance_terms
 
-# ===== NOUVEAU: Fonctions de filtrage métadonnées =====
-
-def _normalize_filter_value(value: Any) -> str:
-    """Normalise une valeur de filtre pour la comparaison"""
-    if value is None:
-        return ""
-    return str(value).lower().strip()
-
-def _matches_metadata_filter(doc_metadata: Dict[str, Any], filter_key: str, filter_value: Any) -> bool:
-    """Vérifie si un document correspond à un filtre spécifique"""
-    if not filter_value:
-        return True  # Pas de filtre = tous les docs passent
-    
-    doc_value = doc_metadata.get(filter_key)
-    if doc_value is None:
-        return False  # Document n'a pas cette métadonnée
-    
-    filter_norm = _normalize_filter_value(filter_value)
-    doc_norm = _normalize_filter_value(doc_value)
-    
-    # Correspondance exacte ou partielle intelligente
-    if filter_norm == doc_norm:
-        return True
-    
-    # Correspondances spéciales selon le type de filtre
-    if filter_key == "species":
-        # Correspondances d'espèces flexibles
-        species_aliases = {
-            "broiler": ["broiler", "chair", "meat", "ross", "cobb"],
-            "layer": ["layer", "pondeuse", "laying", "egg", "lohmann", "hy-line", "isa"]
-        }
-        for species, aliases in species_aliases.items():
-            if filter_norm in aliases and any(alias in doc_norm for alias in aliases):
-                return True
-    
-    elif filter_key == "line":
-        # Correspondances de lignées flexibles
-        if filter_norm in doc_norm or doc_norm in filter_norm:
-            return True
-        # Patterns spéciaux (Ross 308 = ross308, etc.)
-        filter_clean = re.sub(r'[^\w\d]', '', filter_norm)
-        doc_clean = re.sub(r'[^\w\d]', '', doc_norm)
-        if filter_clean in doc_clean or doc_clean in filter_clean:
-            return True
-    
-    elif filter_key == "sex":
-        # Correspondances de sexe multilingues
-        sex_aliases = {
-            "male": ["male", "mâle", "males", "m"],
-            "female": ["female", "femelle", "females", "f"],
-            "mixed": ["mixed", "mixte", "both", "les deux"]
-        }
-        for sex, aliases in sex_aliases.items():
-            if filter_norm in aliases and any(alias in doc_norm for alias in aliases):
-                return True
-    
-    # Correspondance partielle générique
-    return filter_norm in doc_norm
-
-def _apply_metadata_filters(documents: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Applique les filtres de métadonnées sur une liste de documents"""
-    if not filters:
-        return documents
-    
-    filtered = []
-    applied_filters = {k: v for k, v in filters.items() if v}  # Enlever les filtres vides
-    
-    logger.debug(f"🔍 Application des filtres: {applied_filters} sur {len(documents)} documents")
-    
-    for doc in documents:
-        metadata = doc.get("metadata", {}) or {}
-        
-        # Vérifier si le document passe tous les filtres
-        passes_all_filters = True
-        
-        for filter_key, filter_value in applied_filters.items():
-            if not _matches_metadata_filter(metadata, filter_key, filter_value):
-                passes_all_filters = False
-                break
-        
-        if passes_all_filters:
-            filtered.append(doc)
-    
-    logger.debug(f"✅ Filtrage terminé: {len(filtered)}/{len(documents)} documents retenus")
-    return filtered
-
-def _boost_priority_content(query: str, intent: Optional[str], documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Booste la priorité de certains types de contenu selon l'intention et la requête"""
-    if not documents:
-        return documents
-    
-    # Pour PerfTargets, prioriser les tables de performance
-    if intent == "PerfTargets" or _query_has_numbers_or_units(query):
-        # Séparer tables et texte
-        tables = []
-        texts = []
-        
-        for doc in documents:
-            metadata = doc.get("metadata", {}) or {}
-            content = doc.get("content", "")
-            
-            is_perf_table = (
-                metadata.get("table_type") == "perf_targets" or
-                metadata.get("chunk_type") == "table" or
-                _looks_like_table(content, metadata)
-            )
-            
-            if is_perf_table:
-                tables.append(doc)
-            else:
-                texts.append(doc)
-        
-        # Retourner tables en premier, puis textes
-        logger.debug(f"📊 Priorité table-first: {len(tables)} tables, {len(texts)} textes")
-        return tables + texts
-    
-    return documents
-
 # =====================================================================
-# Enhanced Retriever with Metadata Filtering
+# Enhanced Retriever
 # =====================================================================
 
 class RAGRetriever:
@@ -277,8 +158,7 @@ class RAGRetriever:
     Enhanced RAG retriever avec :
     - Méthodes d'embedding multiples (SentenceTransformers / OpenAI / TF-IDF)
     - Multi-index par espèce (broiler/layer/global) avec auto-détection améliorée
-    - **NOUVEAU: Filtrage avancé des métadonnées (species/line/sex/document_type)**
-    - Table-first re-ranking intelligent avec priorité PerfTargets
+    - Table-first re-ranking intelligent
     - Chargements FAISS robustes + métadonnées normalisées
     - Gestion avancée des ambiguïtés et fallbacks adaptatifs
     """
@@ -718,18 +598,9 @@ class RAGRetriever:
         overlap = len(qw & tw) / max(1, len(qw))
         return min(0.15, overlap * 0.15)  # Enhanced bonus
 
-    def _enhanced_table_first_rerank(self, query: str, pairs: List[Tuple[Dict[str, Any], float]], intent: Optional[str] = None) -> List[Tuple[Dict[str, Any], float]]:
-        """Enhanced table-first ranking with PerfTargets priority"""
-        if not pairs:
-            return pairs
-        
-        # Priorité table-first pour PerfTargets ou requêtes techniques
-        needs_table_priority = (
-            intent == "PerfTargets" or 
-            _query_has_numbers_or_units(query)
-        )
-        
-        if not needs_table_priority:
+    def _enhanced_table_first_rerank(self, query: str, pairs: List[Tuple[Dict[str, Any], float]]) -> List[Tuple[Dict[str, Any], float]]:
+        """Enhanced table-first ranking with better detection"""
+        if not pairs or not _query_has_numbers_or_units(query):
             return pairs
         
         boosted: List[Tuple[Dict[str, Any], float, float]] = []
@@ -740,13 +611,9 @@ class RAGRetriever:
             base = self._score_from_distance(raw)
             bonus = 0.0
             
-            # Bonus spécial pour PerfTargets + tables de performance
-            if intent == "PerfTargets" and md.get("table_type") == "perf_targets":
-                bonus += 0.3  # Bonus majeur pour tables de performance
-            
             # Enhanced table detection bonus
             if _looks_like_table(text, md):
-                bonus += 0.2
+                bonus += 0.2  # Increased bonus for tables
             
             # Metadata-based bonuses
             if md.get("chunk_type") == "table":
@@ -779,28 +646,16 @@ class RAGRetriever:
         return [(d, s) for (d, s, _) in boosted]
 
     # -----------------------------
-    # 🆕 API publique avec filtrage de métadonnées
+    # Enhanced API publique
     # -----------------------------
 
-    def get_contextual_diagnosis(self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def get_contextual_diagnosis(self, query: str, k: int = 5) -> Optional[Dict[str, Any]]:
         """
-        Enhanced recherche species-aware + table-first + metadata filtering with adaptive fallbacks.
-        
-        Args:
-            query: Question à traiter
-            k: Nombre de résultats souhaités
-            filters: Filtres de métadonnées (species, line, sex, document_type, etc.)
-        
-        Returns:
-            Dict avec answer, source_documents, métadonnées enrichies
+        Enhanced recherche species-aware + table-first with adaptive fallbacks.
+        Retourne une réponse synthétisée + documents sources avec métadonnées enrichies.
         """
         # Enhanced species detection with confidence
         species_hint, confidence = _enhanced_detect_species_from_query(query)
-        
-        # Si pas d'espèce détectée, essayer de l'extraire des filtres
-        if not species_hint and filters and filters.get("species"):
-            species_hint = filters["species"]
-            confidence = 0.5  # Confiance moyenne car vient des filtres
         
         if not species_hint:
             species_hint = "global"
@@ -820,11 +675,6 @@ class RAGRetriever:
             # Low confidence - start with global
             candidates = ["global"] + [s for s in _SPECIES if s != "global"]
 
-        # Log des filtres appliqués
-        applied_filters = {k: v for k, v in (filters or {}).items() if v}
-        if applied_filters:
-            logger.info(f"🔍 Recherche avec filtres: {applied_filters}")
-
         for sp in candidates:
             tried.append(sp)
             if not self._load_index_for_species(sp):
@@ -835,11 +685,9 @@ class RAGRetriever:
             if emb is None:
                 continue
 
-            # Recherche initiale avec multiplicateur adaptatif
-            search_multiplier = 4 if applied_filters else 3 if confidence > 0.5 else 2
-            initial_k = max(k * search_multiplier, 15)  # Plus de résultats pour compenser le filtrage
-            
-            scores, indices = self._search_index(sp, emb, initial_k)
+            # Adaptive search width based on species confidence
+            search_multiplier = 3 if confidence > 0.5 else 2
+            scores, indices = self._search_index(sp, emb, max(k * search_multiplier, 10))
             if scores is None or indices is None:
                 continue
 
@@ -847,43 +695,8 @@ class RAGRetriever:
             if not pairs:
                 continue
 
-            # 🆕 Application des filtres de métadonnées AVANT le re-ranking
-            if applied_filters:
-                raw_docs = [doc for doc, _ in pairs]
-                filtered_docs = _apply_metadata_filters(raw_docs, applied_filters)
-                
-                # Reconstituer les pairs avec scores
-                filtered_pairs = []
-                for filtered_doc in filtered_docs:
-                    for doc, score in pairs:
-                        if doc is filtered_doc:  # Comparaison par identité d'objet
-                            filtered_pairs.append((doc, score))
-                            break
-                
-                pairs = filtered_pairs
-                logger.debug(f"📋 Après filtrage: {len(pairs)} résultats retenus pour {sp}")
-
-            if not pairs:
-                continue  # Pas de résultats après filtrage
-
-            # Détection de l'intention pour le re-ranking (optionnel)
-            intent = None
-            if "poids" in query.lower() or "weight" in query.lower() or "performance" in query.lower():
-                intent = "PerfTargets"
-
-            # Enhanced table-first re-ranking avec intention
-            pairs = self._enhanced_table_first_rerank(query, pairs, intent)
-            
-            # 🆕 Boost prioritaire pour certains contenus selon l'intention
-            raw_docs_ordered = [doc for doc, _ in pairs]
-            priority_docs = _boost_priority_content(query, intent, raw_docs_ordered)
-            
-            # Reconstituer pairs avec nouvel ordre
-            if priority_docs != raw_docs_ordered:
-                pairs_dict = {id(doc): score for doc, score in pairs}
-                pairs = [(doc, pairs_dict.get(id(doc), 0.5)) for doc in priority_docs if id(doc) in pairs_dict]
-
-            # Limiter aux k meilleurs résultats
+            # Enhanced table-first re-ranking
+            pairs = self._enhanced_table_first_rerank(query, pairs)
             pairs = pairs[:k]
 
             # Store best results for potential fallback
@@ -892,22 +705,19 @@ class RAGRetriever:
                 best_species = sp
 
             # Success criteria: good results or high confidence match
-            success_threshold = max(1, k // 3) if applied_filters else k // 2
-            
-            if pairs and (len(pairs) >= success_threshold or sp == species_hint):
+            if pairs and (len(pairs) >= k // 2 or sp == species_hint):
                 answer = self._enhanced_synthesize_answer(query, pairs)
                 source_documents = [doc for doc, _ in pairs]
 
                 return {
                     "answer": answer,
                     "source_documents": source_documents,
-                    "search_type": "enhanced_vector_filtered" if applied_filters else "enhanced_vector",
+                    "search_type": "enhanced_vector",
                     "total_results": len(pairs),
                     "embedding_method": method,
                     "species_index_used": sp,
                     "species_detected": species_hint,
                     "species_confidence": confidence,
-                    "filters_applied": applied_filters,
                     "tried": tried,
                     "enhanced_features": True,
                 }
@@ -921,18 +731,17 @@ class RAGRetriever:
             return {
                 "answer": answer,
                 "source_documents": source_documents,
-                "search_type": "enhanced_vector_fallback_filtered" if applied_filters else "enhanced_vector_fallback",
+                "search_type": "enhanced_vector_fallback",
                 "total_results": len(pairs),
                 "embedding_method": method,
                 "species_index_used": sp,
                 "species_detected": species_hint,
                 "species_confidence": confidence,
-                "filters_applied": applied_filters,
                 "tried": tried,
                 "enhanced_features": True,
             }
 
-        logger.warning("Aucun résultat valide sur les espèces testées: %s (filtres: %s)", "→".join(tried), applied_filters)
+        logger.warning("Aucun résultat valide sur les espèces testées: %s", "→".join(tried))
         return None
 
     def _enhanced_synthesize_answer(self, query: str, results: List[Tuple[Dict[str, Any], float]]) -> str:
@@ -1013,17 +822,14 @@ class RAGRetriever:
         # Add metadata context
         enhancements = []
         
-        if metadata.get("species"):
-            enhancements.append(f"Espèce: {metadata['species']}")
+        if metadata.get("strain"):
+            enhancements.append(f"Souche: {metadata['strain']}")
         
-        if metadata.get("line"):
-            enhancements.append(f"Lignée: {metadata['line']}")
+        if metadata.get("production_phase"):
+            enhancements.append(f"Phase: {metadata['production_phase']}")
         
-        if metadata.get("sex"):
-            enhancements.append(f"Sexe: {metadata['sex']}")
-        
-        if metadata.get("document_type"):
-            enhancements.append(f"Type: {metadata['document_type']}")
+        if metadata.get("domain"):
+            enhancements.append(f"Domaine: {metadata['domain']}")
         
         if enhancements:
             return f"{source} ({', '.join(enhancements)})"
@@ -1037,9 +843,6 @@ class RAGRetriever:
         if metadata.get("chunk_type") == "table":
             context_parts.append("Tableau")
         
-        if metadata.get("table_type") == "perf_targets":
-            context_parts.append("Objectifs performance")
-        
         if metadata.get("age_range"):
             context_parts.append(f"Âge: {metadata['age_range']}")
         
@@ -1051,8 +854,7 @@ class RAGRetriever:
     # Interface compacte de compatibilité (améliorée)
     def retrieve(self, query: str, **kwargs) -> List[Dict[str, Any]]:
         """Enhanced retrieve method with backward compatibility"""
-        filters = kwargs.get("filters")
-        result = self.get_contextual_diagnosis(query, k=kwargs.get("k", 5), filters=filters)
+        result = self.get_contextual_diagnosis(query, k=kwargs.get("k", 5))
         if result and result.get("source_documents"):
             # Add enhanced metadata to results
             documents = result["source_documents"]
@@ -1061,7 +863,6 @@ class RAGRetriever:
                     "species_detected": result.get("species_detected"),
                     "species_confidence": result.get("species_confidence"),
                     "search_type": result.get("search_type"),
-                    "filters_applied": result.get("filters_applied"),
                     "enhanced": True
                 }
             return documents
@@ -1078,7 +879,6 @@ class RAGRetriever:
             "embedding_method": {sp: self.method_by_species.get(sp) for sp in _SPECIES},
             "embedding_dimension": {sp: self.emb_dim_by_species.get(sp) for sp in _SPECIES},
             "enhanced_features": True,
-            "metadata_filtering": True,
         }
         
         # Enhanced path resolution info
@@ -1096,13 +896,6 @@ class RAGRetriever:
             "species_with_data": [sp for sp in _SPECIES if len(self.documents_by_species.get(sp, [])) > 0]
         }
         
-        # Metadata filtering capabilities
-        info["filtering_capabilities"] = {
-            "supported_filters": ["species", "line", "sex", "document_type", "chunk_type", "table_type"],
-            "flexible_matching": True,
-            "priority_boosting": True
-        }
-        
         return info
 
     def test_species_detection(self, test_queries: List[str]) -> Dict[str, Any]:
@@ -1115,30 +908,6 @@ class RAGRetriever:
                 "confidence": confidence,
                 "classification": "high" if confidence > 0.7 else "medium" if confidence > 0.3 else "low"
             }
-        return results
-
-    def test_metadata_filtering(self, test_filters: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Test metadata filtering capabilities"""
-        results = {}
-        
-        for i, filters in enumerate(test_filters):
-            test_name = f"test_{i+1}"
-            try:
-                # Test avec une requête générique
-                result = self.get_contextual_diagnosis("test query", k=5, filters=filters)
-                results[test_name] = {
-                    "filters": filters,
-                    "success": result is not None,
-                    "documents_found": len(result.get("source_documents", [])) if result else 0,
-                    "species_used": result.get("species_index_used") if result else None
-                }
-            except Exception as e:
-                results[test_name] = {
-                    "filters": filters,
-                    "success": False,
-                    "error": str(e)
-                }
-        
         return results
 
 
@@ -1160,8 +929,6 @@ def create_enhanced_retriever(openai_api_key: Optional[str] = None, **kwargs) ->
     logger.info("✅ Enhanced RAG Retriever created with features:")
     logger.info("   - Advanced species detection with confidence scoring")
     logger.info("   - Intelligent table-first ranking")
-    logger.info("   - 🆕 Advanced metadata filtering (species/line/sex)")
-    logger.info("   - Priority boosting for PerfTargets")
     logger.info("   - Adaptive fallback strategies")
     logger.info("   - Enhanced metadata awareness")
     logger.info("   - 🔧 Robust document format handling")
