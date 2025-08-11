@@ -6,6 +6,7 @@ Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
 - Route vers compute (si possible) OU vers table-first (perf targets) OU vers RAGRetriever (multi-index)
 - Retourne un payload structuré pour le frontend
 """
+
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 import os
@@ -18,6 +19,167 @@ from ..utils.question_classifier import classify, Intention
 from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
+
+
+
+
+# === HOTFIX PerfTargets — ajoute ces imports/helpers en haut du fichier ===
+import re
+from typing import Optional, Tuple
+
+# ---- Helpers robustes ----
+_AGE_PATTERNS = [
+    r"\b(?:âge|age)\s*[:=]?\s*(\d{1,2})\s*(?:j|jours|d|days)\b",  # âge: 21 jours / age=21d
+    r"\b(?:J|D)\s*?(\d{1,2})\b",                                 # J21 / D21
+    r"\b(?:day|jour)\s*(\d{1,2})\b",                              # day 21 / jour 21
+    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                        # 21 j / 21d
+    r"\bage_days\s*[:=]\s*(\d{1,2})\b",                           # age_days=21
+]
+
+def _extract_age_days_from_text(text: str) -> Optional[int]:
+    if not text:
+        return None
+    for pat in _AGE_PATTERNS:
+        m = re.search(pat, text, flags=re.I)
+        if m:
+            try:
+                val = int(m.group(1))
+                # bornes raisonnables pour un lot de chair
+                if 0 <= val <= 70:
+                    return val
+            except Exception:
+                continue
+    return None
+
+def _normalize_sex_from_text(text: str) -> Optional[str]:
+    t = (text or "").lower()
+    if any(k in t for k in ["as hatched", "as-hatched", "as_hatched", "mixte", "mixed", " ah "]):
+        return "as_hatched"
+    if any(k in t for k in ["mâle", "male", " mâle", " male "]):
+        return "male"
+    if any(k in t for k in ["femelle", "female", " femelle", " female "]):
+        return "female"
+    return None
+
+# ---- Optionnel : petit formateur de réponse PerfStore (réutilisable) ----
+def _format_perf_answer(rec: dict, norm: dict, nearest_used: bool) -> dict:
+    target_g = rec.get("weight_g")
+    age_used = rec.get("age_days")
+    source_name = rec.get("source_name") or "perf_targets.csv"
+    txt = f"Poids cible à {age_used} jours: {target_g} g."
+    return {
+        "text": txt,
+        "source": "perfstore",
+        "confidence": 0.9 if not nearest_used else 0.85,
+        "sources": [{"type": "table", "name": source_name, "nearest_used": nearest_used, "age_days": age_used}],
+        "meta": {"norm": norm, "nearest_used": nearest_used},
+    }
+
+def _answer_perf_targets(dm, entities: dict, strategy: str = "exact_then_nearest") -> Tuple[Optional[dict], dict]:
+    """
+    dm = self (DialogueManager)
+    Retourne (answer_dict | None, meta)
+    """
+    meta = {"nearest_used": False, "reason": None, "norm": entities}
+    try:
+        if not getattr(dm, "perfstore", None):
+            meta["reason"] = "perfstore_not_initialized"
+            return None, meta
+
+        # exact
+        rec = dm.perfstore.lookup(entities, strategy="exact")
+        if rec:
+            return _format_perf_answer(rec, entities, nearest_used=False), meta
+
+        if strategy in ("nearest", "exact_then_nearest"):
+            recn = dm.perfstore.lookup(entities, strategy="nearest")
+            if recn:
+                meta["nearest_used"] = True
+                return _format_perf_answer(recn, entities, nearest_used=True), meta
+
+        meta["reason"] = "no_match_in_perfstore"
+        return None, meta
+    except Exception as e:
+        meta["reason"] = f"perfstore_error:{e.__class__.__name__}"
+        return None, meta
+
+# === Dans la classe DialogueManager.handle(...), ajoute ce bloc au début de la logique ===
+# après extraction de l’intent/entities (préserve ton code existant)
+if intent == "PerfTargets":
+    # 1) enrichir depuis la question si l’extracteur n’a pas tout
+    entities = (result.entities or {}) if "result" in locals() else (entities or {})
+    species = entities.get("species") or "broiler"
+    line = entities.get("line") or "ross308"
+
+    sex = entities.get("sex") or _normalize_sex_from_text(question)
+    age_days = entities.get("age_days")
+    if age_days is None:
+        age_days = _extract_age_days_from_text(question)
+
+    unit = entities.get("unit") or ("metric" if "metric" in (question or "").lower() or "métrique" in (question or "").lower() else None)
+
+    enriched = {"species": species, "line": line}
+    if sex: enriched["sex"] = sex
+    if age_days is not None: enriched["age_days"] = age_days
+    if unit: enriched["unit"] = unit
+
+    # 2) si âge manquant -> retourner une CLARIFICATION propre (au lieu de rag_no_results)
+    if "age_days" not in enriched:
+        return {
+            "type": "clarification",
+            "intent": intent,
+            "route_taken": "perfstore_needs_age",
+            "session_id": session_id,
+            "clarification": {
+                "questions": [{
+                    "id": "age_days",
+                    "text": "Quel est l’âge en jours ?",
+                    "kind": "single_choice",
+                    "choices": [14, 21, 28, 35, 42]
+                }],
+                "hint": {"species": species, "line": line, "sex": sex or "as_hatched"}
+            }
+        }
+
+    # 3) tenter PerfStore d’abord (exact -> nearest); respecter force_perfstore si présent
+    ans, meta = _answer_perf_targets(self, enriched, strategy="exact_then_nearest")
+    if ans:
+        ans["meta"] = {**(ans.get("meta") or {}), **meta, "filters_applied": enriched}
+        return {
+            "type": "answer",
+            "intent": intent,
+            "answer": ans,
+            "route_taken": "perfstore_exact" if not meta["nearest_used"] else "perfstore_nearest",
+            "session_id": session_id,
+        }
+    # 4) échec PerfStore → on laissera le flux RAG existant continuer (code original inchangé)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ===== Import robuste du RAGRetriever (code original conservé) =====
 RAG_AVAILABLE = False
@@ -556,12 +718,15 @@ def handle(
             logger.info("📊 Table-first (PerfTargets) avant RAG")
             try:
                 norm = _normalize_entities_soft(entities)
+                if norm.get("age_days") is None:
+                    age_guess = _extract_age_days_from_text(question)
+                    if age_guess is not None:
+                        norm["age_days"] = age_guess                
                 store = _get_perf_store(norm["species"])  # singleton
                 rec = None
                 dbg = None
-                if store and norm.get("age_days") is not None:
+                if store:
                     rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
-
                 if rec:
                     line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
                     sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}

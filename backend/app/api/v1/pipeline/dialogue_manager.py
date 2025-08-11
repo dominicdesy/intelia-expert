@@ -6,6 +6,7 @@ Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
 - Route vers compute (si possible) OU vers table-first (perf targets) OU vers RAGRetriever (multi-index)
 - Retourne un payload structuré pour le frontend
 """
+
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 import os
@@ -19,47 +20,74 @@ from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
 
-# ===== Import robuste du RAGRetriever (code original conservé) =====
-RAG_AVAILABLE = False
-RAGRetrieverCls = None
-try:
-    from rag.retriever import RAGRetriever as _RAGRetrieverImported
-    RAGRetrieverCls = _RAGRetrieverImported
-    RAG_AVAILABLE = True
-    logger.info("✅ RAGRetriever importé depuis rag.retriever")
-except Exception as e1:
-    try:
-        from ...rag.retriever import RAGRetriever as _RAGRetrieverImported2  # type: ignore
-        RAGRetrieverCls = _RAGRetrieverImported2
-        RAG_AVAILABLE = True
-        logger.info("✅ RAGRetriever importé depuis ...rag.retriever")
-    except Exception as e2:
-        try:
-            from .retriever import RAGRetriever as _RAGRetrieverImported3  # type: ignore
-            RAGRetrieverCls = _RAGRetrieverImported3
-            RAG_AVAILABLE = True
-            logger.info("✅ RAGRetriever importé depuis .retriever")
-        except Exception as e3:
-            logger.warning(f"⚠️ Impossible d'importer RAGRetriever ({e1} | {e2} | {e3}). RAG désactivé.")
-            RAG_AVAILABLE = False
-            RAGRetrieverCls = None
+# ---------------------------------------------------------------------------
+# Helpers PerfTargets (dédupliqués)
+# ---------------------------------------------------------------------------
 
-# ===== Singleton RAGRetriever =====
-_RAG_SINGLETON = None
+_AGE_PATTERNS = [
+    r"\b(?:âge|age)\s*[:=]?\s*(\d{1,2})\s*(?:j|jours|d|days)\b",  # âge: 21 jours / age=21d
+    r"\b(?:J|D)\s*?(\d{1,2})\b",                                 # J21 / D21
+    r"\b(?:day|jour)\s*(\d{1,2})\b",                              # day 21 / jour 21
+    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                        # 21 j / 21d
+    r"\bage_days\s*[:=]\s*(\d{1,2})\b",                           # age_days=21
+]
 
-def _get_retriever():
-    """Retourne un singleton RAGRetriever, ou None si indisponible."""
-    global _RAG_SINGLETON
-    if not RAG_AVAILABLE or RAGRetrieverCls is None:
+def _extract_age_days_from_text(text: str) -> Optional[int]:
+    if not text:
         return None
-    if _RAG_SINGLETON is None:
-        try:
-            _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
-            logger.info("🔎 RAGRetriever initialisé")
-        except Exception as e:
-            logger.error(f"❌ Init RAGRetriever échoué: {e}")
-            _RAG_SINGLETON = None
-    return _RAG_SINGLETON
+    for pat in _AGE_PATTERNS:
+        m = re.search(pat, text, flags=re.I)
+        if m:
+            try:
+                val = int(m.group(1))
+                if 0 <= val <= 70:
+                    return val
+            except Exception:
+                continue
+    return None
+
+def _normalize_sex_from_text(text: str) -> Optional[str]:
+    t = (text or "").lower()
+    if any(k in t for k in ["as hatched", "as-hatched", "as_hatched", "mixte", "mixed", " ah "]):
+        return "as_hatched"
+    if any(k in t for k in ["mâle", " male ", "male"]):
+        return "male"
+    if any(k in t for k in ["femelle", " female ", "female"]):
+        return "female"
+    return None
+
+def _slug(s: Optional[str]) -> str:
+    return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
+
+def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
+    species = (entities.get("species") or entities.get("production_type") or "broiler").lower().strip()
+    line_raw = entities.get("line") or entities.get("breed") or ""
+    line = _slug(line_raw)
+    if line in {"cobb-500","cobb_500","cobb 500"}: line = "cobb500"
+    if line in {"ross-308","ross_308","ross 308"}: line = "ross308"
+
+    sex_raw = (entities.get("sex") or "").lower().strip()
+    sex_map = {
+        "m":"male","male":"male","f":"female","female":"female",
+        "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
+    }
+    sex = sex_map.get(sex_raw) or "as_hatched"
+
+    age_days = entities.get("age_days")
+    if age_days is None and entities.get("age_weeks") is not None:
+        try: age_days = int(entities["age_weeks"]) * 7
+        except Exception: age_days = None
+    try: age_days = int(age_days) if age_days is not None else None
+    except Exception: age_days = None
+
+    unit = (entities.get("unit") or "metric").lower().strip()
+    if unit not in ("metric","imperial"): unit = "metric"
+
+    return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
+
+# ---------------------------------------------------------------------------
+# PerfStore singletons & lookup (code original conservé, unifié)
+# ---------------------------------------------------------------------------
 
 # ===== Import table-first PerfStore =====
 try:
@@ -91,7 +119,133 @@ def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]
             _PERF_STORE = None
     return _PERF_STORE
 
-# ===== Utilitaires RAG (code original conservé) =====
+def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Essaie un match exact (line, unit, sex, age_days) puis nearest sur l'âge.
+    Retourne (record, debug).
+    """
+    debug: Dict[str, Any] = {}
+    try:
+        # Récupération DataFrame (tolérant)
+        df = getattr(store, "as_dataframe", None)
+        df = df() if callable(df) else getattr(store, "df", None)
+        if df is None:
+            return None, {"reason": "no_dataframe"}
+
+        # 1) Normalisation colonnes minimales
+        if "unit" in df.columns:
+            df["unit"] = df["unit"].astype(str).str.lower().str.replace(r"[^a-z]+","", regex=True)
+            df["unit"] = df["unit"].replace({"metrics":"metric","gram":"metric","grams":"metric","g":"metric",
+                                             "imperial":"imperial","lb":"imperial","lbs":"imperial"})
+        if "line" in df.columns:
+            df["line"] = df["line"].astype(str).str.lower().str.replace(r"[-_\s]+","", regex=True)
+            df["line"] = df["line"].replace({"cobb500":"cobb500","ross308":"ross308","ross_308":"ross308","ross 308":"ross308"})
+
+        # 2) Filtrage par line/unit/sex (fallback sex→as_hatched si nécessaire)
+        if "line" in df.columns:
+            df = df[df["line"].eq(norm["line"])]
+        if "unit" in df.columns:
+            df = df[df["unit"].eq(norm["unit"])]
+        ds = df
+        if "sex" in df.columns:
+            ds = df[df["sex"].eq(norm["sex"])]
+            if ds.empty and norm["sex"] in ("male","female"):
+                ds = df[df["sex"].eq("as_hatched")]
+        if ds is None or len(ds) == 0:
+            return None, debug
+
+        # 3) Exact age match
+        if norm.get("age_days") is not None and "age_days" in ds.columns:
+            try:
+                ex = ds[ds["age_days"].astype(int) == int(norm["age_days"])]
+                if not ex.empty:
+                    row = ex.iloc[0].to_dict()
+                    debug["nearest_used"] = False
+                    return {
+                        "line": row.get("line", norm["line"]),
+                        "sex": row.get("sex", norm["sex"]),
+                        "unit": row.get("unit", norm["unit"]),
+                        "age_days": row.get("age_days", norm.get("age_days")),
+                        "weight_g": row.get("weight_g"),
+                        "weight_lb": row.get("weight_lb"),
+                        "daily_gain_g": row.get("daily_gain_g"),
+                        "cum_fcr": row.get("cum_fcr"),
+                        "source_doc": row.get("source_doc"),
+                        "page": row.get("page"),
+                    }, debug
+            except Exception:
+                pass
+
+        # 5) Nearest par distance d'âge
+        t = int(norm.get("age_days") or 0)
+        ds = ds.copy()
+        ds["__d__"] = (ds["age_days"].astype(int) - t).abs()
+        row = ds.sort_values(["__d__", "age_days"]).iloc[0].to_dict()
+        debug["nearest_used"] = (row.get("age_days") != t)
+        debug["nearest_age_days"] = int(row.get("age_days"))
+        debug["delta"] = abs(int(row.get("age_days")) - t)
+        return {
+            "line": row.get("line", norm["line"]),
+            "sex": row.get("sex", norm["sex"]),
+            "unit": row.get("unit", norm["unit"]),
+            "age_days": row.get("age_days", norm.get("age_days")),
+            "weight_g": row.get("weight_g"),
+            "weight_lb": row.get("weight_lb"),
+            "daily_gain_g": row.get("daily_gain_g"),
+            "cum_fcr": row.get("cum_fcr"),
+            "source_doc": row.get("source_doc"),
+            "page": row.get("page"),
+        }, debug
+    except Exception as e:
+        logger.info(f"[PerfStore] nearest lookup failed: {e}")
+        return None, debug
+
+# ---------------------------------------------------------------------------
+# RAG Retriever (code original conservé)
+# ---------------------------------------------------------------------------
+
+# ===== Import robuste du RAGRetriever =====
+RAG_AVAILABLE = False
+RAGRetrieverCls = None
+try:
+    from rag.retriever import RAGRetriever as _RAGRetrieverImported
+    RAGRetrieverCls = _RAGRetrieverImported
+    RAG_AVAILABLE = True
+    logger.info("✅ RAGRetriever importé depuis rag.retriever")
+except Exception as e1:
+    try:
+        from .rag.retriever import RAGRetriever as _RAGRetrieverImported2  # type: ignore
+        RAGRetrieverCls = _RAGRetrieverImported2
+        RAG_AVAILABLE = True
+        logger.info("✅ RAGRetriever importé depuis .rag.retriever")
+    except Exception as e2:
+        try:
+            from .retriever import RAGRetriever as _RAGRetrieverImported3  # type: ignore
+            RAGRetrieverCls = _RAGRetrieverImported3
+            RAG_AVAILABLE = True
+            logger.info("✅ RAGRetriever importé depuis .retriever")
+        except Exception as e3:
+            logger.warning(f"⚠️ Impossible d'importer RAGRetriever ({e1} | {e2} | {e3}). RAG désactivé.")
+            RAG_AVAILABLE = False
+            RAGRetrieverCls = None
+
+# ===== Singleton RAGRetriever =====
+_RAG_SINGLETON = None
+
+def _get_retriever():
+    """Retourne un singleton RAGRetriever, ou None si indisponible."""
+    global _RAG_SINGLETON
+    if not RAG_AVAILABLE or RAGRetrieverCls is None:
+        return None
+    if _RAG_SINGLETON is None:
+        try:
+            _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
+            logger.info("🔎 RAGRetriever initialisé")
+        except Exception as e:
+            logger.error(f"❌ Init RAGRetriever échoué: {e}")
+            _RAG_SINGLETON = None
+    return _RAG_SINGLETON
+
 def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     formatted = []
     for doc in source_documents[:5]:
@@ -142,7 +296,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         filters = _build_filters_from_entities(entities or {})
         result = retriever.get_contextual_diagnosis(question, k=k, filters=filters)
 
-        # === NEW: retry sans sex si vide (souvent trop strict)
+        # NEW: retry sans sex si vide (souvent trop strict)
         if not result and filters and "sex" in filters:
             f2 = dict(filters); f2.pop("sex", None)
             result = retriever.get_contextual_diagnosis(question, k=k, filters=f2)
@@ -181,46 +335,20 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
             "meta": {"error": str(e), "filters_applied": _build_filters_from_entities(entities or {})}
         }
 
-# ===== NETTOYAGE & SYNTHÈSE (code original conservé) =====
+# ---------------------------------------------------------------------------
+# NETTOYAGE & SYNTHÈSE (code original conservé)
+# ---------------------------------------------------------------------------
+
 def _final_sanitize(text: str) -> str:
     if not text:
         return ""
     text = re.sub(r'\*\*?source\s*:\s*[^*\n]+(\*\*)?', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\(?(source|src)\s*:\s*[^)\n]+?\)?', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'[\w\-\s]+\.(pdf|docx?|xlsx)', '', text, flags=re.IGNORECASE)
-    headers_to_remove = [
-        r'INTRODUCTION AND .+ CHARACTERISTICS',
-        r'INTRODUCTION\s+AND\s+[\w\s]+\s+CHARACTERISTICS',
-        r'Cobb\s+MX\s*[\w\s]*',
-        r'Ross\s+\d+\s*[\w\s]*(?:Male|Female|Mâle|Femelle)?',
-        r'BODY\s+WEIGHT\s+AND\s+FEED\s+CONVERSION',
-        r'PERFORMANCE\s+OBJECTIVES',
-        r'NUTRITION\s+SPECIFICATIONS?',
-        r'MANAGEMENT\s+GUIDE',
-        r'BREEDING\s+GUIDE',
-        r'PARENT\sTOCK\s+GUIDE',
-    ]
-    for pattern in headers_to_remove:
-        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-    table_patterns = [
-        r'Age \(days\)\s*Weight \(lb\)\s*Daily Gain[^|]+',
-        r'Imperial \(Male\) C500[^|]+',
-        r'Age\s+Weight\s+Feed\s+Conversion[^|]+',
-        r'\|\s*Age\s*\|\s*Weight\s*\|\s*[^|]+\|',
-        r'Days\s+Grams\s+Pounds\s+Feed[^|]+',
-        r'Age\s+\(weeks\)\s+Body\s+Weight[^|]+',
-        r'\d+\s+\d+\.\d+\s+\d+\.\d+\s+\d+\.\d+\s*\n',
-        r'Week\s+\d+\s+Week\s+\d+\s+Week\s+\d+',
-    ]
-    for pattern in table_patterns:
-        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    text = re.sub(r'[\w\-\s]+\.\s*(All rights reserved|Confidential)[^.\n]*\.', '', text, flags=re.IGNORECASE)
     technical_phrases = [
-        r'should be aware of local legislation[^.]+\.',
-        r'Apply your knowledge and judgment[^.]+\.',
-        r'Please use the .+ as a reference[^.]+\.',
-        r'Consult your veterinarian[^.]+\.',
-        r'These are guidelines only[^.]+\.',
-        r'Results may vary[^.]+\.',
+        r'\bFigure\s+\d+[:.]',
+        r'\bTable\s+\d+[:.]',
+        r'\b(For more information|See also)[^.\n]+\.',
         r'Contact your technical[^.]+\.',
     ]
     for phrase in technical_phrases:
@@ -288,13 +416,13 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
         line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
         sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte"}
         sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
-        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
+        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
         header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
-        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
-        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
-        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
-        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
-        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
+        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
+        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
+        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
+        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
+        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
         cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l’hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
         text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
         quick_replies = {
@@ -311,178 +439,15 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
         return {"text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
                 "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
 
-# ▼▼▼ NEW: normalisation douce pour table-first ▼▼▼
-def _slug(s: Optional[str]) -> str:
-    return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
+# ---------------------------------------------------------------------------
+# Entrée principale
+# ---------------------------------------------------------------------------
 
-def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
-    species = (entities.get("species") or entities.get("production_type") or "broiler").lower().strip()
-    line_raw = entities.get("line") or entities.get("breed") or ""
-    line = _slug(line_raw)
-    if line in {"cobb-500","cobb_500","cobb 500"}: line = "cobb500"
-    if line in {"ross-308","ross_308","ross 308"}: line = "ross308"
-    sex_raw = (entities.get("sex") or "").lower().strip()
-    sex_map = {
-        "m":"male","male":"male","f":"female","female":"female",
-        "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
-    }
-    sex = sex_map.get(sex_raw) or "as_hatched"
-    age_days = entities.get("age_days")
-    if age_days is None and entities.get("age_weeks") is not None:
-        try: age_days = int(entities["age_weeks"]) * 7
-        except Exception: age_days = None
-    try: age_days = int(age_days) if age_days is not None else None
-    except Exception: age_days = None
-    unit = (entities.get("unit") or "metric").lower().strip()
-    if unit not in ("metric","imperial"): unit = "metric"
-    return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
-
-# ▼▼▼ NEW: exact ou nearest (sans modifier perf_store.py) ▼▼▼
-
-
-def _extract_age_days_from_text(q: str) -> Optional[int]:
-    try:
-        ql = (q or "").lower()
-        # 21 jours | 21 day(s) | day 21 | j21
-        import re
-        for pat in [
-            r'(\d+)\s*(?:jour|jours|day|days)\b',
-            r'\bday\s*(\d+)\b',
-            r'\bj\s*(\d+)\b',
-            r'\b(?:à|a)\s*(\d+)\s*(?:jours|days)\b',
-        ]:
-            m = re.search(pat, ql)
-            if m:
-                v = int(m.group(1))
-                if 0 <= v <= 100:
-                    return v
-    except Exception:
-        pass
-    return None
-
-
-def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
-    debug = {"strategy": "exact_then_nearest", "norm": dict(norm), "nearest_used": False}
-    # exact
-    if norm.get("age_days") is not None:
-        rec = store.get(line=norm["line"], sex=norm["sex"], unit=norm["unit"], age_days=int(norm["age_days"]))
-        if rec:
-            return rec, debug
-    # nearest
-    try:
-        df = store._load_df(norm["line"])  # type: ignore (accès interne)
-# --- après: df = store._load_df(norm["line"]) ---
-        if df is None:
-            return None, debug
-
-        # 🔧 NORMALISATION DES COLONNES/VALEURS (tolérante aux CSV hétérogènes)
-        import re
-        def slug(s): 
-            return re.sub(r'[^a-z0-9]+','_', str(s).strip().lower()).strip('_')
-
-        # 1) Renommer colonnes communes
-        colmap = {}
-        for c in df.columns:
-            sc = slug(c)
-            if sc in {"age_days","age_day","agedays","age"}:
-                colmap[c] = "age_days"
-            elif sc in {"sex","sexe"}:
-                colmap[c] = "sex"
-            elif sc in {"unit","unite","units"}:
-                colmap[c] = "unit"
-            elif sc in {"weight_g","weightgrams","body_weight_g","poids_g","weight__g_","weight_g_"}:
-                colmap[c] = "weight_g"
-            elif sc in {"weight_lb","weightlbs","weight_pounds","poids_lb","weight__lb_","weight_lb_"}:
-                colmap[c] = "weight_lb"
-            elif sc in {"daily_gain_g","adg_g","avg_daily_gain_g"}:
-                colmap[c] = "daily_gain_g"
-            elif sc in {"cum_fcr","cumulative_fcr","fcr_cum"}:
-                colmap[c] = "cum_fcr"
-            elif sc in {"source_doc","source","document","doc"}:
-                colmap[c] = "source_doc"
-            elif sc in {"page","page_number","page_no"}:
-                colmap[c] = "page"
-            elif sc in {"line","breed","lignee"}:
-                colmap[c] = "line"
-        if colmap:
-            df = df.rename(columns=colmap)
-
-        # 2) Si "age_days" absent, tenter de le dériver depuis "age" ou "day(s)"
-        if "age_days" not in df.columns:
-            # Cherche colonnes d'âge typiques
-            for c in df.columns:
-                sc = slug(c)
-                if sc in {"age","days","day"}:
-                    try:
-                        df["age_days"] = df[c].astype(int)
-                        break
-                    except Exception:
-                        try:
-                            # extraire nombres depuis "21 days" / "J21"
-                            df["age_days"] = df[c].astype(str).str.extract(r'(\d+)').astype(float).astype("Int64")
-                            break
-                        except Exception:
-                            pass
-        if "age_days" not in df.columns:
-            return None, debug  # toujours rien d'exploitable
-
-        # 3) Normaliser valeurs sex/unit/line
-        if "sex" in df.columns:
-            df["sex"] = df["sex"].astype(str).str.strip().str.lower().replace({
-                "m":"male","male":"male","f":"female","female":"female",
-                "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
-            })
-        if "unit" in df.columns:
-            df["unit"] = df["unit"].astype(str).str.lower().str.replace(r"\s*\(.*\)","", regex=True)
-            df["unit"] = df["unit"].replace({"metrics":"metric","gram":"metric","grams":"metric","g":"metric",
-                                             "imperial":"imperial","lb":"imperial","lbs":"imperial"})
-        if "line" in df.columns:
-            df["line"] = df["line"].astype(str).str.lower().str.replace(r"[-_\s]+","", regex=True)
-            df["line"] = df["line"].replace({"cobb500":"cobb500","ross308":"ross308","ross_308":"ross308","ross 308":"ross308"})
-
-        # 4) Filtrage par line/unit/sex avec fallback sex→as_hatched
-        if "line" in df.columns:
-            df = df[df["line"].eq(norm["line"])]
-        if "unit" in df.columns:
-            df = df[df["unit"].eq(norm["unit"])]
-        ds = df
-        if "sex" in df.columns:
-            ds = df[df["sex"].eq(norm["sex"])]
-            if ds.empty and norm["sex"] in ("male","female"):
-                ds = df[df["sex"].eq("as_hatched")]
-        if ds is None or len(ds)==0:
-            return None, debug
-
-        # 5) Nearest par distance d'âge (tolère l'absence de weight_lb/weight_g)
-        t = int(norm.get("age_days") or 0)
-        ds = ds.copy()
-        ds["__d__"] = (ds["age_days"].astype(int) - t).abs()
-        row = ds.sort_values(["__d__","age_days"]).iloc[0].to_dict()
-        debug["nearest_used"] = (row.get("age_days") != t)
-        debug["nearest_age_days"] = int(row.get("age_days"))
-        debug["delta"] = abs(int(row.get("age_days")) - t)
-        return {
-            "line": row.get("line", norm["line"]),
-            "sex": row.get("sex", norm["sex"]),
-            "unit": row.get("unit", norm["unit"]),
-            "age_days": row.get("age_days", norm.get("age_days")),
-            "weight_g": row.get("weight_g"),
-            "weight_lb": row.get("weight_lb"),
-            "daily_gain_g": row.get("daily_gain_g"),
-            "cum_fcr": row.get("cum_fcr"),
-            "source_doc": row.get("source_doc"),
-            "page": row.get("page"),
-        }, debug
-    except Exception as e:
-        logger.info(f"[PerfStore] nearest lookup failed: {e}")
-        return None, debug
-
-# ===== Entrée principale (ajouts balisés) =====
 def handle(
     session_id: str,
     question: str,
     lang: str = "fr",
-    # ▼▼▼ NEW: overrides & debug provenant de expert.py ▼▼▼
+    # Overrides & debug
     debug: bool = False,
     force_perfstore: bool = False,
     intent_hint: Optional[str] = None,
@@ -502,7 +467,7 @@ def handle(
         intent: Intention = classification["intent"]
         entities = classification["entities"]
 
-        # ▼▼▼ NEW: hint manuel (tests console) ▼▼▼
+        # Hint manuel (tests console)
         if intent_hint and str(intent_hint).lower().startswith("perf"):
             intent = Intention.PerfTargets
 
@@ -529,7 +494,7 @@ def handle(
                 "session_id": session_id
             }
 
-        # Étape 4: Calcul direct si possible
+        # Étape 4: Calcul direct si possible (code original)
         def _should_compute(i: Intention) -> bool:
             return i in {
                 Intention.WaterFeedIntake,
@@ -540,7 +505,7 @@ def handle(
             }
         if _should_compute(intent):
             logger.info(f"🧮 Calcul direct pour intent: {intent}")
-            result = _compute_answer(intent, entities)
+            result = _compute_answer(intent, entities)  # défini ailleurs dans le projet
             result["text"] = _final_sanitize(result.get("text", ""))
             return {
                 "type": "answer",
@@ -550,8 +515,7 @@ def handle(
                 "session_id": session_id
             }
 
-        # ===== Étape 4bis: TABLE-FIRST pour PerfTargets =====
-        # ▼▼▼ NEW: guard RELAXÉ + override + normalisation robuste ▼▼▼
+        # Étape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
             logger.info("📊 Table-first (PerfTargets) avant RAG")
             try:
@@ -559,12 +523,14 @@ def handle(
                 if norm.get("age_days") is None:
                     age_guess = _extract_age_days_from_text(question)
                     if age_guess is not None:
-                        norm["age_days"] = age_guess                
+                        norm["age_days"] = age_guess
+
                 store = _get_perf_store(norm["species"])  # singleton
                 rec = None
                 dbg = None
                 if store:
                     rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
+
                 if rec:
                     line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
                     sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}
@@ -581,7 +547,7 @@ def handle(
                         val_txt = "**n/a**"
                     age_disp = int(rec.get("age_days") or norm.get("age_days") or 0)
                     text = f"{line_label} · {sex_label} · {age_disp} j : {val_txt} (objectif {unit_label})."
-                    source_item = []
+                    source_item: List[Dict[str, Any]] = []
                     if rec.get("source_doc"):
                         source_item.append({
                             "name": rec["source_doc"],
