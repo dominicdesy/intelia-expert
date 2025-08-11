@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct)
+Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
 - classify -> normalize -> completeness/clarifications
 - Réponse générale + clarifications pour questions incomplètes
-- Route vers compute (si possible) OU vers RAGRetriever (table-first, multi-index)
+- Route vers compute (si possible) OU vers table-first (perf targets) OU vers RAGRetriever (multi-index)
 - Retourne un payload structuré pour le frontend
 """
 from typing import Dict, Any, List, Optional
@@ -61,6 +61,39 @@ def _get_retriever():
             _RAG_SINGLETON = None
     return _RAG_SINGLETON
 
+# ===== Import table-first PerfStore =====
+try:
+    # lit rag_index/<species>/tables/<line>*.csv via manifest généré par build_rag
+    from .perf_store import PerfStore  # type: ignore
+    PERF_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"⚠️ PerfStore indisponible: {e}")
+    PerfStore = None  # type: ignore
+    PERF_AVAILABLE = False
+
+# ===== Singleton PerfStore =====
+_PERF_STORE: Optional["PerfStore"] = None
+
+def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]:
+    """
+    Instancie un PerfStore pointant vers ./rag_index/<species>/tables/.
+    species_hint: 'broiler' | 'layer' | 'global' ... (déduit des entités sinon)
+    """
+    if not PERF_AVAILABLE or PerfStore is None:
+        return None
+    global _PERF_STORE
+    species = (species_hint or "broiler").strip().lower()
+    # si singleton déjà créé mais pour une autre espèce, on réinstancie
+    if _PERF_STORE is None or getattr(_PERF_STORE, "species", "") != species:
+        try:
+            root = os.environ.get("RAG_INDEX_ROOT", "./rag_index")
+            _PERF_STORE = PerfStore(root=root, species=species)  # type: ignore
+            logger.info(f"📊 PerfStore initialisé (root={root}, species={species})")
+        except Exception as e:
+            logger.warning(f"⚠️ PerfStore indisponible: {e}")
+            _PERF_STORE = None
+    return _PERF_STORE
+
 # ===== Utilitaires RAG =====
 def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -95,22 +128,13 @@ def _build_filters_from_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
     Construit un dict de filtres pour le RAGRetriever à partir des entités détectées.
     """
     filters = {}
-    
-    # Mappage des entités vers les filtres RAG
     if "species" in entities and entities["species"]:
         filters["species"] = entities["species"]
-    
     if "line" in entities and entities["line"]:
         filters["line"] = entities["line"]
-        
     if "sex" in entities and entities["sex"]:
         filters["sex"] = entities["sex"]
-    
-    # Autres filtres possibles selon le contexte
-    if "age_days" in entities or "age_weeks" in entities:
-        # Pourrait être utilisé pour filtrer sur des tranches d'âge
-        pass
-        
+    # Age éventuellement exploitable plus tard (tranches)
     logger.debug(f"🔍 Filtres RAG construits: {filters}")
     return filters
 
@@ -129,12 +153,15 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         }
     
     try:
-        # Construction des filtres à partir des entités
         filters = _build_filters_from_entities(entities or {})
-        
-        # Appel du retriever avec filtres
+        # 1er essai avec filtres complets
         result = retriever.get_contextual_diagnosis(question, k=k, filters=filters)
-        
+
+        # NEW: si rien, on retente sans filtre 'sex' (souvent trop strict)
+        if not result and filters and "sex" in filters:
+            f2 = dict(filters); f2.pop("sex", None)
+            result = retriever.get_contextual_diagnosis(question, k=k, filters=f2)
+
         if not result:
             return {
                 "text": "Aucune information pertinente trouvée dans la base de connaissances.",
@@ -429,7 +456,7 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
 # ===== Entrée principale =====
 def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION HYBRIDE (RAGRetriever direct)
+    Fonction principale de traitement des questions - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
@@ -477,6 +504,87 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
                 "route_taken": "compute",
                 "session_id": session_id
             }
+
+        # ===== Étape 4bis: TABLE-FIRST pour PerfTargets =====
+        if intent == Intention.PerfTargets and completeness_score >= 0.8:
+            logger.info("📊 Table-first (PerfTargets) avant RAG")
+            try:
+                # species → choisit le bon sous-dossier de rag_index
+                species_hint = (entities.get("species") or entities.get("production_type") or "broiler")
+                store = _get_perf_store(species_hint)
+
+                # Normalisations / défauts
+                age_days = entities.get("age_days")
+                if age_days is None and entities.get("age_weeks") is not None:
+                    try:
+                        age_days = int(entities.get("age_weeks")) * 7
+                    except Exception:
+                        age_days = None
+
+                unit = (entities.get("unit") or "metric")
+                line = (entities.get("line") or "cobb500")
+                sex  = (entities.get("sex") or "as_hatched")
+
+                rec = None
+                if store and age_days is not None:
+                    rec = store.get(line=line, sex=sex, unit=unit, age_days=int(age_days))
+
+                if rec:
+                    # Libellés conviviaux + rendu court
+                    line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
+                    sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"As Hatched","mixed":"Mixte"}
+                    sex_label = sex_map.get(str(rec.get("sex","")).lower(), rec.get("sex",""))
+                    unit_label = (rec.get("unit") or unit or "metric").lower()
+                    v_g = rec.get("weight_g")
+                    v_lb = rec.get("weight_lb")
+                    if v_g is not None:
+                        try:
+                            val_txt = f"**{float(v_g):.0f} g**"
+                        except Exception:
+                            val_txt = f"**{v_g} g**"
+                    elif v_lb is not None:
+                        try:
+                            val_txt = f"**{float(v_lb):.2f} lb**"
+                        except Exception:
+                            val_txt = f"**{v_lb} lb**"
+                    else:
+                        val_txt = "**n/a**"
+
+                    text = f"{line_label} · {sex_label} · {int(rec.get('age_days', age_days))} j : {val_txt} (objectif {unit_label})."
+
+                    source_item = []
+                    if rec.get("source_doc"):
+                        source_item.append({
+                            "name": rec["source_doc"],
+                            "meta": {
+                                "page": rec.get("page"),
+                                "line": rec.get("line"),
+                                "sex": rec.get("sex"),
+                                "unit": rec.get("unit")
+                            }
+                        })
+
+                    return {
+                        "type": "answer",
+                        "intent": intent,
+                        "answer": {
+                            "text": text,
+                            "source": "table_lookup",
+                            "confidence": 0.98,
+                            "sources": source_item,
+                            "meta": {"lookup": {
+                                "line": rec.get("line") or line,
+                                "sex": rec.get("sex") or sex,
+                                "unit": rec.get("unit") or unit_label,
+                                "age_days": rec.get("age_days") or int(age_days)
+                            }}
+                        },
+                        "route_taken": "table_lookup",
+                        "session_id": session_id
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Table-first lookup échoué: {e}")
+                # on continue vers RAG
 
         # Étape 5: RAG complet via RAGRetriever avec filtres
         logger.info("📚 RAG via RAGRetriever avec filtres")
