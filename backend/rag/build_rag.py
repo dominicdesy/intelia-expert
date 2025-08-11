@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Enhanced RAG Index Builder (CLI)
+v1.4 — CSV perf_targets → rag_index/<species>/tables + manifest
 v1.3+ — PyMuPDF words-based table detection + optional table split + OCR provider (Tesseract)
 🆕 ENHANCED: Garantie métadonnées complètes (species/line/sex) + table_type="perf_targets" automatique
 
@@ -33,12 +34,11 @@ from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any, Optional, Iterable
 
 import numpy as np
-
+import csv  # NEW
 
 # ----------------------------- Logging --------------------------------- #
 def log(msg: str) -> None:
     print(msg, flush=True)
-
 
 # ------------------------ Normalisation util --------------------------- #
 def _normalize_text(txt: str) -> str:
@@ -49,7 +49,6 @@ def _normalize_text(txt: str) -> str:
     # espaces multiples
     txt = re.sub(r"\s{2,}", " ", txt).strip()
     return txt
-
 
 # --------------------- Enhanced file iteration ------------------------- #
 def _iter_files_local(root: str, allowed_exts: Tuple[str, ...], recursive: bool = True) -> Iterable[str]:
@@ -87,7 +86,6 @@ def _iter_files_local(root: str, allowed_exts: Tuple[str, ...], recursive: bool 
     for fp in sorted(results):
         yield fp
 
-
 # --------- 🆕 ENHANCED Metadata enrichment with validation ------------- #
 try:
     from rag.metadata_enrichment import enhanced_enrich_metadata, validate_required_metadata, analyze_table_detection
@@ -107,7 +105,6 @@ except Exception:
             return {"total_chunks": len(chunks), "coverage": {}, "critical_coverage": 0}
         def analyze_table_detection(chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
             return {"tables_detected": 0, "total_chunks": len(chunks), "perf_targets_tables": 0}
-
 
 # --------------------- 🆕 ENHANCED Table-first chunker -------------------- #
 def _enhanced_chunk_text_with_metadata_guarantee(
@@ -156,15 +153,13 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                 r"(?:target|objective|objectif)\s*(?:weight|poids|bw|performance)",
                 r"(?:age|week|day|jour|semaine)\s*(?:weight|poids|bw)",
                 r"(?:fcr|conversion)\s*(?:target|objective|standard)",
-                r"(?:growth|croissance)\s*(?:curve|courbe|target)",
+                r"(?:growth|croissance)\s*(?:curve|courbe|target|standard)",
                 r"body\s*weight\s*(?:target|objective|standard)",
                 r"weekly\s*(?:weight|gain|poids)",
                 r"\d+\s*(?:days?|jours?|weeks?|semaines?)\s*\d+",
             ]
-            
             pattern_matches = sum(1 for pattern in perf_patterns 
                                 if _re.search(pattern, text_lower, _re.IGNORECASE))
-            
             if pattern_matches >= 2 and (multi_col_lines >= 2 or pipe_lines >= 1):
                 is_table = True
                 table_type = "perf_targets"
@@ -172,25 +167,21 @@ def _enhanced_chunk_text_with_metadata_guarantee(
     if is_table:
         import re as _re
         table_txt = _re.sub(r"-\s*\n", "", raw).strip()
-        
         meta = dict(base_meta)
         meta["chunk_type"] = "table"
         if table_type:
             meta["table_type"] = table_type
         if species:
             meta["species"] = species
-        
         return [{"text": table_txt, "metadata": meta}]
     else:
         norm = _normalize_text(raw)
         if not norm:
             return []
-
         chunks: List[Dict[str, Any]] = []
         words = norm.split(" ")
         buf: List[str] = []
         cur_len = 0
-
         for w in words:
             if not w:
                 continue
@@ -203,9 +194,7 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                     if species:
                         meta["species"] = species
                     chunks.append({"text": piece, "metadata": meta})
-                buf = []
-                cur_len = 0
-
+                buf, cur_len = [], 0
         if buf:
             piece = " ".join(buf).strip()
             if len(piece) >= min_chunk_length:
@@ -213,9 +202,7 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                 if species:
                     meta["species"] = species
                 chunks.append({"text": piece, "metadata": meta})
-
         return chunks
-
 
 # ---------------------- PDF health scan (optional) --------------------- #
 @dataclass
@@ -225,7 +212,6 @@ class PdfScanResult:
     redaction_annots: int
     text_ratio: float
     max_image_ratio: float
-
 
 def _scan_pdf_health(fp: str) -> Optional[PdfScanResult]:
     try:
@@ -286,7 +272,6 @@ def _scan_pdf_health(fp: str) -> Optional[PdfScanResult]:
         max_image_ratio=image_area_max
     )
 
-
 # --------------------- Auto-clean redaction (optional) ----------------- #
 def _auto_clean_if_needed(fp: str, scan: Optional[PdfScanResult], out_dir: Path) -> str:
     if not scan or scan.redaction_annots <= 0:
@@ -319,7 +304,6 @@ def _auto_clean_if_needed(fp: str, scan: Optional[PdfScanResult], out_dir: Path)
             pass
         return fp
 
-
 # ---------------------- Providers availability helper ------------------ #
 def _pdf_available() -> bool:
     try:
@@ -327,7 +311,6 @@ def _pdf_available() -> bool:
         return True
     except Exception:
         return False
-
 
 # ---------------------- Provider: pdftotext (Poppler) ------------------- #
 def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int, timeout_per_file: int = 60, species: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
@@ -348,7 +331,6 @@ def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int, timeout_
     except Exception as e:
         log(f"       · pdftotext failed on {fp}: {e}")
         return None
-
 
 # ---------------------- Provider: pypdfium2 (PDFium) -------------------- #
 def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_length: int = 80, species: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
@@ -390,7 +372,6 @@ def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_l
     except Exception:
         pass
     return chunks or []
-
 
 # ---------------------- 🆕 ENHANCED Provider: pymupdf (words-based) ----------------- #
 def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max_pages: int = 0,
@@ -571,7 +552,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
         pass
     return chunks or []
 
-
 # ---------------------- Provider: OCR (PyMuPDF + Tesseract) ------------ #
 def _extract_pdf_ocr(
     fp: str,
@@ -649,7 +629,6 @@ def _extract_pdf_ocr(
 
     return chunks or []
 
-
 # ---------------------- Router (external enhanced) ---------------------- #
 def _run_enhanced_router_with_timeout(
     fp: str, species: str, timeout_sec: int, enhanced_metadata: bool
@@ -687,7 +666,6 @@ def _run_enhanced_router_with_timeout(
         return "timeout", "router timeout", None
     except Exception as e:
         return "error", str(e), None
-
 
 # --------------- Provider cascade & quality assessment ----------------- #
 def _try_enhanced_providers_for_pdf(
@@ -750,7 +728,6 @@ def _try_enhanced_providers_for_pdf(
 
     return "none", None, last_err
 
-
 # ----------------------- Embeddings & FAISS I/O ------------------------ #
 def _load_model(name: str):
     try:
@@ -760,14 +737,12 @@ def _load_model(name: str):
         log(f"❌ Cannot load embedding model '{name}': {e}")
         sys.exit(1)
 
-
 def _have_faiss() -> bool:
     try:
         import faiss  # noqa: F401
         return True
     except Exception:
         return False
-
 
 def _embed(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
     embs = model.encode(
@@ -779,14 +754,12 @@ def _embed(model, texts: List[str], batch_size: int = 64) -> np.ndarray:
     )
     return embs.astype("float32", copy=False)
 
-
 def _write_faiss(embs: np.ndarray, out_path: Path) -> None:
     import faiss
     dim = int(embs.shape[1])
     index = faiss.IndexFlatIP(dim)  # cosine sur vecteurs normalisés
     index.add(embs)
     faiss.write_index(index, str(out_path))
-
 
 def _enhanced_save_meta(
     out_dir: Path, species: str, model_name: str,
@@ -821,11 +794,10 @@ def _enhanced_save_meta(
         "tables_found": tables_found,
         "perf_targets_tables": perf_tables_found,
         "metadata_coverage": metadata_coverage,
-        "version": "1.3+enhanced",
+        "version": "1.4",
     }
     with open(out_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
-
 
 # --------------------------- Quality filter ---------------------------- #
 def _quality_filter(chunks: List[Dict[str, Any]], min_len: int = 80) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -840,6 +812,76 @@ def _quality_filter(chunks: List[Dict[str, Any]], min_len: int = 80) -> Tuple[Li
     stats = {"removed": removed, "kept": len(kept)}
     return kept, stats
 
+# --------------------------- CSV perf utils (NEW) ---------------------- #
+def _is_perf_targets_csv(path: Path) -> bool:
+    """Heuristique simple: fichier .csv contenant 'perf' et 'target' ou 'performance' dans le nom."""
+    if path.suffix.lower() != ".csv":
+        return False
+    name = path.name.lower()
+    return ("perf" in name and ("target" in name or "targets" in name or "performance" in name))
+
+def _infer_line_from_filename(name: str) -> str:
+    """
+    Déduit la lignée ('cobb500', 'ross308', ...) à partir du nom de fichier.
+    Heuristique: token avant '_perf' ou premier token alpha-num collé.
+    """
+    n = name.lower()
+    n = n.replace("-", "_")
+    m = re.search(r"([a-z0-9]+)\s*[_-]?perf", n)
+    if m:
+        return m.group(1)
+    # fallback: prendre le premier token alpha-num
+    m = re.search(r"([a-z0-9]+)", n)
+    return m.group(1) if m else "unknown"
+
+def _read_csv_header(csv_path: Path) -> List[str]:
+    try:
+        with open(csv_path, "r", encoding="utf-8", newline="") as f:
+            dialect = csv.Sniffer().sniff(f.read(1024))
+            f.seek(0)
+            reader = csv.reader(f, dialect)
+            headers = next(reader, [])
+            return [h.strip() for h in headers if h is not None]
+    except Exception:
+        # fallback simple: split par virgule
+        try:
+            with open(csv_path, "r", encoding="utf-8") as f:
+                first = f.readline()
+                return [h.strip() for h in first.split(",")]
+        except Exception:
+            return []
+
+def _ensure_tables_dir(out_dir: Path) -> Path:
+    tables_dir = out_dir / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    return tables_dir
+
+def _copy_perf_csv_and_manifest(src_csv: Path, tables_dir: Path, species: str) -> None:
+    """
+    Copie le CSV dans rag_index/<species>/tables/ et génère un manifest JSON à côté.
+    """
+    dst_csv = tables_dir / src_csv.name
+    try:
+        shutil.copy2(src_csv, dst_csv)
+    except Exception as e:
+        log(f"   • ⚠️ Copy failed for {src_csv}: {e}")
+        return
+
+    headers = _read_csv_header(src_csv)
+    line = _infer_line_from_filename(src_csv.name)
+    manifest = {
+        "type": "perf_targets",
+        "species": species,
+        "line": line,
+        "csv": dst_csv.name,
+        "columns": headers or ["line","sex","unit","age_days","weight_g","weight_lb","daily_gain_g","cum_fcr","source_doc","page"]
+    }
+    manifest_path = tables_dir / f"{line}_perf_targets.manifest.json"
+    try:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log(f"   • ⚠️ Manifest write failed for {manifest_path}: {e}")
 
 # ------------------------------ CLI parse ------------------------------ #
 def _parse_args():
@@ -901,7 +943,6 @@ def _parse_args():
                    help="Embedding batch size (default: 64)")
     return p.parse_args()
 
-
 # --------------------------------- Main -------------------------------- #
 def main() -> int:
     args = _parse_args()
@@ -916,7 +957,7 @@ def main() -> int:
     out_dir = (out_root / species)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"🔎 Enhanced RAG Index Builder v1.3+")
+    log(f"🔎 Enhanced RAG Index Builder v1.4")
     log(f"🔎 Source root: {src}")
     log(f"💾 Output root: {out_root}")
     log(f"🐔 Species to build: {species}")
@@ -939,6 +980,15 @@ def main() -> int:
         log("   • no files detected")
         log("\n✅ Build completed. Total chunks indexed: 0")
         return 0
+
+    # === NEW: copy perf_targets CSVs to rag_index/<species>/tables + manifest
+    tables_dir = _ensure_tables_dir(out_dir)
+    perf_csvs = [Path(f) for f in files if _is_perf_targets_csv(Path(f))]
+    if perf_csvs:
+        log(f"\n📦 Preparing perf_targets tables → {tables_dir}")
+        for csv_fp in perf_csvs:
+            _copy_perf_csv_and_manifest(csv_fp, tables_dir, species)
+        log(f"   • perf CSV copied: {len(perf_csvs)}")
 
     # Optional PDF health scan
     scan_summary: Dict[str, int] = {"scanned": 0, "copy_restricted": 0, "redactions": 0}
@@ -964,7 +1014,6 @@ def main() -> int:
             })
         if pdf_health_rows:
             try:
-                import csv
                 with open(out_dir / "pdf_health.csv", "w", newline="", encoding="utf-8") as f:
                     writer = csv.DictWriter(f, fieldnames=list(pdf_health_rows[0].keys()))
                     writer.writeheader()
@@ -984,21 +1033,21 @@ def main() -> int:
         if args.verbose:
             log(f"   • [{i}/{len(files)}] {fp}")
 
-        if suf == ".pdf" and args.auto_clean_redactions and args.scan_pdf:
-            scan = next((row for row in pdf_health_rows if row["path"] == fp), None)
-            if scan and (scan.get("redaction_annots", 0) > 0):
-                fp = _auto_clean_if_needed(fp, PdfScanResult(
-                    path=scan["path"],
-                    copy_restricted=bool(scan["copy_restricted"]),
-                    redaction_annots=int(scan["redaction_annots"]),
-                    text_ratio=float(scan["text_ratio"]),
-                    max_image_ratio=float(scan["max_image_ratio"])
-                ), out_dir)
-
-        chunks: List[Dict[str, Any]] = []
-        last_err: Optional[str] = None
-
+        # NOTE: on traite les CSV en texte (pour qu'ils restent aussi consultables par le RAG)
         if suf == ".pdf":
+            if args.auto_clean_redactions and args.scan_pdf:
+                scan = next((row for row in pdf_health_rows if row["path"] == fp), None)
+                if scan and (scan.get("redaction_annots", 0) > 0):
+                    fp = _auto_clean_if_needed(fp, PdfScanResult(
+                        path=scan["path"],
+                        copy_restricted=bool(scan["copy_restricted"]),
+                        redaction_annots=int(scan["redaction_annots"]),
+                        text_ratio=float(scan["text_ratio"]),
+                        max_image_ratio=float(scan["max_image_ratio"])
+                    ), out_dir)
+
+            chunks: List[Dict[str, Any]] = []
+            last_err: Optional[str] = None
             prov, out_chunks, last_err = _try_enhanced_providers_for_pdf(
                 fp=fp, species=species, providers=providers,
                 chunk_size=args.chunk_size, max_pages=args.max_pages,
@@ -1016,6 +1065,7 @@ def main() -> int:
                 if last_err and not chunks:
                     log(f"       · last_error={last_err}")
         else:
+            # .csv, .txt, .md, .html, ...
             try:
                 with open(fp, "r", encoding="utf-8", errors="ignore") as f:
                     txt = f.read()
@@ -1062,7 +1112,7 @@ def main() -> int:
                 if perf_tables > 0:
                     log(f"       · perf_targets tables: {perf_tables}")
             else:
-                log(f"       · no chunks extracted ({last_err or 'no detail'})")
+                log(f"       · no chunks extracted")
 
     log(f"   • files detected: {len(files)}")
     log(f"   • chunks indexed: {n_chunks}")
@@ -1111,15 +1161,15 @@ def main() -> int:
     tables_found = sum(1 for it in items if (it.get("metadata", {}).get("chunk_type") == "table"))
     perf_tables_found = sum(1 for it in items if (it.get("metadata", {}).get("table_type") == "perf_targets"))
 
-    # 🆕 index.pkl riche (inchangé dans l'esprit, mais exploitable)
+    # 🆕 index.pkl riche
     with open(out_dir / "index.pkl", "wb") as f:
         index_data = {
             "documents": items,
             "method": "SentenceTransformers",
             "embedding_method": "SentenceTransformers",
             "model_name": model_name,
-            "embedding_dim": int(embs.shape[1]),         # 🆕
-            "enhanced_version": "v1.3+enhanced",
+            "embedding_dim": int(embs.shape[1]),
+            "enhanced_version": "v1.4",
             "processing_stats": {
                 "tables_found": tables_found,
                 "perf_targets_tables": perf_tables_found,
@@ -1140,8 +1190,8 @@ def main() -> int:
         tables_found=tables_found,
         perf_tables_found=perf_tables_found,
         metadata_coverage=metadata_coverage,
-        embedding_dim=int(embs.shape[1]),          # 🆕
-        n_docs=len(files)                          # 🆕
+        embedding_dim=int(embs.shape[1]),
+        n_docs=len(files)
     )
 
     log(f"\n🧾 Tables detected: {tables_found}")
@@ -1150,7 +1200,6 @@ def main() -> int:
         log(f"📊 Metadata coverage: {metadata_coverage:.1f}%")
     log("\n✅ Build completed successfully with enhanced metadata guarantees.")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
