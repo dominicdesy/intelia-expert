@@ -338,6 +338,29 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
 # ▼▼▼ NEW: exact ou nearest (sans modifier perf_store.py) ▼▼▼
+
+
+def _extract_age_days_from_text(q: str) -> Optional[int]:
+    try:
+        ql = (q or "").lower()
+        # 21 jours | 21 day(s) | day 21 | j21
+        import re
+        for pat in [
+            r'(\d+)\s*(?:jour|jours|day|days)\b',
+            r'\bday\s*(\d+)\b',
+            r'\bj\s*(\d+)\b',
+            r'\b(?:à|a)\s*(\d+)\s*(?:jours|days)\b',
+        ]:
+            m = re.search(pat, ql)
+            if m:
+                v = int(m.group(1))
+                if 0 <= v <= 100:
+                    return v
+    except Exception:
+        pass
+    return None
+
+
 def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     debug = {"strategy": "exact_then_nearest", "norm": dict(norm), "nearest_used": False}
     # exact
