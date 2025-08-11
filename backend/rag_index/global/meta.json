@@ -4,7 +4,7 @@
   "embedding_dim": 384,
   "files_indexed": 21,
   "n_docs": 21,
-  "chunks_indexed": 244,
+  "chunks_indexed": 222,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\common\\health\\AviaTech_Staph.pdf",
     "C:\\intelia_gpt\\documents\\public\\common\\health\\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf",
@@ -19,11 +19,11 @@
   },
   "quality_stats": {
     "removed": 0,
-    "kept": 12
+    "kept": 11
   },
   "enhanced_features": true,
-  "tables_found": 128,
+  "tables_found": 106,
   "perf_targets_tables": 0,
   "metadata_coverage": 0.0,
-  "version": "1.3+enhanced"
+  "version": "1.4"
 }

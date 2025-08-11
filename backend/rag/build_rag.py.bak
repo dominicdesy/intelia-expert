@@ -159,38 +159,29 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                 r"(?:growth|croissance)\s*(?:curve|courbe|target)",
                 r"body\s*weight\s*(?:target|objective|standard)",
                 r"weekly\s*(?:weight|gain|poids)",
-                r"\d+\s*(?:days?|jours?|weeks?|semaines?)\s*\d+",  # "21 days 450g"
+                r"\d+\s*(?:days?|jours?|weeks?|semaines?)\s*\d+",
             ]
             
             pattern_matches = sum(1 for pattern in perf_patterns 
                                 if _re.search(pattern, text_lower, _re.IGNORECASE))
             
-            # Si plusieurs patterns performance + structure tabulaire minimale
             if pattern_matches >= 2 and (multi_col_lines >= 2 or pipe_lines >= 1):
                 is_table = True
-                table_type = "perf_targets"  # 🆕 Tag automatique
+                table_type = "perf_targets"
 
-    # --- TRAITEMENT SELON TYPE DÉTECTÉ ---
     if is_table:
-        # Préserver la structure tabulaire
         import re as _re
-        table_txt = _re.sub(r"-\s*\n", "", raw).strip()  # déhyphénation uniquement
+        table_txt = _re.sub(r"-\s*\n", "", raw).strip()
         
         meta = dict(base_meta)
         meta["chunk_type"] = "table"
-        
-        # 🆕 Ajouter le type de table si détecté
         if table_type:
             meta["table_type"] = table_type
-        
-        # 🆕 Ajout des métadonnées species/line/sex si disponibles
         if species:
             meta["species"] = species
         
         return [{"text": table_txt, "metadata": meta}]
-
     else:
-        # Texte normal : normalisation complète + découpe
         norm = _normalize_text(raw)
         if not norm:
             return []
@@ -209,7 +200,6 @@ def _enhanced_chunk_text_with_metadata_guarantee(
                 piece = " ".join(buf).strip()
                 if len(piece) >= min_chunk_length:
                     meta = dict(base_meta)
-                    # 🆕 Ajouter species aux métadonnées texte aussi
                     if species:
                         meta["species"] = species
                     chunks.append({"text": piece, "metadata": meta})
@@ -411,14 +401,12 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
     """
     if not _pdf_available():
         return None
-    import fitz, math
+    import fitz, math, re
 
-    # tolérances (points PDF)
-    Y_LINE_TOL = 3.5   # regroupe les mots sur la même ligne (proche en y)
-    X_COL_TOL  = 7.5   # regroupe les colonnes (x proches)
+    Y_LINE_TOL = 3.5
+    X_COL_TOL  = 7.5
     MIN_COLS   = 3
 
-    # 🆕 Patterns pour détecter les tables de performance
     PERF_TABLE_INDICATORS = [
         r"(?:target|objective|objectif)\s*(?:weight|poids|performance)",
         r"(?:age|week|day|jour|semaine)\s*(?:weight|poids|bw)",
@@ -430,8 +418,7 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
     ]
 
     def _group_words_into_lines(words, y_tol=Y_LINE_TOL):
-        # words: (x0, y0, x1, y1, "text", block_no, line_no, word_no)
-        words = sorted(words, key=lambda w: (w[1], w[0]))  # (y0, x0)
+        words = sorted(words, key=lambda w: (w[1], w[0]))
         lines, cur, cur_y = [], [], None
         for w in words:
             y = w[1]
@@ -442,7 +429,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                 if cur: lines.append(cur)
                 cur, cur_y = [w], y
         if cur: lines.append(cur)
-        # remap -> [(x0,text), ...] trié
         out = []
         for L in lines:
             L = sorted(L, key=lambda w: w[0])
@@ -463,13 +449,11 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
         return clusters
 
     def _assign_row_to_cols(row, centers, tol=X_COL_TOL):
-        # mappe chaque mot à la colonne la plus proche si distance <= tol
         assign = []
         for (x, t) in row:
             j = min(range(len(centers)), key=lambda k: abs(x - centers[k]))
             if abs(x - centers[j]) <= tol:
                 assign.append((j, t))
-        # concaténer les mots par colonne
         assign.sort(key=lambda z: z[0])
         out, last, buf = [], None, []
         for j, t in assign:
@@ -496,16 +480,15 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
         for i in range(total):
             try:
                 page = doc.load_page(i)
-                words = page.get_text("words")  # (x0, y0, x1, y1, "text", block, line, word)
+                words = page.get_text("words")
                 page_meta = {
                     "source_file": fp, 
-                    "page_number": i + 1,  # 🆕 Utiliser page_number
+                    "page_number": i + 1,
                     "total_pages": doc.page_count, 
                     "extraction": "pymupdf"
                 }
 
                 if not words:
-                    # fallback texte brut
                     txt = page.get_text("text") or ""
                     chunks.extend(_enhanced_chunk_text_with_metadata_guarantee(txt, chunk_size, page_meta, min_chunk_length, species))
                     continue
@@ -518,11 +501,9 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                 multi = sum(1 for r in assigned if len(r) >= MIN_COLS)
                 ratio = multi / max(1, len(lines))
 
-                # heuristique "table"
                 is_table = (ncols >= MIN_COLS) and (multi >= 10 or ratio >= 0.25)
 
                 if is_table:
-                    # reconstruire la page tabulée (colonnes ordonnées par x)
                     order = list(range(ncols))
                     lines_out = []
                     for mapped in assigned:
@@ -531,7 +512,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
 
                     table_text = "\n".join(lines_out).strip()
                     
-                    # 🆕 Détection automatique du type de table
                     table_type = None
                     if table_text:
                         text_lower = table_text.lower()
@@ -540,7 +520,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                         if perf_matches >= 2:
                             table_type = "perf_targets"
 
-                    # Split optionnel des gros tableaux
                     if max_table_lines and len(lines_out) > max_table_lines:
                         import math
                         parts = int(math.ceil(len(lines_out) / max_table_lines))
@@ -549,9 +528,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                             if part:
                                 meta = dict(page_meta)
                                 meta["chunk_type"] = "table"
-                                meta["table_part"] = k + 1
-                                meta["table_parts"] = parts
-                                # 🆕 Ajouter table_type si détecté
                                 if table_type:
                                     meta["table_type"] = table_type
                                 if species:
@@ -561,14 +537,12 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                         if table_text:
                             meta = dict(page_meta)
                             meta["chunk_type"] = "table"
-                            # 🆕 Ajouter table_type si détecté
                             if table_type:
                                 meta["table_type"] = table_type
                             if species:
                                 meta["species"] = species
                             chunks.append({"text": table_text, "metadata": meta})
                         else:
-                            # fallback blocks → chunker
                             try:
                                 blocks = page.get_text("blocks") or []
                                 blocks.sort(key=lambda b: (b[1], b[0]))
@@ -578,7 +552,6 @@ def _extract_pymupdf_with_enhanced_table_detection(fp: str, chunk_size: int, max
                                 plain = page.get_text("text") or ""
                             chunks.extend(_enhanced_chunk_text_with_metadata_guarantee(plain, chunk_size, page_meta, min_chunk_length, species))
                 else:
-                    # pas table → blocks / texte
                     try:
                         blocks = page.get_text("blocks") or []
                         blocks.sort(key=lambda b: (b[1], b[0]))
@@ -623,7 +596,6 @@ def _extract_pdf_ocr(
         log(f"       · OCR not available (imports failed): {e}")
         return None
 
-    # tesseract.exe custom path (option param or env)
     if tesseract_cmd:
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
     else:
@@ -641,7 +613,7 @@ def _extract_pdf_ocr(
     if max_pages and total > max_pages:
         total = max_pages
 
-    zoom = max(1.0, float(dpi) / 72.0)  # base 72 DPI
+    zoom = max(1.0, float(dpi) / 72.0)
 
     try:
         for i in range(total):
@@ -658,7 +630,7 @@ def _extract_pdf_ocr(
                     continue
                 page_meta = {
                     "source_file": fp,
-                    "page_number": i + 1,  # 🆕 Utiliser page_number
+                    "page_number": i + 1,
                     "total_pages": doc.page_count,
                     "extraction": "ocr",
                     "ocr_dpi": dpi,
@@ -740,7 +712,7 @@ def _try_enhanced_providers_for_pdf(
                     max_pages=max_pages,
                     min_chunk_length=min_chunk_length,
                     max_table_lines=max_table_lines,
-                    species=species  # 🆕 Passer species
+                    species=species
                 )
                 if chunks:
                     return prov, chunks, None
@@ -756,7 +728,7 @@ def _try_enhanced_providers_for_pdf(
                         dpi=ocr_dpi, lang=ocr_lang,
                         max_pages=max_pages,
                         tesseract_cmd=tesseract_cmd,
-                        species=species  # 🆕 Passer species
+                        species=species
                     )
                     if chunks:
                         return prov, chunks, None
@@ -823,22 +795,33 @@ def _enhanced_save_meta(
     quality_stats: Dict[str, Any] | None = None,
     enhanced_features: bool = True,
     tables_found: int = 0,
-    perf_tables_found: int = 0,  # 🆕 Nouveau paramètre
-    metadata_coverage: float = 0.0  # 🆕 Nouveau paramètre
+    perf_tables_found: int = 0,
+    metadata_coverage: float = 0.0,
+    embedding_dim: int = 0,            # 🆕
+    n_docs: int = 0                    # 🆕
 ) -> None:
+    """
+    ⬆️ Ajout d'un manifest riche, lisible par le loader:
+    - n_chunks (total d'items/chunks)
+    - n_docs (nombre de fichiers sources distincts)
+    - embedding_dim
+    - model_name
+    """
     meta = {
         "species": species,
         "model_name": model_name,
+        "embedding_dim": embedding_dim,          # 🆕
         "files_indexed": n_files,
+        "n_docs": n_docs,                        # 🆕
         "chunks_indexed": n_chunks,
         "files_sample": files_sample,
         "pdf_scan_summary": pdf_scan_summary or {},
         "quality_stats": quality_stats or {},
         "enhanced_features": enhanced_features,
         "tables_found": tables_found,
-        "perf_targets_tables": perf_tables_found,  # 🆕 Nouveau champ
-        "metadata_coverage": metadata_coverage,    # 🆕 Nouveau champ
-        "version": "1.3+enhanced",  # 🆕 Version mise à jour
+        "perf_targets_tables": perf_tables_found,
+        "metadata_coverage": metadata_coverage,
+        "version": "1.3+enhanced",
     }
     with open(out_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -927,7 +910,6 @@ def main() -> int:
     species = args.species.strip().lower()
     model_name = args.embed_model
 
-    # Normalise exts (ajoute le point si manquant)
     exts = tuple((e if e.startswith(".") else f".{e}").lower().strip()
                  for e in args.exts.split(",") if e.strip())
 
@@ -990,7 +972,7 @@ def main() -> int:
             except Exception:
                 pass
 
-    # 🆕 ENHANCED Process files avec garantie métadonnées
+    # ENHANCED Process files
     items: List[Dict[str, Any]] = []
     n_chunks = 0
     providers = [p.strip().lower() for p in (args.pdf_providers or "").split(",") if p.strip()]
@@ -1002,7 +984,6 @@ def main() -> int:
         if args.verbose:
             log(f"   • [{i}/{len(files)}] {fp}")
 
-        # Clean if requested and redactions detected
         if suf == ".pdf" and args.auto_clean_redactions and args.scan_pdf:
             scan = next((row for row in pdf_health_rows if row["path"] == fp), None)
             if scan and (scan.get("redaction_annots", 0) > 0):
@@ -1035,7 +1016,6 @@ def main() -> int:
                 if last_err and not chunks:
                     log(f"       · last_error={last_err}")
         else:
-            # Non-PDF : utiliser le chunker amélioré avec espèce
             try:
                 with open(fp, "r", encoding="utf-8", errors="ignore") as f:
                     txt = f.read()
@@ -1047,13 +1027,9 @@ def main() -> int:
                 last_err = str(e)
                 chunks = []
 
-        # 🆕 ENRICHISSEMENT MÉTADONNÉES OBLIGATOIRE (pas conditionnel)
         if chunks and ENHANCED_METADATA_AVAILABLE:
             try:
-                # Passer des contexte additionnels depuis args si disponible
-                additional_context = {
-                    "species": species,
-                }
+                additional_context = {"species": species}
                 chunks = enhanced_enrich_metadata(
                     chunks, 
                     species=species, 
@@ -1065,13 +1041,11 @@ def main() -> int:
                 if args.verbose:
                     log(f"       · metadata enrichment failed: {e}")
 
-        # Quality filter
         if args.enable_quality_filter and chunks:
             chunks, qstats = _quality_filter(chunks, min_len=args.min_chunk_length)
         else:
             qstats = {}
 
-        # Collect
         for ch in chunks:
             text = (ch.get("text") or "").strip()
             meta = dict(ch.get("metadata", {}) or {})
@@ -1083,7 +1057,6 @@ def main() -> int:
         if args.verbose:
             if chunks:
                 log(f"       · chunks={len(chunks)}")
-                # 🆕 Log des tables de performance détectées
                 perf_tables = sum(1 for ch in chunks 
                                 if ch.get("metadata", {}).get("table_type") == "perf_targets")
                 if perf_tables > 0:
@@ -1098,30 +1071,23 @@ def main() -> int:
         log("\n✅ Build completed. Total chunks indexed: 0")
         return 0
 
-    # 🆕 NOUVELLE SECTION: Validation et reporting métadonnées
+    # 🆕 Validation / stats
     metadata_coverage = 0.0
     if items and ENHANCED_METADATA_AVAILABLE:
         log(f"\n🔍 Validating metadata coverage...")
-        
-        # Validation de la couverture métadonnées
         metadata_stats = validate_required_metadata(items)
         log(f"   • Metadata coverage:")
         for field, stats in metadata_stats["coverage"].items():
             log(f"     - {field}: {stats['count']}/{metadata_stats['total_chunks']} ({stats['percentage']:.1f}%)")
-        
         metadata_coverage = metadata_stats["critical_coverage"]
         if metadata_coverage < 90:
             log(f"   ⚠️ Warning: Critical metadata coverage only {metadata_coverage:.1f}%")
         else:
             log(f"   ✅ Critical metadata coverage: {metadata_coverage:.1f}%")
-        
-        # Analyse des tables
         table_stats = analyze_table_detection(items)
         log(f"   • Table detection:")
         log(f"     - Tables detected: {table_stats['tables_detected']}/{table_stats['total_chunks']} ({table_stats['table_percentage']:.1f}%)")
         log(f"     - Performance tables: {table_stats['perf_targets_tables']}")
-        
-        # Ajouter aux stats globales
         qstats.update({
             "metadata_coverage": metadata_stats["critical_coverage"],
             "tables_detected": table_stats["tables_detected"],
@@ -1142,33 +1108,40 @@ def main() -> int:
     _write_faiss(embs, out_dir / "index.faiss")
     np.save(out_dir / "embeddings.npy", embs)
 
-    # 🆕 Compteurs améliorés de tables pour reporting
     tables_found = sum(1 for it in items if (it.get("metadata", {}).get("chunk_type") == "table"))
     perf_tables_found = sum(1 for it in items if (it.get("metadata", {}).get("table_type") == "perf_targets"))
 
+    # 🆕 index.pkl riche (inchangé dans l'esprit, mais exploitable)
     with open(out_dir / "index.pkl", "wb") as f:
         index_data = {
-            "documents": items,                    # sans duplication des embeddings
+            "documents": items,
             "method": "SentenceTransformers",
             "embedding_method": "SentenceTransformers",
             "model_name": model_name,
-            "enhanced_version": "v1.3+enhanced",  # 🆕 Version mise à jour
+            "embedding_dim": int(embs.shape[1]),         # 🆕
+            "enhanced_version": "v1.3+enhanced",
             "processing_stats": {
                 "tables_found": tables_found,
-                "perf_targets_tables": perf_tables_found,  # 🆕 Nouveau champ
-                "metadata_coverage": metadata_coverage      # 🆕 Nouveau champ
+                "perf_targets_tables": perf_tables_found,
+                "metadata_coverage": metadata_coverage
             }
         }
         pickle.dump(index_data, f)
 
+    # 🆕 manifest riche
     _enhanced_save_meta(
         out_dir, species, model_name,
-        n_files=len(files), n_chunks=n_chunks, files_sample=files[:5],
-        pdf_scan_summary=scan_summary, quality_stats=qstats,
+        n_files=len(files),
+        n_chunks=n_chunks,
+        files_sample=files[:5],
+        pdf_scan_summary=scan_summary,
+        quality_stats=qstats,
         enhanced_features=True, 
         tables_found=tables_found,
-        perf_tables_found=perf_tables_found,      # 🆕 Nouveau paramètre
-        metadata_coverage=metadata_coverage        # 🆕 Nouveau paramètre
+        perf_tables_found=perf_tables_found,
+        metadata_coverage=metadata_coverage,
+        embedding_dim=int(embs.shape[1]),          # 🆕
+        n_docs=len(files)                          # 🆕
     )
 
     log(f"\n🧾 Tables detected: {tables_found}")

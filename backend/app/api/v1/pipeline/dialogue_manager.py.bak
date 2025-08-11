@@ -350,50 +350,81 @@ Réponse synthétique :""".format(question=question, context=_final_sanitize(con
 # ===== MODE HYBRIDE AMÉLIORÉ =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
-    Mode hybride amélioré : synthèse courte + questions manquantes uniquement.
-    Ne plus concaténer le texte brut RAG.
+    Mode hybride UX-first : message court + questions ciblées + defaults + quick replies.
+    Ne concatène aucun texte RAG. Pas de dépendance au wrapper LLM.
     """
     try:
-        # Recherche RAG avec filtres
-        rag = _rag_answer(question, k=3, entities=entities)  # k réduit pour synthèse
-        base_text = rag.get("text", "")
-        
-        # Synthèse courte au lieu de concaténation
-        if base_text:
-            # Génération d'une réponse synthétique courte
-            synthesis_prompt = f"""Basé sur ces informations, donne une réponse courte (2-3 phrases) sur : {question}
-
-Informations disponibles : {base_text[:1000]}
-
-Réponse courte et générale :"""
-            
+        # 1) Normaliser l'âge en jours
+        age_days = None
+        if entities.get("age_days") is not None:
             try:
-                from ..utils.llm import complete
-                short_answer = complete(synthesis_prompt, temperature=0.3)
-                enhanced_text = _final_sanitize(short_answer) if short_answer else "Informations partielles disponibles."
-            except ImportError:
-                # Fallback : réponse générique courte
-                enhanced_text = f"Des informations sont disponibles concernant {intent.value}. Pour une réponse précise, veuillez compléter les détails ci-dessous."
-        else:
-            enhanced_text = f"Informations sur {intent.value} disponibles. Précisions nécessaires :"
-        
-        return {
-            "text": enhanced_text,
-            "source": "hybrid_synthesis",
-            "confidence": 0.6,
-            "enriched": True,
-            "rag_meta": rag.get("meta", {}),
-            "rag_sources": rag.get("sources", [])
+                age_days = int(entities["age_days"])
+            except Exception:
+                pass
+        elif entities.get("age_weeks") is not None:
+            try:
+                age_days = int(entities["age_weeks"]) * 7
+            except Exception:
+                pass
+
+        # 2) Defaults intelligents (modifiables)
+        defaults = {
+            "species": entities.get("species") or "broiler",
+            "line": entities.get("line") or "ross308",
+            "sex": entities.get("sex") or "mixed",
+            "age_days": age_days,
         }
-        
-    except Exception as e:
-        logger.error(f"❌ Error generating hybrid answer: {e}")
+
+        # 3) Libellés conviviaux
+        species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
+        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
+        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte"}
+        sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
+        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
+
+        # 4) Message EXACT demandé
+        header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
+        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
+        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
+        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
+        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
+        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
+        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l’hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
+        text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
+
+        # 5) Quick replies pour le frontend
+        quick_replies = {
+            "species": ["broiler", "layer", "other"],
+            "line": ["ross308", "cobb500", "hubbard", "other"],
+            "sex": ["male", "female", "mixed"],
+            "one_click": {
+                "species": defaults["species"],
+                "line": defaults["line"],
+                "sex": defaults["sex"],
+                "age_days": defaults["age_days"],
+            }
+        }
+
         return {
-            "text": f"Informations partielles sur {intent.value}. Merci de compléter les détails demandés pour une réponse précise.",
-            "source": "fallback",
+            "text": text,
+            "source": "hybrid_ui",
+            "confidence": 0.9,
+            "enriched": True,
+            "suggested_defaults": defaults,
+            "quick_replies": quick_replies,
+            "rag_meta": {},          # volontairement vide (pas de concat RAG)
+            "rag_sources": []        # aucune source en mode clarification
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error generating hybrid UX answer: {e}")
+        return {
+            "text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
+            "source": "hybrid_ui_fallback",
             "confidence": 0.4,
             "enriched": False
         }
+
 
 # ===== Entrée principale =====
 def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
