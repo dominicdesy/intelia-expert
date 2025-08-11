@@ -338,6 +338,29 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
 # ▼▼▼ NEW: exact ou nearest (sans modifier perf_store.py) ▼▼▼
+
+
+def _extract_age_days_from_text(q: str) -> Optional[int]:
+    try:
+        ql = (q or "").lower()
+        # 21 jours | 21 day(s) | day 21 | j21
+        import re
+        for pat in [
+            r'(\d+)\s*(?:jour|jours|day|days)\b',
+            r'\bday\s*(\d+)\b',
+            r'\bj\s*(\d+)\b',
+            r'\b(?:à|a)\s*(\d+)\s*(?:jours|days)\b',
+        ]:
+            m = re.search(pat, ql)
+            if m:
+                v = int(m.group(1))
+                if 0 <= v <= 100:
+                    return v
+    except Exception:
+        pass
+    return None
+
+
 def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     debug = {"strategy": "exact_then_nearest", "norm": dict(norm), "nearest_used": False}
     # exact
@@ -348,22 +371,97 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
     # nearest
     try:
         df = store._load_df(norm["line"])  # type: ignore (accès interne)
-        if df is None or "age_days" not in df.columns:
+# --- après: df = store._load_df(norm["line"]) ---
+        if df is None:
             return None, debug
-        df_unit = df[df["unit"].eq(norm["unit"])]
-        df_sex = df_unit[df_unit["sex"].eq(norm["sex"])]
-        if df_sex.empty and norm["sex"] in ("male","female"):
-            df_sex = df_unit[df_unit["sex"].eq("as_hatched")]
-        if df_sex.empty:
+
+        # 🔧 NORMALISATION DES COLONNES/VALEURS (tolérante aux CSV hétérogènes)
+        import re
+        def slug(s): 
+            return re.sub(r'[^a-z0-9]+','_', str(s).strip().lower()).strip('_')
+
+        # 1) Renommer colonnes communes
+        colmap = {}
+        for c in df.columns:
+            sc = slug(c)
+            if sc in {"age_days","age_day","agedays","age"}:
+                colmap[c] = "age_days"
+            elif sc in {"sex","sexe"}:
+                colmap[c] = "sex"
+            elif sc in {"unit","unite","units"}:
+                colmap[c] = "unit"
+            elif sc in {"weight_g","weightgrams","body_weight_g","poids_g","weight__g_","weight_g_"}:
+                colmap[c] = "weight_g"
+            elif sc in {"weight_lb","weightlbs","weight_pounds","poids_lb","weight__lb_","weight_lb_"}:
+                colmap[c] = "weight_lb"
+            elif sc in {"daily_gain_g","adg_g","avg_daily_gain_g"}:
+                colmap[c] = "daily_gain_g"
+            elif sc in {"cum_fcr","cumulative_fcr","fcr_cum"}:
+                colmap[c] = "cum_fcr"
+            elif sc in {"source_doc","source","document","doc"}:
+                colmap[c] = "source_doc"
+            elif sc in {"page","page_number","page_no"}:
+                colmap[c] = "page"
+            elif sc in {"line","breed","lignee"}:
+                colmap[c] = "line"
+        if colmap:
+            df = df.rename(columns=colmap)
+
+        # 2) Si "age_days" absent, tenter de le dériver depuis "age" ou "day(s)"
+        if "age_days" not in df.columns:
+            # Cherche colonnes d'âge typiques
+            for c in df.columns:
+                sc = slug(c)
+                if sc in {"age","days","day"}:
+                    try:
+                        df["age_days"] = df[c].astype(int)
+                        break
+                    except Exception:
+                        try:
+                            # extraire nombres depuis "21 days" / "J21"
+                            df["age_days"] = df[c].astype(str).str.extract(r'(\d+)').astype(float).astype("Int64")
+                            break
+                        except Exception:
+                            pass
+        if "age_days" not in df.columns:
+            return None, debug  # toujours rien d'exploitable
+
+        # 3) Normaliser valeurs sex/unit/line
+        if "sex" in df.columns:
+            df["sex"] = df["sex"].astype(str).str.strip().str.lower().replace({
+                "m":"male","male":"male","f":"female","female":"female",
+                "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
+            })
+        if "unit" in df.columns:
+            df["unit"] = df["unit"].astype(str).str.lower().str.replace(r"\s*\(.*\)","", regex=True)
+            df["unit"] = df["unit"].replace({"metrics":"metric","gram":"metric","grams":"metric","g":"metric",
+                                             "imperial":"imperial","lb":"imperial","lbs":"imperial"})
+        if "line" in df.columns:
+            df["line"] = df["line"].astype(str).str.lower().str.replace(r"[-_\s]+","", regex=True)
+            df["line"] = df["line"].replace({"cobb500":"cobb500","ross308":"ross308","ross_308":"ross308","ross 308":"ross308"})
+
+        # 4) Filtrage par line/unit/sex avec fallback sex→as_hatched
+        if "line" in df.columns:
+            df = df[df["line"].eq(norm["line"])]
+        if "unit" in df.columns:
+            df = df[df["unit"].eq(norm["unit"])]
+        ds = df
+        if "sex" in df.columns:
+            ds = df[df["sex"].eq(norm["sex"])]
+            if ds.empty and norm["sex"] in ("male","female"):
+                ds = df[df["sex"].eq("as_hatched")]
+        if ds is None or len(ds)==0:
             return None, debug
-        target = int(norm.get("age_days") or 0)
-        df_sex = df_sex.copy()
-        df_sex["__delta__"] = (df_sex["age_days"] - target).abs()
-        row = df_sex.sort_values(["__delta__", "age_days"]).iloc[0].to_dict()
-        debug["nearest_used"] = True
+
+        # 5) Nearest par distance d'âge (tolère l'absence de weight_lb/weight_g)
+        t = int(norm.get("age_days") or 0)
+        ds = ds.copy()
+        ds["__d__"] = (ds["age_days"].astype(int) - t).abs()
+        row = ds.sort_values(["__d__","age_days"]).iloc[0].to_dict()
+        debug["nearest_used"] = (row.get("age_days") != t)
         debug["nearest_age_days"] = int(row.get("age_days"))
-        debug["delta"] = abs(int(row.get("age_days")) - target)
-        rec = {
+        debug["delta"] = abs(int(row.get("age_days")) - t)
+        return {
             "line": row.get("line", norm["line"]),
             "sex": row.get("sex", norm["sex"]),
             "unit": row.get("unit", norm["unit"]),
@@ -374,8 +472,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
             "cum_fcr": row.get("cum_fcr"),
             "source_doc": row.get("source_doc"),
             "page": row.get("page"),
-        }
-        return rec, debug
+        }, debug
     except Exception as e:
         logger.info(f"[PerfStore] nearest lookup failed: {e}")
         return None, debug
