@@ -1,8 +1,10 @@
 {
   "species": "broiler",
   "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dim": 384,
   "files_indexed": 19,
-  "chunks_indexed": 1274,
+  "n_docs": 19,
+  "chunks_indexed": 1369,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\biosecurity\\biosec-poultry-farms.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf",
@@ -20,8 +22,8 @@
     "kept": 97
   },
   "enhanced_features": true,
-  "tables_found": 735,
-  "perf_targets_tables": 7,
+  "tables_found": 699,
+  "perf_targets_tables": 4,
   "metadata_coverage": 0.0,
   "version": "1.3+enhanced"
 }

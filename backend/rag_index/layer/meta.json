@@ -1,7 +1,9 @@
 {
   "species": "layer",
   "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dim": 384,
   "files_indexed": 12,
+  "n_docs": 12,
   "chunks_indexed": 463,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown - Alternative - Performance Sell Sheet ENG.pdf",
