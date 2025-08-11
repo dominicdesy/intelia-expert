@@ -343,14 +343,8 @@ export const generateAIResponse = async (
       }
     }
 
-    console.log('🎯 [apiService] Données traitées DialogueManager:', {
-      type: processedData.type,
-      requires_clarification: processedData.requires_clarification,
-      clarification_questions_count: processedData.clarification_questions?.length || 0,
-      has_response: !!processedData.response,
-      has_general_answer: !!processedData.general_answer,
-      has_versions: !!processedData.response_versions
-    })
+
+	console.log('🎯 [apiService] Données traitées DialogueManager:', processedData)
 
     return processedData
 
