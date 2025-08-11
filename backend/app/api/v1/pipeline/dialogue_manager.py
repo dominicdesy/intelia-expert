@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION HYBRIDE
+Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct)
 - classify -> normalize -> completeness/clarifications
-- NOUVEAU: Réponse générale + clarifications pour questions incomplètes
-- route to compute (when complete) OR to RAG (with clarifications)
-- returns a structured payload for the frontend
+- Réponse générale + clarifications pour questions incomplètes
+- Route vers compute (si possible) OU vers RAGRetriever (table-first, multi-index)
+- Retourne un payload structuré pour le frontend
 """
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,30 +18,124 @@ from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
 
-# Import RAG avec fallback
+# ===== Import robuste du RAGRetriever =====
+RAG_AVAILABLE = False
+RAGRetrieverCls = None
 try:
-    from .rag_engine import answer_with_rag
+    # chemin "classique" si le package top-level s'appelle rag
+    from rag.retriever import RAGRetriever as _RAGRetrieverImported
+    RAGRetrieverCls = _RAGRetrieverImported
     RAG_AVAILABLE = True
-    logger.info("✅ RAG engine imported from pipeline")
-except ImportError:
+    logger.info("✅ RAGRetriever importé depuis rag.retriever")
+except Exception as e1:
     try:
-        from ....rag_engine import answer_with_rag
+        # selon la disposition des dossiers, on tente en relatif
+        from ...rag.retriever import RAGRetriever as _RAGRetrieverImported2  # type: ignore
+        RAGRetrieverCls = _RAGRetrieverImported2
         RAG_AVAILABLE = True
-        logger.info("✅ RAG imported from ....rag_engine")
-    except ImportError:
+        logger.info("✅ RAGRetriever importé depuis ...rag.retriever")
+    except Exception as e2:
         try:
-            def answer_with_rag(question: str, entities: Dict[str, Any], intent=None) -> Dict[str, Any]:
-                return {
-                    "text": f"Réponse RAG pour: {question}",
-                    "source": "fallback_rag",
-                    "confidence": 0.8
-                }
+            # dernier essai: import local voisin (si lancé depuis rag/)
+            from .retriever import RAGRetriever as _RAGRetrieverImported3  # type: ignore
+            RAGRetrieverCls = _RAGRetrieverImported3
+            RAG_AVAILABLE = True
+            logger.info("✅ RAGRetriever importé depuis .retriever")
+        except Exception as e3:
+            logger.warning(f"⚠️ Impossible d'importer RAGRetriever ({e1} | {e2} | {e3}). RAG désactivé.")
             RAG_AVAILABLE = False
-            logger.warning("⚠️ RAG engine not found, using fallback")
-        except Exception as e:
-            logger.error(f"❌ All RAG import attempts failed: {e}")
-            RAG_AVAILABLE = False
+            RAGRetrieverCls = None
 
+# ===== Singleton RAGRetriever =====
+_RAG_SINGLETON = None
+
+def _get_retriever():
+    """Retourne un singleton RAGRetriever, ou None si indisponible."""
+    global _RAG_SINGLETON
+    if not RAG_AVAILABLE or RAGRetrieverCls is None:
+        return None
+    if _RAG_SINGLETON is None:
+        try:
+            _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
+            logger.info("🔎 RAGRetriever initialisé")
+        except Exception as e:
+            logger.error(f"❌ Init RAGRetriever échoué: {e}")
+            _RAG_SINGLETON = None
+    return _RAG_SINGLETON
+
+# ===== Utilitaires RAG =====
+def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Compacte les infos sources (nom lisible + méta utiles).
+    """
+    formatted = []
+    for doc in source_documents[:5]:
+        if not isinstance(doc, dict):
+            continue
+        src = doc.get("source") or doc.get("file_path") or doc.get("path") or "source inconnue"
+        if isinstance(src, str) and ("/" in src or "\\" in src):
+            src_name = src.split("/")[-1].split("\\")[-1]
+        else:
+            src_name = str(src)
+        md = doc.get("metadata", {})
+        formatted.append({
+            "name": src_name,
+            "meta": {
+                "chunk_type": (md or {}).get("chunk_type"),
+                "species": (md or {}).get("species"),
+                "document_type": (md or {}).get("document_type"),
+                "table_type": (md or {}).get("table_type"),
+                "page": (md or {}).get("page_number"),
+            }
+        })
+    return formatted
+
+def _rag_answer(question: str, k: int = 5) -> Dict[str, Any]:
+    """
+    Appelle le RAGRetriever et retourne un dict standardisé:
+    { text, sources[], route, meta }
+    """
+    retriever = _get_retriever()
+    if retriever is None:
+        return {
+            "text": "Le moteur RAG n'est pas disponible pour le moment.",
+            "sources": [],
+            "route": "rag_unavailable",
+            "meta": {}
+        }
+    try:
+        result = retriever.get_contextual_diagnosis(question, k=k)
+        if not result:
+            return {
+                "text": "Aucune information pertinente trouvée dans la base de connaissances.",
+                "sources": [],
+                "route": "rag_no_results",
+                "meta": {}
+            }
+        text = result.get("answer") or "Résultats trouvés."
+        sources = _format_sources(result.get("source_documents", []))
+        meta = {
+            "embedding_method": result.get("embedding_method"),
+            "species_index_used": result.get("species_index_used"),
+            "total_results": result.get("total_results"),
+            "tried": result.get("tried", []),
+        }
+        return {
+            "text": text,
+            "sources": sources,
+            "route": "rag_retriever",
+            "meta": meta
+        }
+    except Exception as e:
+        logger.error(f"❌ Erreur RAGRetriever: {e}")
+        return {
+            "text": "Une erreur est survenue lors de la recherche RAG.",
+            "sources": [],
+            "route": "rag_error",
+            "meta": {"error": str(e)}
+        }
+
+# ===== Règles compute =====
 def _should_compute(intent: Intention) -> bool:
     return intent in {
         Intention.WaterFeedIntake,
@@ -52,7 +147,6 @@ def _should_compute(intent: Intention) -> bool:
 
 def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, Any]:
     ans = {"text": "", "values": {}}
-    
     try:
         if intent == Intention.WaterFeedIntake:
             eff = entities.get("flock_size") or 1000
@@ -95,96 +189,82 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
         logger.error(f"❌ Error in _compute_answer: {e}")
         ans["text"] = f"Erreur dans le calcul pour {intent}"
         ans["error"] = str(e)
-    
     return ans
 
+# ===== Hybride : réponse générale + clarifications =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
-    Génère une réponse générale enrichie avec des exemples spécifiques
+    Génère une réponse générale via RAGRetriever + ajoute des précisions selon l'intention.
     """
     try:
-        # D'abord récupérer la réponse RAG générale
-        rag_response = answer_with_rag(question, entities, intent=intent)
-        base_text = rag_response.get("text", "")
-        
-        # Enrichir avec des exemples spécifiques selon l'intention
-        if intent == Intention.PerfTargets and "poids" in question.lower():
-            age_detected = entities.get("age_days") or entities.get("age_weeks", 0) * 7 or 12
-            
+        rag = _rag_answer(question, k=5)
+        base_text = rag.get("text", "")
+
+        # Exemples de petites enrichissements thématiques
+        qlower = question.lower()
+        if intent == Intention.PerfTargets and ("poids" in qlower or "weight" in qlower):
+            age_detected = entities.get("age_days") or (entities.get("age_weeks", 0) * 7) or 14
             specific_examples = f"""
 
-**Exemples pour {age_detected} jours :**
-• **Ross 308 mâle** : ~400-450g
-• **Ross 308 femelle** : ~350-400g  
-• **Cobb 500 mâle** : ~420-470g
-• **Cobb 500 femelle** : ~370-420g
-
-*Les valeurs peuvent varier selon les conditions d'élevage et le programme alimentaire.*"""
-            
+**Repères typiques à ~{age_detected} jours (ordre de grandeur):**
+• Ross 308 mâle: ~400–450 g  • femelle: ~350–400 g
+• Cobb 500 mâle: ~420–470 g  • femelle: ~370–420 g
+*À confirmer selon programme alimentaire et conditions.*
+"""
             enhanced_text = base_text + specific_examples
-            
         elif intent == Intention.WaterFeedIntake:
-            enhanced_text = base_text + "\n\n**Facteurs influençant :** température ambiante, type d'abreuvoirs, qualité de l'eau, état de santé du troupeau."
-            
+            enhanced_text = base_text + "\n\n**Facteurs clés :** température ambiante, type d'abreuvoirs, qualité de l'eau, état sanitaire."
         elif intent == Intention.NutritionSpecs:
-            enhanced_text = base_text + "\n\n**Variables importantes :** phase d'élevage, objectifs de performance, conditions climatiques."
-            
+            enhanced_text = base_text + "\n\n**Variables :** phase (starter/grower/finisher), objectifs de performance, climat."
         else:
             enhanced_text = base_text
-        
+
         return {
             "text": enhanced_text,
-            "source": rag_response.get("source", "rag"),
-            "confidence": rag_response.get("confidence", 0.7),
-            "enriched": True
+            "source": "rag_retriever",
+            "confidence": 0.7,
+            "enriched": True,
+            "rag_meta": rag.get("meta", {}),
+            "rag_sources": rag.get("sources", [])
         }
-        
     except Exception as e:
         logger.error(f"❌ Error generating general answer: {e}")
-        # Fallback simple
         return {
-            "text": f"Voici des informations générales sur votre question concernant {intent}. Pour une réponse plus précise, merci de fournir les détails demandés ci-dessous.",
+            "text": f"Voici des informations générales sur {intent}. Pour une réponse précise, merci de compléter les détails demandés.",
             "source": "fallback",
             "confidence": 0.5,
             "enriched": False
         }
 
+# ===== Entrée principale =====
 def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION HYBRIDE
+    Fonction principale de traitement des questions - VERSION HYBRIDE (RAGRetriever direct)
     """
     try:
-        logger.info(f"🤖 Processing question: {question[:50]}...")
-        
+        logger.info(f"🤖 Processing question: {question[:120]}...")
         # Étape 1: Classification
         classification = classify(question)
         logger.debug(f"Classification: {classification}")
-        
+
         # Étape 2: Normalisation
         classification = normalize(classification)
         intent: Intention = classification["intent"]
         entities = classification["entities"]
-        
         logger.info(f"Intent: {intent}, Entities: {list(entities.keys())}")
 
         # Étape 3: Vérification de complétude
         completeness = compute_completeness(intent, entities)
         completeness_score = completeness["completeness_score"]
         missing_fields = completeness["missing_fields"]
-        
-        logger.info(f"Completeness score: {completeness_score}")
+        logger.info(f"Completeness score: {completeness_score} | Missing: {missing_fields}")
 
-        # NOUVEAU COMPORTEMENT HYBRIDE
+        # HYBRIDE : si infos manquantes → réponse générale + clarifications
         if missing_fields and completeness_score < 0.8:
-            logger.info(f"Generating hybrid response (general + clarifications)")
-            
-            # Générer réponse générale enrichie
-            general_answer = _generate_general_answer_with_specifics(
-                question, entities, intent, missing_fields
-            )
-            
+            logger.info("🧭 Mode hybride: réponse générale + questions de précision")
+            general_answer = _generate_general_answer_with_specifics(question, entities, intent, missing_fields)
             return {
-                "type": "partial_answer",  # NOUVEAU TYPE
+                "type": "partial_answer",
                 "intent": intent,
                 "general_answer": general_answer,
                 "completeness_score": completeness_score,
@@ -194,9 +274,9 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
                 "session_id": session_id
             }
 
-        # Étape 4: Calcul direct si complet et calculable
+        # Étape 4: Calcul direct si possible
         if _should_compute(intent):
-            logger.info(f"Computing precise answer for intent: {intent}")
+            logger.info(f"🧮 Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)
             return {
                 "type": "answer",
@@ -206,31 +286,23 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
                 "session_id": session_id
             }
 
-        # Étape 5: RAG complet si informations suffisantes
-        logger.info(f"Using complete RAG for intent: {intent}")
-        try:
-            rag = answer_with_rag(question, entities, intent=intent)
-            return {
-                "type": "answer",
-                "intent": intent,
-                "answer": rag,
-                "route_taken": "rag",
-                "session_id": session_id
-            }
-        except Exception as e:
-            logger.error(f"❌ RAG error: {e}")
-            # Fallback ultime
-            return {
-                "type": "answer",
-                "intent": intent,
-                "answer": {
-                    "text": f"Je traite votre question sur {intent}. Le système RAG rencontre un problème temporaire.",
-                    "source": "fallback"
-                },
-                "route_taken": "fallback",
-                "session_id": session_id
-            }
-    
+        # Étape 5: RAG complet via RAGRetriever
+        logger.info("📚 RAG via RAGRetriever")
+        rag = _rag_answer(question, k=5)
+        return {
+            "type": "answer",
+            "intent": intent,
+            "answer": {
+                "text": rag.get("text", ""),
+                "source": "rag_retriever",
+                "confidence": 0.8,  # valeur générique; on peut ajouter un scoring plus tard
+                "sources": rag.get("sources", []),
+                "meta": rag.get("meta", {})
+            },
+            "route_taken": rag.get("route", "rag_retriever"),
+            "session_id": session_id
+        }
+
     except Exception as e:
         logger.exception(f"❌ Critical error in handle(): {e}")
         return {

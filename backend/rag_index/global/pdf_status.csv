@@ -1,0 +1,24 @@
+status,file,is_encrypted,can_copy,pages,text_pages,text_pages_ratio,max_image_coverage,avg_image_coverage,redaction_annots
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\AviaTech_Staph.pdf,False,True,6,6,1.0,0.079,0.032,6
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\skin_scratches.pdf,False,True,4,4,1.0,0.065,0.016,4
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\is2014.pdf,False,True,2,2,1.0,0.019,0.01,2
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\Drinking-Water-Management.pdf,False,True,5,5,1.0,0.017,0.017,5
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\ascites.pdf,False,True,3,3,1.0,0.0,0.0,3
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\fowl_cholera.pdf,False,True,4,4,1.0,0.0,0.0,4
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\ilt.pdf,False,True,11,11,1.0,0.0,0.0,11
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\infectious_bronchitis_virus_ibv.pdf,False,True,5,5,1.0,0.0,0.0,5
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\infectious_bursal_disease.pdf,False,True,7,7,1.0,0.0,0.0,7
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\understandingcoccidiosis.pdf,False,True,7,7,1.0,0.0,0.0,7
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU HEAT ENG.pdf,False,True,8,6,0.75,0.072,0.016,8
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU LPAI ENG.pdf,False,True,8,4,0.5,0.173,0.05,8
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU MYCO ENG.pdf,False,True,12,6,0.5,0.139,0.024,12
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU COL ENG.pdf,False,True,8,4,0.5,0.132,0.028,8
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU NEST ENG.pdf,False,True,10,5,0.5,0.131,0.028,10
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU EDS ENG.pdf,False,True,4,2,0.5,0.129,0.028,4
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU FLY ENG.pdf,False,True,8,4,0.5,0.085,0.024,8
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU IBD ENG.pdf,False,True,4,2,0.5,0.076,0.026,4
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\TU Full beak management ENG.pdf,False,True,8,4,0.5,0.072,0.027,8
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\ABVista _IPP_1-5_2015.pdf,False,True,5,0,0.0,0.864,0.864,5
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf,False,True,48,0,0.0,0.115,0.091,48
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\Ceva_IPP_2021_1-6.pdf,False,True,6,0,0.0,0.075,0.004,6
+RedactionAnnots,C:\intelia_gpt\documents\public\common\health\Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf,False,True,2,0,0.0,0.027,0.02,2
