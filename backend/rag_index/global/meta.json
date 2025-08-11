@@ -1,7 +1,9 @@
 {
   "species": "global",
   "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dim": 384,
   "files_indexed": 21,
+  "n_docs": 21,
   "chunks_indexed": 244,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\common\\health\\AviaTech_Staph.pdf",
