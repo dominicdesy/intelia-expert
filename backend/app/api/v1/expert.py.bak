@@ -16,7 +16,7 @@ except ImportError as e:
     DIALOGUE_AVAILABLE = False
     
     # Fonction fallback
-    def handle(session_id: str, question: str, lang: str = "fr") -> Dict[str, Any]:
+    def handle(session_id: str, question: str, lang: str = "fr", **kwargs) -> Dict[str, Any]:
         return {
             "type": "error",
             "message": "Dialogue service temporarily unavailable",
@@ -29,6 +29,10 @@ class AskPayload(BaseModel):
     session_id: Optional[str] = "default"
     question: str
     lang: Optional[str] = "fr"
+    # ==== NEW: overrides de test (facultatifs, backward-compatible) ====
+    debug: Optional[bool] = False
+    force_perfstore: Optional[bool] = False
+    intent_hint: Optional[str] = None  # ex: "PerfTargets"
 
 @router.post("/ask")
 def ask(payload: AskPayload) -> Dict[str, Any]:
@@ -45,7 +49,11 @@ def ask(payload: AskPayload) -> Dict[str, Any]:
         result = handle(
             session_id=payload.session_id or "default",
             question=payload.question,
-            lang=payload.lang or "fr"
+            lang=payload.lang or "fr",
+            # ==== NEW: propage les overrides sans impacter le code existant ====
+            debug=bool(payload.debug),
+            force_perfstore=bool(payload.force_perfstore),
+            intent_hint=(payload.intent_hint or None),
         )
         
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
