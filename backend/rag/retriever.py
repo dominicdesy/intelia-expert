@@ -1,441 +1,496 @@
 """
-RAG Retriever - Complete fixed version with robust embedding support
-Clean code compliant with proper error handling and method normalization
+RAG Retriever - Species-aware, table-first, multi-index, robust embedding support
+
+Améliorations clés vs. version précédente :
+- Multi-index par espèce (broiler/layer/global) avec détection auto et fallback
+- Priorité table-first (re-ranking quand la requête contient des chiffres/unités)
+- Cache des index FAISS par espèce (évite les rechargements)
+- Modèle SentenceTransformer paresseux et réutilisable
+- Conserve : multi-méthodes d'embeddings, normalisation, robustesse FAISS, synthèse d'answer, debug
+
+ENV pris en charge (si présents) :
+- RAG_INDEX_DIR (racine contenant /global, /broiler, /layer)
+- RAG_INDEX_GLOBAL, RAG_INDEX_BROILER, RAG_INDEX_LAYER (chemins directs)
+- OPENAI_API_KEY (si méthode OpenAI utilisée)
 """
 
+from __future__ import annotations
+
 import os
-import json
+import re
 import pickle
 import logging
-import numpy as np
+import threading
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
+# -----------------------------
+# Helpers (espèce & tables)
+# -----------------------------
+
+_SPECIES = ("broiler", "layer", "global")
+
+
+def _detect_species_from_query(q: str) -> Optional[str]:
+    ql = (q or "").lower()
+    # Indices "layer"
+    if any(w in ql for w in ["layer", "pondeuse", "ponte", "œuf", "oeuf", "lohmann", "hy-line", "hyline", "w-36", "w36", "w-80", "w80"]):
+        return "layer"
+    # Indices "broiler"
+    if any(w in ql for w in ["broiler", "poulet de chair", "ross 308", "ross308", "cobb 500", "cobb500", "croissance", "poids", "fcr"]):
+        # garde-fou : si indices layer aussi → incertain
+        if any(w in ql for w in ["layer", "pondeuse", "ponte", "lohmann", "hy-line", "hyline"]):
+            return None
+        return "broiler"
+    return None
+
+
+def _looks_like_table(text: str, md: Dict[str, Any]) -> bool:
+    # métadonnée explicite
+    if isinstance(md, dict) and (md.get("chunk_type") == "table" or md.get("table_type")):
+        return True
+    t = text or ""
+    # indices rapides (markdown pipes, CSV, colonnes à espaces)
+    if t.count("|") >= 3:
+        return True
+    if t.count(",") >= 5 and "\n" in t:
+        return True
+    if re.search(r"\S+\s{2,}\S+\s{2,}\S+", t):
+        return True
+    return False
+
+
+def _query_has_numbers_or_units(q: str) -> bool:
+    ql = (q or "").lower()
+    return any(ch.isdigit() for ch in ql) or any(u in ql for u in ["kg", "g", "fcr", "%", "°c", "ppm", "m³", "m3"])
+
+
+# =====================================================================
+# Retriever
+# =====================================================================
 
 class RAGRetriever:
     """
-    RAG retriever with complete embedding method support.
-    Handles all embedding methods with proper normalization and fallbacks.
+    RAG retriever avec :
+    - Méthodes d'embedding multiples (SentenceTransformers / OpenAI / TF-IDF)
+    - Multi-index par espèce (broiler/layer/global) avec auto-détection
+    - Table-first re-ranking
+    - Chargements FAISS robustes + métadonnées normalisées
     """
-    
-    def __init__(self, openai_api_key: Optional[str] = None):
-        """Initialize RAG retriever with robust configuration."""
-        self.openai_api_key = openai_api_key or os.environ.get('OPENAI_API_KEY')
-        self.rag_index_path = self._get_rag_index_path()
-        self.index = None
-        self.documents = []
-        self.embeddings = None
-        self.method = None
-        self.is_loaded = False
-        
-        # Load index on initialization
-        self._load_index()
-    
-    def _get_rag_index_path(self) -> Path:
-        """Get RAG index path with multiple fallback locations."""
-        # Check environment variable
-        if os.environ.get('RAG_INDEX_PATH'):
-            return Path(os.environ['RAG_INDEX_PATH'])
-        
-        # Check current directory
-        current_dir = Path.cwd() / "rag_index"
-        if current_dir.exists():
-            return current_dir
-        
-        # Check parent directory
-        parent_dir = Path(__file__).parent.parent / "rag_index"
-        if parent_dir.exists():
-            return parent_dir
-        
-        # Default fallback
-        return Path("rag_index")
-    
+
+    # Cache modèle SentenceTransformer partagé (par worker)
+    _st_model = None
+    _st_lock = threading.Lock()
+
+    def __init__(self, openai_api_key: Optional[str] = None) -> None:
+        self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
+
+        # États par espèce
+        self.index_by_species: Dict[str, Any] = {}
+        self.documents_by_species: Dict[str, List[Dict[str, Any]]] = {}
+        self.method_by_species: Dict[str, str] = {}
+        self.emb_dim_by_species: Dict[str, Optional[int]] = {}
+        self.is_loaded_by_species: Dict[str, bool] = {s: False for s in _SPECIES}
+
+        # Chargement eager de "global" (optionnel)
+        self._load_index_for_species("global")
+
+    # -----------------------------
+    # Résolution chemins index
+    # -----------------------------
+
+    def _get_rag_index_path(self, species: str) -> Path:
+        """
+        Résout le chemin d'index pour une espèce donnée en respectant (par ordre) :
+        - RAG_INDEX_<SPECIES>
+        - RAG_INDEX_DIR/<species>
+        - ./rag_index/<species>
+        - ./rag_index (fallback legacy)
+        """
+        sp = (species or "global").lower()
+        env_key = f"RAG_INDEX_{sp.upper()}"
+        if os.environ.get(env_key):
+            return Path(os.environ[env_key])
+
+        root = os.environ.get("RAG_INDEX_DIR")
+        if root:
+            p = Path(root) / sp
+            if p.exists():
+                return p
+
+        p1 = Path.cwd() / "rag_index" / sp
+        if p1.exists():
+            return p1
+        p2 = Path(__file__).parent.parent / "rag_index" / sp
+        if p2.exists():
+            return p2
+
+        # fallback legacy (un seul dossier)
+        return Path.cwd() / "rag_index"
+
+    # -----------------------------
+    # Normalisation méthode embeddings
+    # -----------------------------
+
     def _normalize_embedding_method(self, method: str) -> str:
-        """
-        Normalize embedding method names to standard format.
-        Fixes the core issue: sentence_transformers -> SentenceTransformers
-        """
         if not method or not isinstance(method, str):
-            return "SentenceTransformers"  # Default fallback
-        
-        method_lower = method.lower().strip()
-        
-        # Mapping of all possible variations to standard names
-        method_mapping = {
+            return "SentenceTransformers"
+        m = method.lower().strip()
+        mapping = {
             # SentenceTransformers variations
-            'sentence_transformers': 'SentenceTransformers',
-            'sentence-transformers': 'SentenceTransformers',
-            'sentencetransformers': 'SentenceTransformers',
-            'sentence transformers': 'SentenceTransformers',
-            'all-minilm-l6-v2': 'SentenceTransformers',
-            
+            "sentence_transformers": "SentenceTransformers",
+            "sentence-transformers": "SentenceTransformers",
+            "sentencetransformers": "SentenceTransformers",
+            "sentence transformers": "SentenceTransformers",
+            "all-minilm-l6-v2": "SentenceTransformers",
+            "huggingface": "SentenceTransformers",
+            "transformer": "SentenceTransformers",
+            "bert": "SentenceTransformers",
             # OpenAI variations
-            'openai': 'OpenAI',
-            'openaiembeddings': 'OpenAI',
-            'openai_embeddings': 'OpenAI',
-            'text-embedding-ada-002': 'OpenAI',
-            'ada-002': 'OpenAI',
-            
+            "openai": "OpenAI",
+            "openaiembeddings": "OpenAI",
+            "openai_embeddings": "OpenAI",
+            "text-embedding-ada-002": "OpenAI",
+            "ada-002": "OpenAI",
             # TF-IDF variations
-            'tfidf': 'TF-IDF',
-            'tf-idf': 'TF-IDF',
-            'tf_idf': 'TF-IDF',
-            
-            # Other variations
-            'huggingface': 'SentenceTransformers',
-            'transformer': 'SentenceTransformers',
-            'bert': 'SentenceTransformers'
+            "tfidf": "TF-IDF",
+            "tf-idf": "TF-IDF",
+            "tf_idf": "TF-IDF",
         }
-        
-        # Return normalized method or default
-        normalized = method_mapping.get(method_lower, method)
-        
-        # Final validation - ensure it's a supported method
-        supported_methods = ['SentenceTransformers', 'OpenAI', 'TF-IDF']
-        if normalized not in supported_methods:
-            logger.warning(f"Unknown method '{method}' normalized to SentenceTransformers")
-            return 'SentenceTransformers'
-        
-        return normalized
-    
-    def _load_index(self) -> bool:
-        """Load existing FAISS index and metadata with error recovery."""
-        try:
-            import faiss
-        except ImportError:
-            logger.error("FAISS not available - cannot load index")
-            return False
-        
-        try:
-            # Check if index files exist
-            index_file = self.rag_index_path / "index.faiss"
-            metadata_file = self.rag_index_path / "index.pkl"
-            
-            if not index_file.exists() or not metadata_file.exists():
-                logger.warning(f"RAG index files not found in {self.rag_index_path}")
-                return False
-            
-            # Load FAISS index
-            self.index = faiss.read_index(str(index_file))
-            logger.info(f"Loaded FAISS index with {self.index.ntotal} vectors")
-            
-            # Load and fix metadata
-            with open(metadata_file, 'rb') as f:
-                data = pickle.load(f)
-            
-            # Extract and normalize method
-            raw_method = data.get('method', data.get('embedding_method', 'SentenceTransformers'))
-            self.method = self._normalize_embedding_method(raw_method)
-            
-            # Load documents and embeddings
-            self.documents = data.get('documents', [])
-            self.embeddings = data.get('embeddings', [])
-            
-            # Convert embeddings to numpy array if needed
-            if self.embeddings and not isinstance(self.embeddings, np.ndarray):
-                self.embeddings = np.array(self.embeddings)
-            
-            logger.info(f"Loaded {len(self.documents)} documents with {self.method} embeddings")
-            
-            # Save corrected metadata if method was changed
-            if raw_method != self.method:
-                logger.info(f"Corrected embedding method: {raw_method} -> {self.method}")
-                self._save_corrected_metadata(data)
-            
-            self.is_loaded = True
+        out = mapping.get(m, method)
+        if out not in {"SentenceTransformers", "OpenAI", "TF-IDF"}:
+            logger.warning("Unknown embedding method '%s' → fallback SentenceTransformers", method)
+            return "SentenceTransformers"
+        return out
+
+    # -----------------------------
+    # Chargement index (par espèce)
+    # -----------------------------
+
+    def _load_index_for_species(self, species: str) -> bool:
+        """Charge FAISS + documents pour une espèce. Idempotent et mis en cache."""
+        sp = (species or "global").lower()
+        if sp not in _SPECIES:
+            sp = "global"
+        if self.is_loaded_by_species.get(sp):
             return True
-            
-        except Exception as e:
-            logger.error(f"Error loading RAG index: {e}")
+
+        try:
+            import faiss  # noqa: F401
+        except ImportError:
+            logger.error("FAISS non disponible — impossible de charger l'index (%s)", sp)
             return False
-    
-    def _save_corrected_metadata(self, data: Dict[str, Any]) -> None:
-        """Save corrected metadata with normalized method name."""
+
+        path = self._get_rag_index_path(sp)
+        faiss_file = path / "index.faiss"
+        pkl_file = path / "index.pkl"
+
+        if not faiss_file.exists() or not pkl_file.exists():
+            logger.warning("Fichiers d'index introuvables pour %s dans %s", sp, path)
+            return False
+
         try:
-            # Update method in data
-            data['method'] = self.method
-            data['embedding_method'] = self.method
-            
-            # Save corrected metadata
-            metadata_file = self.rag_index_path / "index.pkl"
-            backup_file = self.rag_index_path / "index.pkl.backup"
-            
-            # Create backup
-            if metadata_file.exists() and not backup_file.exists():
-                import shutil
-                shutil.copy2(metadata_file, backup_file)
-            
-            # Save corrected version
-            with open(metadata_file, 'wb') as f:
-                pickle.dump(data, f)
-            
-            logger.info("Saved corrected metadata with normalized embedding method")
-            
+            idx = faiss.read_index(str(faiss_file))
+            with open(pkl_file, "rb") as f:
+                data = pickle.load(f)
+
+            raw_method = data.get("method", data.get("embedding_method", "SentenceTransformers"))
+            method = self._normalize_embedding_method(raw_method)
+            docs = data.get("documents", [])
+            embeddings = data.get("embeddings", None)
+            emb_dim = (len(embeddings[0]) if isinstance(embeddings, list) and embeddings else None)
+
+            # Mémoriser
+            self.index_by_species[sp] = idx
+            self.documents_by_species[sp] = docs
+            self.method_by_species[sp] = method
+            self.emb_dim_by_species[sp] = emb_dim
+            self.is_loaded_by_species[sp] = True
+
+            # Sauvegarder normalisation méthode si différente
+            if raw_method != method:
+                try:
+                    data["method"] = method
+                    data["embedding_method"] = method
+                    backup = pkl_file.with_suffix(".pkl.backup")
+                    if pkl_file.exists() and not backup.exists():
+                        import shutil
+                        shutil.copy2(pkl_file, backup)
+                    with open(pkl_file, "wb") as wf:
+                        pickle.dump(data, wf)
+                    logger.info("Métadonnées corrigées (méthode embeddings normalisée) pour %s", sp)
+                except Exception as e:
+                    logger.warning("Impossible d'enregistrer les métadonnées corrigées (%s): %s", sp, e)
+
+            logger.info("✅ Index %s chargé | ntotal=%s | docs=%d | method=%s",
+                        sp, getattr(idx, "ntotal", "n/a"), len(docs), method)
+            return True
         except Exception as e:
-            logger.error(f"Failed to save corrected metadata: {e}")
-    
+            logger.error("Erreur de chargement index %s: %s", sp, e)
+            return False
+
+    # -----------------------------
+    # Disponibilité
+    # -----------------------------
+
     def is_available(self) -> bool:
-        """Check if retriever is available and ready."""
-        return self.is_loaded and self.index is not None and len(self.documents) > 0
-    
-    def get_contextual_diagnosis(self, query: str, k: int = 5) -> Optional[Dict[str, Any]]:
-        """
-        Search for relevant documents with robust error handling.
-        Main entry point for RAG searches.
-        """
-        if not self.is_available():
-            logger.warning("RAG retriever not available or index not loaded")
-            return None
-        
-        try:
-            # Create query embedding
-            query_embedding = self._create_query_embedding(query)
-            if query_embedding is None:
-                logger.warning("Failed to create query embedding")
-                return None
-            
-            # Search FAISS index
-            scores, indices = self._search_index(query_embedding, k)
-            if scores is None or indices is None:
-                logger.warning("FAISS search failed")
-                return None
-            
-            # Process results
-            results = self._process_search_results(scores, indices)
-            if not results:
-                logger.warning("No valid search results found")
-                return None
-            
-            # Generate answer
-            answer = self._synthesize_answer(query, results)
-            source_documents = [doc for doc, _ in results]
-            
-            return {
-                'answer': answer,
-                'source_documents': source_documents,
-                'search_type': 'vector',
-                'total_results': len(results),
-                'embedding_method': self.method
-            }
-            
-        except Exception as e:
-            logger.error(f"Contextual diagnosis failed: {e}")
-            return None
-    
-    def _create_query_embedding(self, query: str) -> Optional[np.ndarray]:
-        """Create embedding for query using the detected method."""
-        try:
-            if self.method == "OpenAI":
-                return self._create_openai_embedding(query)
-            elif self.method == "SentenceTransformers":
-                return self._create_sentence_transformer_embedding(query)
-            elif self.method == "TF-IDF":
-                return self._create_tfidf_embedding(query)
-            else:
-                # Fallback based on available tools
-                logger.warning(f"Unknown method {self.method}, attempting fallback")
-                return self._create_fallback_embedding(query)
-                
-        except Exception as e:
-            logger.error(f"Query embedding creation failed: {e}")
-            return None
-    
+        """Vrai si au moins un index espèce est chargé et non vide."""
+        for sp in _SPECIES:
+            if self.is_loaded_by_species.get(sp) and self.index_by_species.get(sp) is not None:
+                if getattr(self.index_by_species[sp], "ntotal", 0) > 0:
+                    return True
+        return False
+
+    # -----------------------------
+    # Embeddings
+    # -----------------------------
+
+    def _ensure_st_model(self):
+        """Singleton SentenceTransformer (lazy)."""
+        if self._st_model is not None:
+            return self._st_model
+        with self._st_lock:
+            if self._st_model is None:
+                from sentence_transformers import SentenceTransformer
+                self._st_model = SentenceTransformer("all-MiniLM-L6-v2")
+        return self._st_model
+
     def _create_openai_embedding(self, query: str) -> Optional[np.ndarray]:
-        """Create OpenAI embedding."""
         if not self.openai_api_key:
-            logger.error("OpenAI API key not available for embedding")
+            logger.error("OPENAI_API_KEY manquant pour embeddings OpenAI")
             return None
-        
         try:
             import openai
-            
             client = openai.OpenAI(api_key=self.openai_api_key)
-            response = client.embeddings.create(
-                input=query,
-                model="text-embedding-ada-002"
-            )
-            
-            embedding = np.array(response.data[0].embedding, dtype=np.float32)
-            logger.debug(f"Created OpenAI embedding: dimension {len(embedding)}")
-            return embedding
-            
+            resp = client.embeddings.create(input=query, model="text-embedding-ada-002")
+            vec = np.array(resp.data[0].embedding, dtype=np.float32)
+            return vec
         except Exception as e:
-            logger.error(f"OpenAI embedding failed: {e}")
+            logger.error("Echec embedding OpenAI: %s", e)
             return None
-    
+
     def _create_sentence_transformer_embedding(self, query: str) -> Optional[np.ndarray]:
-        """Create SentenceTransformer embedding."""
         try:
-            from sentence_transformers import SentenceTransformer
-            
-            model = SentenceTransformer('all-MiniLM-L6-v2')
-            embedding = model.encode([query], normalize_embeddings=True)
-            
-            embedding_array = np.array(embedding[0], dtype=np.float32)
-            logger.debug(f"Created SentenceTransformer embedding: dimension {len(embedding_array)}")
-            return embedding_array
-            
+            model = self._ensure_st_model()
+            emb = model.encode([query], normalize_embeddings=True)
+            return np.array(emb[0], dtype=np.float32)
         except Exception as e:
-            logger.error(f"SentenceTransformer embedding failed: {e}")
+            logger.error("Echec embedding SentenceTransformer: %s", e)
             return None
-    
-    def _create_tfidf_embedding(self, query: str) -> Optional[np.ndarray]:
-        """Create TF-IDF embedding (simplified)."""
+
+    def _create_tfidf_embedding(self, query: str, species: str) -> Optional[np.ndarray]:
+        dim = self.emb_dim_by_species.get(species) or 0
+        if not dim:
+            return None
+        words = (query or "").lower().split()
+        vec = np.zeros(dim, dtype=np.float32)
+        for i, w in enumerate(words[:dim]):
+            vec[i] = 0.1 + (hash(w) % 100) / 1000.0
+        return vec
+
+    def _create_query_embedding(self, query: str, method: str, species: str) -> Optional[np.ndarray]:
         try:
-            # For TF-IDF, create a simple representation
-            if self.embeddings is not None and len(self.embeddings) > 0:
-                dimension = len(self.embeddings[0])
-                # Simple word-based vector
-                words = query.lower().split()
-                vector = np.zeros(dimension, dtype=np.float32)
-                
-                # Set some values based on query length and content
-                for i, word in enumerate(words):
-                    if i < dimension:
-                        vector[i] = 0.1 + (hash(word) % 100) / 1000.0
-                
-                return vector
-            
-            return None
-            
+            if method == "OpenAI":
+                return self._create_openai_embedding(query)
+            if method == "SentenceTransformers":
+                return self._create_sentence_transformer_embedding(query)
+            if method == "TF-IDF":
+                return self._create_tfidf_embedding(query, species)
+            # fallback cascade
+            emb = self._create_sentence_transformer_embedding(query)
+            if emb is not None:
+                return emb
+            if self.openai_api_key:
+                emb = self._create_openai_embedding(query)
+                if emb is not None:
+                    return emb
+            return self._create_tfidf_embedding(query, species)
         except Exception as e:
-            logger.error(f"TF-IDF embedding failed: {e}")
+            logger.error("Echec création embedding requête: %s", e)
             return None
-    
-    def _create_fallback_embedding(self, query: str) -> Optional[np.ndarray]:
-        """Create fallback embedding when method is unknown."""
-        # Try SentenceTransformers first
-        embedding = self._create_sentence_transformer_embedding(query)
-        if embedding is not None:
-            self.method = "SentenceTransformers"
-            return embedding
-        
-        # Try OpenAI if available
-        if self.openai_api_key:
-            embedding = self._create_openai_embedding(query)
-            if embedding is not None:
-                self.method = "OpenAI"
-                return embedding
-        
-        # Last resort: TF-IDF
-        embedding = self._create_tfidf_embedding(query)
-        if embedding is not None:
-            self.method = "TF-IDF"
-            return embedding
-        
-        logger.error("All embedding methods failed")
-        return None
-    
-    def _search_index(self, query_embedding: np.ndarray, k: int) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
-        """Search FAISS index with query embedding."""
+
+    # -----------------------------
+    # FAISS search
+    # -----------------------------
+
+    def _search_index(self, species: str, query_embedding: np.ndarray, k: int) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         try:
             import faiss
-            
-            # Ensure query embedding is the right shape
-            if query_embedding.ndim == 1:
-                query_embedding = query_embedding.reshape(1, -1)
-            
-            # Normalize for cosine similarity (except TF-IDF)
-            if self.method != "TF-IDF":
-                faiss.normalize_L2(query_embedding)
-            
-            # Search
-            distances, indices = self.index.search(query_embedding.astype('float32'), k)
-            
-            logger.debug(f"FAISS search completed: {len(distances[0])} results")
+            idx = self.index_by_species.get(species)
+            if idx is None:
+                return None, None
+
+            qe = query_embedding
+            if qe.ndim == 1:
+                qe = qe.reshape(1, -1)
+            # normalisation L2 sauf TF-IDF
+            if self.method_by_species.get(species) != "TF-IDF":
+                faiss.normalize_L2(qe)
+            distances, indices = idx.search(qe.astype("float32"), k)
             return distances, indices
-            
         except Exception as e:
-            logger.error(f"FAISS search failed: {e}")
+            logger.error("Echec recherche FAISS (%s): %s", species, e)
             return None, None
-    
-    def _process_search_results(self, distances: np.ndarray, indices: np.ndarray) -> List[Tuple[Dict[str, Any], float]]:
-        """Process search results into document-score pairs."""
-        results = []
-        
+
+    def _process_search_results(self, species: str, distances: np.ndarray, indices: np.ndarray) -> List[Tuple[Dict[str, Any], float]]:
+        results: List[Tuple[Dict[str, Any], float]] = []
+        docs = self.documents_by_species.get(species, [])
         try:
             for i, idx in enumerate(indices[0]):
-                if idx >= 0 and idx < len(self.documents):
-                    doc = self.documents[idx]
+                if 0 <= idx < len(docs):
+                    doc = docs[idx]
                     score = float(distances[0][i])
-                    
-                    # Ensure document has required fields
-                    if isinstance(doc, dict) and 'content' in doc:
+                    if isinstance(doc, dict) and "content" in doc:
                         results.append((doc, score))
-            
-            logger.debug(f"Processed {len(results)} valid search results")
             return results
-            
         except Exception as e:
-            logger.error(f"Result processing failed: {e}")
+            logger.error("Echec traitement résultats: %s", e)
             return []
-    
+
+    # -----------------------------
+    # Table-first re-ranking
+    # -----------------------------
+
+    @staticmethod
+    def _score_from_distance(distance: float) -> float:
+        if distance <= 0:
+            return 1.0
+        return float(max(0.0, min(1.0, np.exp(-distance * 1.5))))
+
+    @staticmethod
+    def _token_overlap_boost(q: str, t: str) -> float:
+        qw = set((q or "").lower().split())
+        if not qw:
+            return 0.0
+        tw = set((t or "").lower().split())
+        overlap = len(qw & tw) / max(1, len(qw))
+        return min(0.1, overlap * 0.1)  # petit bonus contrôlé
+
+    def _table_first_rerank(self, query: str, pairs: List[Tuple[Dict[str, Any], float]]) -> List[Tuple[Dict[str, Any], float]]:
+        if not pairs or not _query_has_numbers_or_units(query):
+            return pairs
+        boosted: List[Tuple[Dict[str, Any], float, float]] = []
+        for doc, raw in pairs:
+            text = doc.get("content", "")
+            md = doc.get("metadata", {}) or {}
+            base = self._score_from_distance(raw)
+            bonus = 0.0
+            if _looks_like_table(text, md):
+                bonus += 0.15
+            bonus += self._token_overlap_boost(query, text)
+            boosted.append((doc, raw, min(1.0, base + bonus)))
+        boosted.sort(key=lambda r: r[2], reverse=True)
+        return [(d, s) for (d, s, _) in boosted]
+
+    # -----------------------------
+    # API publique
+    # -----------------------------
+
+    def get_contextual_diagnosis(self, query: str, k: int = 5) -> Optional[Dict[str, Any]]:
+        """
+        Recherche species-aware + table-first.
+        Retourne une réponse synthétisée + documents sources.
+        """
+        species_hint = _detect_species_from_query(query) or "global"
+        tried: List[str] = []
+
+        # ordre d'essai : espèce détectée → autres → fallback global
+        candidates = [species_hint] + [s for s in _SPECIES if s != species_hint]
+        for sp in candidates:
+            tried.append(sp)
+            if not self._load_index_for_species(sp):
+                continue
+
+            method = self.method_by_species.get(sp, "SentenceTransformers")
+            emb = self._create_query_embedding(query, method, sp)
+            if emb is None:
+                continue
+
+            # élargir la recherche brute pour permettre le re-ranking
+            scores, indices = self._search_index(sp, emb, max(k * 2, 10))
+            if scores is None or indices is None:
+                continue
+
+            pairs = self._process_search_results(sp, scores, indices)
+            if not pairs:
+                continue
+
+            # table-first si pertinent
+            pairs = self._table_first_rerank(query, pairs)
+            pairs = pairs[:k]
+
+            answer = self._synthesize_answer(query, pairs)
+            source_documents = [doc for doc, _ in pairs]
+
+            return {
+                "answer": answer,
+                "source_documents": source_documents,
+                "search_type": "vector",
+                "total_results": len(pairs),
+                "embedding_method": method,
+                "species_index_used": sp,
+                "tried": tried,
+            }
+
+        logger.warning("Aucun résultat valide sur les espèces testées: %s", "→".join(tried))
+        return None
+
     def _synthesize_answer(self, query: str, results: List[Tuple[Dict[str, Any], float]]) -> str:
-        """Synthesize answer from search results."""
         if not results:
-            return "No relevant information found in the knowledge base."
-        
+            return "Aucune information pertinente trouvée dans la base de connaissances."
+
         try:
-            # Extract top results
-            relevant_content = []
-            for doc, score in results[:3]:
-                content = doc.get('content', '')
-                source = doc.get('source', doc.get('file_path', 'Unknown'))
-                
-                # Extract filename from path
-                if isinstance(source, str) and '/' in source:
-                    source = source.split('/')[-1]
-                
-                # Truncate long content
-                if len(content) > 400:
-                    content = content[:400] + "..."
-                
-                relevant_content.append(f"From {source}:\n{content}")
-            
-            # Create comprehensive answer
-            answer = "Based on the expert knowledge base:\n\n"
-            answer += "\n\n".join(relevant_content)
-            answer += f"\n\n(Found {len(results)} relevant sections from {len(set(doc.get('source', 'unknown') for doc, _ in results))} sources)"
-            
-            return answer
-            
+            parts: List[str] = []
+            for doc, _score in results[:3]:
+                content = doc.get("content", "") or ""
+                src = doc.get("source", doc.get("file_path", "source inconnue")) or "source inconnue"
+                # nom de fichier lisible
+                if isinstance(src, str) and ("/" in src or "\\" in src):
+                    src = src.split("/")[-1].split("\\")[-1]
+                # tronquer le contenu pour l'aperçu
+                if len(content) > 500:
+                    content = content[:500] + "..."
+                parts.append(f"Source: {src}\n{content}")
+
+            header = "Basé sur la base de connaissances :"  # court et clair
+            return header + "\n\n" + "\n\n".join(parts)
+
         except Exception as e:
-            logger.error(f"Answer synthesis failed: {e}")
-            return f"Found {len(results)} relevant documents but failed to synthesize answer."
-    
+            logger.error("Echec synthèse réponse: %s", e)
+            return f"{len(results)} documents pertinents trouvés, mais la synthèse a échoué."
+
+    # Interface compacte de compatibilité (comme avant)
     def retrieve(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        """Simple retrieve interface for compatibility."""
-        result = self.get_contextual_diagnosis(query, k=kwargs.get('k', 5))
-        if result and result.get('source_documents'):
-            return result['source_documents']
+        result = self.get_contextual_diagnosis(query, k=kwargs.get("k", 5))
+        if result and result.get("source_documents"):
+            return result["source_documents"]
         return []
-    
+
+    # Debug étendu
     def get_debug_info(self) -> Dict[str, Any]:
-        """Get comprehensive debug information."""
-        return {
-            'rag_index_path': str(self.rag_index_path),
-            'index_exists': self.rag_index_path.exists(),
-            'is_loaded': self.is_loaded,
-            'is_available': self.is_available(),
-            'index_available': self.index is not None,
-            'documents_count': len(self.documents),
-            'embedding_method': self.method,
-            'embedding_dimension': len(self.embeddings[0]) if self.embeddings is not None and len(self.embeddings) > 0 else None,
-            'openai_key_configured': bool(self.openai_api_key),
-            'faiss_index_size': self.index.ntotal if self.index else 0
+        info: Dict[str, Any] = {
+            "is_available": self.is_available(),
+            "loaded_species": {sp: self.is_loaded_by_species.get(sp, False) for sp in _SPECIES},
+            "faiss_ntotal": {sp: getattr(self.index_by_species.get(sp), "ntotal", 0) if self.index_by_species.get(sp) else 0 for sp in _SPECIES},
+            "documents_count": {sp: len(self.documents_by_species.get(sp, [])) for sp in _SPECIES},
+            "embedding_method": {sp: self.method_by_species.get(sp) for sp in _SPECIES},
+            "embedding_dimension": {sp: self.emb_dim_by_species.get(sp) for sp in _SPECIES},
         }
+        # chemins résolus (utile en prod)
+        try:
+            info["index_paths"] = {sp: str(self._get_rag_index_path(sp)) for sp in _SPECIES}
+        except Exception:
+            pass
+        return info
 
 
-# Compatibility alias
+# Compat alias & factory
 ContextualRetriever = RAGRetriever
 
 
 def create_rag_retriever(openai_api_key: Optional[str] = None) -> RAGRetriever:
-    """Factory function to create RAG retriever."""
-    return RAGRetriever(openai_api_key)
-
-
-# Module initialization with improved logging
-logger.info("RAG Retriever module loaded with complete embedding support")
+    return RAGRetriever(openai_api_key=openai_api_key)

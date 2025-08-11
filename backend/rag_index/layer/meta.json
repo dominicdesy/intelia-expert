@@ -1,12 +1,17 @@
 {
-  "tenant": "public",
   "species": "layer",
-  "chunks": 866,
-  "table_chunks": 34,
-  "table_ratio": 0.0393,
-  "files": 12,
-  "model": "all-MiniLM-L6-v2",
-  "chunk_size": 1000,
-  "overlap": 200,
-  "built_at": "2025-08-09 17:42:58"
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "build_time": "2025-08-10T21:13:23",
+  "num_files": 12,
+  "num_chunks": 552,
+  "files_sample": [
+    "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown - Alternative - Performance Sell Sheet ENG.pdf",
+    "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown - Conventional - Performance Sell Sheet ENG.pdf",
+    "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown ALT STD ENG.pdf",
+    "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown Parent Stock ENG.pdf",
+    "C:\\intelia_gpt\\documents\\public\\species\\layer\\breeds\\hy_line_brown\\Hyline Brown STD ENG.pdf"
+  ],
+  "pdf_scan_summary": {
+    "RedactionAnnots": 12
+  }
 }
