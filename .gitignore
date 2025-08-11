@@ -9,3 +9,15 @@ backend/rag_index/
 **/_clean/
 **/*.faiss
 **/*.pkl
+
+
+# Index et artefacts RAG
+backend/rag_index/
+**/_clean/
+**/*.faiss
+**/*.pkl
+**/meta.json
+
+# Fichiers temporaires Python
+__pycache__/
+*.py[cod]
