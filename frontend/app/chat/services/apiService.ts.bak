@@ -103,7 +103,7 @@ const generateUUID = (): string => {
 
 // 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
 interface EnhancedAIResponse {
-  response: string
+  response?: string
   conversation_id: string
   language: string
   ai_enhancements_used?: string[]
@@ -138,11 +138,22 @@ interface EnhancedAIResponse {
   vague_entities?: string[]
   
   // 🚀 NOUVEAU : Support format DialogueManager
-  type?: 'answer' | 'clarification'
+  type?: 'answer' | 'clarification' | 'partial_answer'
   questions?: string[]
   source?: string
   documents_used?: number
   warning?: string
+  
+  // 🔧 AJOUT CRITIQUE : Support format partial_answer
+  general_answer?: {
+    text: string
+    source?: string
+  }
+  follow_up_questions?: Array<{
+    field: string
+    question: string
+    options?: string[]
+  }>
   
   // 🚀 AJOUT : Champ pour compatibilité
   full_text?: string
@@ -157,7 +168,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE ADAPTÉE : Compatible DialogueManager + garde compatibilité ancienne
+ * 🔧 FONCTION PRINCIPALE ADAPTÉE : Compatible DialogueManager + garde compatibilité
  */
 export const generateAIResponse = async (
   question: string,
@@ -255,73 +266,67 @@ export const generateAIResponse = async (
 
     const data = await response.json()
     
-    // 🔧 CORRECTION : Extraire responseText de la réponse
-    let responseText = ''
-    if (data.response) {
-      // Si data.response est un objet avec answer
-      if (typeof data.response === 'object' && data.response.answer) {
-        responseText = data.response.answer
-      } else if (typeof data.response === 'string') {
-        responseText = data.response
-      }
-    } else if (data.questions && Array.isArray(data.questions)) {
-      // Mode clarification
-      responseText = data.questions.join('\n')
-    }
-    
     console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
-      has_response: !!responseText,
+      has_general_answer: !!data.general_answer,
       has_questions: !!data.questions,
-      response_length: responseText.length,
-      questions_count: data.questions?.length || 0,
       source: data.source,
       documents_used: data.documents_used
     })
 
-    // 🔧 ADAPTÉ : Conversion format DialogueManager vers format attendu
+    // 🔧 CORRECTION CRITIQUE : Préserver le format selon le type de réponse
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
-      type: data.type,
       
-      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: responseText,
-      full_text: responseText, // 🔧 AJOUT : Pour compatibilité
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - NE PAS TRANSFORMER
+      ...(data.type === 'partial_answer' ? {
+        type: 'partial_answer',
+        general_answer: data.general_answer,
+        follow_up_questions: data.follow_up_questions,
+        // ❌ NE PAS créer le champ response ici - extractAnswerAndSources() s'attend à general_answer.text
+        rag_used: true,
+        sources: data.source ? [{ source: data.source }] : [],
+        mode: 'rag_partial_answer',
+        note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
+        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
+      } : {}),
       
       // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
+        type: 'clarification',
         requires_clarification: true,
         clarification_questions: data.questions || [],
         clarification_type: 'missing_info',
-        vague_entities: ['breed', 'sex'], // Default pour compatibilité
+        vague_entities: ['breed', 'sex'],
         clarification_result: {
           clarification_requested: true,
           clarification_type: 'missing_info',
           missing_information: ['breed', 'sex'],
           confidence: 0.5
-        }
-      } : {
-        requires_clarification: false
-      }),
+        },
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager',
+        note: 'Clarification requise'
+      } : {}),
       
-      // 🔧 GESTION RÉPONSE : Format DialogueManager
+      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager
       ...(data.type === 'answer' ? {
+        type: 'answer',
+        response: data.response?.answer || data.response || '',
+        full_text: data.response?.answer || data.response || '',
+        requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_dialoguemanager',
         note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {
-        rag_used: false,
-        sources: [],
-        mode: 'clarification_dialoguemanager',
-        note: 'Clarification requise'
-      })
+      } : {})
     }
 
-    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions (comme avant)
+    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions SEULEMENT si response existe
     if (processedData.response && !processedData.response_versions) {
       console.log('✅ [apiService] Génération automatique response_versions')
       
@@ -339,11 +344,12 @@ export const generateAIResponse = async (
     }
 
     console.log('🎯 [apiService] Données traitées DialogueManager:', {
+      type: processedData.type,
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
-      has_response: !!responseText,
-      has_versions: !!processedData.response_versions,
-      type: processedData.type
+      has_response: !!processedData.response,
+      has_general_answer: !!processedData.general_answer,
+      has_versions: !!processedData.response_versions
     })
 
     return processedData
@@ -406,37 +412,33 @@ export const generateAIResponsePublic = async (
 
     const data = await response.json()
     
-    // 🔧 CORRECTION : Même extraction que version auth
-    let responseText = ''
-    if (data.response) {
-      if (typeof data.response === 'object' && data.response.answer) {
-        responseText = data.response.answer
-      } else if (typeof data.response === 'string') {
-        responseText = data.response
-      }
-    } else if (data.questions && Array.isArray(data.questions)) {
-      responseText = data.questions.join('\n')
-    }
-    
     console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
-      has_response: !!responseText,
+      has_general_answer: !!data.general_answer,
       has_questions: !!data.questions
     })
 
-    // 🔧 MÊME CONVERSION que la version auth
+    // 🔧 MÊME CORRECTION que la version auth
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
-      type: data.type,
       
-      // 🔧 CHAMPS REQUIS TOUJOURS PRÉSENTS
-      response: responseText,
-      full_text: responseText,
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER
+      ...(data.type === 'partial_answer' ? {
+        type: 'partial_answer',
+        general_answer: data.general_answer,
+        follow_up_questions: data.follow_up_questions,
+        rag_used: true,
+        sources: data.source ? [{ source: data.source }] : [],
+        mode: 'rag_partial_answer_public',
+        note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
+        confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
+      } : {}),
       
       // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
+        type: 'clarification',
         requires_clarification: true,
         clarification_questions: data.questions || [],
         clarification_type: 'missing_info',
@@ -446,27 +448,28 @@ export const generateAIResponsePublic = async (
           clarification_type: 'missing_info',
           missing_information: ['breed', 'sex'],
           confidence: 0.5
-        }
-      } : {
-        requires_clarification: false
-      }),
+        },
+        rag_used: false,
+        sources: [],
+        mode: 'clarification_dialoguemanager_public',
+        note: 'Clarification requise'
+      } : {}),
       
       // 🔧 GESTION RÉPONSE
       ...(data.type === 'answer' ? {
+        type: 'answer',
+        response: data.response?.answer || data.response || '',
+        full_text: data.response?.answer || data.response || '',
+        requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_dialoguemanager_public',
         note: data.warning || `Documents utilisés: ${data.documents_used || 0}`,
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
-      } : {
-        rag_used: false,
-        sources: [],
-        mode: 'clarification_dialoguemanager_public',
-        note: 'Clarification requise'
-      })
+      } : {})
     }
 
-    // 🚀 GÉNÉRATION response_versions
+    // 🚀 GÉNÉRATION response_versions SEULEMENT si response existe
     if (processedData.response && !processedData.response_versions) {
       const mainResponse = processedData.response
       
@@ -732,6 +735,7 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Conversion format DialogueManager vers format frontend')
   console.log('  ✅ Support clarification via type: "clarification"')
   console.log('  ✅ Support réponse via type: "answer"')
+  console.log('  ✅ PRÉSERVATION format partial_answer + general_answer')
   console.log('  ✅ Génération automatique response_versions')
   console.log('  ✅ Toutes fonctions auxiliaires préservées')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
@@ -830,13 +834,15 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🚀 Utilisation endpoint /ask simplifié')
   console.log('  - 🚀 Session ID via header X-Session-ID')
   console.log('  - 🚀 Body simplifié: { question }')
-  console.log('  - 🚀 Support type: clarification/answer')
+  console.log('  - 🚀 Support type: clarification/answer/partial_answer')
+  console.log('  - 🚀 PRÉSERVATION format partial_answer')
   console.log('  - 🚀 Conversion automatique format')
   console.log('FONCTIONNALITÉS:')
   console.log('  - ✅ Clarification intelligente automatique')
   console.log('  - ✅ Gestion mémoire conversation Postgres')
   console.log('  - ✅ Pipeline RAG modulaire')
   console.log('  - ✅ Toutes fonctions frontend préservées')
+  console.log('  - ✅ Support extractAnswerAndSources() natif')
   console.groupEnd()
 }
 
