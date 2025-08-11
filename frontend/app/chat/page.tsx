@@ -311,10 +311,35 @@ export default function ChatInterface() {
     })
   }
 
+  // 🔧 FONCTION CORRIGÉE : Support type "partial_answer" + indentation fixée
   const extractAnswerAndSources = (result: any): [string, any[]] => {
-    const responseContent = result?.response || ""
     let answerText = ""
     let sources: any[] = []
+
+    // 🚀 NOUVEAU : Support type "partial_answer" du DialogueManager hybride
+    if (result?.type === 'partial_answer' && result?.general_answer) {
+      console.log('🎯 [extractAnswerAndSources] Type partial_answer détecté')
+      
+      answerText = result.general_answer.text || ""
+      sources = result.general_answer.rag_sources || []
+      
+      // Ajouter les questions de clarification à la fin
+      if (result.follow_up_questions && result.follow_up_questions.length > 0) {
+        answerText += "\n\n**Pour une réponse plus précise, veuillez préciser :**\n"
+        result.follow_up_questions.forEach((q: any, index: number) => {
+          if (q.options && q.options.length > 0) {
+            answerText += `${index + 1}. ${q.question} (${q.options.join(', ')})\n`
+          } else {
+            answerText += `${index + 1}. ${q.question}\n`
+          }
+        })
+      }
+      
+      return [answerText, sources]
+    }
+
+    // ✅ ANCIEN CODE CONSERVÉ pour compatibilité
+    const responseContent = result?.response || ""
 
     if (typeof responseContent === 'object' && responseContent !== null) {
       answerText = String(responseContent.answer || "").trim()
@@ -442,7 +467,7 @@ export default function ChatInterface() {
         console.log('🔄 [handleSendMessage] État clarification activé')
 
       } else {
-        // Extraction de la réponse avec nettoyage JSON
+        // Extraction de la réponse avec nettoyage JSON + support partial_answer
         const [answerText, sources] = extractAnswerAndSources(response)
 
         const aiMessage: Message = {
