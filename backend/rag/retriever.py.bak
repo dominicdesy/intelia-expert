@@ -108,7 +108,6 @@ class RAGRetriever:
         Résout le chemin d'index pour une espèce donnée en respectant (par ordre) :
         - RAG_INDEX_<SPECIES>
         - RAG_INDEX_DIR/<species>
-        - ./backend/rag_index/<species>  # 🔧 CORRECTION AJOUTÉE
         - ./rag_index/<species>
         - ./rag_index (fallback legacy)
         """
@@ -123,24 +122,12 @@ class RAGRetriever:
             if p.exists():
                 return p
 
-        # 🔧 CORRECTION : Ajouter le chemin backend/rag_index en priorité
-        p_backend = Path.cwd() / "backend" / "rag_index" / sp
-        if p_backend.exists():
-            logger.info("✅ Index trouvé dans backend/rag_index pour %s: %s", sp, p_backend)
-            return p_backend
-
         p1 = Path.cwd() / "rag_index" / sp
         if p1.exists():
             return p1
         p2 = Path(__file__).parent.parent / "rag_index" / sp
         if p2.exists():
             return p2
-
-        # 🔧 CORRECTION : Fallback aussi vers backend/rag_index
-        p_backend_fallback = Path.cwd() / "backend" / "rag_index"
-        if p_backend_fallback.exists():
-            logger.info("✅ Fallback vers backend/rag_index pour %s: %s", sp, p_backend_fallback)
-            return p_backend_fallback
 
         # fallback legacy (un seul dossier)
         return Path.cwd() / "rag_index"
