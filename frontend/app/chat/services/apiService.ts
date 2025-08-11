@@ -314,11 +314,11 @@ export const generateAIResponse = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager - AVEC CORRECTION
+      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager - AVEC CORRECTION data.answer
       ...(data.type === 'answer' ? {
         type: 'answer',
-        response: data.response?.answer || data.response || data.general_answer?.text || '',
-        full_text: data.response?.answer || data.response || data.general_answer?.text || '',
+        response: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
+        full_text: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
         requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
@@ -460,11 +460,11 @@ export const generateAIResponsePublic = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 🔧 GESTION RÉPONSE ANSWER - AVEC CORRECTION
+      // 🔧 GESTION RÉPONSE ANSWER - AVEC CORRECTION data.answer
       ...(data.type === 'answer' ? {
         type: 'answer',
-        response: data.response?.answer || data.response || data.general_answer?.text || '',
-        full_text: data.response?.answer || data.response || data.general_answer?.text || '',
+        response: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
+        full_text: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
         requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],

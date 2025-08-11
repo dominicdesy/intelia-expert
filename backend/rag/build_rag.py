@@ -22,8 +22,8 @@ Exemples PowerShell:
     --out "C:\\intelia_gpt\\intelia-expert\\backend\\rag_index" `
     --species broiler --verbose --auto-clean-redactions `
     --pdf-providers "pdftotext,pypdfium2,pymupdf,router" `
-    --chunk-size 3500 --max-pages 60 --timeout-per-file 45 --embed-batch-size 128 `
-    --enable-quality-filter --min-chunk-length 50
+    --chunk-size 2000 --max-pages 60 --timeout-per-file 120 --embed-batch-size 128 `
+    --enable-quality-filter --min-chunk-length 80
 
   # Global: enhanced with metadata enrichment
   python -m rag.build_rag `
@@ -31,6 +31,8 @@ Exemples PowerShell:
     --out "C:\\intelia_gpt\\intelia-expert\\backend\\rag_index" `
     --species global --verbose --enhanced-metadata `
     --pdf-providers "pdftotext,pypdfium2"
+
+  # Preset gros PDF: pdftotext,pypdfium2,pymupdf,router --chunk-size 2000 --embed-batch-size 128 --timeout-per-file 120
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ import time
 import traceback
 import shutil
 import subprocess
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Iterable, List, Dict, Any, Tuple, Optional
@@ -578,59 +581,8 @@ def _strip_redactions(src: str, dst: str) -> bool:
             pass
         return False
 
-
-def _has_redaction_annots(page) -> bool:
-    """
-    Version améliorée de la détection des redactions
-    """
-    import fitz
-    
-    try:
-        # Méthode 1: API moderne
-        try:
-            redact_annots = page.annots(types=[fitz.PDF_ANNOT_REDACT])
-            if redact_annots and len(redact_annots) > 0:
-                return True
-        except Exception:
-            pass
-        
-        # Méthode 2: Parcours manuel
-        annot = page.first_annot
-        while annot:
-            try:
-                annot_type_str = str(annot.type)
-                annot_type_num = getattr(annot, 'type', None)
-                
-                # Vérifications multiples pour la redaction
-                if (
-                    "Redact" in annot_type_str or 
-                    "redact" in annot_type_str.lower() or
-                    annot_type_num == fitz.PDF_ANNOT_REDACT or
-                    (hasattr(annot, 'info') and annot.info and 
-                     "redact" in str(annot.info.get('title', '')).lower())
-                ):
-                    return True
-                    
-            except Exception:
-                pass
-            
-            annot = annot.next
-            
-    except Exception:
-        pass
-    
-    return False
-
-
-
-
-
-
-
-
-
 # ------------------------ Enhanced Provider registry -------------------- #
-def _enhanced_chunk_text(text: str, size: int, base_meta: Dict[str, Any], min_length: int = 50) -> List[Dict[str, Any]]:
+def _enhanced_chunk_text(text: str, size: int, base_meta: Dict[str, Any], min_length: int = 80) -> List[Dict[str, Any]]:
     """Enhanced chunking with quality filtering"""
     text = (text or "").strip()
     if not text or len(text) < min_length:
@@ -673,8 +625,15 @@ def _enhanced_chunk_text(text: str, size: int, base_meta: Dict[str, Any], min_le
     
     return out
 
+def _normalize_text(txt: str) -> str:
+    """Normalize text for better chunking - less noise"""
+    txt = re.sub(r'-\s*\n', '', txt)  # déhyphénation "brood-\n ing" → "brooding"
+    txt = re.sub(r'\s*\n\s*', ' ', txt)  # lignes → phrase
+    txt = re.sub(r'\s{2,}', ' ', txt).strip()  # espaces multiples
+    return txt
+
 # Enhanced provider functions with better error handling and metadata
-def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int = 50) -> Optional[List[Dict[str, Any]]]:
+def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int = 80) -> Optional[List[Dict[str, Any]]]:
     exe = shutil.which("pdftotext")
     if not exe:
         return None
@@ -682,6 +641,7 @@ def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int = 50) -> 
         p = subprocess.run([exe, "-layout", "-enc", "UTF-8", "-q", fp, "-"],
                            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         txt = p.stdout.decode("utf-8", errors="ignore")
+        txt = _normalize_text(txt)
         return _enhanced_chunk_text(txt, chunk_size, {
             "source_file": fp, 
             "extraction": "pdftotext",
@@ -691,7 +651,7 @@ def _extract_pdftotext(fp: str, chunk_size: int, min_chunk_length: int = 50) -> 
         log(f"       · pdftotext failed on {fp}: {e}")
         return None
 
-def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_length: int = 50) -> Optional[List[Dict[str, Any]]]:
+def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_length: int = 80):
     try:
         import pypdfium2 as pdfium
     except Exception:
@@ -700,42 +660,30 @@ def _extract_pypdfium2(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_l
         doc = pdfium.PdfDocument(fp)
     except Exception:
         return None
-    
-    chunks: List[Dict[str, Any]] = []
+
+    chunks = []
     total = len(doc)
     limit = total if max_pages <= 0 else min(max_pages, total)
-    
-    try:
-        for i in range(limit):
-            page = doc[i]
-            tp = page.get_textpage()
-            try:
-                txt = tp.get_text_range()
-            except Exception:
-                txt = tp.get_text_bounded() if hasattr(tp, "get_text_bounded") else ""
-            try:
-                tp.close()
-            except Exception:
-                pass
-            
-            txt = (txt or "").strip()
-            if not txt:
-                continue
-                
-            chunks.extend(_enhanced_chunk_text(txt, chunk_size, {
-                "source_file": fp, 
-                "page": i+1, 
-                "extraction": "pypdfium2",
-                "extraction_quality": "high" if len(txt) > 500 else "medium"
-            }, min_chunk_length))
-    finally:
+    for i in range(limit):
+        page = doc[i]
+        tp = page.get_textpage()
         try:
-            doc.close()
-        except Exception:
-            pass
+            txt = tp.get_text_bounded() or ""
+            txt = _normalize_text(txt)
+        finally:
+            try: tp.close()
+            except: pass
+        txt = txt.strip()
+        if not txt:
+            continue
+        chunks.extend(_enhanced_chunk_text(txt, chunk_size, {
+            "source_file": fp, "page": i+1, "extraction": "pypdfium2"
+        }, min_chunk_length))
+    try: doc.close()
+    except: pass
     return chunks or []
 
-def _extract_pymupdf(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_length: int = 50) -> Optional[List[Dict[str, Any]]]:
+def _extract_pymupdf(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_length: int = 80) -> Optional[List[Dict[str, Any]]]:
     if not _pdf_available():
         return None
     import fitz
@@ -762,6 +710,7 @@ def _extract_pymupdf(fp: str, chunk_size: int, max_pages: int = 0, min_chunk_len
             except Exception:
                 txt = page.get_text("text") or ""
             
+            txt = _normalize_text(txt)
             txt = txt.strip()
             if not txt:
                 continue
@@ -845,7 +794,7 @@ def _run_enhanced_router_with_timeout(fp: str, species: str, timeout_s: int, enh
 def _try_enhanced_providers_for_pdf(
     fp: str, species: str, providers: List[str],
     chunk_size: int, max_pages: int, timeout_router: int,
-    enhanced_metadata: bool = True, min_chunk_length: int = 50
+    enhanced_metadata: bool = True, min_chunk_length: int = 80
 ) -> Tuple[str, Optional[List[Dict[str, Any]]], Optional[str]]:
     """Enhanced provider cascade with quality assessment"""
     
@@ -961,20 +910,23 @@ def _parse_args():
     # Enhanced processing options
     p.add_argument("--enhanced-metadata", action="store_true", default=True,
                    help="Enable advanced metadata enrichment (default: True)")
-    p.add_argument("--enable-quality-filter", action="store_true", default=False,
-                   help="Enable quality filtering of chunks")
-    p.add_argument("--min-chunk-length", type=int, default=50,
-                   help="Minimum chunk length to include (default: 50)")
+    p.add_argument("--enable-quality-filter", action="store_true", default=True,
+                   help="Enable quality filtering of chunks (default: True)")
+    p.add_argument("--min-chunk-length", type=int, default=80,
+                   help="Minimum chunk length to include (default: 80)")
 
     # Provider options
     p.add_argument("--pdf-providers", default="pdftotext,pypdfium2,pymupdf,router",
                    help="Provider order for PDF processing")
-    p.add_argument("--chunk-size", type=int, default=1500,
-                   help="Text chunk size (default: 1500)")
+    p.add_argument("--chunk-size", type=int, default=2000,
+                   help="Text chunk size (default: 2000)")
     p.add_argument("--max-pages", type=int, default=0,
                    help="Max pages per PDF (0 = no limit)")
-    p.add_argument("--timeout-per-file", type=int, default=60,
-                   help="Timeout for router provider (default: 60s)")
+    
+    # Timeout par défaut adapté selon la plateforme
+    default_timeout = 120 if sys.platform == "win32" else 60
+    p.add_argument("--timeout-per-file", type=int, default=default_timeout,
+                   help=f"Timeout for router provider (default: {default_timeout}s)")
 
     # Embedding options
     p.add_argument("--embed-batch-size", type=int, default=64,
@@ -1007,7 +959,8 @@ def main() -> int:
         log(f"❌ Source path not found: {src}")
         return 2
 
-    files = list(_iter_files_local(str(src), allowed_exts=exts, recursive=args.recursive))
+    # Tri des fichiers pour reproductibilité
+    files = sorted(_iter_files_local(str(src), allowed_exts=exts, recursive=args.recursive))
     log(f"   • files detected: {len(files)}")
     if not files:
         log("⚠️  No files detected. Check --exts or path.")
@@ -1023,25 +976,25 @@ def main() -> int:
         except Exception as e:
             log(f"⚠️  Enhanced PDF scan failed: {e}")
 
-    # 2) Enhanced Auto-clean with validation
+    # 2) Auto-clean ciblé uniquement si redactions détectées
     replacement_map: Dict[str, str] = {}
     if args.auto_clean_redactions and pdf_rows:
-        if not _pdf_available():
-            log("⚠️  auto-clean redactions requires PyMuPDF (pip install pymupdf)")
-        else:
-            clean_dir = out_dir / "_clean"
-            clean_dir.mkdir(parents=True, exist_ok=True)
-            targets = [r for r in pdf_rows if r.get("status") == "RedactionAnnots" and r.get("redaction_annots", 0) > 0]
-            if targets:
+        targets = [r for r in pdf_rows if r.get("status") == "RedactionAnnots" and r.get("redaction_annots", 0) > 0]
+        if targets:  # Uniquement si on a des redactions
+            if not _pdf_available():
+                log("⚠️  auto-clean redactions requires PyMuPDF (pip install pymupdf)")
+            else:
+                clean_dir = out_dir / "_clean"
+                clean_dir.mkdir(parents=True, exist_ok=True)
                 log(f"   • Enhanced auto-clean: {len(targets)} PDF(s) with redactions")
-            for r in targets:
-                src_pdf = r["file"]
-                dst_pdf = str(clean_dir / (Path(src_pdf).stem + "_clean.pdf"))
-                ok = _strip_redactions(src_pdf, dst_pdf)
-                if ok:
-                    replacement_map[src_pdf] = dst_pdf
-                    if args.verbose:
-                        log(f"     ✓ cleaned: {src_pdf} → {dst_pdf}")
+                for r in targets:
+                    src_pdf = r["file"]
+                    dst_pdf = str(clean_dir / (Path(src_pdf).stem + "_clean.pdf"))
+                    ok = _strip_redactions(src_pdf, dst_pdf)
+                    if ok:
+                        replacement_map[src_pdf] = dst_pdf
+                        if args.verbose:
+                            log(f"     ✓ cleaned: {src_pdf} → {dst_pdf}")
 
     # 3) Enhanced Extraction with comprehensive processing
     provider_order = [p.strip() for p in (args.pdf_providers or "").split(",") if p.strip()]
@@ -1172,10 +1125,9 @@ def main() -> int:
     import pickle
     np.save(out_dir / "embeddings.npy", embs)
     with open(out_dir / "index.pkl", "wb") as f:
-        # Enhanced index data with metadata versioning
+        # Index data sans duplication des embeddings
         index_data = {
             "documents": items,
-            "embeddings": embs.tolist(),  # For compatibility
             "method": "SentenceTransformers",
             "embedding_method": "SentenceTransformers",
             "model_name": model_name,
