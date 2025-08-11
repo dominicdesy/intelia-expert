@@ -387,7 +387,7 @@ def enhanced_enrich_metadata(
     # Ajout du contexte additionnel
     if additional_context:
         for key, value in additional_context.items():
-            if key in metadata.__annotations__ and value is not None:
+            if key in ChunkMeta.__annotations__ and value is not None:
                 metadata[key] = value
     
     return metadata
