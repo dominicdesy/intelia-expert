@@ -314,7 +314,7 @@ export const generateAIResponse = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager
+      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager - AVEC CORRECTION
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: data.response?.answer || data.response || data.general_answer?.text || '',
@@ -368,7 +368,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE ADAPTÉE : Compatible DialogueManager (sans auth)
+ * 🔧 VERSION PUBLIQUE ADAPTÉE : Compatible DialogueManager (sans auth) - AVEC CORRECTION
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -460,7 +460,7 @@ export const generateAIResponsePublic = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 🔧 GESTION RÉPONSE
+      // 🔧 GESTION RÉPONSE ANSWER - AVEC CORRECTION
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: data.response?.answer || data.response || data.general_answer?.text || '',
