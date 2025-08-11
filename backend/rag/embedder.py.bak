@@ -7,7 +7,6 @@ FastRAGEmbedder - Enhanced with Advanced Query Normalization
 - Table-first ranking with technical units recognition
 - Single-API search(query, k=5, species=None)
 - ENV-aware loader: load_from_env() reads RAG_INDEX_* paths
-- FIXED: Enhanced metadata preservation during index loading
 """
 
 from __future__ import annotations
@@ -437,13 +436,10 @@ class FastRAGEmbedder:
         return False
 
     # -------------------------
-    # Index loading - FIXED: Enhanced metadata preservation
+    # Index loading (unchanged from original)
     # -------------------------
     def load_index(self, index_path: str) -> bool:
-        """
-        Load FAISS index + documents (index.pkl). Idempotent.
-        FIXED: Enhanced metadata preservation during loading.
-        """
+        """Load FAISS index + documents (index.pkl). Idempotent."""
         if not self._dependencies_ok:
             logger.error("❌ Dependencies not available for loading index")
             return False
@@ -466,7 +462,7 @@ class FastRAGEmbedder:
                 t1 = time.time()
                 with open(pkl_file, "rb") as f:
                     raw_documents = pickle.load(f)
-                docs = self._normalize_documents_with_metadata_preservation(raw_documents)
+                docs = self._normalize_documents(raw_documents)
                 logger.info("✅ Documents loaded in %.2fs", time.time() - t1)
 
                 if idx.ntotal != len(docs):
@@ -499,80 +495,41 @@ class FastRAGEmbedder:
         default = "/app/public/global" if Path("/app/public/global").exists() else "/app/rag_index/global"
         return self.load_index(default)
 
-    def _normalize_documents_with_metadata_preservation(self, raw_documents: Any) -> List[Dict[str, Any]]:
-        """
-        FIXED: Enhanced document normalization with complete metadata preservation.
-        Ensures all enriched metadata (species, domain, chunk_type, etc.) is preserved.
-        """
+    def _normalize_documents(self, raw_documents: Any) -> List[Dict[str, Any]]:
+        """Normalize document format"""
         normalized: List[Dict[str, Any]] = []
         try:
             if isinstance(raw_documents, dict):
                 for key, value in raw_documents.items():
                     if isinstance(value, dict):
-                        # Preserve ALL metadata fields, not just basic ones
-                        metadata = value.get("metadata", {})
-                        if not isinstance(metadata, dict):
-                            metadata = {}
-                        
                         doc = {
                             "id": value.get("id", key),
                             "text": value.get("text", value.get("content", str(value))),
-                            "metadata": dict(metadata),  # Deep copy to preserve all fields
+                            "metadata": value.get("metadata", {}),
                         }
-                        
-                        # Log preserved metadata for debugging
-                        if self.debug and metadata:
-                            preserved_fields = list(metadata.keys())
-                            if len(preserved_fields) > 3:  # Only log if significant metadata
-                                logger.debug("🔍 Preserved metadata fields: %s", preserved_fields[:10])
-                        
                         normalized.append(doc)
                     elif isinstance(value, str):
                         normalized.append({"id": key, "text": value, "metadata": {}})
-                        
             elif isinstance(raw_documents, list):
                 for i, item in enumerate(raw_documents):
                     if isinstance(item, dict):
-                        # Preserve ALL metadata fields, not just basic ones
-                        metadata = item.get("metadata", {})
-                        if not isinstance(metadata, dict):
-                            metadata = {}
-                        
                         doc = {
                             "id": item.get("id", f"doc_{i}"),
                             "text": item.get("text", item.get("content", str(item))),
-                            "metadata": dict(metadata),  # Deep copy to preserve all fields
+                            "metadata": item.get("metadata", {}),
                         }
-                        
-                        # Log preserved metadata for debugging
-                        if self.debug and metadata:
-                            preserved_fields = list(metadata.keys())
-                            if len(preserved_fields) > 3:  # Only log if significant metadata
-                                logger.debug("🔍 Preserved metadata fields: %s", preserved_fields[:10])
-                        
                         normalized.append(doc)
                     elif isinstance(item, str):
                         normalized.append({"id": f"doc_{i}", "text": item, "metadata": {}})
-                        
         except Exception as e:
-            logger.error("❌ Error normalizing documents with metadata preservation: %s", e)
+            logger.error("❌ Error normalizing documents: %s", e)
 
         if self.debug:
-            logger.info("🔍 Normalized %d documents with enhanced metadata preservation", len(normalized))
-            if normalized:
-                # Sample metadata check
-                sample_meta = normalized[0].get("metadata", {})
-                if sample_meta:
-                    logger.info("   Sample preserved metadata keys: %s", list(sample_meta.keys()))
-
+            logger.info("🔍 Normalized %d documents", len(normalized))
         return normalized
 
-    def _normalize_documents(self, raw_documents: Any) -> List[Dict[str, Any]]:
-        """Legacy wrapper for backward compatibility"""
-        return self._normalize_documents_with_metadata_preservation(raw_documents)
-
     # -------------------------
-    # Enhanced search methods (unchanged)
+    # Enhanced search methods
     # -------------------------
     def _embed_query(self, normalized_query: str, species_hint: Optional[str]) -> np.ndarray:
         key = f"{normalized_query}|{species_hint or 'any'}"
@@ -729,7 +686,6 @@ class FastRAGEmbedder:
             "normalize_queries": self.normalize_queries,
             "ready": self.is_ready(),
             "enhanced_features": True,
-            "metadata_preservation": True,  # NEW: indicate enhanced metadata support
         }
 
     def clear_cache(self) -> None:
@@ -761,7 +717,6 @@ class FastRAGEmbedder:
             "has_search_engine": self.has_search_engine(),
             "documents_count": len(self._documents),
             "enhanced_features": True,
-            "metadata_preservation": True,  # NEW: indicate enhanced metadata support
         }
         return info
 

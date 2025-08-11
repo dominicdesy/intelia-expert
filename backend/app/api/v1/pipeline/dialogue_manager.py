@@ -9,7 +9,6 @@ Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct)
 from typing import Dict, Any, List, Optional
 import logging
 import os
-# >>> AJOUT
 import re
 
 logger = logging.getLogger(__name__)
@@ -24,21 +23,18 @@ from ..utils import formulas
 RAG_AVAILABLE = False
 RAGRetrieverCls = None
 try:
-    # chemin "classique" si le package top-level s'appelle rag
     from rag.retriever import RAGRetriever as _RAGRetrieverImported
     RAGRetrieverCls = _RAGRetrieverImported
     RAG_AVAILABLE = True
     logger.info("✅ RAGRetriever importé depuis rag.retriever")
 except Exception as e1:
     try:
-        # selon la disposition des dossiers, on tente en relatif
         from ...rag.retriever import RAGRetriever as _RAGRetrieverImported2  # type: ignore
         RAGRetrieverCls = _RAGRetrieverImported2
         RAG_AVAILABLE = True
         logger.info("✅ RAGRetriever importé depuis ...rag.retriever")
     except Exception as e2:
         try:
-            # dernier essai: import local voisin (si lancé depuis rag/)
             from .retriever import RAGRetriever as _RAGRetrieverImported3  # type: ignore
             RAGRetrieverCls = _RAGRetrieverImported3
             RAG_AVAILABLE = True
@@ -85,6 +81,8 @@ def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, An
             "meta": {
                 "chunk_type": (md or {}).get("chunk_type"),
                 "species": (md or {}).get("species"),
+                "line": (md or {}).get("line"),
+                "sex": (md or {}).get("sex"),
                 "document_type": (md or {}).get("document_type"),
                 "table_type": (md or {}).get("table_type"),
                 "page": (md or {}).get("page_number"),
@@ -92,9 +90,33 @@ def _format_sources(source_documents: List[Dict[str, Any]]) -> List[Dict[str, An
         })
     return formatted
 
-def _rag_answer(question: str, k: int = 5) -> Dict[str, Any]:
+def _build_filters_from_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Appelle le RAGRetriever et retourne un dict standardisé:
+    Construit un dict de filtres pour le RAGRetriever à partir des entités détectées.
+    """
+    filters = {}
+    
+    # Mappage des entités vers les filtres RAG
+    if "species" in entities and entities["species"]:
+        filters["species"] = entities["species"]
+    
+    if "line" in entities and entities["line"]:
+        filters["line"] = entities["line"]
+        
+    if "sex" in entities and entities["sex"]:
+        filters["sex"] = entities["sex"]
+    
+    # Autres filtres possibles selon le contexte
+    if "age_days" in entities or "age_weeks" in entities:
+        # Pourrait être utilisé pour filtrer sur des tranches d'âge
+        pass
+        
+    logger.debug(f"🔍 Filtres RAG construits: {filters}")
+    return filters
+
+def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Appelle le RAGRetriever avec filtres et retourne un dict standardisé:
     { text, sources[], route, meta }
     """
     retriever = _get_retriever()
@@ -105,15 +127,22 @@ def _rag_answer(question: str, k: int = 5) -> Dict[str, Any]:
             "route": "rag_unavailable",
             "meta": {}
         }
+    
     try:
-        result = retriever.get_contextual_diagnosis(question, k=k)
+        # Construction des filtres à partir des entités
+        filters = _build_filters_from_entities(entities or {})
+        
+        # Appel du retriever avec filtres
+        result = retriever.get_contextual_diagnosis(question, k=k, filters=filters)
+        
         if not result:
             return {
                 "text": "Aucune information pertinente trouvée dans la base de connaissances.",
                 "sources": [],
                 "route": "rag_no_results",
-                "meta": {}
+                "meta": {"filters_applied": filters}
             }
+            
         text = result.get("answer") or "Résultats trouvés."
         sources = _format_sources(result.get("source_documents", []))
         meta = {
@@ -121,20 +150,23 @@ def _rag_answer(question: str, k: int = 5) -> Dict[str, Any]:
             "species_index_used": result.get("species_index_used"),
             "total_results": result.get("total_results"),
             "tried": result.get("tried", []),
+            "filters_applied": filters,
         }
+        
         return {
             "text": text,
             "sources": sources,
             "route": "rag_retriever",
             "meta": meta
         }
+        
     except Exception as e:
         logger.error(f"❌ Erreur RAGRetriever: {e}")
         return {
             "text": "Une erreur est survenue lors de la recherche RAG.",
             "sources": [],
             "route": "rag_error",
-            "meta": {"error": str(e)}
+            "meta": {"error": str(e), "filters_applied": _build_filters_from_entities(entities or {})}
         }
 
 # ===== Règles compute =====
@@ -193,123 +225,173 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
         ans["error"] = str(e)
     return ans
 
-# ===== AJOUT #1 : Sanitizer final minimaliste =====
+# ===== NETTOYAGE RENFORCÉ =====
 def _final_sanitize(text: str) -> str:
+    """
+    Sanitisation renforcée pour éliminer les fragments indésirables des PDFs.
+    """
     if not text:
         return ""
-    # 1) enlever toute mention de sources explicites
+    
+    # 1) Enlever toute mention de sources explicites
     text = re.sub(r'\*\*?source\s*:\s*[^*\n]+(\*\*)?', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\(?(source|src)\s*:\s*[^)\n]+?\)?', '', text, flags=re.IGNORECASE)
-    # 2) enlever noms de fichiers PDF probables
+    
+    # 2) Enlever noms de fichiers PDF/documents
     text = re.sub(r'[\w\-\s]+\.(pdf|docx?|xlsx)', '', text, flags=re.IGNORECASE)
-    # 3) patterns techniques fréquents à filtrer
-    for pat in [
-        r'ould be aware of local legislation[^.]+\.',
-        r'Apply your knowledge and judgment[^.]+\.',
-        r'Please use the .+ as a reference[^.]+\.',
+    
+    # 3) Patterns d'en-têtes à supprimer (étendus)
+    headers_to_remove = [
         r'INTRODUCTION AND .+ CHARACTERISTICS',
+        r'INTRODUCTION\s+AND\s+[\w\s]+\s+CHARACTERISTICS',
+        r'Cobb\s+MX\s*[\w\s]*',
+        r'Ross\s+\d+\s*[\w\s]*(?:Male|Female|Mâle|Femelle)?',
+        r'BODY\s+WEIGHT\s+AND\s+FEED\s+CONVERSION',
+        r'PERFORMANCE\s+OBJECTIVES',
+        r'NUTRITION\s+SPECIFICATIONS?',
+        r'MANAGEMENT\s+GUIDE',
+        r'BREEDING\s+GUIDE',
+        r'PARENT\s+STOCK\s+GUIDE',
+    ]
+    
+    for pattern in headers_to_remove:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    
+    # 4) Tableaux mal formatés (patterns étendus)
+    table_patterns = [
         r'Age \(days\)\s*Weight \(lb\)\s*Daily Gain[^|]+',
         r'Imperial \(Male\) C500[^|]+',
-    ]:
-        text = re.sub(pat, '', text, flags=re.IGNORECASE)
-    # 4) espaces propres
-    text = re.sub(r'[ \t]+', ' ', text)
-    text = re.sub(r'\n\s*\n', '\n\n', text)
-    return text.strip()
+        r'Age\s+Weight\s+Feed\s+Conversion[^|]+',
+        r'\|\s*Age\s*\|\s*Weight\s*\|\s*[^|]+\|',
+        r'Days\s+Grams\s+Pounds\s+Feed[^|]+',
+        r'Age\s+\(weeks\)\s+Body\s+Weight[^|]+',
+        # Patterns de tableaux avec colonnes mal alignées
+        r'\d+\s+\d+\.\d+\s+\d+\.\d+\s+\d+\.\d+\s*\n',
+        r'Week\s+\d+\s+Week\s+\d+\s+Week\s+\d+',
+    ]
+    
+    for pattern in table_patterns:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    
+    # 5) Phrases techniques récurrentes à filtrer
+    technical_phrases = [
+        r'should be aware of local legislation[^.]+\.',
+        r'Apply your knowledge and judgment[^.]+\.',
+        r'Please use the .+ as a reference[^.]+\.',
+        r'Consult your veterinarian[^.]+\.',
+        r'These are guidelines only[^.]+\.',
+        r'Results may vary[^.]+\.',
+        r'Contact your technical[^.]+\.',
+    ]
+    
+    for phrase in technical_phrases:
+        text = re.sub(phrase, '', text, flags=re.IGNORECASE)
+    
+    # 6) Nettoyage des espaces et formatage
+    text = re.sub(r'[ \t]+', ' ', text)  # Multiples espaces
+    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Multiples retours ligne
+    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)  # Espaces début/fin de ligne
+    
+    # 7) Suppression des lignes très courtes (probablement des fragments)
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        line = line.strip()
+        if len(line) > 10 or line.startswith(('##', '**', '-', '•')):  # Garder le markdown
+            cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines).strip()
 
-# ===== AJOUT #2 : Prompt de synthèse optionnel (no-op par défaut)
-IMPROVED_SYNTHESIS_PROMPT = """
-Tu es un expert avicole. Réponds de manière claire et synthétique.
+# ===== WRAPPER LLM =====
+def _maybe_synthesize(question: str, context_text: str) -> str:
+    """
+    Si ENABLE_SYNTH_PROMPT=1, tente d'appeler un wrapper LLM interne.
+    En cas d'échec ou si non configuré, retourne le texte tel quel (no-op).
+    """
+    try:
+        if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
+            return context_text
+            
+        # Import paresseux du wrapper LLM
+        try:
+            from ..utils.llm import complete  # Nouveau wrapper standardisé
+        except ImportError:
+            try:
+                from ..utils.openai_utils import complete  # Fallback
+            except ImportError:
+                logger.warning("⚠️ Aucun wrapper LLM trouvé pour la synthèse")
+                return context_text
+        
+        # Prompt de synthèse optimisé
+        synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
 
 RÈGLES IMPORTANTES :
 - NE JAMAIS mentionner les sources dans ta réponse
 - NE JAMAIS inclure de fragments de texte brut des PDFs
 - NE JAMAIS copier-coller des tableaux mal formatés
 - Utiliser du Markdown (##, ###, -, **)
-- Si l'info est incertaine, donne une fourchette et dis-le.
+- Si l'info est incertaine, donne une fourchette et dis-le
+- Réponse concise mais complète
 
-Exemple de bonne réponse :
-## Poids idéal Ross 308 mâle à 17 jours
-**Objectifs :**
-- Ross 308 mâle : 450-500 g
-**Facteurs clés :**
-- Alimentation 22–23% protéines; Température 24–26°C
-**Surveillance :**
-- Pesées hebdo, viser CV < 10%
+Question : {question}
 
-Contexte (extraits nettoyés) :
+Informations à synthétiser :
 {context}
 
-Question :
-{question}
+Réponse synthétique :""".format(question=question, context=_final_sanitize(context_text)[:2000])
 
-Réponse synthétique :
-""".strip()
-
-def _maybe_synthesize(question: str, context_text: str) -> str:
-    """
-    Si ENABLE_SYNTH_PROMPT=1, tente d'appeler un client LLM interne (facultatif).
-    En cas d'échec ou si non configuré, retourne le texte tel quel (no-op).
-    """
-    try:
-        if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
-            return context_text
-        # Import paresseux pour ne rien casser si le module n'existe pas
-        from app.api.v1.utils import llm  # attendu: llm.complete(prompt, temperature=0.2) -> str
-        cleaned_ctx = _final_sanitize((context_text or ""))[:2000]
-        prompt = IMPROVED_SYNTHESIS_PROMPT.format(context=cleaned_ctx, question=question or "")
-        out = llm.complete(prompt, temperature=0.2)
-        return _final_sanitize(out or context_text) or context_text
-    except Exception as _:
-        # Sécurité maximale: ne rien casser si le LLM n'est pas dispo
+        synthesized = complete(synthesis_prompt, temperature=0.2)
+        return _final_sanitize(synthesized) if synthesized else context_text
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
         return context_text
 
-# ===== Hybride : réponse générale + clarifications =====
+# ===== MODE HYBRIDE AMÉLIORÉ =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
-    Génère une réponse générale via RAGRetriever + ajoute des précisions selon l'intention.
+    Mode hybride amélioré : synthèse courte + questions manquantes uniquement.
+    Ne plus concaténer le texte brut RAG.
     """
     try:
-        rag = _rag_answer(question, k=5)
+        # Recherche RAG avec filtres
+        rag = _rag_answer(question, k=3, entities=entities)  # k réduit pour synthèse
         base_text = rag.get("text", "")
+        
+        # Synthèse courte au lieu de concaténation
+        if base_text:
+            # Génération d'une réponse synthétique courte
+            synthesis_prompt = f"""Basé sur ces informations, donne une réponse courte (2-3 phrases) sur : {question}
 
-        # Exemples de petites enrichissements thématiques
-        qlower = question.lower()
-        if intent == Intention.PerfTargets and ("poids" in qlower or "weight" in qlower):
-            age_detected = entities.get("age_days") or (entities.get("age_weeks", 0) * 7) or 14
-            specific_examples = f"""
+Informations disponibles : {base_text[:1000]}
 
-**Repères typiques à ~{age_detected} jours (ordre de grandeur):**
-• Ross 308 mâle: ~400–450 g  • femelle: ~350–400 g
-• Cobb 500 mâle: ~420–470 g  • femelle: ~370–420 g
-*À confirmer selon programme alimentaire et conditions.*
-"""
-            enhanced_text = base_text + specific_examples
-        elif intent == Intention.WaterFeedIntake:
-            enhanced_text = base_text + "\n\n**Facteurs clés :** température ambiante, type d'abreuvoirs, qualité de l'eau, état sanitaire."
-        elif intent == Intention.NutritionSpecs:
-            enhanced_text = base_text + "\n\n**Variables :** phase (starter/grower/finisher), objectifs de performance, climat."
+Réponse courte et générale :"""
+            
+            try:
+                from ..utils.llm import complete
+                short_answer = complete(synthesis_prompt, temperature=0.3)
+                enhanced_text = _final_sanitize(short_answer) if short_answer else "Informations partielles disponibles."
+            except ImportError:
+                # Fallback : réponse générique courte
+                enhanced_text = f"Des informations sont disponibles concernant {intent.value}. Pour une réponse précise, veuillez compléter les détails ci-dessous."
         else:
-            enhanced_text = base_text
-
-        # >>> AJOUT : Sanitize + (optionnel) synthèse
-        enhanced_text = _final_sanitize(enhanced_text)
-        enhanced_text = _maybe_synthesize(question, enhanced_text)
-
+            enhanced_text = f"Informations sur {intent.value} disponibles. Précisions nécessaires :"
+        
         return {
             "text": enhanced_text,
-            "source": "rag_retriever",
-            "confidence": 0.7,
+            "source": "hybrid_synthesis",
+            "confidence": 0.6,
             "enriched": True,
             "rag_meta": rag.get("meta", {}),
             "rag_sources": rag.get("sources", [])
         }
+        
     except Exception as e:
-        logger.error(f"❌ Error generating general answer: {e}")
+        logger.error(f"❌ Error generating hybrid answer: {e}")
         return {
-            "text": f"Voici des informations générales sur {intent}. Pour une réponse précise, merci de compléter les détails demandés.",
+            "text": f"Informations partielles sur {intent.value}. Merci de compléter les détails demandés pour une réponse précise.",
             "source": "fallback",
-            "confidence": 0.5,
+            "confidence": 0.4,
             "enriched": False
         }
 
@@ -320,6 +402,7 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
+        
         # Étape 1: Classification
         classification = classify(question)
         logger.debug(f"Classification: {classification}")
@@ -336,9 +419,9 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
         missing_fields = completeness["missing_fields"]
         logger.info(f"Completeness score: {completeness_score} | Missing: {missing_fields}")
 
-        # HYBRIDE : si infos manquantes → réponse générale + clarifications
+        # HYBRIDE : si infos manquantes → synthèse courte + clarifications
         if missing_fields and completeness_score < 0.8:
-            logger.info("🧭 Mode hybride: réponse générale + questions de précision")
+            logger.info("🧭 Mode hybride: synthèse courte + questions de précision")
             general_answer = _generate_general_answer_with_specifics(question, entities, intent, missing_fields)
             return {
                 "type": "partial_answer",
@@ -347,7 +430,7 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
                 "completeness_score": completeness_score,
                 "missing_fields": missing_fields,
                 "follow_up_questions": completeness["follow_up_questions"],
-                "route_taken": "hybrid_rag_clarification",
+                "route_taken": "hybrid_synthesis_clarification",
                 "session_id": session_id
             }
 
@@ -355,7 +438,6 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
         if _should_compute(intent):
             logger.info(f"🧮 Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)
-            # >>> AJOUT : sanitize final sur texte de calcul (par sûreté)
             result["text"] = _final_sanitize(result.get("text", ""))
             return {
                 "type": "answer",
@@ -365,18 +447,19 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
                 "session_id": session_id
             }
 
-        # Étape 5: RAG complet via RAGRetriever
-        logger.info("📚 RAG via RAGRetriever")
-        rag = _rag_answer(question, k=5)
+        # Étape 5: RAG complet via RAGRetriever avec filtres
+        logger.info("📚 RAG via RAGRetriever avec filtres")
+        rag = _rag_answer(question, k=5, entities=entities)
         rag_text = _final_sanitize(rag.get("text", ""))
         rag_text = _maybe_synthesize(question, rag_text)
+        
         return {
             "type": "answer",
             "intent": intent,
             "answer": {
                 "text": rag_text,
                 "source": "rag_retriever",
-                "confidence": 0.8,  # valeur générique; on peut ajouter un scoring plus tard
+                "confidence": 0.8,
                 "sources": rag.get("sources", []),
                 "meta": rag.get("meta", {})
             },

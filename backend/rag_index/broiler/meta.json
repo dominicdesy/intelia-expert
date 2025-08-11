@@ -1,17 +1,27 @@
 {
   "species": "broiler",
-  "model": "sentence-transformers/all-MiniLM-L6-v2",
-  "build_time": "2025-08-10T22:50:06",
-  "num_files": 20,
-  "num_chunks": 713,
+  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "files_indexed": 19,
+  "chunks_indexed": 1274,
   "files_sample": [
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\biosecurity\\biosec-poultry-farms.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Breeder-Management-Guide.pdf",
     "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Broiler-Guide_English-2021-min.pdf",
-    "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Cobb-Male-Supplement.pdf"
+    "C:\\intelia_gpt\\documents\\public\\species\\broiler\\breeds\\cobb\\Cobb-MX-Male-Supplement.pdf"
   ],
   "pdf_scan_summary": {
-    "RedactionAnnots": 20
-  }
+    "scanned": 19,
+    "copy_restricted": 0,
+    "redactions": 0
+  },
+  "quality_stats": {
+    "removed": 19,
+    "kept": 97
+  },
+  "enhanced_features": true,
+  "tables_found": 735,
+  "perf_targets_tables": 7,
+  "metadata_coverage": 0.0,
+  "version": "1.3+enhanced"
 }

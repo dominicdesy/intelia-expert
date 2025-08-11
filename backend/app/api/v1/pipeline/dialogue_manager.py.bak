@@ -9,6 +9,8 @@ Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct)
 from typing import Dict, Any, List, Optional
 import logging
 import os
+# >>> AJOUT
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +193,77 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
         ans["error"] = str(e)
     return ans
 
+# ===== AJOUT #1 : Sanitizer final minimaliste =====
+def _final_sanitize(text: str) -> str:
+    if not text:
+        return ""
+    # 1) enlever toute mention de sources explicites
+    text = re.sub(r'\*\*?source\s*:\s*[^*\n]+(\*\*)?', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\(?(source|src)\s*:\s*[^)\n]+?\)?', '', text, flags=re.IGNORECASE)
+    # 2) enlever noms de fichiers PDF probables
+    text = re.sub(r'[\w\-\s]+\.(pdf|docx?|xlsx)', '', text, flags=re.IGNORECASE)
+    # 3) patterns techniques fréquents à filtrer
+    for pat in [
+        r'ould be aware of local legislation[^.]+\.',
+        r'Apply your knowledge and judgment[^.]+\.',
+        r'Please use the .+ as a reference[^.]+\.',
+        r'INTRODUCTION AND .+ CHARACTERISTICS',
+        r'Age \(days\)\s*Weight \(lb\)\s*Daily Gain[^|]+',
+        r'Imperial \(Male\) C500[^|]+',
+    ]:
+        text = re.sub(pat, '', text, flags=re.IGNORECASE)
+    # 4) espaces propres
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    return text.strip()
+
+# ===== AJOUT #2 : Prompt de synthèse optionnel (no-op par défaut)
+IMPROVED_SYNTHESIS_PROMPT = """
+Tu es un expert avicole. Réponds de manière claire et synthétique.
+
+RÈGLES IMPORTANTES :
+- NE JAMAIS mentionner les sources dans ta réponse
+- NE JAMAIS inclure de fragments de texte brut des PDFs
+- NE JAMAIS copier-coller des tableaux mal formatés
+- Utiliser du Markdown (##, ###, -, **)
+- Si l'info est incertaine, donne une fourchette et dis-le.
+
+Exemple de bonne réponse :
+## Poids idéal Ross 308 mâle à 17 jours
+**Objectifs :**
+- Ross 308 mâle : 450-500 g
+**Facteurs clés :**
+- Alimentation 22–23% protéines; Température 24–26°C
+**Surveillance :**
+- Pesées hebdo, viser CV < 10%
+
+Contexte (extraits nettoyés) :
+{context}
+
+Question :
+{question}
+
+Réponse synthétique :
+""".strip()
+
+def _maybe_synthesize(question: str, context_text: str) -> str:
+    """
+    Si ENABLE_SYNTH_PROMPT=1, tente d'appeler un client LLM interne (facultatif).
+    En cas d'échec ou si non configuré, retourne le texte tel quel (no-op).
+    """
+    try:
+        if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
+            return context_text
+        # Import paresseux pour ne rien casser si le module n'existe pas
+        from app.api.v1.utils import llm  # attendu: llm.complete(prompt, temperature=0.2) -> str
+        cleaned_ctx = _final_sanitize((context_text or ""))[:2000]
+        prompt = IMPROVED_SYNTHESIS_PROMPT.format(context=cleaned_ctx, question=question or "")
+        out = llm.complete(prompt, temperature=0.2)
+        return _final_sanitize(out or context_text) or context_text
+    except Exception as _:
+        # Sécurité maximale: ne rien casser si le LLM n'est pas dispo
+        return context_text
+
 # ===== Hybride : réponse générale + clarifications =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
@@ -218,6 +291,10 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
             enhanced_text = base_text + "\n\n**Variables :** phase (starter/grower/finisher), objectifs de performance, climat."
         else:
             enhanced_text = base_text
+
+        # >>> AJOUT : Sanitize + (optionnel) synthèse
+        enhanced_text = _final_sanitize(enhanced_text)
+        enhanced_text = _maybe_synthesize(question, enhanced_text)
 
         return {
             "text": enhanced_text,
@@ -278,6 +355,8 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
         if _should_compute(intent):
             logger.info(f"🧮 Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)
+            # >>> AJOUT : sanitize final sur texte de calcul (par sûreté)
+            result["text"] = _final_sanitize(result.get("text", ""))
             return {
                 "type": "answer",
                 "intent": intent,
@@ -289,11 +368,13 @@ def handle(session_id: str, question: str, lang: str="fr") -> Dict[str, Any]:
         # Étape 5: RAG complet via RAGRetriever
         logger.info("📚 RAG via RAGRetriever")
         rag = _rag_answer(question, k=5)
+        rag_text = _final_sanitize(rag.get("text", ""))
+        rag_text = _maybe_synthesize(question, rag_text)
         return {
             "type": "answer",
             "intent": intent,
             "answer": {
-                "text": rag.get("text", ""),
+                "text": rag_text,
                 "source": "rag_retriever",
                 "confidence": 0.8,  # valeur générique; on peut ajouter un scoring plus tard
                 "sources": rag.get("sources", []),
