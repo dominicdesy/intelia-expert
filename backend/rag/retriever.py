@@ -1,12 +1,14 @@
 """
-RAG Retriever - Species-aware, table-first, multi-index, robust embedding support
+RAG Retriever - Enhanced Species-aware, table-first, multi-index with Advanced Detection
 
 Améliorations clés vs. version précédente :
-- Multi-index par espèce (broiler/layer/global) avec détection auto et fallback
-- Priorité table-first (re-ranking quand la requête contient des chiffres/unités)
+- Enhanced species detection avec scoring de confiance
+- Multi-index par espèce (broiler/layer/global) avec détection auto et fallback intelligent
+- Priorité table-first (re-ranking quand la requête contient des chiffres/unités)  
 - Cache des index FAISS par espèce (évite les rechargements)
 - Modèle SentenceTransformer paresseux et réutilisable
-- Conserve : multi-méthodes d'embeddings, normalisation, robustesse FAISS, synthèse d'answer, debug
+- Gestion des ambiguïtés avec fallbacks adaptatifs
+- Integration des métadonnées enrichies
 
 ENV pris en charge (si présents) :
 - RAG_INDEX_DIR (racine contenant /global, /broiler, /layer)
@@ -29,57 +31,136 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # -----------------------------
-# Helpers (espèce & tables)
+# Enhanced Helpers (espèce & tables)
 # -----------------------------
 
 _SPECIES = ("broiler", "layer", "global")
 
+def _enhanced_detect_species_from_query(q: str) -> Tuple[Optional[str], float]:
+    """
+    Enhanced species detection from query with confidence scoring
+    Returns: (species, confidence_score)
+    """
+    ql = (q or "").lower()
+    species_scores = {"broiler": 0.0, "layer": 0.0}
+    
+    # Enhanced keywords with weights
+    species_keywords_weighted = {
+        "layer": [
+            # High confidence indicators (weight 3)
+            ("pondeuse", 3), ("ponte", 3), ("œuf", 3), ("oeuf", 3), ("layer", 3),
+            ("lohmann brown", 3), ("hy-line brown", 3), ("w-36", 3), ("w-80", 3),
+            ("lsl-lite", 3), ("isa brown", 3),
+            # Medium confidence (weight 2)
+            ("lohmann", 2), ("hy-line", 2), ("hyline", 2), ("isa", 2), ("laying hen", 2),
+            ("poule pondeuse", 2), ("egg production", 2), ("hen day", 2),
+            # Lower confidence (weight 1)
+            ("w36", 1), ("w80", 1), ("production", 1)
+        ],
+        "broiler": [
+            # High confidence indicators (weight 3)
+            ("ross 308", 3), ("ross308", 3), ("cobb 500", 3), ("cobb500", 3),
+            ("ross 708", 3), ("poulet de chair", 3), ("broiler", 3), ("hubbard", 3),
+            # Medium confidence (weight 2)
+            ("ross", 2), ("cobb", 2), ("meat chicken", 2), ("chair", 2),
+            ("griller", 2), ("fcr", 2), ("finisher", 2), ("starter", 2),
+            # Lower confidence (weight 1)  
+            ("croissance", 1), ("poids", 1), ("gain", 1), ("weight", 1)
+        ]
+    }
+    
+    # Calculate weighted scores
+    for species, keywords in species_keywords_weighted.items():
+        for keyword, weight in keywords:
+            if keyword in ql:
+                species_scores[species] += weight
+    
+    # Select best species
+    max_score = max(species_scores.values())
+    if max_score == 0:
+        return None, 0.0
+    
+    best_species = max(species_scores, key=species_scores.get)
+    confidence = min(max_score / 10.0, 1.0)  # Normalize to 0-1
+    
+    # Handle conflicts intelligently
+    sorted_scores = sorted(species_scores.values(), reverse=True)
+    if len(sorted_scores) > 1 and sorted_scores[0] - sorted_scores[1] < 2:
+        # Ambiguous case - reduce confidence but don't eliminate
+        return best_species, confidence * 0.6
+    
+    return best_species, confidence
 
 def _detect_species_from_query(q: str) -> Optional[str]:
-    ql = (q or "").lower()
-    # Indices "layer"
-    if any(w in ql for w in ["layer", "pondeuse", "ponte", "œuf", "oeuf", "lohmann", "hy-line", "hyline", "w-36", "w36", "w-80", "w80"]):
-        return "layer"
-    # Indices "broiler"
-    if any(w in ql for w in ["broiler", "poulet de chair", "ross 308", "ross308", "cobb 500", "cobb500", "croissance", "poids", "fcr"]):
-        # garde-fou : si indices layer aussi → incertain
-        if any(w in ql for w in ["layer", "pondeuse", "ponte", "lohmann", "hy-line", "hyline"]):
-            return None
-        return "broiler"
-    return None
-
+    """Legacy compatibility wrapper"""
+    species, confidence = _enhanced_detect_species_from_query(q)
+    # Only return species if confidence is reasonable
+    return species if confidence > 0.3 else None
 
 def _looks_like_table(text: str, md: Dict[str, Any]) -> bool:
+    """Enhanced table detection"""
     # métadonnée explicite
     if isinstance(md, dict) and (md.get("chunk_type") == "table" or md.get("table_type")):
         return True
+    
     t = text or ""
-    # indices rapides (markdown pipes, CSV, colonnes à espaces)
-    if t.count("|") >= 3:
-        return True
-    if t.count(",") >= 5 and "\n" in t:
-        return True
-    if re.search(r"\S+\s{2,}\S+\s{2,}\S+", t):
-        return True
-    return False
-
+    
+    # Enhanced detection patterns
+    table_indicators = [
+        # Markdown tables
+        t.count("|") >= 3,
+        # CSV-like content
+        t.count(",") >= 5 and "\n" in t,
+        # Tabular spacing (multiple columns)
+        re.search(r"\S+\s{2,}\S+\s{2,}\S+", t),
+        # Headers with numerical data
+        re.search(r"(?:age|week|day|poids|weight|fcr|protein)\s+\d+", t, re.IGNORECASE),
+        # Performance tables (common patterns)
+        re.search(r"\d+\s*[-–]\s*\d+\s*(?:days?|jours?|weeks?|sem)", t, re.IGNORECASE),
+        # Nutritional tables
+        re.search(r"(?:lysine|protein|energy|calcium)\s*[:\-]\s*\d+", t, re.IGNORECASE)
+    ]
+    
+    return any(table_indicators)
 
 def _query_has_numbers_or_units(q: str) -> bool:
+    """Enhanced detection of technical queries needing table-first ranking"""
     ql = (q or "").lower()
-    return any(ch.isdigit() for ch in ql) or any(u in ql for u in ["kg", "g", "fcr", "%", "°c", "ppm", "m³", "m3"])
-
+    
+    # Numbers
+    has_numbers = any(ch.isdigit() for ch in ql)
+    
+    # Technical units (expanded list)
+    technical_units = [
+        "kg", "g", "fcr", "%", "°c", "ppm", "m³", "m3", "lux", "pa",
+        "kcal", "mj", "mg", "days", "weeks", "jours", "semaines",
+        "density", "densité", "birds/m²", "sujets/m²"
+    ]
+    
+    has_units = any(u in ql for u in technical_units)
+    
+    # Performance indicators
+    performance_terms = [
+        "rate", "taux", "ratio", "indice", "conversion", "gain",
+        "production", "efficiency", "mortality", "viability"
+    ]
+    
+    has_performance_terms = any(t in ql for t in performance_terms)
+    
+    return has_numbers or has_units or has_performance_terms
 
 # =====================================================================
-# Retriever
+# Enhanced Retriever
 # =====================================================================
 
 class RAGRetriever:
     """
-    RAG retriever avec :
+    Enhanced RAG retriever avec :
     - Méthodes d'embedding multiples (SentenceTransformers / OpenAI / TF-IDF)
-    - Multi-index par espèce (broiler/layer/global) avec auto-détection
-    - Table-first re-ranking
+    - Multi-index par espèce (broiler/layer/global) avec auto-détection améliorée
+    - Table-first re-ranking intelligent
     - Chargements FAISS robustes + métadonnées normalisées
+    - Gestion avancée des ambiguïtés et fallbacks adaptatifs
     """
 
     # Cache modèle SentenceTransformer partagé (par worker)
@@ -100,17 +181,12 @@ class RAGRetriever:
         self._load_index_for_species("global")
 
     # -----------------------------
-    # Résolution chemins index
+    # Résolution chemins index - Enhanced
     # -----------------------------
 
     def _get_rag_index_path(self, species: str) -> Path:
         """
-        Résout le chemin d'index pour une espèce donnée en respectant (par ordre) :
-        - RAG_INDEX_<SPECIES>
-        - RAG_INDEX_DIR/<species>
-        - ./backend/rag_index/<species>  # 🔧 CORRECTION AJOUTÉE
-        - ./rag_index/<species>
-        - ./rag_index (fallback legacy)
+        Enhanced path resolution with better backend support
         """
         sp = (species or "global").lower()
         env_key = f"RAG_INDEX_{sp.upper()}"
@@ -123,26 +199,31 @@ class RAGRetriever:
             if p.exists():
                 return p
 
-        # 🔧 CORRECTION : Ajouter le chemin backend/rag_index en priorité
-        p_backend = Path.cwd() / "backend" / "rag_index" / sp
-        if p_backend.exists():
-            logger.info("✅ Index trouvé dans backend/rag_index pour %s: %s", sp, p_backend)
-            return p_backend
+        # Enhanced priority paths
+        search_paths = [
+            Path.cwd() / "backend" / "rag_index" / sp,  # Backend priority
+            Path.cwd() / "rag_index" / sp,
+            Path(__file__).parent.parent / "backend" / "rag_index" / sp,
+            Path(__file__).parent.parent / "rag_index" / sp,
+        ]
+        
+        for path in search_paths:
+            if path.exists():
+                logger.info("✅ Index trouvé pour %s: %s", sp, path)
+                return path
 
-        p1 = Path.cwd() / "rag_index" / sp
-        if p1.exists():
-            return p1
-        p2 = Path(__file__).parent.parent / "rag_index" / sp
-        if p2.exists():
-            return p2
+        # Fallback paths
+        fallback_paths = [
+            Path.cwd() / "backend" / "rag_index",
+            Path.cwd() / "rag_index"
+        ]
+        
+        for path in fallback_paths:
+            if path.exists():
+                logger.info("✅ Fallback index pour %s: %s", sp, path)
+                return path
 
-        # 🔧 CORRECTION : Fallback aussi vers backend/rag_index
-        p_backend_fallback = Path.cwd() / "backend" / "rag_index"
-        if p_backend_fallback.exists():
-            logger.info("✅ Fallback vers backend/rag_index pour %s: %s", sp, p_backend_fallback)
-            return p_backend_fallback
-
-        # fallback legacy (un seul dossier)
+        # Ultimate fallback
         return Path.cwd() / "rag_index"
 
     # -----------------------------
@@ -181,11 +262,114 @@ class RAGRetriever:
         return out
 
     # -----------------------------
-    # Chargement index (par espèce)
+    # 🔧 CORRECTION CRITIQUE : Normalisation robuste des documents
+    # -----------------------------
+
+    def _normalize_documents_format(self, raw_docs: Any) -> List[Dict[str, Any]]:
+        """
+        🔧 CORRECTION : Normalise différents formats de documents pour éviter l'erreur 'list' object has no attribute 'get'
+        """
+        normalized = []
+        
+        try:
+            if isinstance(raw_docs, list):
+                for i, doc in enumerate(raw_docs):
+                    if isinstance(doc, dict):
+                        # Format déjà correct
+                        if "content" in doc:
+                            normalized.append(doc)
+                        elif "text" in doc:
+                            # Conversion text -> content
+                            normalized.append({
+                                "content": doc["text"],
+                                "metadata": doc.get("metadata", {}),
+                                "source": doc.get("source", f"doc_{i}")
+                            })
+                        else:
+                            # Dictionnaire avec clés inconnues - prendre la première valeur string
+                            content = ""
+                            for key, value in doc.items():
+                                if isinstance(value, str) and len(value) > 10:
+                                    content = value
+                                    break
+                            normalized.append({
+                                "content": content or str(doc),
+                                "metadata": {"original_format": "dict_conversion"},
+                                "source": f"doc_{i}"
+                            })
+                    elif isinstance(doc, str):
+                        # Format string simple
+                        normalized.append({
+                            "content": doc,
+                            "metadata": {"original_format": "string"},
+                            "source": f"doc_{i}"
+                        })
+                    else:
+                        # Autres formats - conversion en string
+                        normalized.append({
+                            "content": str(doc),
+                            "metadata": {"original_format": type(doc).__name__},
+                            "source": f"doc_{i}"
+                        })
+            
+            elif isinstance(raw_docs, dict):
+                # Format dictionnaire avec clés comme IDs
+                for key, value in raw_docs.items():
+                    if isinstance(value, dict):
+                        if "content" in value:
+                            normalized.append(value)
+                        elif "text" in value:
+                            normalized.append({
+                                "content": value["text"],
+                                "metadata": value.get("metadata", {}),
+                                "source": value.get("source", key)
+                            })
+                        else:
+                            # Dictionnaire sans 'content' ni 'text'
+                            content = str(value)
+                            for k, v in value.items():
+                                if isinstance(v, str) and len(v) > 10:
+                                    content = v
+                                    break
+                            normalized.append({
+                                "content": content,
+                                "metadata": {"original_format": "dict_value"},
+                                "source": key
+                            })
+                    elif isinstance(value, str):
+                        normalized.append({
+                            "content": value,
+                            "metadata": {"original_format": "dict_string"},
+                            "source": key
+                        })
+            
+            else:
+                # Format inconnu - essayer de le convertir
+                logger.warning("Format de documents inconnu: %s", type(raw_docs).__name__)
+                normalized.append({
+                    "content": str(raw_docs),
+                    "metadata": {"original_format": type(raw_docs).__name__},
+                    "source": "unknown_format"
+                })
+        
+        except Exception as e:
+            logger.error("Erreur lors de la normalisation des documents: %s", e)
+            # Fallback de sécurité
+            normalized = [{
+                "content": "Erreur de chargement du document",
+                "metadata": {"error": str(e)},
+                "source": "error_fallback"
+            }]
+        
+        logger.info("✅ Documents normalisés: %d documents convertis au format standard", len(normalized))
+        return normalized
+
+    # -----------------------------
+    # Chargement index (par espèce) - Enhanced avec correction
     # -----------------------------
 
     def _load_index_for_species(self, species: str) -> bool:
-        """Charge FAISS + documents pour une espèce. Idempotent et mis en cache."""
+        """Enhanced index loading with robust document format handling"""
         sp = (species or "global").lower()
         if sp not in _SPECIES:
             sp = "global"
@@ -213,7 +397,11 @@ class RAGRetriever:
 
             raw_method = data.get("method", data.get("embedding_method", "SentenceTransformers"))
             method = self._normalize_embedding_method(raw_method)
-            docs = data.get("documents", [])
+            
+            # 🔧 CORRECTION CRITIQUE : Normalisation robuste des documents
+            raw_docs = data.get("documents", [])
+            docs = self._normalize_documents_format(raw_docs)
+            
             embeddings = data.get("embeddings", None)
             emb_dim = (len(embeddings[0]) if isinstance(embeddings, list) and embeddings else None)
 
@@ -224,7 +412,7 @@ class RAGRetriever:
             self.emb_dim_by_species[sp] = emb_dim
             self.is_loaded_by_species[sp] = True
 
-            # Sauvegarder normalisation méthode si différente
+            # Enhanced metadata correction
             if raw_method != method:
                 try:
                     data["method"] = method
@@ -365,7 +553,7 @@ class RAGRetriever:
             return []
 
     # -----------------------------
-    # Table-first re-ranking
+    # Enhanced Table-first re-ranking
     # -----------------------------
 
     @staticmethod
@@ -381,38 +569,85 @@ class RAGRetriever:
             return 0.0
         tw = set((t or "").lower().split())
         overlap = len(qw & tw) / max(1, len(qw))
-        return min(0.1, overlap * 0.1)  # petit bonus contrôlé
+        return min(0.15, overlap * 0.15)  # Enhanced bonus
 
-    def _table_first_rerank(self, query: str, pairs: List[Tuple[Dict[str, Any], float]]) -> List[Tuple[Dict[str, Any], float]]:
+    def _enhanced_table_first_rerank(self, query: str, pairs: List[Tuple[Dict[str, Any], float]]) -> List[Tuple[Dict[str, Any], float]]:
+        """Enhanced table-first ranking with better detection"""
         if not pairs or not _query_has_numbers_or_units(query):
             return pairs
+        
         boosted: List[Tuple[Dict[str, Any], float, float]] = []
+        
         for doc, raw in pairs:
             text = doc.get("content", "")
             md = doc.get("metadata", {}) or {}
             base = self._score_from_distance(raw)
             bonus = 0.0
+            
+            # Enhanced table detection bonus
             if _looks_like_table(text, md):
+                bonus += 0.2  # Increased bonus for tables
+            
+            # Metadata-based bonuses
+            if md.get("chunk_type") == "table":
                 bonus += 0.15
+            
+            if md.get("domain") in ["performance", "nutrition"]:
+                bonus += 0.1
+            
+            # Technical content bonus
+            technical_patterns = [
+                r"\d+\s*(?:kg|g|%|°c|days?|weeks?|fcr)",
+                r"(?:protein|lysine|calcium|energy)\s*[:=]\s*\d+",
+                r"(?:mortality|growth|conversion)\s*[:=]\s*\d+"
+            ]
+            
+            for pattern in technical_patterns:
+                if re.search(pattern, text.lower()):
+                    bonus += 0.05
+                    break
+            
+            # Token overlap bonus
             bonus += self._token_overlap_boost(query, text)
-            boosted.append((doc, raw, min(1.0, base + bonus)))
+            
+            # Apply bonus with ceiling
+            final_score = min(1.0, base + bonus)
+            boosted.append((doc, raw, final_score))
+        
+        # Sort by enhanced score
         boosted.sort(key=lambda r: r[2], reverse=True)
         return [(d, s) for (d, s, _) in boosted]
 
     # -----------------------------
-    # API publique
+    # Enhanced API publique
     # -----------------------------
 
     def get_contextual_diagnosis(self, query: str, k: int = 5) -> Optional[Dict[str, Any]]:
         """
-        Recherche species-aware + table-first.
-        Retourne une réponse synthétisée + documents sources.
+        Enhanced recherche species-aware + table-first with adaptive fallbacks.
+        Retourne une réponse synthétisée + documents sources avec métadonnées enrichies.
         """
-        species_hint = _detect_species_from_query(query) or "global"
+        # Enhanced species detection with confidence
+        species_hint, confidence = _enhanced_detect_species_from_query(query)
+        
+        if not species_hint:
+            species_hint = "global"
+        
         tried: List[str] = []
+        best_results = None
+        best_species = None
 
-        # ordre d'essai : espèce détectée → autres → fallback global
-        candidates = [species_hint] + [s for s in _SPECIES if s != species_hint]
+        # Adaptive search strategy based on confidence
+        if confidence > 0.7:
+            # High confidence - try detected species first
+            candidates = [species_hint] + [s for s in _SPECIES if s != species_hint]
+        elif confidence > 0.3:
+            # Medium confidence - try detected + global
+            candidates = [species_hint, "global"] + [s for s in _SPECIES if s not in [species_hint, "global"]]
+        else:
+            # Low confidence - start with global
+            candidates = ["global"] + [s for s in _SPECIES if s != "global"]
+
         for sp in candidates:
             tried.append(sp)
             if not self._load_index_for_species(sp):
@@ -423,8 +658,9 @@ class RAGRetriever:
             if emb is None:
                 continue
 
-            # élargir la recherche brute pour permettre le re-ranking
-            scores, indices = self._search_index(sp, emb, max(k * 2, 10))
+            # Adaptive search width based on species confidence
+            search_multiplier = 3 if confidence > 0.5 else 2
+            scores, indices = self._search_index(sp, emb, max(k * search_multiplier, 10))
             if scores is None or indices is None:
                 continue
 
@@ -432,59 +668,182 @@ class RAGRetriever:
             if not pairs:
                 continue
 
-            # table-first si pertinent
-            pairs = self._table_first_rerank(query, pairs)
+            # Enhanced table-first re-ranking
+            pairs = self._enhanced_table_first_rerank(query, pairs)
             pairs = pairs[:k]
 
-            answer = self._synthesize_answer(query, pairs)
+            # Store best results for potential fallback
+            if not best_results or len(pairs) > len(best_results[0]):
+                best_results = (pairs, sp, method)
+                best_species = sp
+
+            # Success criteria: good results or high confidence match
+            if pairs and (len(pairs) >= k // 2 or sp == species_hint):
+                answer = self._enhanced_synthesize_answer(query, pairs)
+                source_documents = [doc for doc, _ in pairs]
+
+                return {
+                    "answer": answer,
+                    "source_documents": source_documents,
+                    "search_type": "enhanced_vector",
+                    "total_results": len(pairs),
+                    "embedding_method": method,
+                    "species_index_used": sp,
+                    "species_detected": species_hint,
+                    "species_confidence": confidence,
+                    "tried": tried,
+                    "enhanced_features": True,
+                }
+
+        # Fallback to best results if available
+        if best_results:
+            pairs, sp, method = best_results
+            answer = self._enhanced_synthesize_answer(query, pairs)
             source_documents = [doc for doc, _ in pairs]
 
             return {
                 "answer": answer,
                 "source_documents": source_documents,
-                "search_type": "vector",
+                "search_type": "enhanced_vector_fallback",
                 "total_results": len(pairs),
                 "embedding_method": method,
                 "species_index_used": sp,
+                "species_detected": species_hint,
+                "species_confidence": confidence,
                 "tried": tried,
+                "enhanced_features": True,
             }
 
         logger.warning("Aucun résultat valide sur les espèces testées: %s", "→".join(tried))
         return None
 
-    def _synthesize_answer(self, query: str, results: List[Tuple[Dict[str, Any], float]]) -> str:
+    def _enhanced_synthesize_answer(self, query: str, results: List[Tuple[Dict[str, Any], float]]) -> str:
+        """Enhanced answer synthesis with better formatting and metadata awareness"""
         if not results:
             return "Aucune information pertinente trouvée dans la base de connaissances."
 
         try:
             parts: List[str] = []
-            for doc, _score in results[:3]:
+            
+            # Group results by source type for better organization
+            table_results = []
+            text_results = []
+            
+            for doc, score in results[:5]:  # Consider more results for synthesis
                 content = doc.get("content", "") or ""
-                src = doc.get("source", doc.get("file_path", "source inconnue")) or "source inconnue"
-                # nom de fichier lisible
-                if isinstance(src, str) and ("/" in src or "\\" in src):
-                    src = src.split("/")[-1].split("\\")[-1]
-                # tronquer le contenu pour l'aperçu
-                if len(content) > 500:
-                    content = content[:500] + "..."
-                parts.append(f"Source: {src}\n{content}")
+                metadata = doc.get("metadata", {}) or {}
+                
+                if _looks_like_table(content, metadata) or metadata.get("chunk_type") == "table":
+                    table_results.append((doc, score))
+                else:
+                    text_results.append((doc, score))
+            
+            # Prioritize tables for technical queries
+            if _query_has_numbers_or_units(query) and table_results:
+                primary_results = table_results[:2] + text_results[:1]
+            else:
+                primary_results = (table_results + text_results)[:3]
+            
+            for doc, score in primary_results:
+                content = doc.get("content", "") or ""
+                metadata = doc.get("metadata", {}) or {}
+                
+                # Enhanced source identification
+                src = self._get_enhanced_source_info(doc)
+                
+                # Content preprocessing for better readability
+                if len(content) > 600:
+                    content = content[:600] + "..."
+                
+                # Add metadata context if relevant
+                context_info = self._extract_context_info(metadata)
+                if context_info:
+                    content = f"[{context_info}]\n{content}"
+                
+                parts.append(f"**Source: {src}**\n{content}")
 
-            header = "Basé sur la base de connaissances :"  # court et clair
-            return header + "\n\n" + "\n\n".join(parts)
+            # Enhanced header based on query type
+            if _query_has_numbers_or_units(query):
+                header = "Données techniques trouvées :"
+            else:
+                header = "Informations pertinentes :"
+            
+            return header + "\n\n" + "\n\n---\n\n".join(parts)
 
         except Exception as e:
-            logger.error("Echec synthèse réponse: %s", e)
+            logger.error("Echec synthèse réponse améliorée: %s", e)
             return f"{len(results)} documents pertinents trouvés, mais la synthèse a échoué."
 
-    # Interface compacte de compatibilité (comme avant)
+    def _get_enhanced_source_info(self, doc: Dict[str, Any]) -> str:
+        """Extract enhanced source information from document"""
+        metadata = doc.get("metadata", {}) or {}
+        
+        # Try multiple source fields
+        source_candidates = [
+            metadata.get("source"),
+            metadata.get("file_path"),
+            metadata.get("source_file"),
+            doc.get("source")
+        ]
+        
+        source = next((s for s in source_candidates if s), "source inconnue")
+        
+        # Clean up file path
+        if isinstance(source, str) and ("/" in source or "\\" in source):
+            source = source.split("/")[-1].split("\\")[-1]
+        
+        # Add metadata context
+        enhancements = []
+        
+        if metadata.get("strain"):
+            enhancements.append(f"Souche: {metadata['strain']}")
+        
+        if metadata.get("production_phase"):
+            enhancements.append(f"Phase: {metadata['production_phase']}")
+        
+        if metadata.get("domain"):
+            enhancements.append(f"Domaine: {metadata['domain']}")
+        
+        if enhancements:
+            return f"{source} ({', '.join(enhancements)})"
+        
+        return source
+
+    def _extract_context_info(self, metadata: Dict[str, Any]) -> str:
+        """Extract contextual information from metadata"""
+        context_parts = []
+        
+        if metadata.get("chunk_type") == "table":
+            context_parts.append("Tableau")
+        
+        if metadata.get("age_range"):
+            context_parts.append(f"Âge: {metadata['age_range']}")
+        
+        if metadata.get("technical_level") == "advanced":
+            context_parts.append("Niveau avancé")
+        
+        return " - ".join(context_parts)
+
+    # Interface compacte de compatibilité (améliorée)
     def retrieve(self, query: str, **kwargs) -> List[Dict[str, Any]]:
+        """Enhanced retrieve method with backward compatibility"""
         result = self.get_contextual_diagnosis(query, k=kwargs.get("k", 5))
         if result and result.get("source_documents"):
-            return result["source_documents"]
+            # Add enhanced metadata to results
+            documents = result["source_documents"]
+            for doc in documents:
+                doc["_retrieval_metadata"] = {
+                    "species_detected": result.get("species_detected"),
+                    "species_confidence": result.get("species_confidence"),
+                    "search_type": result.get("search_type"),
+                    "enhanced": True
+                }
+            return documents
         return []
 
-    # Debug étendu
+    # Enhanced Debug Information
     def get_debug_info(self) -> Dict[str, Any]:
+        """Enhanced debug information with more detailed insights"""
         info: Dict[str, Any] = {
             "is_available": self.is_available(),
             "loaded_species": {sp: self.is_loaded_by_species.get(sp, False) for sp in _SPECIES},
@@ -492,18 +851,59 @@ class RAGRetriever:
             "documents_count": {sp: len(self.documents_by_species.get(sp, [])) for sp in _SPECIES},
             "embedding_method": {sp: self.method_by_species.get(sp) for sp in _SPECIES},
             "embedding_dimension": {sp: self.emb_dim_by_species.get(sp) for sp in _SPECIES},
+            "enhanced_features": True,
         }
-        # chemins résolus (utile en prod)
+        
+        # Enhanced path resolution info
         try:
             info["index_paths"] = {sp: str(self._get_rag_index_path(sp)) for sp in _SPECIES}
-        except Exception:
-            pass
+            info["path_exists"] = {sp: self._get_rag_index_path(sp).exists() for sp in _SPECIES}
+        except Exception as e:
+            info["path_resolution_error"] = str(e)
+        
+        # Performance stats
+        total_docs = sum(len(self.documents_by_species.get(sp, [])) for sp in _SPECIES)
+        info["performance_stats"] = {
+            "total_documents": total_docs,
+            "average_docs_per_species": total_docs / len(_SPECIES) if total_docs > 0 else 0,
+            "species_with_data": [sp for sp in _SPECIES if len(self.documents_by_species.get(sp, [])) > 0]
+        }
+        
         return info
 
+    def test_species_detection(self, test_queries: List[str]) -> Dict[str, Any]:
+        """Test species detection on multiple queries"""
+        results = {}
+        for query in test_queries:
+            species, confidence = _enhanced_detect_species_from_query(query)
+            results[query] = {
+                "detected_species": species,
+                "confidence": confidence,
+                "classification": "high" if confidence > 0.7 else "medium" if confidence > 0.3 else "low"
+            }
+        return results
 
-# Compat alias & factory
+
+# =====================================================================
+# Compatibility Aliases & Factory Functions
+# =====================================================================
+
 ContextualRetriever = RAGRetriever
 
-
 def create_rag_retriever(openai_api_key: Optional[str] = None) -> RAGRetriever:
+    """Factory function for creating enhanced RAG retriever"""
     return RAGRetriever(openai_api_key=openai_api_key)
+
+def create_enhanced_retriever(openai_api_key: Optional[str] = None, **kwargs) -> RAGRetriever:
+    """Factory function with explicit enhanced features mention"""
+    retriever = RAGRetriever(openai_api_key=openai_api_key)
+    
+    # Log enhancement status
+    logger.info("✅ Enhanced RAG Retriever created with features:")
+    logger.info("   - Advanced species detection with confidence scoring")
+    logger.info("   - Intelligent table-first ranking")
+    logger.info("   - Adaptive fallback strategies")
+    logger.info("   - Enhanced metadata awareness")
+    logger.info("   - 🔧 Robust document format handling")
+    
+    return retriever
