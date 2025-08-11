@@ -138,3 +138,48 @@ def force_import_test():
             "traceback": traceback.format_exc(),
             "import_successful": False
         }
+
+@router.get("/perfstore-status")
+def perfstore_status():
+    try:
+        from .pipeline.dialogue_manager import _get_perf_store  # type: ignore
+        store = _get_perf_store("broiler")
+        if not store:
+            return {"ok": False, "reason": "PerfStore None"}
+        root = getattr(store, "root", None); species = getattr(store, "species", None)
+        lines = []
+        for ln in ["ross308", "cobb500"]:
+            try:
+                df = store._load_df(ln)  # type: ignore
+                lines.append({"line": ln, "rows": 0 if df is None else int(len(df))})
+            except Exception as e:
+                lines.append({"line": ln, "error": str(e)})
+        return {"ok": True, "root": root, "species": species, "lines": lines}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@router.post("/perf-probe")
+def perf_probe(payload: AskPayload):
+    try:
+        from .pipeline.dialogue_manager import _normalize_entities_soft, _get_perf_store, _perf_lookup_exact_or_nearest  # type: ignore
+        q = (payload.question or "")
+        # mini extraction d'âge pour debug
+        import re
+        m = re.search(r'(\d+)\s*(?:jour|jours|day|days)\b', q.lower())
+        entities = {"species":"broiler"}
+        if "ross" in q.lower(): entities["line"] = "ross308"
+        if "cobb" in q.lower(): entities["line"] = "cobb500"
+        if "male" in q.lower() or "mâle" in q.lower(): entities["sex"] = "male"
+        if "female" in q.lower() or "femelle" in q.lower(): entities["sex"] = "female"
+        if "as hatched" in q.lower() or "mixte" in q.lower(): entities["sex"] = "as_hatched"
+        if m: entities["age_days"] = int(m.group(1))
+        if "imperial" in q.lower(): entities["unit"] = "imperial"
+        if "metric" in q.lower() or "métrique" in q.lower(): entities["unit"] = "metric"
+        norm = _normalize_entities_soft(entities)
+        store = _get_perf_store(norm["species"])
+        if not store:
+            return {"entities": entities, "norm": norm, "rec": None, "debug": {"note":"store=None"}}
+        rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
+        return {"entities": entities, "norm": norm, "rec": rec, "debug": dbg}
+    except Exception as e:
+        return {"error": str(e)}

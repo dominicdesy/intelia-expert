@@ -30,7 +30,7 @@ class AskPayload(BaseModel):
     session_id: Optional[str] = "default"
     question: str
     lang: Optional[str] = "fr"
-    # === NEW: overrides de test & debug (backward-compatible) ===
+    # ▼▼▼ NEW: overrides de test & debug (backward-compatible) ▼▼▼
     debug: Optional[bool] = False
     force_perfstore: Optional[bool] = False
     intent_hint: Optional[str] = None  # ex: "PerfTargets"
@@ -43,19 +43,25 @@ def ask(payload: AskPayload) -> Dict[str, Any]:
     try:
         logger.info(f"📝 Question reçue: {payload.question[:50]}...")
 
-        if not DIALOGUE_AVAILABLE:
-            logger.warning("⚠️ Dialogue manager not available, using fallback")
-
         # Appeler la fonction handle (code original + NEW kwargs)
-        result = handle(
-            session_id=payload.session_id or "default",
-            question=payload.question,
-            lang=payload.lang or "fr",
-            # === NEW: propage vers dialogue_manager ===
-            debug=bool(payload.debug),
-            force_perfstore=bool(payload.force_perfstore),
-            intent_hint=(payload.intent_hint or None),
-        )
+        if DIALOGUE_AVAILABLE:
+            result = handle(
+                session_id=payload.session_id or "default",
+                question=payload.question,
+                lang=payload.lang or "fr",
+                # ▼▼▼ NEW: propagation vers dialogue_manager ▼▼▼
+                debug=bool(payload.debug),
+                force_perfstore=bool(payload.force_perfstore),
+                intent_hint=(payload.intent_hint or None),
+            )
+        else:
+            # Fallback strict à la signature minimale (évite TypeError)
+            logger.warning("⚠️ Dialogue manager not available, using fallback")
+            result = handle(
+                payload.session_id or "default",
+                payload.question,
+                payload.lang or "fr",
+            )
 
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
         return result
