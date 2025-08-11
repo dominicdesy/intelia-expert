@@ -280,12 +280,14 @@ export const generateAIResponse = async (
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - NE PAS TRANSFORMER
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
         follow_up_questions: data.follow_up_questions,
-        // ❌ NE PAS créer le champ response ici - extractAnswerAndSources() s'attend à general_answer.text
+        // 🚀 CORRECTION FINALE : Créer aussi le champ response pour que extractAnswerAndSources ne soit plus nécessaire
+        response: data.general_answer?.text || '',
+        full_text: data.general_answer?.text || '',
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_partial_answer',
@@ -343,8 +345,14 @@ export const generateAIResponse = async (
       }
     }
 
-
-	console.log('🎯 [apiService] Données traitées DialogueManager:', processedData)
+    console.log('🎯 [apiService] Données traitées DialogueManager:', {
+      type: processedData.type,
+      requires_clarification: processedData.requires_clarification,
+      clarification_questions_count: processedData.clarification_questions?.length || 0,
+      has_response: !!processedData.response,
+      has_general_answer: !!processedData.general_answer,
+      has_versions: !!processedData.response_versions
+    })
 
     return processedData
 
@@ -418,11 +426,14 @@ export const generateAIResponsePublic = async (
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE  
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
         follow_up_questions: data.follow_up_questions,
+        // 🚀 CORRECTION FINALE : Créer aussi le champ response pour que extractAnswerAndSources ne soit plus nécessaire
+        response: data.general_answer?.text || '',
+        full_text: data.general_answer?.text || '',
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
         mode: 'rag_partial_answer_public',
