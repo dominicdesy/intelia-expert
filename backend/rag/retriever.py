@@ -369,7 +369,7 @@ class RAGRetriever:
     # -----------------------------
 
     def _load_index_for_species(self, species: str) -> bool:
-        """Enhanced index loading with robust document format handling"""
+        """Enhanced index loading with ultra-robust document format handling"""
         sp = (species or "global").lower()
         if sp not in _SPECIES:
             sp = "global"
@@ -392,9 +392,36 @@ class RAGRetriever:
 
         try:
             idx = faiss.read_index(str(faiss_file))
+            
+            # 🔧 CORRECTION ULTIME : Gestion robuste du fichier pickle
             with open(pkl_file, "rb") as f:
-                data = pickle.load(f)
+                raw_data = pickle.load(f)
+            
+            # Normaliser le format des données pickled AVANT tout accès
+            if isinstance(raw_data, list):
+                # Si c'est une liste, créer un dictionnaire avec les documents
+                logger.info("Format pickle détecté: liste de %d éléments pour %s", len(raw_data), sp)
+                data = {
+                    "documents": raw_data,
+                    "method": "SentenceTransformers",
+                    "embedding_method": "SentenceTransformers",
+                    "embeddings": None
+                }
+            elif isinstance(raw_data, dict):
+                # Format dictionnaire - vérifier la structure
+                data = raw_data
+                logger.info("Format pickle détecté: dictionnaire avec clés %s pour %s", list(data.keys()), sp)
+            else:
+                # Format inconnu - essayer de le convertir
+                logger.warning("Format pickle inconnu pour %s: %s", sp, type(raw_data).__name__)
+                data = {
+                    "documents": [str(raw_data)],
+                    "method": "SentenceTransformers",
+                    "embedding_method": "SentenceTransformers",
+                    "embeddings": None
+                }
 
+            # Maintenant on peut utiliser .get() en sécurité
             raw_method = data.get("method", data.get("embedding_method", "SentenceTransformers"))
             method = self._normalize_embedding_method(raw_method)
             
