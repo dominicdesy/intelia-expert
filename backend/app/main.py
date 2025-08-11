@@ -83,52 +83,46 @@ async def lifespan(app: FastAPI):
                 rag_paths[key] = env_path
                 logger.info(f"🔧 Override ENV pour {key}: {env_path}")
 
-        # 🚀 CHARGEMENT RAG GLOBAL (obligatoire)
+        # Helper pour logguer proprement une instance
+        def _log_loaded(name: str, path: str, emb) -> None:
+            try:
+                stats = emb.get_index_stats() if hasattr(emb, "get_index_stats") else {}
+                n_docs = stats.get("n_docs")
+                faiss_total = stats.get("faiss_total")
+                chunks_loaded = stats.get("chunks_loaded", faiss_total)
+                dim = stats.get("embedding_dim", "unknown")
+                model = stats.get("model_name", "unknown")
+                logger.info(
+                    f"✅ RAG {name.capitalize()} chargé: {path} "
+                    f"(docs={n_docs if n_docs is not None else 'unknown'}, "
+                    f"chunks={chunks_loaded if chunks_loaded is not None else 'unknown'}, "
+                    f"dim={dim}, model={model})"
+                )
+            except Exception:
+                logger.info(f"✅ RAG {name.capitalize()} chargé: {path}")
+
+        # 🚀 GLOBAL
         global_path = rag_paths["global"]
         logger.info(f"📁 Chargement RAG Global: {global_path}")
-
         if os.path.exists(global_path):
             global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
                 app.state.rag = global_embedder
-
-                # Compter les documents
-                doc_count = "unknown"
-                try:
-                    if hasattr(global_embedder, 'get_document_count'):
-                        doc_count = global_embedder.get_document_count()
-                    elif hasattr(global_embedder, 'documents') and global_embedder.documents:
-                        doc_count = len(global_embedder.documents)
-                except Exception:
-                    pass
-
-                logger.info(f"✅ RAG Global chargé: {global_path} ({doc_count} documents)")
+                _log_loaded("global", global_path, global_embedder)
             else:
                 logger.error(f"❌ RAG Global: Échec chargement depuis {global_path}")
         else:
             logger.error(f"❌ RAG Global: Chemin inexistant {global_path}")
 
-        # 🚀 CHARGEMENT RAG BROILER
+        # 🚀 BROILER
         broiler_path = rag_paths["broiler"]
         logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
-
         if os.path.exists(broiler_path):
             try:
                 broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if broiler_embedder.load_index(broiler_path) and broiler_embedder.has_search_engine():
                     app.state.rag_broiler = broiler_embedder
-
-                    # Compter les documents
-                    doc_count = "unknown"
-                    try:
-                        if hasattr(broiler_embedder, 'get_document_count'):
-                            doc_count = broiler_embedder.get_document_count()
-                        elif hasattr(broiler_embedder, 'documents') and broiler_embedder.documents:
-                            doc_count = len(broiler_embedder.documents)
-                    except Exception:
-                        pass
-
-                    logger.info(f"✅ RAG Broiler chargé: {broiler_path} ({doc_count} documents)")
+                    _log_loaded("broiler", broiler_path, broiler_embedder)
                 else:
                     logger.warning(f"⚠️ RAG Broiler: Échec chargement depuis {broiler_path}")
             except Exception as e:
@@ -136,27 +130,15 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning(f"⚠️ RAG Broiler: Chemin inexistant {broiler_path}")
 
-        # 🚀 CHARGEMENT RAG LAYER
+        # 🚀 LAYER
         layer_path = rag_paths["layer"]
         logger.info(f"📁 Chargement RAG Layer: {layer_path}")
-
         if os.path.exists(layer_path):
             try:
                 layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
                 if layer_embedder.load_index(layer_path) and layer_embedder.has_search_engine():
                     app.state.rag_layer = layer_embedder
-
-                    # Compter les documents
-                    doc_count = "unknown"
-                    try:
-                        if hasattr(layer_embedder, 'get_document_count'):
-                            doc_count = layer_embedder.get_document_count()
-                        elif hasattr(layer_embedder, 'documents') and layer_embedder.documents:
-                            doc_count = len(layer_embedder.documents)
-                    except Exception:
-                        pass
-
-                    logger.info(f"✅ RAG Layer chargé: {layer_path} ({doc_count} documents)")
+                    _log_loaded("layer", layer_path, layer_embedder)
                 else:
                     logger.warning(f"⚠️ RAG Layer: Échec chargement depuis {layer_path}")
             except Exception as e:
@@ -278,7 +260,6 @@ async def rag_debug():
         "RAG_INDEX_LAYER": os.getenv("RAG_INDEX_LAYER"),
     }
 
-    # Vérification des 3 chemins
     path_status = {}
     for name, path in rag_paths.items():
         try:
@@ -304,7 +285,6 @@ async def rag_debug():
                 "error": str(e)
             }
 
-    # Status des 3 instances RAG
     instances_status = {}
     for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
         embedder = getattr(app.state, attr, None)
@@ -326,7 +306,6 @@ async def rag_debug():
 
         instances_status[name] = instance_info
 
-    # Calculs totaux
     total_available = sum(1 for info in path_status.values() if info.get("complete", False))
     total_loaded = sum(1 for info in instances_status.values() if info.get("functional", False))
     total_documents = sum(info.get("documents", 0) for info in instances_status.values() if isinstance(info.get("documents"), int))
@@ -360,7 +339,6 @@ async def test_rag_access():
     }
     rag_paths = get_rag_paths()
 
-    # Test filesystem pour les 3 RAG
     filesystem_test = {
         "base_path": "/workspace/backend/rag_index",
         "base_exists": os.path.exists("/workspace/backend/rag_index"),
@@ -400,7 +378,6 @@ async def test_rag_access():
 
     results["tests"]["filesystem"] = filesystem_test
 
-    # Test des instances actuelles
     current_instances = {}
     for name, attr in [("global", "rag"), ("broiler", "rag_broiler"), ("layer", "rag_layer")]:
         embedder = getattr(app.state, attr, None)
@@ -415,20 +392,15 @@ async def test_rag_access():
             try:
                 instance_info["functional"] = True
                 instance_info["search_ready"] = embedder.has_search_engine()
-
                 if hasattr(embedder, 'get_document_count'):
                     instance_info["document_count"] = embedder.get_document_count()
                 elif hasattr(embedder, 'documents') and embedder.documents:
                     instance_info["document_count"] = len(embedder.documents)
-
             except Exception as e:
                 instance_info["error"] = str(e)
 
         current_instances[name] = instance_info
 
-    results["tests"]["current_instances"] = current_instances
-
-    # Résumé
     available_rags = sum(1 for info in filesystem_test["rags"].values() if info.get("complete", False))
     loaded_rags = sum(1 for info in current_instances.values() if info.get("functional", False))
     total_documents = sum(info.get("document_count", 0) for info in current_instances.values() if isinstance(info.get("document_count"), int))
@@ -468,6 +440,7 @@ async def root():
             getattr(app.state, "rag_layer", None)
         ] if rag and hasattr(rag, 'has_search_engine') and rag.has_search_engine())
 
+    # (reste inchangé)
         if total_rags == 3:
             return "optimal_3_rags"
         elif total_rags == 1:
@@ -486,7 +459,7 @@ async def root():
         "optimization": "three_rag_system_enabled"
     }
 
-# Exception handlers
+# Exception handlers (inchangés)
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     response = JSONResponse(

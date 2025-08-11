@@ -17,6 +17,7 @@ import time
 import pickle
 import logging
 import re
+import json  # 🆕 manifest support
 import threading
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -59,6 +60,10 @@ class FastRAGEmbedder:
         self._documents: List[Dict[str, Any]] = []
         self._ready = False
         self._dependencies_ok = False
+
+        # 🆕 persisted stats / manifest
+        self._stats: Dict[str, Any] = {}
+        self._manifest: Dict[str, Any] = {}
 
         # caches
         self.embedding_cache: Dict[str, np.ndarray] = {} if cache_embeddings else {}
@@ -439,6 +444,20 @@ class FastRAGEmbedder:
     # -------------------------
     # Index loading - FIXED: Enhanced metadata preservation
     # -------------------------
+    def _read_manifest(self, base: Path) -> Dict[str, Any]:
+        """🆕 Optional side manifest (meta.json) reader."""
+        try:
+            mf = base / "meta.json"
+            if mf.exists():
+                with open(mf, "r", encoding="utf-8") as f:
+                    data = json.load(f) or {}
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            if self.debug:
+                logger.warning("ℹ️ Could not read meta.json: %s", e)
+        return {}
+
     def load_index(self, index_path: str) -> bool:
         """
         Load FAISS index + documents (index.pkl). Idempotent.
@@ -456,6 +475,9 @@ class FastRAGEmbedder:
                 logger.error("❌ Index files not found in %s", base)
                 return False
 
+            # 🆕 load manifest if present
+            self._manifest = self._read_manifest(base)
+
             with self._index_lock:
                 t0 = time.time()
                 logger.info("🔄 Loading FAISS index from %s", faiss_file)
@@ -469,14 +491,58 @@ class FastRAGEmbedder:
                 docs = self._normalize_documents_with_metadata_preservation(raw_documents)
                 logger.info("✅ Documents loaded in %.2fs", time.time() - t1)
 
-                if idx.ntotal != len(docs):
-                    logger.warning("⚠️ Index mismatch: FAISS has %d vectors, docs=%d", idx.ntotal, len(docs))
+                # 🆕 robust stats
+                faiss_total = int(getattr(idx, "ntotal", 0))
+                n_chunks = len(docs)
+                manifest_chunks = None
+                manifest_docs = None
+                embedding_dim = None
+                model_from_index = None
+                try:
+                    if isinstance(self._manifest, dict):
+                        if "chunks_indexed" in self._manifest:
+                            manifest_chunks = int(self._manifest.get("chunks_indexed") or 0)
+                        if "n_docs" in self._manifest:
+                            manifest_docs = int(self._manifest.get("n_docs") or 0)
+                        if "embedding_dim" in self._manifest:
+                            embedding_dim = int(self._manifest.get("embedding_dim") or 0)
+                    if isinstance(raw_documents, dict):
+                        model_from_index = raw_documents.get("model_name")
+                        if embedding_dim is None:
+                            embedding_dim = raw_documents.get("embedding_dim")
+                except Exception:
+                    pass
+
+                # Correct comparison: CHUNKS vs FAISS vectors
+                if faiss_total != n_chunks:
+                    logger.warning("⚠️ Chunk count mismatch: faiss=%d vs loaded_chunks=%d", faiss_total, n_chunks)
+                elif manifest_chunks is not None and faiss_total != manifest_chunks:
+                    logger.warning("⚠️ Chunk count mismatch vs manifest: faiss=%d vs manifest=%d", faiss_total, manifest_chunks)
+                else:
+                    logger.info("✅ Index-chunk counts aligned: %d", faiss_total)
 
                 self._index = idx
                 self._documents = docs
                 self._ready = True
 
+                # 🆕 persist stats for external logging
+                self._stats = {
+                    "faiss_total": faiss_total,
+                    "chunks_loaded": n_chunks,
+                    "n_docs": manifest_docs,
+                    "embedding_dim": embedding_dim,
+                    "model_name": model_from_index or self._manifest.get("model_name") or self.model_name,
+                    "path": str(base),
+                }
+
             logger.info("✅ Enhanced index loaded successfully - Search engine ready")
+            if self._stats:
+                logger.info("   Stats: docs=%s, chunks=%d, faiss=%d, dim=%s, model=%s",
+                            self._stats.get("n_docs", "unknown"),
+                            self._stats.get("chunks_loaded", 0),
+                            self._stats.get("faiss_total", 0),
+                            self._stats.get("embedding_dim", "unknown"),
+                            self._stats.get("model_name", self.model_name))
             return True
         except Exception as e:
             logger.error("❌ Error loading index: %s", e)
@@ -503,9 +569,34 @@ class FastRAGEmbedder:
         """
         FIXED: Enhanced document normalization with complete metadata preservation.
         Ensures all enriched metadata (species, domain, chunk_type, etc.) is preserved.
+        🆕 Support explicit format: {'documents': [ ...chunks... ]}
         """
         normalized: List[Dict[str, Any]] = []
         try:
+            # 🆕 FIRST: support index.pkl as {"documents": [...]}
+            if isinstance(raw_documents, dict) and isinstance(raw_documents.get("documents"), list):
+                for i, item in enumerate(raw_documents["documents"]):
+                    if isinstance(item, dict):
+                        metadata = item.get("metadata", {})
+                        if not isinstance(metadata, dict):
+                            metadata = {}
+                        doc = {
+                            "id": item.get("id", f"doc_{i}"),
+                            "text": item.get("text", item.get("content", str(item))),
+                            "metadata": dict(metadata),
+                        }
+                        if self.debug and metadata:
+                            preserved_fields = list(metadata.keys())
+                            if len(preserved_fields) > 3:
+                                logger.debug("🔍 Preserved metadata fields: %s", preserved_fields[:10])
+                        normalized.append(doc)
+                    elif isinstance(item, str):
+                        normalized.append({"id": f"doc_{i}", "text": item, "metadata": {}})
+                if self.debug:
+                    logger.info("🔍 Normalized %d chunks from 'documents' list", len(normalized))
+                return normalized
+
+            # ORIGINAL behaviors kept
             if isinstance(raw_documents, dict):
                 for key, value in raw_documents.items():
                     if isinstance(value, dict):
@@ -712,10 +803,10 @@ class FastRAGEmbedder:
         return self.search_with_adaptive_threshold(query, k, species)
 
     # -------------------------
-    # Utils (unchanged)
+    # Utils (unchanged) + 🆕 stats helpers
     # -------------------------
     def get_stats(self) -> Dict[str, Any]:
-        return {
+        base = {
             "documents_loaded": len(self._documents),
             "search_available": self.has_search_engine(),
             "cache_enabled": bool(self.embedding_cache) if self.cache_embeddings else False,
@@ -731,6 +822,27 @@ class FastRAGEmbedder:
             "enhanced_features": True,
             "metadata_preservation": True,  # NEW: indicate enhanced metadata support
         }
+        # 🆕 merge with loader stats (prefixed)
+        try:
+            base.update({f"index_{k}": v for k, v in (self._stats or {}).items()})
+        except Exception:
+            pass
+        return base
+
+    # 🆕 external-friendly stats
+    def get_index_stats(self) -> Dict[str, Any]:
+        return dict(self._stats or {})
+
+    def get_document_count(self) -> int:
+        """
+        Prefer manifest's n_docs when available; fallback to number of chunks.
+        """
+        try:
+            if isinstance(self._stats, dict) and isinstance(self._stats.get("n_docs"), int):
+                return int(self._stats["n_docs"])
+        except Exception:
+            pass
+        return len(self._documents)
 
     def clear_cache(self) -> None:
         if self.embedding_cache is not None:

@@ -481,6 +481,7 @@ async def root():
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
         "rag": rag_status(),
+        "synthesis_enabled": synthesis_enabled,
         "cors_fix": "applied",
         "optimization": "three_rag_system_enabled"
     }
