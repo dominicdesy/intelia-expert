@@ -317,8 +317,8 @@ export const generateAIResponse = async (
       // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager
       ...(data.type === 'answer' ? {
         type: 'answer',
-        response: data.response?.answer || data.response || '',
-        full_text: data.response?.answer || data.response || '',
+        response: data.response?.answer || data.response || data.general_answer?.text || '',
+        full_text: data.response?.answer || data.response || data.general_answer?.text || '',
         requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
@@ -463,8 +463,8 @@ export const generateAIResponsePublic = async (
       // 🔧 GESTION RÉPONSE
       ...(data.type === 'answer' ? {
         type: 'answer',
-        response: data.response?.answer || data.response || '',
-        full_text: data.response?.answer || data.response || '',
+        response: data.response?.answer || data.response || data.general_answer?.text || '',
+        full_text: data.response?.answer || data.response || data.general_answer?.text || '',
         requires_clarification: false,
         rag_used: true,
         sources: data.source ? [{ source: data.source }] : [],
