@@ -114,6 +114,31 @@ export default function ChatInterface() {
     console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
+  // 🚀 NOUVELLE FONCTION : Nettoyer le texte de réponse
+  const cleanResponseText = (text: string): string => {
+    let cleaned = text
+
+    // 🚀 NOUVEAU : Retirer les références aux sources
+    cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
+    cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '') // Cas tronqué
+    
+    // Retirer les fragments de texte brut des PDFs
+    cleaned = cleaned.replace(/ould be aware of local legislation[^.]+\./g, '')
+    cleaned = cleaned.replace(/Apply your knowledge and judgment[^.]+\./g, '')
+    
+    // Nettoyer les tableaux mal formatés
+    cleaned = cleaned.replace(/Age \(days\) Weight \(lb\)[^|]+\|[^|]+\|/g, '')
+    
+    // Retirer les répétitions de mots coupés
+    cleaned = cleaned.replace(/\b\w{1,3}\.\.\./g, '')
+    
+    // Normaliser les espaces multiples
+    cleaned = cleaned.replace(/\s+/g, ' ')
+    cleaned = cleaned.replace(/\n\s*\n/g, '\n\n')
+    
+    return cleaned.trim()
+  }
+
   // Tous les useEffect existants restent identiques
   useEffect(() => {
     isMountedRef.current = true
@@ -311,31 +336,22 @@ export default function ChatInterface() {
     })
   }
 
-  // 🔧 FONCTION CORRIGÉE : Support type "partial_answer" + indentation fixée
+  // 🔧 FONCTION MODIFIÉE : extractAnswerAndSources - Sources supprimées
   const extractAnswerAndSources = (result: any): [string, any[]] => {
     let answerText = ""
-    let sources: any[] = []
+    let sources: any[] = [] // Toujours vide maintenant
 
     // 🚀 NOUVEAU : Support type "partial_answer" du DialogueManager hybride
     if (result?.type === 'partial_answer' && result?.general_answer) {
       console.log('🎯 [extractAnswerAndSources] Type partial_answer détecté')
       
       answerText = result.general_answer.text || ""
-      sources = result.general_answer.rag_sources || []
+      // 🚀 SUPPRIMÉ : sources = result.general_answer.rag_sources || []
       
-      // Ajouter les questions de clarification à la fin
-      if (result.follow_up_questions && result.follow_up_questions.length > 0) {
-        answerText += "\n\n**Pour une réponse plus précise, veuillez préciser :**\n"
-        result.follow_up_questions.forEach((q: any, index: number) => {
-          if (q.options && q.options.length > 0) {
-            answerText += `${index + 1}. ${q.question} (${q.options.join(', ')})\n`
-          } else {
-            answerText += `${index + 1}. ${q.question}\n`
-          }
-        })
-      }
+      // 🚀 SUPPRIMÉ : Ajout des questions de clarification
+      // Plus d'affichage des questions dans le texte principal
       
-      return [answerText, sources]
+      return [answerText, []] // Toujours retourner sources vides
     }
 
     // ✅ ANCIEN CODE CONSERVÉ pour compatibilité
@@ -344,10 +360,9 @@ export default function ChatInterface() {
     if (typeof responseContent === 'object' && responseContent !== null) {
       answerText = String(responseContent.answer || "").trim()
       if (!answerText) {
-        answerText = "Désolé, je n'ai pas pu formater la réponse. Peux-tu préciser la lignée et l'âge ?"
+        answerText = "Désolé, je n'ai pas pu formater la réponse."
       }
-      const rawSources = responseContent.sources || responseContent.citations || responseContent.source || []
-      sources = Array.isArray(rawSources) ? rawSources.map(s => typeof s === 'object' ? s : { source: String(s) }) : []
+      // 🚀 SUPPRIMÉ : Extraction des sources
     } else {
       answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
       
@@ -361,14 +376,12 @@ export default function ChatInterface() {
             .replace(/\\\\/g, '\\')
         }
       }
-      
-      sources = []
     }
     
-    return [answerText, sources]
+    return [answerText, []] // Toujours retourner sources vides
   }
 
-  // 🚀 FONCTION MODIFIÉE : handleSendMessage avec niveau détecté automatiquement
+  // 🚀 FONCTION MODIFIÉE : handleSendMessage avec nettoyage du texte
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
@@ -469,10 +482,11 @@ export default function ChatInterface() {
       } else {
         // Extraction de la réponse avec nettoyage JSON + support partial_answer
         const [answerText, sources] = extractAnswerAndSources(response)
+        const cleanedText = cleanResponseText(answerText) // 🚀 NOUVEAU : Appliquer le nettoyage
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: answerText,
+          content: cleanedText, // 🚀 Utiliser le texte nettoyé
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
@@ -693,19 +707,34 @@ export default function ChatInterface() {
                             className="prose prose-sm max-w-none prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900"
                             components={{
                               h2: ({node, ...props}) => (
-                                <h2 className="text-lg font-bold text-gray-900 mt-0 mb-3 flex items-center gap-2" {...props} />
+                                <h2 className="text-lg font-bold text-gray-900 mt-4 mb-3 flex items-center gap-2" {...props} />
+                              ),
+                              h3: ({node, ...props}) => (
+                                <h3 className="text-base font-semibold text-gray-800 mt-3 mb-2" {...props} />
                               ),
                               p: ({node, ...props}) => (
                                 <p className="leading-relaxed text-gray-800 my-2" {...props} />
                               ),
                               ul: ({node, ...props}) => (
-                                <ul className="list-disc list-inside space-y-2 text-gray-800 my-3 ml-2" {...props} />
+                                <ul className="list-disc list-inside space-y-1 text-gray-800 my-3 ml-2" {...props} />
                               ),
                               li: ({node, ...props}) => (
                                 <li className="leading-relaxed pl-1" {...props} />
                               ),
                               strong: ({node, ...props}) => (
-                                <strong className="font-semibold text-gray-900" {...props} />
+                                <strong className="font-semibold text-blue-800" {...props} />
+                              ),
+                              // 🚀 NOUVEAU : Support pour les tableaux
+                              table: ({node, ...props}) => (
+                                <div className="overflow-x-auto my-4">
+                                  <table className="min-w-full border border-gray-300 rounded-lg" {...props} />
+                                </div>
+                              ),
+                              th: ({node, ...props}) => (
+                                <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left" {...props} />
+                              ),
+                              td: ({node, ...props}) => (
+                                <td className="border border-gray-300 px-3 py-2" {...props} />
                               ),
                             }}
                           >
