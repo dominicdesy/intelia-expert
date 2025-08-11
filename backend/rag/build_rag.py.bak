@@ -456,54 +456,178 @@ def _scan_pdfs(files: List[str], out_csv: Path) -> Tuple[List[Dict[str, Any]], D
     return rows, dict(status_counter)
 
 def _strip_redactions(src: str, dst: str) -> bool:
-    """Enhanced redaction removal with validation"""
+    """
+    Version corrigée de la fonction de nettoyage des redactions
+    """
     if not _pdf_available():
         return False
+    
     import fitz
+    
     try:
         doc = fitz.open(src)
-    except Exception:
+    except Exception as e:
+        log(f"       ✗ Failed to open PDF: {e}")
         return False
     
     modified = False
     redactions_removed = 0
     
-    for page in doc:
-        a = page.first_annot
-        while a:
-            nxt = a.next
+    try:
+        # Vérifier si le document peut être modifié
+        if doc.is_encrypted:
+            log(f"       ✗ PDF is encrypted, cannot clean: {src}")
+            doc.close()
+            return False
+        
+        # Parcourir toutes les pages
+        for page_num, page in enumerate(doc):
             try:
-                if "Redact" in str(a.type):
+                # Méthode 1: Chercher les annotations de redaction par type
+                redact_annots = []
+                try:
+                    # Essayer la méthode moderne
+                    redact_annots = page.annots(types=[fitz.PDF_ANNOT_REDACT])
+                    if redact_annots:
+                        for annot in redact_annots:
+                            try:
+                                page.delete_annot(annot)
+                                modified = True
+                                redactions_removed += 1
+                            except Exception as e:
+                                log(f"       ⚠ Failed to delete annotation: {e}")
+                except Exception:
+                    # Fallback: méthode manuelle
+                    pass
+                
+                # Méthode 2: Parcours manuel de toutes les annotations
+                annot = page.first_annot
+                while annot:
+                    next_annot = annot.next
                     try:
-                        page.delete_annot(a)
-                        modified = True
-                        redactions_removed += 1
-                    except Exception:
-                        pass
-            finally:
-                a = nxt
-    
-    if not modified:
+                        # Vérifier si c'est une redaction par type d'annotation
+                        annot_type_str = str(annot.type)
+                        annot_type_num = getattr(annot, 'type', None)
+                        
+                        # Types de redaction possibles
+                        is_redaction = (
+                            "Redact" in annot_type_str or 
+                            "redact" in annot_type_str.lower() or
+                            annot_type_num == fitz.PDF_ANNOT_REDACT or
+                            (hasattr(annot, 'info') and "redact" in annot.info.get('title', '').lower())
+                        )
+                        
+                        if is_redaction:
+                            try:
+                                page.delete_annot(annot)
+                                modified = True
+                                redactions_removed += 1
+                            except Exception as e:
+                                log(f"       ⚠ Failed to delete redaction annotation: {e}")
+                    except Exception as e:
+                        log(f"       ⚠ Error processing annotation: {e}")
+                    
+                    annot = next_annot
+                    
+            except Exception as e:
+                log(f"       ⚠ Error processing page {page_num}: {e}")
+                continue
+        
+        # Si aucune modification, pas besoin de sauvegarder
+        if not modified:
+            log(f"       ℹ No redactions found to clean in: {src}")
+            doc.close()
+            return False
+        
+        # Créer le dossier de destination
+        out_dir = Path(dst).parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Sauvegarder le document nettoyé
+        try:
+            # Options de sauvegarde optimisées
+            doc.save(dst, 
+                    deflate=True,           # Compression
+                    garbage=4,              # Nettoyage maximal
+                    clean=True,             # Nettoyage supplémentaire
+                    sanitize=True,          # Suppression de métadonnées sensibles
+                    incremental=False,      # Réécriture complète
+                    expand=0,               # Pas d'expansion
+                    linear=False)           # Pas d'optimisation linéaire
+            
+            log(f"       ✓ Removed {redactions_removed} redaction annotation(s)")
+            doc.close()
+            
+            # Vérifier que le fichier a été créé et a une taille raisonnable
+            if Path(dst).exists() and Path(dst).stat().st_size > 1000:
+                return True
+            else:
+                log(f"       ✗ Output file too small or missing: {dst}")
+                return False
+                
+        except Exception as e:
+            log(f"       ✗ Failed to save cleaned PDF: {e}")
+            doc.close()
+            return False
+            
+    except Exception as e:
+        log(f"       ✗ Unexpected error during cleaning: {e}")
         try:
             doc.close()
-        except Exception:
+        except:
             pass
         return False
-    
-    out_dir = Path(dst).parent
-    out_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _has_redaction_annots(page) -> bool:
+    """
+    Version améliorée de la détection des redactions
+    """
+    import fitz
     
     try:
-        doc.save(dst, deflate=True, garbage=4)
-        doc.close()
-        log(f"     ✓ Removed {redactions_removed} redaction annotations")
-        return True
-    except Exception:
-        try: 
-            doc.close()
-        except Exception: 
+        # Méthode 1: API moderne
+        try:
+            redact_annots = page.annots(types=[fitz.PDF_ANNOT_REDACT])
+            if redact_annots and len(redact_annots) > 0:
+                return True
+        except Exception:
             pass
-        return False
+        
+        # Méthode 2: Parcours manuel
+        annot = page.first_annot
+        while annot:
+            try:
+                annot_type_str = str(annot.type)
+                annot_type_num = getattr(annot, 'type', None)
+                
+                # Vérifications multiples pour la redaction
+                if (
+                    "Redact" in annot_type_str or 
+                    "redact" in annot_type_str.lower() or
+                    annot_type_num == fitz.PDF_ANNOT_REDACT or
+                    (hasattr(annot, 'info') and annot.info and 
+                     "redact" in str(annot.info.get('title', '')).lower())
+                ):
+                    return True
+                    
+            except Exception:
+                pass
+            
+            annot = annot.next
+            
+    except Exception:
+        pass
+    
+    return False
+
+
+
+
+
+
+
+
 
 # ------------------------ Enhanced Provider registry -------------------- #
 def _enhanced_chunk_text(text: str, size: int, base_meta: Dict[str, Any], min_length: int = 50) -> List[Dict[str, Any]]:
