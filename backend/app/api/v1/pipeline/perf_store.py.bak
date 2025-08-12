@@ -23,32 +23,9 @@ import os
 import json
 import re
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
-
-# [FIX] Import pandas avec gestion d'erreur
-try:
-    import pandas as pd
-    PANDAS_AVAILABLE = True
-except ImportError as e:
-    logger.error(f"❌ Failed to import pandas: {e}")
-    PANDAS_AVAILABLE = False
-    # Fallback minimal pour éviter les crashes
-    class pd:  # type: ignore
-        class DataFrame:
-            pass
-        @staticmethod
-        def read_csv(*args, **kwargs):
-            raise ImportError("pandas not available")
-        @staticmethod
-        def read_parquet(*args, **kwargs):
-            raise ImportError("pandas not available")
-        @staticmethod
-        def read_feather(*args, **kwargs):
-            raise ImportError("pandas not available")
-        @staticmethod
-        def concat(*args, **kwargs):
-            raise ImportError("pandas not available")
 
 # --------- Normalisations légères --------- #
 _CANON_SEX = {
@@ -86,6 +63,7 @@ class PerfManifest:
     csv_name: str
     path_csv: Path
 
+    # (FIX) doublon de décorateur @staticmethod supprimé
     @staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
@@ -138,31 +116,16 @@ class PerfStore:
     Cache: un DataFrame par lignée (line)
     """
     def __init__(self, root: str = "./rag_index", species: str = "broiler"):
-        if not PANDAS_AVAILABLE:
-            raise ImportError("pandas is required for PerfStore but not available")
-            
         self.root = Path(root)
         self.species = (species or "broiler").strip().lower()
 
-        # [FIX] Gestion robuste des variables d'environnement
-        env_var = f"RAG_INDEX_{self.species.upper()}"
-        env_path = os.environ.get(env_var, "")
-        
         # autodétection du dossier "tables"
         candidates = [
             self.root / self.species / "tables",             # .../rag_index/broiler/tables
             self.root / "tables" / self.species,             # .../rag_index/tables/broiler
             self.root / "tables",                            # .../rag_index/tables
+            Path(os.environ.get(f"RAG_INDEX_{self.species.upper()}", "")).resolve() / "tables",
         ]
-        
-        # [FIX] Ajouter le chemin d'environnement seulement s'il n'est pas vide
-        if env_path.strip():
-            try:
-                env_tables_path = Path(env_path).resolve() / "tables"
-                candidates.insert(0, env_tables_path)
-            except Exception as e:
-                logger.warning(f"[PerfStore] Invalid environment path {env_var}={env_path}: {e}")
-        
         self.dir_tables = next((p for p in candidates if p and p.exists() and p.is_dir()),
                                self.root / self.species / "tables")
         logger.info(f"[PerfStore] tables_dir={self.dir_tables}")
@@ -181,10 +144,6 @@ class PerfStore:
 
     # lecture multi-format (csv/parquet/feather)
     def _read_any(self, path: Path) -> Optional[pd.DataFrame]:
-        if not PANDAS_AVAILABLE:
-            logger.error("[PerfStore] pandas not available for reading files")
-            return None
-            
         try:
             ext = path.suffix.lower()
             if ext == ".csv":
@@ -193,7 +152,6 @@ class PerfStore:
                 return pd.read_parquet(path)
             if ext == ".feather":
                 return pd.read_feather(path)
-            logger.warning(f"[PerfStore] unsupported file extension: {ext}")
             return None
         except Exception as e:
             logger.warning(f"[PerfStore] read failed for {path}: {e}")
@@ -201,54 +159,47 @@ class PerfStore:
 
     # normalisation centralisée des colonnes (line/sex/unit/age_days)
     def _normalize_columns(self, df: pd.DataFrame, fallback_line: Optional[str] = None) -> pd.DataFrame:
-        if not PANDAS_AVAILABLE:
-            return df
-            
-        try:
-            # line
-            if "line" in df.columns:
-                df["line"] = (
-                    df["line"].astype(str).str.lower().str.strip()
-                      .str.replace(r"[-_\s]+", "", regex=True)
+        # line
+        if "line" in df.columns:
+            df["line"] = (
+                df["line"].astype(str).str.lower().str.strip()
+                  .str.replace(r"[-_\s]+", "", regex=True)
+            )
+        elif fallback_line:
+            df["line"] = _canon_line(fallback_line)
+
+        # unit
+        if "unit" in df.columns:
+            df["unit"] = df["unit"].astype(str).str.lower().map(_canon_unit)
+        else:
+            df["unit"] = "metric"
+
+        # sex
+        if "sex" in df.columns:
+            df["sex"] = (
+                df["sex"].astype(str).str.strip().str.lower()
+                  .map(_CANON_SEX).fillna(df["sex"].astype(str).str.lower())
+            )
+
+        # age → age_days (tolère "day", "Age (d)", "jours", etc.)
+        lower = {str(c).lower(): c for c in df.columns}
+        age_src = None
+        for key in ["age_days", "day", "days", "age", "age(d)", "age_d", "age (days)", "jours"]:
+            if key in lower:
+                age_src = lower[key]
+                break
+        if age_src and age_src != "age_days":
+            try:
+                df["age_days"] = df[age_src].astype(str).str.extract(r"(\d+)")[0].fillna("0").astype(int)
+            except Exception:
+                df["age_days"] = (
+                    df[age_src].apply(lambda x: re.sub(r"[^\d]", "", str(x)) if x is not None else "")
+                               .replace("", "0").astype(int)
                 )
-            elif fallback_line:
-                df["line"] = _canon_line(fallback_line)
+        if "age_days" not in df.columns:
+            df["age_days"] = 0
 
-            # unit
-            if "unit" in df.columns:
-                df["unit"] = df["unit"].astype(str).str.lower().map(_canon_unit)
-            else:
-                df["unit"] = "metric"
-
-            # sex
-            if "sex" in df.columns:
-                df["sex"] = (
-                    df["sex"].astype(str).str.strip().str.lower()
-                      .map(_CANON_SEX).fillna(df["sex"].astype(str).str.lower())
-                )
-
-            # age → age_days (tolère "day", "Age (d)", "jours", etc.)
-            lower = {str(c).lower(): c for c in df.columns}
-            age_src = None
-            for key in ["age_days", "day", "days", "age", "age(d)", "age_d", "age (days)", "jours"]:
-                if key in lower:
-                    age_src = lower[key]
-                    break
-            if age_src and age_src != "age_days":
-                try:
-                    df["age_days"] = df[age_src].astype(str).str.extract(r"(\d+)")[0].fillna("0").astype(int)
-                except Exception:
-                    df["age_days"] = (
-                        df[age_src].apply(lambda x: re.sub(r"[^\d]", "", str(x)) if x is not None else "")
-                                   .replace("", "0").astype(int)
-                    )
-            if "age_days" not in df.columns:
-                df["age_days"] = 0
-
-            return df
-        except Exception as e:
-            logger.error(f"[PerfStore] column normalization failed: {e}")
-            return df
+        return df
 
     # fallback sans manifest: retrouver le fichier correspondant à la lignée
     def _find_table_for_line(self, line: str) -> Optional[Path]:
@@ -284,10 +235,6 @@ class PerfStore:
         1) via manifest si présent ; 2) sinon via scan du dossier tables/
         Normalisation systématique des colonnes.
         """
-        if not PANDAS_AVAILABLE:
-            logger.error("[PerfStore] pandas not available for loading dataframes")
-            return None
-            
         line = _canon_line(line)
         if not line:
             return None
@@ -312,16 +259,12 @@ class PerfStore:
 
         df = self._normalize_columns(df, fallback_line=line)
         self._cache_df[line] = df
-        # invalide le DF global car une nouvelle lignée vient d'être chargée
+        # invalide le DF global car une nouvelle lignée vient d’être chargée
         self._df_all = None
         return df
 
     # DF global (compat: as_dataframe + propriété df)
     def as_dataframe(self) -> Optional[pd.DataFrame]:
-        if not PANDAS_AVAILABLE:
-            logger.error("[PerfStore] pandas not available for dataframe operations")
-            return None
-            
         if self._df_all is not None:
             return self._df_all
         if not self.dir_tables.exists():
@@ -361,10 +304,6 @@ class PerfStore:
         Retourne un dict standardisé ou None si introuvable.
         Fallback: si (male/female) introuvable, on tente "as_hatched".
         """
-        if not PANDAS_AVAILABLE:
-            logger.error("[PerfStore] pandas not available for get operations")
-            return None
-            
         line = _canon_line(line)
         sex = _canon_sex(sex)
         unit = _canon_unit(unit)
@@ -375,18 +314,14 @@ class PerfStore:
             return None
 
         def _query(_sex: str):
-            try:
-                q = (
-                    (df["line"].eq(line)) &
-                    (df["sex"].eq(_sex)) &
-                    (df["unit"].eq(unit)) &
-                    (df["age_days"].eq(age_days))
-                )
-                hit = df[q]
-                return hit.iloc[0].to_dict() if not hit.empty else None
-            except Exception as e:
-                logger.warning(f"[PerfStore] query failed for {line}/{_sex}/{unit}/{age_days}: {e}")
-                return None
+            q = (
+                (df["line"].eq(line)) &
+                (df["sex"].eq(_sex)) &
+                (df["unit"].eq(unit)) &
+                (df["age_days"].eq(age_days))
+            )
+            hit = df[q]
+            return hit.iloc[0].to_dict() if not hit.empty else None
 
         row = _query(sex)
         if row is None and sex in ("male", "female"):
@@ -402,8 +337,7 @@ class PerfStore:
                 tmp["__d__"] = (tmp["age_days"].astype(int) - t).abs()
                 if not tmp.empty:
                     row = tmp.sort_values(["__d__", "age_days"]).iloc[0].to_dict()
-            except Exception as e:
-                logger.warning(f"[PerfStore] nearest age lookup failed: {e}")
+            except Exception:
                 row = None
         if row is None:
             return None
@@ -426,11 +360,7 @@ class PerfStore:
         if not self.dir_tables.exists():
             return []
         slugs = set()
-        try:
-            for p in self.dir_tables.iterdir():
-                if p.is_file() and p.suffix.lower() in (".csv", ".parquet", ".feather"):
-                    slugs.add(_canon_line(p.stem))
-            return sorted(slugs)
-        except Exception as e:
-            logger.warning(f"[PerfStore] available_lines failed: {e}")
-            return []
+        for p in self.dir_tables.iterdir():
+            if p.is_file() and p.suffix.lower() in (".csv", ".parquet", ".feather"):
+                slugs.add(_canon_line(p.stem))
+        return sorted(slugs)

@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict, List
 import logging
 import os
-import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,54 +26,6 @@ except Exception as e:
             "message": "Dialogue service temporarily unavailable",
             "session_id": session_id,
         }
-
-# ===== Fonction locale pour normalisation des entités =====
-def _normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """Version locale de normalisation des entités"""
-    result = {}
-    
-    # Species
-    species = (entities.get("species") or "broiler").lower()
-    result["species"] = species
-    
-    # Line
-    line = entities.get("line")
-    if line:
-        line = re.sub(r"[-_\s]+", "", str(line).lower())
-    result["line"] = line
-    
-    # Sex
-    sex = entities.get("sex")
-    if sex:
-        sex_mapping = {
-            "male": "male", "m": "male", "♂": "male",
-            "female": "female", "f": "female", "♀": "female", 
-            "as_hatched": "as_hatched", "ah": "as_hatched", 
-            "mixte": "as_hatched", "mixed": "as_hatched",
-            "as hatched": "as_hatched", "as-hatched": "as_hatched"
-        }
-        sex = sex_mapping.get(str(sex).lower().replace(" ", "_"), sex)
-    result["sex"] = sex
-    
-    # Unit
-    unit = entities.get("unit")
-    if unit and str(unit).lower() in ["imperial", "imp", "us", "lb", "lbs"]:
-        unit = "imperial"
-    else:
-        unit = "metric"
-    result["unit"] = unit
-    
-    # Age
-    age_days = entities.get("age_days")
-    if age_days is not None:
-        try:
-            result["age_days"] = int(age_days)
-        except:
-            result["age_days"] = None
-    else:
-        result["age_days"] = None
-    
-    return result
 
 # ===== Schémas =====
 class AskPayload(BaseModel):
@@ -217,7 +168,7 @@ def perfstore_status():
         return {"ok": False, "error": str(e)}
 
 # ============================
-# [PATCH] /perf-probe robuste & JSON-safe avec imports protégés
+# [PATCH] /perf-probe robuste & JSON-safe
 # ============================
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
@@ -227,16 +178,11 @@ def perf_probe(payload: AskPayload):
     - Lignes disponibles, colonnes, nb de lignes et tables_dir
     - Enregistrement trouvé (rec) avec fallback nearest si nécessaire
     """
+    import re as _re
     try:
-        # [FIX] Protéger TOUS les imports
-        try:
-            from .pipeline.perf_store import PerfStore  # type: ignore
-        except ImportError as e:
-            return jsonable_encoder({
-                "error": "import_failed", 
-                "message": f"Failed to import PerfStore: {str(e)}",
-                "entities": (payload.entities or {}) if payload else {},
-            })
+        # Imports à l'intérieur pour ne pas casser le module si PerfStore est HS
+        from .pipeline.dialogue_manager import _normalize_entities_soft  # type: ignore
+        from .pipeline.perf_store import PerfStore  # type: ignore
 
         q = (payload.question or "") if payload else ""
         ql = q.lower()
@@ -268,29 +214,24 @@ def perf_probe(payload: AskPayload):
 
         age_days = entities_in.get("age_days")
         if age_days is None:
-            m = re.search(r"(\d+)\s*(?:j|jour|jours|d|day|days)\b", ql)
+            m = _re.search(r"(\d+)\s*(?:j|jour|jours|d|day|days)\b", ql)
             if m:
                 try:
                     age_days = int(m.group(1))
                 except Exception:
                     age_days = None
 
-        # [FIX] Normalisation avec fonction locale
-        norm = _normalize_entities_soft_local(
+        # Normalisation centralisée (préserve la logique originale)
+        norm = _normalize_entities_soft(
             {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
         )
 
         # Instanciation PerfStore (autodétection tables_dir dans PerfStore)
+        store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=norm["species"])
         try:
-            store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=norm["species"])
             available = store.available_lines()
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "perfstore_init_failed",
-                "message": f"Failed to initialize PerfStore: {str(e)}",
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-            })
+        except Exception:
+            available = []
 
         # Ligne non déterminée → retour explicite (JSON-safe)
         if not norm.get("line"):
@@ -307,23 +248,7 @@ def perf_probe(payload: AskPayload):
             return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
         # Charge DF de la lignée
-        try:
-            df = store._load_df(norm["line"])
-        except Exception as e:
-            out = {
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "load_df_failed",
-                    "message": str(e),
-                    "line": norm.get("line"),
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                },
-            }
-            return jsonable_encoder(out, exclude_none=True)
-
+        df = store._load_df(norm["line"])
         if df is None:
             out = {
                 "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
@@ -346,7 +271,7 @@ def perf_probe(payload: AskPayload):
                 unit=norm["unit"],
                 age_days=int(norm.get("age_days") or 0),
             )
-        except Exception as e:
+        except Exception:
             rec = None
 
         dbg = {
