@@ -2,7 +2,7 @@
   "type": "perf_targets",
   "species": "broiler",
   "line": "cobb500",
-  "file": "cobb500_perf_targets.csv",
+  "csv": "cobb500_perf_targets.csv",
   "columns": {
     "line": "line",
     "sex": "sex",

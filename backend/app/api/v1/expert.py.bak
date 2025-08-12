@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 import logging
 
@@ -26,33 +26,42 @@ except ImportError as e:
 router = APIRouter()
 
 class AskPayload(BaseModel):
-    # (code original) —
+    # (code original)
     session_id: Optional[str] = "default"
     question: str
     lang: Optional[str] = "fr"
-    # ▼▼▼ NEW: overrides de test & debug (backward-compatible) ▼▼▼
+    # NEW: debug & overrides (déjà présents dans certaines branches)
     debug: Optional[bool] = False
     force_perfstore: Optional[bool] = False
     intent_hint: Optional[str] = None  # ex: "PerfTargets"
+    # [PATCH] NEW: entities pass-through (facultatif)
+    entities: Dict[str, Any] = Field(default_factory=dict)
+
+    # Tolérance aux champs inconnus (retro-compat)
+    model_config = {"extra": "allow"}
 
 @router.post("/ask")
-def ask(payload: AskPayload) -> Dict[str, Any]:
+def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
     """
     Endpoint principal pour poser des questions
     """
     try:
-        logger.info(f"📝 Question reçue: {payload.question[:50]}...")
+        logger.info(f"📝 Question reçue: {payload.question[:80]}...")
 
-        # Appeler la fonction handle (code original + NEW kwargs)
+        # Prise en charge optionnelle du flag via query string (?force_perfstore=1)
+        fp_qs = request.query_params.get("force_perfstore")
+        force_perf = bool(payload.force_perfstore) or (fp_qs in ("1", "true", "True", "yes"))
+
+        # Appeler la fonction handle (code original + propagation des nouveaux kwargs)
         if DIALOGUE_AVAILABLE:
             result = handle(
                 session_id=payload.session_id or "default",
                 question=payload.question,
                 lang=payload.lang or "fr",
-                # ▼▼▼ NEW: propagation vers dialogue_manager ▼▼▼
                 debug=bool(payload.debug),
-                force_perfstore=bool(payload.force_perfstore),
+                force_perfstore=force_perf,
                 intent_hint=(payload.intent_hint or None),
+                entities=(payload.entities or {}),  # [PATCH] pass-through
             )
         else:
             # Fallback strict à la signature minimale (évite TypeError)
@@ -71,11 +80,11 @@ def ask(payload: AskPayload) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 @router.post("/ask-public")
-def ask_public(payload: AskPayload) -> Dict[str, Any]:
+def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
     """
     Endpoint public (même logique que /ask)
     """
-    return ask(payload)
+    return ask(payload, request)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
