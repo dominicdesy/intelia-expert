@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 import logging
+import os  # [PATCH]
 
 logger = logging.getLogger(__name__)
 
@@ -167,28 +168,132 @@ def perfstore_status():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+# ============================
+# [PATCH] /perf-probe robuste
+# ============================
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
+    """
+    Debug léger PerfStore: renvoie toujours un JSON sérialisable (pas d'exception 500).
+    Donne la normalisation, la ligne détectée, les colonnes, le nombre de lignes,
+    les lignes disponibles et la table_dir effective.
+    """
+    import traceback
+    import re as _re
     try:
-        from .pipeline.dialogue_manager import _normalize_entities_soft, _get_perf_store, _perf_lookup_exact_or_nearest  # type: ignore
-        q = (payload.question or "")
-        # mini extraction d'âge pour debug
-        import re
-        m = re.search(r'(\d+)\s*(?:jour|jours|day|days)\b', q.lower())
-        entities = {"species":"broiler"}
-        if "ross" in q.lower(): entities["line"] = "ross308"
-        if "cobb" in q.lower(): entities["line"] = "cobb500"
-        if "male" in q.lower() or "mâle" in q.lower(): entities["sex"] = "male"
-        if "female" in q.lower() or "femelle" in q.lower(): entities["sex"] = "female"
-        if "as hatched" in q.lower() or "mixte" in q.lower(): entities["sex"] = "as_hatched"
-        if m: entities["age_days"] = int(m.group(1))
-        if "imperial" in q.lower(): entities["unit"] = "imperial"
-        if "metric" in q.lower() or "métrique" in q.lower(): entities["unit"] = "metric"
-        norm = _normalize_entities_soft(entities)
-        store = _get_perf_store(norm["species"])
-        if not store:
-            return {"entities": entities, "norm": norm, "rec": None, "debug": {"note":"store=None"}}
-        rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
-        return {"entities": entities, "norm": norm, "rec": rec, "debug": dbg}
+        # Imports locaux pour éviter d'échouer au chargement du module
+        from .pipeline.dialogue_manager import _normalize_entities_soft  # reuse de la normalisation existante
+        from .pipeline.perf_store import PerfStore  # classe PerfStore
+
+        q = (payload.question or "") if payload else ""
+        ql = q.lower()
+
+        # Détecter espèces/ligne depuis payload.entities puis question
+        entities_in = (payload.entities or {}) if payload and payload.entities is not None else {}
+        species = (entities_in.get("species") or "broiler").lower()
+        line = entities_in.get("line")
+        if not line:
+            if "cobb" in ql: line = "cobb500"
+            elif "ross" in ql: line = "ross308"
+
+        # Détection légère du sexe / unité / âge depuis la question si absent
+        sex = entities_in.get("sex")
+        if not sex:
+            if ("as hatched" in ql) or ("as-hatched" in ql) or ("mixte" in ql) or (" ah " in ql):
+                sex = "as_hatched"
+            elif ("male" in ql) or ("mâle" in ql):
+                sex = "male"
+            elif ("female" in ql) or ("femelle" in ql):
+                sex = "female"
+
+        unit = entities_in.get("unit")
+        if not unit:
+            if ("metric" in ql) or ("métrique" in ql):
+                unit = "metric"
+            elif "imperial" in ql:
+                unit = "imperial"
+
+        age_days = entities_in.get("age_days")
+        if age_days is None:
+            m = _re.search(r"(\d+)\s*(?:j|jour|jours|d|day|days)\b", ql)
+            if m:
+                try: age_days = int(m.group(1))
+                except Exception: age_days = None
+
+        # Normalisation canonique
+        norm = _normalize_entities_soft({
+            "species": species,
+            "line": line,
+            "sex": sex,
+            "age_days": age_days,
+            "unit": unit,
+        })
+
+        # Instanciation du store (avec autodétection de tables_dir dans PerfStore)
+        store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT","./rag_index"), species=norm["species"])
+        try:
+            available = store.available_lines()
+        except Exception:
+            available = []
+
+        # Si la lignée n'est pas déterminée, retourne l'info utile
+        if not norm.get("line"):
+            return {
+                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+                "norm": norm,
+                "rec": None,
+                "debug": {
+                    "error": "missing_line",
+                    "available_lines": available,
+                    "tables_dir": str(getattr(store, "dir_tables", "")),
+                }
+            }
+
+        # Charger la table ligne → DataFrame (pas de retour non sérialisable)
+        df = store._load_df(norm["line"])
+        if df is None:
+            return {
+                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+                "norm": norm,
+                "rec": None,
+                "debug": {
+                    "error": "table_missing",
+                    "line": norm.get("line"),
+                    "available_lines": available,
+                    "tables_dir": str(getattr(store, "dir_tables", "")),
+                }
+            }
+
+        # Lookup via PerfStore.get (exact puis nearest côté store)
+        try:
+            rec = store.get(
+                line=norm["line"],
+                sex=norm["sex"],
+                unit=norm["unit"],
+                age_days=int(norm.get("age_days") or 0)
+            )
+        except Exception as e:
+            rec = None
+
+        # Debug sérialisable seulement
+        dbg = {
+            "rows": int(len(df)),
+            "columns": [str(c) for c in df.columns],
+            "available_lines": available,
+            "tables_dir": str(getattr(store, "dir_tables", "")),
+        }
+
+        return {
+            "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+            "norm": norm,
+            "rec": rec,
+            "debug": dbg
+        }
+
     except Exception as e:
-        return {"error": str(e)}
+        # Jamais de 500: on renvoie un JSON explicite
+        return {
+            "error": "internal",
+            "message": str(e),
+            "trace": traceback.format_exc()[:2000]
+        }

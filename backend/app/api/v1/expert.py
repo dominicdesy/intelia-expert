@@ -164,7 +164,13 @@ def perfstore_status():
                 lines.append({"line": ln, "rows": 0 if df is None else int(len(df))})
             except Exception as e:
                 lines.append({"line": ln, "error": str(e)})
-        return {"ok": True, "root": root, "species": species, "lines": lines}
+        return {
+            "ok": True,
+            "root": str(root) if root else None,
+            "species": species,
+            "tables_dir": str(getattr(store, "dir_tables", "")),
+            "lines": lines
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
