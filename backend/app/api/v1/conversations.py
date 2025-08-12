@@ -53,7 +53,7 @@ async def test_public_post(data: dict = {}):
 
 # ===== Endpoints pour les conversations (CODE ORIGINAL) =====
 
-@router.get("/conversations/{session_id}")
+@router.get("/{session_id}")
 def get_conversation(session_id: str) -> Dict[str, Any]:
     """
     Récupère l'historique complet d'une conversation par session_id.
@@ -106,7 +106,7 @@ def get_conversation(session_id: str) -> Dict[str, Any]:
         logger.exception(f"❌ Erreur récupération conversation {session_id}")
         raise HTTPException(status_code=500, detail=f"Error retrieving conversation: {str(e)}")
 
-@router.get("/conversations/user/{user_id}")
+@router.get("/user/{user_id}")
 def get_user_conversations(
     user_id: str, 
     limit: int = Query(default=20, ge=1, le=100),
@@ -152,7 +152,7 @@ def get_user_conversations(
         logger.exception(f"❌ Erreur récupération conversations user {user_id}")
         raise HTTPException(status_code=500, detail=f"Error retrieving user conversations: {str(e)}")
 
-@router.delete("/conversations/{session_id}")
+@router.delete("/{session_id}")
 def delete_conversation(session_id: str) -> Dict[str, Any]:
     """
     Supprime une conversation complètement.
@@ -191,7 +191,7 @@ def delete_conversation(session_id: str) -> Dict[str, Any]:
         logger.exception(f"❌ Erreur suppression conversation {session_id}")
         raise HTTPException(status_code=500, detail=f"Error deleting conversation: {str(e)}")
 
-@router.get("/conversations")
+@router.get("/")
 def list_recent_conversations(
     limit: int = Query(default=10, ge=1, le=50),
     hours: int = Query(default=24, ge=1, le=168)  # Max 1 semaine
@@ -237,7 +237,7 @@ def list_recent_conversations(
         logger.exception("❌ Erreur récupération conversations récentes")
         raise HTTPException(status_code=500, detail=f"Error listing conversations: {str(e)}")
 
-@router.post("/conversations/{session_id}/clear")
+@router.post("/{session_id}/clear")
 def clear_conversation(session_id: str) -> Dict[str, Any]:
     """
     Vide le contenu d'une conversation (équivalent à reset).
@@ -277,7 +277,7 @@ def clear_conversation(session_id: str) -> Dict[str, Any]:
         logger.exception(f"❌ Erreur vidage conversation {session_id}")
         raise HTTPException(status_code=500, detail=f"Error clearing conversation: {str(e)}")
 
-@router.get("/conversations/stats")
+@router.get("/stats")
 def get_conversation_stats() -> Dict[str, Any]:
     """
     Récupère les statistiques globales des conversations.
@@ -315,7 +315,7 @@ def get_conversation_stats() -> Dict[str, Any]:
         logger.exception("❌ Erreur récupération statistiques")
         raise HTTPException(status_code=500, detail=f"Error retrieving stats: {str(e)}")
 
-@router.post("/conversations/cleanup")
+@router.post("/cleanup")
 def cleanup_old_conversations(
     days_old: int = Query(default=7, ge=1, le=30),
     dry_run: bool = Query(default=True)
@@ -363,9 +363,9 @@ def cleanup_old_conversations(
         logger.exception("❌ Erreur nettoyage conversations")
         raise HTTPException(status_code=500, detail=f"Error during cleanup: {str(e)}")
 
-# ===== Endpoint de santé =====
+# ===== Endpoint de santé (CORRIGÉ) =====
 
-@router.get("/conversations/health")
+@router.get("/health")
 def health_check() -> Dict[str, Any]:
     """
     Vérification de santé du service de conversations.
