@@ -135,22 +135,105 @@ async def get_user_conversations(
             try:
                 stats = memory.get_stats()
                 
-                # Pour l'instant, retourner une structure compatible
-                # TODO: Implémenter le mapping user_id -> sessions dans PostgreSQL
-                result = {
-                    "status": "success",
-                    "user_id": user_id,
-                    "conversations": [],  # À implémenter selon votre logique métier
-                    "total_count": 0,
-                    "limit": limit,
-                    "offset": offset,
-                    "source": "postgresql",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "system_stats": stats
-                }
+                # 🔧 NOUVEAU: Implémenter le mapping user_id -> sessions
+                try:
+                    import psycopg2
+                    import json
+                    from datetime import datetime
+                    
+                    # Connexion PostgreSQL pour récupérer les sessions utilisateur
+                    with psycopg2.connect(memory.dsn) as conn:
+                        with conn.cursor() as cur:
+                            # Requête pour trouver les sessions qui contiennent cet user_id
+                            cur.execute("""
+                                SELECT session_id, context, created_at, updated_at 
+                                FROM conversation_memory 
+                                WHERE context::text LIKE %s
+                                ORDER BY updated_at DESC
+                                LIMIT %s OFFSET %s
+                            """, (f'%{user_id}%', limit, offset))
+                            
+                            sessions = cur.fetchall()
+                            
+                            # Compter le total
+                            cur.execute("""
+                                SELECT COUNT(*) 
+                                FROM conversation_memory 
+                                WHERE context::text LIKE %s
+                            """, (f'%{user_id}%',))
+                            
+                            total_count = cur.fetchone()[0]
+                            
+                            # Transformer en format conversations
+                            conversations = []
+                            for session_id, context, created_at, updated_at in sessions:
+                                try:
+                                    # Parser le contexte JSON
+                                    ctx = json.loads(context) if isinstance(context, str) else context
+                                    messages = ctx.get("messages", [])
+                                    
+                                    # Créer une conversation formatée
+                                    conversation = {
+                                        "id": session_id,
+                                        "title": f"Conversation {session_id[:8]}...",
+                                        "preview": "Conversation utilisateur",
+                                        "message_count": len(messages),
+                                        "created_at": created_at.isoformat() if created_at else datetime.utcnow().isoformat(),
+                                        "updated_at": updated_at.isoformat() if updated_at else datetime.utcnow().isoformat(),
+                                        "language": "fr",
+                                        "status": "active"
+                                    }
+                                    
+                                    # Extraire le titre et preview des messages si possible
+                                    if messages:
+                                        # Premier message utilisateur comme titre potentiel
+                                        user_messages = [m for m in messages if m.get("isUser", False)]
+                                        if user_messages:
+                                            first_msg = user_messages[0].get("content", "")
+                                            conversation["title"] = first_msg[:50] + "..." if len(first_msg) > 50 else first_msg
+                                            conversation["preview"] = first_msg[:100] + "..." if len(first_msg) > 100 else first_msg
+                                    
+                                    conversations.append(conversation)
+                                    
+                                except Exception as parse_error:
+                                    logger.warning(f"⚠️ Erreur parsing session {session_id}: {parse_error}")
+                                    continue
                 
-                logger.info(f"✅ PostgreSQL: conversations retrieved for user {user_id}")
-                return result
+                    result = {
+                        "status": "success",
+                        "user_id": user_id,
+                        "conversations": conversations,
+                        "total_count": total_count,
+                        "limit": limit,
+                        "offset": offset,
+                        "source": "postgresql",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "system_stats": stats
+                    }
+                    
+                    logger.info(f"✅ PostgreSQL: {total_count} conversations found for user {user_id}")
+                    return result
+                    
+                except Exception as db_error:
+                    logger.error(f"❌ PostgreSQL query error: {db_error}")
+                    # Fallback vers le comportement précédent
+                    result = {
+                        "status": "success",
+                        "user_id": user_id,
+                        "conversations": [],
+                        "total_count": 0,
+                        "limit": limit,
+                        "offset": offset,
+                        "source": "postgresql_fallback",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "system_stats": stats,
+                        "error": f"Database query failed: {str(db_error)}"
+                    }
+                    return result
+                
+            except Exception as e:
+                logger.error(f"❌ PostgreSQL error for user {user_id}: {e}")
+                # Fallback ci-dessous
                 
             except Exception as e:
                 logger.error(f"❌ PostgreSQL error for user {user_id}: {e}")

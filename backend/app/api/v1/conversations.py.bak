@@ -38,7 +38,85 @@ if not MEMORY_AVAILABLE:
     except Exception as e:
         logger.warning(f"⚠️ ConversationTracker unavailable: {e}")
 
-# ===== ENDPOINT PRINCIPAL QUI MANQUAIT =====
+# ===== ENDPOINTS SPÉCIFIQUES (AVANT les routes génériques) =====
+
+@router.get("/health")
+async def health_check() -> Dict[str, Any]:
+    """
+    Vérification de santé du service.
+    """
+    try:
+        if MEMORY_AVAILABLE and memory:
+            stats = memory.get_stats()
+            return {
+                "status": "healthy",
+                "backend": "postgresql",
+                "total_conversations": stats.get("total_sessions", 0),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        elif conversation_tracker:
+            return {
+                "status": "healthy",
+                "backend": "conversation_tracker",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "status": "limited",
+                "backend": "none",
+                "message": "No conversation backend available",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    except Exception as e:
+        logger.exception("❌ Health check failed")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@router.get("/stats")
+async def get_stats() -> Dict[str, Any]:
+    """
+    Statistiques du service de conversations.
+    """
+    try:
+        if MEMORY_AVAILABLE and memory:
+            stats = memory.get_stats()
+            enhanced_stats = {
+                **stats,
+                "service_status": "operational",
+                "backend": "postgresql",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            return enhanced_stats
+        else:
+            return {
+                "total_sessions": 0,
+                "service_status": "limited",
+                "backend": "none",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    except Exception as e:
+        logger.exception("❌ Error getting stats")
+        return {
+            "error": str(e),
+            "service_status": "error",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@router.get("/test-public")
+async def test_public() -> Dict[str, Any]:
+    """
+    Test public endpoint.
+    """
+    return {
+        "status": "success",
+        "message": "🎉 Conversations router fully functional!",
+        "router": "conversations",
+        "backend_available": MEMORY_AVAILABLE,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @router.get("/user/{user_id}")
 async def get_user_conversations(
@@ -122,7 +200,7 @@ async def get_user_conversations(
             detail=f"Error retrieving conversations for user {user_id}: {str(e)}"
         )
 
-# ===== AUTRES ENDPOINTS ESSENTIELS =====
+# ===== ROUTES GÉNÉRIQUES (APRÈS les routes spécifiques) =====
 
 @router.get("/{session_id}")
 async def get_conversation(session_id: str) -> Dict[str, Any]:
@@ -200,83 +278,3 @@ async def delete_conversation(session_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.exception(f"❌ Error deleting conversation {session_id}")
         raise HTTPException(status_code=500, detail=f"Error deleting conversation: {str(e)}")
-
-# ===== ENDPOINTS EXISTANTS (Compatibilité) =====
-
-@router.get("/health")
-async def health_check() -> Dict[str, Any]:
-    """
-    Vérification de santé du service.
-    """
-    try:
-        if MEMORY_AVAILABLE and memory:
-            stats = memory.get_stats()
-            return {
-                "status": "healthy",
-                "backend": "postgresql",
-                "total_conversations": stats.get("total_sessions", 0),
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        elif conversation_tracker:
-            return {
-                "status": "healthy",
-                "backend": "conversation_tracker",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        else:
-            return {
-                "status": "limited",
-                "backend": "none",
-                "message": "No conversation backend available",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-    except Exception as e:
-        logger.exception("❌ Health check failed")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-@router.get("/test-public")
-async def test_public() -> Dict[str, Any]:
-    """
-    Test public endpoint.
-    """
-    return {
-        "status": "success",
-        "message": "🎉 Conversations router fully functional!",
-        "router": "conversations",
-        "backend_available": MEMORY_AVAILABLE,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@router.get("/stats")
-async def get_stats() -> Dict[str, Any]:
-    """
-    Statistiques du service de conversations.
-    """
-    try:
-        if MEMORY_AVAILABLE and memory:
-            stats = memory.get_stats()
-            enhanced_stats = {
-                **stats,
-                "service_status": "operational",
-                "backend": "postgresql",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            return enhanced_stats
-        else:
-            return {
-                "total_sessions": 0,
-                "service_status": "limited",
-                "backend": "none",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-    except Exception as e:
-        logger.exception("❌ Error getting stats")
-        return {
-            "error": str(e),
-            "service_status": "error",
-            "timestamp": datetime.utcnow().isoformat()
-        }
