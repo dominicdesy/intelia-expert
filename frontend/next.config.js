@@ -4,23 +4,23 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // 🔧 Configuration pour DigitalOcean App Platform
-  output: 'standalone',
+  // 🔧 FORCER LE MODE SPA - Désactive complètement la génération statique
+  output: 'export',
   trailingSlash: true,
 
-  // 🔧 Désactiver la génération statique pour éviter les erreurs de prérendu
+  // 🔧 Désactiver complètement le prérendu
   experimental: {
     appDir: true
   },
 
-  // Configuration images - optimisée pour la production
+  // Configuration images - optimisée pour SPA export
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com'
     ],
     formats: ['image/webp', 'image/avif'],
-    unoptimized: process.env.NODE_ENV === 'production', // Pour DigitalOcean
+    unoptimized: true, // Obligatoire pour output: 'export'
   },
 
   // Variables d'environnement
@@ -39,38 +39,8 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // 🔧 Headers de sécurité et cache
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY'
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          }
-        ]
-      }
-    ]
-  },
-
-  // 🔧 Redirections pour l'API backend
-  async rewrites() {
-    return [
-      {
-        source: '/api/v1/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/v1/:path*`
-      }
-    ]
-  },
+  // 🔧 Supprimé - Headers et rewrites incompatibles avec output: 'export'
+  // En mode export, tout est statique côté client
 
   // ✅ MINIMAL WEBPACK - AUCUNE MODIFICATION CSS
   webpack: (config, { isServer }) => {
