@@ -8,14 +8,15 @@ const nextConfig = {
   output: 'standalone',
   trailingSlash: true,
 
-  // 🔧 Désactiver complètement la génération statique
+  // 🔧 DÉSACTIVER COMPLÈTEMENT LA GÉNÉRATION STATIQUE
   experimental: {
-    appDir: true
+    appDir: true,
+    isrMemoryCacheSize: 0, // Désactive ISR
   },
   
-  // 🔧 Forcer le rendu côté client pour toutes les pages
-  async generateStaticParams() {
-    return []
+  // 🔧 Générer aucune page statique
+  generateBuildId: async () => {
+    return 'no-static-pages'
   },
 
   // Configuration images - optimisée pour standalone
@@ -44,10 +45,7 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // 🔧 Supprimé - Headers et rewrites incompatibles avec certaines configurations
-  // En mode standalone, tout est géré côté serveur
-  
-  // 🔧 Configuration pour éviter la génération statique
+  // 🔧 Headers pour éviter le cache
   async headers() {
     return [
       {
@@ -56,6 +54,14 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'no-cache, no-store, must-revalidate'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
           }
         ]
       }
@@ -64,6 +70,11 @@ const nextConfig = {
 
   // ✅ MINIMAL WEBPACK - AUCUNE MODIFICATION CSS
   webpack: (config, { isServer }) => {
+    // Désactiver la minification pour debug
+    if (!isServer && process.env.NODE_ENV === 'production') {
+      config.optimization.minimize = false
+    }
+    
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,

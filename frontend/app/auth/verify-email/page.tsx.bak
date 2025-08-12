@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-// 🔧 1. Votre contenu existant devient VerifyEmailPageContent
-function VerifyEmailPageContent() {
+export default function VerifyEmailPage() {
   const [message, setMessage] = useState('')
-  const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     // Vérifier si il y a un token dans l'URL
@@ -98,26 +97,5 @@ function VerifyEmailPageContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-// 🔧 2. Export principal avec Suspense
-export default function VerifyEmailPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100 mb-4">
-            <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de la vérification...</p>
-        </div>
-      </div>
-    }>
-      <VerifyEmailPageContent />
-    </Suspense>
   )
 }
