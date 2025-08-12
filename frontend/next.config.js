@@ -4,13 +4,23 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // Configuration images
+  // 🔧 Configuration pour DigitalOcean App Platform
+  output: 'standalone',
+  trailingSlash: true,
+
+  // 🔧 Désactiver la génération statique pour éviter les erreurs de prérendu
+  experimental: {
+    appDir: true
+  },
+
+  // Configuration images - optimisée pour la production
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com'
     ],
     formats: ['image/webp', 'image/avif'],
+    unoptimized: process.env.NODE_ENV === 'production', // Pour DigitalOcean
   },
 
   // Variables d'environnement
@@ -27,6 +37,39 @@ const nextConfig = {
   // Configuration ESLint
   eslint: {
     ignoreDuringBuilds: false,
+  },
+
+  // 🔧 Headers de sécurité et cache
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin'
+          }
+        ]
+      }
+    ]
+  },
+
+  // 🔧 Redirections pour l'API backend
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/v1/:path*`
+      }
+    ]
   },
 
   // ✅ MINIMAL WEBPACK - AUCUNE MODIFICATION CSS
