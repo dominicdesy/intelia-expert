@@ -1,6 +1,6 @@
 # app/api/v1/expert.py
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.encoders import jsonable_encoder  # [PATCH] JSON-safe responses
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict, List
@@ -8,6 +8,9 @@ import logging
 import os
 import re
 import math
+
+# 🔒 Import authentification
+from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -157,23 +160,16 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
-# ===== Schémas =====
-class AskPayload(BaseModel):
-    session_id: Optional[str] = "default"
-    question: str
-    lang: Optional[str] = "fr"
-    debug: Optional[bool] = False
-    force_perfstore: Optional[bool] = False
-    intent_hint: Optional[str] = None
-    entities: Dict[str, Any] = Field(default_factory=dict)
-    model_config = {"extra": "allow"}
-
-# ===== Endpoints =====
-@router.post("/ask")
-def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
-    """Endpoint principal pour poser des questions (préserve la logique existante)."""
+# ===== Fonction interne partagée (NOUVEAU) =====
+def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Logique interne pour traiter les questions (avec ou sans auth)."""
     try:
-        logger.info(f"📝 Question reçue: {payload.question[:120]}")
+        # Log différencié selon l'authentification
+        if current_user:
+            user_email = current_user.get('email', 'unknown')
+            logger.info(f"📝 Question authentifiée de {user_email}: {payload.question[:120]}")
+        else:
+            logger.info(f"📝 Question publique: {payload.question[:120]}")
 
         fp_qs = request.query_params.get("force_perfstore")
         force_perf = bool(payload.force_perfstore) or (fp_qs in ("1", "true", "True", "yes"))
@@ -192,16 +188,44 @@ def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
             logger.warning("⚠️ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
 
+        # Ajouter les infos utilisateur dans la réponse si authentifié
+        if current_user:
+            result["user"] = {
+                "email": current_user.get('email'),
+                "user_id": current_user.get('user_id')
+            }
+
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
         return result
     except Exception as e:
-        logger.exception("❌ Erreur dans /ask")
+        logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
+
+# ===== Schémas =====
+class AskPayload(BaseModel):
+    session_id: Optional[str] = "default"
+    question: str
+    lang: Optional[str] = "fr"
+    debug: Optional[bool] = False
+    force_perfstore: Optional[bool] = False
+    intent_hint: Optional[str] = None
+    entities: Dict[str, Any] = Field(default_factory=dict)
+    model_config = {"extra": "allow"}
+
+# ===== Endpoints =====
+@router.post("/ask")
+def ask(
+    payload: AskPayload, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
+) -> Dict[str, Any]:
+    """Endpoint principal SÉCURISÉ pour poser des questions."""
+    return _ask_internal(payload, request, current_user)
 
 @router.post("/ask-public")
 def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
-    """Endpoint public (même logique que /ask)."""
-    return ask(payload, request)
+    """Endpoint public (pas d'authentification requise)."""
+    return _ask_internal(payload, request, None)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
@@ -284,7 +308,7 @@ def test_basic():
     return {"status": "ok", "message": "Basic endpoint works"}
 
 # ============================
-# [FUSION] /perf-probe complet avec extraction + nettoyage JSON
+# [FUSION] /perf-probe complet avec extraction + nettoyage JSON (INCHANGÉ)
 # ============================
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
