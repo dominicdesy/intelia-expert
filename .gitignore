@@ -1,23 +1,73 @@
-﻿node_modules/
-.next/
-dist/
-.env*
-*.log
+﻿# ------------------------------
+# OS / éditeurs
+# ------------------------------
 .DS_Store
 Thumbs.db
-backend/rag_index/
-**/_clean/
-**/*.faiss
-**/*.pkl
+.idea/
+.vscode/
+*.swp
 
+# ------------------------------
+# Logs / artefacts
+# ------------------------------
+logs/
+*.log
+*.pid
+*.out
 
-# Index et artefacts RAG
-backend/rag_index/
-**/_clean/
-**/*.faiss
-**/*.pkl
-**/meta.json
-
-# Fichiers temporaires Python
+# ------------------------------
+# Python (backend)
+# ------------------------------
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.dist-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.mypy_cache/
+.pytest_cache/
+.coverage*
+htmlcov/
+.ruff_cache/
+.env
+.env.*
+
+# ------------------------------
+# Node / Next.js (frontend)
+# ------------------------------
+node_modules/
+.npm/
+.pnpm-store/
+.next/
+.next-cache/
+out/
+.vercel/
+.vite/
+*.tsbuildinfo
+
+# ------------------------------
+# RAG / PerfStore
+# ⚠️ On N'ignore PAS rag_index/, on versionne le contenu
+#    (manifests .manifest, CSV, XLSX, etc.)
+#    On ignore seulement les fichiers générés/lourds.
+# ------------------------------
+**/index.faiss
+**/index.pkl
+**/meta.json
+**/_clean/
+**/*.faiss
+**/*.bin
+**/*.npy
+**/*.npz
+
+# ------------------------------
+# Docker / déploiement
+# ------------------------------
+docker-data/
+*.local
+*.override.yml
