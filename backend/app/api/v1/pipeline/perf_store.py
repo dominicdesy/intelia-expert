@@ -63,7 +63,7 @@ class PerfManifest:
     csv_name: str
     path_csv: Path
 
-    # (FIX) il y avait deux décorateurs @staticmethod superposés → IndentationError/500
+    # (FIX) doublon de décorateur @staticmethod supprimé
     @staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
