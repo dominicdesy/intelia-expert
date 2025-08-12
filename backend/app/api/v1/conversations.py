@@ -26,7 +26,32 @@ except Exception as e:
     MEMORY_AVAILABLE = False
     memory = None
 
-# ===== Endpoints pour les conversations =====
+# ===== ENDPOINT DE TEST PUBLIC (AJOUTÉ) =====
+
+@router.get("/test-public")
+async def test_public_endpoint():
+    """Endpoint de test public pour vérifier que le router fonctionne"""
+    return {
+        "status": "success",
+        "message": "🎉 Le router conversations fonctionne parfaitement !",
+        "timestamp": datetime.utcnow().isoformat(),
+        "router": "conversations",
+        "auth_required": False,
+        "memory_available": MEMORY_AVAILABLE
+    }
+
+@router.post("/test-public-post")
+async def test_public_post(data: dict = {}):
+    """Test POST public"""
+    return {
+        "status": "success", 
+        "message": "🚀 POST fonctionne aussi !",
+        "received_data": data,
+        "router": "conversations",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# ===== Endpoints pour les conversations (CODE ORIGINAL) =====
 
 @router.get("/conversations/{session_id}")
 def get_conversation(session_id: str) -> Dict[str, Any]:
