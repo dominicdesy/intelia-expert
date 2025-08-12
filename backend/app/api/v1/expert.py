@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.encoders import jsonable_encoder  # [PATCH] ensure JSON-safe outputs
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 import logging
@@ -156,7 +157,8 @@ def perfstore_status():
         store = _get_perf_store("broiler")
         if not store:
             return {"ok": False, "reason": "PerfStore None"}
-        root = getattr(store, "root", None); species = getattr(store, "species", None)
+        root = getattr(store, "root", None)
+        species = getattr(store, "species", None)
         lines = []
         for ln in ["ross308", "cobb500"]:
             try:
@@ -164,13 +166,9 @@ def perfstore_status():
                 lines.append({"line": ln, "rows": 0 if df is None else int(len(df))})
             except Exception as e:
                 lines.append({"line": ln, "error": str(e)})
-        return {
-            "ok": True,
-            "root": str(root) if root else None,
-            "species": species,
-            "tables_dir": str(getattr(store, "dir_tables", "")),
-            "lines": lines
-        }
+        # [PATCH] expose tables_dir pour diagnostic rapide (vu dans tes logs)
+        tables_dir = str(getattr(store, "dir_tables", "")) if getattr(store, "dir_tables", None) else None
+        return {"ok": True, "root": str(root) if root else None, "species": species, "tables_dir": tables_dir, "lines": lines}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -244,7 +242,7 @@ def perf_probe(payload: AskPayload):
 
         # Si la lignée n'est pas déterminée, retourne l'info utile
         if not norm.get("line"):
-            return {
+            out = {
                 "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
                 "norm": norm,
                 "rec": None,
@@ -254,11 +252,12 @@ def perf_probe(payload: AskPayload):
                     "tables_dir": str(getattr(store, "dir_tables", "")),
                 }
             }
+            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
         # Charger la table ligne → DataFrame (pas de retour non sérialisable)
         df = store._load_df(norm["line"])
         if df is None:
-            return {
+            out = {
                 "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
                 "norm": norm,
                 "rec": None,
@@ -269,6 +268,7 @@ def perf_probe(payload: AskPayload):
                     "tables_dir": str(getattr(store, "dir_tables", "")),
                 }
             }
+            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
         # Lookup via PerfStore.get (exact puis nearest côté store)
         try:
@@ -278,7 +278,7 @@ def perf_probe(payload: AskPayload):
                 unit=norm["unit"],
                 age_days=int(norm.get("age_days") or 0)
             )
-        except Exception as e:
+        except Exception:
             rec = None
 
         # Debug sérialisable seulement
@@ -289,17 +289,19 @@ def perf_probe(payload: AskPayload):
             "tables_dir": str(getattr(store, "dir_tables", "")),
         }
 
-        return {
+        out = {
             "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
             "norm": norm,
             "rec": rec,
             "debug": dbg
         }
+        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
     except Exception as e:
         # Jamais de 500: on renvoie un JSON explicite
-        return {
+        out = {
             "error": "internal",
             "message": str(e),
-            "trace": traceback.format_exc()[:2000]
+            "trace": (e.__class__.__name__ + ": " + str(e))[:1000]
         }
+        return jsonable_encoder(out, exclude_none=True)  # [PATCH]

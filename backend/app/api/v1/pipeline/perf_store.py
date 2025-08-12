@@ -63,6 +63,7 @@ class PerfManifest:
     csv_name: str
     path_csv: Path
 
+    # [PATCH] remove duplicate decorator + keep staticmethod
     @staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
@@ -90,7 +91,7 @@ class PerfManifest:
             csv_path = csv_path.resolve()
 
             if not csv_path.exists():
-                # tentatif case-insensitive dans dir_tables
+                # tentative case-insensitive dans dir_tables
                 try:
                     lower_target = csv_path.name.lower()
                     csv_path = next(

@@ -64,7 +64,6 @@ class PerfManifest:
     path_csv: Path
 
     @staticmethod
-@staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
         try:
