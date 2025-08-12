@@ -16,22 +16,20 @@ Conventions:
 """
 
 from __future__ import annotations
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from pathlib import Path
 import os
 import json
 import re
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 
-# [FIX] Import pandas avec gestion d'erreur robuste
+# [FIX] Import pandas avec gestion d'erreur
 try:
     import pandas as pd
     PANDAS_AVAILABLE = True
-    logger.debug("✅ pandas available for PerfStore")
 except ImportError as e:
     logger.error(f"❌ Failed to import pandas: {e}")
     PANDAS_AVAILABLE = False
@@ -51,9 +49,6 @@ except ImportError as e:
         @staticmethod
         def concat(*args, **kwargs):
             raise ImportError("pandas not available")
-        @staticmethod
-        def isna(value):
-            return value is None or (isinstance(value, float) and str(value).lower() == 'nan')
 
 # --------- Normalisations légères --------- #
 _CANON_SEX = {
@@ -135,20 +130,19 @@ class PerfManifest:
             logger.debug(f"[PerfManifest] load failed for line={line}: {e}")
             return None
 
-# --------- Store principal amélioré --------- #
+# --------- Store principal --------- #
 class PerfStore:
     """
     root: racine du dossier rag_index (par défaut "./rag_index")
     species: sous-dossier (ex: "broiler", "layer", "global", ...)
-    Cache: un DataFrame par lignée (line) avec TTL
+    Cache: un DataFrame par lignée (line)
     """
-    def __init__(self, root: str = "./rag_index", species: str = "broiler", cache_ttl: int = 3600):
+    def __init__(self, root: str = "./rag_index", species: str = "broiler"):
         if not PANDAS_AVAILABLE:
             raise ImportError("pandas is required for PerfStore but not available")
             
         self.root = Path(root)
         self.species = (species or "broiler").strip().lower()
-        self.cache_ttl = cache_ttl  # TTL en secondes (1h par défaut)
 
         # [FIX] Gestion robuste des variables d'environnement
         env_var = f"RAG_INDEX_{self.species.upper()}"
@@ -173,70 +167,10 @@ class PerfStore:
                                self.root / self.species / "tables")
         logger.info(f"[PerfStore] tables_dir={self.dir_tables}")
 
-        # [AMÉLIORATION] Caches avec TTL
-        self._cache_df: Dict[str, Tuple[pd.DataFrame, float]] = {}  # (df, timestamp)
+        # caches
+        self._cache_df: Dict[str, pd.DataFrame] = {}
         self._cache_manifest: Dict[str, Optional[PerfManifest]] = {}
         self._df_all: Optional[pd.DataFrame] = None  # DF global (compat as_dataframe/df)
-
-    # ——— [NOUVELLE] Conversion sûre pandas vers dict ——— #
-    def _safe_to_dict(self, row) -> Dict[str, Any]:
-        """Conversion sûre pandas row vers dict avec nettoyage des types numpy/pandas"""
-        if not PANDAS_AVAILABLE:
-            return {}
-            
-        result = {}
-        try:
-            for key, value in row.items():
-                if pd.isna(value):
-                    result[key] = None
-                elif hasattr(value, 'item'):  # numpy scalar
-                    try:
-                        result[key] = value.item()
-                    except:
-                        result[key] = str(value)
-                else:
-                    result[key] = value
-            return result
-        except Exception as e:
-            logger.warning(f"[PerfStore] _safe_to_dict failed: {e}")
-            return {}
-
-    # ——— [NOUVELLE] Validation des DataFrames ——— #
-    def _validate_df(self, df: pd.DataFrame, line: str) -> bool:
-        """Validation basique du DataFrame chargé"""
-        if not PANDAS_AVAILABLE or df is None:
-            return False
-            
-        required_cols = {"line", "sex", "unit", "age_days"}
-        missing = required_cols - set(df.columns)
-        if missing:
-            logger.warning(f"[PerfStore] Missing required columns {missing} in table for line={line}")
-            return False
-            
-        if len(df) == 0:
-            logger.warning(f"[PerfStore] Empty table for line={line}")
-            return False
-            
-        return True
-
-    # ——— [AMÉLIORATION] Cache avec TTL ——— #
-    def _is_cache_valid(self, line: str) -> bool:
-        """Vérifie si le cache est encore valide"""
-        if line not in self._cache_df:
-            return False
-        _, timestamp = self._cache_df[line]
-        return (time.time() - timestamp) < self.cache_ttl
-
-    def _get_cached_df(self, line: str) -> Optional[pd.DataFrame]:
-        """Récupère le DataFrame depuis le cache si valide"""
-        if self._is_cache_valid(line):
-            df, _ = self._cache_df[line]
-            return df
-        return None
-
-    def _set_cache_df(self, line: str, df: pd.DataFrame):
-        """Met en cache le DataFrame avec timestamp"""
-        self._cache_df[line] = (df, time.time())
 
     # ——— helpers ——— #
     def _get_manifest(self, line: str) -> Optional[PerfManifest]:
@@ -265,7 +199,7 @@ class PerfStore:
             logger.warning(f"[PerfStore] read failed for {path}: {e}")
             return None
 
-    # [FIX CRITIQUE] normalisation centralisée des colonnes (line/sex/unit/age_days)
+    # normalisation centralisée des colonnes (line/sex/unit/age_days)
     def _normalize_columns(self, df: pd.DataFrame, fallback_line: Optional[str] = None) -> pd.DataFrame:
         if not PANDAS_AVAILABLE:
             return df
@@ -286,13 +220,12 @@ class PerfStore:
             else:
                 df["unit"] = "metric"
 
-            # [FIX CRITIQUE] sex - évite le problème .fillna() circulaire
+            # sex
             if "sex" in df.columns:
-                sex_series = df["sex"].astype(str).str.strip().str.lower()
-                sex_mapped = sex_series.map(_CANON_SEX)
-                df["sex"] = sex_mapped.fillna("as_hatched")  # Fallback sûr au lieu de la référence circulaire
-            else:
-                df["sex"] = "as_hatched"
+                df["sex"] = (
+                    df["sex"].astype(str).str.strip().str.lower()
+                      .map(_CANON_SEX).fillna(df["sex"].astype(str).str.lower())
+                )
 
             # age → age_days (tolère "day", "Age (d)", "jours", etc.)
             lower = {str(c).lower(): c for c in df.columns}
@@ -344,11 +277,11 @@ class PerfStore:
         candidates.sort(key=_prio)
         return candidates[0]
 
-    # [AMÉLIORATION] API avec cache TTL
+    # API déjà utilisée par le dialogue_manager (compat)
     def _load_df(self, line: str) -> Optional[pd.DataFrame]:
         """
-        Chargement d'une table pour la lignée avec cache TTL.
-        1) cache si valide ; 2) via manifest si présent ; 3) sinon via scan du dossier tables/
+        Chargement d'une table pour la lignée.
+        1) via manifest si présent ; 2) sinon via scan du dossier tables/
         Normalisation systématique des colonnes.
         """
         if not PANDAS_AVAILABLE:
@@ -358,17 +291,14 @@ class PerfStore:
         line = _canon_line(line)
         if not line:
             return None
+        if line in self._cache_df:
+            return self._cache_df[line]
 
-        # 1) Cache TTL
-        cached_df = self._get_cached_df(line)
-        if cached_df is not None:
-            return cached_df
-
-        # 2) Manifest
+        # 1) Manifest
         mf = self._get_manifest(line)
         path = mf.path_csv if mf and mf.path_csv.exists() else None
 
-        # 3) Fallback scan si pas de manifest ou fichier manquant
+        # 2) Fallback scan si pas de manifest ou fichier manquant
         if path is None:
             path = self._find_table_for_line(line)
 
@@ -381,15 +311,7 @@ class PerfStore:
             return None
 
         df = self._normalize_columns(df, fallback_line=line)
-        
-        # [NOUVELLE] Validation
-        if not self._validate_df(df, line):
-            logger.error(f"[PerfStore] DataFrame validation failed for line={line}")
-            return None
-
-        # Cache avec TTL
-        self._set_cache_df(line, df)
-        
+        self._cache_df[line] = df
         # invalide le DF global car une nouvelle lignée vient d'être chargée
         self._df_all = None
         return df
@@ -415,8 +337,7 @@ class PerfStore:
                     # déduis la lignée depuis le nom de fichier si la colonne line manque
                     fallback_line = _canon_line(p.stem)
                     df = self._normalize_columns(df, fallback_line=fallback_line)
-                    if self._validate_df(df, fallback_line):
-                        frames.append(df)
+                    frames.append(df)
         except Exception as e:
             logger.warning(f"[PerfStore] building global DF failed: {e}")
             return None
@@ -434,48 +355,11 @@ class PerfStore:
     def df(self) -> Optional[pd.DataFrame]:
         return self.as_dataframe()
 
-    # ——— [NOUVELLE] Méthode de diagnostic complète ——— #
-    def get_diagnostic_info(self, line: str) -> Dict[str, Any]:
-        """Informations complètes pour debugging d'une lignée"""
-        line = _canon_line(line)
-        df = self._load_df(line)
-        
-        if df is None:
-            return {
-                "line": line,
-                "error": "table_not_found",
-                "available_lines": self.available_lines(),
-                "tables_dir": str(self.dir_tables)
-            }
-        
-        try:
-            age_values = df["age_days"].dropna().astype(int)
-            return {
-                "line": line,
-                "status": "ok",
-                "total_rows": len(df),
-                "age_range": [int(age_values.min()), int(age_values.max())] if len(age_values) > 0 else [0, 0],
-                "available_sexes": sorted(df["sex"].unique().tolist()),
-                "available_units": sorted(df["unit"].unique().tolist()),
-                "sample_ages": sorted(age_values.unique()[:10].tolist()),
-                "columns": df.columns.tolist(),
-                "cache_status": "cached" if self._is_cache_valid(line) else "fresh_load"
-            }
-        except Exception as e:
-            return {
-                "line": line,
-                "error": "analysis_failed",
-                "message": str(e),
-                "total_rows": len(df),
-                "columns": df.columns.tolist() if hasattr(df, 'columns') else []
-            }
-
-    # ——— [AMÉLIORATION] API publique avec conversion sûre ——— #
+    # ——— API publique ——— #
     def get(self, line: str, sex: str, unit: str, age_days: int) -> Optional[Dict[str, Any]]:
         """
         Retourne un dict standardisé ou None si introuvable.
         Fallback: si (male/female) introuvable, on tente "as_hatched".
-        [FIX] Utilise _safe_to_dict pour éviter les problèmes de sérialisation JSON.
         """
         if not PANDAS_AVAILABLE:
             logger.error("[PerfStore] pandas not available for get operations")
@@ -499,9 +383,7 @@ class PerfStore:
                     (df["age_days"].eq(age_days))
                 )
                 hit = df[q]
-                if not hit.empty:
-                    return self._safe_to_dict(hit.iloc[0])  # [FIX] Conversion sûre
-                return None
+                return hit.iloc[0].to_dict() if not hit.empty else None
             except Exception as e:
                 logger.warning(f"[PerfStore] query failed for {line}/{_sex}/{unit}/{age_days}: {e}")
                 return None
@@ -519,15 +401,13 @@ class PerfStore:
                 tmp = tmp.copy()
                 tmp["__d__"] = (tmp["age_days"].astype(int) - t).abs()
                 if not tmp.empty:
-                    row = self._safe_to_dict(tmp.sort_values(["__d__", "age_days"]).iloc[0])
+                    row = tmp.sort_values(["__d__", "age_days"]).iloc[0].to_dict()
             except Exception as e:
                 logger.warning(f"[PerfStore] nearest age lookup failed: {e}")
                 row = None
-        
         if row is None:
             return None
 
-        # [AMÉLIORATION] Structure de retour standardisée avec nettoyage
         return {
             "line": row.get("line", line),
             "sex": row.get("sex", sex),
@@ -540,34 +420,6 @@ class PerfStore:
             "source_doc": row.get("source_doc"),
             "page": row.get("page"),
         }
-
-    # ——— [NOUVELLE] Méthode de requête par plage d'âges ——— #
-    def get_range(self, line: str, sex: str, unit: str, age_start: int, age_end: int) -> List[Dict[str, Any]]:
-        """Récupère les données sur une plage d'âges"""
-        if not PANDAS_AVAILABLE:
-            return []
-            
-        line = _canon_line(line)
-        sex = _canon_sex(sex)
-        unit = _canon_unit(unit)
-
-        df = self._load_df(line)
-        if df is None:
-            return []
-
-        try:
-            q = (
-                (df["line"].eq(line)) &
-                (df["sex"].eq(sex)) &
-                (df["unit"].eq(unit)) &
-                (df["age_days"] >= age_start) &
-                (df["age_days"] <= age_end)
-            )
-            hits = df[q].sort_values("age_days")
-            return [self._safe_to_dict(row) for _, row in hits.iterrows()]
-        except Exception as e:
-            logger.warning(f"[PerfStore] get_range failed: {e}")
-            return []
 
     # utilitaire debug pratique
     def available_lines(self) -> List[str]:
@@ -582,23 +434,3 @@ class PerfStore:
         except Exception as e:
             logger.warning(f"[PerfStore] available_lines failed: {e}")
             return []
-
-    # ——— [NOUVELLE] Nettoyage du cache ——— #
-    def clear_cache(self):
-        """Vide le cache (utile pour les tests ou rechargement forcé)"""
-        self._cache_df.clear()
-        self._cache_manifest.clear()
-        self._df_all = None
-        logger.info("[PerfStore] Cache cleared")
-
-    def cache_stats(self) -> Dict[str, Any]:
-        """Statistiques du cache"""
-        current_time = time.time()
-        valid_entries = sum(1 for _, (_, ts) in self._cache_df.items() 
-                          if (current_time - ts) < self.cache_ttl)
-        return {
-            "total_cached_lines": len(self._cache_df),
-            "valid_cached_lines": valid_entries,
-            "cache_ttl_seconds": self.cache_ttl,
-            "manifest_cache_size": len(self._cache_manifest)
-        }
