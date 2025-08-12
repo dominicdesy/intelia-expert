@@ -14,7 +14,7 @@ router = APIRouter(prefix="/v1")
 
 # Ordre logique par domaine
 router.include_router(system_router, tags=["System"])
-router.include_router(auth_router, prefix="/auth", tags=["Auth"])  # 🔧 PRÉFIXE AJOUTÉ
+router.include_router(auth_router, tags=["Auth"])  # 🔧 PAS DE PRÉFIXE (déjà dans auth.py)
 router.include_router(admin_router, tags=["Admin"])
 router.include_router(health_router, tags=["Health"])
 router.include_router(invitations_router, tags=["Invitations"])
