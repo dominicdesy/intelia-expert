@@ -114,11 +114,15 @@ export default function ChatInterface() {
     console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
-  // 🚀 NOUVELLE FONCTION : Nettoyer le texte de réponse
+  // 🚀 FONCTION ÉTENDUE : Nettoyer le texte de réponse (synchronisée avec backend _final_sanitize)
   const cleanResponseText = (text: string): string => {
     let cleaned = text
 
-    // 🚀 NOUVEAU : Retirer toutes les références aux sources (patterns multiples)
+    // ========================
+    // ✅ CODE ORIGINAL CONSERVÉ (fonctionne bien)
+    // ========================
+    
+    // Retirer toutes les références aux sources (patterns multiples)
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
     cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '') // Cas tronqué
     cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '') // Cas génériques
@@ -155,6 +159,53 @@ export default function ChatInterface() {
     // Nettoyer les numérotations orphelines (ex: "2. Gross and Microscopic Lesions:")
     cleaned = cleaned.replace(/^\d+\.\s+[A-Z][^:]+:\s*$/gm, '')
     cleaned = cleaned.replace(/^\w\.\s+[A-Z][^:]+:\s*$/gm, '')
+
+    // ========================
+    // 🚀 NOUVELLES REGEX (synchronisées avec backend _final_sanitize)
+    // ========================
+    
+    // En-têtes "INTRODUCTION…", "Cobb MX…" et variants
+    cleaned = cleaned.replace(/^INTRODUCTION[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^Introduction[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^Cobb MX[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^COBB MX[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^Cobb [0-9]+[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^COBB [0-9]+[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^Ross [0-9]+[^\n]*$/gm, '')
+    cleaned = cleaned.replace(/^ROSS [0-9]+[^\n]*$/gm, '')
+    
+    // En-têtes techniques génériques en majuscules
+    cleaned = cleaned.replace(/^[A-Z\s]{10,}:?\s*$/gm, '') // Lignes tout en majuscules
+    cleaned = cleaned.replace(/^[A-Z][A-Z\s]+GUIDE[^\n]*$/gm, '') // Guides techniques
+    cleaned = cleaned.replace(/^[A-Z][A-Z\s]+MANUAL[^\n]*$/gm, '') // Manuels
+    cleaned = cleaned.replace(/^[A-Z][A-Z\s]+MANAGEMENT[^\n]*$/gm, '') // Management
+    
+    // Tableaux mal formattés - patterns étendus
+    cleaned = cleaned.replace(/\|\s*Age\s*\|\s*Weight[^|]*\|[^\n]*\n/g, '') // En-têtes de tableaux
+    cleaned = cleaned.replace(/\|\s*Days\s*\|\s*Grams[^|]*\|[^\n]*\n/g, '')
+    cleaned = cleaned.replace(/\|\s*Week\s*\|\s*Target[^|]*\|[^\n]*\n/g, '')
+    cleaned = cleaned.replace(/\|[\s\-]+\|[\s\-]+\|/g, '') // Séparateurs de tableaux
+    
+    // Fragments de PDF mal parsés
+    cleaned = cleaned.replace(/[A-Z]{2,}\s+[A-Z]{2,}\s+[A-Z]{2,}/g, '') // Séquences majuscules
+    cleaned = cleaned.replace(/\b[A-Z]\.[A-Z]\.[A-Z]\./g, '') // Initiales orphelines
+    cleaned = cleaned.replace(/Page\s+\d+\s+of\s+\d+/gi, '') // Numéros de pages
+    cleaned = cleaned.replace(/Copyright\s+[©\(c\)]\s*[^\n]*/gi, '') // Copyright
+    
+    // Références bibliographiques orphelines
+    cleaned = cleaned.replace(/^\([^)]+\)\s*$/gm, '') // Références entre parenthèses seules
+    cleaned = cleaned.replace(/^et\s+al\.[^\n]*$/gm, '') // "et al." orphelin
+    cleaned = cleaned.replace(/^[A-Z][a-z]+,\s+[A-Z]\.[^\n]*$/gm, '') // Citations d'auteurs
+    
+    // Codes et identifiants techniques
+    cleaned = cleaned.replace(/\b[A-Z]{2,}\-[0-9]+\b/g, '') // Codes type ABC-123
+    cleaned = cleaned.replace(/\b[0-9]{4,}\-[0-9]{2,}\b/g, '') // Codes numériques
+    cleaned = cleaned.replace(/\bDOI:\s*[^\s]+/gi, '') // DOI
+    cleaned = cleaned.replace(/\bISSN:\s*[^\s]+/gi, '') // ISSN
+    
+    // ========================
+    // ✅ NETTOYAGE FINAL ORIGINAL CONSERVÉ
+    // ========================
     
     // Normaliser les espaces multiples
     cleaned = cleaned.replace(/\s+/g, ' ')
