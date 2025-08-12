@@ -183,7 +183,7 @@ app = FastAPI(
 )
 
 # =============================================================================
-# CORS MIDDLEWARE
+# CORS MIDDLEWARE - FIX APPLIQUÉ POUR CREDENTIALS
 # =============================================================================
 @app.middleware("http")
 async def cors_handler(request: Request, call_next):
@@ -196,7 +196,8 @@ async def cors_handler(request: Request, call_next):
         "http://localhost:8080",
     ]
     if origin in allowed_origins or os.getenv("ENV") != "production":
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        # 🔧 FIX: Utiliser l'origin spécifique au lieu de "*" quand credentials est requis
+        response.headers["Access-Control-Allow-Origin"] = origin if origin in allowed_origins else "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent"
         response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -211,7 +212,7 @@ app.add_middleware(
         "https://expert-app-cngws.ondigitalocean.app",
         "http://localhost:3000",
         "http://localhost:8080",
-        "*"
+        # 🔧 FIX: Retirer "*" pour éviter le conflit avec credentials
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -241,7 +242,8 @@ async def options_handler(request: Request, full_path: str):
         return JSONResponse(
             content={},
             headers={
-                "Access-Control-Allow-Origin": origin or "*",
+                # 🔧 FIX: Utiliser l'origin spécifique au lieu de "*" 
+                "Access-Control-Allow-Origin": origin if origin in allowed_origins else "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent",
                 "Access-Control-Allow-Credentials": "true",
@@ -557,7 +559,8 @@ async def http_exc_handler(request: Request, exc: HTTPException):
     ]
 
     if origin in allowed_origins or os.getenv("ENV") != "production":
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        # 🔧 FIX: Utiliser l'origin spécifique au lieu de "*"
+        response.headers["Access-Control-Allow-Origin"] = origin if origin in allowed_origins else "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
         response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -583,7 +586,8 @@ async def generic_exc_handler(request: Request, exc: Exception):
     ]
 
     if origin in allowed_origins or os.getenv("ENV") != "production":
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        # 🔧 FIX: Utiliser l'origin spécifique au lieu de "*"
+        response.headers["Access-Control-Allow-Origin"] = origin if origin in allowed_origins else "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
         response.headers["Access-Control-Allow-Credentials"] = "true"
