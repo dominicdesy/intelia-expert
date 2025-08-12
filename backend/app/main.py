@@ -1,4 +1,4 @@
-# app/main.py - VERSION 3 RAG COMPLETS
+# app/main.py - VERSION 3 RAG COMPLETS - CORRIGÉ AVEC AUTH
 from __future__ import annotations
 
 import os
@@ -10,7 +10,6 @@ from typing import Any, Optional, Dict, List
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.middleware.auth_middleware import auth_middleware
 
 # .env (facultatif)
 try:
@@ -219,6 +218,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🔒 AJOUT DU MIDDLEWARE D'AUTHENTIFICATION (CORRIGÉ)
+try:
+    from app.middleware.auth_middleware import auth_middleware
+    app.middleware("http")(auth_middleware)
+    logger.info("✅ Middleware d'authentification activé")
+except ImportError as e:
+    logger.warning(f"⚠️ Middleware d'authentification non disponible: {e}")
+except Exception as e:
+    logger.error(f"❌ Erreur lors de l'activation du middleware d'auth: {e}")
+
 @app.options("/{full_path:path}")
 async def options_handler(request: Request, full_path: str):
     origin = request.headers.get("Origin")
@@ -243,18 +252,84 @@ async def options_handler(request: Request, full_path: str):
         raise HTTPException(status_code=403, detail="Origin not allowed")
 
 # -------------------------------------------------------------------
-# Montage des routers (agrégateur v1 unique)
+# Montage des routers - CORRIGÉ
 # -------------------------------------------------------------------
-from app.api.v1 import router as api_v1_router
-app.include_router(api_v1_router)  # => expose /api/v1/* grâce à root_path="/api"
-
-# Router conversations (nouveau)
-from app.api.v1 import conversations
-app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])
-
+# 🔧 CREATION D'UN ROUTER V1 TEMPORAIRE SI LE FICHIER __init__.py EST VIDE
+try:
+    from app.api.v1 import router as api_v1_router
+    app.include_router(api_v1_router)
+    logger.info("✅ Router API v1 chargé depuis __init__.py")
+except ImportError as e:
+    logger.warning(f"⚠️ Impossible de charger le router v1 depuis __init__.py: {e}")
+    logger.info("🔧 Création d'un router v1 temporaire...")
+    
+    # Créer un router temporaire et inclure manuellement les composants
+    from fastapi import APIRouter
+    temp_v1_router = APIRouter(prefix="/v1", tags=["v1"])
+    
+    # Importer et monter les routers individuellement
+    try:
+        from app.api.v1.expert import router as expert_router
+        temp_v1_router.include_router(expert_router, tags=["expert"])
+        logger.info("✅ Expert router ajouté")
+    except ImportError as e:
+        logger.error(f"❌ Impossible de charger expert router: {e}")
+    
+    try:
+        from app.api.v1.auth import router as auth_router
+        temp_v1_router.include_router(auth_router, tags=["auth"])
+        logger.info("✅ Auth router ajouté")
+    except ImportError as e:
+        logger.error(f"❌ Impossible de charger auth router: {e}")
+    
+    try:
+        from app.api.v1.health import router as health_router
+        temp_v1_router.include_router(health_router, tags=["health"])
+        logger.info("✅ Health router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Health router non disponible: {e}")
+    
+    try:
+        from app.api.v1.system import router as system_router
+        temp_v1_router.include_router(system_router, tags=["system"])
+        logger.info("✅ System router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ System router non disponible: {e}")
+    
+    try:
+        from app.api.v1.admin import router as admin_router
+        temp_v1_router.include_router(admin_router, tags=["admin"])
+        logger.info("✅ Admin router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Admin router non disponible: {e}")
+    
+    try:
+        from app.api.v1.invitations import router as invitations_router
+        temp_v1_router.include_router(invitations_router, tags=["invitations"])
+        logger.info("✅ Invitations router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Invitations router non disponible: {e}")
+    
+    try:
+        from app.api.v1.logging import router as logging_router
+        temp_v1_router.include_router(logging_router, tags=["logging"])
+        logger.info("✅ Logging router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Logging router non disponible: {e}")
+    
+    try:
+        from app.api.v1.conversations import router as conversations_router
+        temp_v1_router.include_router(conversations_router, tags=["conversations"])
+        logger.info("✅ Conversations router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Conversations router non disponible: {e}")
+    
+    # Monter le router temporaire
+    app.include_router(temp_v1_router)
+    logger.info("✅ Router v1 temporaire monté avec succès")
 
 # -------------------------------------------------------------------
-# Debug RAG - 3 RAG COMPLETS
+# Debug RAG - 3 RAG COMPLETS (INCHANGÉ)
 # -------------------------------------------------------------------
 @app.get("/rag/debug", tags=["Debug"])
 async def rag_debug():
@@ -446,7 +521,6 @@ async def root():
             getattr(app.state, "rag_layer", None)
         ] if rag and hasattr(rag, 'has_search_engine') and rag.has_search_engine())
 
-    # (reste inchangé)
         if total_rags == 3:
             return "optimal_3_rags"
         elif total_rags == 1:
@@ -465,7 +539,7 @@ async def root():
         "optimization": "three_rag_system_enabled"
     }
 
-# Exception handlers (inchangés)
+# Exception handlers (INCHANGÉS)
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     response = JSONResponse(
