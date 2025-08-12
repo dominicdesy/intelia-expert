@@ -1,60 +1,61 @@
+# app/api/v1/expert.py
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.encoders import jsonable_encoder  # (NEW) pour sérialiser numpy/Path/Decimal…
+from fastapi.encoders import jsonable_encoder  # [PATCH] JSON-safe responses
 from pydantic import BaseModel, Field
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 import logging
 import os
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
-# Import avec gestion d'erreurs robuste (code original conservé)
+# ===== Import Dialogue Manager (préserve le code original) =====
 try:
-    from .pipeline.dialogue_manager import handle
+    from .pipeline.dialogue_manager import handle  # type: ignore
     DIALOGUE_AVAILABLE = True
     logger.info("✅ DialogueManager handle function imported successfully")
-except ImportError as e:
+except Exception as e:
     logger.error(f"❌ Failed to import dialogue_manager.handle: {e}")
     DIALOGUE_AVAILABLE = False
 
-    # Fonction fallback (code original conservé)
-    def handle(session_id: str, question: str, lang: str = "fr") -> Dict[str, Any]:
+    # Fallback minimal, signature d'origine conservée
+    def handle(session_id: str, question: str, lang: str = "fr", **kwargs) -> Dict[str, Any]:
         return {
             "type": "error",
             "message": "Dialogue service temporarily unavailable",
-            "session_id": session_id
+            "session_id": session_id,
         }
 
-router = APIRouter()
-
+# ===== Schémas =====
 class AskPayload(BaseModel):
     # (code original)
     session_id: Optional[str] = "default"
     question: str
     lang: Optional[str] = "fr"
-    # NEW: debug & overrides (déjà présents dans certaines branches)
+    # (déjà présents dans certaines branches)
     debug: Optional[bool] = False
     force_perfstore: Optional[bool] = False
-    intent_hint: Optional[str] = None  # ex: "PerfTargets"
-    # NEW: entities pass-through (facultatif)
+    intent_hint: Optional[str] = None
+    # [PATCH] pass-through des entités
     entities: Dict[str, Any] = Field(default_factory=dict)
 
-    # Tolérance aux champs inconnus (retro-compat)
+    # rétro‑compat : accepter des champs inconnus
     model_config = {"extra": "allow"}
 
+# ===== Endpoints =====
 @router.post("/ask")
 def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
     """
-    Endpoint principal pour poser des questions
+    Endpoint principal pour poser des questions (préserve la logique existante).
     """
     try:
-        logger.info(f"📝 Question reçue: {payload.question[:80]}...")
+        logger.info(f"📝 Question reçue: {payload.question[:120]}")
 
-        # Prise en charge optionnelle du flag via query string (?force_perfstore=1)
+        # [PATCH] support du flag via query string (?force_perfstore=1)
         fp_qs = request.query_params.get("force_perfstore")
         force_perf = bool(payload.force_perfstore) or (fp_qs in ("1", "true", "True", "yes"))
 
-        # Appeler la fonction handle (code original + propagation des nouveaux kwargs)
         if DIALOGUE_AVAILABLE:
             result = handle(
                 session_id=payload.session_id or "default",
@@ -63,95 +64,81 @@ def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
                 debug=bool(payload.debug),
                 force_perfstore=force_perf,
                 intent_hint=(payload.intent_hint or None),
-                entities=(payload.entities or {}),  # pass-through
+                entities=(payload.entities or {}),
             )
         else:
-            # Fallback strict à la signature minimale (évite TypeError)
             logger.warning("⚠️ Dialogue manager not available, using fallback")
-            result = handle(
-                payload.session_id or "default",
-                payload.question,
-                payload.lang or "fr",
-            )
+            result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
 
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
         return result
-
     except Exception as e:
-        logger.exception(f"❌ Erreur dans /ask: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        logger.exception("❌ Erreur dans /ask")
+        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
 @router.post("/ask-public")
 def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
     """
-    Endpoint public (même logique que /ask)
+    Endpoint public (même logique que /ask).
     """
     return ask(payload, request)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
     """
-    Status du système dialogue
+    État synthétique du service.
     """
     return {
         "status": "ok" if DIALOGUE_AVAILABLE else "degraded",
         "dialogue_manager_available": DIALOGUE_AVAILABLE,
         "service": "expert_api",
-        "version": "1.0"
     }
 
 @router.get("/debug")
 def debug_imports() -> Dict[str, Any]:
     """
-    Debug des imports pour diagnostiquer les problèmes
+    Vérifie quelques imports utiles (préserve le comportement original).
     """
-    debug_info = {
-        "dialogue_available": DIALOGUE_AVAILABLE,
-        "imports_tested": []
-    }
-
-    # Test des imports individuels - CHEMINS CORRIGÉS (code original conservé)
-    imports_to_test = [
+    debug_info: Dict[str, Any] = {"dialogue_available": DIALOGUE_AVAILABLE, "imports_tested": []}
+    imports_to_test: List[str] = [
         "app.api.v1.utils.question_classifier",
         "app.api.v1.pipeline.context_extractor",
         "app.api.v1.pipeline.clarification_manager",
         "app.api.v1.pipeline.rag_engine",
         "app.api.v1.utils.formulas",
-        "app.api.v1.pipeline.intent_registry"
+        "app.api.v1.pipeline.intent_registry",
     ]
-
     for import_path in imports_to_test:
         try:
             __import__(import_path)
             debug_info["imports_tested"].append({"path": import_path, "status": "✅ OK"})
         except Exception as e:
             debug_info["imports_tested"].append({"path": import_path, "status": f"❌ Error: {e}"})
-
     return debug_info
 
 @router.post("/force-import-test")
 def force_import_test():
-    """Test d'urgence pour diagnostiquer l'import dialogue_manager"""
+    """
+    Teste l'import et un appel basique de handle() sans casser l'API.
+    """
     import traceback
-
     try:
-        from .pipeline.dialogue_manager import handle
-        test_result = handle("test", "test question", "fr", debug=True)
-        return {
-            "status": "✅ SUCCESS",
-            "result": test_result,
-            "import_successful": True
-        }
+        from .pipeline.dialogue_manager import handle as _handle  # type: ignore
+        test_result = _handle("test", "test question", "fr", debug=True)
+        return {"status": "✅ SUCCESS", "result": test_result, "import_successful": True}
     except Exception as e:
         return {
             "status": "❌ FAILED",
             "error": str(e),
             "traceback": traceback.format_exc(),
-            "import_successful": False
+            "import_successful": False,
         }
 
 @router.get("/perfstore-status")
 def perfstore_status():
+    """
+    Expose quelques infos sur le PerfStore (ne jette pas d'exception).
+    """
     try:
         from .pipeline.dialogue_manager import _get_perf_store  # type: ignore
         store = _get_perf_store("broiler")
@@ -159,6 +146,8 @@ def perfstore_status():
             return {"ok": False, "reason": "PerfStore None"}
         root = getattr(store, "root", None)
         species = getattr(store, "species", None)
+        tables_dir = str(getattr(store, "dir_tables", "")) if getattr(store, "dir_tables", None) else None
+
         lines = []
         for ln in ["ross308", "cobb500"]:
             try:
@@ -166,39 +155,47 @@ def perfstore_status():
                 lines.append({"line": ln, "rows": 0 if df is None else int(len(df))})
             except Exception as e:
                 lines.append({"line": ln, "error": str(e)})
-        tables_dir = str(getattr(store, "dir_tables", "")) if getattr(store, "dir_tables", None) else None
-        return {"ok": True, "root": str(root) if root is not None else None, "species": species, "tables_dir": tables_dir, "lines": lines}
+
+        # [PATCH] stringifier root pour éviter des types non JSON
+        return {
+            "ok": True,
+            "root": str(root) if root is not None else None,  # [PATCH]
+            "species": species,
+            "tables_dir": tables_dir,
+            "lines": lines,
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 # ============================
-# /perf-probe robuste (JSON-safe)
+# [PATCH] /perf-probe robuste & JSON-safe
 # ============================
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
     """
-    Debug léger PerfStore: renvoie toujours un JSON sérialisable (pas d'exception 500).
-    Donne la normalisation, la ligne détectée, les colonnes, le nombre de lignes,
-    les lignes disponibles et la table_dir effective.
+    Diagnostic PerfStore : renvoie TOUJOURS un JSON sérialisable (pas de 500).
+    - Normalisation des entités (species/line/sex/unit/age_days)
+    - Lignes disponibles, colonnes, nb de lignes et tables_dir
+    - Enregistrement trouvé (rec) avec fallback nearest si nécessaire
     """
     import re as _re
     try:
-        # Imports locaux pour éviter d'échouer au chargement du module
-        from .pipeline.dialogue_manager import _normalize_entities_soft  # reuse de la normalisation existante
-        from .pipeline.perf_store import PerfStore  # classe PerfStore
+        # Imports à l'intérieur pour ne pas casser le module si PerfStore est HS
+        from .pipeline.dialogue_manager import _normalize_entities_soft  # type: ignore
+        from .pipeline.perf_store import PerfStore  # type: ignore
 
         q = (payload.question or "") if payload else ""
         ql = q.lower()
 
-        # Détecter espèces/ligne depuis payload.entities puis question
-        entities_in = (payload.entities or {}) if payload and payload.entities is not None else {}
+        entities_in = (payload.entities or {}) if (payload and payload.entities is not None) else {}
         species = (entities_in.get("species") or "broiler").lower()
         line = entities_in.get("line")
         if not line:
-            if "cobb" in ql: line = "cobb500"
-            elif "ross" in ql: line = "ross308"
+            if "cobb" in ql:
+                line = "cobb500"
+            elif "ross" in ql:
+                line = "ross308"
 
-        # Détection légère du sexe / unité / âge depuis la question si absent
         sex = entities_in.get("sex")
         if not sex:
             if ("as hatched" in ql) or ("as-hatched" in ql) or ("mixte" in ql) or (" ah " in ql):
@@ -219,26 +216,24 @@ def perf_probe(payload: AskPayload):
         if age_days is None:
             m = _re.search(r"(\d+)\s*(?:j|jour|jours|d|day|days)\b", ql)
             if m:
-                try: age_days = int(m.group(1))
-                except Exception: age_days = None
+                try:
+                    age_days = int(m.group(1))
+                except Exception:
+                    age_days = None
 
-        # Normalisation canonique
-        norm = _normalize_entities_soft({
-            "species": species,
-            "line": line,
-            "sex": sex,
-            "age_days": age_days,
-            "unit": unit,
-        })
+        # Normalisation centralisée (préserve la logique originale)
+        norm = _normalize_entities_soft(
+            {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
+        )
 
-        # Instanciation du store (avec autodétection de tables_dir dans PerfStore)
-        store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT","./rag_index"), species=norm["species"])
+        # Instanciation PerfStore (autodétection tables_dir dans PerfStore)
+        store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=norm["species"])
         try:
             available = store.available_lines()
         except Exception:
             available = []
 
-        # Si la lignée n'est pas déterminée, retourne l'info utile
+        # Ligne non déterminée → retour explicite (JSON-safe)
         if not norm.get("line"):
             out = {
                 "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
@@ -248,11 +243,11 @@ def perf_probe(payload: AskPayload):
                     "error": "missing_line",
                     "available_lines": available,
                     "tables_dir": str(getattr(store, "dir_tables", "")),
-                }
+                },
             }
-            return jsonable_encoder(out, exclude_none=True)
+            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
-        # Charger la table ligne → DataFrame (pas de retour non sérialisable)
+        # Charge DF de la lignée
         df = store._load_df(norm["line"])
         if df is None:
             out = {
@@ -264,22 +259,21 @@ def perf_probe(payload: AskPayload):
                     "line": norm.get("line"),
                     "available_lines": available,
                     "tables_dir": str(getattr(store, "dir_tables", "")),
-                }
+                },
             }
-            return jsonable_encoder(out, exclude_none=True)
+            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
-        # Lookup via PerfStore.get (exact puis nearest côté store)
+        # Lookup exact -> nearest (logique dans PerfStore.get)
         try:
             rec = store.get(
                 line=norm["line"],
                 sex=norm["sex"],
                 unit=norm["unit"],
-                age_days=int(norm.get("age_days") or 0)
+                age_days=int(norm.get("age_days") or 0),
             )
         except Exception:
             rec = None
 
-        # Debug sérialisable seulement
         dbg = {
             "rows": int(len(df)),
             "columns": [str(c) for c in df.columns],
@@ -291,15 +285,11 @@ def perf_probe(payload: AskPayload):
             "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
             "norm": norm,
             "rec": rec,
-            "debug": dbg
+            "debug": dbg,
         }
-        return jsonable_encoder(out, exclude_none=True)
+        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
 
     except Exception as e:
-        # Jamais de 500: on renvoie un JSON explicite
-        out = {
-            "error": "internal",
-            "message": str(e),
-            "trace": f"{type(e).__name__}: {e}"
-        }
-        return jsonable_encoder(out, exclude_none=True)
+        # Ne jamais renvoyer une 500 : toujours un JSON sérialisable
+        out = {"error": "internal", "message": str(e)}
+        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
