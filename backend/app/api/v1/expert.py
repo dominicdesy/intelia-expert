@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.encoders import jsonable_encoder  # [PATCH] ensure JSON-safe outputs
+from fastapi.encoders import jsonable_encoder  # (NEW) pour sérialiser numpy/Path/Decimal…
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 import logging
-import os  # [PATCH]
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class AskPayload(BaseModel):
     debug: Optional[bool] = False
     force_perfstore: Optional[bool] = False
     intent_hint: Optional[str] = None  # ex: "PerfTargets"
-    # [PATCH] NEW: entities pass-through (facultatif)
+    # NEW: entities pass-through (facultatif)
     entities: Dict[str, Any] = Field(default_factory=dict)
 
     # Tolérance aux champs inconnus (retro-compat)
@@ -63,7 +63,7 @@ def ask(payload: AskPayload, request: Request) -> Dict[str, Any]:
                 debug=bool(payload.debug),
                 force_perfstore=force_perf,
                 intent_hint=(payload.intent_hint or None),
-                entities=(payload.entities or {}),  # [PATCH] pass-through
+                entities=(payload.entities or {}),  # pass-through
             )
         else:
             # Fallback strict à la signature minimale (évite TypeError)
@@ -166,14 +166,13 @@ def perfstore_status():
                 lines.append({"line": ln, "rows": 0 if df is None else int(len(df))})
             except Exception as e:
                 lines.append({"line": ln, "error": str(e)})
-        # [PATCH] expose tables_dir pour diagnostic rapide (vu dans tes logs)
         tables_dir = str(getattr(store, "dir_tables", "")) if getattr(store, "dir_tables", None) else None
-        return {"ok": True, "root": str(root) if root else None, "species": species, "tables_dir": tables_dir, "lines": lines}
+        return {"ok": True, "root": str(root) if root is not None else None, "species": species, "tables_dir": tables_dir, "lines": lines}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 # ============================
-# [PATCH] /perf-probe robuste
+# /perf-probe robuste (JSON-safe)
 # ============================
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
@@ -182,7 +181,6 @@ def perf_probe(payload: AskPayload):
     Donne la normalisation, la ligne détectée, les colonnes, le nombre de lignes,
     les lignes disponibles et la table_dir effective.
     """
-    import traceback
     import re as _re
     try:
         # Imports locaux pour éviter d'échouer au chargement du module
@@ -252,7 +250,7 @@ def perf_probe(payload: AskPayload):
                     "tables_dir": str(getattr(store, "dir_tables", "")),
                 }
             }
-            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+            return jsonable_encoder(out, exclude_none=True)
 
         # Charger la table ligne → DataFrame (pas de retour non sérialisable)
         df = store._load_df(norm["line"])
@@ -268,7 +266,7 @@ def perf_probe(payload: AskPayload):
                     "tables_dir": str(getattr(store, "dir_tables", "")),
                 }
             }
-            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+            return jsonable_encoder(out, exclude_none=True)
 
         # Lookup via PerfStore.get (exact puis nearest côté store)
         try:
@@ -295,13 +293,13 @@ def perf_probe(payload: AskPayload):
             "rec": rec,
             "debug": dbg
         }
-        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+        return jsonable_encoder(out, exclude_none=True)
 
     except Exception as e:
         # Jamais de 500: on renvoie un JSON explicite
         out = {
             "error": "internal",
             "message": str(e),
-            "trace": (e.__class__.__name__ + ": " + str(e))[:1000]
+            "trace": f"{type(e).__name__}: {e}"
         }
-        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+        return jsonable_encoder(out, exclude_none=True)

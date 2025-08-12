@@ -45,7 +45,7 @@ def _canon_sex(s: Optional[str]) -> str:
 
 def _canon_unit(u: Optional[str]) -> str:
     u = (u or "metric").strip().lower()
-    # [PATCH] mapping tolérant
+    # mapping tolérant
     if u in {"imperial", "imp", "us", "lb", "lbs"}:
         return "imperial"
     if u in {"metric", "si", "g", "gram", "grams", "metrics"}:
@@ -63,7 +63,7 @@ class PerfManifest:
     csv_name: str
     path_csv: Path
 
-    # [PATCH] remove duplicate decorator + keep staticmethod
+    # (FIX) il y avait deux décorateurs @staticmethod superposés → IndentationError/500
     @staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
@@ -73,7 +73,7 @@ class PerfManifest:
                 return None
             data = json.loads(mf.read_text(encoding="utf-8"))
 
-            # [PATCH] résout 'csv' | 'file' | 'path' + logs + normalisation
+            # résout 'csv' | 'file' | 'path' + logs + normalisation
             csv_name = None
             for key in ("csv", "file", "path"):
                 val = data.get(key)
@@ -119,7 +119,7 @@ class PerfStore:
         self.root = Path(root)
         self.species = (species or "broiler").strip().lower()
 
-        # [PATCH] autodétection du dossier "tables"
+        # autodétection du dossier "tables"
         candidates = [
             self.root / self.species / "tables",             # .../rag_index/broiler/tables
             self.root / "tables" / self.species,             # .../rag_index/tables/broiler
@@ -133,7 +133,7 @@ class PerfStore:
         # caches
         self._cache_df: Dict[str, pd.DataFrame] = {}
         self._cache_manifest: Dict[str, Optional[PerfManifest]] = {}
-        self._df_all: Optional[pd.DataFrame] = None  # [PATCH] DF global (compat as_dataframe/df)
+        self._df_all: Optional[pd.DataFrame] = None  # DF global (compat as_dataframe/df)
 
     # ——— helpers ——— #
     def _get_manifest(self, line: str) -> Optional[PerfManifest]:
@@ -142,7 +142,7 @@ class PerfStore:
             self._cache_manifest[line] = PerfManifest.load(self.dir_tables, line)
         return self._cache_manifest[line]
 
-    # [PATCH] lecture multi-format (csv/parquet/feather)
+    # lecture multi-format (csv/parquet/feather)
     def _read_any(self, path: Path) -> Optional[pd.DataFrame]:
         try:
             ext = path.suffix.lower()
@@ -157,7 +157,7 @@ class PerfStore:
             logger.warning(f"[PerfStore] read failed for {path}: {e}")
             return None
 
-    # [PATCH] normalisation centralisée des colonnes (line/sex/unit/age_days)
+    # normalisation centralisée des colonnes (line/sex/unit/age_days)
     def _normalize_columns(self, df: pd.DataFrame, fallback_line: Optional[str] = None) -> pd.DataFrame:
         # line
         if "line" in df.columns:
@@ -201,7 +201,7 @@ class PerfStore:
 
         return df
 
-    # [PATCH] fallback sans manifest: retrouver le fichier correspondant à la lignée
+    # fallback sans manifest: retrouver le fichier correspondant à la lignée
     def _find_table_for_line(self, line: str) -> Optional[Path]:
         if not self.dir_tables.exists():
             return None
@@ -263,7 +263,7 @@ class PerfStore:
         self._df_all = None
         return df
 
-    # [PATCH] DF global (compat: as_dataframe + propriété df)
+    # DF global (compat: as_dataframe + propriété df)
     def as_dataframe(self) -> Optional[pd.DataFrame]:
         if self._df_all is not None:
             return self._df_all
@@ -355,7 +355,7 @@ class PerfStore:
             "page": row.get("page"),
         }
 
-    # [PATCH] utilitaire debug pratique
+    # utilitaire debug pratique
     def available_lines(self) -> List[str]:
         if not self.dir_tables.exists():
             return []
