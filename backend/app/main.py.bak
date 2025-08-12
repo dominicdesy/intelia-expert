@@ -10,7 +10,6 @@ from typing import Any, Optional, Dict, List
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.middleware.auth_middleware import auth_middleware
 
 # .env (facultatif)
 try:

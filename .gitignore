@@ -51,6 +51,14 @@ out/
 *.tsbuildinfo
 
 # ------------------------------
+# Documents Office (Word, etc.)
+# ------------------------------
+*.doc
+*.docx
+*.DOC
+*.DOCX
+
+# ------------------------------
 # RAG / PerfStore
 # ⚠️ On N'ignore PAS rag_index/, on versionne le contenu
 #    (manifests .manifest, CSV, XLSX, etc.)
