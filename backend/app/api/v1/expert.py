@@ -216,32 +216,78 @@ def perfstore_status():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+
+
+@router.get("/test-basic")
+def test_basic():
+    """Test ultra-basique sans aucune dépendance"""
+    return {"status": "ok", "message": "Basic endpoint works"}
+    
+    
+    
+    
 # ============================
 # [PATCH] /perf-probe robuste & JSON-safe avec imports protégés
 # ============================
-
-
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
-    """Version minimale pour tester seulement le CSV"""
+    """Version qui préserve les bonnes valeurs et nettoie seulement les NaN/inf"""
+    import math
+    import numpy as np
     
-    # Test 1: Import
+    def clean_for_json(value):
+        """Nettoie seulement les valeurs problématiques pour JSON"""
+        if value is None:
+            return None
+        if isinstance(value, (int, str, bool)):
+            return value
+        if isinstance(value, float):
+            # Garde les vraies valeurs float, nettoie seulement NaN/inf
+            if math.isnan(value) or math.isinf(value):
+                return None
+            return float(value)  # Assure que c'est un float Python standard
+        if hasattr(value, 'item'):  # numpy scalars
+            val = value.item()
+            if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                return None
+            return val
+        return value
+    
+    def clean_dict_for_json(obj):
+        """Nettoie récursivement seulement les valeurs problématiques"""
+        if isinstance(obj, dict):
+            return {k: clean_dict_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_dict_for_json(v) for v in obj]
+        else:
+            return clean_for_json(obj)
+    
     try:
         from .pipeline.perf_store import PerfStore
-        import pandas as pd
-    except Exception as e:
-        return {"error": "import", "message": str(e)}
-    
-    # Test 2: Lecture CSV directe
-    try:
-        csv_path = "/workspace/backend/rag_index/broiler/tables/cobb500_perf_targets.csv"
-        df_raw = pd.read_csv(csv_path)
-        return {
+        
+        # Parse des entités de base
+        entities_in = (payload.entities or {}) if payload else {}
+        line = entities_in.get("line", "cobb500")
+        sex = entities_in.get("sex", "male") 
+        unit = entities_in.get("unit", "metric")
+        age_days = entities_in.get("age_days", 21)
+        
+        store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species="broiler")
+        rec = store.get(line=line, sex=sex, unit=unit, age_days=int(age_days))
+        
+        # Nettoie pour JSON en préservant les vraies valeurs
+        result = {
             "success": True,
-            "csv_loaded": True,
-            "shape": [len(df_raw), len(df_raw.columns)],
-            "columns": list(df_raw.columns),
-            "first_row": df_raw.iloc[0].to_dict() if len(df_raw) > 0 else None
+            "entities": {"line": line, "sex": sex, "unit": unit, "age_days": age_days},
+            "rec": clean_dict_for_json(rec) if rec else None,
+            "message": "Performance data found" if rec else "No data found for these parameters"
         }
+        
+        return jsonable_encoder(result)
+        
     except Exception as e:
-        return {"error": "csv_read", "message": str(e), "csv_path": csv_path}
+        return jsonable_encoder({
+            "success": False,
+            "error": str(e),
+            "message": "Error retrieving performance data"
+        })
