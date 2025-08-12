@@ -160,6 +160,17 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
+# ===== Schémas (DÉPLACÉ ICI) =====
+class AskPayload(BaseModel):
+    session_id: Optional[str] = "default"
+    question: str
+    lang: Optional[str] = "fr"
+    debug: Optional[bool] = False
+    force_perfstore: Optional[bool] = False
+    intent_hint: Optional[str] = None
+    entities: Dict[str, Any] = Field(default_factory=dict)
+    model_config = {"extra": "allow"}
+
 # ===== Fonction interne partagée (NOUVEAU) =====
 def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Logique interne pour traiter les questions (avec ou sans auth)."""
