@@ -142,51 +142,112 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
     """
     debug: Dict[str, Any] = {}
     try:
-        # Récupération DataFrame (tolérant)
+        # -----------------------
+        # 0) Récup du DataFrame
+        # -----------------------
         df = getattr(store, "as_dataframe", None)
         df = df() if callable(df) else getattr(store, "df", None)
-        if df is None:
-            return None, {"reason": "no_dataframe"}
 
-        # 1) Normalisation colonnes minimales
+        if df is None:
+            # [PATCH] fallback per-line si pas de DF global
+            _load_df = getattr(store, "_load_df", None)
+            if callable(_load_df):
+                try:
+                    df = _load_df(norm.get("line"))
+                    debug["used_per_line_table"] = True  # [PATCH]
+                except Exception as e:
+                    debug["load_df_error"] = str(e)
+
+        if df is None:
+            return None, {"reason": "no_dataframe", "hint": "per-line table missing", "line": norm.get("line")}
+
+        # ---------------------------------------------
+        # 1) Harmonisation colonnes minimales (unit/line)
+        # ---------------------------------------------
         if "unit" in df.columns:
-            df["unit"] = df["unit"].astype(str).str.lower().str.replace(r"[^a-z]+","", regex=True)
-            df["unit"] = df["unit"].replace({"metrics":"metric","gram":"metric","grams":"metric","g":"metric",
-                                             "imperial":"imperial","lb":"imperial","lbs":"imperial"})
+            df["unit"] = (
+                df["unit"].astype(str).str.lower().str.replace(r"[^a-z]+", "", regex=True)
+                  .replace({
+                      "metrics": "metric", "gram": "metric", "grams": "metric", "g": "metric",
+                      "imperial": "imperial", "lb": "imperial", "lbs": "imperial"
+                  })
+            )
+
         if "line" in df.columns:
-            df["line"] = df["line"].astype(str).str.lower().str.replace(r"[-_\s]+","", regex=True)
-            df["line"] = df["line"].replace({"cobb-500":"cobb500","cobb_500":"cobb500","cobb 500":"cobb500",
-                                             "ross-308":"ross308","ross_308":"ross308","ross 308":"ross308"})
-        # [PATCH] — normalisation de la colonne sex pour tolérer variantes CSV
+            df["line"] = (
+                df["line"].astype(str).str.lower().str.replace(r"[-_\s]+", "", regex=True)
+                  .replace({
+                      "cobb-500": "cobb500", "cobb_500": "cobb500", "cobb 500": "cobb500",
+                      "ross-308": "ross308", "ross_308": "ross308", "ross 308": "ross308"
+                  })
+            )
+
+        # ---------------------------------------------------------
+        # [PATCH] 1bis) Harmonisation de la colonne d'âge → age_days
+        # ---------------------------------------------------------
+        try:
+            # on cherche en insensitive parmi les colonnes existantes
+            lower_map = {str(c).lower(): c for c in df.columns}
+            possible = ["age_days", "day", "days", "age", "age(d)", "age_d", "age_days(d)", "age (days)", "jours"]
+            found_key = next((lower_map[k] for k in possible if k in lower_map), None)
+
+            if found_key and found_key != "age_days":
+                # extrait le nombre (ex: "21 d" → 21)
+                tmp = df[found_key].astype(str).str.extract(r"(\d+)")[0]
+                df["age_days"] = tmp.fillna("0").astype(int)
+                debug["age_col_harmonized_from"] = str(found_key)
+            elif not found_key:
+                # aucune colonne d'âge → crée une colonne neutre pour éviter KeyError
+                df["age_days"] = 0
+                debug["age_col_harmonized_from"] = None
+        except Exception as e:
+            # en cas de souci, garde une colonne par défaut
+            debug["age_harmonize_error"] = str(e)
+            if "age_days" not in df.columns:
+                df["age_days"] = 0
+
+        # ------------------------------------------------
+        # 2) Normalisation tolérante de la colonne "sex"
+        # ------------------------------------------------
+        ds = df
         if "sex" in df.columns:
             _sex_norm = (
                 df["sex"].astype(str).str.strip().str.lower()
-                .map({
-                    "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
-                    "mixte": "as_hatched", "mixed": "as_hatched",
-                    "male": "male", "m": "male", "♂": "male",
-                    "female": "female", "f": "female", "♀": "female",
-                })
+                   .map({
+                       "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
+                       "mixte": "as_hatched", "mixed": "as_hatched",
+                       "male": "male", "m": "male", "♂": "male",
+                       "female": "female", "f": "female", "♀": "female",
+                   })
             )
             df["sex"] = _sex_norm.fillna(df["sex"].astype(str).str.strip().str.lower())
 
-        # 2) Filtrage par line/unit/sex (fallback sex→as_hatched si nécessaire)
+        # ------------------------------------------------
+        # 3) Filtrage par line / unit / sex (+ fallback sex)
+        # ------------------------------------------------
         if "line" in df.columns:
             df = df[df["line"].eq(norm["line"])]
         if "unit" in df.columns:
             df = df[df["unit"].eq(norm["unit"])]
+
         ds = df
         if "sex" in df.columns:
             ds = df[df["sex"].eq(norm["sex"])]
-            if ds.empty and norm["sex"] in ("male","female"):
+            if ds.empty and norm["sex"] in ("male", "female"):
                 ds = df[df["sex"].eq("as_hatched")]
-        if ds is None or len(ds) == 0:
-            return None, debug
 
-        # 3) Exact age match
+        if ds is None or len(ds) == 0:
+            debug["post_filter_rows"] = 0
+            return None, debug
+        debug["post_filter_rows"] = int(len(ds))
+
+        # --------------------------
+        # 4) Exact age match (si t)
+        # --------------------------
         if norm.get("age_days") is not None and "age_days" in ds.columns:
             try:
-                ex = ds[ds["age_days"].astype(int) == int(norm["age_days"])]
+                t = int(norm["age_days"])
+                ex = ds[ds["age_days"].astype(int) == t]
                 if not ex.empty:
                     row = ex.iloc[0].to_dict()
                     debug["nearest_used"] = False
@@ -205,29 +266,37 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
             except Exception:
                 pass
 
-        # 5) Nearest par distance d'âge
-        t = int(norm.get("age_days") or 0)
-        ds = ds.copy()
-        ds["__d__"] = (ds["age_days"].astype(int) - t).abs()
-        row = ds.sort_values(["__d__", "age_days"]).iloc[0].to_dict()
-        debug["nearest_used"] = (row.get("age_days") != t)
-        debug["nearest_age_days"] = int(row.get("age_days"))
-        debug["delta"] = abs(int(row.get("age_days")) - t)
-        return {
-            "line": row.get("line", norm["line"]),
-            "sex": row.get("sex", norm["sex"]),
-            "unit": row.get("unit", norm["unit"]),
-            "age_days": row.get("age_days", norm.get("age_days")),
-            "weight_g": row.get("weight_g"),
-            "weight_lb": row.get("weight_lb"),
-            "daily_gain_g": row.get("daily_gain_g"),
-            "cum_fcr": row.get("cum_fcr"),
-            "source_doc": row.get("source_doc"),
-            "page": row.get("page"),
-        }, debug
+        # --------------------------
+        # 5) Nearest sur l'âge
+        # --------------------------
+        try:
+            t = int(norm.get("age_days") or 0)
+            ds = ds.copy()
+            ds["__d__"] = (ds["age_days"].astype(int) - t).abs()
+            row = ds.sort_values(["__d__", "age_days"]).iloc[0].to_dict()
+            debug["nearest_used"] = (int(row.get("age_days", -1)) != t)
+            debug["nearest_age_days"] = int(row.get("age_days", 0))
+            debug["delta"] = abs(int(row.get("age_days", 0)) - t)
+            return {
+                "line": row.get("line", norm["line"]),
+                "sex": row.get("sex", norm["sex"]),
+                "unit": row.get("unit", norm["unit"]),
+                "age_days": row.get("age_days", norm.get("age_days")),
+                "weight_g": row.get("weight_g"),
+                "weight_lb": row.get("weight_lb"),
+                "daily_gain_g": row.get("daily_gain_g"),
+                "cum_fcr": row.get("cum_fcr"),
+                "source_doc": row.get("source_doc"),
+                "page": row.get("page"),
+            }, debug
+        except Exception as e:
+            logger.info(f"[PerfStore] nearest lookup failed: {e}")
+            debug["nearest_error"] = str(e)
+            return None, debug
+
     except Exception as e:
-        logger.info(f"[PerfStore] nearest lookup failed: {e}")
-        return None, debug
+        return None, {"reason": f"lookup_error: {e}"}
+
 
 # ---------------------------------------------------------------------------
 # RAG Retriever (code original conservé)

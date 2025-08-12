@@ -2,9 +2,7 @@
 """
 Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
 - classify -> normalize -> completeness/clarifications
-- Réponse générale + clarifications pour questions incomplètes
-- Route vers compute (si possible) OU vers table-first (perf targets) OU vers RAGRetriever (multi-index)
-- Retourne un payload structuré pour le frontend
+- Route vers compute (si possible) OU table-first (perf targets) OU RAGRetriever
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -235,7 +233,6 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
 # RAG Retriever (code original conservé)
 # ---------------------------------------------------------------------------
 
-# ===== Import robuste du RAGRetriever =====
 RAG_AVAILABLE = False
 RAGRetrieverCls = None
 try:
@@ -260,7 +257,6 @@ except Exception as e1:
             RAG_AVAILABLE = False
             RAGRetrieverCls = None
 
-# ===== Singleton RAGRetriever =====
 _RAG_SINGLETON = None
 
 def _get_retriever():
@@ -482,12 +478,15 @@ def handle(
     debug: bool = False,
     force_perfstore: bool = False,
     intent_hint: Optional[str] = None,
+    # [PATCH] NEW: entities pass-through depuis l’API
+    entities: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Fonction principale de traitement des questions - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
+        logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
 
         # Étape 1: Classification
         classification = classify(question)
@@ -496,7 +495,14 @@ def handle(
         # Étape 2: Normalisation
         classification = normalize(classification)
         intent: Intention = classification["intent"]
-        entities = classification["entities"]
+
+        # Fusion des entities (NER + overrides)
+        _ents = dict(classification.get("entities") or {})
+        if entities:
+            try: _ents.update(entities)
+            except Exception: pass
+        entities = _ents
+
         # [PATCH] — Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
         entities["sex"] = _canon_sex(entities.get("sex")) or entities.get("sex")
 
@@ -504,7 +510,7 @@ def handle(
         if intent_hint and str(intent_hint).lower().startswith("perf"):
             intent = Intention.PerfTargets
 
-        logger.info(f"Intent: {intent}, Entities: {list(entities.keys())}")
+        logger.info(f"Intent: {intent}, Entities keys: {list(entities.keys())}")
 
         # Étape 3: Vérification de complétude
         completeness = compute_completeness(intent, entities)
