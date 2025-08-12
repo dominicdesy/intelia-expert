@@ -64,6 +64,7 @@ class PerfManifest:
     path_csv: Path
 
     @staticmethod
+@staticmethod
     def load(dir_tables: Path, line: str) -> Optional["PerfManifest"]:
         """Lit tables/<line>_perf_targets.manifest.json si présent."""
         try:
@@ -71,12 +72,36 @@ class PerfManifest:
             if not mf.exists():
                 return None
             data = json.loads(mf.read_text(encoding="utf-8"))
-            csv_name = data.get("csv") or data.get("file") or data.get("path")
+
+            # [PATCH] résout 'csv' | 'file' | 'path' + logs + normalisation
+            csv_name = None
+            for key in ("csv", "file", "path"):
+                val = data.get(key)
+                if val:
+                    csv_name = str(val).strip()
+                    break
             if not csv_name:
+                logger.warning(f"[PerfManifest] missing 'csv|file|path' for line={line}")
                 return None
-            csv_path = dir_tables / csv_name
+
+            # supporte chemin relatif/absolu + case-insensitive fallback
+            csv_path = Path(csv_name)
+            if not csv_path.is_absolute():
+                csv_path = (dir_tables / csv_path)
+            csv_path = csv_path.resolve()
+
             if not csv_path.exists():
-                return None
+                # tentatif case-insensitive dans dir_tables
+                try:
+                    lower_target = csv_path.name.lower()
+                    csv_path = next(
+                        p for p in dir_tables.iterdir()
+                        if p.is_file() and p.name.lower() == lower_target
+                    )
+                except Exception:
+                    logger.warning(f"[PerfManifest] file not found at {csv_path} (line={line})")
+                    return None
+
             ln = data.get("line") or line
             return PerfManifest(line=_canon_line(ln), csv_name=csv_name, path_csv=csv_path)
         except Exception as e:
