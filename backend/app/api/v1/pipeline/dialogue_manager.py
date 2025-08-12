@@ -56,6 +56,22 @@ def _normalize_sex_from_text(text: str) -> Optional[str]:
         return "female"
     return None
 
+# [PATCH] — Canonisation tolérante du sexe pour NER/PerfStore/RAG
+def _canon_sex(s: Optional[str]) -> Optional[str]:
+    if not s:
+        return None
+    s = str(s).strip().lower()
+    return {
+        "as hatched": "as_hatched",
+        "as-hatched": "as_hatched",
+        "as_hatched": "as_hatched",
+        "ah": "as_hatched",
+        "mixte": "as_hatched",
+        "mixed": "as_hatched",
+        "male": "male", "m": "male", "♂": "male",
+        "female": "female", "f": "female", "♀": "female",
+    }.get(s, s)
+
 def _slug(s: Optional[str]) -> str:
     return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
 
@@ -72,6 +88,8 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
         "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
     }
     sex = sex_map.get(sex_raw) or "as_hatched"
+    # [PATCH] — canonise la valeur normalisée
+    sex = _canon_sex(sex) or sex
 
     age_days = entities.get("age_days")
     if age_days is None and entities.get("age_weeks") is not None:
@@ -139,7 +157,20 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> T
                                              "imperial":"imperial","lb":"imperial","lbs":"imperial"})
         if "line" in df.columns:
             df["line"] = df["line"].astype(str).str.lower().str.replace(r"[-_\s]+","", regex=True)
-            df["line"] = df["line"].replace({"cobb500":"cobb500","ross308":"ross308","ross_308":"ross308","ross 308":"ross308"})
+            df["line"] = df["line"].replace({"cobb-500":"cobb500","cobb_500":"cobb500","cobb 500":"cobb500",
+                                             "ross-308":"ross308","ross_308":"ross308","ross 308":"ross308"})
+        # [PATCH] — normalisation de la colonne sex pour tolérer variantes CSV
+        if "sex" in df.columns:
+            _sex_norm = (
+                df["sex"].astype(str).str.strip().str.lower()
+                .map({
+                    "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
+                    "mixte": "as_hatched", "mixed": "as_hatched",
+                    "male": "male", "m": "male", "♂": "male",
+                    "female": "female", "f": "female", "♀": "female",
+                })
+            )
+            df["sex"] = _sex_norm.fillna(df["sex"].astype(str).str.strip().str.lower())
 
         # 2) Filtrage par line/unit/sex (fallback sex→as_hatched si nécessaire)
         if "line" in df.columns:
@@ -414,16 +445,16 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
                     "age_days": age_days}
         species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
         line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
-        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte"}
+        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte", "as_hatched": "Mixte"}
         sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
-        age_label = f"{age_days} jours" if age_days is not None else "l’âge indiqué"
+        age_label = f"{age_days} jours" if age_days is not None else "l'âge indiqué"
         header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
-        sub = "Pour te donner la valeur précise, j’ai besoin de confirmer ces points :"
+        sub = "Pour te donner la valeur précise, j'ai besoin de confirmer ces points :"
         q1 = "• **Espèce** : Poulet de chair (broiler) ?"
         q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
         q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
         defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
-        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l’hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
+        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l'hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
         text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
         quick_replies = {
             "species": ["broiler", "layer", "other"],
@@ -466,6 +497,8 @@ def handle(
         classification = normalize(classification)
         intent: Intention = classification["intent"]
         entities = classification["entities"]
+        # [PATCH] — Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
+        entities["sex"] = _canon_sex(entities.get("sex")) or entities.get("sex")
 
         # Hint manuel (tests console)
         if intent_hint and str(intent_hint).lower().startswith("perf"):
