@@ -1,0 +1,24 @@
+{
+  "type": "perf_targets",
+  "species": "broiler",
+  "line": "cobb500",
+  "file": "cobb500_perf_targets.csv",
+  "columns": {
+    "line": "line",
+    "sex": "sex",
+    "unit": "unit",
+    "age_days": "age_days",
+    "weight_g": "weight_g",
+    "weight_lb": "weight_lb",
+    "daily_gain_g": "daily_gain_g",
+    "daily_gain_lb": "daily_gain_lb",
+    "avg_daily_gain_g": "avg_daily_gain_g",
+    "avg_daily_gain_lb": "avg_daily_gain_lb",
+    "cum_fcr": "cum_fcr",
+    "daily_feed_intake_g": "daily_feed_intake_g",
+    "daily_feed_intake_lb": "daily_feed_intake_lb",
+    "cum_feed_intake_g": "cum_feed_intake_g",
+    "cum_feed_intake_lb": "cum_feed_intake_lb",
+    "source_doc": "source_doc"
+  }
+}
