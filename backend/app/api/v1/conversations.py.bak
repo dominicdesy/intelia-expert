@@ -158,8 +158,7 @@ def delete_conversation(session_id: str) -> Dict[str, Any]:
             "message": f"Conversation {'deleted' if existed else 'did not exist'}"
         }
         
-        status = 'supprimée' if existed else "n'existait pas"
-        logger.info(f"✅ Conversation {session_id} {status}")        
+        logger.info(f"✅ Conversation {session_id} {'supprimée' if existed else 'n\\'existait pas'}")
         return jsonable_encoder(result)
         
     except Exception as e:
