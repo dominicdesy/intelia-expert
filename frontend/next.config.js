@@ -4,8 +4,8 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // 🔧 FORCER LE MODE SPA - Désactive complètement la génération statique
-  output: 'export',
+  // 🔧 Configuration pour DigitalOcean - Mode standalone
+  output: 'standalone',
   trailingSlash: true,
 
   // 🔧 Désactiver complètement le prérendu
@@ -13,14 +13,14 @@ const nextConfig = {
     appDir: true
   },
 
-  // Configuration images - optimisée pour SPA export
+  // Configuration images - optimisée pour standalone
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
       'avatars.githubusercontent.com'
     ],
     formats: ['image/webp', 'image/avif'],
-    unoptimized: true, // Obligatoire pour output: 'export'
+    unoptimized: process.env.NODE_ENV === 'production',
   },
 
   // Variables d'environnement
