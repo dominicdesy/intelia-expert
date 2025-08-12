@@ -26,6 +26,9 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/health",
     "/api/v1/auth/login",
     "/api/v1/auth/debug/jwt-config",
+    # 🆕 AJOUT DES ENDPOINTS CONVERSATIONS PUBLICS
+    "/api/v1/conversations/test-public",
+    "/api/v1/conversations/test-public-post",
     # Endpoints sans prefix /api aussi
     "/ask-public",
     "/v1/ask-public",
@@ -40,7 +43,10 @@ PUBLIC_ENDPOINTS = {
     "/openapi.json",
     "/health",
     "/auth/login",
-    "/auth/debug/jwt-config"
+    "/auth/debug/jwt-config",
+    # 🆕 AJOUT DES ENDPOINTS CONVERSATIONS PUBLICS (sans /api)
+    "/v1/conversations/test-public",
+    "/v1/conversations/test-public-post"
 }
 
 async def verify_supabase_token(request: Request) -> Dict[str, Any]:
@@ -99,7 +105,9 @@ def is_public_endpoint(path: str) -> bool:
         "/api/cors-test",
         "/api/v1/system-status",
         "/api/v1/debug",
-        "/api/v1/ask-public"
+        "/api/v1/ask-public",
+        # 🆕 AJOUT DES PATTERNS CONVERSATIONS PUBLICS
+        "/api/v1/conversations/test-public"
     ]
     
     return any(path.startswith(pattern) for pattern in public_patterns)
