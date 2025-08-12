@@ -12,7 +12,23 @@ logger = logging.getLogger(__name__)
 
 # Liste des endpoints publics (pas d'auth requise)
 PUBLIC_ENDPOINTS = {
+    "/api/ask-public",
+    "/api/v1/ask-public", 
+    "/api/v1/system-status", 
+    "/api/v1/debug",
+    "/api/rag/debug",
+    "/api/rag/test",
+    "/api/cors-test",
+    "/api/",
+    "/api/docs",
+    "/api/redoc",
+    "/api/openapi.json",
+    "/api/v1/health",
+    "/api/v1/auth/login",
+    "/api/v1/auth/debug/jwt-config",
+    # Endpoints sans prefix /api aussi
     "/ask-public",
+    "/v1/ask-public",
     "/system-status", 
     "/debug",
     "/rag/debug",
@@ -73,7 +89,17 @@ def is_public_endpoint(path: str) -> bool:
         "/openapi.json",
         "/health",
         "/auth/",
-        "/static/"
+        "/static/",
+        # Patterns avec prefix /api
+        "/api/docs",
+        "/api/redoc",
+        "/api/openapi.json", 
+        "/api/v1/auth/",
+        "/api/rag/",
+        "/api/cors-test",
+        "/api/v1/system-status",
+        "/api/v1/debug",
+        "/api/v1/ask-public"
     ]
     
     return any(path.startswith(pattern) for pattern in public_patterns)
