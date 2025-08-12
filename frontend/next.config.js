@@ -8,9 +8,14 @@ const nextConfig = {
   output: 'standalone',
   trailingSlash: true,
 
-  // 🔧 Désactiver complètement le prérendu
+  // 🔧 Désactiver complètement la génération statique
   experimental: {
     appDir: true
+  },
+  
+  // 🔧 Forcer le rendu côté client pour toutes les pages
+  async generateStaticParams() {
+    return []
   },
 
   // Configuration images - optimisée pour standalone
@@ -39,8 +44,23 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // 🔧 Supprimé - Headers et rewrites incompatibles avec output: 'export'
-  // En mode export, tout est statique côté client
+  // 🔧 Supprimé - Headers et rewrites incompatibles avec certaines configurations
+  // En mode standalone, tout est géré côté serveur
+  
+  // 🔧 Configuration pour éviter la génération statique
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate'
+          }
+        ]
+      }
+    ]
+  },
 
   // ✅ MINIMAL WEBPACK - AUCUNE MODIFICATION CSS
   webpack: (config, { isServer }) => {
