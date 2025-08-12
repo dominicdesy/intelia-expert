@@ -222,149 +222,123 @@ def perfstore_status():
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
     """
-    Diagnostic PerfStore : renvoie TOUJOURS un JSON sérialisable (pas de 500).
-    - Normalisation des entités (species/line/sex/unit/age_days)
-    - Lignes disponibles, colonnes, nb de lignes et tables_dir
-    - Enregistrement trouvé (rec) avec fallback nearest si nécessaire
+    Version ultra-défensive pour diagnostiquer exactement où ça plante
     """
     try:
-        # [FIX] Protéger TOUS les imports
+        # [STEP 1] Imports protégés
         try:
             from .pipeline.perf_store import PerfStore  # type: ignore
-        except ImportError as e:
-            return jsonable_encoder({
-                "error": "import_failed", 
-                "message": f"Failed to import PerfStore: {str(e)}",
-                "entities": (payload.entities or {}) if payload else {},
-            })
-
-        q = (payload.question or "") if payload else ""
-        ql = q.lower()
-
-        entities_in = (payload.entities or {}) if (payload and payload.entities is not None) else {}
-        species = (entities_in.get("species") or "broiler").lower()
-        line = entities_in.get("line")
-        if not line:
-            if "cobb" in ql:
-                line = "cobb500"
-            elif "ross" in ql:
-                line = "ross308"
-
-        sex = entities_in.get("sex")
-        if not sex:
-            if ("as hatched" in ql) or ("as-hatched" in ql) or ("mixte" in ql) or (" ah " in ql):
-                sex = "as_hatched"
-            elif ("male" in ql) or ("mâle" in ql):
-                sex = "male"
-            elif ("female" in ql) or ("femelle" in ql):
-                sex = "female"
-
-        unit = entities_in.get("unit")
-        if not unit:
-            if ("metric" in ql) or ("métrique" in ql):
-                unit = "metric"
-            elif "imperial" in ql:
-                unit = "imperial"
-
-        age_days = entities_in.get("age_days")
-        if age_days is None:
-            m = re.search(r"(\d+)\s*(?:j|jour|jours|d|day|days)\b", ql)
-            if m:
-                try:
-                    age_days = int(m.group(1))
-                except Exception:
-                    age_days = None
-
-        # [FIX] Normalisation avec fonction locale
-        norm = _normalize_entities_soft_local(
-            {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
-        )
-
-        # Instanciation PerfStore (autodétection tables_dir dans PerfStore)
-        try:
-            store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species=norm["species"])
-            available = store.available_lines()
+            step1_ok = True
         except Exception as e:
             return jsonable_encoder({
-                "error": "perfstore_init_failed",
-                "message": f"Failed to initialize PerfStore: {str(e)}",
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
+                "error": "step1_import_failed", 
+                "message": str(e),
+                "step": "import PerfStore"
             })
 
-        # Ligne non déterminée → retour explicite (JSON-safe)
-        if not norm.get("line"):
-            out = {
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "missing_line",
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                },
-            }
-            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
-
-        # Charge DF de la lignée
+        # [STEP 2] Parsing payload
         try:
-            df = store._load_df(norm["line"])
+            q = (payload.question or "") if payload else ""
+            entities_in = (payload.entities or {}) if (payload and payload.entities is not None) else {}
+            step2_ok = True
         except Exception as e:
-            out = {
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "load_df_failed",
-                    "message": str(e),
-                    "line": norm.get("line"),
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                },
-            }
-            return jsonable_encoder(out, exclude_none=True)
+            return jsonable_encoder({
+                "error": "step2_payload_failed",
+                "message": str(e),
+                "step": "parse payload"
+            })
 
-        if df is None:
-            out = {
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "table_missing",
-                    "line": norm.get("line"),
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                },
-            }
-            return jsonable_encoder(out, exclude_none=True)  # [PATCH]
-
-        # Lookup exact -> nearest (logique dans PerfStore.get)
+        # [STEP 3] Normalisation locale des entités
         try:
-            rec = store.get(
-                line=norm["line"],
-                sex=norm["sex"],
-                unit=norm["unit"],
-                age_days=int(norm.get("age_days") or 0),
+            norm = _normalize_entities_soft_local(
+                {"species": "broiler", "line": "cobb500", "sex": "male", "age_days": 21, "unit": "metric"}
             )
+            step3_ok = True
         except Exception as e:
-            rec = None
+            return jsonable_encoder({
+                "error": "step3_normalize_failed",
+                "message": str(e),
+                "step": "normalize entities"
+            })
 
-        dbg = {
-            "rows": int(len(df)),
-            "columns": [str(c) for c in df.columns],
+        # [STEP 4] Instanciation PerfStore
+        try:
+            store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species="broiler")
+            step4_ok = True
+        except Exception as e:
+            return jsonable_encoder({
+                "error": "step4_perfstore_init_failed",
+                "message": str(e),
+                "step": "PerfStore init",
+                "rag_root": os.environ.get("RAG_INDEX_ROOT", "./rag_index")
+            })
+
+        # [STEP 5] available_lines
+        try:
+            available = store.available_lines()
+            step5_ok = True
+        except Exception as e:
+            return jsonable_encoder({
+                "error": "step5_available_lines_failed",
+                "message": str(e),
+                "step": "available_lines"
+            })
+
+        # [STEP 6] _load_df avec protection maximale
+        try:
+            df = store._load_df("cobb500")
+            if df is None:
+                return jsonable_encoder({
+                    "error": "step6_load_df_returned_none",
+                    "step": "load_df returned None",
+                    "available_lines": available
+                })
+            step6_ok = True
+            df_info = {
+                "rows": len(df),
+                "columns": list(df.columns),
+                "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()}
+            }
+        except Exception as e:
+            return jsonable_encoder({
+                "error": "step6_load_df_failed",
+                "message": str(e),
+                "step": "_load_df('cobb500')",
+                "available_lines": available
+            })
+
+        # [STEP 7] store.get avec protection
+        try:
+            rec = store.get(line="cobb500", sex="male", unit="metric", age_days=21)
+            step7_ok = True
+        except Exception as e:
+            return jsonable_encoder({
+                "error": "step7_store_get_failed",
+                "message": str(e),
+                "step": "store.get",
+                "df_info": df_info
+            })
+
+        # [SUCCESS] Tout a marché
+        return jsonable_encoder({
+            "status": "success",
+            "steps_completed": [
+                "import", "payload", "normalize", 
+                "perfstore_init", "available_lines", 
+                "load_df", "store_get"
+            ],
             "available_lines": available,
-            "tables_dir": str(getattr(store, "dir_tables", "")),
-        }
-
-        out = {
-            "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-            "norm": norm,
+            "df_info": df_info,
             "rec": rec,
-            "debug": dbg,
-        }
-        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+            "message": "All steps completed successfully"
+        })
 
     except Exception as e:
-        # Ne jamais renvoyer une 500 : toujours un JSON sérialisable
-        out = {"error": "internal", "message": str(e)}
-        return jsonable_encoder(out, exclude_none=True)  # [PATCH]
+        # Catch-all final
+        return jsonable_encoder({
+            "error": "unexpected_error",
+            "message": str(e),
+            "step": "unknown"
+        })
+
+
