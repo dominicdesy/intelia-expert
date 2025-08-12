@@ -17,7 +17,7 @@ router = APIRouter()
 
 # Import du système de mémoire PostgreSQL existant
 try:
-    from .postgres_memory import PostgresMemory
+    from .pipeline.postgres_memory import PostgresMemory
     memory = PostgresMemory(dsn=os.getenv("DATABASE_URL"))
     MEMORY_AVAILABLE = True
     logger.info("✅ PostgresMemory initialized for conversations")
