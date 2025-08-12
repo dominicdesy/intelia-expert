@@ -4,33 +4,25 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // 🔧 Configuration pour DigitalOcean - CORRECTION MODE STANDALONE
-  // ❌ output: 'standalone', // DÉSACTIVÉ temporairement - cause des conflits avec next start
+  // 🔧 Configuration pour DigitalOcean
   trailingSlash: true,
 
-  // ✅ CONFIGURATION CORRIGÉE - Suppression des options obsolètes
+  // ✅ CONFIGURATION SIMPLIFIÉE - Suppression des options obsolètes
   experimental: {
-    // ❌ appDir: true, // SUPPRIMÉ - obsolète dans Next.js 14+ (app directory est maintenant stable)
-    // ❌ isrMemoryCacheSize: 0, // SUPPRIMÉ - obsolète et remplacé par d'autres options
+    // ❌ Supprimé: appDir, isrMemoryCacheSize (obsolètes dans Next.js 14+)
     
-    // ✅ NOUVELLES OPTIONS pour résoudre Supabase Edge Runtime
+    // ✅ Configuration minimale pour Supabase
     serverComponentsExternalPackages: [
-      '@supabase/supabase-js',
-      '@supabase/realtime-js',
-      '@supabase/auth-helpers-nextjs'
-    ],
-    
-    // ✅ Configuration moderne pour les performances
-    optimizeCss: true,
-    scrollRestoration: true
+      '@supabase/supabase-js'
+    ]
   },
   
-  // ✅ Générer un build ID stable
+  // ✅ Générer un build ID simple
   generateBuildId: async () => {
-    return process.env.VERCEL_GIT_COMMIT_SHA || 'standalone-build'
+    return 'intelia-expert-build'
   },
 
-  // Configuration images - optimisée pour standalone
+  // Configuration images
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
@@ -56,7 +48,7 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
 
-  // ✅ Headers optimisés pour la sécurité et les performances
+  // Headers de sécurité
   async headers() {
     return [
       {
@@ -73,28 +65,20 @@ const nextConfig = {
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
           }
         ]
       }
     ]
   },
 
-  // ✅ CONFIGURATION WEBPACK CORRIGÉE pour Supabase Edge Runtime
-  webpack: (config, { isServer, dev }) => {
-    // Désactiver la minification pour debug en développement
+  // ✅ CONFIGURATION WEBPACK SIMPLIFIÉE - Résout juste les incompatibilités critiques
+  webpack: (config, { isServer }) => {
+    // Désactiver la minification pour debug
     if (!isServer && process.env.NODE_ENV === 'production') {
       config.optimization.minimize = false
     }
     
-    // ✅ CORRECTION PRINCIPALE: Résolution des incompatibilités Supabase
+    // ✅ CORRECTION MINIMALE pour Supabase - Seulement les polyfills nécessaires
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -103,58 +87,15 @@ const nextConfig = {
         tls: false,
         crypto: false,
         stream: false,
-        url: false,
-        zlib: false,
-        http: false,
-        https: false,
-        assert: false,
-        os: false,
-        path: false,
-        util: false,
-        process: false, // ✅ AJOUTÉ pour résoudre process.versions dans Supabase
-        buffer: false,
-        events: false
-      }
-      
-      // ✅ Configuration spéciale pour Supabase Realtime
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // Évite les conflits avec les modules Node.js dans le navigateur
-        'encoding': false,
+        process: false, // ✅ Résout process.versions dans Supabase Realtime
       }
     }
     
-    // ✅ Optimisation pour les modules externes
-    config.externals = config.externals || []
-    if (isServer) {
-      config.externals.push({
-        '@supabase/supabase-js': '@supabase/supabase-js',
-        '@supabase/realtime-js': '@supabase/realtime-js'
-      })
-    }
+    // ❌ SUPPRIMÉ: config.externals qui causait l'erreur
+    // ❌ SUPPRIMÉ: config.resolve.alias qui causait des conflits
     
     return config
-  },
-
-  // ✅ Configuration pour éviter les erreurs de build en production
-  onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
-  },
-
-  // ✅ SCRIPT DE DÉMARRAGE pour Digital Ocean
-  async rewrites() {
-    return {
-      beforeFiles: [],
-      afterFiles: [],
-      fallback: [
-        {
-          source: '/:path*',
-          destination: '/:path*',
-        },
-      ],
-    }
-  },
+  }
 }
 
 module.exports = nextConfig
