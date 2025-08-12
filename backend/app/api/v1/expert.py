@@ -219,126 +219,29 @@ def perfstore_status():
 # ============================
 # [PATCH] /perf-probe robuste & JSON-safe avec imports protégés
 # ============================
+
+
 @router.post("/perf-probe")
 def perf_probe(payload: AskPayload):
-    """
-    Version ultra-défensive pour diagnostiquer exactement où ça plante
-    """
+    """Version minimale pour tester seulement le CSV"""
+    
+    # Test 1: Import
     try:
-        # [STEP 1] Imports protégés
-        try:
-            from .pipeline.perf_store import PerfStore  # type: ignore
-            step1_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step1_import_failed", 
-                "message": str(e),
-                "step": "import PerfStore"
-            })
-
-        # [STEP 2] Parsing payload
-        try:
-            q = (payload.question or "") if payload else ""
-            entities_in = (payload.entities or {}) if (payload and payload.entities is not None) else {}
-            step2_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step2_payload_failed",
-                "message": str(e),
-                "step": "parse payload"
-            })
-
-        # [STEP 3] Normalisation locale des entités
-        try:
-            norm = _normalize_entities_soft_local(
-                {"species": "broiler", "line": "cobb500", "sex": "male", "age_days": 21, "unit": "metric"}
-            )
-            step3_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step3_normalize_failed",
-                "message": str(e),
-                "step": "normalize entities"
-            })
-
-        # [STEP 4] Instanciation PerfStore
-        try:
-            store = PerfStore(root=os.environ.get("RAG_INDEX_ROOT", "./rag_index"), species="broiler")
-            step4_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step4_perfstore_init_failed",
-                "message": str(e),
-                "step": "PerfStore init",
-                "rag_root": os.environ.get("RAG_INDEX_ROOT", "./rag_index")
-            })
-
-        # [STEP 5] available_lines
-        try:
-            available = store.available_lines()
-            step5_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step5_available_lines_failed",
-                "message": str(e),
-                "step": "available_lines"
-            })
-
-        # [STEP 6] _load_df avec protection maximale
-        try:
-            df = store._load_df("cobb500")
-            if df is None:
-                return jsonable_encoder({
-                    "error": "step6_load_df_returned_none",
-                    "step": "load_df returned None",
-                    "available_lines": available
-                })
-            step6_ok = True
-            df_info = {
-                "rows": len(df),
-                "columns": list(df.columns),
-                "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()}
-            }
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step6_load_df_failed",
-                "message": str(e),
-                "step": "_load_df('cobb500')",
-                "available_lines": available
-            })
-
-        # [STEP 7] store.get avec protection
-        try:
-            rec = store.get(line="cobb500", sex="male", unit="metric", age_days=21)
-            step7_ok = True
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "step7_store_get_failed",
-                "message": str(e),
-                "step": "store.get",
-                "df_info": df_info
-            })
-
-        # [SUCCESS] Tout a marché
-        return jsonable_encoder({
-            "status": "success",
-            "steps_completed": [
-                "import", "payload", "normalize", 
-                "perfstore_init", "available_lines", 
-                "load_df", "store_get"
-            ],
-            "available_lines": available,
-            "df_info": df_info,
-            "rec": rec,
-            "message": "All steps completed successfully"
-        })
-
+        from .pipeline.perf_store import PerfStore
+        import pandas as pd
     except Exception as e:
-        # Catch-all final
-        return jsonable_encoder({
-            "error": "unexpected_error",
-            "message": str(e),
-            "step": "unknown"
-        })
-
-
+        return {"error": "import", "message": str(e)}
+    
+    # Test 2: Lecture CSV directe
+    try:
+        csv_path = "/workspace/backend/rag_index/broiler/tables/cobb500_perf_targets.csv"
+        df_raw = pd.read_csv(csv_path)
+        return {
+            "success": True,
+            "csv_loaded": True,
+            "shape": [len(df_raw), len(df_raw.columns)],
+            "columns": list(df_raw.columns),
+            "first_row": df_raw.iloc[0].to_dict() if len(df_raw) > 0 else None
+        }
+    except Exception as e:
+        return {"error": "csv_read", "message": str(e), "csv_path": csv_path}
