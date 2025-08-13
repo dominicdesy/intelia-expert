@@ -1,5 +1,3 @@
-// page.tsx
-
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -104,11 +102,61 @@ export default function ChatInterface() {
     return 'U'
   }
 
-preprocessMarkdown] Contenu traité:', {
+  // 🔧 FONCTION RENFORCÉE : Préprocesseur Markdown pour réparer le formatage cassé
+  const preprocessMarkdown = (content: string): string => {
+    if (!content) return ""
+    
+    let processed = content
+
+    // 🚨 CORRECTION CRITIQUE : Réparer les titres collés au texte suivant
+    // Exemple: "## Diagnostic PrincipalLa mortalité" → "## Diagnostic Principal\n\nLa mortalité"
+    processed = processed.replace(/(#{1,6})\s*([^#\n]+?)([A-Z][a-z])/g, '$1 $2\n\n$3')
+    
+    // 🚨 CORRECTION : Ajouter saut de ligne après tous les titres si manquant
+    processed = processed.replace(/^(#{1,6}[^\n]+)(?!\n)/gm, '$1\n')
+    
+    // 🚨 CORRECTION : Séparer les mots collés par une virgule manquante
+    // Exemple: "diarrhée hémorragique, suggère" au lieu de "diarrhée hémorragiquesugère"
+    processed = processed.replace(/([a-z])([A-Z])/g, '$1, $2')
+    
+    // 🚨 CORRECTION : Réparer les phrases collées après ponctuation
+    processed = processed.replace(/([.!?:])([A-Z])/g, '$1 $2')
+    
+    // 🚨 CORRECTION : Ajouter espaces avant les mots importants en gras
+    processed = processed.replace(/([a-z])(\*\*[A-Z])/g, '$1 $2')
+    
+    // 🚨 CORRECTION : Séparer les sections importantes collées
+    processed = processed.replace(/([.!?:])\s*(\*\*[^*]+\*\*)/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Structure en sections avec ### pour sous-parties
+    processed = processed.replace(/([.!?:])\s*-\s*([A-Z][^:]+:)/g, '$1\n\n### $2')
+    
+    // 🔨 CORRECTION : Améliorer la structure des listes
+    processed = processed.replace(/([.!?:])\s*-\s*([A-Z][^-]+)/g, '$1\n\n- $2')
+    
+    // 🔨 CORRECTION : Ajouter espacement avant les listes
+    processed = processed.replace(/([^.\n])\n([•\-\*]\s)/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Ajouter espacement après les listes
+    processed = processed.replace(/([•\-\*]\s[^\n]+)\n([A-Z][^•\-\*])/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Gérer les sections spéciales (Causes, Recommandations, etc.)
+    processed = processed.replace(/(Causes Possibles|Recommandations|Prévention|Court terme|Long terme|Immédiat)([^-:])/g, '\n\n### $1\n\n$2')
+    
+    // 🔨 NORMALISATION : Nettoyer les espaces multiples
+    processed = processed.replace(/[ \t]+/g, ' ')
+    
+    // 🔨 NORMALISATION : Éviter les triples sauts de ligne
+    processed = processed.replace(/\n\n\n+/g, '\n\n')
+    
+    // 🔨 NETTOYAGE : Supprimer espaces en début/fin
+    processed = processed.trim()
+    
+    console.log('🔧 [preprocessMarkdown] Réparation intensive:', {
       original_length: content.length,
       processed_length: processed.length,
-      has_headings: /^#{1,6}\s/.test(processed),
-      preview: processed.substring(0, 200)
+      repairs_made: content !== processed,
+      preview: processed.substring(0, 300)
     })
     
     return processed
