@@ -22,7 +22,7 @@ import {
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
-import { FeedbackModal } from './components/modals/FeedbackModal'
+import { FeedbackModal } from './components/FeedbackModal'
 
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
@@ -43,7 +43,7 @@ export default function ChatInterface() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [showConcisionSettings, setShowConcisionSettings] = useState(false)
   
-  // Ã‰tats existants inchangÃ©s
+  // États existants inchangés
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
     originalQuestion: string
@@ -74,9 +74,9 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  console.log('ðŸ" [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
+  console.log('📝 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // ðŸ"§ FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
+  // 📧 FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
   const getUserInitials = (user: any): string => {
     if (!user) return 'U'
     
@@ -102,22 +102,22 @@ export default function ChatInterface() {
     return 'U'
   }
 
-  // ðŸš€ FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
+  // 🔄 FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
   const reprocessAllMessages = () => {
     if (!currentConversation?.messages) return
 
     const updatedMessages = currentConversation.messages.map(message => {
-      // Ne traiter que les rÃ©ponses IA qui ont response_versions
+      // Ne traiter que les réponses IA qui ont response_versions
       if (!message.isUser && 
           message.id !== 'welcome' && 
           message.response_versions &&
           !message.content.includes('Mode clarification') &&
-          !message.content.includes('ðŸ'¡ RÃ©pondez simplement')) {
+          !message.content.includes('🎁 Répondez simplement')) {
         
-        // ðŸš€ SÃ‰LECTION DE VERSION : Utiliser selectVersionFromResponse
+        // 🔄 SÉLECTION DE VERSION : Utiliser selectVersionFromResponse
         const selectedContent = (message.response_versions?.standard || message.response_versions?.detailed || message.response_versions?.concise || Object.values(message.response_versions || {})[0] || '')
         
-        console.log(`ðŸ"‹ [reprocessAllMessages] Message ${message.id} - passage Ã  ${config.level}`, {
+        console.log(`📝 [reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
           original_length: message.content.length,
           new_length: selectedContent.length,
           versions_available: Object.keys(message.response_versions)
@@ -137,32 +137,32 @@ export default function ChatInterface() {
     }
 
     setCurrentConversation(updatedConversation)
-    console.log('âœ… [reprocessAllMessages] Tous les messages retraitÃ©s avec niveau:', config.level)
+    console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
-	// ðŸš€ FONCTION Ã‰TENDUE : Nettoyer le texte de rÃ©ponse (synchronisÃ©e avec backend _final_sanitize)
-	const cleanResponseText = (text: string): string => {
-	  if (!text) return ""
-	  
-	  // ðŸš¨ PROTECTION CRITIQUE : Ne pas nettoyer les rÃ©ponses courtes PerfStore
-	  if (text.length < 100) {
-		console.log('ðŸ›¡ï¸ [cleanResponseText] RÃ©ponse courte protÃ©gÃ©e:', text)
-		return text.trim()
-	  }
-	  
-	  let cleaned = text	
+  // 🔄 FONCTION ÉTENDUE : Nettoyer le texte de réponse (synchronisée avec backend _final_sanitize)
+  const cleanResponseText = (text: string): string => {
+    if (!text) return ""
+    
+    // 🔨 PROTECTION CRITIQUE : Ne pas nettoyer les réponses courtes PerfStore
+    if (text.length < 100) {
+      console.log('🛡️ [cleanResponseText] Réponse courte protégée:', text)
+      return text.trim()
+    }
+    
+    let cleaned = text
 
     // ========================
-    // âœ… CODE ORIGINAL CONSERVÃ‰ (fonctionne bien)
+    // ✅ CODE ORIGINAL CONSERVÉ (fonctionne bien)
     // ========================
     
-    // Retirer toutes les rÃ©fÃ©rences aux sources (patterns multiples)
+    // Retirer toutes les références aux sources (patterns multiples)
     cleaned = cleaned.replace(/\*\*Source:\s*[^*]+\*\*/g, '')
-    cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '') // Cas tronquÃ©
-    cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '') // Cas gÃ©nÃ©riques
-    cleaned = cleaned.replace(/Source:\s*[^\n]+/g, '') // Sans astÃ©risques
+    cleaned = cleaned.replace(/\*\*ource:\s*[^*]+\*\*/g, '') // Cas tronqué
+    cleaned = cleaned.replace(/\*\*Source[^*]*\*\*/g, '') // Cas génériques
+    cleaned = cleaned.replace(/Source:\s*[^\n]+/g, '') // Sans astérisques
     
-    // Retirer les longs passages de texte technique des PDFs (patterns Ã©tendus)
+    // Retirer les longs passages de texte technique des PDFs (patterns étendus)
     cleaned = cleaned.replace(/protection, regardless of the species involved[^.]+\./g, '')
     cleaned = cleaned.replace(/bird ages, from the adverse effects[^.]+\./g, '')
     cleaned = cleaned.replace(/oocyst production reaches a maximum[^.]+\./g, '')
@@ -174,31 +174,31 @@ export default function ChatInterface() {
     cleaned = cleaned.replace(/Mice and darkling beetles[^.]+\./g, '')
     cleaned = cleaned.replace(/IBD does not transmit[^.]+\./g, '')
     
-    // Retirer les fragments de phrases coupÃ©es qui commencent sans majuscule
+    // Retirer les fragments de phrases coupées qui commencent sans majuscule
     cleaned = cleaned.replace(/^[a-z][^.]+\.\.\./gm, '')
     
-    // Retirer les fragments techniques gÃ©nÃ©riques
+    // Retirer les fragments techniques génériques
     cleaned = cleaned.replace(/ould be aware of local legislation[^.]+\./g, '')
     cleaned = cleaned.replace(/Apply your knowledge and judgment[^.]+\./g, '')
     
-    // Nettoyer les tableaux mal formatÃ©s
+    // Nettoyer les tableaux mal formatés
     cleaned = cleaned.replace(/Age \(days\) Weight \(lb\)[^|]+\|[^|]+\|/g, '')
     
-    // Retirer les rÃ©pÃ©titions de mots coupÃ©s
+    // Retirer les répétitions de mots coupés
     cleaned = cleaned.replace(/\b\w{1,3}\.\.\./g, '')
     
     // Retirer les phrases qui se terminent abruptement par ---
     cleaned = cleaned.replace(/[^.!?]+---\s*/g, '')
     
-    // Nettoyer les numÃ©rotations orphelines (ex: "2. Gross and Microscopic Lesions:")
+    // Nettoyer les numérotations orphelines (ex: "2. Gross and Microscopic Lesions:")
     cleaned = cleaned.replace(/^\d+\.\s+[A-Z][^:]+:\s*$/gm, '')
     cleaned = cleaned.replace(/^\w\.\s+[A-Z][^:]+:\s*$/gm, '')
 
     // ========================
-    // ðŸš€ NOUVELLES REGEX (synchronisÃ©es avec backend _final_sanitize)
+    // 🔄 NOUVELLES REGEX (synchronisées avec backend _final_sanitize)
     // ========================
     
-    // En-tÃªtes "INTRODUCTIONâ€¦", "Cobb MXâ€¦" et variants
+    // En-têtes "INTRODUCTION…", "Cobb MX…" et variants
     cleaned = cleaned.replace(/^INTRODUCTION[^\n]*$/gm, '')
     cleaned = cleaned.replace(/^Introduction[^\n]*$/gm, '')
     cleaned = cleaned.replace(/^Cobb MX[^\n]*$/gm, '')
@@ -208,37 +208,37 @@ export default function ChatInterface() {
     cleaned = cleaned.replace(/^Ross [0-9]+[^\n]*$/gm, '')
     cleaned = cleaned.replace(/^ROSS [0-9]+[^\n]*$/gm, '')
     
-    // En-tÃªtes techniques gÃ©nÃ©riques en majuscules
+    // En-têtes techniques génériques en majuscules
     cleaned = cleaned.replace(/^[A-Z\s]{10,}:?\s*$/gm, '') // Lignes tout en majuscules
     cleaned = cleaned.replace(/^[A-Z][A-Z\s]+GUIDE[^\n]*$/gm, '') // Guides techniques
     cleaned = cleaned.replace(/^[A-Z][A-Z\s]+MANUAL[^\n]*$/gm, '') // Manuels
     cleaned = cleaned.replace(/^[A-Z][A-Z\s]+MANAGEMENT[^\n]*$/gm, '') // Management
     
-    // Tableaux mal formattÃ©s - patterns Ã©tendus
-    cleaned = cleaned.replace(/\|\s*Age\s*\|\s*Weight[^|]*\|[^\n]*\n/g, '') // En-tÃªtes de tableaux
+    // Tableaux mal formattés - patterns étendus
+    cleaned = cleaned.replace(/\|\s*Age\s*\|\s*Weight[^|]*\|[^\n]*\n/g, '') // En-têtes de tableaux
     cleaned = cleaned.replace(/\|\s*Days\s*\|\s*Grams[^|]*\|[^\n]*\n/g, '')
     cleaned = cleaned.replace(/\|\s*Week\s*\|\s*Target[^|]*\|[^\n]*\n/g, '')
-    cleaned = cleaned.replace(/\|[\s\-]+\|[\s\-]+\|/g, '') // SÃ©parateurs de tableaux
+    cleaned = cleaned.replace(/\|[\s\-]+\|[\s\-]+\|/g, '') // Séparateurs de tableaux
     
-    // Fragments de PDF mal parsÃ©s
-    cleaned = cleaned.replace(/[A-Z]{2,}\s+[A-Z]{2,}\s+[A-Z]{2,}/g, '') // SÃ©quences majuscules
+    // Fragments de PDF mal parsés
+    cleaned = cleaned.replace(/[A-Z]{2,}\s+[A-Z]{2,}\s+[A-Z]{2,}/g, '') // Séquences majuscules
     cleaned = cleaned.replace(/\b[A-Z]\.[A-Z]\.[A-Z]\./g, '') // Initiales orphelines
-    cleaned = cleaned.replace(/Page\s+\d+\s+of\s+\d+/gi, '') // NumÃ©ros de pages
-    cleaned = cleaned.replace(/Copyright\s+[Â©\(c\)]\s*[^\n]*/gi, '') // Copyright
+    cleaned = cleaned.replace(/Page\s+\d+\s+of\s+\d+/gi, '') // Numéros de pages
+    cleaned = cleaned.replace(/Copyright\s+[©\(c\)]\s*[^\n]*/gi, '') // Copyright
     
-    // RÃ©fÃ©rences bibliographiques orphelines
-    cleaned = cleaned.replace(/^\([^)]+\)\s*$/gm, '') // RÃ©fÃ©rences entre parenthÃ¨ses seules
+    // Références bibliographiques orphelines
+    cleaned = cleaned.replace(/^\([^)]+\)\s*$/gm, '') // Références entre parenthèses seules
     cleaned = cleaned.replace(/^et\s+al\.[^\n]*$/gm, '') // "et al." orphelin
     cleaned = cleaned.replace(/^[A-Z][a-z]+,\s+[A-Z]\.[^\n]*$/gm, '') // Citations d'auteurs
     
     // Codes et identifiants techniques
     cleaned = cleaned.replace(/\b[A-Z]{2,}\-[0-9]+\b/g, '') // Codes type ABC-123
-    cleaned = cleaned.replace(/\b[0-9]{4,}\-[0-9]{2,}\b/g, '') // Codes numÃ©riques
+    cleaned = cleaned.replace(/\b[0-9]{4,}\-[0-9]{2,}\b/g, '') // Codes numériques
     cleaned = cleaned.replace(/\bDOI:\s*[^\s]+/gi, '') // DOI
     cleaned = cleaned.replace(/\bISSN:\s*[^\s]+/gi, '') // ISSN
     
     // ========================
-    // âœ… NETTOYAGE FINAL ORIGINAL CONSERVÃ‰
+    // ✅ NETTOYAGE FINAL ORIGINAL CONSERVÉ
     // ========================
     
     // Normaliser les espaces multiples
@@ -246,7 +246,7 @@ export default function ChatInterface() {
     cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n')
     cleaned = cleaned.replace(/\n\s*\n/g, '\n\n')
     
-    // Retirer les lignes vides en dÃ©but et fin
+    // Retirer les lignes vides en début et fin
     cleaned = cleaned.replace(/^\s*\n+/, '')
     cleaned = cleaned.replace(/\n+\s*$/, '')
     
@@ -264,7 +264,7 @@ export default function ChatInterface() {
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !hasRedirectedRef.current) {
       hasRedirectedRef.current = true
-      console.log('ðŸ"„ [ChatInterface] Redirection - utilisateur non authentifiÃ©')
+      console.log('📞 [ChatInterface] Redirection - utilisateur non authentifié')
       
       if (typeof window !== 'undefined') {
         window.location.replace('/')
@@ -405,7 +405,7 @@ export default function ChatInterface() {
           loadConversations(user.id)
             .then(() => {
               if (isMountedRef.current) {
-                console.log('Historique conversations chargÃ©')
+                console.log('Historique conversations chargé')
               }
             })
             .catch(err => {
@@ -450,47 +450,65 @@ export default function ChatInterface() {
     })
   }
 
-  // ðŸ"§ FONCTION CORRIGÃ‰E : extractAnswerAndSources - ORDRE DES CONDITIONS FIXÃ‰
+  // 🌾 FONCTION CORRIGÉE : extractAnswerAndSources avec support validation_rejected
   const extractAnswerAndSources = (result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = [] // Toujours vide maintenant
 
-    console.log('ðŸŽ¯ [extractAnswerAndSources] DÃ©but extraction:', {
+    console.log('🔯 [extractAnswerAndSources] Début extraction:', {
       type: result?.type,
       has_answer: !!result?.answer,
       has_general_answer: !!result?.general_answer
     })
 
-    // ðŸš¨ CORRECTION CRITIQUE : Traiter type "answer" EN PREMIER
+    // 🌾 NOUVEAU : Gérer le type "validation_rejected"
+    if (result?.type === 'validation_rejected') {
+      console.log('🚫 [extractAnswerAndSources] Question rejetée par validation agricole')
+      
+      // Créer un message informatif avec suggestions
+      let rejectionMessage = result.message || "Cette question ne concerne pas le domaine agricole."
+      
+      // Ajouter les sujets suggérés si disponibles
+      if (result.validation?.suggested_topics && result.validation.suggested_topics.length > 0) {
+        rejectionMessage += "\n\n**Voici quelques sujets que je peux vous aider :**\n"
+        result.validation.suggested_topics.forEach((topic: string, index: number) => {
+          rejectionMessage += `• ${topic}\n`
+        })
+      }
+      
+      return [rejectionMessage, []]
+    }
+
+    // 🔨 CORRECTION CRITIQUE : Traiter type "answer" EN PREMIER
     if (result?.type === 'answer' && result?.answer) {
-      console.log('ðŸŽ¯ [extractAnswerAndSources] Type answer dÃ©tectÃ©')
+      console.log('🔯 [extractAnswerAndSources] Type answer détecté')
       answerText = result.answer.text || ""
-      console.log('ðŸŽ¯ [extractAnswerAndSources] Answer text extraite:', answerText.substring(0, 100))
+      console.log('🔯 [extractAnswerAndSources] Answer text extraite:', answerText.substring(0, 100))
       return [answerText, []]
     }
 
-    // ðŸš€ Support type "partial_answer" du DialogueManager hybride
+    // 🔄 Support type "partial_answer" du DialogueManager hybride
     if (result?.type === 'partial_answer' && result?.general_answer) {
-      console.log('ðŸŽ¯ [extractAnswerAndSources] Type partial_answer dÃ©tectÃ©')
+      console.log('🔯 [extractAnswerAndSources] Type partial_answer détecté')
       
       answerText = result.general_answer.text || ""
-      console.log('ðŸŽ¯ [extractAnswerAndSources] General answer text extraite:', answerText.substring(0, 100))
+      console.log('🔯 [extractAnswerAndSources] General answer text extraite:', answerText.substring(0, 100))
       
       return [answerText, []] // Toujours retourner sources vides
     }
 
-    // âœ… ANCIEN CODE CONSERVÃ‰ pour compatibilitÃ©
+    // ✅ ANCIEN CODE CONSERVÉ pour compatibilité
     const responseContent = result?.response || ""
 
     if (typeof responseContent === 'object' && responseContent !== null) {
       answerText = String(responseContent.answer || "").trim()
       if (!answerText) {
-        answerText = "DÃ©solÃ©, je n'ai pas pu formater la rÃ©ponse."
+        answerText = "Désolé, je n'ai pas pu formater la réponse."
       }
     } else {
-      answerText = String(responseContent).trim() || "DÃ©solÃ©, je n'ai pas pu formater la rÃ©ponse."
+      answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
       
-      // âœ… CORRECTION: Nettoyer le JSON visible si prÃ©sent
+      // ✅ CORRECTION: Nettoyer le JSON visible si présent
       if (answerText.includes("'type': 'text'") && answerText.includes("'answer':")) {
         const match = answerText.match(/'answer': "(.+?)"/)
         if (match) {
@@ -502,15 +520,15 @@ export default function ChatInterface() {
       }
     }
     
-    console.log('ðŸŽ¯ [extractAnswerAndSources] RÃ©sultat final:', answerText.substring(0, 100))
+    console.log('🔯 [extractAnswerAndSources] Résultat final:', answerText.substring(0, 100))
     return [answerText, []] // Toujours retourner sources vides
   }
 
-  // ðŸš€ FONCTION MODIFIÃ‰E : handleSendMessage avec nettoyage du texte
+  // 🔄 FONCTION MODIFIÉE : handleSendMessage avec nettoyage du texte
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
-    console.log('ðŸ"¤ [ChatInterface] Envoi message:', {
+    console.log('📤 [ChatInterface] Envoi message:', {
       text: text.substring(0, 50) + '...',
       hasClarificationState: !!clarificationState,
       concisionLevel: config.level
@@ -541,55 +559,56 @@ export default function ChatInterface() {
     try {
       let response;
       
-      // ðŸš€ DÃ‰TECTION AUTOMATIQUE : Niveau optimal pour la question
+      // 🔄 DÉTECTION AUTOMATIQUE : Niveau optimal pour la question
       const optimalLevel = undefined;
-      console.log('ðŸŽ¯ [handleSendMessage] Niveau optimal dÃ©tectÃ©:', optimalLevel)
+      console.log('🔯 [handleSendMessage] Niveau optimal détecté:', optimalLevel)
       
       if (clarificationState) {
-        console.log('ðŸŽª [handleSendMessage] Mode clarification')
+        console.log('🔪 [handleSendMessage] Mode clarification')
         
         response = await generateAIResponse(
           clarificationState.originalQuestion + " " + text.trim(),
           user,
           currentLanguage,
           conversationIdToSend,
-          optimalLevel, // ðŸš€ NOUVEAU : Passer niveau optimal
+          optimalLevel, // 🔄 NOUVEAU : Passer niveau optimal
           true,
           clarificationState.originalQuestion,
           { answer: text.trim() }
         )
         
         setClarificationState(null)
-        console.log('âœ… [handleSendMessage] Clarification traitÃ©e')
+        console.log('✅ [handleSendMessage] Clarification traitée')
         
       } else {
-        // ðŸš€ APPEL MODIFIÃ‰ : Passer niveau optimal au backend
+        // 🔄 APPEL MODIFIÉ : Passer niveau optimal au backend
         response = await generateAIResponse(
           text.trim(), 
           user, 
           currentLanguage, 
           conversationIdToSend,
-          optimalLevel // ðŸš€ NOUVEAU : Niveau optimal dÃ©tectÃ© automatiquement
+          optimalLevel // 🔄 NOUVEAU : Niveau optimal détecté automatiquement
         )
       }
 
       if (!isMountedRef.current) return
 
-      console.log('ðŸ"¥ [handleSendMessage] RÃ©ponse reÃ§ue:', {
+      console.log('📥 [handleSendMessage] Réponse reçue:', {
         conversation_id: response.conversation_id,
         response_length: response.response?.length || 0,
         versions_received: Object.keys(response.response_versions || {}),
-        clarification_requested: response.clarification_result?.clarification_requested || false
+        clarification_requested: response.clarification_result?.clarification_requested || false,
+        type: response.type // 🌾 NOUVEAU : Log du type de réponse
       })
 
       const needsClarification = response.clarification_result?.clarification_requested === true
 
       if (needsClarification) {
-        console.log('â" [handleSendMessage] Clarification demandÃ©e')
+        console.log('❓ [handleSendMessage] Clarification demandée')
         
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: (response.full_text || response.response) + "\n\nðŸ'¡ RÃ©pondez simplement dans le chat avec les informations demandÃ©es.",
+          content: (response.full_text || response.response) + "\n\n🎁 Répondez simplement dans le chat avec les informations demandées.",
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id
@@ -602,21 +621,21 @@ export default function ChatInterface() {
           clarificationQuestions: response.clarification_questions || []
         })
 
-        console.log('ðŸ"„ [handleSendMessage] Ã‰tat clarification activÃ©')
+        console.log('📞 [handleSendMessage] État clarification activé')
 
       } else {
-        // ðŸš¨ CORRECTION CRITIQUE : Extraction avec fonction corrigÃ©e
+        // 🔨 CORRECTION CRITIQUE : Extraction avec fonction corrigée
         const [answerText, sources] = extractAnswerAndSources(response)
         
-        console.log('ðŸŽ¯ [handleSendMessage] Texte extrait:', {
+        console.log('🔯 [handleSendMessage] Texte extrait:', {
           length: answerText.length,
           preview: answerText.substring(0, 100),
           empty: !answerText || answerText.trim() === ''
         })
         
-        const cleanedText = cleanResponseText(answerText) // ðŸš€ NOUVEAU : Appliquer le nettoyage
+        const cleanedText = cleanResponseText(answerText) // 🔄 NOUVEAU : Appliquer le nettoyage
 
-        console.log('ðŸŽ¯ [handleSendMessage] Texte nettoyÃ©:', {
+        console.log('🔯 [handleSendMessage] Texte nettoyé:', {
           length: cleanedText.length,
           preview: cleanedText.substring(0, 100),
           empty: !cleanedText || cleanedText.trim() === ''
@@ -624,17 +643,17 @@ export default function ChatInterface() {
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: cleanedText || "Erreur: contenu vide", // ðŸš¨ PROTECTION: Fallback si vide
+          content: cleanedText || "Erreur: contenu vide", // 🔨 PROTECTION: Fallback si vide
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
-          // ðŸš€ NOUVEAU : Stocker toutes les versions reÃ§ues du backend
+          // 🔄 NOUVEAU : Stocker toutes les versions reçues du backend
           response_versions: response.response_versions,
-          // Garder pour compatibilitÃ© (peut Ãªtre supprimÃ© plus tard)
+          // Garder pour compatibilité (peut être supprimé plus tard)
           originalResponse: response.response
         }
 
-        console.log('ðŸŽ¯ [handleSendMessage] Message AI crÃ©Ã©:', {
+        console.log('🔯 [handleSendMessage] Message AI créé:', {
           id: aiMessage.id,
           content_length: aiMessage.content.length,
           content_preview: aiMessage.content.substring(0, 100),
@@ -642,7 +661,7 @@ export default function ChatInterface() {
         })
 
         addMessage(aiMessage)
-        console.log('âœ… [handleSendMessage] Message ajoutÃ© avec versions:', Object.keys(response.response_versions || {}))
+        console.log('✅ [handleSendMessage] Message ajouté avec versions:', Object.keys(response.response_versions || {}))
       }
       
     } catch (error) {
@@ -681,7 +700,7 @@ export default function ChatInterface() {
 
     const message = messages.find(msg => msg.id === messageId)
     if (!message || !message.conversation_id) {
-      console.warn('Conversation ID non trouvÃ© pour le feedback', messageId)
+      console.warn('Conversation ID non trouvé pour le feedback', messageId)
       return
     }
 
@@ -701,7 +720,7 @@ export default function ChatInterface() {
           try {
             await conversationService.sendFeedbackComment(message.conversation_id, comment.trim())
           } catch (commentError) {
-            console.warn('Commentaire non envoyÃ© (endpoint manquant):', commentError)
+            console.warn('Commentaire non envoyé (endpoint manquant):', commentError)
           }
         }
       } catch (feedbackError) {
@@ -716,7 +735,7 @@ export default function ChatInterface() {
       }
       
     } catch (error) {
-      console.error('Erreur gÃ©nÃ©rale feedback:', error)
+      console.error('Erreur générale feedback:', error)
       throw error
     } finally {
       if (isMountedRef.current) {
@@ -782,7 +801,7 @@ export default function ChatInterface() {
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
       <div className="h-screen bg-gray-50 flex flex-col">
-        <header className="bg-white border-b border-gray-100 px-4 py-3">
+        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
             {/* Boutons gauche */}
             <div className="flex items-center space-x-2">
@@ -796,7 +815,7 @@ export default function ChatInterface() {
               </button>
             </div>
 
-            {/* Titre centrÃ© avec logo */}
+            {/* Titre centré avec logo */}
             <div className="flex-1 flex justify-center items-center space-x-3">
               <div className="w-8 h-8 grid place-items-center">
                 <InteliaLogo className="h-7 w-auto" />
@@ -806,7 +825,7 @@ export default function ChatInterface() {
               </div>
             </div>
             
-            {/* Avatar utilisateur Ã  droite */}
+            {/* Avatar utilisateur à droite */}
             <div className="flex items-center">
               <UserMenuButton />
             </div>
@@ -815,12 +834,12 @@ export default function ChatInterface() {
           {showConcisionSettings && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-700">ParamÃ¨tres de concision</h3>
+                <h3 className="font-medium text-gray-700">Paramètres de concision</h3>
                 <button
                   onClick={() => setShowConcisionSettings(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  âœ•
+                  ✕
                 </button>
               </div>
               
@@ -829,7 +848,7 @@ export default function ChatInterface() {
                   onClick={reprocessAllMessages}
                   className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm transition-colors"
                 >
-                  ðŸ"„ Appliquer Ã  toutes les rÃ©ponses
+                  📞 Appliquer à toutes les réponses
                 </button>
               )}
             </div>
@@ -839,9 +858,9 @@ export default function ChatInterface() {
         <div className="flex-1 overflow-hidden flex flex-col">
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-4 py-6"
+            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6"
           >
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
                 <div className="text-center">
                   <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
@@ -852,20 +871,20 @@ export default function ChatInterface() {
 
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  <div className="text-sm">Aucun message Ã  afficher</div>
+                  <div className="text-sm">Aucun message à afficher</div>
                 </div>
               ) : (
                 messages.map((message, index) => (
                   <div key={`${message.id}-${index}`}>
                     <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                      {/* 🔧 CORRECTION LOGO: Container avec largeur fixe pour éviter l'écrasement */}
+                      {/* 📧 CORRECTION LOGO: Container avec largeur fixe pour éviter l'écrasement */}
                       {!message.isUser && (
                         <div className="flex-shrink-0 w-8 h-8 relative">
                           <InteliaLogo className="w-8 h-8" />
                         </div>
                       )}
                       
-                      <div className={`px-4 py-3 rounded-2xl ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                      <div className={`px-3 sm:px-4 py-3 rounded-2xl max-w-[85%] sm:max-w-none ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
                         {message.isUser ? (
                           <p className="whitespace-pre-wrap leading-relaxed text-sm">
                             {message.content}
@@ -892,7 +911,7 @@ export default function ChatInterface() {
                               strong: ({node, ...props}) => (
                                 <strong className="font-semibold text-blue-800" {...props} />
                               ),
-                              // ðŸš€ NOUVEAU : Support pour les tableaux
+                              // 🔄 NOUVEAU : Support pour les tableaux
                               table: ({node, ...props}) => (
                                 <div className="overflow-x-auto my-4">
                                   <table className="min-w-full border border-gray-300 rounded-lg" {...props} />
@@ -943,7 +962,7 @@ export default function ChatInterface() {
                               </span>
                               {message.feedbackComment && (
                                 <span className="text-xs text-blue-600" title={`Commentaire: ${message.feedbackComment}`}>
-                                  ðŸ'¬
+                                  💬
                                 </span>
                               )}
                             </div>
@@ -951,7 +970,7 @@ export default function ChatInterface() {
                         </div>
                       )}
 
-                      {/* ðŸ"§ CORRECTION 2: Avatar avec initiales pour les messages utilisateur */}
+                      {/* 📧 CORRECTION 2: Avatar avec initiales pour les messages utilisateur */}
                       {message.isUser && (
                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                           <span className="text-white text-sm font-medium">
@@ -969,7 +988,7 @@ export default function ChatInterface() {
                   <div className="w-8 h-8 grid place-items-center flex-shrink-0">
                     <InteliaLogo className="h-7 w-auto" />
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                  <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -996,18 +1015,18 @@ export default function ChatInterface() {
             </div>
           )}
 
-          <div className="px-4 py-4 bg-white border-t border-gray-100">
-            <div className="max-w-4xl mx-auto">
+          <div className="px-2 sm:px-4 py-4 bg-white border-t border-gray-100">
+            <div className="max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700 text-sm font-medium">
-                      ðŸ'¡ Mode clarification : rÃ©pondez Ã  la question ci-dessus
+                      🎁 Mode clarification : répondez à la question ci-dessus
                     </span>
                     <button
                       onClick={() => {
                         setClarificationState(null)
-                        console.log('ðŸ"„ [ChatInterface] Clarification annulÃ©e')
+                        console.log('📞 [ChatInterface] Clarification annulée')
                       }}
                       className="text-blue-600 hover:text-blue-800 text-sm underline"
                     >
@@ -1029,7 +1048,7 @@ export default function ChatInterface() {
                         handleSendMessage()
                       }
                     }}
-                    placeholder={clarificationState ? "RÃ©pondez Ã  la question ci-dessus..." : t('chat.placeholder')}
+                    placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
                     className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
                     disabled={isLoadingChat}
                     aria-label={t('chat.placeholder')}
