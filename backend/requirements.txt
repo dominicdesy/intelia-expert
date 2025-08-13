@@ -53,6 +53,9 @@ pillow==10.3.0
 # HTTP Requests
 requests==2.31.0
 
+# System Monitoring
+psutil==5.9.5
+
 # Compatibility
 typing-extensions>=4.8.0
 
