@@ -76,6 +76,32 @@ export default function ChatInterface() {
 
   console.log('🔍 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
+  // 🔧 FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
+  const getUserInitials = (user: any): string => {
+    if (!user) return 'U'
+    
+    // Essayer depuis le nom complet
+    if (user.name) {
+      const names = user.name.trim().split(' ')
+      if (names.length >= 2) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase()
+      }
+      return names[0][0].toUpperCase()
+    }
+    
+    // Essayer depuis l'email
+    if (user.email) {
+      const emailPart = user.email.split('@')[0]
+      if (emailPart.includes('.')) {
+        const parts = emailPart.split('.')
+        return (parts[0][0] + parts[1][0]).toUpperCase()
+      }
+      return emailPart.substring(0, 2).toUpperCase()
+    }
+    
+    return 'U'
+  }
+
   // 🚀 FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
   const reprocessAllMessages = () => {
     if (!currentConversation?.messages) return
@@ -830,6 +856,7 @@ export default function ChatInterface() {
                 messages.map((message, index) => (
                   <div key={`${message.id}-${index}`}>
                     <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                      {/* 🔧 CORRECTION 1: Logo Intelia pour toutes les réponses IA */}
                       {!message.isUser && (
                         <div className="relative">
                           <InteliaLogo className="w-8 h-8 flex-shrink-0 mt-1" />
@@ -922,9 +949,12 @@ export default function ChatInterface() {
                         </div>
                       )}
 
+                      {/* 🔧 CORRECTION 2: Avatar avec initiales pour les messages utilisateur */}
                       {message.isUser && (
                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                          <UserIcon className="w-5 h-5 text-white" />
+                          <span className="text-white text-sm font-medium">
+                            {getUserInitials(user)}
+                          </span>
                         </div>
                       )}
                     </div>
