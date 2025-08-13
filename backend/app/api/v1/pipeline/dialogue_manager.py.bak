@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE
+Dialogue orchestration - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL
 - classify -> normalize -> completeness/clarifications
 - Route vers compute (si possible) OU table-first (perf targets) OU RAGRetriever
 - NOUVEAU: Intégration postgres_memory pour continuité de session
+- NOUVEAU: Fallback OpenAI quand RAG insuffisant
+- NOUVEAU: Support multilingue universel avec détection automatique
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -36,6 +38,16 @@ except ImportError as e:
         def clear(self, session_id): self.store.pop(session_id, None)
     PostgresMemory = MemoryFallback
 
+# ========== FALLBACK OPENAI ==========
+try:
+    from ..utils.openai_utils import complete as openai_complete
+    from ..utils.openai_utils import get_openai_status
+    OPENAI_FALLBACK_AVAILABLE = True
+    logger.info("✅ OpenAI fallback disponible pour réponses manquantes")
+except ImportError as e:
+    logger.warning(f"⚠️ OpenAI fallback indisponible: {e}")
+    OPENAI_FALLBACK_AVAILABLE = False
+
 # Singleton mémoire conversationnelle
 _CONVERSATION_MEMORY = None
 
@@ -55,7 +67,211 @@ def _get_conversation_memory():
     return _CONVERSATION_MEMORY
 
 # ---------------------------------------------------------------------------
-# Helpers PerfTargets (dédupliqués)
+# NOUVEAU: Détection de langue universelle et post-processing multilingue
+# ---------------------------------------------------------------------------
+
+def _detect_question_language_openai(question: str) -> str:
+    """
+    Utilise OpenAI pour détecter automatiquement la langue de la question.
+    Supporte toutes les langues sans limitation.
+    """
+    if not question or not OPENAI_FALLBACK_AVAILABLE:
+        return "fr"  # Fallback par défaut
+    
+    try:
+        detection_prompt = f"""Detect the language of this question and respond with ONLY the 2-letter ISO language code (en, fr, es, de, it, pt, etc.).
+
+Question: "{question}"
+
+Language code:"""
+
+        language_code = openai_complete(
+            prompt=detection_prompt,
+            temperature=0.1,  # Très déterministe
+            max_tokens=5     # Juste le code langue
+        )
+        
+        if language_code:
+            detected = language_code.strip().lower()[:2]  # Premier code à 2 lettres
+            logger.info(f"🌍 Langue détectée par OpenAI: {detected}")
+            return detected
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur détection langue OpenAI: {e}")
+    
+    # Fallback simple si OpenAI échoue
+    return _detect_language_simple_fallback(question)
+
+def _detect_language_simple_fallback(question: str) -> str:
+    """
+    Fallback simple si OpenAI n'est pas disponible.
+    Détection basique français vs non-français.
+    """
+    if not question:
+        return "fr"
+        
+    text_lower = question.lower()
+    
+    # Indicateurs français fréquents
+    french_indicators = [
+        " le ", " la ", " les ", " un ", " une ", " des ", " du ", " de la ",
+        "quel", "quelle", "comment", "pourquoi", "combien", " est ", " sont "
+    ]
+    
+    french_score = sum(1 for indicator in french_indicators if indicator in text_lower)
+    
+    if french_score >= 2:  # Au moins 2 indicateurs français
+        return "fr"
+    else:
+        return "auto"  # Laisse OpenAI gérer dans le post-processing
+
+def _adapt_response_to_language(response_text: str, source_type: str, target_language: str, original_question: str) -> str:
+    """
+    Adapte la réponse à la langue cible via OpenAI de manière intelligente.
+    Supporte TOUTES les langues automatiquement.
+    """
+    # Si français, pas de traitement
+    if target_language == "fr":
+        return response_text
+    
+    # Si pas d'OpenAI, retourner tel quel
+    if not OPENAI_FALLBACK_AVAILABLE:
+        logger.warning(f"⚠️ OpenAI indisponible pour adaptation linguistique vers {target_language}")
+        return response_text
+    
+    try:
+        # Prompt adaptatif selon le type de source
+        adaptation_prompts = {
+            "rag_retriever": f"""The user asked this question: "{original_question}"
+
+Here is the response found in the knowledge base (originally in French):
+"{response_text}"
+
+Please rewrite this response in the same language as the user's question, maintaining:
+- Technical accuracy
+- Professional tone
+- All specific values and data
+- Proper formatting (markdown if present)
+
+Adapted response:""",
+
+            "table_lookup": f"""The user asked: "{original_question}"
+
+Here is a performance data response (originally in French):
+"{response_text}"
+
+Please reformat this data in the same language as the user's question, keeping:
+- All numerical values exact
+- Professional poultry terminology
+- Clear formatting
+
+Reformatted response:""",
+
+            "hybrid_ui": f"""The user asked: "{original_question}"
+
+Here is a clarification request (originally in French):
+"{response_text}"
+
+Please rewrite this clarification request in the same language as the user's question, maintaining:
+- Clear questions
+- Professional tone
+- All suggested options
+
+Clarification in user's language:""",
+
+            "openai_fallback": response_text,  # Déjà géré par OpenAI
+
+            "compute": f"""The user asked: "{original_question}"
+
+Here is a calculated response (originally in French):
+"{response_text}"
+
+Please rewrite this in the same language as the user's question, keeping:
+- All calculations and formulas exact
+- Technical accuracy
+- Professional tone
+
+Calculated response in user's language:"""
+        }
+        
+        prompt = adaptation_prompts.get(source_type, adaptation_prompts["rag_retriever"])
+        
+        # Adaptation via OpenAI
+        adapted_text = openai_complete(
+            prompt=prompt,
+            temperature=0.3,  # Légèrement créatif pour naturel
+            max_tokens=600    # Assez pour réponses complètes
+        )
+        
+        if adapted_text and len(adapted_text.strip()) > 10:
+            logger.info(f"✅ Réponse adaptée de {source_type} vers langue détectée")
+            return adapted_text.strip()
+        else:
+            logger.warning(f"⚠️ Adaptation linguistique échouée, retour original")
+            return response_text
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur adaptation linguistique: {e}")
+        return response_text
+
+def _finalize_response_with_language(response: Dict[str, Any], question: str, effective_language: str, detected_language: str) -> Dict[str, Any]:
+    """
+    Helper pour appliquer l'adaptation linguistique à toute réponse finale.
+    Utilise cette fonction avant chaque return dans handle().
+    """
+    if effective_language == "fr":
+        # Ajouter les métadonnées de langue même pour le français
+        if response.get("type") == "answer" and "answer" in response:
+            response["answer"]["meta"] = response["answer"].get("meta", {})
+            response["answer"]["meta"]["detected_language"] = detected_language
+            response["answer"]["meta"]["effective_language"] = effective_language
+        elif response.get("type") == "partial_answer":
+            response["language_metadata"] = {
+                "detected_language": detected_language,
+                "effective_language": effective_language
+            }
+        return response  # Pas de traitement nécessaire
+    
+    # Adapter le texte principal selon le type de réponse
+    if response.get("type") == "answer" and response.get("answer", {}).get("text"):
+        answer = response["answer"]
+        original_text = answer["text"]
+        source_type = answer.get("source", "unknown")
+        
+        adapted_text = _adapt_response_to_language(
+            response_text=original_text,
+            source_type=source_type,
+            target_language=effective_language,
+            original_question=question
+        )
+        
+        # Mettre à jour la réponse
+        response["answer"]["text"] = adapted_text
+        response["answer"]["meta"] = response["answer"].get("meta", {})
+        response["answer"]["meta"]["detected_language"] = detected_language
+        response["answer"]["meta"]["effective_language"] = effective_language
+        
+    elif response.get("type") == "partial_answer" and response.get("general_answer", {}).get("text"):
+        # Pour le mode hybride
+        original_text = response["general_answer"]["text"]
+        
+        adapted_text = _adapt_response_to_language(
+            response_text=original_text,
+            source_type="hybrid_ui",
+            target_language=effective_language,
+            original_question=question
+        )
+        
+        response["general_answer"]["text"] = adapted_text
+        response["language_metadata"] = {
+            "detected_language": detected_language,
+            "effective_language": effective_language
+        }
+    
+    return response
+
+# ---------------------------------------------------------------------------
+# Helpers PerfTargets (dédupliqués) - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 _AGE_PATTERNS = [
@@ -158,7 +374,7 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
 # ---------------------------------------------------------------------------
-# NOUVEAU: Gestion du contexte conversationnel
+# NOUVEAU: Gestion du contexte conversationnel - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def _merge_conversation_context(current_entities: Dict[str, Any], session_context: Dict[str, Any], question: str) -> Dict[str, Any]:
@@ -244,7 +460,154 @@ def _clear_conversation_context(session_id: str):
         logger.error(f"❌ Erreur effacement contexte: {e}")
 
 # ---------------------------------------------------------------------------
-# PerfStore singletons & lookup (code original conservé, unifié)
+# NOUVEAU: Fonctions de fallback OpenAI - CODE ORIGINAL CONSERVÉ
+# ---------------------------------------------------------------------------
+
+def _should_use_openai_fallback(rag_result: Dict[str, Any], intent: Intention) -> bool:
+    """
+    Détermine si OpenAI fallback doit être utilisé après échec RAG
+    """
+    # Cas où le RAG n'a pas trouvé de résultats
+    if rag_result.get("route") in ["rag_no_results", "rag_error", "rag_unavailable"]:
+        return True
+    
+    # Cas où le RAG a trouvé très peu de contenu pertinent
+    text = rag_result.get("text", "")
+    if len(text.strip()) < 50:  # Réponse trop courte
+        return True
+        
+    # Cas où le RAG retourne un message d'erreur générique
+    text_lower = text.lower()
+    error_indicators = [
+        "aucune information", "non disponible", "n'est pas disponible",
+        "une erreur est survenue", "moteur rag", "base de connaissances"
+    ]
+    if any(indicator in text_lower for indicator in error_indicators):
+        return True
+        
+    return False
+
+def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> str:
+    """
+    Construit un contexte agricole pour orienter la réponse OpenAI
+    """
+    context_parts = []
+    
+    # Contexte espèce
+    species = entities.get("species", "").lower()
+    if species == "broiler":
+        context_parts.append("Contexte : Poulets de chair (broilers)")
+    elif species == "layer":
+        context_parts.append("Contexte : Poules pondeuses")
+    else:
+        context_parts.append("Contexte : Élevage de volailles")
+    
+    # Contexte lignée si disponible
+    line = entities.get("line")
+    if line:
+        line_map = {
+            "ross308": "lignée Ross 308",
+            "cobb500": "lignée Cobb 500",
+            "hubbard": "lignée Hubbard"
+        }
+        line_name = line_map.get(line.lower(), f"lignée {line}")
+        context_parts.append(f"Lignée : {line_name}")
+    
+    # Contexte âge si disponible
+    age_days = entities.get("age_days")
+    if age_days:
+        context_parts.append(f"Âge : {age_days} jours")
+    
+    # Contexte sexe si disponible
+    sex = entities.get("sex")
+    if sex:
+        sex_map = {
+            "male": "mâles",
+            "female": "femelles", 
+            "as_hatched": "sexes mélangés"
+        }
+        sex_name = sex_map.get(sex.lower(), sex)
+        context_parts.append(f"Sexe : {sex_name}")
+    
+    # Contexte intention
+    intent_context = {
+        "PerfTargets": "Focus sur les objectifs de performance (poids, croissance)",
+        "HealthDiagnosis": "Focus sur la santé et diagnostic vétérinaire",
+        "NutritionAdvice": "Focus sur l'alimentation et la nutrition",
+        "HousingEnvironment": "Focus sur le logement et l'environnement d'élevage",
+        "ManagementPractices": "Focus sur les pratiques de gestion d'élevage",
+        "WaterFeedIntake": "Focus sur la consommation d'eau et d'aliment",
+        "EquipmentSizing": "Focus sur le dimensionnement des équipements",
+        "VentilationSizing": "Focus sur la ventilation et l'ambiance",
+        "EnvSetpoints": "Focus sur les consignes environnementales",
+        "Economics": "Focus sur les aspects économiques de l'élevage"
+    }
+    
+    intent_name = intent.name if hasattr(intent, 'name') else str(intent)
+    if intent_name in intent_context:
+        context_parts.append(intent_context[intent_name])
+    
+    return "\n".join(context_parts)
+
+def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent: Intention, rag_context: str = "") -> Dict[str, Any]:
+    """
+    Génère une réponse via OpenAI quand le RAG échoue
+    MODIFIÉ: Le prompt reste en français, mais OpenAI détectera automatiquement la langue de la question
+    """
+    if not OPENAI_FALLBACK_AVAILABLE:
+        return None
+        
+    try:
+        # Construction du prompt contextualisé
+        system_context = _build_agricultural_context(entities, intent)
+        
+        # MODIFIÉ: Prompt adaptatif qui laisse OpenAI détecter la langue
+        fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
+
+{system_context}
+
+Question de l'utilisateur : {question}
+
+Contexte partiel disponible (si pertinent) : {rag_context}
+
+Instructions :
+- Réponds dans la MÊME LANGUE que la question de l'utilisateur
+- Donne une réponse basée sur tes connaissances en aviculture
+- Sois précis et technique quand approprié  
+- Si tu mentionnes des valeurs, indique qu'elles sont approximatives
+- Structure ta réponse en Markdown si pertinent
+- Si la question sort du domaine avicole, redirige poliment vers l'élevage de volailles
+- Mentionne que pour des données spécifiques à une lignée/âge précis, une consultation des guides techniques est recommandée
+
+Réponse professionnelle dans la langue de la question :"""
+
+        response = openai_complete(
+            prompt=fallback_prompt,
+            temperature=0.3,  # Légèrement créatif mais précis
+            max_tokens=400
+        )
+        
+        if response:
+            return {
+                "text": response,
+                "source": "openai_fallback",
+                "confidence": 0.75,  # Confiance modérée
+                "sources": [],
+                "meta": {
+                    "fallback_reason": "rag_insufficient",
+                    "entities_used": entities,
+                    "intent": intent.name if hasattr(intent, 'name') else str(intent),
+                    "rag_context_provided": bool(rag_context.strip())
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ OpenAI fallback échoué: {e}")
+        
+    return None
+
+# ---------------------------------------------------------------------------
+# PerfStore singletons & lookup - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 # ===== Import table-first PerfStore =====
@@ -441,7 +804,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
 
 
 # ---------------------------------------------------------------------------
-# RAG Retriever (code original conservé)
+# RAG Retriever - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 RAG_AVAILABLE = False
@@ -574,7 +937,49 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         }
 
 # ---------------------------------------------------------------------------
-# NETTOYAGE & SYNTHÈSE (code original conservé)
+# RAG avec fallback OpenAI - CODE ORIGINAL CONSERVÉ
+# ---------------------------------------------------------------------------
+
+def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Version améliorée de _rag_answer avec fallback OpenAI
+    """
+    # Essai RAG standard d'abord
+    rag_result = _rag_answer(question, k, entities)
+    
+    # Vérifier si fallback OpenAI nécessaire
+    intent = entities.get("_intent") if entities else None
+    
+    # Check si fallback activé via config
+    enable_fallback = str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on")
+    if not enable_fallback:
+        logger.debug("🚫 Fallback OpenAI désactivé par configuration")
+        return rag_result
+    
+    if _should_use_openai_fallback(rag_result, intent):
+        logger.info("🤖 Activation fallback OpenAI après échec RAG")
+        
+        # Tenter fallback OpenAI
+        openai_result = _generate_openai_fallback_response(
+            question=question,
+            entities=entities or {},
+            intent=intent,
+            rag_context=rag_result.get("text", "")
+        )
+        
+        if openai_result:
+            # Succès OpenAI - enrichir avec métadonnées RAG
+            openai_result["meta"]["rag_attempted"] = True
+            openai_result["meta"]["rag_route"] = rag_result.get("route")
+            openai_result["meta"]["rag_meta"] = rag_result.get("meta", {})
+            return openai_result
+        else:
+            logger.warning("⚠️ Fallback OpenAI échoué, retour au RAG original")
+    
+    return rag_result
+
+# ---------------------------------------------------------------------------
+# NETTOYAGE & SYNTHÈSE - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def _final_sanitize(text: str) -> str:
@@ -593,7 +998,7 @@ def _final_sanitize(text: str) -> str:
         text = re.sub(phrase, '', text, flags=re.IGNORECASE)
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
-    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s+|\s+
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
@@ -636,7 +1041,7 @@ Réponse synthétique :""".format(question=question, context=_final_sanitize(con
         logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
         return context_text
 
-# ===== Mode hybride (code original conservé) =====
+# ===== Mode hybride - CODE ORIGINAL CONSERVÉ =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     try:
         age_days = None
@@ -651,7 +1056,7 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
                     "sex": entities.get("sex") or "mixed",
                     "age_days": age_days}
         species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
-        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "–")
+        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
         sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte", "as_hatched": "Mixte"}
         sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
         age_label = f"{age_days} jours" if age_days is not None else "l'âge indiqué"
@@ -678,7 +1083,36 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
                 "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
 
 # ---------------------------------------------------------------------------
-# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE
+# Fonction de statut pour monitoring - CODE ORIGINAL CONSERVÉ
+# ---------------------------------------------------------------------------
+
+def get_fallback_status() -> Dict[str, Any]:
+    """
+    Retourne le statut du système de fallback OpenAI
+    """
+    status = {
+        "openai_fallback_available": OPENAI_FALLBACK_AVAILABLE,
+        "rag_available": RAG_AVAILABLE,
+        "perfstore_available": PERF_AVAILABLE,
+        "memory_available": MEMORY_AVAILABLE
+    }
+    
+    if OPENAI_FALLBACK_AVAILABLE:
+        try:
+            openai_status = get_openai_status()
+            status["openai_status"] = openai_status
+        except Exception as e:
+            status["openai_error"] = str(e)
+    
+    # Configuration fallback
+    status["fallback_enabled"] = str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on")
+    status["synthesis_enabled"] = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
+    status["auto_language_detection"] = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
+    
+    return status
+
+# ---------------------------------------------------------------------------
+# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -693,11 +1127,31 @@ def handle(
     entities: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE
+    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
         logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
+
+        # =================================================================
+        # NOUVEAU: DÉTECTION DE LANGUE AUTOMATIQUE
+        # =================================================================
+        auto_detection_enabled = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
+        
+        if auto_detection_enabled:
+            detected_language = _detect_question_language_openai(question)
+            logger.info(f"🌍 Langue détectée: {detected_language} | Paramètre lang: {lang}")
+            
+            # Utiliser la langue détectée si pas spécifiée explicitement ou si détection différente
+            if lang == "fr" and detected_language != "fr":
+                effective_language = detected_language
+                logger.info(f"🔄 Utilisation langue détectée: {effective_language}")
+            else:
+                effective_language = lang
+        else:
+            detected_language = lang
+            effective_language = lang
+            logger.info(f"🌍 Détection automatique désactivée, utilisation lang: {effective_language}")
 
         # =================================================================
         # NOUVEAU: Récupération du contexte conversationnel
@@ -760,7 +1214,7 @@ def handle(
             # NOUVEAU: Sauvegarder le contexte pour continuité
             _save_conversation_context(session_id, intent, entities, question, missing_fields)
             
-            return {
+            response = {
                 "type": "partial_answer",
                 "intent": intent,
                 "general_answer": general_answer,
@@ -770,6 +1224,9 @@ def handle(
                 "route_taken": "hybrid_synthesis_clarification",
                 "session_id": session_id
             }
+            
+            # NOUVEAU: Appliquer adaptation linguistique
+            return _finalize_response_with_language(response, question, effective_language, detected_language)
 
         # Étape 4: Calcul direct si possible (code original)
         def _should_compute(i: Intention) -> bool:
@@ -788,13 +1245,16 @@ def handle(
             # NOUVEAU: Effacer le contexte après réponse finale
             _clear_conversation_context(session_id)
             
-            return {
+            response = {
                 "type": "answer",
                 "intent": intent,
                 "answer": result,
                 "route_taken": "compute",
                 "session_id": session_id
             }
+            
+            # NOUVEAU: Appliquer adaptation linguistique
+            return _finalize_response_with_language(response, question, effective_language, detected_language)
 
         # Étape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
@@ -843,7 +1303,7 @@ def handle(
                     # NOUVEAU: Effacer le contexte après réponse finale réussie
                     _clear_conversation_context(session_id)
                     
-                    return {
+                    response = {
                         "type": "answer",
                         "intent": Intention.PerfTargets,
                         "answer": {
@@ -864,40 +1324,478 @@ def handle(
                         "route_taken": "perfstore_hit",
                         "session_id": session_id
                     }
+                    
+                    # NOUVEAU: Appliquer adaptation linguistique
+                    return _finalize_response_with_language(response, question, effective_language, detected_language)
                 else:
                     logger.info("📊 PerfStore MISS → fallback RAG")
             except Exception as e:
                 logger.warning(f"⚠️ Table-first lookup échoué: {e}")
                 # on continue vers RAG
 
-        # Étape 5: RAG complet via RAGRetriever avec filtres (code original)
-        logger.info("📚 RAG via RAGRetriever avec filtres")
-        rag = _rag_answer(question, k=5, entities=entities)
+        # Étape 5: RAG complet avec fallback OpenAI
+        logger.info("📚 RAG via RAGRetriever avec fallback OpenAI")
+        
+        # Passer l'intent dans les entities pour le fallback
+        entities_with_intent = dict(entities)
+        entities_with_intent["_intent"] = intent
+        
+        rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent)
         rag_text = _final_sanitize(rag.get("text", ""))
-        rag_text = _maybe_synthesize(question, rag_text)
+        
+        # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI
+        if rag.get("source") != "openai_fallback":
+            rag_text = _maybe_synthesize(question, rag_text)
 
         # NOUVEAU: Effacer le contexte après réponse finale (même si RAG)
         _clear_conversation_context(session_id)
 
-        return {
+        response = {
             "type": "answer",
             "intent": intent,
             "answer": {
                 "text": rag_text,
-                "source": "rag_retriever",
-                "confidence": 0.8,
+                "source": rag.get("source", "rag_retriever"),
+                "confidence": rag.get("confidence", 0.8),
                 "sources": rag.get("sources", []),
                 "meta": rag.get("meta", {})
             },
             "route_taken": rag.get("route", "rag_retriever"),
             "session_id": session_id
         }
+        
+        # NOUVEAU: Appliquer adaptation linguistique
+        return _finalize_response_with_language(response, question, effective_language, detected_language)
 
     except Exception as e:
         logger.exception(f"❌ Critical error in handle(): {e}")
-        return {
+        response = {
             "type": "error",
             "error": str(e),
             "message": "Une erreur inattendue s'est produite lors du traitement de votre question.",
             "session_id": session_id
         }
+        
+        # Même en cas d'erreur, essayer d'adapter la langue si possible
+        try:
+            detected_language = _detect_question_language_openai(question) if question else "fr"
+            effective_language = detected_language if detected_language != "fr" else "fr"
+            return _finalize_response_with_language(response, question or "", effective_language, detected_language)
+        except:
+            return response
+
+# ---------------------------------------------------------------------------
+# Fonction manquante _compute_answer (placeholder pour la compatibilité)
+# ---------------------------------------------------------------------------
+
+def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Placeholder pour les calculs directs (WaterFeedIntake, EquipmentSizing, etc.)
+    Cette fonction doit être implémentée selon vos besoins spécifiques.
+    """
+    logger.warning(f"⚠️ _compute_answer not implemented for intent: {intent}")
+    return {
+        "text": f"Calcul pour {intent} non encore implémenté.",
+        "source": "compute_placeholder",
+        "confidence": 0.1
+    }, '', text, flags=re.MULTILINE)
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        line = line.strip()
+        if len(line) > 10 or line.startswith(('##', '**', '-', '•')):
+            cleaned_lines.append(line)
+    return '\n'.join(cleaned_lines).strip()
+
+def _maybe_synthesize(question: str, context_text: str) -> str:
+    try:
+        if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
+            return context_text
+        try:
+            from ..utils.llm import complete
+        except ImportError:
+            try:
+                from ..utils.openai_utils import complete
+            except ImportError:
+                logger.warning("⚠️ Aucun wrapper LLM trouvé pour la synthèse")
+                return context_text
+        synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
+
+RÈGLES IMPORTANTES :
+- NE JAMAIS mentionner les sources dans ta réponse
+- NE JAMAIS inclure de fragments de texte brut des PDFs
+- NE JAMAIS copier-coller des tableaux mal formatés
+- Utiliser du Markdown (##, ###, -, **)
+- Si l'info est incertaine, donne une fourchette et dis-le
+- Réponse concise mais complète
+
+Question : {question}
+
+Informations à synthétiser :
+{context}
+
+Réponse synthétique :""".format(question=question, context=_final_sanitize(context_text)[:2000])
+        synthesized = complete(synthesis_prompt, temperature=0.2)
+        return _final_sanitize(synthesized) if synthesized else context_text
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
+        return context_text
+
+# ===== Mode hybride - CODE ORIGINAL CONSERVÉ =====
+def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
+    try:
+        age_days = None
+        if entities.get("age_days") is not None:
+            try: age_days = int(entities["age_days"])
+            except Exception: pass
+        elif entities.get("age_weeks") is not None:
+            try: age_days = int(entities["age_weeks"]) * 7
+            except Exception: pass
+        defaults = {"species": entities.get("species") or "broiler",
+                    "line": entities.get("line") or "ross308",
+                    "sex": entities.get("sex") or "mixed",
+                    "age_days": age_days}
+        species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
+        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
+        sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte", "as_hatched": "Mixte"}
+        sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
+        age_label = f"{age_days} jours" if age_days is not None else "l'âge indiqué"
+        header = f"Le **poids cible à {age_label}** dépend de la **lignée** et du **sexe**."
+        sub = "Pour te donner la valeur précise, j'ai besoin de confirmer ces points :"
+        q1 = "• **Espèce** : Poulet de chair (broiler) ?"
+        q2 = "• **Lignée** : Ross 308, Cobb 500 ou autre ?"
+        q3 = "• **Sexe** : Mâle, Femelle ou Mixte ?"
+        defaults_line = f"**Broiler · {line_label} · {sex_label}" + (f" · {age_days} jours**" if age_days is not None else "**")
+        cta = f"👉 Si tu veux aller plus vite, je peux répondre avec l'hypothèse par défaut suivante et tu corriges si besoin :\n{defaults_line}. **Tu valides ?**"
+        text = "\n".join([header, sub, "", q1, q2, q3, "", cta]).strip()
+        quick_replies = {
+            "species": ["broiler", "layer", "other"],
+            "line": ["ross308", "cobb500", "hubbard", "other"],
+            "sex": ["male", "female", "mixed"],
+            "one_click": defaults
+        }
+        return {"text": text, "source": "hybrid_ui", "confidence": 0.9,
+                "enriched": True, "suggested_defaults": defaults,
+                "quick_replies": quick_replies, "rag_meta": {}, "rag_sources": []}
+    except Exception as e:
+        logger.error(f"❌ Error generating hybrid UX answer: {e}")
+        return {"text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
+                "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
+
+# ---------------------------------------------------------------------------
+# Fonction de statut pour monitoring - CODE ORIGINAL CONSERVÉ
+# ---------------------------------------------------------------------------
+
+def get_fallback_status() -> Dict[str, Any]:
+    """
+    Retourne le statut du système de fallback OpenAI
+    """
+    status = {
+        "openai_fallback_available": OPENAI_FALLBACK_AVAILABLE,
+        "rag_available": RAG_AVAILABLE,
+        "perfstore_available": PERF_AVAILABLE,
+        "memory_available": MEMORY_AVAILABLE
+    }
+    
+    if OPENAI_FALLBACK_AVAILABLE:
+        try:
+            openai_status = get_openai_status()
+            status["openai_status"] = openai_status
+        except Exception as e:
+            status["openai_error"] = str(e)
+    
+    # Configuration fallback
+    status["fallback_enabled"] = str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on")
+    status["synthesis_enabled"] = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
+    status["auto_language_detection"] = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
+    
+    return status
+
+# ---------------------------------------------------------------------------
+# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE
+# ---------------------------------------------------------------------------
+
+def handle(
+    session_id: str,
+    question: str,
+    lang: str = "fr",
+    # Overrides & debug
+    debug: bool = False,
+    force_perfstore: bool = False,
+    intent_hint: Optional[str] = None,
+    # [PATCH] NEW: entities pass-through depuis l'API
+    entities: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL
+    """
+    try:
+        logger.info(f"🤖 Processing question: {question[:120]}...")
+        logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
+
+        # =================================================================
+        # NOUVEAU: DÉTECTION DE LANGUE AUTOMATIQUE
+        # =================================================================
+        auto_detection_enabled = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
+        
+        if auto_detection_enabled:
+            detected_language = _detect_question_language_openai(question)
+            logger.info(f"🌍 Langue détectée: {detected_language} | Paramètre lang: {lang}")
+            
+            # Utiliser la langue détectée si pas spécifiée explicitement ou si détection différente
+            if lang == "fr" and detected_language != "fr":
+                effective_language = detected_language
+                logger.info(f"🔄 Utilisation langue détectée: {effective_language}")
+            else:
+                effective_language = lang
+        else:
+            detected_language = lang
+            effective_language = lang
+            logger.info(f"🌍 Détection automatique désactivée, utilisation lang: {effective_language}")
+
+        # =================================================================
+        # NOUVEAU: Récupération du contexte conversationnel
+        # =================================================================
+        memory = _get_conversation_memory()
+        session_context = memory.get(session_id) or {}
+        logger.info(f"🧠 Contexte de session: {session_context}")
+
+        # Étape 1: Classification
+        classification = classify(question)
+        logger.debug(f"Classification: {classification}")
+
+        # Étape 2: Normalisation
+        classification = normalize(classification)
+        intent: Intention = classification["intent"]
+
+        # Fusion des entities (NER + overrides + contexte conversationnel)
+        _ents = dict(classification.get("entities") or {})
+        if entities:
+            try: _ents.update(entities)
+            except Exception: pass
+        
+        # NOUVEAU: Vérifier si on continue une conversation
+        if _should_continue_conversation(session_context, intent):
+            logger.info("🔗 Continuation de conversation détectée")
+            # Fusionner avec le contexte précédent et enrichir automatiquement
+            _ents = _merge_conversation_context(_ents, session_context, question)
+            # Forcer l'intention vers PerfTargets si c'était en attente
+            if session_context.get("pending_intent") == "PerfTargets":
+                intent = Intention.PerfTargets
+                logger.info("🎯 Intention forcée vers PerfTargets par contexte conversationnel")
+        
+        entities = _ents
+
+        # [PATCH] – Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
+        entities["sex"] = _canon_sex(entities.get("sex")) or entities.get("sex")
+
+        # Hint manuel (tests console)
+        if intent_hint and str(intent_hint).lower().startswith("perf"):
+            intent = Intention.PerfTargets
+
+        logger.info(f"Intent: {intent}, Entities keys: {list(entities.keys())}")
+
+        # Étape 3: Vérification de complétude
+        completeness = compute_completeness(intent, entities)
+        completeness_score = completeness["completeness_score"]
+        missing_fields = completeness["missing_fields"]
+        logger.info(f"Completeness score: {completeness_score} | Missing: {missing_fields}")
+
+        # NOUVEAU: Si conversation continue et complète maintenant, aller directement au traitement
+        if _should_continue_conversation(session_context, intent) and completeness_score >= 0.8:
+            logger.info("🚀 Conversation continue avec données complètes → traitement direct")
+            # Effacer le contexte car on va donner la réponse finale
+            _clear_conversation_context(session_id)
+        # HYBRIDE : si infos manquantes → synthèse courte + clarifications
+        elif missing_fields and completeness_score < 0.8:
+            logger.info("🧭 Mode hybride: synthèse courte + questions de précision")
+            general_answer = _generate_general_answer_with_specifics(question, entities, intent, missing_fields)
+            
+            # NOUVEAU: Sauvegarder le contexte pour continuité
+            _save_conversation_context(session_id, intent, entities, question, missing_fields)
+            
+            response = {
+                "type": "partial_answer",
+                "intent": intent,
+                "general_answer": general_answer,
+                "completeness_score": completeness_score,
+                "missing_fields": missing_fields,
+                "follow_up_questions": completeness["follow_up_questions"],
+                "route_taken": "hybrid_synthesis_clarification",
+                "session_id": session_id
+            }
+            
+            # NOUVEAU: Appliquer adaptation linguistique
+            return _finalize_response_with_language(response, question, effective_language, detected_language)
+
+        # Étape 4: Calcul direct si possible (code original)
+        def _should_compute(i: Intention) -> bool:
+            return i in {
+                Intention.WaterFeedIntake,
+                Intention.EquipmentSizing,
+                Intention.VentilationSizing,
+                Intention.EnvSetpoints,
+                Intention.Economics
+            }
+        if _should_compute(intent):
+            logger.info(f"🧮 Calcul direct pour intent: {intent}")
+            result = _compute_answer(intent, entities)  # défini ailleurs dans le projet
+            result["text"] = _final_sanitize(result.get("text", ""))
+            
+            # NOUVEAU: Effacer le contexte après réponse finale
+            _clear_conversation_context(session_id)
+            
+            response = {
+                "type": "answer",
+                "intent": intent,
+                "answer": result,
+                "route_taken": "compute",
+                "session_id": session_id
+            }
+            
+            # NOUVEAU: Appliquer adaptation linguistique
+            return _finalize_response_with_language(response, question, effective_language, detected_language)
+
+        # Étape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
+        if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
+            logger.info("📊 Table-first (PerfTargets) avant RAG")
+            try:
+                norm = _normalize_entities_soft(entities)
+                if norm.get("age_days") is None:
+                    age_guess = _extract_age_days_from_text(question)
+                    if age_guess is not None:
+                        norm["age_days"] = age_guess
+
+                store = _get_perf_store(norm["species"])  # singleton
+                rec = None
+                dbg = None
+                if store:
+                    rec, dbg = _perf_lookup_exact_or_nearest(store, norm, question=question)
+
+                if rec:
+                    line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
+                    sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}
+                    sex_label = sex_map.get(str(rec.get("sex","")).lower(), rec.get("sex",""))
+                    unit_label = (rec.get("unit") or norm["unit"] or "metric").lower()
+                    v_g, v_lb = rec.get("weight_g"), rec.get("weight_lb")
+                    if v_g is not None:
+                        try: val_txt = f"**{float(v_g):.0f} g**"
+                        except Exception: val_txt = f"**{v_g} g**"
+                    elif v_lb is not None:
+                        try: val_txt = f"**{float(v_lb):.2f} lb**"
+                        except Exception: val_txt = f"**{v_lb} lb**"
+                    else:
+                        val_txt = "**n/a**"
+                    age_disp = int(rec.get("age_days") or norm.get("age_days") or 0)
+                    text = f"{line_label} · {sex_label} · {age_disp} j : {val_txt} (objectif {unit_label})."
+                    source_item: List[Dict[str, Any]] = []
+                    if rec.get("source_doc"):
+                        source_item.append({
+                            "name": rec["source_doc"],
+                            "meta": {
+                                "page": rec.get("page"),
+                                "line": rec.get("line"),
+                                "sex": rec.get("sex"),
+                                "unit": rec.get("unit")
+                            }
+                        })
+                    
+                    # NOUVEAU: Effacer le contexte après réponse finale réussie
+                    _clear_conversation_context(session_id)
+                    
+                    response = {
+                        "type": "answer",
+                        "intent": Intention.PerfTargets,
+                        "answer": {
+                            "text": text,
+                            "source": "table_lookup",
+                            "confidence": 0.98,
+                            "sources": source_item,
+                            "meta": {
+                                "lookup": {
+                                    "line": rec.get("line"),
+                                    "sex": rec.get("sex"),
+                                    "unit": rec.get("unit"),
+                                    "age_days": age_disp
+                                },
+                                "perf_debug": dbg
+                            }
+                        },
+                        "route_taken": "perfstore_hit",
+                        "session_id": session_id
+                    }
+                    
+                    # NOUVEAU: Appliquer adaptation linguistique
+                    return _finalize_response_with_language(response, question, effective_language, detected_language)
+                else:
+                    logger.info("📊 PerfStore MISS → fallback RAG")
+            except Exception as e:
+                logger.warning(f"⚠️ Table-first lookup échoué: {e}")
+                # on continue vers RAG
+
+        # Étape 5: RAG complet avec fallback OpenAI
+        logger.info("📚 RAG via RAGRetriever avec fallback OpenAI")
+        
+        # Passer l'intent dans les entities pour le fallback
+        entities_with_intent = dict(entities)
+        entities_with_intent["_intent"] = intent
+        
+        rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent)
+        rag_text = _final_sanitize(rag.get("text", ""))
+        
+        # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI
+        if rag.get("source") != "openai_fallback":
+            rag_text = _maybe_synthesize(question, rag_text)
+
+        # NOUVEAU: Effacer le contexte après réponse finale (même si RAG)
+        _clear_conversation_context(session_id)
+
+        response = {
+            "type": "answer",
+            "intent": intent,
+            "answer": {
+                "text": rag_text,
+                "source": rag.get("source", "rag_retriever"),
+                "confidence": rag.get("confidence", 0.8),
+                "sources": rag.get("sources", []),
+                "meta": rag.get("meta", {})
+            },
+            "route_taken": rag.get("route", "rag_retriever"),
+            "session_id": session_id
+        }
+        
+        # NOUVEAU: Appliquer adaptation linguistique
+        return _finalize_response_with_language(response, question, effective_language, detected_language)
+
+    except Exception as e:
+        logger.exception(f"❌ Critical error in handle(): {e}")
+        response = {
+            "type": "error",
+            "error": str(e),
+            "message": "Une erreur inattendue s'est produite lors du traitement de votre question.",
+            "session_id": session_id
+        }
+        
+        # Même en cas d'erreur, essayer d'adapter la langue si possible
+        try:
+            detected_language = _detect_question_language_openai(question) if question else "fr"
+            effective_language = detected_language if detected_language != "fr" else "fr"
+            return _finalize_response_with_language(response, question or "", effective_language, detected_language)
+        except:
+            return response
+
+# ---------------------------------------------------------------------------
+# Fonction manquante _compute_answer (placeholder pour la compatibilité)
+# ---------------------------------------------------------------------------
+
+def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Placeholder pour les calculs directs (WaterFeedIntake, EquipmentSizing, etc.)
+    Cette fonction doit être implémentée selon vos besoins spécifiques.
+    """
+    logger.warning(f"⚠️ _compute_answer not implemented for intent: {intent}")
+    return {
+        "text": f"Calcul pour {intent} non encore implémenté.",
+        "source": "compute_placeholder",
+        "confidence": 0.1
+    }

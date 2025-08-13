@@ -1,11 +1,8 @@
-# app/main.py - VERSION 3 RAG COMPLETS - CORRIGÉ AVEC AUTH + MONITORING COMPLET
+# app/main.py - VERSION 3 RAG COMPLETS - CORRIGÉ AVEC AUTH
 from __future__ import annotations
 
 import os
 import logging
-import time
-import asyncio
-import psutil
 from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Any, Optional, Dict, List
@@ -31,50 +28,7 @@ if synthesis_enabled:
 else:
     logger.info("ℹ️ Synthèse LLM désactivée (ENABLE_SYNTH_PROMPT=0)")
 
-# ========== VARIABLES GLOBALES DE MONITORING ==========
-request_counter = 0
-error_counter = 0
-start_time = time.time()
-active_requests = 0
-
-# ========== FONCTION DE MONITORING PÉRIODIQUE ==========
-async def periodic_monitoring():
-    """Monitoring périodique des performances serveur"""
-    while True:
-        try:
-            await asyncio.sleep(300)  # Toutes les 5 minutes
-            
-            # Calcul des métriques
-            current_time = time.time()
-            uptime_hours = (current_time - start_time) / 3600
-            requests_per_minute = request_counter / (uptime_hours * 60) if uptime_hours > 0 else 0
-            error_rate_percent = (error_counter / max(request_counter, 1)) * 100
-            
-            # Métriques système
-            cpu_percent = psutil.cpu_percent(interval=1)
-            memory = psutil.virtual_memory()
-            memory_percent = memory.percent
-            
-            # Log des métriques serveur
-            try:
-                from app.api.v1.logging import log_server_performance
-                log_server_performance(
-                    active_requests=active_requests,
-                    avg_response_time=250,  # À calculer réellement si nécessaire
-                    requests_per_minute=requests_per_minute,
-                    error_rate=error_rate_percent
-                )
-            except Exception as e:
-                logger.warning(f"⚠️ Erreur logging métriques: {e}")
-                
-            logger.info(f"📊 Métriques: {requests_per_minute:.1f} req/min, "
-                       f"erreurs: {error_rate_percent:.1f}%, "
-                       f"CPU: {cpu_percent:.1f}%, RAM: {memory_percent:.1f}%")
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur monitoring périodique: {e}")
-            await asyncio.sleep(60)  # Retry dans 1 minute en cas d'erreur
-
+ 
 # -------------------------------------------------------------------
 # FONCTION RAG COMPLÈTE - 3 RAG
 # -------------------------------------------------------------------
@@ -88,48 +42,11 @@ def get_rag_paths() -> Dict[str, str]:
     }
 
 # -------------------------------------------------------------------
-# Lifespan: init Supabase + 3 RAG COMPLETS + MONITORING
+# Lifespan: init Supabase + 3 RAG COMPLETS
 # -------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ========== INITIALISATION AU DÉMARRAGE ==========
-    logger.info("🚀 Démarrage de l'application Expert API avec système complet")
-    
-    # Initialisation des services de facturation et analytics
-    try:
-        logger.info("📊 Initialisation des services analytics et facturation...")
-        
-        # Vérifier la base de données
-        database_url = os.getenv("DATABASE_URL")
-        if database_url:
-            logger.info("✅ DATABASE_URL configurée")
-            
-            # Initialiser les services
-            from app.api.v1.logging import get_analytics
-            from app.api.v1.billing import get_billing_manager
-            
-            analytics = get_analytics()
-            billing = get_billing_manager()
-            logger.info("✅ Services analytics et facturation initialisés")
-            
-            # Nettoyer les anciennes sessions (plus de 7 jours)
-            try:
-                from app.api.v1.pipeline.postgres_memory import PostgresMemory
-                memory = PostgresMemory()
-                cleaned = memory.cleanup_old_sessions(days_old=7)
-                if cleaned > 0:
-                    logger.info(f"🧹 {cleaned} anciennes sessions nettoyées")
-            except Exception as e:
-                logger.warning(f"⚠️ Nettoyage sessions échoué: {e}")
-                
-        else:
-            logger.warning("⚠️ DATABASE_URL manquante - services analytics désactivés")
-            
-    except Exception as e:
-        logger.error(f"❌ Erreur initialisation services: {e}")
-        # Ne pas empêcher le démarrage
-    
-    # Initialisation Supabase (CONSERVÉ)
+    # Supabase (optionnel)
     app.state.supabase = None
     try:
         from supabase import create_client
@@ -142,7 +59,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("ℹ️ Supabase indisponible: %s", e)
 
-    # 🚀 CHARGEMENT DES 3 RAG (CONSERVÉ INTÉGRALEMENT)
+    # 🚀 CHARGEMENT DES 3 RAG
     app.state.rag = None
     app.state.rag_broiler = None
     app.state.rag_layer = None
@@ -151,7 +68,7 @@ async def lifespan(app: FastAPI):
         from rag.embedder import FastRAGEmbedder
 
         rag_paths = get_rag_paths()
-        logger.info(f"🔍 Chargement des 3 RAG: {list(rag_paths.keys())}")
+        logger.info(f"📁 Chargement des 3 RAG: {list(rag_paths.keys())}")
 
         # Variables d'environnement (override si définies)
         env_override = {
@@ -186,7 +103,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 GLOBAL
         global_path = rag_paths["global"]
-        logger.info(f"🔍 Chargement RAG Global: {global_path}")
+        logger.info(f"📁 Chargement RAG Global: {global_path}")
         if os.path.exists(global_path):
             global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
@@ -199,7 +116,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 BROILER
         broiler_path = rag_paths["broiler"]
-        logger.info(f"🔍 Chargement RAG Broiler: {broiler_path}")
+        logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
         if os.path.exists(broiler_path):
             try:
                 broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -215,7 +132,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 LAYER
         layer_path = rag_paths["layer"]
-        logger.info(f"🔍 Chargement RAG Layer: {layer_path}")
+        logger.info(f"📁 Chargement RAG Layer: {layer_path}")
         if os.path.exists(layer_path):
             try:
                 layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -250,33 +167,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("❌ Erreur critique initialisation RAG: %s", e)
 
-    # ========== DÉMARRAGE DU MONITORING PÉRIODIQUE ==========
-    monitoring_task = None
-    try:
-        monitoring_task = asyncio.create_task(periodic_monitoring())
-        logger.info("📊 Monitoring périodique démarré")
-    except Exception as e:
-        logger.error(f"❌ Erreur démarrage monitoring: {e}")
-
-    # ========== L'APPLICATION DÉMARRE ==========
-    logger.info("🎯 Application Expert API prête avec système complet")
-    yield  # --- L'application fonctionne ---
-
-    # ========== NETTOYAGE À L'ARRÊT ==========
-    logger.info("🛑 Arrêt de l'application Expert API")
-    
-    # Arrêter le monitoring
-    if monitoring_task:
-        try:
-            monitoring_task.cancel()
-            logger.info("📊 Monitoring périodique arrêté")
-        except Exception as e:
-            logger.error(f"❌ Erreur arrêt monitoring: {e}")
-    
-    # Statistiques finales
-    uptime_hours = (time.time() - start_time) / 3600
-    logger.info(f"📈 Statistiques finales: {request_counter} requêtes en {uptime_hours:.1f}h, "
-               f"{error_counter} erreurs ({(error_counter/max(request_counter,1)*100):.1f}%)")
+    yield  # --- shutdown
 
 # -------------------------------------------------------------------
 # FastAPI
@@ -290,40 +181,6 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
-
-# =============================================================================
-# MIDDLEWARE DE MONITORING DES REQUÊTES
-# =============================================================================
-@app.middleware("http")
-async def monitoring_middleware(request: Request, call_next):
-    """Middleware pour tracker les performances en temps réel"""
-    global request_counter, error_counter, active_requests
-    
-    start_time_req = time.time()
-    active_requests += 1
-    request_counter += 1
-    
-    try:
-        response = await call_next(request)
-        
-        # Tracker les erreurs
-        if response.status_code >= 400:
-            error_counter += 1
-            
-        return response
-        
-    except Exception as e:
-        error_counter += 1
-        logger.error(f"❌ Erreur dans middleware monitoring: {e}")
-        raise
-        
-    finally:
-        active_requests -= 1
-        processing_time = (time.time() - start_time_req) * 1000
-        
-        # Log des requêtes lentes
-        if processing_time > 5000:  # Plus de 5 secondes
-            logger.warning(f"🐌 Requête lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
 
 # =============================================================================
 # CORS MIDDLEWARE
@@ -395,7 +252,7 @@ async def options_handler(request: Request, full_path: str):
         raise HTTPException(status_code=403, detail="Origin not allowed")
 
 # -------------------------------------------------------------------
-# Montage des routers - CORRIGÉ avec Billing
+# Montage des routers - CORRIGÉ
 # -------------------------------------------------------------------
 # 🔧 CREATION D'UN ROUTER V1 TEMPORAIRE SI LE FICHIER __init__.py EST VIDE
 try:
@@ -466,13 +323,6 @@ except ImportError as e:
         logger.info("✅ Conversations router ajouté")
     except ImportError as e:
         logger.warning(f"⚠️ Conversations router non disponible: {e}")
-    
-    try:
-        from app.api.v1.billing import router as billing_router
-        temp_v1_router.include_router(billing_router, tags=["billing"])
-        logger.info("✅ Billing router ajouté")
-    except ImportError as e:
-        logger.warning(f"⚠️ Billing router non disponible: {e}")
     
     # Monter le router temporaire
     app.include_router(temp_v1_router)
@@ -654,102 +504,6 @@ async def test_rag_access():
 
     return results
 
-# ========== NOUVEAU ENDPOINT DE SANTÉ SYSTÈME ==========
-@app.get("/health/complete", tags=["Health"])
-async def complete_health_check():
-    """🏥 Check de santé complet du système"""
-    try:
-        health_status = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "status": "healthy",
-            "components": {}
-        }
-        
-        # Check base de données
-        try:
-            from app.api.v1.logging import get_analytics
-            analytics = get_analytics()
-            health_status["components"]["database"] = {
-                "status": "healthy",
-                "type": "postgresql"
-            }
-        except Exception as e:
-            health_status["components"]["database"] = {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-            health_status["status"] = "degraded"
-        
-        # Check RAG
-        total_rags = sum(1 for rag in [
-            getattr(app.state, "rag", None),
-            getattr(app.state, "rag_broiler", None), 
-            getattr(app.state, "rag_layer", None)
-        ] if rag and hasattr(rag, 'has_search_engine') and rag.has_search_engine())
-        
-        health_status["components"]["rag"] = {
-            "status": "healthy" if total_rags >= 2 else "degraded" if total_rags >= 1 else "unhealthy",
-            "loaded_rags": total_rags,
-            "total_rags": 3
-        }
-        
-        # Check OpenAI (si configuré)
-        openai_key = os.getenv("OPENAI_API_KEY")
-        health_status["components"]["openai"] = {
-            "status": "configured" if openai_key else "not_configured"
-        }
-        
-        # Métriques système
-        uptime_hours = (time.time() - start_time) / 3600
-        health_status["metrics"] = {
-            "uptime_hours": round(uptime_hours, 2),
-            "total_requests": request_counter,
-            "error_rate_percent": round((error_counter / max(request_counter, 1)) * 100, 2),
-            "active_requests": active_requests
-        }
-        
-        # Déterminer le statut global
-        component_statuses = [comp["status"] for comp in health_status["components"].values() 
-                            if comp["status"] in ["healthy", "degraded", "unhealthy"]]
-        
-        if any(status == "unhealthy" for status in component_statuses):
-            health_status["status"] = "unhealthy"
-        elif any(status == "degraded" for status in component_statuses):
-            health_status["status"] = "degraded"
-        
-        return health_status
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur health check: {e}")
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/metrics", tags=["Monitoring"])
-async def system_metrics():
-    """📊 Métriques système pour monitoring externe"""
-    try:
-        uptime_seconds = time.time() - start_time
-        
-        return {
-            "uptime_seconds": uptime_seconds,
-            "requests_total": request_counter,
-            "errors_total": error_counter,
-            "requests_active": active_requests,
-            "error_rate": (error_counter / max(request_counter, 1)) * 100,
-            "requests_per_second": request_counter / max(uptime_seconds, 1),
-            "rag_status": {
-                "global": bool(getattr(app.state, "rag", None)),
-                "broiler": bool(getattr(app.state, "rag_broiler", None)),
-                "layer": bool(getattr(app.state, "rag_layer", None))
-            },
-            "synthesis_enabled": synthesis_enabled
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
 @app.get("/cors-test", tags=["Debug"])
 async def cors_test(request: Request):
     return {
@@ -774,29 +528,15 @@ async def root():
         else:
             return f"partial_{total_rags}_rags"
 
-    # Calculer l'uptime
-    uptime_hours = (time.time() - start_time) / 3600
-    
     return {
         "status": "running",
         "version": "3.5.5",
         "environment": os.getenv("ENV", "production"),
         "database": bool(getattr(app.state, "supabase", None)),
-        "postgresql": bool(os.getenv("DATABASE_URL")),
         "rag": rag_status(),
         "synthesis_enabled": synthesis_enabled,
         "cors_fix": "applied",
-        "optimization": "three_rag_system_enabled",
-        "new_features": {
-            "billing_system": True,
-            "analytics_tracking": True,
-            "quota_enforcement": True,
-            "multilingual_support": True,
-            "openai_fallback": True,
-            "performance_monitoring": True
-        },
-        "uptime_hours": round(uptime_hours, 2),
-        "requests_processed": request_counter
+        "optimization": "three_rag_system_enabled"
     }
 
 # Exception handlers (INCHANGÉS)
