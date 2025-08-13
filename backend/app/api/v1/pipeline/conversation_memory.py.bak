@@ -42,12 +42,9 @@ _CONVERSATION_MEMORY = None
 _AGE_PATTERNS = [
     r"\b(?:âge|age)\s*[:=]?\s*(\d{1,2})\s*(?:j|jours|d|days)\b",  # âge: 21 jours / age=21d
     r"\b(?:J|D)\s*?(\d{1,2})\b",                                 # J21 / D21
-    r"\b(?:day|jour)\s+(\d{1,2})\b",                             # day 21 / jour 14 (corrigé)
-    r"\bjour\s+(\d{1,2})\b",                                     # jour 14 (pattern spécifique)
-    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                       # 21 j / 21d
-    r"\bage_days\s*[:=]\s*(\d{1,2})\b",                          # age_days=21
-    r"\bJ(\d{1,2})\b",                                           # J14, J21
-    r"\bD(\d{1,2})\b",                                           # D14, D21
+    r"\b(?:day|jour)\s*(\d{1,2})\b",                              # day 21 / jour 21
+    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                        # 21 j / 21d
+    r"\bage_days\s*[:=]\s*(\d{1,2})\b",                           # age_days=21
 ]
 
 def extract_age_days_from_text(text: str) -> Optional[int]:
