@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
+Dialogue orchestration - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE
 - classify -> normalize -> completeness/clarifications
 - Route vers compute (si possible) OU table-first (perf targets) OU RAGRetriever
+- NOUVEAU: Intégration postgres_memory pour continuité de session
 """
 
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 import os
 import re
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,40 @@ from ..utils.question_classifier import classify, Intention
 from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
+
+# ========== MÉMOIRE CONVERSATIONNELLE ==========
+try:
+    from .postgres_memory import PostgresMemory
+    MEMORY_AVAILABLE = True
+    logger.info("✅ PostgresMemory importé pour la mémoire conversationnelle")
+except ImportError as e:
+    logger.warning(f"⚠️ PostgresMemory indisponible: {e}")
+    MEMORY_AVAILABLE = False
+    # Fallback en mémoire simple
+    class MemoryFallback:
+        def __init__(self): self.store = {}
+        def get(self, session_id): return self.store.get(session_id, {})
+        def update(self, session_id, context): self.store[session_id] = context
+        def clear(self, session_id): self.store.pop(session_id, None)
+    PostgresMemory = MemoryFallback
+
+# Singleton mémoire conversationnelle
+_CONVERSATION_MEMORY = None
+
+def _get_conversation_memory():
+    """Retourne le singleton de mémoire conversationnelle"""
+    global _CONVERSATION_MEMORY
+    if _CONVERSATION_MEMORY is None:
+        try:
+            if MEMORY_AVAILABLE:
+                _CONVERSATION_MEMORY = PostgresMemory(dsn=os.getenv("DATABASE_URL"))
+            else:
+                _CONVERSATION_MEMORY = PostgresMemory()  # Fallback
+            logger.info("🧠 Mémoire conversationnelle initialisée")
+        except Exception as e:
+            logger.error(f"❌ Erreur initialisation mémoire: {e}")
+            _CONVERSATION_MEMORY = PostgresMemory()  # Fallback simple
+    return _CONVERSATION_MEMORY
 
 # ---------------------------------------------------------------------------
 # Helpers PerfTargets (dédupliqués)
@@ -54,7 +90,27 @@ def _normalize_sex_from_text(text: str) -> Optional[str]:
         return "female"
     return None
 
-# [PATCH] — Canonisation tolérante du sexe pour NER/PerfStore/RAG
+def _extract_line_from_text(text: str) -> Optional[str]:
+    """Extraction de lignée depuis le texte"""
+    t = (text or "").lower()
+    if any(k in t for k in ["cobb", "cobb500", "cobb 500", "cobb-500"]):
+        return "cobb500"
+    if any(k in t for k in ["ross", "ross308", "ross 308", "ross-308"]):
+        return "ross308"
+    if any(k in t for k in ["hubbard"]):
+        return "hubbard"
+    return None
+
+def _extract_species_from_text(text: str) -> Optional[str]:
+    """Extraction d'espèce depuis le texte"""
+    t = (text or "").lower()
+    if any(k in t for k in ["broiler", "poulet de chair", "chair"]):
+        return "broiler"
+    if any(k in t for k in ["layer", "pondeuse", "ponte"]):
+        return "layer"
+    return None
+
+# [PATCH] – Canonisation tolérante du sexe pour NER/PerfStore/RAG
 def _canon_sex(s: Optional[str]) -> Optional[str]:
     if not s:
         return None
@@ -86,7 +142,7 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
         "mixte":"as_hatched","as hatched":"as_hatched","as_hatched":"as_hatched","mixed":"as_hatched"
     }
     sex = sex_map.get(sex_raw) or "as_hatched"
-    # [PATCH] — canonise la valeur normalisée
+    # [PATCH] – canonise la valeur normalisée
     sex = _canon_sex(sex) or sex
 
     age_days = entities.get("age_days")
@@ -100,6 +156,85 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     if unit not in ("metric","imperial"): unit = "metric"
 
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
+
+# ---------------------------------------------------------------------------
+# NOUVEAU: Gestion du contexte conversationnel
+# ---------------------------------------------------------------------------
+
+def _merge_conversation_context(current_entities: Dict[str, Any], session_context: Dict[str, Any], question: str) -> Dict[str, Any]:
+    """
+    Fusionne le contexte de session avec les entités actuelles.
+    Enrichit automatiquement depuis le texte de la question.
+    """
+    merged = dict(session_context.get("entities", {}))
+    
+    # Enrichissement automatique depuis le texte
+    auto_species = _extract_species_from_text(question)
+    auto_line = _extract_line_from_text(question) 
+    auto_sex = _normalize_sex_from_text(question)
+    auto_age = _extract_age_days_from_text(question)
+    
+    if auto_species: merged["species"] = auto_species
+    if auto_line: merged["line"] = auto_line
+    if auto_sex: merged["sex"] = auto_sex
+    if auto_age: merged["age_days"] = auto_age
+    
+    # Fusion avec entités détectées (priorité aux nouvelles)
+    merged.update(current_entities)
+    
+    logger.info(f"🔗 Contexte fusionné: session={session_context.get('entities', {})} + auto={{'species':{auto_species}, 'line':{auto_line}, 'sex':{auto_sex}, 'age':{auto_age}}} + current={current_entities} → {merged}")
+    
+    return merged
+
+def _should_continue_conversation(session_context: Dict[str, Any], current_intent: Intention) -> bool:
+    """
+    Détermine si la question actuelle continue une conversation précédente
+    """
+    if not session_context:
+        return False
+        
+    # Vérifier si il y a une intention en attente
+    pending_intent = session_context.get("pending_intent")
+    last_timestamp = session_context.get("timestamp", 0)
+    
+    # Expiration du contexte après 10 minutes
+    if time.time() - last_timestamp > 600:
+        return False
+        
+    # Continuer si même intention ou intention ambiguë avec contexte PerfTargets
+    if pending_intent == "PerfTargets":
+        return current_intent in [Intention.PerfTargets, Intention.AmbiguousGeneral]
+        
+    return False
+
+def _save_conversation_context(session_id: str, intent: Intention, entities: Dict[str, Any], question: str, missing_fields: List[str]):
+    """
+    Sauvegarde le contexte conversationnel pour continuité
+    """
+    try:
+        memory = _get_conversation_memory()
+        context = {
+            "pending_intent": intent.name if hasattr(intent, 'name') else str(intent),
+            "entities": entities,
+            "question": question,
+            "missing_fields": missing_fields,
+            "timestamp": time.time()
+        }
+        memory.update(session_id, context)
+        logger.info(f"💾 Contexte sauvegardé pour session {session_id}")
+    except Exception as e:
+        logger.error(f"❌ Erreur sauvegarde contexte: {e}")
+
+def _clear_conversation_context(session_id: str):
+    """
+    Efface le contexte conversationnel après réponse complète
+    """
+    try:
+        memory = _get_conversation_memory()
+        memory.clear(session_id)
+        logger.info(f"🧹 Contexte effacé pour session {session_id}")
+    except Exception as e:
+        logger.error(f"❌ Erreur effacement contexte: {e}")
 
 # ---------------------------------------------------------------------------
 # PerfStore singletons & lookup (code original conservé, unifié)
@@ -509,7 +644,7 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
                     "sex": entities.get("sex") or "mixed",
                     "age_days": age_days}
         species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
-        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
+        line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "–")
         sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte", "as_hatched": "Mixte"}
         sex_label = sex_map.get(str(defaults["sex"]).lower(), "Mixte")
         age_label = f"{age_days} jours" if age_days is not None else "l'âge indiqué"
@@ -536,7 +671,7 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
                 "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
 
 # ---------------------------------------------------------------------------
-# Entrée principale
+# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -547,15 +682,22 @@ def handle(
     debug: bool = False,
     force_perfstore: bool = False,
     intent_hint: Optional[str] = None,
-    # [PATCH] NEW: entities pass-through depuis l’API
+    # [PATCH] NEW: entities pass-through depuis l'API
     entities: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION HYBRIDE (RAGRetriever direct + TABLE-FIRST)
+    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
         logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
+
+        # =================================================================
+        # NOUVEAU: Récupération du contexte conversationnel
+        # =================================================================
+        memory = _get_conversation_memory()
+        session_context = memory.get(session_id) or {}
+        logger.info(f"🧠 Contexte de session: {session_context}")
 
         # Étape 1: Classification
         classification = classify(question)
@@ -565,14 +707,25 @@ def handle(
         classification = normalize(classification)
         intent: Intention = classification["intent"]
 
-        # Fusion des entities (NER + overrides)
+        # Fusion des entities (NER + overrides + contexte conversationnel)
         _ents = dict(classification.get("entities") or {})
         if entities:
             try: _ents.update(entities)
             except Exception: pass
+        
+        # NOUVEAU: Vérifier si on continue une conversation
+        if _should_continue_conversation(session_context, intent):
+            logger.info("🔗 Continuation de conversation détectée")
+            # Fusionner avec le contexte précédent et enrichir automatiquement
+            _ents = _merge_conversation_context(_ents, session_context, question)
+            # Forcer l'intention vers PerfTargets si c'était en attente
+            if session_context.get("pending_intent") == "PerfTargets":
+                intent = Intention.PerfTargets
+                logger.info("🎯 Intention forcée vers PerfTargets par contexte conversationnel")
+        
         entities = _ents
 
-        # [PATCH] — Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
+        # [PATCH] – Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
         entities["sex"] = _canon_sex(entities.get("sex")) or entities.get("sex")
 
         # Hint manuel (tests console)
@@ -587,10 +740,19 @@ def handle(
         missing_fields = completeness["missing_fields"]
         logger.info(f"Completeness score: {completeness_score} | Missing: {missing_fields}")
 
+        # NOUVEAU: Si conversation continue et complète maintenant, aller directement au traitement
+        if _should_continue_conversation(session_context, intent) and completeness_score >= 0.8:
+            logger.info("🚀 Conversation continue avec données complètes → traitement direct")
+            # Effacer le contexte car on va donner la réponse finale
+            _clear_conversation_context(session_id)
         # HYBRIDE : si infos manquantes → synthèse courte + clarifications
-        if missing_fields and completeness_score < 0.8:
+        elif missing_fields and completeness_score < 0.8:
             logger.info("🧭 Mode hybride: synthèse courte + questions de précision")
             general_answer = _generate_general_answer_with_specifics(question, entities, intent, missing_fields)
+            
+            # NOUVEAU: Sauvegarder le contexte pour continuité
+            _save_conversation_context(session_id, intent, entities, question, missing_fields)
+            
             return {
                 "type": "partial_answer",
                 "intent": intent,
@@ -615,6 +777,10 @@ def handle(
             logger.info(f"🧮 Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)  # défini ailleurs dans le projet
             result["text"] = _final_sanitize(result.get("text", ""))
+            
+            # NOUVEAU: Effacer le contexte après réponse finale
+            _clear_conversation_context(session_id)
+            
             return {
                 "type": "answer",
                 "intent": intent,
@@ -666,6 +832,10 @@ def handle(
                                 "unit": rec.get("unit")
                             }
                         })
+                    
+                    # NOUVEAU: Effacer le contexte après réponse finale réussie
+                    _clear_conversation_context(session_id)
+                    
                     return {
                         "type": "answer",
                         "intent": Intention.PerfTargets,
@@ -698,6 +868,9 @@ def handle(
         rag = _rag_answer(question, k=5, entities=entities)
         rag_text = _final_sanitize(rag.get("text", ""))
         rag_text = _maybe_synthesize(question, rag_text)
+
+        # NOUVEAU: Effacer le contexte après réponse finale (même si RAG)
+        _clear_conversation_context(session_id)
 
         return {
             "type": "answer",
