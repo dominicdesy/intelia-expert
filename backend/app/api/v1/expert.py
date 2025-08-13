@@ -13,8 +13,11 @@ import time  # NOUVEAU: Ajouté pour les endpoints de test
 # 🔑 Import authentification
 from app.api.v1.auth import get_current_user
 
-# 🏦 Import système de quota
+# 🦆 Import système de quota
 from app.api.v1.billing import check_quota_middleware, increment_quota_usage
+
+# 📊 Import système analytics  
+from app.api.v1.logging import log_question_to_analytics
 
 # 🌾 Import validateur agricole
 try:
@@ -224,6 +227,7 @@ class AskPayload(BaseModel):
 def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Logique interne pour traiter les questions (avec ou sans auth) + validation agricole + quota."""
     user_email = None
+    start_time = time.time()  # 📊 NOUVEAU: Mesure du temps de traitement
     
     try:
         # Extraction des infos utilisateur pour la validation
@@ -264,7 +268,7 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         # Log différencié selon l'authentification
         if current_user:
             user_email_display = current_user.get('email', 'unknown')
-            logger.info(f"🔐 Question authentifiée de {user_email_display}: {payload.question[:120]}")
+            logger.info(f"🔒 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
             logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
@@ -286,6 +290,28 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
                         increment_quota_usage(user_email, success=False)
                     except Exception as e:
                         logger.error(f"❌ Erreur incrémentation quota (validation failed): {e}")
+                
+                # 📊 NOUVEAU: LOGGING VALIDATION ÉCHOUÉE
+                try:
+                    processing_time = int((time.time() - start_time) * 1000)
+                    validation_error = {
+                        "type": "ValidationError",
+                        "message": validation_result.reason,
+                        "category": "validation_error"
+                    }
+                    
+                    log_question_to_analytics(
+                        current_user=current_user,
+                        payload=payload,
+                        result={"type": "validation_rejected"},
+                        response_text="",
+                        processing_time_ms=processing_time,
+                        error_info=validation_error
+                    )
+                    logger.info("📊 Validation échouée loggée dans analytics")
+                    
+                except Exception as log_e:
+                    logger.error(f"❌ Erreur logging analytics (validation): {log_e}")
                 
                 return {
                     "type": "validation_rejected",
@@ -335,6 +361,28 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             except Exception as e:
                 logger.error(f"❌ Erreur incrémentation quota (success): {e}")
 
+        # 📊 NOUVEAU: LOGGING ANALYTICS DÉTAILLÉ
+        try:
+            # Calculer le temps de traitement
+            processing_time = int((time.time() - start_time) * 1000)
+            
+            # Extraire le texte de réponse
+            answer = result.get("answer", {})
+            response_text = answer.get("text", "")
+            
+            # Logger dans le système analytics
+            log_question_to_analytics(
+                current_user=current_user,
+                payload=payload,
+                result=result,
+                response_text=response_text,
+                processing_time_ms=processing_time
+            )
+            logger.info("📊 Question loggée dans analytics")
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur logging analytics: {e}")
+
         # Ajouter les infos utilisateur et de validation dans la réponse
         if current_user:
             result["user"] = {
@@ -360,6 +408,28 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             except Exception as quota_e:
                 logger.error(f"❌ Erreur incrémentation quota (error): {quota_e}")
         
+        # 📊 NOUVEAU: LOGGING DES ERREURS DANS ANALYTICS
+        try:
+            processing_time = int((time.time() - start_time) * 1000)
+            error_info = {
+                "type": type(e).__name__,
+                "message": str(e),
+                "category": "system_error"
+            }
+            
+            log_question_to_analytics(
+                current_user=current_user,
+                payload=payload,
+                result={},
+                response_text="",
+                processing_time_ms=processing_time,
+                error_info=error_info
+            )
+            logger.info("📊 Erreur loggée dans analytics")
+            
+        except Exception as log_e:
+            logger.error(f"❌ Erreur logging analytics (error): {log_e}")
+        
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
@@ -368,7 +438,7 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
 def ask(
     payload: AskPayload, 
     request: Request,
-    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
     """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole et quota."""
     return _ask_internal(payload, request, current_user)
@@ -386,7 +456,8 @@ def system_status() -> Dict[str, Any]:
         "dialogue_manager_available": DIALOGUE_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
-        "billing_system_available": True,  # 🏦 NOUVEAU
+        "billing_system_available": True,  # 🦆 NOUVEAU
+        "analytics_system_available": True,  # 📊 NOUVEAU
         "service": "expert_api",
     }
 
@@ -410,7 +481,7 @@ def fallback_status() -> Dict[str, Any]:
 @router.post("/test-openai-fallback")
 def test_openai_fallback(
     test_question: str,
-    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
     """
     Teste le fallback OpenAI directement (bypass RAG).
@@ -527,7 +598,7 @@ def agricultural_validation_status() -> Dict[str, Any]:
 def test_agricultural_validation(
     test_question: str,
     lang: str = "fr",
-    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise pour les tests
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
 ) -> Dict[str, Any]:
     """Teste la validation agricole sur une question donnée."""
     if not AGRICULTURAL_VALIDATOR_AVAILABLE:
@@ -557,7 +628,7 @@ def test_agricultural_validation(
             "question": test_question
         }
 
-# 🏦 NOUVEAUX ENDPOINTS QUOTA
+# 🦆 NOUVEAUX ENDPOINTS QUOTA
 @router.get("/quota-status")
 def quota_status(
     current_user: dict = Depends(get_current_user)
@@ -617,7 +688,8 @@ def debug_imports() -> Dict[str, Any]:
     debug_info: Dict[str, Any] = {
         "dialogue_available": DIALOGUE_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
-        "billing_system_available": True,  # 🏦 NOUVEAU
+        "billing_system_available": True,  # 🦆 NOUVEAU
+        "analytics_system_available": True,  # 📊 NOUVEAU
         "imports_tested": []
     }
     
@@ -629,7 +701,8 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.utils.formulas",
         "app.api.v1.pipeline.intent_registry",
         "app.api.v1.agricultural_domain_validator",  # 🌾
-        "app.api.v1.billing",  # 🏦 NOUVEAU
+        "app.api.v1.billing",  # 🦆 NOUVEAU
+        "app.api.v1.logging",  # 📊 NOUVEAU
     ]
     
     for import_path in imports_to_test:
