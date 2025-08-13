@@ -800,7 +800,8 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-      <div className="h-screen bg-gray-50 flex flex-col">
+      {/* iOS: utiliser 100dvh pour éviter la zone "perdue" sous la barre d'adresse */}
+      <div className="min-h-dvh h-screen bg-gray-50 flex flex-col">
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
             {/* Boutons gauche */}
@@ -815,13 +816,13 @@ export default function ChatInterface() {
               </button>
             </div>
 
-            {/* Titre centré avec logo */}
-            <div className="flex-1 flex justify-center items-center space-x-3">
+            {/* Titre centré avec logo (min-w-0 pour ne pas pousser la page en largeur) */}
+            <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
               <div className="w-8 h-8 grid place-items-center">
                 <InteliaLogo className="h-7 w-auto" />
               </div>
               <div className="text-center">
-                <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
+                <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
               </div>
             </div>
             
@@ -858,7 +859,7 @@ export default function ChatInterface() {
         <div className="flex-1 overflow-hidden flex flex-col">
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6"
+            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6 overscroll-contain"
           >
             <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
@@ -876,22 +877,24 @@ export default function ChatInterface() {
               ) : (
                 messages.map((message, index) => (
                   <div key={`${message.id}-${index}`}>
-                    <div className={`flex items-start space-x-3 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                    {/* min-w-0 pour éviter que le contenu force un viewport plus large sur iOS */}
+                    <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
                       {/* 📧 CORRECTION LOGO: Container avec largeur fixe pour éviter l'écrasement */}
                       {!message.isUser && (
-                        <div className="flex-shrink-0 w-8 h-8 relative">
-                          <InteliaLogo className="w-8 h-8" />
+                        <div className="flex-shrink-0 w-8 h-8 grid place-items-center">
+                          <InteliaLogo className="h-7 w-auto" />
                         </div>
                       )}
                       
-                      <div className={`px-3 sm:px-4 py-3 rounded-2xl max-w-[85%] sm:max-w-none ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+                      {/* iPhone: limiter la largeur des bulles + autoriser les césures */}
+                      <div className={`px-3 sm:px-4 py-3 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
                         {message.isUser ? (
                           <p className="whitespace-pre-wrap leading-relaxed text-sm">
                             {message.content}
                           </p>
                         ) : (
                           <ReactMarkdown
-                            className="prose prose-sm max-w-none prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900"
+                            className="prose prose-sm max-w-none break-words prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900"
                             components={{
                               h2: ({node, ...props}) => (
                                 <h2 className="text-lg font-bold text-gray-900 mt-4 mb-3 flex items-center gap-2" {...props} />
@@ -913,7 +916,7 @@ export default function ChatInterface() {
                               ),
                               // 🔄 NOUVEAU : Support pour les tableaux
                               table: ({node, ...props}) => (
-                                <div className="overflow-x-auto my-4">
+                                <div className="overflow-x-auto my-4 -mx-1 sm:mx-0">
                                   <table className="min-w-full border border-gray-300 rounded-lg" {...props} />
                                 </div>
                               ),
@@ -988,7 +991,7 @@ export default function ChatInterface() {
                   <div className="w-8 h-8 grid place-items-center flex-shrink-0">
                     <InteliaLogo className="h-7 w-auto" />
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none">
+                  <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -1015,7 +1018,8 @@ export default function ChatInterface() {
             </div>
           )}
 
-          <div className="px-2 sm:px-4 py-4 bg-white border-t border-gray-100">
+          {/* iPhone: tenir compte du safe-area en bas */}
+          <div className="px-2 sm:px-4 py-4 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-100">
             <div className="max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
