@@ -1021,7 +1021,7 @@ export default function ChatInterface() {
           )}
 
           {/* 📱 MODIFICATION 3: Barre sticky avec safe-area conditionnel + hauteurs uniformisées */}
-          <div className="px-2 sm:px-4 py-3 bg-white border-t border-gray-100 sticky bottom-0 z-20 pb-[env(safe-area-inset-bottom)] sm:pb-0">
+          <div className="px-2 sm:px-4 py-2 bg-white border-t border-gray-100 sticky bottom-0 z-20 pb-[env(safe-area-inset-bottom)] sm:pb-2">
             <div className="max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1043,7 +1043,7 @@ export default function ChatInterface() {
               )}
               
               {/* 📱 MODIFICATION 4: Hauteurs uniformisées (h-12 = 48px) et centrage parfait */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 min-h-[48px]">
                 <div className="flex-1">
                   <input
                     type="text"
@@ -1056,7 +1056,7 @@ export default function ChatInterface() {
                       }
                     }}
                     placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
-                    className="w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    className="w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center"
                     disabled={isLoadingChat}
                     aria-label={t('chat.placeholder')}
                   />
@@ -1065,7 +1065,7 @@ export default function ChatInterface() {
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                  className="flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50"
                   title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                   aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                 >
