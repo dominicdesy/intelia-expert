@@ -476,8 +476,21 @@ def _should_use_openai_fallback(rag_result: Dict[str, Any], intent: Intention) -
     if len(text.strip()) < 50:  # Réponse trop courte
         return True
         
-    # Cas où le RAG retourne un message d'erreur générique
+    # NOUVEAU: Détecter les fragments de tableaux non pertinents
     text_lower = text.lower()
+    table_indicators = [
+        "[tableau]", "table", "0.08", "0.10", "0.12", "0.15", "0.17", "0.20",
+        "distance air", "ceiling", "width", "pressure drop", "pa (0.01",
+        "post-mortem", "examination", "subdermal", "thoracic coelomic"
+    ]
+    table_matches = sum(1 for indicator in table_indicators if indicator in text_lower)
+    
+    # Si plus de 3 indicateurs de tableau détectés, probable fragment non pertinent
+    if table_matches >= 3:
+        logger.info(f"🔍 Fragment de tableau détecté ({table_matches} indicateurs) - activation fallback")
+        return True
+        
+    # Cas où le RAG retourne un message d'erreur générique
     error_indicators = [
         "aucune information", "non disponible", "n'est pas disponible",
         "une erreur est survenue", "moteur rag", "base de connaissances"
