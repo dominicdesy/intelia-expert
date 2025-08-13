@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION REFACTORISÉE
-- Module principal maintenant plus léger et focalisé sur l'orchestration
+Dialogue orchestration - VERSION REFACTORISÉE CORRIGÉE
+- Module principal utilisant les modules spécialisés
 - Imports des modules spécialisés pour langue, mémoire et CoT/fallback
 - Preserve la compatibilité avec l'API existante
-- CORRIGÉ: Toutes les indentations vérifiées et corrigées
+- CORRIGÉ: Utilise les fonctions des modules au lieu de les dupliquer
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -35,6 +35,9 @@ from .conversation_memory import (
     save_conversation_context,
     clear_conversation_context,
     extract_age_days_from_text,
+    normalize_sex_from_text,
+    extract_line_from_text,
+    extract_species_from_text,
     get_memory_status
 )
 
@@ -188,19 +191,19 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
         if "unit" in df.columns:
             df["unit"] = (
                 df["unit"].astype(str).str.lower().str.replace(r"[^a-z]+", "", regex=True)
-                  .replace({
-                      "metrics": "metric", "gram": "metric", "grams": "metric", "g": "metric",
-                      "imperial": "imperial", "lb": "imperial", "lbs": "imperial"
-                  })
+                .replace({
+                    "metrics": "metric", "gram": "metric", "grams": "metric", "g": "metric",
+                    "imperial": "imperial", "lb": "imperial", "lbs": "imperial"
+                })
             )
 
         if "line" in df.columns:
             df["line"] = (
                 df["line"].astype(str).str.lower().str.replace(r"[-_\s]+", "", regex=True)
-                  .replace({
-                      "cobb-500": "cobb500", "cobb_500": "cobb500", "cobb 500": "cobb500",
-                      "ross-308": "ross308", "ross_308": "ross308", "ross 308": "ross308"
-                  })
+                .replace({
+                    "cobb-500": "cobb500", "cobb_500": "cobb500", "cobb 500": "cobb500",
+                    "ross-308": "ross308", "ross_308": "ross308", "ross 308": "ross308"
+                })
             )
 
         # Harmonisation de la colonne d'âge → age_days
@@ -226,12 +229,12 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
         if "sex" in df.columns:
             _sex_norm = (
                 df["sex"].astype(str).str.strip().str.lower()
-                   .map({
-                       "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
-                       "mixte": "as_hatched", "mixed": "as_hatched",
-                       "male": "male", "m": "male", "♂": "male",
-                       "female": "female", "f": "female", "♀": "female",
-                   })
+                .map({
+                    "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
+                    "mixte": "as_hatched", "mixed": "as_hatched",
+                    "male": "male", "m": "male", "♂": "male",
+                    "female": "female", "f": "female", "♀": "female",
+                })
             )
             df["sex"] = _sex_norm.fillna(df["sex"].astype(str).str.strip().str.lower())
 
@@ -472,7 +475,7 @@ def _final_sanitize(text: str) -> str:
         text = re.sub(phrase, '', text, flags=re.IGNORECASE)
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
-    text = re.sub(r'^\s+|\s+, '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
