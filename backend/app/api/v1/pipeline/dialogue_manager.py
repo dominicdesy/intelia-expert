@@ -930,7 +930,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
                     df = _load_df(norm.get("line"))
                     debug["used_per_line_table"] = True  # [PATCH]
                 except Exception as e:
-                logger.warning(f"⚠️ Échec clarification spécialisée, fallback standard: {e}")
+                    logger.warning(f"⚠️ Échec clarification spécialisée, fallback standard: {e}")
         
         # Fallback vers méthode standard si fonction spécialisée échoue
         age_days = None
