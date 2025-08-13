@@ -74,9 +74,9 @@ export default function ChatInterface() {
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
 
-  console.log('📝 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
+  console.log('🔍 [Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // 📧 FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
+  // 🔧 FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
   const getUserInitials = (user: any): string => {
     if (!user) return 'U'
     
@@ -112,12 +112,12 @@ export default function ChatInterface() {
           message.id !== 'welcome' && 
           message.response_versions &&
           !message.content.includes('Mode clarification') &&
-          !message.content.includes('🎁 Répondez simplement')) {
+          !message.content.includes('🎯 Répondez simplement')) {
         
         // 🔄 SÉLECTION DE VERSION : Utiliser selectVersionFromResponse
         const selectedContent = (message.response_versions?.standard || message.response_versions?.detailed || message.response_versions?.concise || Object.values(message.response_versions || {})[0] || '')
         
-        console.log(`📝 [reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
+        console.log(`🔍 [reprocessAllMessages] Message ${message.id} - passage à ${config.level}`, {
           original_length: message.content.length,
           new_length: selectedContent.length,
           versions_available: Object.keys(message.response_versions)
@@ -264,7 +264,7 @@ export default function ChatInterface() {
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !hasRedirectedRef.current) {
       hasRedirectedRef.current = true
-      console.log('📞 [ChatInterface] Redirection - utilisateur non authentifié')
+      console.log('🔞 [ChatInterface] Redirection - utilisateur non authentifié')
       
       if (typeof window !== 'undefined') {
         window.location.replace('/')
@@ -593,7 +593,7 @@ export default function ChatInterface() {
 
       if (!isMountedRef.current) return
 
-      console.log('📥 [handleSendMessage] Réponse reçue:', {
+      console.log('🔥 [handleSendMessage] Réponse reçue:', {
         conversation_id: response.conversation_id,
         response_length: response.response?.length || 0,
         versions_received: Object.keys(response.response_versions || {}),
@@ -608,7 +608,7 @@ export default function ChatInterface() {
         
         const clarificationMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: (response.full_text || response.response) + "\n\n🎁 Répondez simplement dans le chat avec les informations demandées.",
+          content: (response.full_text || response.response) + "\n\n🎯 Répondez simplement dans le chat avec les informations demandées.",
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id
@@ -621,7 +621,7 @@ export default function ChatInterface() {
           clarificationQuestions: response.clarification_questions || []
         })
 
-        console.log('📞 [handleSendMessage] État clarification activé')
+        console.log('🔞 [handleSendMessage] État clarification activé')
 
       } else {
         // 🔨 CORRECTION CRITIQUE : Extraction avec fonction corrigée
@@ -800,7 +800,7 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-      {/* iOS: utiliser 100dvh pour éviter la zone "perdue" sous la barre d'adresse */}
+      {/* 📱 MODIFICATION 1: Utiliser 100dvh pour éviter la zone "perdue" sous la barre d'adresse */}
       <div className="min-h-dvh h-screen bg-gray-50 flex flex-col">
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
@@ -849,7 +849,7 @@ export default function ChatInterface() {
                   onClick={reprocessAllMessages}
                   className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm transition-colors"
                 >
-                  📞 Appliquer à toutes les réponses
+                  🔞 Appliquer à toutes les réponses
                 </button>
               )}
             </div>
@@ -857,9 +857,11 @@ export default function ChatInterface() {
         </header>
 
         <div className="flex-1 overflow-hidden flex flex-col">
+          {/* 📱 MODIFICATION 2: Ajouter pb-28 pour éviter que les messages soient cachés par la barre sticky */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6 overscroll-contain"
+            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain"
+            style={{ scrollPaddingBottom: '7rem' }}
           >
             <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
@@ -879,7 +881,7 @@ export default function ChatInterface() {
                   <div key={`${message.id}-${index}`}>
                     {/* min-w-0 pour éviter que le contenu force un viewport plus large sur iOS */}
                     <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                      {/* 📧 CORRECTION LOGO: Container avec largeur fixe pour éviter l'écrasement */}
+                      {/* 🔧 CORRECTION LOGO: Container avec largeur fixe pour éviter l'écrasement */}
                       {!message.isUser && (
                         <div className="flex-shrink-0 w-8 h-8 grid place-items-center">
                           <InteliaLogo className="h-7 w-auto" />
@@ -973,7 +975,7 @@ export default function ChatInterface() {
                         </div>
                       )}
 
-                      {/* 📧 CORRECTION 2: Avatar avec initiales pour les messages utilisateur */}
+                      {/* 🔧 CORRECTION 2: Avatar avec initiales pour les messages utilisateur */}
                       {message.isUser && (
                         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                           <span className="text-white text-sm font-medium">
@@ -1018,19 +1020,19 @@ export default function ChatInterface() {
             </div>
           )}
 
-          {/* iPhone: tenir compte du safe-area en bas */}
-          <div className="px-2 sm:px-4 py-4 pb-[env(safe-area-inset-bottom)] bg-white border-t border-gray-100">
+          {/* 📱 MODIFICATION 3: Barre sticky avec safe-area conditionnel + hauteurs uniformisées */}
+          <div className="px-2 sm:px-4 py-3 bg-white border-t border-gray-100 sticky bottom-0 z-20 pb-[env(safe-area-inset-bottom)] sm:pb-0">
             <div className="max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700 text-sm font-medium">
-                      🎁 Mode clarification : répondez à la question ci-dessus
+                      🎯 Mode clarification : répondez à la question ci-dessus
                     </span>
                     <button
                       onClick={() => {
                         setClarificationState(null)
-                        console.log('📞 [ChatInterface] Clarification annulée')
+                        console.log('🔞 [ChatInterface] Clarification annulée')
                       }}
                       className="text-blue-600 hover:text-blue-800 text-sm underline"
                     >
@@ -1040,6 +1042,7 @@ export default function ChatInterface() {
                 </div>
               )}
               
+              {/* 📱 MODIFICATION 4: Hauteurs uniformisées (h-12 = 48px) et centrage parfait */}
               <div className="flex items-center space-x-3">
                 <div className="flex-1">
                   <input
@@ -1053,7 +1056,7 @@ export default function ChatInterface() {
                       }
                     }}
                     placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
-                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
+                    className="w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
                     disabled={isLoadingChat}
                     aria-label={t('chat.placeholder')}
                   />
@@ -1062,7 +1065,7 @@ export default function ChatInterface() {
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 p-2 text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
+                  className="flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors"
                   title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                   aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                 >
