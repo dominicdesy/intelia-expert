@@ -798,7 +798,9 @@ export default function ChatInterface() {
 
             {/* Titre centrÃ© avec logo */}
             <div className="flex-1 flex justify-center items-center space-x-3">
-              <InteliaLogo className="w-8 h-8" />
+              <div className="w-8 h-8 grid place-items-center">
+                <InteliaLogo className="h-7 w-auto" />
+              </div>
               <div className="text-center">
                 <h1 className="text-lg font-medium text-gray-900">Intelia Expert</h1>
               </div>
@@ -964,8 +966,8 @@ export default function ChatInterface() {
 
               {isLoadingChat && (
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 relative">
-                    <InteliaLogo className="w-8 h-8" />
+                  <div className="w-8 h-8 grid place-items-center flex-shrink-0">
+                    <InteliaLogo className="h-7 w-auto" />
                   </div>
                   <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
                     <div className="flex space-x-1">
