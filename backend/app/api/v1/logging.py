@@ -1,11 +1,14 @@
-# ========== SYSTÈME COMPLET DE FACTURATION ET QUOTAS ==========
-
+# app/api/v1/logging.py
 # -*- coding: utf-8 -*-
+"""
+Système complet de logging et analytics séparé du système de facturation
+Tracking des questions/réponses, erreurs, performance et coûts OpenAI
+"""
 import json
 import time
 import os
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -15,735 +18,756 @@ from enum import Enum
 # Import authentification
 from app.api.v1.auth import get_current_user
 
-router = APIRouter(prefix="/billing", tags=["billing"])
+router = APIRouter(prefix="/logging", tags=["logging"])
 logger = logging.getLogger(__name__)
 
-class PlanType(str, Enum):
-    FREE = "free"
-    BASIC = "basic" 
-    PREMIUM = "premium"
-    ENTERPRISE = "enterprise"
+class LogLevel(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
-class QuotaStatus(str, Enum):
-    AVAILABLE = "available"
-    WARNING = "warning"  # 80% utilisé
-    NEAR_LIMIT = "near_limit"  # 95% utilisé
-    EXCEEDED = "exceeded"
+class ResponseSource(str, Enum):
+    RAG = "rag"
+    OPENAI_FALLBACK = "openai_fallback"
+    TABLE_LOOKUP = "table_lookup"
+    VALIDATION_REJECTED = "validation_rejected"
+    QUOTA_EXCEEDED = "quota_exceeded"
 
-class BillingManager:
+class AnalyticsManager:
     """
-    Gestionnaire complet de facturation avec quotas et limitations temps réel
+    Gestionnaire complet d'analytics et logging
     """
     
     def __init__(self, dsn=None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
-        self._ensure_billing_tables()
-        self._load_plan_configurations()
+        if not self.dsn:
+            raise ValueError("❌ DATABASE_URL manquant - stockage persistant requis")
+        self._ensure_analytics_tables()
     
-    def _ensure_billing_tables(self):
-        """Crée toutes les tables de facturation et quotas"""
+    def _ensure_analytics_tables(self):
+        """Crée toutes les tables d'analytics et logging"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
-                    # Table des plans de facturation
+                    # Table principale des questions/réponses
                     cur.execute("""
-                        CREATE TABLE IF NOT EXISTS billing_plans (
-                            plan_name VARCHAR(50) PRIMARY KEY,
-                            display_name VARCHAR(100),
-                            monthly_quota INTEGER NOT NULL,
-                            price_per_month DECIMAL(10,2) DEFAULT 0.00,
-                            price_per_question DECIMAL(6,4) DEFAULT 0.0000,
-                            overage_rate DECIMAL(6,4) DEFAULT 0.0100,
-                            features JSONB DEFAULT '{}',
-                            active BOOLEAN DEFAULT TRUE,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """)
-                    
-                    # Insérer les plans par défaut
-                    cur.execute("""
-                        INSERT INTO billing_plans (plan_name, display_name, monthly_quota, price_per_month, overage_rate, features)
-                        VALUES 
-                            ('free', 'Plan Gratuit', 100, 0.00, 0.02, '{"support": "community", "priority": "low"}'),
-                            ('basic', 'Plan Basic', 1000, 29.99, 0.015, '{"support": "email", "priority": "normal"}'),
-                            ('premium', 'Plan Premium', 5000, 99.99, 0.01, '{"support": "priority", "priority": "high", "advanced_features": true}'),
-                            ('enterprise', 'Plan Enterprise', 50000, 499.99, 0.005, '{"support": "dedicated", "priority": "highest", "custom_features": true}')
-                        ON CONFLICT (plan_name) DO NOTHING;
-                    """)
-                    
-                    # Table des utilisateurs avec plans et quotas
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS user_billing_info (
-                            user_email VARCHAR(255) PRIMARY KEY,
-                            plan_name VARCHAR(50) DEFAULT 'free' REFERENCES billing_plans(plan_name),
-                            custom_monthly_quota INTEGER, -- Override du quota si nécessaire
-                            billing_enabled BOOLEAN DEFAULT TRUE,
-                            quota_enforcement BOOLEAN DEFAULT TRUE, -- Peut désactiver la limitation
-                            
-                            -- Informations de facturation
-                            billing_address JSONB,
-                            payment_method JSONB,
-                            billing_contact_email VARCHAR(255),
-                            
-                            -- Métadonnées
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            notes TEXT
-                        );
-                    """)
-                    
-                    # Table de tracking d'usage mensuel en temps réel
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS monthly_usage_tracking (
+                        CREATE TABLE IF NOT EXISTS user_questions_complete (
                             id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            month_year VARCHAR(7) NOT NULL, -- YYYY-MM
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
+                            question TEXT NOT NULL,
+                            response_text TEXT,
+                            response_source VARCHAR(50),
+                            status VARCHAR(20) DEFAULT 'success', -- success/error/timeout
+                            processing_time_ms INTEGER,
+                            response_confidence DECIMAL(5,2),
+                            completeness_score DECIMAL(5,2),
                             
-                            -- Compteurs en temps réel
-                            questions_used INTEGER DEFAULT 0,
-                            questions_successful INTEGER DEFAULT 0,
-                            questions_failed INTEGER DEFAULT 0,
+                            -- Metadata
+                            language VARCHAR(10) DEFAULT 'fr',
+                            intent VARCHAR(50),
+                            entities JSONB DEFAULT '{}',
                             
-                            -- Coûts calculés
-                            total_cost_usd DECIMAL(10,6) DEFAULT 0,
-                            openai_cost_usd DECIMAL(10,6) DEFAULT 0,
-                            
-                            -- Quotas et limites
-                            monthly_quota INTEGER NOT NULL,
-                            quota_exceeded_at TIMESTAMP,
-                            
-                            -- Status et flags
-                            current_status VARCHAR(20) DEFAULT 'available',
-                            warning_sent BOOLEAN DEFAULT FALSE,
-                            limit_notifications_sent INTEGER DEFAULT 0,
+                            -- Erreurs
+                            error_type VARCHAR(100),
+                            error_message TEXT,
+                            error_traceback TEXT,
                             
                             -- Timestamps
-                            first_question_at TIMESTAMP,
-                            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            
-                            UNIQUE(user_email, month_year)
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
                     """)
                     
-                    # Table de factures mensuelles
+                    # Table des erreurs système détaillées
                     cur.execute("""
-                        CREATE TABLE IF NOT EXISTS monthly_invoices (
+                        CREATE TABLE IF NOT EXISTS system_errors (
                             id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            month_year VARCHAR(7) NOT NULL,
+                            error_type VARCHAR(100) NOT NULL,
+                            category VARCHAR(50) NOT NULL, -- rag_failure, openai_error, validation_error, etc.
+                            severity VARCHAR(20) DEFAULT 'error', -- info, warning, error, critical
+                            component VARCHAR(100), -- dialogue_manager, rag_engine, etc.
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
                             
-                            -- Détails facturation
-                            plan_name VARCHAR(50),
-                            questions_included INTEGER,
-                            questions_used INTEGER,
-                            overage_questions INTEGER DEFAULT 0,
+                            -- Détails erreur
+                            error_message TEXT,
+                            error_traceback TEXT,
+                            context_data JSONB DEFAULT '{}',
                             
-                            -- Montants
-                            base_amount DECIMAL(10,2),
-                            overage_amount DECIMAL(10,2) DEFAULT 0,
-                            total_amount DECIMAL(10,2),
-                            currency VARCHAR(3) DEFAULT 'EUR',
+                            -- Status résolution
+                            resolved BOOLEAN DEFAULT FALSE,
+                            resolution_notes TEXT,
+                            resolved_at TIMESTAMP,
                             
-                            -- Status facture
-                            status VARCHAR(20) DEFAULT 'draft', -- draft, issued, paid, overdue
-                            issued_at TIMESTAMP,
-                            due_at TIMESTAMP,
-                            paid_at TIMESTAMP,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    
+                    # Table de tracking des appels OpenAI
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS openai_api_calls (
+                            id SERIAL PRIMARY KEY,
+                            user_email VARCHAR(255),
+                            session_id VARCHAR(255),
+                            question_id VARCHAR(255),
                             
-                            -- Détails techniques
-                            breakdown JSONB DEFAULT '{}',
+                            -- Détails appel OpenAI
+                            call_type VARCHAR(50), -- completion, embedding, etc.
+                            model VARCHAR(100),
+                            prompt_tokens INTEGER,
+                            completion_tokens INTEGER,
+                            total_tokens INTEGER,
+                            
+                            -- Coûts (tarifs OpenAI)
+                            cost_usd DECIMAL(10,6),
+                            cost_eur DECIMAL(10,6),
+                            
+                            -- Contexte
+                            purpose VARCHAR(100), -- fallback, language_detection, rag_adaptation, etc.
+                            prompt_preview TEXT, -- Premier 200 chars du prompt
+                            response_preview TEXT, -- Premier 200 chars de la réponse
+                            
+                            -- Performance
+                            response_time_ms INTEGER,
+                            success BOOLEAN DEFAULT TRUE,
+                            error_message TEXT,
+                            
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    
+                    # Table de résumés quotidiens OpenAI
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS daily_openai_summary (
+                            id SERIAL PRIMARY KEY,
+                            user_email VARCHAR(255),
+                            date_only DATE NOT NULL,
+                            
+                            -- Compteurs
+                            total_calls INTEGER DEFAULT 0,
+                            successful_calls INTEGER DEFAULT 0,
+                            failed_calls INTEGER DEFAULT 0,
+                            total_tokens INTEGER DEFAULT 0,
+                            
+                            -- Coûts
+                            total_cost_usd DECIMAL(10,6) DEFAULT 0,
+                            total_cost_eur DECIMAL(10,6) DEFAULT 0,
+                            
+                            -- Breakdown par purpose
+                            cost_by_purpose JSONB DEFAULT '{}',
+                            
+                            -- Performance
+                            avg_response_time_ms INTEGER,
+                            
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            
+                            UNIQUE(user_email, date_only)
+                        );
+                    """)
+                    
+                    # Table de métriques de performance serveur
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS server_performance_metrics (
+                            id SERIAL PRIMARY KEY,
+                            timestamp_hour TIMESTAMP NOT NULL, -- Heure tronquée
+                            
+                            -- Métriques générales
+                            total_requests INTEGER DEFAULT 0,
+                            successful_requests INTEGER DEFAULT 0,
+                            failed_requests INTEGER DEFAULT 0,
+                            avg_response_time_ms INTEGER,
+                            max_response_time_ms INTEGER,
+                            
+                            -- Métriques par type
+                            rag_requests INTEGER DEFAULT 0,
+                            openai_requests INTEGER DEFAULT 0,
+                            validation_rejections INTEGER DEFAULT 0,
+                            quota_blocks INTEGER DEFAULT 0,
+                            
+                            -- Status de santé
+                            health_status VARCHAR(20) DEFAULT 'healthy', -- healthy, degraded, critical
+                            error_rate_percent DECIMAL(5,2) DEFAULT 0,
+                            
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             
-                            UNIQUE(user_email, month_year)
-                        );
-                    """)
-                    
-                    # Table d'audit des actions de quota
-                    cur.execute("""
-                        CREATE TABLE IF NOT EXISTS quota_audit_log (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            action VARCHAR(50) NOT NULL, -- question_allowed, question_blocked, quota_exceeded, quota_reset
-                            details JSONB DEFAULT '{}',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            UNIQUE(timestamp_hour)
                         );
                     """)
                     
                     # Indexes pour performance
                     indexes = [
-                        "CREATE INDEX IF NOT EXISTS idx_usage_tracking_user_month ON monthly_usage_tracking(user_email, month_year);",
-                        "CREATE INDEX IF NOT EXISTS idx_usage_tracking_status ON monthly_usage_tracking(current_status, last_updated);",
-                        "CREATE INDEX IF NOT EXISTS idx_invoices_status ON monthly_invoices(status, due_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_audit_log_user ON quota_audit_log(user_email, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_questions_user_created ON user_questions_complete(user_email, created_at DESC);",
+                        "CREATE INDEX IF NOT EXISTS idx_questions_status ON user_questions_complete(status, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_errors_category ON system_errors(category, severity, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_errors_resolved ON system_errors(resolved, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_openai_user_date ON openai_api_calls(user_email, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_openai_cost ON openai_api_calls(cost_usd, created_at);",
+                        "CREATE INDEX IF NOT EXISTS idx_daily_summary_user ON daily_openai_summary(user_email, date_only);",
+                        "CREATE INDEX IF NOT EXISTS idx_performance_hour ON server_performance_metrics(timestamp_hour);",
                     ]
                     
                     for index_sql in indexes:
                         cur.execute(index_sql)
                     
                     conn.commit()
-                    logger.info("✅ Tables de facturation et quotas créées")
+                    logger.info("✅ Tables d'analytics et logging créées")
                     
         except Exception as e:
-            logger.error(f"❌ Erreur création tables facturation: {e}")
+            logger.error(f"❌ Erreur création tables analytics: {e}")
             raise
     
-    def _load_plan_configurations(self):
-        """Charge les configurations des plans en cache"""
+    def log_question_response(
+        self, 
+        user_email: Optional[str],
+        session_id: str,
+        question: str,
+        response_text: str = "",
+        response_source: str = "unknown",
+        status: str = "success",
+        processing_time_ms: int = 0,
+        confidence: float = None,
+        completeness_score: float = None,
+        language: str = "fr",
+        intent: str = None,
+        entities: Dict[str, Any] = None,
+        error_info: Dict[str, Any] = None
+    ) -> str:
+        """Log une question/réponse complète"""
         try:
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("SELECT * FROM billing_plans WHERE active = true")
-                    self.plans = {row['plan_name']: dict(row) for row in cur.fetchall()}
-                    logger.info(f"✅ {len(self.plans)} plans de facturation chargés")
-        except Exception as e:
-            logger.error(f"❌ Erreur chargement plans: {e}")
-            self.plans = {}
-    
-    def check_quota_before_question(self, user_email: str) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Vérifie si l'utilisateur peut poser une question (quota disponible)
-        Retourne (autorisé, détails)
-        """
-        try:
-            current_month = datetime.now().strftime("%Y-%m")
-            
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Récupérer les infos utilisateur et usage actuel
-                    cur.execute("""
-                        SELECT 
-                            ubi.plan_name,
-                            ubi.custom_monthly_quota,
-                            ubi.quota_enforcement,
-                            bp.monthly_quota as plan_quota,
-                            bp.display_name as plan_display_name,
-                            mut.questions_used,
-                            mut.monthly_quota as current_quota,
-                            mut.current_status
-                        FROM user_billing_info ubi
-                        LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
-                        LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email 
-                            AND mut.month_year = %s
-                        WHERE ubi.user_email = %s
-                    """, (current_month, user_email))
-                    
-                    user_info = cur.fetchone()
-                    
-                    if not user_info:
-                        # Nouvel utilisateur - créer avec plan gratuit
-                        self._initialize_new_user(user_email)
-                        return self.check_quota_before_question(user_email)
-                    
-                    # Déterminer le quota effectif
-                    quota = user_info['custom_monthly_quota'] or user_info['plan_quota'] or 100
-                    questions_used = user_info['questions_used'] or 0
-                    
-                    # Si l'enforcement est désactivé, toujours autoriser
-                    if not user_info['quota_enforcement']:
-                        return True, {
-                            "status": "unlimited",
-                            "quota": quota,
-                            "used": questions_used,
-                            "remaining": "unlimited"
-                        }
-                    
-                    # Vérifier le quota
-                    remaining = quota - questions_used
-                    
-                    if remaining <= 0:
-                        # Quota dépassé
-                        self._log_quota_action(user_email, "question_blocked", {
-                            "quota": quota,
-                            "used": questions_used,
-                            "month": current_month
-                        })
-                        
-                        return False, {
-                            "status": "exceeded",
-                            "quota": quota,
-                            "used": questions_used,
-                            "remaining": 0,
-                            "plan": user_info['plan_display_name'],
-                            "message": f"Quota mensuel de {quota} questions dépassé. Passez à un plan supérieur ou attendez le mois prochain."
-                        }
-                    
-                    # Déterminer le statut
-                    usage_percent = (questions_used / quota) * 100
-                    if usage_percent >= 95:
-                        status = QuotaStatus.NEAR_LIMIT
-                    elif usage_percent >= 80:
-                        status = QuotaStatus.WARNING
-                    else:
-                        status = QuotaStatus.AVAILABLE
-                    
-                    return True, {
-                        "status": status.value,
-                        "quota": quota,
-                        "used": questions_used,
-                        "remaining": remaining,
-                        "usage_percent": round(usage_percent, 1),
-                        "plan": user_info['plan_display_name']
-                    }
-                    
-        except Exception as e:
-            logger.error(f"❌ Erreur vérification quota pour {user_email}: {e}")
-            # En cas d'erreur, autoriser la question (fail-safe)
-            return True, {"status": "error", "message": "Erreur de vérification quota"}
-    
-    def increment_usage_after_question(self, user_email: str, success: bool = True, cost_usd: float = 0.0) -> None:
-        """
-        Incrémente l'usage après qu'une question ait été traitée
-        """
-        try:
-            current_month = datetime.now().strftime("%Y-%m")
+            question_id = f"{session_id}_{int(time.time() * 1000)}"
             
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
-                    # Récupérer le quota de l'utilisateur
                     cur.execute("""
-                        SELECT 
-                            COALESCE(ubi.custom_monthly_quota, bp.monthly_quota, 100) as quota
-                        FROM user_billing_info ubi
-                        LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
-                        WHERE ubi.user_email = %s
-                    """, (user_email,))
-                    
-                    quota_result = cur.fetchone()
-                    quota = quota_result[0] if quota_result else 100
-                    
-                    # Mettre à jour ou créer l'enregistrement d'usage
-                    cur.execute("""
-                        INSERT INTO monthly_usage_tracking (
-                            user_email, month_year, questions_used, questions_successful, 
-                            questions_failed, total_cost_usd, monthly_quota, first_question_at
-                        ) VALUES (%s, %s, 1, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (user_email, month_year) 
-                        DO UPDATE SET 
-                            questions_used = monthly_usage_tracking.questions_used + 1,
-                            questions_successful = monthly_usage_tracking.questions_successful + %s,
-                            questions_failed = monthly_usage_tracking.questions_failed + %s,
-                            total_cost_usd = monthly_usage_tracking.total_cost_usd + %s,
-                            last_updated = CURRENT_TIMESTAMP
+                        INSERT INTO user_questions_complete (
+                            user_email, session_id, question_id, question, response_text,
+                            response_source, status, processing_time_ms, response_confidence,
+                            completeness_score, language, intent, entities,
+                            error_type, error_message, error_traceback
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
-                        user_email, current_month, 
-                        1 if success else 0, 0 if success else 1, cost_usd, quota,
-                        1 if success else 0, 0 if success else 1, cost_usd
+                        user_email, session_id, question_id, question[:2000], response_text[:5000],
+                        response_source, status, processing_time_ms, confidence,
+                        completeness_score, language, intent, json.dumps(entities or {}),
+                        error_info.get("type") if error_info else None,
+                        error_info.get("message") if error_info else None,
+                        error_info.get("traceback") if error_info else None
                     ))
-                    
-                    # Mettre à jour le statut si nécessaire
-                    self._update_quota_status(cur, user_email, current_month)
-                    
                     conn.commit()
                     
-                    # Log de l'action
-                    self._log_quota_action(user_email, "question_allowed", {
-                        "success": success,
-                        "cost_usd": cost_usd,
-                        "month": current_month
-                    })
-                    
-        except Exception as e:
-            logger.error(f"❌ Erreur incrémentation usage pour {user_email}: {e}")
-    
-    def _update_quota_status(self, cur, user_email: str, month_year: str) -> None:
-        """Met à jour le statut du quota après usage"""
-        try:
-            cur.execute("""
-                SELECT questions_used, monthly_quota 
-                FROM monthly_usage_tracking 
-                WHERE user_email = %s AND month_year = %s
-            """, (user_email, month_year))
-            
-            result = cur.fetchone()
-            if not result:
-                return
-            
-            questions_used, quota = result
-            usage_percent = (questions_used / quota) * 100
-            
-            # Déterminer le nouveau statut
-            if questions_used >= quota:
-                new_status = QuotaStatus.EXCEEDED
-                # Marquer le moment où le quota a été dépassé
-                cur.execute("""
-                    UPDATE monthly_usage_tracking 
-                    SET current_status = %s, quota_exceeded_at = CURRENT_TIMESTAMP
-                    WHERE user_email = %s AND month_year = %s AND quota_exceeded_at IS NULL
-                """, (new_status.value, user_email, month_year))
-            elif usage_percent >= 95:
-                new_status = QuotaStatus.NEAR_LIMIT
-            elif usage_percent >= 80:
-                new_status = QuotaStatus.WARNING
-            else:
-                new_status = QuotaStatus.AVAILABLE
-            
-            # Mettre à jour le statut
-            cur.execute("""
-                UPDATE monthly_usage_tracking 
-                SET current_status = %s 
-                WHERE user_email = %s AND month_year = %s
-            """, (new_status.value, user_email, month_year))
+            return question_id
             
         except Exception as e:
-            logger.error(f"❌ Erreur update quota status: {e}")
+            logger.error(f"❌ Erreur log question/réponse: {e}")
+            return "error"
     
-    def _initialize_new_user(self, user_email: str, plan_name: str = "free") -> None:
-        """Initialise un nouvel utilisateur avec un plan par défaut"""
+    def log_system_error(
+        self,
+        error_type: str,
+        category: str,
+        severity: str = "error",
+        component: str = None,
+        user_email: str = None,
+        session_id: str = None,
+        question_id: str = None,
+        error_message: str = None,
+        error_traceback: str = None,
+        context_data: Dict[str, Any] = None
+    ) -> None:
+        """Log une erreur système"""
         try:
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        INSERT INTO user_billing_info (user_email, plan_name)
-                        VALUES (%s, %s)
-                        ON CONFLICT (user_email) DO NOTHING
-                    """, (user_email, plan_name))
-                    conn.commit()
-                    logger.info(f"✅ Nouvel utilisateur initialisé: {user_email} - Plan: {plan_name}")
-        except Exception as e:
-            logger.error(f"❌ Erreur initialisation utilisateur {user_email}: {e}")
-    
-    def _log_quota_action(self, user_email: str, action: str, details: Dict[str, Any]) -> None:
-        """Log des actions liées aux quotas pour audit"""
-        try:
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO quota_audit_log (user_email, action, details)
-                        VALUES (%s, %s, %s)
-                    """, (user_email, action, json.dumps(details)))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"❌ Erreur log quota action: {e}")
-    
-    def generate_monthly_invoice(self, user_email: str, year: int, month: int) -> Dict[str, Any]:
-        """Génère une facture mensuelle pour un utilisateur"""
-        try:
-            month_year = f"{year:04d}-{month:02d}"
-            
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Récupérer les données de facturation
-                    cur.execute("""
-                        SELECT 
-                            ubi.plan_name,
-                            bp.display_name,
-                            bp.price_per_month,
-                            bp.overage_rate,
-                            COALESCE(ubi.custom_monthly_quota, bp.monthly_quota) as quota,
-                            mut.questions_used,
-                            mut.total_cost_usd
-                        FROM user_billing_info ubi
-                        LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
-                        LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email 
-                            AND mut.month_year = %s
-                        WHERE ubi.user_email = %s
-                    """, (month_year, user_email))
-                    
-                    billing_data = cur.fetchone()
-                    
-                    if not billing_data:
-                        return {"error": f"Aucune donnée de facturation pour {user_email}"}
-                    
-                    # Calculs de facturation
-                    questions_used = billing_data['questions_used'] or 0
-                    quota = billing_data['quota']
-                    base_amount = billing_data['price_per_month']
-                    
-                    # Calcul des dépassements
-                    overage_questions = max(0, questions_used - quota)
-                    overage_amount = overage_questions * billing_data['overage_rate']
-                    total_amount = base_amount + overage_amount
-                    
-                    # Breakdown détaillé
-                    breakdown = {
-                        "plan": billing_data['display_name'],
-                        "quota_included": quota,
-                        "questions_used": questions_used,
-                        "base_price": float(base_amount),
-                        "overage_questions": overage_questions,
-                        "overage_rate": float(billing_data['overage_rate']),
-                        "overage_amount": float(overage_amount),
-                        "openai_costs": float(billing_data['total_cost_usd'] or 0)
-                    }
-                    
-                    # Insérer ou mettre à jour la facture
-                    cur.execute("""
-                        INSERT INTO monthly_invoices (
-                            user_email, month_year, plan_name, questions_included,
-                            questions_used, overage_questions, base_amount, 
-                            overage_amount, total_amount, breakdown
+                        INSERT INTO system_errors (
+                            error_type, category, severity, component, user_email,
+                            session_id, question_id, error_message, error_traceback, context_data
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (user_email, month_year)
-                        DO UPDATE SET 
-                            questions_used = EXCLUDED.questions_used,
-                            overage_questions = EXCLUDED.overage_questions,
-                            overage_amount = EXCLUDED.overage_amount,
-                            total_amount = EXCLUDED.total_amount,
-                            breakdown = EXCLUDED.breakdown
                     """, (
-                        user_email, month_year, billing_data['plan_name'], quota,
-                        questions_used, overage_questions, base_amount,
-                        overage_amount, total_amount, json.dumps(breakdown)
+                        error_type, category, severity, component, user_email,
+                        session_id, question_id, error_message, error_traceback,
+                        json.dumps(context_data or {})
                     ))
-                    
                     conn.commit()
                     
-                    return {
-                        "user_email": user_email,
-                        "month_year": month_year,
-                        "invoice_data": breakdown,
-                        "total_amount": float(total_amount),
-                        "currency": "EUR",
-                        "status": "generated"
-                    }
-                    
         except Exception as e:
-            logger.error(f"❌ Erreur génération facture pour {user_email}: {e}")
-            return {"error": str(e)}
+            logger.error(f"❌ Erreur log system error: {e}")
     
-    def change_user_plan(self, user_email: str, new_plan: str, effective_date: datetime = None) -> Dict[str, Any]:
-        """Change le plan d'un utilisateur"""
+    def track_openai_call(
+        self,
+        user_email: str = None,
+        session_id: str = None,
+        question_id: str = None,
+        call_type: str = "completion",
+        model: str = "gpt-3.5-turbo",
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        purpose: str = "fallback",
+        prompt_preview: str = "",
+        response_preview: str = "",
+        response_time_ms: int = 0,
+        success: bool = True,
+        error_message: str = None
+    ) -> None:
+        """Track un appel OpenAI avec calcul des coûts"""
         try:
-            if new_plan not in self.plans:
-                return {"error": f"Plan '{new_plan}' non trouvé"}
+            # Calcul des coûts (tarifs OpenAI approximatifs)
+            total_tokens = prompt_tokens + completion_tokens
+            
+            # Tarifs approximatifs GPT-3.5-turbo (USD pour 1K tokens)
+            if "gpt-4" in model.lower():
+                cost_per_1k_prompt = 0.03
+                cost_per_1k_completion = 0.06
+            else:  # GPT-3.5-turbo
+                cost_per_1k_prompt = 0.0015
+                cost_per_1k_completion = 0.002
+            
+            cost_usd = (prompt_tokens / 1000 * cost_per_1k_prompt) + (completion_tokens / 1000 * cost_per_1k_completion)
+            cost_eur = cost_usd * 0.92  # Approximation EUR
             
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
-                    # Mettre à jour le plan utilisateur
                     cur.execute("""
-                        UPDATE user_billing_info 
-                        SET plan_name = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE user_email = %s
-                    """, (new_plan, user_email))
+                        INSERT INTO openai_api_calls (
+                            user_email, session_id, question_id, call_type, model,
+                            prompt_tokens, completion_tokens, total_tokens, cost_usd, cost_eur,
+                            purpose, prompt_preview, response_preview, response_time_ms,
+                            success, error_message
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        user_email, session_id, question_id, call_type, model,
+                        prompt_tokens, completion_tokens, total_tokens, cost_usd, cost_eur,
+                        purpose, prompt_preview[:200], response_preview[:200], response_time_ms,
+                        success, error_message
+                    ))
                     
-                    if cur.rowcount == 0:
-                        # Créer l'utilisateur s'il n'existe pas
-                        cur.execute("""
-                            INSERT INTO user_billing_info (user_email, plan_name)
-                            VALUES (%s, %s)
-                        """, (user_email, new_plan))
+                    # Mise à jour du résumé quotidien
+                    self._update_daily_openai_summary(cur, user_email, cost_usd, cost_eur, total_tokens, purpose, success, response_time_ms)
                     
                     conn.commit()
                     
-                    # Log de l'action
-                    self._log_quota_action(user_email, "plan_changed", {
-                        "new_plan": new_plan,
-                        "effective_date": (effective_date or datetime.now()).isoformat()
-                    })
-                    
-                    return {
-                        "user_email": user_email,
-                        "new_plan": new_plan,
-                        "plan_details": self.plans[new_plan],
-                        "status": "updated"
-                    }
-                    
         except Exception as e:
-            logger.error(f"❌ Erreur changement plan pour {user_email}: {e}")
-            return {"error": str(e)}
+            logger.error(f"❌ Erreur track OpenAI call: {e}")
     
-    def get_user_billing_summary(self, user_email: str) -> Dict[str, Any]:
-        """Résumé complet de facturation pour un utilisateur"""
+    def _update_daily_openai_summary(self, cur, user_email, cost_usd, cost_eur, tokens, purpose, success, response_time_ms):
+        """Met à jour le résumé quotidien OpenAI"""
         try:
-            current_month = datetime.now().strftime("%Y-%m")
+            today = datetime.now().date()
+            
+            # Upsert du résumé quotidien
+            cur.execute("""
+                INSERT INTO daily_openai_summary (
+                    user_email, date_only, total_calls, successful_calls, failed_calls,
+                    total_tokens, total_cost_usd, total_cost_eur, cost_by_purpose, avg_response_time_ms
+                ) VALUES (%s, %s, 1, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_email, date_only)
+                DO UPDATE SET 
+                    total_calls = daily_openai_summary.total_calls + 1,
+                    successful_calls = daily_openai_summary.successful_calls + %s,
+                    failed_calls = daily_openai_summary.failed_calls + %s,
+                    total_tokens = daily_openai_summary.total_tokens + %s,
+                    total_cost_usd = daily_openai_summary.total_cost_usd + %s,
+                    total_cost_eur = daily_openai_summary.total_cost_eur + %s,
+                    avg_response_time_ms = (daily_openai_summary.avg_response_time_ms * daily_openai_summary.total_calls + %s) / (daily_openai_summary.total_calls + 1),
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                user_email, today, 1 if success else 0, 0 if success else 1, tokens, cost_usd, cost_eur,
+                json.dumps({purpose: float(cost_usd)}), response_time_ms,
+                1 if success else 0, 0 if success else 1, tokens, cost_usd, cost_eur, response_time_ms
+            ))
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur update daily summary: {e}")
+    
+    def get_user_analytics(self, user_email: str, days: int = 30) -> Dict[str, Any]:
+        """Analytics complètes pour un utilisateur"""
+        try:
+            start_date = datetime.now() - timedelta(days=days)
             
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Informations utilisateur et usage actuel
+                    # Questions/réponses
                     cur.execute("""
                         SELECT 
-                            ubi.plan_name,
-                            bp.display_name,
-                            bp.price_per_month,
-                            COALESCE(ubi.custom_monthly_quota, bp.monthly_quota) as quota,
-                            mut.questions_used,
-                            mut.current_status,
-                            mut.total_cost_usd,
-                            mut.first_question_at
-                        FROM user_billing_info ubi
-                        LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
-                        LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email 
-                            AND mut.month_year = %s
-                        WHERE ubi.user_email = %s
-                    """, (current_month, user_email))
+                            COUNT(*) as total_questions,
+                            COUNT(*) FILTER (WHERE status = 'success') as successful_questions,
+                            COUNT(*) FILTER (WHERE status = 'error') as failed_questions,
+                            AVG(processing_time_ms) as avg_processing_time,
+                            AVG(response_confidence) as avg_confidence
+                        FROM user_questions_complete 
+                        WHERE user_email = %s AND created_at >= %s
+                    """, (user_email, start_date))
                     
-                    current_data = cur.fetchone()
+                    questions_stats = dict(cur.fetchone() or {})
                     
-                    if not current_data:
-                        return {"error": f"Utilisateur {user_email} non trouvé"}
-                    
-                    # Historique des factures
+                    # Coûts OpenAI
                     cur.execute("""
-                        SELECT month_year, total_amount, status
-                        FROM monthly_invoices 
-                        WHERE user_email = %s
-                        ORDER BY month_year DESC
-                        LIMIT 12
-                    """, (user_email,))
+                        SELECT 
+                            COUNT(*) as total_calls,
+                            SUM(total_tokens) as total_tokens,
+                            SUM(cost_usd) as total_cost_usd,
+                            SUM(cost_eur) as total_cost_eur,
+                            AVG(cost_usd) as avg_cost_per_call
+                        FROM openai_api_calls 
+                        WHERE user_email = %s AND created_at >= %s
+                    """, (user_email, start_date))
                     
-                    invoice_history = [dict(row) for row in cur.fetchall()]
+                    openai_stats = dict(cur.fetchone() or {})
+                    
+                    # Breakdown par purpose
+                    cur.execute("""
+                        SELECT 
+                            purpose,
+                            COUNT(*) as calls,
+                            SUM(cost_usd) as cost_usd
+                        FROM openai_api_calls 
+                        WHERE user_email = %s AND created_at >= %s
+                        GROUP BY purpose
+                        ORDER BY cost_usd DESC
+                    """, (user_email, start_date))
+                    
+                    cost_by_purpose = [dict(row) for row in cur.fetchall()]
                     
                     return {
                         "user_email": user_email,
-                        "current_month": current_month,
-                        "plan": {
-                            "name": current_data['plan_name'],
-                            "display_name": current_data['display_name'],
-                            "monthly_price": float(current_data['price_per_month'] or 0)
-                        },
-                        "current_usage": {
-                            "quota": current_data['quota'],
-                            "used": current_data['questions_used'] or 0,
-                            "remaining": (current_data['quota'] or 0) - (current_data['questions_used'] or 0),
-                            "status": current_data['current_status'] or "available",
-                            "costs_usd": float(current_data['total_cost_usd'] or 0)
-                        },
-                        "invoice_history": invoice_history
+                        "period_days": days,
+                        "questions": questions_stats,
+                        "openai_costs": openai_stats,
+                        "cost_by_purpose": cost_by_purpose
                     }
                     
         except Exception as e:
-            logger.error(f"❌ Erreur billing summary pour {user_email}: {e}")
+            logger.error(f"❌ Erreur get user analytics: {e}")
+            return {"error": str(e)}
+    
+    def log_server_performance(
+        self,
+        timestamp_hour: datetime,
+        total_requests: int = 0,
+        successful_requests: int = 0,
+        failed_requests: int = 0,
+        avg_response_time_ms: int = 0,
+        max_response_time_ms: int = 0,
+        health_status: str = "healthy",
+        error_rate_percent: float = 0.0,
+        rag_requests: int = 0,
+        openai_requests: int = 0,
+        validation_rejections: int = 0,
+        quota_blocks: int = 0
+    ) -> None:
+        """Log des métriques de performance serveur par heure"""
+        try:
+            with psycopg2.connect(self.dsn) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO server_performance_metrics (
+                            timestamp_hour, total_requests, successful_requests, 
+                            failed_requests, avg_response_time_ms, max_response_time_ms,
+                            rag_requests, openai_requests, validation_rejections, quota_blocks,
+                            health_status, error_rate_percent
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (timestamp_hour) 
+                        DO UPDATE SET 
+                            total_requests = EXCLUDED.total_requests,
+                            successful_requests = EXCLUDED.successful_requests,
+                            failed_requests = EXCLUDED.failed_requests,
+                            avg_response_time_ms = EXCLUDED.avg_response_time_ms,
+                            max_response_time_ms = EXCLUDED.max_response_time_ms,
+                            rag_requests = EXCLUDED.rag_requests,
+                            openai_requests = EXCLUDED.openai_requests,
+                            validation_rejections = EXCLUDED.validation_rejections,
+                            quota_blocks = EXCLUDED.quota_blocks,
+                            health_status = EXCLUDED.health_status,
+                            error_rate_percent = EXCLUDED.error_rate_percent
+                    """, (
+                        timestamp_hour, total_requests, successful_requests, failed_requests,
+                        avg_response_time_ms, max_response_time_ms, rag_requests, openai_requests,
+                        validation_rejections, quota_blocks, health_status, error_rate_percent
+                    ))
+                    conn.commit()
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur log server performance: {e}")
+    
+    def get_server_performance_analytics(self, hours: int = 24) -> Dict[str, Any]:
+        """Analytics de performance serveur sur les dernières heures"""
+        try:
+            start_time = datetime.now() - timedelta(hours=hours)
+            
+            with psycopg2.connect(self.dsn) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Métriques globales
+                    cur.execute("""
+                        SELECT 
+                            AVG(avg_response_time_ms) as avg_response_time,
+                            AVG(error_rate_percent) as avg_error_rate,
+                            SUM(total_requests) as total_requests,
+                            SUM(failed_requests) as total_failures,
+                            COUNT(*) FILTER (WHERE health_status = 'healthy') as healthy_hours,
+                            COUNT(*) FILTER (WHERE health_status = 'degraded') as degraded_hours,
+                            COUNT(*) FILTER (WHERE health_status = 'critical') as critical_hours
+                        FROM server_performance_metrics 
+                        WHERE timestamp_hour >= %s
+                    """, (start_time,))
+                    
+                    global_stats = dict(cur.fetchone() or {})
+                    
+                    # Patterns par heure
+                    cur.execute("""
+                        SELECT 
+                            EXTRACT(HOUR FROM timestamp_hour) as hour_of_day,
+                            AVG(total_requests) as avg_requests,
+                            MAX(total_requests) as peak_requests,
+                            AVG(avg_response_time_ms) as avg_response_time
+                        FROM server_performance_metrics 
+                        WHERE timestamp_hour >= %s
+                        GROUP BY EXTRACT(HOUR FROM timestamp_hour)
+                        ORDER BY hour_of_day
+                    """, (start_time,))
+                    
+                    hourly_patterns = [dict(row) for row in cur.fetchall()]
+                    
+                    # Déterminer le statut de santé actuel
+                    current_health = "healthy"
+                    if global_stats.get("avg_error_rate", 0) > 10:
+                        current_health = "critical"
+                    elif global_stats.get("avg_error_rate", 0) > 5:
+                        current_health = "degraded"
+                    
+                    return {
+                        "period_hours": hours,
+                        "current_status": {
+                            "overall_health": current_health,
+                            "avg_response_time_ms": int(global_stats.get("avg_response_time", 0) or 0),
+                            "error_rate_percent": round(global_stats.get("avg_error_rate", 0) or 0, 2)
+                        },
+                        "global_stats": global_stats,
+                        "hourly_usage_patterns": hourly_patterns
+                    }
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur get server performance analytics: {e}")
             return {"error": str(e)}
 
 # Singleton
-_billing_manager = None
+_analytics_manager = None
 
-def get_billing_manager() -> BillingManager:
-    global _billing_manager
-    if _billing_manager is None:
-        _billing_manager = BillingManager()
-    return _billing_manager
+def get_analytics_manager() -> AnalyticsManager:
+    global _analytics_manager
+    if _analytics_manager is None:
+        _analytics_manager = AnalyticsManager()
+    return _analytics_manager
 
-# ========== ENDPOINTS DE FACTURATION ==========
+# ========== FONCTION POUR MAIN.PY ==========
 
-@router.get("/quota-check/{user_email}")
-def check_user_quota(
-    user_email: str,
+def get_analytics():
+    """Fonction analytics pour compatibilité avec main.py"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "status": "analytics_available",
+            "tables_created": True,
+            "dsn_configured": bool(analytics.dsn)
+        }
+    except Exception as e:
+        return {
+            "status": "analytics_error",
+            "error": str(e)
+        }
+
+# ========== FONCTIONS HELPER POUR MAIN.PY ==========
+
+def log_server_performance(**kwargs) -> None:
+    """Fonction helper pour logger les performances serveur depuis main.py"""
+    try:
+        analytics = get_analytics_manager()
+        analytics.log_server_performance(**kwargs)
+    except Exception as e:
+        logger.error(f"❌ Erreur log server performance helper: {e}")
+
+def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
+    """Fonction helper pour récupérer les analytics serveur depuis main.py"""
+    try:
+        analytics = get_analytics_manager()
+        return analytics.get_server_performance_analytics(hours)
+    except Exception as e:
+        logger.error(f"❌ Erreur get server analytics: {e}")
+        return {"error": str(e)}
+
+# ========== FONCTIONS MIDDLEWARE POUR EXPERT.PY ==========
+
+def log_question_to_analytics(
+    current_user: Optional[Dict[str, Any]],
+    payload: Any,
+    result: Dict[str, Any],
+    response_text: str = "",
+    processing_time_ms: int = 0,
+    error_info: Dict[str, Any] = None
+) -> None:
+    """Fonction helper pour logger depuis expert.py"""
+    try:
+        analytics = get_analytics_manager()
+        
+        user_email = current_user.get('email') if current_user else None
+        session_id = getattr(payload, 'session_id', 'unknown')
+        question = getattr(payload, 'question', '')
+        
+        # Déterminer la source et le statut
+        if error_info:
+            status = "error"
+            source = "error"
+        elif result.get("type") == "quota_exceeded":
+            status = "quota_exceeded"
+            source = "quota_exceeded"
+        elif result.get("type") == "validation_rejected":
+            status = "validation_rejected" 
+            source = "validation_rejected"
+        else:
+            status = "success"
+            answer = result.get("answer", {})
+            source = answer.get("source", "unknown")
+        
+        analytics.log_question_response(
+            user_email=user_email,
+            session_id=session_id,
+            question=question,
+            response_text=response_text,
+            response_source=source,
+            status=status,
+            processing_time_ms=processing_time_ms,
+            confidence=result.get("confidence"),
+            entities=getattr(payload, 'entities', {}),
+            error_info=error_info
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur log question to analytics: {e}")
+
+def track_openai_call(
+    user_email: str = None,
+    session_id: str = None,
+    question_id: str = None,
+    call_type: str = "completion",
+    model: str = "gpt-3.5-turbo",
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    purpose: str = "fallback",
+    response_time_ms: int = 0,
+    success: bool = True
+) -> None:
+    """Fonction helper pour tracker les appels OpenAI"""
+    try:
+        analytics = get_analytics_manager()
+        analytics.track_openai_call(
+            user_email=user_email,
+            session_id=session_id,
+            question_id=question_id,
+            call_type=call_type,
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            purpose=purpose,
+            response_time_ms=response_time_ms,
+            success=success
+        )
+    except Exception as e:
+        logger.error(f"❌ Erreur track OpenAI call: {e}")
+
+# ========== ENDPOINTS ANALYTICS ==========
+
+@router.get("/analytics/dashboard")
+def analytics_dashboard(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Vérification du quota utilisateur"""
-    
-    # Sécurité
-    if current_user.get("email") != user_email and not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    billing = get_billing_manager()
-    allowed, details = billing.check_quota_before_question(user_email)
-    
-    return {
-        "user_email": user_email,
-        "quota_available": allowed,
-        "details": details
-    }
-
-@router.get("/my-billing")
-def my_billing_info(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Informations de facturation personnelles"""
-    
-    user_email = current_user.get("email")
-    if not user_email:
-        raise HTTPException(status_code=400, detail="User email not found")
-    
-    billing = get_billing_manager()
-    return billing.get_user_billing_summary(user_email)
-
-@router.post("/change-plan")
-def change_user_plan(
-    new_plan: str,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Changement de plan de facturation"""
-    
-    user_email = current_user.get("email")
-    if not user_email:
-        raise HTTPException(status_code=400, detail="User email not found")
-    
-    billing = get_billing_manager()
-    return billing.change_user_plan(user_email, new_plan)
-
-@router.post("/generate-invoice/{user_email}/{year}/{month}")
-def generate_invoice(
-    user_email: str,
-    year: int,
-    month: int,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Génération de facture mensuelle"""
-    
+    """Dashboard analytics (admin only)"""
     if not current_user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    billing = get_billing_manager()
-    return billing.generate_monthly_invoice(user_email, year, month)
+    try:
+        analytics = get_analytics_manager()
+        # Implémentation du dashboard admin
+        return {
+            "status": "dashboard_available",
+            "message": "Dashboard analytics à implémenter"
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
-@router.get("/plans")
-def available_plans() -> Dict[str, Any]:
-    """Liste des plans disponibles"""
+@router.get("/analytics/my-usage")
+def my_usage_analytics(
+    days: int = Query(30, ge=1, le=365),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Analytics personnelles de l'utilisateur"""
+    user_email = current_user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="User email not found")
     
-    billing = get_billing_manager()
-    return {
-        "plans": billing.plans
-    }
-
-# ========== MIDDLEWARE POUR EXPERT.PY ==========
-
-def check_quota_middleware(user_email: str) -> Tuple[bool, Dict[str, Any]]:
-    """
-    Middleware à appeler AVANT le traitement de chaque question
-    Retourne (autorisé, détails_quota)
-    """
     try:
-        billing = get_billing_manager()
-        return billing.check_quota_before_question(user_email)
+        analytics = get_analytics_manager()
+        return analytics.get_user_analytics(user_email, days)
     except Exception as e:
-        logger.error(f"❌ Erreur quota middleware: {e}")
-        # En cas d'erreur, autoriser (fail-safe)
-        return True, {"status": "error", "message": "Erreur système"}
+        return {"error": str(e)}
 
-def increment_quota_usage(user_email: str, success: bool = True, cost_usd: float = 0.0) -> None:
-    """
-    Middleware à appeler APRÈS le traitement de chaque question
-    """
+@router.get("/analytics/openai-costs")
+def openai_costs_analytics(
+    days: int = Query(30, ge=1, le=365),
+    user_email: str = Query(None),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Analytics des coûts OpenAI"""
+    
+    # Si user_email spécifié, vérifier les permissions
+    if user_email:
+        if current_user.get("email") != user_email and not current_user.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        user_email = current_user.get("email")
+    
+    if not user_email:
+        raise HTTPException(status_code=400, detail="User email required")
+    
     try:
-        billing = get_billing_manager()
-        billing.increment_usage_after_question(user_email, success, cost_usd)
+        analytics = get_analytics_manager()
+        return analytics.get_user_analytics(user_email, days)
     except Exception as e:
-        logger.error(f"❌ Erreur increment quota: {e}")
+        return {"error": str(e)}
 
-# ========== INTÉGRATION DANS EXPERT.PY ==========
-"""
-Dans expert.py, modifier _ask_internal() comme suit:
-
-def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+@router.get("/analytics/performance")
+def server_performance_analytics(
+    hours: int = Query(24, ge=1, le=168),  # Max 7 jours
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Analytics de performance serveur (admin only)"""
+    if not current_user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     try:
-        user_email = current_user.get('email') if current_user else None
-        
-        # 1. VÉRIFICATION QUOTA AVANT TRAITEMENT
-        if user_email:
-            quota_allowed, quota_details = check_quota_middleware(user_email)
-            
-            if not quota_allowed:
-                return {
-                    "type": "quota_exceeded",
-                    "message": quota_details.get("message", "Quota mensuel dépassé"),
-                    "quota_details": quota_details,
-                    "session_id": payload.session_id or "default"
-                }
-        
-        # 2. TRAITEMENT NORMAL
-        result = handle(...)
-        
-        # 3. INCRÉMENT USAGE APRÈS SUCCÈS
-        if user_email:
-            increment_quota_usage(user_email, success=True, cost_usd=0.0)
-        
-        return result
-        
+        analytics = get_analytics_manager()
+        return analytics.get_server_performance_analytics(hours)
     except Exception as e:
-        # 4. INCRÉMENT USAGE MÊME EN CAS D'ERREUR
-        if user_email:
-            increment_quota_usage(user_email, success=False, cost_usd=0.0)
-        raise
-"""
+        return {"error": str(e)}
+
+@router.get("/health-check")
+def analytics_health_check() -> Dict[str, Any]:
+    """Health check du système analytics"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "status": "healthy",
+            "analytics_available": True,
+            "database_connected": bool(analytics.dsn),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "analytics_available": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
