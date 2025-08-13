@@ -2,7 +2,6 @@
 """
 Processeur Chain-of-Thought et fallback OpenAI
 Extrait de dialogue_manager.py pour modularité
-VERSION CORRIGÉE: Formatage Markdown amélioré
 """
 
 import logging
@@ -277,7 +276,7 @@ Réponse experte structurée:"""
     return None
 
 # ---------------------------------------------------------------------------
-# FALLBACK OPENAI AMÉLIORÉ AVEC FORMATAGE CORRIGÉ
+# FALLBACK OPENAI AMÉLIORÉ
 # ---------------------------------------------------------------------------
 
 def should_use_openai_fallback(rag_result: Dict[str, Any], intent) -> bool:
@@ -320,7 +319,6 @@ def should_use_openai_fallback(rag_result: Dict[str, Any], intent) -> bool:
 def generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent, rag_context: str = "", target_language: str = "fr") -> Optional[Dict[str, Any]]:
     """
     Génère une réponse via OpenAI quand le RAG échoue
-    VERSION CORRIGÉE: Formatage Markdown forcé et structure claire
     """
     if not OPENAI_FALLBACK_AVAILABLE:
         return None
@@ -344,7 +342,7 @@ def generate_openai_fallback_response(question: str, entities: Dict[str, Any], i
         # Fallback standard si CoT non disponible/approprié
         system_context = build_agricultural_context(entities, intent)
         
-        # 🔧 CORRECTION: Prompt avec formatage Markdown forcé
+        # Prompt ultra-explicite pour forcer la langue
         if target_language == "fr":
             fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
 
@@ -354,32 +352,15 @@ Question de l'utilisateur : {question}
 
 Contexte partiel disponible (si pertinent) : {rag_context}
 
-INSTRUCTIONS DE FORMATAGE OBLIGATOIRES :
-- Commence par un titre principal avec ## (exemple: ## Diagnostic Principal)
-- Structure ta réponse avec des sections claires utilisant ### pour les sous-titres
-- Utilise **gras** pour les éléments importants (diagnostic, valeurs clés)
-- Utilise des listes à puces avec - pour énumérer les points
-- Sépare chaque section par une ligne vide
-- JAMAIS de tableaux bruts ou de données mal formatées
-- JAMAIS de fragments de texte non structurés
+INSTRUCTIONS IMPORTANTES :
+- Réponds EXCLUSIVEMENT en français
+- Donne une réponse basée sur tes connaissances en aviculture
+- Sois précis et technique quand approprié  
+- Si tu mentionnes des valeurs, indique qu'elles sont approximatives
+- Structure ta réponse en Markdown si pertinent
+- Mentionne que pour des données spécifiques à une lignée/âge précis, une consultation des guides techniques est recommandée
 
-STRUCTURE SUGGÉRÉE :
-## Diagnostic Principal
-[Description claire du diagnostic principal]
-
-### Causes Possibles
-- Cause 1 avec explication
-- Cause 2 avec explication
-- Cause 3 avec explication
-
-### Recommandations
-- **Immédiat** : Action urgente
-- **Court terme** : Actions à 2-7 jours
-- **Prévention** : Mesures préventives
-
-Si tu mentionnes des valeurs, indique qu'elles sont approximatives et qu'une consultation des guides techniques spécifiques est recommandée.
-
-Réponse professionnelle BIEN FORMATÉE EN FRANÇAIS :"""
+Réponse professionnelle EN FRANÇAIS :"""
 
         else:
             # Pour toutes les autres langues (surtout anglais)
@@ -391,38 +372,22 @@ User's question: {question}
 
 Partial available context (if relevant): {rag_context}
 
-MANDATORY FORMATTING INSTRUCTIONS:
-- Start with a main title using ## (example: ## Primary Diagnosis)
-- Structure your response with clear sections using ### for subtitles
-- Use **bold** for important elements (diagnosis, key values)
-- Use bullet points with - to enumerate items
-- Separate each section with a blank line
-- NEVER include raw tables or poorly formatted data
-- NEVER include unstructured text fragments
+CRITICAL INSTRUCTIONS:
+- You MUST respond ONLY in English
+- DO NOT use any French words or phrases
+- Provide an answer based on your poultry farming knowledge  
+- Be precise and technical when appropriate
+- If you mention values, indicate they are approximate
+- Structure your response in Markdown if relevant
+- Mention that for specific data related to a precise breed/age, consulting technical guides is recommended
 
-SUGGESTED STRUCTURE:
-## Primary Diagnosis
-[Clear description of the main diagnosis]
-
-### Possible Causes
-- Cause 1 with explanation
-- Cause 2 with explanation
-- Cause 3 with explanation
-
-### Recommendations
-- **Immediate**: Urgent action
-- **Short term**: Actions within 2-7 days
-- **Prevention**: Preventive measures
-
-If you mention values, indicate they are approximate and recommend consulting specific technical guides.
-
-Professional WELL-FORMATTED response IN ENGLISH ONLY:"""
+Professional response IN ENGLISH ONLY:"""
 
         # Utilisation de la fonction complete optimisée
         response = openai_complete(
             prompt=fallback_prompt,
             temperature=0.3,  # Légèrement créatif mais précis
-            max_tokens=500    # Augmenté pour permettre le formatage
+            max_tokens=400
         )
         
         if response:
@@ -438,8 +403,7 @@ Professional WELL-FORMATTED response IN ENGLISH ONLY:"""
                     "rag_context_provided": bool(rag_context.strip()),
                     "target_language": target_language,
                     "prompt_language": "french" if target_language == "fr" else "english",
-                    "cot_attempted": False,
-                    "formatting_enhanced": True  # 🔧 Nouveau flag
+                    "cot_attempted": False
                 }
             }
             
@@ -455,7 +419,6 @@ Professional WELL-FORMATTED response IN ENGLISH ONLY:"""
 def maybe_synthesize(question: str, context_text: str) -> str:
     """
     Utilise les nouvelles fonctions de synthèse si disponibles
-    VERSION CORRIGÉE: Formatage amélioré
     """
     try:
         if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
@@ -470,28 +433,25 @@ def maybe_synthesize(question: str, context_text: str) -> str:
             except Exception as e:
                 logger.warning(f"⚠️ Échec synthèse spécialisée, fallback standard: {e}")
         
-        # 🔧 CORRECTION: Prompt de synthèse avec formatage forcé
-        synthesis_prompt = f"""Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
+        # Fallback vers méthode standard
+        synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
 
-RÈGLES DE FORMATAGE OBLIGATOIRES :
-- Utilise ## pour le titre principal
-- Utilise ### pour les sections
-- Utilise **gras** pour les éléments importants
-- Utilise des listes à puces avec - pour énumérer
-- Sépare les sections par des lignes vides
+RÈGLES IMPORTANTES :
 - NE JAMAIS mentionner les sources dans ta réponse
 - NE JAMAIS inclure de fragments de texte brut des PDFs
 - NE JAMAIS copier-coller des tableaux mal formatés
+- Utiliser du Markdown (##, ###, -, **)
 - Si l'info est incertaine, donne une fourchette et dis-le
+- Réponse concise mais complète
 
 Question : {question}
 
 Informations à synthétiser :
-{context_text[:2000]}
+{context}
 
-Réponse synthétique BIEN FORMATÉE :"""
+Réponse synthétique :""".format(question=question, context=context_text[:2000])
         
-        synthesized = openai_complete(synthesis_prompt, temperature=0.2, max_tokens=400)
+        synthesized = openai_complete(synthesis_prompt, temperature=0.2)
         return synthesized if synthesized else context_text
         
     except Exception as e:
@@ -512,14 +472,8 @@ def generate_clarification_response_advanced(intent, missing_fields: list, gener
     except Exception as e:
         logger.warning(f"⚠️ Échec clarification spécialisée: {e}")
     
-    # Fallback basique avec formatage
-    return f"""## Informations Supplémentaires Requises
-
-Pour vous donner une réponse précise, j'ai besoin de précisions sur :
-
-{chr(10).join(f'- **{field}**' for field in missing_fields)}
-
-Pouvez-vous me fournir ces informations pour une analyse complète ?"""
+    # Fallback basique
+    return f"J'ai besoin de précisions sur: {', '.join(missing_fields)}. Pouvez-vous me donner ces informations ?"
 
 # ---------------------------------------------------------------------------
 # FONCTIONS DE STATUT ET TEST
@@ -533,8 +487,7 @@ def get_cot_fallback_status() -> Dict[str, Any]:
         "openai_fallback_available": OPENAI_FALLBACK_AVAILABLE,
         "openai_cot_available": OPENAI_COT_AVAILABLE,
         "fallback_enabled": str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on"),
-        "synthesis_enabled": str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on"),
-        "formatting_enhanced": True  # 🔧 Nouveau statut
+        "synthesis_enabled": str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
     }
     
     if OPENAI_FALLBACK_AVAILABLE:
@@ -567,8 +520,7 @@ def test_cot_fallback_pipeline() -> Dict[str, Any]:
         # Test fonction de base
         results["basic_status"] = {
             "openai_fallback": OPENAI_FALLBACK_AVAILABLE,
-            "cot_available": OPENAI_COT_AVAILABLE,
-            "formatting_enhanced": True
+            "cot_available": OPENAI_COT_AVAILABLE
         }
         
         # Test CoT si disponible
@@ -590,7 +542,6 @@ def test_cot_fallback_pipeline() -> Dict[str, Any]:
         return {
             "status": "success",
             "message": "Pipeline CoT et fallback testé avec succès",
-            "formatting_fix": "applied",
             "detailed_results": results
         }
         
