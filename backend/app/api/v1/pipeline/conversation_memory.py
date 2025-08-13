@@ -141,6 +141,60 @@ def extract_species_from_text(text: str) -> Optional[str]:
     logger.debug("❌ [SPECIES_EXTRACT] Aucune espèce détectée")
     return None
 
+def extract_signs_from_text(text: str) -> Optional[str]:
+    """
+    NOUVELLE FONCTION: Extraction des signes cliniques depuis le texte via OpenAI
+    """
+    if not text:
+        return None
+    
+    logger.debug(f"🔍 [SIGNS_EXTRACT] Analyse: '{text}'")
+    
+    # Fallback rapide pour signes évidents
+    obvious_signs = [
+        "diarrhée hémorragique", "diarrhée sanglante", "diarrhée", 
+        "mortalité", "boiterie", "paralysie", "convulsions", "toux"
+    ]
+    
+    t = text.lower()
+    for sign in obvious_signs:
+        if sign in t:
+            logger.info(f"✅ [SIGNS_EXTRACT] Signe évident détecté: {sign}")
+            return sign
+    
+    # Si OpenAI disponible, extraction intelligente
+    try:
+        from ..utils.openai_utils import complete as openai_complete
+        
+        extraction_prompt = f"""Tu es un vétérinaire expert. Extrais UNIQUEMENT les signes cliniques mentionnés dans ce texte sur l'aviculture.
+
+Texte: "{text}"
+
+INSTRUCTIONS:
+- Extrais SEULEMENT les symptômes/signes cliniques mentionnés
+- Si aucun signe clinique n'est mentionné, réponds "AUCUN"
+- Donne une réponse courte (maximum 3-4 mots)
+- Exemples de signes: diarrhée, boiterie, mortalité, convulsions, toux, etc.
+
+Signes cliniques détectés:"""
+
+        response = openai_complete(
+            prompt=extraction_prompt,
+            temperature=0.1,  # Très déterministe
+            max_tokens=20     # Réponse courte
+        )
+        
+        if response and response.strip().upper() != "AUCUN":
+            extracted_sign = response.strip()
+            logger.info(f"✅ [SIGNS_EXTRACT] OpenAI détecté: '{extracted_sign}'")
+            return extracted_sign
+            
+    except Exception as e:
+        logger.warning(f"⚠️ [SIGNS_EXTRACT] Échec OpenAI: {e}")
+    
+    logger.debug("❌ [SIGNS_EXTRACT] Aucun signe clinique détecté")
+    return None
+
 # ---------------------------------------------------------------------------
 # GESTION MÉMOIRE CONVERSATIONNELLE
 # ---------------------------------------------------------------------------
@@ -179,12 +233,14 @@ def merge_conversation_context(current_entities: Dict[str, Any], session_context
     auto_line = extract_line_from_text(question) 
     auto_sex = normalize_sex_from_text(question)
     auto_age = extract_age_days_from_text(question)
+    auto_signs = extract_signs_from_text(question)
     
     auto_extracted = {
         "species": auto_species,
         "line": auto_line, 
         "sex": auto_sex,
-        "age_days": auto_age
+        "age_days": auto_age,
+        "signs": auto_signs
     }
     logger.info(f"🤖 [MERGE] Auto-extraction: {auto_extracted}")
     
@@ -274,7 +330,8 @@ def get_memory_status() -> Dict[str, Any]:
             "patterns_age_ameliores",
             "logs_detailles_extraction", 
             "logique_fusion_securisee",
-            "preservation_age_valide"
+            "preservation_age_valide",
+            "extraction_signes_cliniques"
         ]
     }
 
@@ -293,7 +350,8 @@ def debug_text_extraction(text: str) -> Dict[str, Any]:
         "age_days": extract_age_days_from_text(text),
         "species": extract_species_from_text(text),
         "line": extract_line_from_text(text),
-        "sex": normalize_sex_from_text(text)
+        "sex": normalize_sex_from_text(text),
+        "signs": extract_signs_from_text(text)
     }
     
     logger.info(f"🔬 [DEBUG] Résultats: {results}")
