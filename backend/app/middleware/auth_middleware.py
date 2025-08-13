@@ -132,8 +132,8 @@ async def auth_middleware(request: Request, call_next):
         logger.warning(f"⚠️ BYPASS TEMPORAIRE conversations: {request.url.path}")
         return await call_next(request)
     
-    # 🔧 NOUVEAU: BYPASS TEMPORAIRE POUR ENDPOINTS DIALOGUE/EXPERT (DEBUG)
-    if request.url.path in ["/api/v1/expert", "/api/v1/ask", "/api/v1/chat", "/api/v1/query"]:
+    # 🔧 NOUVEAU: BYPASS TEMPORAIRE POUR TOUS LES ENDPOINTS EXPERT (DEBUG)
+    if request.url.path.startswith("/api/v1/expert/"):
         logger.warning(f"⚠️ BYPASS TEMPORAIRE expert: {request.url.path}")
         return await call_next(request)
     
