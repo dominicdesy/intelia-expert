@@ -2,6 +2,7 @@
 """
 Gestion de la mémoire conversationnelle et contexte de session
 Extrait de dialogue_manager.py pour modularité
+VERSION CORRIGÉE - Conservation du code original avec améliorations
 """
 
 import logging
@@ -36,64 +37,108 @@ except ImportError as e:
 _CONVERSATION_MEMORY = None
 
 # ---------------------------------------------------------------------------
-# PATTERNS D'EXTRACTION AUTOMATIQUE
+# PATTERNS D'EXTRACTION AUTOMATIQUE - VERSION AMÉLIORÉE
 # ---------------------------------------------------------------------------
 
+# CORRECTION: Patterns plus robustes et ordonnés par priorité
 _AGE_PATTERNS = [
-    r"\b(?:âge|age)\s*[:=]?\s*(\d{1,2})\s*(?:j|jours|d|days)\b",  # âge: 21 jours / age=21d
-    r"\b(?:J|D)\s*?(\d{1,2})\b",                                 # J21 / D21
-    r"\b(?:day|jour)\s+(\d{1,2})\b",                             # day 21 / jour 14 (corrigé)
-    r"\bjour\s+(\d{1,2})\b",                                     # jour 14 (pattern spécifique)
-    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                       # 21 j / 21d
+    # Patterns spécifiques d'abord (plus précis)
+    r"\bjour\s+(\d{1,2})\b",                                     # jour 14 (priorité haute)
+    r"\b(?:J|D)(\d{1,2})\b",                                     # J14, D14 (sans espace)
+    r"\b(?:J|D)\s*(\d{1,2})\b",                                  # J 14, D 14 (avec espace)
+    r"\b(?:âge|age)\s*[:=]?\s*(\d{1,2})\s*(?:j|jours|d|days)\b", # âge: 21 jours / age=21d
+    r"\b(?:day|jour)\s+(\d{1,2})\b",                             # day 21 / jour 14
     r"\bage_days\s*[:=]\s*(\d{1,2})\b",                          # age_days=21
-    r"\bJ(\d{1,2})\b",                                           # J14, J21
-    r"\bD(\d{1,2})\b",                                           # D14, D21
+    # Patterns génériques en dernier (moins précis)
+    r"\b(\d{1,2})\s*(?:j|jours|d|days)\b",                       # 21 j / 21d
 ]
 
 def extract_age_days_from_text(text: str) -> Optional[int]:
-    """Extraction automatique de l'âge depuis le texte"""
+    """
+    Extraction automatique de l'âge depuis le texte
+    CORRECTION: Logs détaillés et gestion améliorée des patterns
+    """
     if not text:
+        logger.debug("🔍 [AGE_EXTRACT] Texte vide")
         return None
-    for pat in _AGE_PATTERNS:
+    
+    logger.debug(f"🔍 [AGE_EXTRACT] Analyse du texte: '{text}'")
+    
+    for i, pat in enumerate(_AGE_PATTERNS):
         m = re.search(pat, text, flags=re.I)
         if m:
             try:
                 val = int(m.group(1))
+                logger.info(f"✅ [AGE_EXTRACT] Pattern {i} trouvé: '{pat}' -> âge={val}")
                 if 0 <= val <= 70:
                     return val
-            except Exception:
+                else:
+                    logger.warning(f"⚠️ [AGE_EXTRACT] Âge hors limites: {val}")
+            except Exception as e:
+                logger.warning(f"⚠️ [AGE_EXTRACT] Erreur conversion: {e}")
                 continue
+    
+    logger.warning(f"❌ [AGE_EXTRACT] Aucun âge détecté dans: '{text}'")
     return None
 
 def normalize_sex_from_text(text: str) -> Optional[str]:
     """Normalisation du sexe depuis le texte"""
-    t = (text or "").lower()
+    if not text:
+        return None
+    
+    t = text.lower()
+    logger.debug(f"🔍 [SEX_EXTRACT] Analyse: '{t}'")
+    
     if any(k in t for k in ["as hatched", "as-hatched", "as_hatched", "mixte", "mixed", " ah "]):
+        logger.info("✅ [SEX_EXTRACT] Sexe détecté: as_hatched")
         return "as_hatched"
     if any(k in t for k in ["mâle", " male ", "male"]):
+        logger.info("✅ [SEX_EXTRACT] Sexe détecté: male")
         return "male"
     if any(k in t for k in ["femelle", " female ", "female"]):
+        logger.info("✅ [SEX_EXTRACT] Sexe détecté: female")
         return "female"
+    
+    logger.debug("❌ [SEX_EXTRACT] Aucun sexe détecté")
     return None
 
 def extract_line_from_text(text: str) -> Optional[str]:
     """Extraction de lignée depuis le texte"""
-    t = (text or "").lower()
+    if not text:
+        return None
+    
+    t = text.lower()
+    logger.debug(f"🔍 [LINE_EXTRACT] Analyse: '{t}'")
+    
     if any(k in t for k in ["cobb", "cobb500", "cobb 500", "cobb-500"]):
+        logger.info("✅ [LINE_EXTRACT] Lignée détectée: cobb500")
         return "cobb500"
     if any(k in t for k in ["ross", "ross308", "ross 308", "ross-308"]):
+        logger.info("✅ [LINE_EXTRACT] Lignée détectée: ross308")
         return "ross308"
     if any(k in t for k in ["hubbard"]):
+        logger.info("✅ [LINE_EXTRACT] Lignée détectée: hubbard")
         return "hubbard"
+    
+    logger.debug("❌ [LINE_EXTRACT] Aucune lignée détectée")
     return None
 
 def extract_species_from_text(text: str) -> Optional[str]:
     """Extraction d'espèce depuis le texte"""
-    t = (text or "").lower()
+    if not text:
+        return None
+    
+    t = text.lower()
+    logger.debug(f"🔍 [SPECIES_EXTRACT] Analyse: '{t}'")
+    
     if any(k in t for k in ["broiler", "poulet de chair", "chair"]):
+        logger.info("✅ [SPECIES_EXTRACT] Espèce détectée: broiler")
         return "broiler"
     if any(k in t for k in ["layer", "pondeuse", "ponte"]):
+        logger.info("✅ [SPECIES_EXTRACT] Espèce détectée: layer")
         return "layer"
+    
+    logger.debug("❌ [SPECIES_EXTRACT] Aucune espèce détectée")
     return None
 
 # ---------------------------------------------------------------------------
@@ -119,35 +164,47 @@ def merge_conversation_context(current_entities: Dict[str, Any], session_context
     """
     Fusionne le contexte de session avec les entités actuelles.
     Enrichit automatiquement depuis le texte de la question.
-    CORRECTION: Préserve l'âge du contexte précédent si non présent dans la nouvelle question.
+    CORRECTION MAJEURE: Logique de fusion simplifiée et sécurisée
     """
-    # CORRECTION: Commencer par le contexte de session (qui contient l'âge)
-    merged = dict(session_context.get("entities", {}))
+    logger.info(f"🔗 [MERGE] Début fusion - session: {session_context.get('entities', {})}")
+    logger.info(f"🔗 [MERGE] Current entities: {current_entities}")
+    logger.info(f"🔗 [MERGE] Question: '{question}'")
     
-    # Enrichissement automatique depuis le texte
+    # 1. Commencer par le contexte de session (données persistantes)
+    merged = dict(session_context.get("entities", {}))
+    logger.debug(f"🔗 [MERGE] Base session: {merged}")
+    
+    # 2. Enrichissement automatique depuis le texte de la question
     auto_species = extract_species_from_text(question)
     auto_line = extract_line_from_text(question) 
     auto_sex = normalize_sex_from_text(question)
     auto_age = extract_age_days_from_text(question)
     
-    # CORRECTION: Seulement remplacer si la nouvelle valeur existe
-    if auto_species: 
-        merged["species"] = auto_species
-    if auto_line: 
-        merged["line"] = auto_line
-    if auto_sex: 
-        merged["sex"] = auto_sex
-    if auto_age: 
-        merged["age_days"] = auto_age  # Seulement si nouvel âge détecté
+    auto_extracted = {
+        "species": auto_species,
+        "line": auto_line, 
+        "sex": auto_sex,
+        "age_days": auto_age
+    }
+    logger.info(f"🤖 [MERGE] Auto-extraction: {auto_extracted}")
     
-    # CORRECTION: Fusion sélective - ne pas écraser l'âge s'il n'est pas dans current_entities
+    # 3. CORRECTION: Fusion prioritaire - auto-extraction en premier
+    for key, value in auto_extracted.items():
+        if value is not None:
+            merged[key] = value
+            logger.debug(f"✅ [MERGE] Auto-ajout: {key}={value}")
+    
+    # 4. CORRECTION: Current entities en dernier, mais seulement si valeurs valides
     for key, value in current_entities.items():
-        if key == "age_days" and value is None and merged.get("age_days") is not None:
-            # Garder l'âge du contexte précédent si la nouvelle valeur est None
-            continue
-        merged[key] = value
+        if value is not None:  # Seulement les valeurs non-nulles
+            # SÉCURITÉ: Ne pas écraser un âge valide par None
+            if key == "age_days" and value is None and merged.get("age_days") is not None:
+                logger.warning(f"⚠️ [MERGE] Préservation âge existant: {merged.get('age_days')}")
+                continue
+            merged[key] = value
+            logger.debug(f"✅ [MERGE] Current ajout: {key}={value}")
     
-    logger.info(f"🔗 Contexte fusionné: session={session_context.get('entities', {})} + auto={{'species':{auto_species}, 'line':{auto_line}, 'sex':{auto_sex}, 'age':{auto_age}}} + current={current_entities} → {merged}")
+    logger.info(f"🎯 [MERGE] Résultat final: {merged}")
     
     return merged
 
@@ -211,5 +268,49 @@ def get_memory_status() -> Dict[str, Any]:
         "postgres_enabled": MEMORY_AVAILABLE,
         "fallback_type": "in_memory" if not MEMORY_AVAILABLE else "postgresql",
         "auto_extraction_enabled": True,
-        "context_expiry_minutes": 10
+        "context_expiry_minutes": 10,
+        "version": "corrected_v1.1",
+        "improvements": [
+            "patterns_age_ameliores",
+            "logs_detailles_extraction", 
+            "logique_fusion_securisee",
+            "preservation_age_valide"
+        ]
     }
+
+# ---------------------------------------------------------------------------
+# FONCTIONS DE DEBUG ET TEST
+# ---------------------------------------------------------------------------
+
+def debug_text_extraction(text: str) -> Dict[str, Any]:
+    """
+    NOUVELLE FONCTION: Debug complet de l'extraction automatique
+    """
+    logger.info(f"🔬 [DEBUG] Test extraction sur: '{text}'")
+    
+    results = {
+        "text": text,
+        "age_days": extract_age_days_from_text(text),
+        "species": extract_species_from_text(text),
+        "line": extract_line_from_text(text),
+        "sex": normalize_sex_from_text(text)
+    }
+    
+    logger.info(f"🔬 [DEBUG] Résultats: {results}")
+    return results
+
+def test_merge_logic(question: str, session_entities: Dict = None, current_entities: Dict = None) -> Dict[str, Any]:
+    """
+    NOUVELLE FONCTION: Test de la logique de fusion
+    """
+    session_context = {"entities": session_entities or {}}
+    current = current_entities or {}
+    
+    logger.info(f"🧪 [TEST] Question: '{question}'")
+    logger.info(f"🧪 [TEST] Session: {session_entities}")
+    logger.info(f"🧪 [TEST] Current: {current_entities}")
+    
+    result = merge_conversation_context(current, session_context, question)
+    
+    logger.info(f"🧪 [TEST] Résultat: {result}")
+    return result
