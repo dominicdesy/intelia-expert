@@ -10,8 +10,11 @@ import re
 import math
 import time  # NOUVEAU: Ajouté pour les endpoints de test
 
-# 🔐 Import authentification
+# 🔑 Import authentification
 from app.api.v1.auth import get_current_user
+
+# 🏦 Import système de quota
+from app.api.v1.billing import check_quota_middleware, increment_quota_usage
 
 # 🌾 Import validateur agricole
 try:
@@ -217,17 +220,51 @@ class AskPayload(BaseModel):
     bypass_validation: Optional[bool] = False  # 🌾 NOUVEAU: pour bypass administrateur
     model_config = {"extra": "allow"}
 
-# ===== Fonction interne partagée avec validation =====
+# ===== Fonction interne partagée avec validation ET quota =====
 def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Logique interne pour traiter les questions (avec ou sans auth) + validation agricole."""
+    """Logique interne pour traiter les questions (avec ou sans auth) + validation agricole + quota."""
+    user_email = None
+    
     try:
         # Extraction des infos utilisateur pour la validation
         user_id, request_ip = _get_user_info_for_validation(request, current_user)
         
+        # Extraction de l'email pour le quota
+        if current_user:
+            user_email = current_user.get('email')
+        
+        # 🚫 VÉRIFICATION QUOTA AVANT TRAITEMENT
+        if user_email:
+            try:
+                quota_allowed, quota_details = check_quota_middleware(user_email)
+                
+                if not quota_allowed:
+                    logger.warning(f"🚫 Quota dépassé pour {user_email}: {quota_details.get('message', 'Quota exceeded')}")
+                    return {
+                        "type": "quota_exceeded",
+                        "message": quota_details.get("message", "Quota mensuel dépassé"),
+                        "quota_details": quota_details,
+                        "upgrade_suggestions": [
+                            {"plan": "basic", "price": "29.99€", "quota": "1000 questions"},
+                            {"plan": "premium", "price": "99.99€", "quota": "5000 questions"}
+                        ],
+                        "session_id": payload.session_id or "default",
+                        "user": {
+                            "email": user_email,
+                            "user_id": current_user.get('user_id')
+                        }
+                    }
+                else:
+                    logger.info(f"✅ Quota OK pour {user_email}: {quota_details.get('usage', 0)}/{quota_details.get('limit', 'unlimited')}")
+            except Exception as e:
+                logger.error(f"❌ Erreur vérification quota pour {user_email}: {e}")
+                # En cas d'erreur quota, on continue le traitement
+                pass
+
         # Log différencié selon l'authentification
         if current_user:
-            user_email = current_user.get('email', 'unknown')
-            logger.info(f"🔐 Question authentifiée de {user_email}: {payload.question[:120]}")
+            user_email_display = current_user.get('email', 'unknown')
+            logger.info(f"🔐 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
             logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
@@ -243,6 +280,13 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             
             if not validation_result.is_valid:
                 logger.warning(f"🚫 Question rejetée par validation agricole: {validation_result.reason}")
+                # ❌ INCRÉMENT USAGE MÊME POUR VALIDATION ÉCHOUÉE
+                if user_email:
+                    try:
+                        increment_quota_usage(user_email, success=False)
+                    except Exception as e:
+                        logger.error(f"❌ Erreur incrémentation quota (validation failed): {e}")
+                
                 return {
                     "type": "validation_rejected",
                     "message": validation_result.reason,
@@ -283,6 +327,14 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             logger.warning("⚠️ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
 
+        # ✅ SUCCÈS: Incrément usage après traitement réussi
+        if user_email:
+            try:
+                increment_quota_usage(user_email, success=True)
+                logger.info(f"📊 Usage incrémenté pour {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Erreur incrémentation quota (success): {e}")
+
         # Ajouter les infos utilisateur et de validation dans la réponse
         if current_user:
             result["user"] = {
@@ -300,6 +352,14 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         return result
         
     except Exception as e:
+        # ❌ ERREUR: Incrément usage même en cas d'erreur de traitement
+        if user_email:
+            try:
+                increment_quota_usage(user_email, success=False)
+                logger.info(f"📊 Usage incrémenté pour {user_email} (erreur)")
+            except Exception as quota_e:
+                logger.error(f"❌ Erreur incrémentation quota (error): {quota_e}")
+        
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
@@ -310,7 +370,7 @@ def ask(
     request: Request,
     current_user: dict = Depends(get_current_user)  # 🔐 Auth requise
 ) -> Dict[str, Any]:
-    """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole."""
+    """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole et quota."""
     return _ask_internal(payload, request, current_user)
 
 @router.post("/ask-public")
@@ -326,6 +386,7 @@ def system_status() -> Dict[str, Any]:
         "dialogue_manager_available": DIALOGUE_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
+        "billing_system_available": True,  # 🏦 NOUVEAU
         "service": "expert_api",
     }
 
@@ -496,12 +557,67 @@ def test_agricultural_validation(
             "question": test_question
         }
 
+# 🏦 NOUVEAUX ENDPOINTS QUOTA
+@router.get("/quota-status")
+def quota_status(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Récupère le statut du quota pour l'utilisateur connecté."""
+    user_email = current_user.get('email')
+    if not user_email:
+        raise HTTPException(status_code=400, detail="Email utilisateur non trouvé")
+    
+    try:
+        quota_allowed, quota_details = check_quota_middleware(user_email)
+        return {
+            "user_email": user_email,
+            "quota_allowed": quota_allowed,
+            "quota_details": quota_details,
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération quota pour {user_email}: {e}")
+        return {
+            "error": f"Failed to get quota status: {str(e)}",
+            "user_email": user_email
+        }
+
+@router.post("/test-quota-increment")
+def test_quota_increment(
+    success: bool = True,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Teste l'incrémentation du quota (pour debug)."""
+    user_email = current_user.get('email')
+    if not user_email:
+        raise HTTPException(status_code=400, detail="Email utilisateur non trouvé")
+    
+    try:
+        increment_quota_usage(user_email, success=success)
+        
+        # Récupération du statut mis à jour
+        quota_allowed, quota_details = check_quota_middleware(user_email)
+        
+        return {
+            "message": f"Quota incrémenté (success={success})",
+            "user_email": user_email,
+            "updated_quota": quota_details,
+            "tester": current_user.get('email', 'unknown'),
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        return {
+            "error": f"Failed to increment quota: {str(e)}",
+            "user_email": user_email
+        }
+
 @router.get("/debug")
 def debug_imports() -> Dict[str, Any]:
     """Vérifie quelques imports utiles (préserve le comportement original)."""
     debug_info: Dict[str, Any] = {
         "dialogue_available": DIALOGUE_AVAILABLE,
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
+        "billing_system_available": True,  # 🏦 NOUVEAU
         "imports_tested": []
     }
     
@@ -512,7 +628,8 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.pipeline.rag_engine",
         "app.api.v1.utils.formulas",
         "app.api.v1.pipeline.intent_registry",
-        "app.api.v1.agricultural_domain_validator",  # 🌾 NOUVEAU
+        "app.api.v1.agricultural_domain_validator",  # 🌾
+        "app.api.v1.billing",  # 🏦 NOUVEAU
     ]
     
     for import_path in imports_to_test:

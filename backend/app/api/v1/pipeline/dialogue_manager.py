@@ -998,7 +998,7 @@ def _final_sanitize(text: str) -> str:
         text = re.sub(phrase, '', text, flags=re.IGNORECASE)
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
-    text = re.sub(r'^\s+|\s+
+    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
