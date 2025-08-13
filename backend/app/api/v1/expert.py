@@ -12,7 +12,22 @@ import math
 # 🔒 Import authentification
 from app.api.v1.auth import get_current_user
 
-logger = logging.getLogger(__name__)
+# 🌾 Import validateur agricole
+try:
+    from app.api.v1.agricultural_domain_validator import (
+        validate_agricultural_question,
+        get_agricultural_validator_stats,
+        is_agricultural_validation_enabled,
+        ValidationResult
+    )
+    AGRICULTURAL_VALIDATOR_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Agricultural domain validator imported successfully")
+except ImportError as e:
+    AGRICULTURAL_VALIDATOR_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.error(f"❌ Failed to import agricultural validator: {e}")
+
 router = APIRouter()
 
 # ===== Import Dialogue Manager (préserve le code original) =====
@@ -102,6 +117,35 @@ def _normalize_entities_soft_local(entities: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
+# ===== Fonction de validation agricole =====
+def _validate_agricultural_question(question: str, lang: str = "fr", user_id: str = "unknown", request_ip: str = "unknown") -> ValidationResult:
+    """Valide qu'une question concerne le domaine agricole"""
+    if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+        logger.warning("⚠️ Agricultural validator not available, allowing all questions")
+        return ValidationResult(is_valid=True, confidence=100.0, reason="Validator unavailable")
+    
+    try:
+        return validate_agricultural_question(question, lang, user_id, request_ip)
+    except Exception as e:
+        logger.error(f"❌ Error in agricultural validation: {e}")
+        # En cas d'erreur, permettre la question avec un avertissement
+        return ValidationResult(is_valid=True, confidence=50.0, reason=f"Validation error: {str(e)}")
+
+def _get_user_info_for_validation(request: Request, current_user: Optional[Dict[str, Any]] = None) -> tuple[str, str]:
+    """Extrait les informations utilisateur pour la validation"""
+    if current_user:
+        user_id = current_user.get('email', current_user.get('user_id', 'authenticated_user'))
+    else:
+        user_id = "anonymous_user"
+    
+    # Extraire l'IP de la requête
+    request_ip = getattr(request.client, 'host', 'unknown') if hasattr(request, 'client') else 'unknown'
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    if forwarded_for:
+        request_ip = forwarded_for.split(',')[0].strip()
+    
+    return str(user_id), str(request_ip)
+
 # ===== Fonction de nettoyage JSON améliorée =====
 def clean_for_json(value):
     """Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
@@ -160,7 +204,7 @@ def extract_age_from_text(text: str) -> Optional[int]:
                 continue
     return None
 
-# ===== Schémas (DÉPLACÉ ICI) =====
+# ===== Schémas =====
 class AskPayload(BaseModel):
     session_id: Optional[str] = "default"
     question: str
@@ -169,19 +213,58 @@ class AskPayload(BaseModel):
     force_perfstore: Optional[bool] = False
     intent_hint: Optional[str] = None
     entities: Dict[str, Any] = Field(default_factory=dict)
+    bypass_validation: Optional[bool] = False  # 🌾 NOUVEAU: pour bypass administrateur
     model_config = {"extra": "allow"}
 
-# ===== Fonction interne partagée (NOUVEAU) =====
+# ===== Fonction interne partagée avec validation =====
 def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Logique interne pour traiter les questions (avec ou sans auth)."""
+    """Logique interne pour traiter les questions (avec ou sans auth) + validation agricole."""
     try:
+        # Extraction des infos utilisateur pour la validation
+        user_id, request_ip = _get_user_info_for_validation(request, current_user)
+        
         # Log différencié selon l'authentification
         if current_user:
             user_email = current_user.get('email', 'unknown')
-            logger.info(f"📝 Question authentifiée de {user_email}: {payload.question[:120]}")
+            logger.info(f"🔍 Question authentifiée de {user_email}: {payload.question[:120]}")
         else:
-            logger.info(f"📝 Question publique: {payload.question[:120]}")
+            logger.info(f"🔍 Question publique: {payload.question[:120]}")
 
+        # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
+        validation_bypassed = False
+        if not payload.bypass_validation:
+            validation_result = _validate_agricultural_question(
+                question=payload.question,
+                lang=payload.lang or "fr",
+                user_id=user_id,
+                request_ip=request_ip
+            )
+            
+            if not validation_result.is_valid:
+                logger.warning(f"🚫 Question rejetée par validation agricole: {validation_result.reason}")
+                return {
+                    "type": "validation_rejected",
+                    "message": validation_result.reason,
+                    "session_id": payload.session_id or "default",
+                    "validation": {
+                        "is_valid": False,
+                        "confidence": validation_result.confidence,
+                        "suggested_topics": validation_result.suggested_topics,
+                        "detected_keywords": validation_result.detected_keywords,
+                        "rejected_keywords": validation_result.rejected_keywords
+                    },
+                    "user": {
+                        "email": current_user.get('email') if current_user else None,
+                        "user_id": current_user.get('user_id') if current_user else None
+                    } if current_user else None
+                }
+            else:
+                logger.info(f"✅ Question validée (confiance: {validation_result.confidence:.1f}%)")
+        else:
+            validation_bypassed = True
+            logger.info("⚠️ Validation agricole bypassée par l'utilisateur")
+
+        # Traitement normal de la question
         fp_qs = request.query_params.get("force_perfstore")
         force_perf = bool(payload.force_perfstore) or (fp_qs in ("1", "true", "True", "yes"))
 
@@ -199,29 +282,25 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             logger.warning("⚠️ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
 
-        # Ajouter les infos utilisateur dans la réponse si authentifié
+        # Ajouter les infos utilisateur et de validation dans la réponse
         if current_user:
             result["user"] = {
                 "email": current_user.get('email'),
                 "user_id": current_user.get('user_id')
             }
+        
+        # Ajouter les métadonnées de validation
+        result["validation_metadata"] = {
+            "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
+            "validation_bypassed": validation_bypassed
+        }
 
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
         return result
+        
     except Exception as e:
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
-
-# ===== Schémas =====
-class AskPayload(BaseModel):
-    session_id: Optional[str] = "default"
-    question: str
-    lang: Optional[str] = "fr"
-    debug: Optional[bool] = False
-    force_perfstore: Optional[bool] = False
-    intent_hint: Optional[str] = None
-    entities: Dict[str, Any] = Field(default_factory=dict)
-    model_config = {"extra": "allow"}
 
 # ===== Endpoints =====
 @router.post("/ask")
@@ -230,12 +309,12 @@ def ask(
     request: Request,
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
-    """Endpoint principal SÉCURISÉ pour poser des questions."""
+    """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole."""
     return _ask_internal(payload, request, current_user)
 
 @router.post("/ask-public")
 def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
-    """Endpoint public (pas d'authentification requise)."""
+    """Endpoint public (pas d'authentification requise) avec validation agricole."""
     return _ask_internal(payload, request, None)
 
 @router.get("/system-status")
@@ -244,13 +323,75 @@ def system_status() -> Dict[str, Any]:
     return {
         "status": "ok" if DIALOGUE_AVAILABLE else "degraded",
         "dialogue_manager_available": DIALOGUE_AVAILABLE,
+        "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
+        "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
         "service": "expert_api",
     }
+
+@router.get("/agricultural-validation-status")
+def agricultural_validation_status() -> Dict[str, Any]:
+    """Status détaillé du validateur agricole."""
+    if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+        return {
+            "available": False,
+            "reason": "Module not imported or not available"
+        }
+    
+    try:
+        stats = get_agricultural_validator_stats()
+        return {
+            "available": True,
+            "stats": stats
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "error": str(e)
+        }
+
+@router.post("/test-agricultural-validation")
+def test_agricultural_validation(
+    test_question: str,
+    lang: str = "fr",
+    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
+) -> Dict[str, Any]:
+    """Teste la validation agricole sur une question donnée."""
+    if not AGRICULTURAL_VALIDATOR_AVAILABLE:
+        return {
+            "error": "Agricultural validator not available"
+        }
+    
+    user_id = current_user.get('email', current_user.get('user_id', 'test_user'))
+    
+    try:
+        validation_result = validate_agricultural_question(
+            question=test_question,
+            language=lang,
+            user_id=str(user_id),
+            request_ip="test_ip"
+        )
+        
+        return {
+            "question": test_question,
+            "lang": lang,
+            "validation": validation_result.to_dict(),
+            "tester": user_id
+        }
+    except Exception as e:
+        return {
+            "error": f"Validation test failed: {str(e)}",
+            "question": test_question
+        }
 
 @router.get("/debug")
 def debug_imports() -> Dict[str, Any]:
     """Vérifie quelques imports utiles (préserve le comportement original)."""
-    debug_info: Dict[str, Any] = {"dialogue_available": DIALOGUE_AVAILABLE, "imports_tested": []}
+    debug_info: Dict[str, Any] = {
+        "dialogue_available": DIALOGUE_AVAILABLE,
+        "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
+        "imports_tested": []
+    }
+    
     imports_to_test: List[str] = [
         "app.api.v1.utils.question_classifier",
         "app.api.v1.pipeline.context_extractor",
@@ -258,13 +399,16 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.pipeline.rag_engine",
         "app.api.v1.utils.formulas",
         "app.api.v1.pipeline.intent_registry",
+        "app.api.v1.agricultural_domain_validator",  # 🌾 NOUVEAU
     ]
+    
     for import_path in imports_to_test:
         try:
             __import__(import_path)
             debug_info["imports_tested"].append({"path": import_path, "status": "✅ OK"})
         except Exception as e:
             debug_info["imports_tested"].append({"path": import_path, "status": f"❌ Error: {e}"})
+    
     return debug_info
 
 @router.post("/force-import-test")
