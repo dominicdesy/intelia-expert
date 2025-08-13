@@ -674,7 +674,6 @@ def handle(
             
             if cot_result:
                 logger.info("✅ Analyse CoT réussie, retour direct")
-                save_conversation_to_database(session_id, question, response)
                 clear_conversation_context(session_id)
                 
                 response = {
@@ -699,7 +698,6 @@ def handle(
         if should_continue_conversation(session_context, intent) and completeness_score >= 0.8:
             logger.info("🚀 Conversation continue avec données complètes → traitement direct")
             # Effacer le contexte car on va donner la réponse finale
-            save_conversation_to_database(session_id, question, response)
             clear_conversation_context(session_id)
             
         # HYBRIDE : si infos manquantes → synthèse courte + clarifications
@@ -740,7 +738,6 @@ def handle(
             result["text"] = _final_sanitize(result.get("text", ""))
             
             # Effacer le contexte après réponse finale
-            save_conversation_to_database(session_id, question, response)
             clear_conversation_context(session_id)
             
             
@@ -804,7 +801,6 @@ def handle(
                         })
                     
                     # Effacer le contexte après réponse finale réussie
-                    save_conversation_to_database(session_id, question, response)
                     clear_conversation_context(session_id)
                     
                     response = {
@@ -852,7 +848,6 @@ def handle(
             rag_text = maybe_synthesize(question, rag_text)
 
         # Effacer le contexte après réponse finale (même si RAG)
-        save_conversation_to_database(session_id, question, response)
         clear_conversation_context(session_id)
 
         response = {
