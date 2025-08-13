@@ -5,7 +5,6 @@ Dialogue orchestration - VERSION REFACTORISÉE CORRIGÉE
 - Imports des modules spécialisés pour langue, mémoire et CoT/fallback
 - Preserve la compatibilité avec l'API existante
 - CORRIGÉ: Utilise les fonctions des modules au lieu de les dupliquer
-- FIX: Auto-extraction systématique même pour nouvelles conversations
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -320,7 +319,7 @@ def _get_retriever():
     if _RAG_SINGLETON is None:
         try:
             _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
-            logger.info("📎 RAGRetriever initialisé")
+            logger.info("🔎 RAGRetriever initialisé")
         except Exception as e:
             logger.error(f"❌ Init RAGRetriever échoué: {e}")
             _RAG_SINGLETON = None
@@ -561,7 +560,7 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
     }
 
 # ---------------------------------------------------------------------------
-# FONCTION PRINCIPALE HANDLE - VERSION CORRIGÉE
+# FONCTION PRINCIPALE HANDLE - REFACTORISÉE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -576,9 +575,8 @@ def handle(
     entities: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION REFACTORISÉE CORRIGÉE
+    Fonction principale de traitement des questions - VERSION REFACTORISÉE
     Préserve la compatibilité avec l'API existante
-    FIX: Auto-extraction systématique même pour nouvelles conversations
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
@@ -619,9 +617,6 @@ def handle(
         classification = normalize(classification)
         intent: Intention = classification["intent"]
 
-        # =================================================================
-        # FUSION DES ENTITIES - VERSION CORRIGÉE
-        # =================================================================
         # Fusion des entities (NER + overrides + contexte conversationnel)
         _ents = dict(classification.get("entities") or {})
         if entities:
@@ -630,13 +625,11 @@ def handle(
             except Exception: 
                 pass
         
-        # ✅ CORRECTION: Toujours appliquer merge_conversation_context pour auto-extraction
-        logger.info("🔗 Application de merge_conversation_context (auto-extraction)")
-        _ents = merge_conversation_context(_ents, session_context, question)
-        
-        # Vérifier si on continue une conversation APRÈS la fusion
+        # Vérifier si on continue une conversation
         if should_continue_conversation(session_context, intent):
             logger.info("🔗 Continuation de conversation détectée")
+            # Fusionner avec le contexte précédent et enrichir automatiquement
+            _ents = merge_conversation_context(_ents, session_context, question)
             # Forcer l'intention vers PerfTargets si c'était en attente
             if session_context.get("pending_intent") == "PerfTargets":
                 intent = Intention.PerfTargets
@@ -897,8 +890,7 @@ def get_fallback_status() -> Dict[str, Any]:
     
     # Statut unifié
     unified_status = {
-        "dialogue_manager_version": "refactored_fixed",
-        "auto_extraction_fix": "applied",
+        "dialogue_manager_version": "refactored",
         "modules": {
             "language_processor": language_status,
             "conversation_memory": memory_status,
@@ -958,8 +950,7 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         
         # Test fonction de base
         results["basic_status"] = {
-            "dialogue_manager": "refactored_fixed",
-            "auto_extraction_fix": "applied",
+            "dialogue_manager": "refactored",
             "modules_imported": True,
             "rag_available": RAG_AVAILABLE,
             "perfstore_available": PERF_AVAILABLE
@@ -987,7 +978,6 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         return {
             "status": "success",
             "message": "Pipeline refactorisé testé avec succès",
-            "fix_applied": "auto_extraction_systématique",
             "detailed_results": results
         }
         

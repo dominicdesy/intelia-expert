@@ -395,6 +395,15 @@ export const generateAIResponse = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID:', error)
     }
 
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation
+    try {
+      await saveConversationExplicitly(processedData, user.id, finalQuestion)
+      console.log('✅ [apiService] Conversation sauvegardée explicitement')
+    } catch (saveError) {
+      console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
+      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
+    }
+
     console.log('🎯 [apiService] Données traitées DialogueManager:', {
       type: processedData.type,
       requires_clarification: processedData.requires_clarification,
@@ -575,10 +584,111 @@ export const generateAIResponsePublic = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID (public):', error)
     }
 
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique)
+    try {
+      await saveConversationPublic(processedData, finalQuestion)
+      console.log('✅ [apiService] Conversation publique sauvegardée explicitement')
+    } catch (saveError) {
+      console.warn('⚠️ [apiService] Erreur sauvegarde conversation publique:', saveError)
+      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
+    }
+
     return processedData
 
   } catch (error) {
     console.error('❌ [apiService] Erreur DialogueManager public:', error)
+    throw error
+  }
+}
+
+/**
+ * 🚀 NOUVELLES FONCTIONS DE SAUVEGARDE EXPLICITE
+ */
+const saveConversationExplicitly = async (
+  processedData: EnhancedAIResponse,
+  userId: string,
+  question: string
+): Promise<void> => {
+  if (!processedData.response && !processedData.general_answer?.text) {
+    console.log('⚠️ [saveConversationExplicitly] Pas de contenu à sauvegarder')
+    return
+  }
+
+  try {
+    const conversationData = {
+      user_id: userId,
+      conversation_id: processedData.conversation_id,
+      question: question,
+      response: processedData.response || processedData.general_answer?.text || '',
+      full_text: processedData.full_text || processedData.response || processedData.general_answer?.text || '',
+      confidence_score: processedData.confidence_score || 0.8,
+      response_time_ms: processedData.response_time || 1000,
+      language: processedData.language || 'fr',
+      rag_used: processedData.rag_used || true,
+      timestamp: processedData.timestamp || new Date().toISOString()
+    }
+
+    const headers = getAuthHeaders()
+
+    const response = await fetch(`${API_BASE_URL}/conversation`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(conversationData)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+    }
+
+    console.log('✅ [saveConversationExplicitly] Conversation sauvegardée en base')
+  } catch (error) {
+    console.error('❌ [saveConversationExplicitly] Erreur:', error)
+    throw error
+  }
+}
+
+const saveConversationPublic = async (
+  processedData: EnhancedAIResponse,
+  question: string
+): Promise<void> => {
+  if (!processedData.response && !processedData.general_answer?.text) {
+    console.log('⚠️ [saveConversationPublic] Pas de contenu à sauvegarder')
+    return
+  }
+
+  try {
+    // Pour les conversations publiques, on utilise un user_id générique ou on skip la sauvegarde
+    console.log('ℹ️ [saveConversationPublic] Conversation publique - sauvegarde optionnelle')
+    
+    // Optionnel: sauvegarder avec un user_id anonyme
+    const conversationData = {
+      user_id: 'anonymous',
+      conversation_id: processedData.conversation_id,
+      question: question,
+      response: processedData.response || processedData.general_answer?.text || '',
+      full_text: processedData.full_text || processedData.response || processedData.general_answer?.text || '',
+      confidence_score: processedData.confidence_score || 0.8,
+      response_time_ms: processedData.response_time || 1000,
+      language: processedData.language || 'fr',
+      rag_used: processedData.rag_used || true,
+      timestamp: processedData.timestamp || new Date().toISOString()
+    }
+
+    const response = await fetch(`${API_BASE_URL}/conversation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(conversationData)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+    }
+
+    console.log('✅ [saveConversationPublic] Conversation publique sauvegardée')
+  } catch (error) {
+    console.error('❌ [saveConversationPublic] Erreur:', error)
     throw error
   }
 }
