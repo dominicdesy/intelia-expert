@@ -328,65 +328,6 @@ def system_status() -> Dict[str, Any]:
         "service": "expert_api",
     }
 
-
-# Ajouts pour expert.py
-# À ajouter après les autres endpoints
-
-@router.get("/fallback-status")
-def fallback_status() -> Dict[str, Any]:
-    """
-    Status détaillé du système de fallback OpenAI.
-    """
-    try:
-        from .pipeline.dialogue_manager import get_fallback_status
-        return get_fallback_status()
-    except Exception as e:
-        return {
-            "error": "Could not get fallback status",
-            "message": str(e),
-            "openai_fallback_available": False
-        }
-
-@router.post("/test-openai-fallback")
-def test_openai_fallback(
-    test_question: str,
-    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise
-) -> Dict[str, Any]:
-    """
-    Teste le fallback OpenAI directement (bypass RAG).
-    """
-    try:
-        from .pipeline.dialogue_manager import _generate_openai_fallback_response, Intention
-        
-        # Entités de test basiques
-        test_entities = {
-            "species": "broiler",
-            "line": "ross308", 
-            "sex": "as_hatched",
-            "age_days": 21
-        }
-        
-        result = _generate_openai_fallback_response(
-            question=test_question,
-            entities=test_entities,
-            intent=Intention.PerfTargets,  # Intent par défaut pour test
-            rag_context="Contexte RAG non disponible (test)"
-        )
-        
-        return {
-            "test_question": test_question,
-            "openai_response": result,
-            "tester": current_user.get('email', 'unknown'),
-            "timestamp": time.time()
-        }
-        
-    except Exception as e:
-        return {
-            "error": f"Test OpenAI fallback failed: {str(e)}",
-            "test_question": test_question
-        }
-
-
 @router.get("/agricultural-validation-status")
 def agricultural_validation_status() -> Dict[str, Any]:
     """Status détaillé du validateur agricole."""

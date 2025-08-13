@@ -22,7 +22,7 @@ import {
 import { HistoryMenu } from './components/HistoryMenu'
 import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
-import { FeedbackModal } from './components/FeedbackModal'
+import { FeedbackModal } from './components/modals/FeedbackModal'
 
 export default function ChatInterface() {
   const { user, isAuthenticated, isLoading } = useAuthStore()
