@@ -132,6 +132,11 @@ async def auth_middleware(request: Request, call_next):
         logger.warning(f"⚠️ BYPASS TEMPORAIRE conversations: {request.url.path}")
         return await call_next(request)
     
+    # 🔧 NOUVEAU: BYPASS TEMPORAIRE POUR DIALOGUE (DEBUG)
+    if request.url.path in ["/dialogue", "/api/dialogue", "/api/v1/dialogue"]:
+        logger.warning(f"⚠️ BYPASS TEMPORAIRE dialogue: {request.url.path}")
+        return await call_next(request)
+    
     # Vérifier l'auth pour les autres endpoints
     try:
         user_info = await verify_supabase_token(request)
