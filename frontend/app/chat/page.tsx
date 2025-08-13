@@ -114,9 +114,17 @@ export default function ChatInterface() {
     console.log('✅ [reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
-  // 🚀 FONCTION ÉTENDUE : Nettoyer le texte de réponse (synchronisée avec backend _final_sanitize)
-  const cleanResponseText = (text: string): string => {
-    let cleaned = text
+	// 🚀 FONCTION ÉTENDUE : Nettoyer le texte de réponse (synchronisée avec backend _final_sanitize)
+	const cleanResponseText = (text: string): string => {
+	  if (!text) return ""
+	  
+	  // 🚨 PROTECTION CRITIQUE : Ne pas nettoyer les réponses courtes PerfStore
+	  if (text.length < 100) {
+		console.log('🛡️ [cleanResponseText] Réponse courte protégée:', text)
+		return text.trim()
+	  }
+	  
+	  let cleaned = text	
 
     // ========================
     // ✅ CODE ORIGINAL CONSERVÉ (fonctionne bien)

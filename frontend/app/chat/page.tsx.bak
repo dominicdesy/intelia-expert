@@ -416,30 +416,34 @@ export default function ChatInterface() {
     })
   }
 
-  // 🔧 FONCTION MODIFIÉE : extractAnswerAndSources - Sources supprimées
+  // 🔧 FONCTION CORRIGÉE : extractAnswerAndSources - ORDRE DES CONDITIONS FIXÉ
   const extractAnswerAndSources = (result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = [] // Toujours vide maintenant
 
-    // 🚀 NOUVEAU : Support type "partial_answer" du DialogueManager hybride
+    console.log('🎯 [extractAnswerAndSources] Début extraction:', {
+      type: result?.type,
+      has_answer: !!result?.answer,
+      has_general_answer: !!result?.general_answer
+    })
+
+    // 🚨 CORRECTION CRITIQUE : Traiter type "answer" EN PREMIER
+    if (result?.type === 'answer' && result?.answer) {
+      console.log('🎯 [extractAnswerAndSources] Type answer détecté')
+      answerText = result.answer.text || ""
+      console.log('🎯 [extractAnswerAndSources] Answer text extraite:', answerText.substring(0, 100))
+      return [answerText, []]
+    }
+
+    // 🚀 Support type "partial_answer" du DialogueManager hybride
     if (result?.type === 'partial_answer' && result?.general_answer) {
       console.log('🎯 [extractAnswerAndSources] Type partial_answer détecté')
       
       answerText = result.general_answer.text || ""
-      // 🚀 SUPPRIMÉ : sources = result.general_answer.rag_sources || []
-      
-      // 🚀 SUPPRIMÉ : Ajout des questions de clarification
-      // Plus d'affichage des questions dans le texte principal
+      console.log('🎯 [extractAnswerAndSources] General answer text extraite:', answerText.substring(0, 100))
       
       return [answerText, []] // Toujours retourner sources vides
     }
-
-	// 🔧 AJOUT APRÈS le bloc partial_answer
-	if (result?.type === 'answer' && result?.answer) {
-	  console.log('🎯 [extractAnswerAndSources] Type answer détecté')
-	  answerText = result.answer.text || ""
-	  return [answerText, []]
-	}
 
     // ✅ ANCIEN CODE CONSERVÉ pour compatibilité
     const responseContent = result?.response || ""
@@ -449,7 +453,6 @@ export default function ChatInterface() {
       if (!answerText) {
         answerText = "Désolé, je n'ai pas pu formater la réponse."
       }
-      // 🚀 SUPPRIMÉ : Extraction des sources
     } else {
       answerText = String(responseContent).trim() || "Désolé, je n'ai pas pu formater la réponse."
       
@@ -465,6 +468,7 @@ export default function ChatInterface() {
       }
     }
     
+    console.log('🎯 [extractAnswerAndSources] Résultat final:', answerText.substring(0, 100))
     return [answerText, []] // Toujours retourner sources vides
   }
 
@@ -564,16 +568,29 @@ export default function ChatInterface() {
           clarificationQuestions: response.clarification_questions || []
         })
 
-        console.log('🔄 [handleSendMessage] État clarification activé')
+        console.log('📄 [handleSendMessage] État clarification activé')
 
       } else {
-        // Extraction de la réponse avec nettoyage JSON + support partial_answer
+        // 🚨 CORRECTION CRITIQUE : Extraction avec fonction corrigée
         const [answerText, sources] = extractAnswerAndSources(response)
+        
+        console.log('🎯 [handleSendMessage] Texte extrait:', {
+          length: answerText.length,
+          preview: answerText.substring(0, 100),
+          empty: !answerText || answerText.trim() === ''
+        })
+        
         const cleanedText = cleanResponseText(answerText) // 🚀 NOUVEAU : Appliquer le nettoyage
+
+        console.log('🎯 [handleSendMessage] Texte nettoyé:', {
+          length: cleanedText.length,
+          preview: cleanedText.substring(0, 100),
+          empty: !cleanedText || cleanedText.trim() === ''
+        })
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: cleanedText, // 🚀 Utiliser le texte nettoyé
+          content: cleanedText || "Erreur: contenu vide", // 🚨 PROTECTION: Fallback si vide
           isUser: false,
           timestamp: new Date(),
           conversation_id: response.conversation_id,
@@ -582,6 +599,13 @@ export default function ChatInterface() {
           // Garder pour compatibilité (peut être supprimé plus tard)
           originalResponse: response.response
         }
+
+        console.log('🎯 [handleSendMessage] Message AI créé:', {
+          id: aiMessage.id,
+          content_length: aiMessage.content.length,
+          content_preview: aiMessage.content.substring(0, 100),
+          has_versions: !!aiMessage.response_versions
+        })
 
         addMessage(aiMessage)
         console.log('✅ [handleSendMessage] Message ajouté avec versions:', Object.keys(response.response_versions || {}))
@@ -943,7 +967,7 @@ export default function ChatInterface() {
                     <button
                       onClick={() => {
                         setClarificationState(null)
-                        console.log('🔄 [ChatInterface] Clarification annulée')
+                        console.log('📄 [ChatInterface] Clarification annulée')
                       }}
                       className="text-blue-600 hover:text-blue-800 text-sm underline"
                     >
