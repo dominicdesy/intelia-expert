@@ -586,7 +586,7 @@ export const generateAIResponsePublic = async (
 
     // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique)
     try {
-      await saveConversationPublic(processedData, finalQuestion)
+      await saveConversationPublic(processedData, question.trim())
       console.log('✅ [apiService] Conversation publique sauvegardée explicitement')
     } catch (saveError) {
       console.warn('⚠️ [apiService] Erreur sauvegarde conversation publique:', saveError)
