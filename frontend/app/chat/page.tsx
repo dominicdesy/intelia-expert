@@ -102,28 +102,7 @@ export default function ChatInterface() {
     return 'U'
   }
 
-  // 🔧 FONCTION AJOUTÉE : Préprocesseur Markdown pour corriger le formatage
-  const preprocessMarkdown = (content: string): string => {
-    if (!content) return ""
-    
-    let processed = content
-    
-    // 🔨 CORRECTION PRINCIPALE : Ajouter sauts de ligne après les titres
-    processed = processed.replace(/^(#{1,6})\s*([^#\n]+)(?!\n\n)/gm, '$1 $2\n')
-    
-    // 🔨 CORRECTION : Ajouter espacement avant les listes
-    processed = processed.replace(/([^.\n])\n([•\-\*]\s)/g, '$1\n\n$2')
-    
-    // 🔨 CORRECTION : Ajouter espacement avant les paragraphes après listes
-    processed = processed.replace(/([•\-\*]\s[^\n]+)\n([A-Z][^•\-\*])/g, '$1\n\n$2')
-    
-    // 🔨 CORRECTION : Ajouter espacement avant les sections importantes
-    processed = processed.replace(/([.!?])\n(\*\*[^*]+\*\*)/g, '$1\n\n$2')
-    
-    // 🔨 NORMALISATION : Éviter les triples sauts de ligne
-    processed = processed.replace(/\n\n\n+/g, '\n\n')
-    
-    console.log('📝 [preprocessMarkdown] Contenu traité:', {
+preprocessMarkdown] Contenu traité:', {
       original_length: content.length,
       processed_length: processed.length,
       has_headings: /^#{1,6}\s/.test(processed),
@@ -927,49 +906,49 @@ export default function ChatInterface() {
                           </p>
                         ) : (
                           <ReactMarkdown
-                            className="prose prose-sm max-w-none break-words prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900 prose-h2:border-b prose-h2:border-gray-200 prose-h2:pb-2"
+                            className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
                             components={{
-                              // 🔨 TITRES H2 : Amélioration du style et espacement
+                              // 🔨 TITRES H2 : Style amélioré avec plus d'espacement
                               h2: ({node, ...props}) => (
-                                <h2 className="text-lg font-bold text-gray-900 mt-6 mb-4 border-b border-gray-200 pb-2 flex items-center gap-2" {...props} />
+                                <h2 className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg" {...props} />
                               ),
                               
-                              // 🔨 TITRES H3 : Amélioration du style et espacement  
+                              // 🔨 TITRES H3 : Style pour les sous-sections
                               h3: ({node, ...props}) => (
-                                <h3 className="text-base font-semibold text-gray-800 mt-4 mb-3" {...props} />
+                                <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2" {...props} />
                               ),
                               
-                              // 🔨 PARAGRAPHES : Amélioration de l'espacement
+                              // 🔨 PARAGRAPHES : Espacement généreux
                               p: ({node, ...props}) => (
-                                <p className="leading-relaxed text-gray-800 my-3" {...props} />
+                                <p className="leading-relaxed text-gray-800 my-4 text-justify" {...props} />
                               ),
                               
-                              // 🔨 LISTES : Amélioration de l'espacement et style
+                              // 🔨 LISTES : Style amélioré avec plus d'espace
                               ul: ({node, ...props}) => (
-                                <ul className="list-disc list-inside space-y-2 text-gray-800 my-4 ml-2" {...props} />
+                                <ul className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2" {...props} />
                               ),
                               
-                              // 🔨 ÉLÉMENTS DE LISTE : Amélioration du padding
+                              // 🔨 ÉLÉMENTS DE LISTE : Meilleur spacing
                               li: ({node, ...props}) => (
-                                <li className="leading-relaxed pl-2" {...props} />
+                                <li className="leading-relaxed pl-2 my-2" {...props} />
                               ),
                               
-                              // 🔨 TEXTE EN GRAS : Amélioration du contraste
+                              // 🔨 TEXTE EN GRAS : Plus visible
                               strong: ({node, ...props}) => (
-                                <strong className="font-semibold text-blue-800" {...props} />
+                                <strong className="font-bold text-blue-800 bg-blue-50 px-1 rounded" {...props} />
                               ),
                               
-                              // 🔄 NOUVEAU : Support pour les tableaux
+                              // 🔄 TABLEAUX : Style amélioré
                               table: ({node, ...props}) => (
-                                <div className="overflow-x-auto my-4 -mx-1 sm:mx-0">
-                                  <table className="min-w-full border border-gray-300 rounded-lg" {...props} />
+                                <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
+                                  <table className="min-w-full border border-gray-300 rounded-lg shadow-sm" {...props} />
                                 </div>
                               ),
                               th: ({node, ...props}) => (
-                                <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left" {...props} />
+                                <th className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900" {...props} />
                               ),
                               td: ({node, ...props}) => (
-                                <td className="border border-gray-300 px-3 py-2" {...props} />
+                                <td className="border border-gray-300 px-4 py-3 hover:bg-gray-50" {...props} />
                               ),
                             }}
                           >
