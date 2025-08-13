@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL + COT
+Dialogue orchestration - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL
 - classify -> normalize -> completeness/clarifications
 - Route vers compute (si possible) OU table-first (perf targets) OU RAGRetriever
 - NOUVEAU: Intégration postgres_memory pour continuité de session
 - NOUVEAU: Fallback OpenAI quand RAG insuffisant
 - NOUVEAU: Support multilingue universel avec détection automatique
-- NOUVEAU: Support Chain-of-Thought pour analyses complexes
-- NOUVEAU: Fonctions de synthèse améliorées
-- CORRIGÉ: Toutes les indentations vérifiées et corrigées
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -35,42 +32,21 @@ except ImportError as e:
     MEMORY_AVAILABLE = False
     # Fallback en mémoire simple
     class MemoryFallback:
-        def __init__(self): 
-            self.store = {}
-        def get(self, session_id): 
-            return self.store.get(session_id, {})
-        def update(self, session_id, context): 
-            self.store[session_id] = context
-        def clear(self, session_id): 
-            self.store.pop(session_id, None)
+        def __init__(self): self.store = {}
+        def get(self, session_id): return self.store.get(session_id, {})
+        def update(self, session_id, context): self.store[session_id] = context
+        def clear(self, session_id): self.store.pop(session_id, None)
     PostgresMemory = MemoryFallback
 
-# ========== FALLBACK OPENAI AMÉLIORÉ ==========
+# ========== FALLBACK OPENAI ==========
 try:
-    from ..utils.openai_utils import (
-        complete as openai_complete,
-        complete_with_cot,
-        synthesize_rag_content,
-        generate_clarification_response,
-        get_openai_status,
-        test_cot_pipeline,
-        test_synthesis_pipeline
-    )
+    from ..utils.openai_utils import complete as openai_complete
+    from ..utils.openai_utils import get_openai_status
     OPENAI_FALLBACK_AVAILABLE = True
-    OPENAI_COT_AVAILABLE = True
-    logger.info("✅ OpenAI fallback + CoT disponible pour réponses avancées")
+    logger.info("✅ OpenAI fallback disponible pour réponses manquantes")
 except ImportError as e:
-    logger.warning(f"⚠️ OpenAI fallback avancé indisponible: {e}")
-    # Fallback vers fonctions basiques
-    try:
-        from ..utils.openai_utils import complete as openai_complete
-        from ..utils.openai_utils import get_openai_status
-        OPENAI_FALLBACK_AVAILABLE = True
-        OPENAI_COT_AVAILABLE = False
-        logger.info("✅ OpenAI fallback basique disponible")
-    except ImportError:
-        OPENAI_FALLBACK_AVAILABLE = False
-        OPENAI_COT_AVAILABLE = False
+    logger.warning(f"⚠️ OpenAI fallback indisponible: {e}")
+    OPENAI_FALLBACK_AVAILABLE = False
 
 # Singleton mémoire conversationnelle
 _CONVERSATION_MEMORY = None
@@ -86,19 +62,18 @@ def _get_conversation_memory():
                 _CONVERSATION_MEMORY = PostgresMemory()  # Fallback
             logger.info("🧠 Mémoire conversationnelle initialisée")
         except Exception as e:
-            logger.error(f"⌐ Erreur initialisation mémoire: {e}")
+            logger.error(f"❌ Erreur initialisation mémoire: {e}")
             _CONVERSATION_MEMORY = PostgresMemory()  # Fallback simple
     return _CONVERSATION_MEMORY
 
 # ---------------------------------------------------------------------------
-# NOUVEAU: Détection de langue universelle et post-processing multilingue AMÉLIORÉ
+# NOUVEAU: Détection de langue universelle et post-processing multilingue
 # ---------------------------------------------------------------------------
 
 def _detect_question_language_openai(question: str) -> str:
     """
     Utilise OpenAI pour détecter automatiquement la langue de la question.
     Supporte toutes les langues sans limitation.
-    AMÉLIORÉ: Utilise les nouvelles fonctions optimisées
     """
     if not question or not OPENAI_FALLBACK_AVAILABLE:
         return "fr"  # Fallback par défaut
@@ -154,7 +129,6 @@ def _adapt_response_to_language(response_text: str, source_type: str, target_lan
     """
     Adapte la réponse à la langue cible via OpenAI de manière intelligente.
     Supporte TOUTES les langues automatiquement.
-    AMÉLIORÉ: Utilise les nouvelles fonctions optimisées
     """
     # Si français, pas de traitement
     if target_language == "fr":
@@ -217,25 +191,12 @@ Please rewrite this in the same language as the user's question, keeping:
 - Technical accuracy
 - Professional tone
 
-Calculated response in user's language:""",
-
-            "cot_analysis": f"""The user asked: "{original_question}"
-
-Here is a Chain-of-Thought analysis (originally in French):
-"{response_text}"
-
-Please rewrite this analysis in the same language as the user's question, maintaining:
-- Logical structure and reasoning
-- Technical accuracy
-- Professional tone
-- All recommendations
-
-Analysis in user's language:"""
+Calculated response in user's language:"""
         }
         
         prompt = adaptation_prompts.get(source_type, adaptation_prompts["rag_retriever"])
         
-        # Adaptation via OpenAI améliorée
+        # Adaptation via OpenAI
         adapted_text = openai_complete(
             prompt=prompt,
             temperature=0.3,  # Légèrement créatif pour naturel
@@ -250,14 +211,13 @@ Analysis in user's language:"""
             return response_text
             
     except Exception as e:
-        logger.error(f"⌐ Erreur adaptation linguistique: {e}")
+        logger.error(f"❌ Erreur adaptation linguistique: {e}")
         return response_text
 
 def _finalize_response_with_language(response: Dict[str, Any], question: str, effective_language: str, detected_language: str) -> Dict[str, Any]:
     """
     Helper pour appliquer l'adaptation linguistique à toute réponse finale.
     Utilise cette fonction avant chaque return dans handle().
-    AMÉLIORÉ: Support des réponses CoT
     """
     # Ajouter les métadonnées de langue pour toutes les réponses
     if response.get("type") == "answer" and "answer" in response:
@@ -266,7 +226,7 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
         response["answer"]["meta"]["effective_language"] = effective_language
         
         # Si c'est déjà un fallback OpenAI avec la bonne langue, pas besoin d'adaptation
-        if response["answer"].get("source") in ["openai_fallback", "cot_analysis"]:
+        if response["answer"].get("source") == "openai_fallback":
             target_lang_in_meta = response["answer"]["meta"].get("target_language", "fr")
             if target_lang_in_meta == effective_language:
                 logger.info(f"✅ Fallback OpenAI déjà généré dans la langue cible: {effective_language}")
@@ -289,8 +249,8 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
         source_type = answer.get("source", "unknown")
         
         # Ne pas re-adapter les fallbacks OpenAI qui sont déjà dans la bonne langue
-        if source_type in ["openai_fallback", "cot_analysis"]:
-            logger.info("ℹ️ Fallback OpenAI/CoT - adaptation linguistique déjà effectuée")
+        if source_type == "openai_fallback":
+            logger.info("ℹ️ Fallback OpenAI - adaptation linguistique déjà effectuée")
             return response
         
         adapted_text = _adapt_response_to_language(
@@ -317,173 +277,6 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
         response["general_answer"]["text"] = adapted_text
     
     return response
-
-# ---------------------------------------------------------------------------
-# NOUVEAU: Fonctions Chain-of-Thought pour analyses complexes
-# ---------------------------------------------------------------------------
-
-def _should_use_cot_analysis(intent: Intention, entities: Dict[str, Any], question: str) -> bool:
-    """
-    Détermine si une analyse Chain-of-Thought serait bénéfique
-    """
-    if not OPENAI_COT_AVAILABLE:
-        return False
-    
-    # Intentions complexes bénéficiant du CoT
-    cot_intents = {
-        Intention.HealthDiagnosis,
-        Intention.MultiFactor,
-        Intention.TroubleshootingMultiple,
-        Intention.Economics,
-        Intention.OptimizationStrategy,
-        Intention.ProductionAnalysis
-    }
-    
-    if intent in cot_intents:
-        return True
-    
-    # Détection de questions complexes dans le texte
-    complexity_indicators = [
-        "problème", "diagnostic", "analyse", "optimiser", "améliorer",
-        "stratégie", "multiple", "plusieurs", "complexe", "comparer",
-        "évaluer", "recommandation", "pourquoi", "comment résoudre"
-    ]
-    
-    question_lower = question.lower()
-    complexity_score = sum(1 for indicator in complexity_indicators if indicator in question_lower)
-    
-    # Si 2+ indicateurs de complexité ou question très longue
-    return complexity_score >= 2 or len(question) > 200
-
-def _generate_cot_analysis(question: str, entities: Dict[str, Any], intent: Intention, 
-                          rag_context: str = "", target_language: str = "fr") -> Dict[str, Any]:
-    """
-    Génère une analyse Chain-of-Thought pour questions complexes
-    """
-    if not OPENAI_COT_AVAILABLE:
-        return None
-        
-    try:
-        # Construction du contexte avicole
-        system_context = _build_agricultural_context(entities, intent)
-        
-        # Prompt CoT spécialisé selon l'intention
-        cot_prompts = {
-            "HealthDiagnosis": f"""Tu es un vétérinaire avicole expert. Analyse cette situation sanitaire avec une approche méthodologique rigoureuse.
-
-{system_context}
-
-Question: {question}
-
-Contexte disponible: {rag_context[:500] if rag_context else 'Contexte limité'}
-
-<thinking>
-Identifie les symptômes, signes cliniques et facteurs mentionnés dans la question.
-</thinking>
-
-<analysis>
-Analyse les causes possibles, facteurs de risque et interconnexions.
-</analysis>
-
-<factors>
-Évalue l'impact de l'âge, lignée, environnement et gestion sur la situation.
-</factors>
-
-<recommendations>
-Propose un diagnostic différentiel et plan d'action structuré.
-</recommendations>
-
-Diagnostic vétérinaire professionnel:""",
-
-            "Economics": f"""Tu es un expert en économie avicole. Analyse cette situation avec une approche financière structurée.
-
-{system_context}
-
-Question: {question}
-
-Contexte: {rag_context[:500] if rag_context else 'Données limitées'}
-
-<economic_context>
-Analyse la situation économique actuelle et les facteurs de coût.
-</economic_context>
-
-<cost_benefit_breakdown>
-Décompose les coûts et bénéfices identifiables.
-</cost_benefit_breakdown>
-
-<scenario_analysis>
-Évalue différents scénarios et leur impact financier.
-</scenario_analysis>
-
-<optimization_levers>
-Identifie les leviers d'optimisation économique.
-</optimization_levers>
-
-<financial_recommendation>
-Propose une stratégie financière concrète et chiffrée.
-</financial_recommendation>
-
-Analyse économique complète:""",
-
-            "default": f"""Tu es un expert avicole. Analyse cette situation avec une approche méthodologique.
-
-{system_context}
-
-Question: {question}
-
-Contexte: {rag_context[:500] if rag_context else 'Contexte partiel'}
-
-<thinking>
-Décompose le problème et identifie les éléments clés.
-</thinking>
-
-<analysis>
-Analyse les facteurs impliqués et leurs interactions.
-</analysis>
-
-<recommendations>
-Propose des solutions concrètes et priorisées.
-</recommendations>
-
-Réponse experte structurée:"""
-        }
-        
-        intent_name = intent.name if hasattr(intent, 'name') else str(intent)
-        cot_prompt = cot_prompts.get(intent_name, cot_prompts["default"])
-        
-        # Adaptation linguistique du prompt si nécessaire
-        if target_language != "fr":
-            cot_prompt = cot_prompt.replace("Tu es", "You are").replace("Analyse", "Analyze")
-            # Adaptation basique - le modèle s'adaptera au contexte
-        
-        # Analyse CoT avec parsing
-        cot_result = complete_with_cot(
-            prompt=cot_prompt,
-            temperature=0.4,  # Créativité modérée pour expertise
-            max_tokens=800,   # Suffisant pour analyse complète
-            parse_cot=True
-        )
-        
-        if cot_result:
-            return {
-                "text": cot_result.get("final_answer", cot_result.get("raw_response", "")),
-                "source": "cot_analysis",
-                "confidence": 0.85,  # Confiance élevée pour analyse structurée
-                "sources": [],
-                "meta": {
-                    "cot_sections": cot_result.get("parsed_sections", {}),
-                    "analysis_type": intent_name,
-                    "entities_used": entities,
-                    "rag_context_provided": bool(rag_context.strip()),
-                    "target_language": target_language,
-                    "raw_response_length": len(cot_result.get("raw_response", ""))
-                }
-            }
-            
-    except Exception as e:
-        logger.error(f"⌐ Erreur analyse CoT: {e}")
-        
-    return None
 
 # ---------------------------------------------------------------------------
 # Helpers PerfTargets (dédupliqués) - CODE ORIGINAL CONSERVÉ
@@ -564,10 +357,8 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
     species = (entities.get("species") or entities.get("production_type") or "broiler").lower().strip()
     line_raw = entities.get("line") or entities.get("breed") or ""
     line = _slug(line_raw)
-    if line in {"cobb-500","cobb_500","cobb 500"}: 
-        line = "cobb500"
-    if line in {"ross-308","ross_308","ross 308"}: 
-        line = "ross308"
+    if line in {"cobb-500","cobb_500","cobb 500"}: line = "cobb500"
+    if line in {"ross-308","ross_308","ross 308"}: line = "ross308"
 
     sex_raw = (entities.get("sex") or "").lower().strip()
     sex_map = {
@@ -580,18 +371,13 @@ def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
 
     age_days = entities.get("age_days")
     if age_days is None and entities.get("age_weeks") is not None:
-        try: 
-            age_days = int(entities["age_weeks"]) * 7
-        except Exception: 
-            age_days = None
-    try: 
-        age_days = int(age_days) if age_days is not None else None
-    except Exception: 
-        age_days = None
+        try: age_days = int(entities["age_weeks"]) * 7
+        except Exception: age_days = None
+    try: age_days = int(age_days) if age_days is not None else None
+    except Exception: age_days = None
 
     unit = (entities.get("unit") or "metric").lower().strip()
-    if unit not in ("metric","imperial"): 
-        unit = "metric"
+    if unit not in ("metric","imperial"): unit = "metric"
 
     return {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit}
 
@@ -615,14 +401,10 @@ def _merge_conversation_context(current_entities: Dict[str, Any], session_contex
     auto_age = _extract_age_days_from_text(question)
     
     # CORRECTION: Seulement remplacer si la nouvelle valeur existe
-    if auto_species: 
-        merged["species"] = auto_species
-    if auto_line: 
-        merged["line"] = auto_line
-    if auto_sex: 
-        merged["sex"] = auto_sex
-    if auto_age: 
-        merged["age_days"] = auto_age  # Seulement si nouvel âge détecté
+    if auto_species: merged["species"] = auto_species
+    if auto_line: merged["line"] = auto_line
+    if auto_sex: merged["sex"] = auto_sex
+    if auto_age: merged["age_days"] = auto_age  # Seulement si nouvel âge détecté
     
     # CORRECTION: Fusion sélective - ne pas écraser l'âge s'il n'est pas dans current_entities
     for key, value in current_entities.items():
@@ -672,7 +454,7 @@ def _save_conversation_context(session_id: str, intent: Intention, entities: Dic
         memory.update(session_id, context)
         logger.info(f"💾 Contexte sauvegardé pour session {session_id}")
     except Exception as e:
-        logger.error(f"⌐ Erreur sauvegarde contexte: {e}")
+        logger.error(f"❌ Erreur sauvegarde contexte: {e}")
 
 def _clear_conversation_context(session_id: str):
     """
@@ -683,16 +465,15 @@ def _clear_conversation_context(session_id: str):
         memory.clear(session_id)
         logger.info(f"🧹 Contexte effacé pour session {session_id}")
     except Exception as e:
-        logger.error(f"⌐ Erreur effacement contexte: {e}")
+        logger.error(f"❌ Erreur effacement contexte: {e}")
 
 # ---------------------------------------------------------------------------
-# NOUVEAU: Fonctions de fallback OpenAI améliorées
+# NOUVEAU: Fonctions de fallback OpenAI - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def _should_use_openai_fallback(rag_result: Dict[str, Any], intent: Intention) -> bool:
     """
     Détermine si OpenAI fallback doit être utilisé après échec RAG
-    AMÉLIORÉ: Considère aussi les cas CoT
     """
     # Cas où le RAG n'a pas trouvé de résultats
     if rag_result.get("route") in ["rag_no_results", "rag_error", "rag_unavailable"]:
@@ -730,7 +511,6 @@ def _should_use_openai_fallback(rag_result: Dict[str, Any], intent: Intention) -
 def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> str:
     """
     Construit un contexte agricole pour orienter la réponse OpenAI
-    AMÉLIORÉ: Support des nouvelles intentions CoT
     """
     context_parts = []
     
@@ -770,7 +550,7 @@ def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> 
         sex_name = sex_map.get(sex.lower(), sex)
         context_parts.append(f"Sexe : {sex_name}")
     
-    # Contexte intention AMÉLIORÉ
+    # Contexte intention
     intent_context = {
         "PerfTargets": "Focus sur les objectifs de performance (poids, croissance)",
         "HealthDiagnosis": "Focus sur la santé et diagnostic vétérinaire",
@@ -781,11 +561,7 @@ def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> 
         "EquipmentSizing": "Focus sur le dimensionnement des équipements",
         "VentilationSizing": "Focus sur la ventilation et l'ambiance",
         "EnvSetpoints": "Focus sur les consignes environnementales",
-        "Economics": "Focus sur les aspects économiques de l'élevage",
-        "MultiFactor": "Analyse multi-factorielle complexe",
-        "TroubleshootingMultiple": "Résolution de problèmes multiples",
-        "OptimizationStrategy": "Stratégie d'optimisation globale",
-        "ProductionAnalysis": "Analyse de performance de production"
+        "Economics": "Focus sur les aspects économiques de l'élevage"
     }
     
     intent_name = intent.name if hasattr(intent, 'name') else str(intent)
@@ -797,28 +573,13 @@ def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> 
 def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent: Intention, rag_context: str = "", target_language: str = "fr") -> Dict[str, Any]:
     """
     Génère une réponse via OpenAI quand le RAG échoue
-    AMÉLIORÉ: Intégration avec CoT si approprié et nouvelles fonctions
+    MODIFIÉ: Génère directement dans la langue cible détectée avec instructions ultra-explicites
     """
     if not OPENAI_FALLBACK_AVAILABLE:
         return None
-    
-    try:
-        # NOUVEAU: Vérifier si CoT serait approprié
-        if OPENAI_COT_AVAILABLE and _should_use_cot_analysis(intent, entities, question):
-            logger.info("🧠 Fallback avec analyse CoT pour question complexe")
-            cot_result = _generate_cot_analysis(
-                question=question,
-                entities=entities,
-                intent=intent,
-                rag_context=rag_context,
-                target_language=target_language
-            )
-            
-            if cot_result:
-                cot_result["meta"]["fallback_reason"] = "rag_insufficient_cot_analysis"
-                return cot_result
         
-        # Fallback standard si CoT non disponible/approprié
+    try:
+        # Construction du prompt contextualisé
         system_context = _build_agricultural_context(entities, intent)
         
         # NOUVEAU: Prompt ultra-explicite pour forcer la langue
@@ -862,7 +623,6 @@ CRITICAL INSTRUCTIONS:
 
 Professional response IN ENGLISH ONLY:"""
 
-        # AMÉLIORÉ: Utilisation de la fonction complete optimisée
         response = openai_complete(
             prompt=fallback_prompt,
             temperature=0.3,  # Légèrement créatif mais précis
@@ -881,13 +641,12 @@ Professional response IN ENGLISH ONLY:"""
                     "intent": intent.name if hasattr(intent, 'name') else str(intent),
                     "rag_context_provided": bool(rag_context.strip()),
                     "target_language": target_language,
-                    "prompt_language": "french" if target_language == "fr" else "english",
-                    "cot_attempted": False
+                    "prompt_language": "french" if target_language == "fr" else "english"
                 }
             }
             
     except Exception as e:
-        logger.error(f"⌐ OpenAI fallback échoué: {e}")
+        logger.error(f"❌ OpenAI fallback échoué: {e}")
         
     return None
 
@@ -1128,7 +887,7 @@ def _get_retriever():
             _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
             logger.info("🔎 RAGRetriever initialisé")
         except Exception as e:
-            logger.error(f"⌐ Init RAGRetriever échoué: {e}")
+            logger.error(f"❌ Init RAGRetriever échoué: {e}")
             _RAG_SINGLETON = None
     return _RAG_SINGLETON
 
@@ -1184,8 +943,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
 
         # NEW: retry sans sex si vide (souvent trop strict)
         if not result and filters and "sex" in filters:
-            f2 = dict(filters)
-            f2.pop("sex", None)
+            f2 = dict(filters); f2.pop("sex", None)
             result = retriever.get_contextual_diagnosis(question, k=k, filters=f2)
 
         if not result:
@@ -1214,7 +972,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         }
 
     except Exception as e:
-        logger.error(f"⌐ Erreur RAGRetriever: {e}")
+        logger.error(f"❌ Erreur RAGRetriever: {e}")
         return {
             "text": "Une erreur est survenue lors de la recherche RAG.",
             "sources": [],
@@ -1223,12 +981,12 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         }
 
 # ---------------------------------------------------------------------------
-# RAG avec fallback OpenAI amélioré
+# RAG avec fallback OpenAI - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None, target_language: str = "fr") -> Dict[str, Any]:
     """
-    Version améliorée de _rag_answer avec fallback OpenAI et support CoT
+    Version améliorée de _rag_answer avec fallback OpenAI
     """
     # Essai RAG standard d'abord
     rag_result = _rag_answer(question, k, entities)
@@ -1245,7 +1003,7 @@ def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict
     if _should_use_openai_fallback(rag_result, intent):
         logger.info("🤖 Activation fallback OpenAI après échec RAG")
         
-        # Tenter fallback OpenAI avec la langue cible (possiblement avec CoT)
+        # Tenter fallback OpenAI avec la langue cible
         openai_result = _generate_openai_fallback_response(
             question=question,
             entities=entities or {},
@@ -1266,7 +1024,7 @@ def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict
     return rag_result
 
 # ---------------------------------------------------------------------------
-# NETTOYAGE & SYNTHÈSE AMÉLIORÉS
+# NETTOYAGE & SYNTHÈSE - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def _final_sanitize(text: str) -> str:
@@ -1295,23 +1053,9 @@ def _final_sanitize(text: str) -> str:
     return '\n'.join(cleaned_lines).strip()
 
 def _maybe_synthesize(question: str, context_text: str) -> str:
-    """
-    AMÉLIORÉ: Utilise les nouvelles fonctions de synthèse si disponibles
-    """
     try:
         if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
             return context_text
-        
-        # NOUVEAU: Essai d'abord avec la fonction spécialisée si disponible
-        if OPENAI_FALLBACK_AVAILABLE:
-            try:
-                # Vérifier si synthesize_rag_content est disponible
-                if 'synthesize_rag_content' in globals():
-                    return synthesize_rag_content(question, context_text, max_length=300)
-            except Exception as e:
-                logger.warning(f"⚠️ Échec synthèse spécialisée, fallback standard: {e}")
-        
-        # Fallback vers méthode standard
         try:
             from ..utils.llm import complete
         except ImportError:
@@ -1320,7 +1064,6 @@ def _maybe_synthesize(question: str, context_text: str) -> str:
             except ImportError:
                 logger.warning("⚠️ Aucun wrapper LLM trouvé pour la synthèse")
                 return context_text
-                
         synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
 
 RÈGLES IMPORTANTES :
@@ -1337,88 +1080,26 @@ Informations à synthétiser :
 {context}
 
 Réponse synthétique :""".format(question=question, context=_final_sanitize(context_text)[:2000])
-        
         synthesized = complete(synthesis_prompt, temperature=0.2)
         return _final_sanitize(synthesized) if synthesized else context_text
-        
     except Exception as e:
         logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
         return context_text
 
-# ===== Mode hybride amélioré =====
+# ===== Mode hybride - CODE ORIGINAL CONSERVÉ =====
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
-    """
-    AMÉLIORÉ: Utilise generate_clarification_response si disponible
-    """
     try:
-        # NOUVEAU: Essai avec la fonction spécialisée si disponible
-        if OPENAI_FALLBACK_AVAILABLE and 'generate_clarification_response' in globals():
-            try:
-                clarification_text = generate_clarification_response(
-                    intent=intent.name if hasattr(intent, 'name') else str(intent),
-                    missing_fields=missing_fields,
-                    general_info=""
-                )
-                
-                # Enrichir avec les boutons rapides
-                age_days = None
-                if entities.get("age_days") is not None:
-                    try: 
-                        age_days = int(entities["age_days"])
-                    except Exception: 
-                        pass
-                elif entities.get("age_weeks") is not None:
-                    try: 
-                        age_days = int(entities["age_weeks"]) * 7
-                    except Exception: 
-                        pass
-                    
-                defaults = {
-                    "species": entities.get("species") or "broiler",
-                    "line": entities.get("line") or "ross308",
-                    "sex": entities.get("sex") or "mixed",
-                    "age_days": age_days
-                }
-                
-                quick_replies = {
-                    "species": ["broiler", "layer", "other"],
-                    "line": ["ross308", "cobb500", "hubbard", "other"],
-                    "sex": ["male", "female", "mixed"],
-                    "one_click": defaults
-                }
-                
-                return {
-                    "text": clarification_text, 
-                    "source": "hybrid_ui", 
-                    "confidence": 0.9,
-                    "enriched": True, 
-                    "suggested_defaults": defaults,
-                    "quick_replies": quick_replies, 
-                    "rag_meta": {}, 
-                    "rag_sources": []
-                }
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Échec clarification spécialisée, fallback standard: {e}")
-        
-        # Fallback vers méthode standard si fonction spécialisée échoue
         age_days = None
         if entities.get("age_days") is not None:
-            try: 
-                age_days = int(entities["age_days"])
-            except Exception: 
-                pass
+            try: age_days = int(entities["age_days"])
+            except Exception: pass
         elif entities.get("age_weeks") is not None:
-            try: 
-                age_days = int(entities["age_weeks"]) * 7
-            except Exception: 
-                pass
-        defaults = {
-            "species": entities.get("species") or "broiler",
-            "line": entities.get("line") or "ross308",
-            "sex": entities.get("sex") or "mixed",
-            "age_days": age_days
-        }
+            try: age_days = int(entities["age_weeks"]) * 7
+            except Exception: pass
+        defaults = {"species": entities.get("species") or "broiler",
+                    "line": entities.get("line") or "ross308",
+                    "sex": entities.get("sex") or "mixed",
+                    "age_days": age_days}
         species_label = "Poulet de chair (broiler)" if defaults["species"] == "broiler" else "Pondeuse" if defaults["species"] == "layer" else "Poulet"
         line_label = {"ross308": "Ross 308", "cobb500": "Cobb 500"}.get(str(defaults["line"]).lower(), str(defaults["line"]).title() if defaults["line"] else "—")
         sex_map = {"male": "Mâle", "female": "Femelle", "mixed": "Mixte", "as_hatched": "Mixte"}
@@ -1438,37 +1119,24 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
             "sex": ["male", "female", "mixed"],
             "one_click": defaults
         }
-        return {
-            "text": text, 
-            "source": "hybrid_ui", 
-            "confidence": 0.9,
-            "enriched": True, 
-            "suggested_defaults": defaults,
-            "quick_replies": quick_replies, 
-            "rag_meta": {}, 
-            "rag_sources": []
-        }
+        return {"text": text, "source": "hybrid_ui", "confidence": 0.9,
+                "enriched": True, "suggested_defaults": defaults,
+                "quick_replies": quick_replies, "rag_meta": {}, "rag_sources": []}
     except Exception as e:
-        logger.error(f"⌐ Error generating hybrid UX answer: {e}")
-        return {
-            "text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
-            "source": "hybrid_ui_fallback", 
-            "confidence": 0.4, 
-            "enriched": False
-        }
+        logger.error(f"❌ Error generating hybrid UX answer: {e}")
+        return {"text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
+                "source": "hybrid_ui_fallback", "confidence": 0.4, "enriched": False}
 
 # ---------------------------------------------------------------------------
-# Fonction de statut pour monitoring AMÉLIORÉE
+# Fonction de statut pour monitoring - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
 def get_fallback_status() -> Dict[str, Any]:
     """
-    Retourne le statut du système de fallback OpenAI avec support CoT
-    AMÉLIORÉ: Inclut les nouvelles capacités
+    Retourne le statut du système de fallback OpenAI
     """
     status = {
         "openai_fallback_available": OPENAI_FALLBACK_AVAILABLE,
-        "openai_cot_available": OPENAI_COT_AVAILABLE,
         "rag_available": RAG_AVAILABLE,
         "perfstore_available": PERF_AVAILABLE,
         "memory_available": MEMORY_AVAILABLE
@@ -1486,105 +1154,10 @@ def get_fallback_status() -> Dict[str, Any]:
     status["synthesis_enabled"] = str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
     status["auto_language_detection"] = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
     
-    # NOUVEAU: Statut CoT
-    if OPENAI_COT_AVAILABLE:
-        status["cot_config"] = {
-            "auto_detection_enabled": True,
-            "supported_intents": [
-                "HealthDiagnosis", "MultiFactor", "TroubleshootingMultiple", 
-                "Economics", "OptimizationStrategy", "ProductionAnalysis"
-            ],
-            "complexity_threshold": 2
-        }
-    
     return status
 
-def get_cot_capabilities() -> Dict[str, Any]:
-    """
-    NOUVEAU: Retourne les capacités Chain-of-Thought disponibles dans dialogue_manager
-    """
-    if not OPENAI_COT_AVAILABLE:
-        return {"cot_available": False, "reason": "openai_utils CoT functions not available"}
-    
-    return {
-        "cot_available": True,
-        "auto_detection": True,
-        "parsing_enabled": True,
-        "followup_generation": True,
-        "supported_sections": [
-            "thinking", "analysis", "reasoning", "factors", "recommendations",
-            "validation", "problem_decomposition", "factor_analysis", 
-            "interconnections", "solution_pathway", "risk_mitigation",
-            "economic_context", "cost_benefit_breakdown", "scenario_analysis"
-        ],
-        "supported_intents": [
-            "HealthDiagnosis", "OptimizationStrategy", "TroubleshootingMultiple",
-            "ProductionAnalysis", "MultiFactor", "Economics"
-        ],
-        "complexity_indicators": [
-            "problème", "diagnostic", "analyse", "optimiser", "améliorer",
-            "stratégie", "multiple", "plusieurs", "complexe", "comparer",
-            "évaluer", "recommandation", "pourquoi", "comment résoudre"
-        ]
-    }
-
-def test_enhanced_pipeline() -> Dict[str, Any]:
-    """
-    NOUVEAU: Test complet du pipeline amélioré avec CoT et synthèse
-    """
-    try:
-        results = {}
-        
-        # Test fonction de base
-        results["basic_status"] = {
-            "openai_fallback": OPENAI_FALLBACK_AVAILABLE,
-            "cot_available": OPENAI_COT_AVAILABLE,
-            "rag_available": RAG_AVAILABLE,
-            "memory_available": MEMORY_AVAILABLE
-        }
-        
-        # Test CoT si disponible
-        if OPENAI_COT_AVAILABLE:
-            try:
-                cot_test = test_cot_pipeline()
-                results["cot_test"] = cot_test
-            except Exception as e:
-                results["cot_test"] = {"status": "error", "error": str(e)}
-        
-        # Test synthèse si disponible
-        if OPENAI_FALLBACK_AVAILABLE:
-            try:
-                synthesis_test = test_synthesis_pipeline()
-                results["synthesis_test"] = synthesis_test
-            except Exception as e:
-                results["synthesis_test"] = {"status": "error", "error": str(e)}
-        
-        # Test détection de langue
-        try:
-            lang_test = _detect_question_language_openai("What is the optimal weight for broilers?")
-            results["language_detection"] = {
-                "status": "success",
-                "detected": lang_test,
-                "expected": "en"
-            }
-        except Exception as e:
-            results["language_detection"] = {"status": "error", "error": str(e)}
-        
-        return {
-            "status": "success",
-            "message": "Pipeline amélioré testé avec succès",
-            "detailed_results": results
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec test pipeline amélioré: {str(e)}",
-            "error_type": type(e).__name__
-        }
-
 # ---------------------------------------------------------------------------
-# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE + COT
+# Entrée principale AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -1599,21 +1172,14 @@ def handle(
     entities: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL + COT
-    
-    AMÉLIORATIONS APPLIQUÉES:
-    - Support Chain-of-Thought pour analyses complexes
-    - Nouvelles fonctions de synthèse et clarification
-    - Pipeline de fallback optimisé
-    - Détection automatique de complexité pour CoT
-    - CORRIGÉ: Toutes les indentations vérifiées et corrigées
+    Fonction principale de traitement des questions - VERSION HYBRIDE AVEC MÉMOIRE CONVERSATIONNELLE + FALLBACK OPENAI + MULTILINGUE UNIVERSEL
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
         logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
 
         # =================================================================
-        # NOUVEAU: DÉTECTION DE LANGUE AUTOMATIQUE AMÉLIORÉE
+        # NOUVEAU: DÉTECTION DE LANGUE AUTOMATIQUE
         # =================================================================
         auto_detection_enabled = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
         
@@ -1633,7 +1199,7 @@ def handle(
             logger.info(f"🌍 Détection automatique désactivée, utilisation lang: {effective_language}")
 
         # =================================================================
-        # NOUVEAU: RÉCUPÉRATION DU CONTEXTE CONVERSATIONNEL
+        # NOUVEAU: Récupération du contexte conversationnel
         # =================================================================
         memory = _get_conversation_memory()
         session_context = memory.get(session_id) or {}
@@ -1650,10 +1216,8 @@ def handle(
         # Fusion des entities (NER + overrides + contexte conversationnel)
         _ents = dict(classification.get("entities") or {})
         if entities:
-            try: 
-                _ents.update(entities)
-            except Exception: 
-                pass
+            try: _ents.update(entities)
+            except Exception: pass
         
         # NOUVEAU: Vérifier si on continue une conversation
         if _should_continue_conversation(session_context, intent):
@@ -1675,41 +1239,6 @@ def handle(
             intent = Intention.PerfTargets
 
         logger.info(f"Intent: {intent}, Entities keys: {list(entities.keys())}")
-
-        # =================================================================
-        # NOUVEAU: VÉRIFICATION PRIORITAIRE POUR ANALYSE COT
-        # =================================================================
-        if OPENAI_COT_AVAILABLE and _should_use_cot_analysis(intent, entities, question):
-            logger.info("🧠 Question complexe détectée → Analyse Chain-of-Thought prioritaire")
-            
-            # Passer l'intent dans les entities pour le context
-            entities_with_intent = dict(entities)
-            entities_with_intent["_intent"] = intent
-            
-            # Tentative d'analyse CoT directe
-            cot_result = _generate_cot_analysis(
-                question=question,
-                entities=entities,
-                intent=intent,
-                rag_context="",  # Pas de contexte RAG préalable
-                target_language=effective_language
-            )
-            
-            if cot_result:
-                logger.info("✅ Analyse CoT réussie, retour direct")
-                _clear_conversation_context(session_id)
-                
-                response = {
-                    "type": "answer",
-                    "intent": intent,
-                    "answer": cot_result,
-                    "route_taken": "cot_analysis_priority",
-                    "session_id": session_id
-                }
-                
-                return _finalize_response_with_language(response, question, effective_language, detected_language)
-            else:
-                logger.info("⚠️ Analyse CoT échouée, continuation pipeline standard")
 
         # Étape 3: Vérification de complétude
         completeness = compute_completeness(intent, entities)
@@ -1795,15 +1324,11 @@ def handle(
                     unit_label = (rec.get("unit") or norm["unit"] or "metric").lower()
                     v_g, v_lb = rec.get("weight_g"), rec.get("weight_lb")
                     if v_g is not None:
-                        try: 
-                            val_txt = f"**{float(v_g):.0f} g**"
-                        except Exception: 
-                            val_txt = f"**{v_g} g**"
+                        try: val_txt = f"**{float(v_g):.0f} g**"
+                        except Exception: val_txt = f"**{v_g} g**"
                     elif v_lb is not None:
-                        try: 
-                            val_txt = f"**{float(v_lb):.2f} lb**"
-                        except Exception: 
-                            val_txt = f"**{v_lb} lb**"
+                        try: val_txt = f"**{float(v_lb):.2f} lb**"
+                        except Exception: val_txt = f"**{v_lb} lb**"
                     else:
                         val_txt = "**n/a**"
                     age_disp = int(rec.get("age_days") or norm.get("age_days") or 0)
@@ -1853,8 +1378,8 @@ def handle(
                 logger.warning(f"⚠️ Table-first lookup échoué: {e}")
                 # on continue vers RAG
 
-        # Étape 5: RAG complet avec fallback OpenAI amélioré
-        logger.info("📚 RAG via RAGRetriever avec fallback OpenAI amélioré")
+        # Étape 5: RAG complet avec fallback OpenAI
+        logger.info("📚 RAG via RAGRetriever avec fallback OpenAI")
         
         # Passer l'intent dans les entities pour le fallback
         entities_with_intent = dict(entities)
@@ -1863,8 +1388,8 @@ def handle(
         rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent, target_language=effective_language)
         rag_text = _final_sanitize(rag.get("text", ""))
         
-        # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI ou CoT
-        if rag.get("source") not in ["openai_fallback", "cot_analysis"]:
+        # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI
+        if rag.get("source") != "openai_fallback":
             rag_text = _maybe_synthesize(question, rag_text)
 
         # NOUVEAU: Effacer le contexte après réponse finale (même si RAG)
@@ -1888,7 +1413,7 @@ def handle(
         return _finalize_response_with_language(response, question, effective_language, detected_language)
 
     except Exception as e:
-        logger.exception(f"⌐ Critical error in handle(): {e}")
+        logger.exception(f"❌ Critical error in handle(): {e}")
         response = {
             "type": "error",
             "error": str(e),
@@ -1919,4 +1444,3 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
         "source": "compute_placeholder",
         "confidence": 0.1
     }
-                    "
