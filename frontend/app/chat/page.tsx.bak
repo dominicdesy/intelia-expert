@@ -434,6 +434,13 @@ export default function ChatInterface() {
       return [answerText, []] // Toujours retourner sources vides
     }
 
+	// 🔧 AJOUT APRÈS le bloc partial_answer
+	if (result?.type === 'answer' && result?.answer) {
+	  console.log('🎯 [extractAnswerAndSources] Type answer détecté')
+	  answerText = result.answer.text || ""
+	  return [answerText, []]
+	}
+
     // ✅ ANCIEN CODE CONSERVÉ pour compatibilité
     const responseContent = result?.response || ""
 
