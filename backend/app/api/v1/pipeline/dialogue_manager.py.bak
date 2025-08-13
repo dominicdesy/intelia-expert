@@ -219,24 +219,39 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
     Helper pour appliquer l'adaptation linguistique à toute réponse finale.
     Utilise cette fonction avant chaque return dans handle().
     """
+    # Ajouter les métadonnées de langue pour toutes les réponses
+    if response.get("type") == "answer" and "answer" in response:
+        response["answer"]["meta"] = response["answer"].get("meta", {})
+        response["answer"]["meta"]["detected_language"] = detected_language
+        response["answer"]["meta"]["effective_language"] = effective_language
+        
+        # Si c'est déjà un fallback OpenAI avec la bonne langue, pas besoin d'adaptation
+        if response["answer"].get("source") == "openai_fallback":
+            target_lang_in_meta = response["answer"]["meta"].get("target_language", "fr")
+            if target_lang_in_meta == effective_language:
+                logger.info(f"✅ Fallback OpenAI déjà généré dans la langue cible: {effective_language}")
+                return response
+        
+    elif response.get("type") == "partial_answer":
+        response["language_metadata"] = {
+            "detected_language": detected_language,
+            "effective_language": effective_language
+        }
+    
+    # Si français, pas de traitement supplémentaire nécessaire
     if effective_language == "fr":
-        # Ajouter les métadonnées de langue même pour le français
-        if response.get("type") == "answer" and "answer" in response:
-            response["answer"]["meta"] = response["answer"].get("meta", {})
-            response["answer"]["meta"]["detected_language"] = detected_language
-            response["answer"]["meta"]["effective_language"] = effective_language
-        elif response.get("type") == "partial_answer":
-            response["language_metadata"] = {
-                "detected_language": detected_language,
-                "effective_language": effective_language
-            }
-        return response  # Pas de traitement nécessaire
+        return response
     
     # Adapter le texte principal selon le type de réponse
     if response.get("type") == "answer" and response.get("answer", {}).get("text"):
         answer = response["answer"]
         original_text = answer["text"]
         source_type = answer.get("source", "unknown")
+        
+        # Ne pas re-adapter les fallbacks OpenAI qui sont déjà dans la bonne langue
+        if source_type == "openai_fallback":
+            logger.info("ℹ️ Fallback OpenAI - adaptation linguistique déjà effectuée")
+            return response
         
         adapted_text = _adapt_response_to_language(
             response_text=original_text,
@@ -247,9 +262,6 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
         
         # Mettre à jour la réponse
         response["answer"]["text"] = adapted_text
-        response["answer"]["meta"] = response["answer"].get("meta", {})
-        response["answer"]["meta"]["detected_language"] = detected_language
-        response["answer"]["meta"]["effective_language"] = effective_language
         
     elif response.get("type") == "partial_answer" and response.get("general_answer", {}).get("text"):
         # Pour le mode hybride
@@ -263,10 +275,6 @@ def _finalize_response_with_language(response: Dict[str, Any], question: str, ef
         )
         
         response["general_answer"]["text"] = adapted_text
-        response["language_metadata"] = {
-            "detected_language": detected_language,
-            "effective_language": effective_language
-        }
     
     return response
 
@@ -562,10 +570,10 @@ def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> 
     
     return "\n".join(context_parts)
 
-def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent: Intention, rag_context: str = "") -> Dict[str, Any]:
+def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent: Intention, rag_context: str = "", target_language: str = "fr") -> Dict[str, Any]:
     """
     Génère une réponse via OpenAI quand le RAG échoue
-    MODIFIÉ: Le prompt reste en français, mais OpenAI détectera automatiquement la langue de la question
+    MODIFIÉ: Génère directement dans la langue cible détectée avec instructions ultra-explicites
     """
     if not OPENAI_FALLBACK_AVAILABLE:
         return None
@@ -574,8 +582,9 @@ def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], 
         # Construction du prompt contextualisé
         system_context = _build_agricultural_context(entities, intent)
         
-        # MODIFIÉ: Prompt adaptatif qui laisse OpenAI détecter la langue
-        fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
+        # NOUVEAU: Prompt ultra-explicite pour forcer la langue
+        if target_language == "fr":
+            fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
 
 {system_context}
 
@@ -583,16 +592,36 @@ Question de l'utilisateur : {question}
 
 Contexte partiel disponible (si pertinent) : {rag_context}
 
-Instructions :
-- Réponds dans la MÊME LANGUE que la question de l'utilisateur
+INSTRUCTIONS IMPORTANTES :
+- Réponds EXCLUSIVEMENT en français
 - Donne une réponse basée sur tes connaissances en aviculture
 - Sois précis et technique quand approprié  
 - Si tu mentionnes des valeurs, indique qu'elles sont approximatives
 - Structure ta réponse en Markdown si pertinent
-- Si la question sort du domaine avicole, redirige poliment vers l'élevage de volailles
 - Mentionne que pour des données spécifiques à une lignée/âge précis, une consultation des guides techniques est recommandée
 
-Réponse professionnelle dans la langue de la question :"""
+Réponse professionnelle EN FRANÇAIS :"""
+
+        else:
+            # Pour toutes les autres langues (surtout anglais)
+            fallback_prompt = f"""You are an expert in poultry farming and zootechnics. A user is asking a question about poultry farming.
+
+{system_context}
+
+User's question: {question}
+
+Partial available context (if relevant): {rag_context}
+
+CRITICAL INSTRUCTIONS:
+- You MUST respond ONLY in English
+- DO NOT use any French words or phrases
+- Provide an answer based on your poultry farming knowledge  
+- Be precise and technical when appropriate
+- If you mention values, indicate they are approximate
+- Structure your response in Markdown if relevant
+- Mention that for specific data related to a precise breed/age, consulting technical guides is recommended
+
+Professional response IN ENGLISH ONLY:"""
 
         response = openai_complete(
             prompt=fallback_prompt,
@@ -610,7 +639,9 @@ Réponse professionnelle dans la langue de la question :"""
                     "fallback_reason": "rag_insufficient",
                     "entities_used": entities,
                     "intent": intent.name if hasattr(intent, 'name') else str(intent),
-                    "rag_context_provided": bool(rag_context.strip())
+                    "rag_context_provided": bool(rag_context.strip()),
+                    "target_language": target_language,
+                    "prompt_language": "french" if target_language == "fr" else "english"
                 }
             }
             
@@ -953,7 +984,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
 # RAG avec fallback OpenAI - CODE ORIGINAL CONSERVÉ
 # ---------------------------------------------------------------------------
 
-def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None, target_language: str = "fr") -> Dict[str, Any]:
     """
     Version améliorée de _rag_answer avec fallback OpenAI
     """
@@ -972,12 +1003,13 @@ def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict
     if _should_use_openai_fallback(rag_result, intent):
         logger.info("🤖 Activation fallback OpenAI après échec RAG")
         
-        # Tenter fallback OpenAI
+        # Tenter fallback OpenAI avec la langue cible
         openai_result = _generate_openai_fallback_response(
             question=question,
             entities=entities or {},
             intent=intent,
-            rag_context=rag_result.get("text", "")
+            rag_context=rag_result.get("text", ""),
+            target_language=target_language
         )
         
         if openai_result:
@@ -1353,7 +1385,7 @@ def handle(
         entities_with_intent = dict(entities)
         entities_with_intent["_intent"] = intent
         
-        rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent)
+        rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent, target_language=effective_language)
         rag_text = _final_sanitize(rag.get("text", ""))
         
         # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI
