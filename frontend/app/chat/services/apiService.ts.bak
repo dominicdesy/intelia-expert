@@ -395,7 +395,7 @@ export const generateAIResponse = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID:', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation - DÉSACTIVÉ car endpoint manquant
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation
     try {
       await saveConversationExplicitly(processedData, user.id, finalQuestion)
       console.log('✅ [apiService] Conversation sauvegardée explicitement')
@@ -584,7 +584,7 @@ export const generateAIResponsePublic = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID (public):', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique) - DÉSACTIVÉ car endpoint manquant
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique)
     try {
       await saveConversationPublic(processedData, question.trim())
       console.log('✅ [apiService] Conversation publique sauvegardée explicitement')
@@ -602,22 +602,13 @@ export const generateAIResponsePublic = async (
 }
 
 /**
- * 🚀 FONCTIONS DE SAUVEGARDE EXPLICITE - CORRIGÉES POUR ÉVITER ERREUR 405
+ * 🚀 NOUVELLES FONCTIONS DE SAUVEGARDE EXPLICITE
  */
 const saveConversationExplicitly = async (
   processedData: EnhancedAIResponse,
   userId: string,
   question: string
 ): Promise<void> => {
-  // ✅ CORRECTION : Désactiver car l'endpoint POST /v1/conversation n'existe pas
-  console.log('ℹ️ [saveConversationExplicitly] Sauvegarde automatique via /expert/ask - endpoint POST manquant, skipping explicit save')
-  console.log('📊 [saveConversationExplicitly] Conversation déjà créée avec ID:', processedData.conversation_id)
-  
-  // Les conversations sont automatiquement créées par /v1/expert/ask
-  // Pas besoin de sauvegarde explicite supplémentaire
-  return
-
-  /* ❌ CODE DÉSACTIVÉ car endpoint manquant - conservé pour référence
   if (!processedData.response && !processedData.general_answer?.text) {
     console.log('⚠️ [saveConversationExplicitly] Pas de contenu à sauvegarder')
     return
@@ -654,22 +645,12 @@ const saveConversationExplicitly = async (
     console.error('❌ [saveConversationExplicitly] Erreur:', error)
     throw error
   }
-  */
 }
 
 const saveConversationPublic = async (
   processedData: EnhancedAIResponse,
   question: string
 ): Promise<void> => {
-  // ✅ CORRECTION : Désactiver car l'endpoint POST /v1/conversation n'existe pas
-  console.log('ℹ️ [saveConversationPublic] Sauvegarde automatique via /expert/ask - endpoint POST manquant, skipping explicit save')
-  console.log('📊 [saveConversationPublic] Conversation publique déjà créée avec ID:', processedData.conversation_id)
-  
-  // Les conversations sont automatiquement créées par /v1/expert/ask
-  // Pas besoin de sauvegarde explicite supplémentaire
-  return
-
-  /* ❌ CODE DÉSACTIVÉ car endpoint manquant - conservé pour référence
   if (!processedData.response && !processedData.general_answer?.text) {
     console.log('⚠️ [saveConversationPublic] Pas de contenu à sauvegarder')
     return
@@ -710,7 +691,6 @@ const saveConversationPublic = async (
     console.error('❌ [saveConversationPublic] Erreur:', error)
     throw error
   }
-  */
 }
 
 /**
@@ -961,7 +941,6 @@ export const debugEnhancedAPI = () => {
   console.log('  🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  ✅ Génération automatique response_versions')
   console.log('  🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
-  console.log('  ✅ Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
   console.log('  ✅ Authentification JWT')
   console.log('  ✅ Feedback, conversations, topics')
@@ -1062,7 +1041,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🚨 Extraction type: "answer" de data.answer.text (CORRIGÉ !)')
   console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  - 🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
-  console.log('  - 🚀 Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
   console.log('  - 🚀 Body: { session_id, question }')
   console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
@@ -1075,7 +1053,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Toutes fonctions frontend préservées')
   console.log('  - ✅ Support PerfStore avec type: "answer"')
   console.log('  - 🔧 Intégration ConversationService pour historique (NOUVEAU !)')
-  console.log('  - ✅ Sauvegarde automatique via /expert/ask (CORRIGÉ !)')
   console.groupEnd()
 }
 
