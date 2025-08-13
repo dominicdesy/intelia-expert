@@ -1,0 +1,553 @@
+# -*- coding: utf-8 -*-
+"""
+Processeur Chain-of-Thought et fallback OpenAI
+Extrait de dialogue_manager.py pour modularité
+"""
+
+import logging
+import os
+from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
+
+# Import conditionnel OpenAI avancé
+try:
+    from ..utils.openai_utils import (
+        complete as openai_complete,
+        complete_with_cot,
+        synthesize_rag_content,
+        generate_clarification_response,
+        get_openai_status,
+        test_cot_pipeline,
+        test_synthesis_pipeline
+    )
+    OPENAI_FALLBACK_AVAILABLE = True
+    OPENAI_COT_AVAILABLE = True
+    logger.info("✅ OpenAI fallback + CoT disponible pour réponses avancées")
+except ImportError as e:
+    logger.warning(f"⚠️ OpenAI fallback avancé indisponible: {e}")
+    # Fallback vers fonctions basiques
+    try:
+        from ..utils.openai_utils import complete as openai_complete
+        from ..utils.openai_utils import get_openai_status
+        OPENAI_FALLBACK_AVAILABLE = True
+        OPENAI_COT_AVAILABLE = False
+        logger.info("✅ OpenAI fallback basique disponible")
+    except ImportError:
+        OPENAI_FALLBACK_AVAILABLE = False
+        OPENAI_COT_AVAILABLE = False
+        def openai_complete(*args, **kwargs): return None
+        def get_openai_status(): return {"status": "unavailable"}
+
+# ---------------------------------------------------------------------------
+# DÉTECTION ET ANALYSE CHAIN-OF-THOUGHT
+# ---------------------------------------------------------------------------
+
+def should_use_cot_analysis(intent, entities: Dict[str, Any], question: str) -> bool:
+    """
+    Détermine si une analyse Chain-of-Thought serait bénéfique
+    """
+    if not OPENAI_COT_AVAILABLE:
+        return False
+    
+    # Import local pour éviter circulaire
+    from ..utils.question_classifier import Intention
+    
+    # Intentions complexes bénéficiant du CoT
+    cot_intents = {
+        Intention.HealthDiagnosis,
+        Intention.MultiFactor,
+        Intention.TroubleshootingMultiple,
+        Intention.Economics,
+        Intention.OptimizationStrategy,
+        Intention.ProductionAnalysis
+    }
+    
+    if intent in cot_intents:
+        return True
+    
+    # Détection de questions complexes dans le texte
+    complexity_indicators = [
+        "problème", "diagnostic", "analyse", "optimiser", "améliorer",
+        "stratégie", "multiple", "plusieurs", "complexe", "comparer",
+        "évaluer", "recommandation", "pourquoi", "comment résoudre"
+    ]
+    
+    question_lower = question.lower()
+    complexity_score = sum(1 for indicator in complexity_indicators if indicator in question_lower)
+    
+    # Si 2+ indicateurs de complexité ou question très longue
+    return complexity_score >= 2 or len(question) > 200
+
+def build_agricultural_context(entities: Dict[str, Any], intent) -> str:
+    """
+    Construit un contexte agricole pour orienter la réponse OpenAI
+    """
+    context_parts = []
+    
+    # Contexte espèce
+    species = entities.get("species", "").lower()
+    if species == "broiler":
+        context_parts.append("Contexte : Poulets de chair (broilers)")
+    elif species == "layer":
+        context_parts.append("Contexte : Poules pondeuses")
+    else:
+        context_parts.append("Contexte : Élevage de volailles")
+    
+    # Contexte lignée si disponible
+    line = entities.get("line")
+    if line:
+        line_map = {
+            "ross308": "lignée Ross 308",
+            "cobb500": "lignée Cobb 500",
+            "hubbard": "lignée Hubbard"
+        }
+        line_name = line_map.get(line.lower(), f"lignée {line}")
+        context_parts.append(f"Lignée : {line_name}")
+    
+    # Contexte âge si disponible
+    age_days = entities.get("age_days")
+    if age_days:
+        context_parts.append(f"Âge : {age_days} jours")
+    
+    # Contexte sexe si disponible
+    sex = entities.get("sex")
+    if sex:
+        sex_map = {
+            "male": "mâles",
+            "female": "femelles", 
+            "as_hatched": "sexes mélangés"
+        }
+        sex_name = sex_map.get(sex.lower(), sex)
+        context_parts.append(f"Sexe : {sex_name}")
+    
+    # Contexte intention
+    intent_context = {
+        "PerfTargets": "Focus sur les objectifs de performance (poids, croissance)",
+        "HealthDiagnosis": "Focus sur la santé et diagnostic vétérinaire",
+        "NutritionAdvice": "Focus sur l'alimentation et la nutrition",
+        "HousingEnvironment": "Focus sur le logement et l'environnement d'élevage",
+        "ManagementPractices": "Focus sur les pratiques de gestion d'élevage",
+        "WaterFeedIntake": "Focus sur la consommation d'eau et d'aliment",
+        "EquipmentSizing": "Focus sur le dimensionnement des équipements",
+        "VentilationSizing": "Focus sur la ventilation et l'ambiance",
+        "EnvSetpoints": "Focus sur les consignes environnementales",
+        "Economics": "Focus sur les aspects économiques de l'élevage",
+        "MultiFactor": "Analyse multi-factorielle complexe",
+        "TroubleshootingMultiple": "Résolution de problèmes multiples",
+        "OptimizationStrategy": "Stratégie d'optimisation globale",
+        "ProductionAnalysis": "Analyse de performance de production"
+    }
+    
+    intent_name = intent.name if hasattr(intent, 'name') else str(intent)
+    if intent_name in intent_context:
+        context_parts.append(intent_context[intent_name])
+    
+    return "\n".join(context_parts)
+
+def generate_cot_analysis(question: str, entities: Dict[str, Any], intent, 
+                         rag_context: str = "", target_language: str = "fr") -> Optional[Dict[str, Any]]:
+    """
+    Génère une analyse Chain-of-Thought pour questions complexes
+    """
+    if not OPENAI_COT_AVAILABLE:
+        return None
+        
+    try:
+        # Construction du contexte avicole
+        system_context = build_agricultural_context(entities, intent)
+        
+        # Prompt CoT spécialisé selon l'intention
+        cot_prompts = {
+            "HealthDiagnosis": f"""Tu es un vétérinaire avicole expert. Analyse cette situation sanitaire avec une approche méthodologique rigoureuse.
+
+{system_context}
+
+Question: {question}
+
+Contexte disponible: {rag_context[:500] if rag_context else 'Contexte limité'}
+
+<thinking>
+Identifie les symptômes, signes cliniques et facteurs mentionnés dans la question.
+</thinking>
+
+<analysis>
+Analyse les causes possibles, facteurs de risque et interconnexions.
+</analysis>
+
+<factors>
+Évalue l'impact de l'âge, lignée, environnement et gestion sur la situation.
+</factors>
+
+<recommendations>
+Propose un diagnostic différentiel et plan d'action structuré.
+</recommendations>
+
+Diagnostic vétérinaire professionnel:""",
+
+            "Economics": f"""Tu es un expert en économie avicole. Analyse cette situation avec une approche financière structurée.
+
+{system_context}
+
+Question: {question}
+
+Contexte: {rag_context[:500] if rag_context else 'Données limitées'}
+
+<economic_context>
+Analyse la situation économique actuelle et les facteurs de coût.
+</economic_context>
+
+<cost_benefit_breakdown>
+Décompose les coûts et bénéfices identifiables.
+</cost_benefit_breakdown>
+
+<scenario_analysis>
+Évalue différents scénarios et leur impact financier.
+</scenario_analysis>
+
+<optimization_levers>
+Identifie les leviers d'optimisation économique.
+</optimization_levers>
+
+<financial_recommendation>
+Propose une stratégie financière concrète et chiffrée.
+</financial_recommendation>
+
+Analyse économique complète:""",
+
+            "default": f"""Tu es un expert avicole. Analyse cette situation avec une approche méthodologique.
+
+{system_context}
+
+Question: {question}
+
+Contexte: {rag_context[:500] if rag_context else 'Contexte partiel'}
+
+<thinking>
+Décompose le problème et identifie les éléments clés.
+</thinking>
+
+<analysis>
+Analyse les facteurs impliqués et leurs interactions.
+</analysis>
+
+<recommendations>
+Propose des solutions concrètes et priorisées.
+</recommendations>
+
+Réponse experte structurée:"""
+        }
+        
+        intent_name = intent.name if hasattr(intent, 'name') else str(intent)
+        cot_prompt = cot_prompts.get(intent_name, cot_prompts["default"])
+        
+        # Adaptation linguistique du prompt si nécessaire
+        if target_language != "fr":
+            cot_prompt = cot_prompt.replace("Tu es", "You are").replace("Analyse", "Analyze")
+            # Adaptation basique - le modèle s'adaptera au contexte
+        
+        # Analyse CoT avec parsing
+        cot_result = complete_with_cot(
+            prompt=cot_prompt,
+            temperature=0.4,  # Créativité modérée pour expertise
+            max_tokens=800,   # Suffisant pour analyse complète
+            parse_cot=True
+        )
+        
+        if cot_result:
+            return {
+                "text": cot_result.get("final_answer", cot_result.get("raw_response", "")),
+                "source": "cot_analysis",
+                "confidence": 0.85,  # Confiance élevée pour analyse structurée
+                "sources": [],
+                "meta": {
+                    "cot_sections": cot_result.get("parsed_sections", {}),
+                    "analysis_type": intent_name,
+                    "entities_used": entities,
+                    "rag_context_provided": bool(rag_context.strip()),
+                    "target_language": target_language,
+                    "raw_response_length": len(cot_result.get("raw_response", ""))
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur analyse CoT: {e}")
+        
+    return None
+
+# ---------------------------------------------------------------------------
+# FALLBACK OPENAI AMÉLIORÉ
+# ---------------------------------------------------------------------------
+
+def should_use_openai_fallback(rag_result: Dict[str, Any], intent) -> bool:
+    """
+    Détermine si OpenAI fallback doit être utilisé après échec RAG
+    """
+    # Cas où le RAG n'a pas trouvé de résultats
+    if rag_result.get("route") in ["rag_no_results", "rag_error", "rag_unavailable"]:
+        return True
+    
+    # Cas où le RAG a trouvé très peu de contenu pertinent
+    text = rag_result.get("text", "")
+    if len(text.strip()) < 50:  # Réponse trop courte
+        return True
+        
+    # Détecter les fragments de tableaux non pertinents
+    text_lower = text.lower()
+    table_indicators = [
+        "[tableau]", "table", "0.08", "0.10", "0.12", "0.15", "0.17", "0.20",
+        "distance air", "ceiling", "width", "pressure drop", "pa (0.01",
+        "post-mortem", "examination", "subdermal", "thoracic coelomic"
+    ]
+    table_matches = sum(1 for indicator in table_indicators if indicator in text_lower)
+    
+    # Si plus de 3 indicateurs de tableau détectés, probable fragment non pertinent
+    if table_matches >= 3:
+        logger.info(f"🔍 Fragment de tableau détecté ({table_matches} indicateurs) - activation fallback")
+        return True
+        
+    # Cas où le RAG retourne un message d'erreur générique
+    error_indicators = [
+        "aucune information", "non disponible", "n'est pas disponible",
+        "une erreur est survenue", "moteur rag", "base de connaissances"
+    ]
+    if any(indicator in text_lower for indicator in error_indicators):
+        return True
+        
+    return False
+
+def generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent, rag_context: str = "", target_language: str = "fr") -> Optional[Dict[str, Any]]:
+    """
+    Génère une réponse via OpenAI quand le RAG échoue
+    """
+    if not OPENAI_FALLBACK_AVAILABLE:
+        return None
+    
+    try:
+        # Vérifier si CoT serait approprié
+        if OPENAI_COT_AVAILABLE and should_use_cot_analysis(intent, entities, question):
+            logger.info("🧠 Fallback avec analyse CoT pour question complexe")
+            cot_result = generate_cot_analysis(
+                question=question,
+                entities=entities,
+                intent=intent,
+                rag_context=rag_context,
+                target_language=target_language
+            )
+            
+            if cot_result:
+                cot_result["meta"]["fallback_reason"] = "rag_insufficient_cot_analysis"
+                return cot_result
+        
+        # Fallback standard si CoT non disponible/approprié
+        system_context = build_agricultural_context(entities, intent)
+        
+        # Prompt ultra-explicite pour forcer la langue
+        if target_language == "fr":
+            fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
+
+{system_context}
+
+Question de l'utilisateur : {question}
+
+Contexte partiel disponible (si pertinent) : {rag_context}
+
+INSTRUCTIONS IMPORTANTES :
+- Réponds EXCLUSIVEMENT en français
+- Donne une réponse basée sur tes connaissances en aviculture
+- Sois précis et technique quand approprié  
+- Si tu mentionnes des valeurs, indique qu'elles sont approximatives
+- Structure ta réponse en Markdown si pertinent
+- Mentionne que pour des données spécifiques à une lignée/âge précis, une consultation des guides techniques est recommandée
+
+Réponse professionnelle EN FRANÇAIS :"""
+
+        else:
+            # Pour toutes les autres langues (surtout anglais)
+            fallback_prompt = f"""You are an expert in poultry farming and zootechnics. A user is asking a question about poultry farming.
+
+{system_context}
+
+User's question: {question}
+
+Partial available context (if relevant): {rag_context}
+
+CRITICAL INSTRUCTIONS:
+- You MUST respond ONLY in English
+- DO NOT use any French words or phrases
+- Provide an answer based on your poultry farming knowledge  
+- Be precise and technical when appropriate
+- If you mention values, indicate they are approximate
+- Structure your response in Markdown if relevant
+- Mention that for specific data related to a precise breed/age, consulting technical guides is recommended
+
+Professional response IN ENGLISH ONLY:"""
+
+        # Utilisation de la fonction complete optimisée
+        response = openai_complete(
+            prompt=fallback_prompt,
+            temperature=0.3,  # Légèrement créatif mais précis
+            max_tokens=400
+        )
+        
+        if response:
+            return {
+                "text": response,
+                "source": "openai_fallback",
+                "confidence": 0.75,  # Confiance modérée
+                "sources": [],
+                "meta": {
+                    "fallback_reason": "rag_insufficient",
+                    "entities_used": entities,
+                    "intent": intent.name if hasattr(intent, 'name') else str(intent),
+                    "rag_context_provided": bool(rag_context.strip()),
+                    "target_language": target_language,
+                    "prompt_language": "french" if target_language == "fr" else "english",
+                    "cot_attempted": False
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ OpenAI fallback échoué: {e}")
+        
+    return None
+
+# ---------------------------------------------------------------------------
+# SYNTHÈSE ET CLARIFICATION AMÉLIORÉES
+# ---------------------------------------------------------------------------
+
+def maybe_synthesize(question: str, context_text: str) -> str:
+    """
+    Utilise les nouvelles fonctions de synthèse si disponibles
+    """
+    try:
+        if str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() not in ("1", "true", "yes", "on"):
+            return context_text
+        
+        # Essai d'abord avec la fonction spécialisée si disponible
+        if OPENAI_FALLBACK_AVAILABLE:
+            try:
+                # Vérifier si synthesize_rag_content est disponible
+                if 'synthesize_rag_content' in globals():
+                    return synthesize_rag_content(question, context_text, max_length=300)
+            except Exception as e:
+                logger.warning(f"⚠️ Échec synthèse spécialisée, fallback standard: {e}")
+        
+        # Fallback vers méthode standard
+        synthesis_prompt = """Tu es un expert avicole. Synthétise cette information de manière claire et professionnelle.
+
+RÈGLES IMPORTANTES :
+- NE JAMAIS mentionner les sources dans ta réponse
+- NE JAMAIS inclure de fragments de texte brut des PDFs
+- NE JAMAIS copier-coller des tableaux mal formatés
+- Utiliser du Markdown (##, ###, -, **)
+- Si l'info est incertaine, donne une fourchette et dis-le
+- Réponse concise mais complète
+
+Question : {question}
+
+Informations à synthétiser :
+{context}
+
+Réponse synthétique :""".format(question=question, context=context_text[:2000])
+        
+        synthesized = openai_complete(synthesis_prompt, temperature=0.2)
+        return synthesized if synthesized else context_text
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur lors de la synthèse LLM: {e}")
+        return context_text
+
+def generate_clarification_response_advanced(intent, missing_fields: list, general_info: str = "") -> str:
+    """
+    Utilise generate_clarification_response si disponible, sinon fallback
+    """
+    try:
+        if OPENAI_FALLBACK_AVAILABLE and 'generate_clarification_response' in globals():
+            return generate_clarification_response(
+                intent=intent.name if hasattr(intent, 'name') else str(intent),
+                missing_fields=missing_fields,
+                general_info=general_info
+            )
+    except Exception as e:
+        logger.warning(f"⚠️ Échec clarification spécialisée: {e}")
+    
+    # Fallback basique
+    return f"J'ai besoin de précisions sur: {', '.join(missing_fields)}. Pouvez-vous me donner ces informations ?"
+
+# ---------------------------------------------------------------------------
+# FONCTIONS DE STATUT ET TEST
+# ---------------------------------------------------------------------------
+
+def get_cot_fallback_status() -> Dict[str, Any]:
+    """
+    Retourne le statut du système CoT et fallback
+    """
+    status = {
+        "openai_fallback_available": OPENAI_FALLBACK_AVAILABLE,
+        "openai_cot_available": OPENAI_COT_AVAILABLE,
+        "fallback_enabled": str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on"),
+        "synthesis_enabled": str(os.getenv("ENABLE_SYNTH_PROMPT", "0")).lower() in ("1", "true", "yes", "on")
+    }
+    
+    if OPENAI_FALLBACK_AVAILABLE:
+        try:
+            openai_status = get_openai_status()
+            status["openai_status"] = openai_status
+        except Exception as e:
+            status["openai_error"] = str(e)
+    
+    # Statut CoT
+    if OPENAI_COT_AVAILABLE:
+        status["cot_config"] = {
+            "auto_detection_enabled": True,
+            "supported_intents": [
+                "HealthDiagnosis", "MultiFactor", "TroubleshootingMultiple", 
+                "Economics", "OptimizationStrategy", "ProductionAnalysis"
+            ],
+            "complexity_threshold": 2
+        }
+    
+    return status
+
+def test_cot_fallback_pipeline() -> Dict[str, Any]:
+    """
+    Test complet du pipeline CoT et fallback
+    """
+    try:
+        results = {}
+        
+        # Test fonction de base
+        results["basic_status"] = {
+            "openai_fallback": OPENAI_FALLBACK_AVAILABLE,
+            "cot_available": OPENAI_COT_AVAILABLE
+        }
+        
+        # Test CoT si disponible
+        if OPENAI_COT_AVAILABLE:
+            try:
+                cot_test = test_cot_pipeline()
+                results["cot_test"] = cot_test
+            except Exception as e:
+                results["cot_test"] = {"status": "error", "error": str(e)}
+        
+        # Test synthèse si disponible
+        if OPENAI_FALLBACK_AVAILABLE:
+            try:
+                synthesis_test = test_synthesis_pipeline()
+                results["synthesis_test"] = synthesis_test
+            except Exception as e:
+                results["synthesis_test"] = {"status": "error", "error": str(e)}
+        
+        return {
+            "status": "success",
+            "message": "Pipeline CoT et fallback testé avec succès",
+            "detailed_results": results
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Échec test pipeline: {str(e)}",
+            "error_type": type(e).__name__
+        }
