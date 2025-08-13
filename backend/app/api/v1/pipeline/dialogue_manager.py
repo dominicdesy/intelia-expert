@@ -939,17 +939,17 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
         df = df() if callable(df) else getattr(store, "df", None)
 
         if df is None:
-            # [PATCH] fallback per-line si pas de DF global
-            _load_df = getattr(store, "_load_df", None)
-            if callable(_load_df):
-                try:
-                    df = _load_df(norm.get("line"))
-                    debug["used_per_line_table"] = True  # [PATCH]
-                except Exception as e:
-                    debug["load_df_error"] = str(e)
-
-        if df is None:
-            return None, {"reason": "no_dataframe", "hint": "per-line table missing", "line": norm.get("line")}
+                    # [PATCH] fallback per-line si pas de DF global
+                    _load_df = getattr(store, "_load_df", None)
+                    if callable(_load_df):
+                        try:
+                            df = _load_df(norm.get("line"))
+                            debug["used_per_line_table"] = True  # [PATCH]
+                        except Exception as e:
+                            debug["load_df_error"] = str(e)
+                
+                if df is None:
+                    return None, {"reason": "no_dataframe", "hint": "per-line table missing", "line": norm.get("line")}
 
         # ---------------------------------------------
         # 1) Harmonisation colonnes minimales (unit/line)
