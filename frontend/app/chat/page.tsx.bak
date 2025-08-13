@@ -102,6 +102,37 @@ export default function ChatInterface() {
     return 'U'
   }
 
+  // 🔧 FONCTION AJOUTÉE : Préprocesseur Markdown pour corriger le formatage
+  const preprocessMarkdown = (content: string): string => {
+    if (!content) return ""
+    
+    let processed = content
+    
+    // 🔨 CORRECTION PRINCIPALE : Ajouter sauts de ligne après les titres
+    processed = processed.replace(/^(#{1,6})\s*([^#\n]+)(?!\n\n)/gm, '$1 $2\n')
+    
+    // 🔨 CORRECTION : Ajouter espacement avant les listes
+    processed = processed.replace(/([^.\n])\n([•\-\*]\s)/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Ajouter espacement avant les paragraphes après listes
+    processed = processed.replace(/([•\-\*]\s[^\n]+)\n([A-Z][^•\-\*])/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Ajouter espacement avant les sections importantes
+    processed = processed.replace(/([.!?])\n(\*\*[^*]+\*\*)/g, '$1\n\n$2')
+    
+    // 🔨 NORMALISATION : Éviter les triples sauts de ligne
+    processed = processed.replace(/\n\n\n+/g, '\n\n')
+    
+    console.log('📝 [preprocessMarkdown] Contenu traité:', {
+      original_length: content.length,
+      processed_length: processed.length,
+      has_headings: /^#{1,6}\s/.test(processed),
+      preview: processed.substring(0, 200)
+    })
+    
+    return processed
+  }
+
   // 🔄 FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
   const reprocessAllMessages = () => {
     if (!currentConversation?.messages) return
@@ -528,7 +559,7 @@ export default function ChatInterface() {
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
-    console.log('📤 [ChatInterface] Envoi message:', {
+    console.log('🔤 [ChatInterface] Envoi message:', {
       text: text.substring(0, 50) + '...',
       hasClarificationState: !!clarificationState,
       concisionLevel: config.level
@@ -896,26 +927,38 @@ export default function ChatInterface() {
                           </p>
                         ) : (
                           <ReactMarkdown
-                            className="prose prose-sm max-w-none break-words prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900"
+                            className="prose prose-sm max-w-none break-words prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900 prose-h2:border-b prose-h2:border-gray-200 prose-h2:pb-2"
                             components={{
+                              // 🔨 TITRES H2 : Amélioration du style et espacement
                               h2: ({node, ...props}) => (
-                                <h2 className="text-lg font-bold text-gray-900 mt-4 mb-3 flex items-center gap-2" {...props} />
+                                <h2 className="text-lg font-bold text-gray-900 mt-6 mb-4 border-b border-gray-200 pb-2 flex items-center gap-2" {...props} />
                               ),
+                              
+                              // 🔨 TITRES H3 : Amélioration du style et espacement  
                               h3: ({node, ...props}) => (
-                                <h3 className="text-base font-semibold text-gray-800 mt-3 mb-2" {...props} />
+                                <h3 className="text-base font-semibold text-gray-800 mt-4 mb-3" {...props} />
                               ),
+                              
+                              // 🔨 PARAGRAPHES : Amélioration de l'espacement
                               p: ({node, ...props}) => (
-                                <p className="leading-relaxed text-gray-800 my-2" {...props} />
+                                <p className="leading-relaxed text-gray-800 my-3" {...props} />
                               ),
+                              
+                              // 🔨 LISTES : Amélioration de l'espacement et style
                               ul: ({node, ...props}) => (
-                                <ul className="list-disc list-inside space-y-1 text-gray-800 my-3 ml-2" {...props} />
+                                <ul className="list-disc list-inside space-y-2 text-gray-800 my-4 ml-2" {...props} />
                               ),
+                              
+                              // 🔨 ÉLÉMENTS DE LISTE : Amélioration du padding
                               li: ({node, ...props}) => (
-                                <li className="leading-relaxed pl-1" {...props} />
+                                <li className="leading-relaxed pl-2" {...props} />
                               ),
+                              
+                              // 🔨 TEXTE EN GRAS : Amélioration du contraste
                               strong: ({node, ...props}) => (
                                 <strong className="font-semibold text-blue-800" {...props} />
                               ),
+                              
                               // 🔄 NOUVEAU : Support pour les tableaux
                               table: ({node, ...props}) => (
                                 <div className="overflow-x-auto my-4 -mx-1 sm:mx-0">
@@ -930,7 +973,8 @@ export default function ChatInterface() {
                               ),
                             }}
                           >
-                            {message.content}
+                            {/* 🔧 NOUVEAU : Appliquer le préprocesseur Markdown */}
+                            {preprocessMarkdown(message.content)}
                           </ReactMarkdown>
                         )}
                       </div>
