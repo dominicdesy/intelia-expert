@@ -573,7 +573,7 @@ def _build_agricultural_context(entities: Dict[str, Any], intent: Intention) -> 
 def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], intent: Intention, rag_context: str = "", target_language: str = "fr") -> Dict[str, Any]:
     """
     Génère une réponse via OpenAI quand le RAG échoue
-    MODIFIÉ: Génère directement dans la langue cible détectée
+    MODIFIÉ: Génère directement dans la langue cible détectée avec instructions ultra-explicites
     """
     if not OPENAI_FALLBACK_AVAILABLE:
         return None
@@ -582,43 +582,46 @@ def _generate_openai_fallback_response(question: str, entities: Dict[str, Any], 
         # Construction du prompt contextualisé
         system_context = _build_agricultural_context(entities, intent)
         
-        # MODIFIÉ: Prompt adaptatif qui génère directement dans la langue détectée
+        # NOUVEAU: Prompt ultra-explicite pour forcer la langue
         if target_language == "fr":
-            language_instruction = "Réponds en français"
-            context_label = "Question de l'utilisateur"
-            instructions_text = """Instructions :
-- Réponds en français
+            fallback_prompt = f"""Tu es un expert en aviculture et zootechnie. Un utilisateur pose une question sur l'élevage de volailles.
+
+{system_context}
+
+Question de l'utilisateur : {question}
+
+Contexte partiel disponible (si pertinent) : {rag_context}
+
+INSTRUCTIONS IMPORTANTES :
+- Réponds EXCLUSIVEMENT en français
 - Donne une réponse basée sur tes connaissances en aviculture
 - Sois précis et technique quand approprié  
 - Si tu mentionnes des valeurs, indique qu'elles sont approximatives
 - Structure ta réponse en Markdown si pertinent
-- Si la question sort du domaine avicole, redirige poliment vers l'élevage de volailles
 - Mentionne que pour des données spécifiques à une lignée/âge précis, une consultation des guides techniques est recommandée
 
-Réponse professionnelle en français :"""
+Réponse professionnelle EN FRANÇAIS :"""
+
         else:
-            language_instruction = f"Respond in the same language as the user's question"
-            context_label = "User's question"
-            instructions_text = f"""Instructions :
-- Respond in the SAME LANGUAGE as the user's question
-- Provide an answer based on your poultry farming knowledge
-- Be precise and technical when appropriate
-- If you mention values, indicate they are approximate
-- Structure your response in Markdown if relevant
-- If the question is outside poultry farming, politely redirect to poultry topics
-- Mention that for specific data related to a precise breed/age, consulting technical guides is recommended
-
-Professional response in the user's language:"""
-
-        fallback_prompt = f"""You are an expert in poultry farming and zootechnics. A user is asking a question about poultry farming.
+            # Pour toutes les autres langues (surtout anglais)
+            fallback_prompt = f"""You are an expert in poultry farming and zootechnics. A user is asking a question about poultry farming.
 
 {system_context}
 
-{context_label}: {question}
+User's question: {question}
 
 Partial available context (if relevant): {rag_context}
 
-{instructions_text}"""
+CRITICAL INSTRUCTIONS:
+- You MUST respond ONLY in English
+- DO NOT use any French words or phrases
+- Provide an answer based on your poultry farming knowledge  
+- Be precise and technical when appropriate
+- If you mention values, indicate they are approximate
+- Structure your response in Markdown if relevant
+- Mention that for specific data related to a precise breed/age, consulting technical guides is recommended
+
+Professional response IN ENGLISH ONLY:"""
 
         response = openai_complete(
             prompt=fallback_prompt,
@@ -637,7 +640,8 @@ Partial available context (if relevant): {rag_context}
                     "entities_used": entities,
                     "intent": intent.name if hasattr(intent, 'name') else str(intent),
                     "rag_context_provided": bool(rag_context.strip()),
-                    "target_language": target_language
+                    "target_language": target_language,
+                    "prompt_language": "french" if target_language == "fr" else "english"
                 }
             }
             
