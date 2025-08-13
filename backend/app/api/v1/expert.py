@@ -8,13 +8,14 @@ import logging
 import os
 import re
 import math
+import time  # NOUVEAU: Ajouté pour les endpoints de test
 
-# 🔒 Import authentification
+# 🔐 Import authentification
 from app.api.v1.auth import get_current_user
 
 # 🌾 Import validateur agricole
 try:
-    from app.api.v1.agricultural_domain_validator import (
+    from app.api.v1.pipeline.agricultural_domain_validator import (
         validate_agricultural_question,
         get_agricultural_validator_stats,
         is_agricultural_validation_enabled,
@@ -226,9 +227,9 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         # Log différencié selon l'authentification
         if current_user:
             user_email = current_user.get('email', 'unknown')
-            logger.info(f"🔍 Question authentifiée de {user_email}: {payload.question[:120]}")
+            logger.info(f"🔐 Question authentifiée de {user_email}: {payload.question[:120]}")
         else:
-            logger.info(f"🔍 Question publique: {payload.question[:120]}")
+            logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
         # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
         validation_bypassed = False
@@ -302,12 +303,12 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
-# ===== Endpoints =====
+# ===== Endpoints principaux (code original conservé) =====
 @router.post("/ask")
 def ask(
     payload: AskPayload, 
     request: Request,
-    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
+    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise
 ) -> Dict[str, Any]:
     """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole."""
     return _ask_internal(payload, request, current_user)
@@ -328,9 +329,7 @@ def system_status() -> Dict[str, Any]:
         "service": "expert_api",
     }
 
-
-# Ajouts pour expert.py
-# À ajouter après les autres endpoints
+# ===== NOUVEAUX ENDPOINTS: Fallback OpenAI =====
 
 @router.get("/fallback-status")
 def fallback_status() -> Dict[str, Any]:
@@ -356,7 +355,9 @@ def test_openai_fallback(
     Teste le fallback OpenAI directement (bypass RAG).
     """
     try:
-        from .pipeline.dialogue_manager import _generate_openai_fallback_response, Intention
+        # Import correct de la fonction et de l'Intention
+        from .pipeline.dialogue_manager import _generate_openai_fallback_response
+        from .utils.question_classifier import Intention  # Import correct
         
         # Entités de test basiques
         test_entities = {
@@ -386,6 +387,59 @@ def test_openai_fallback(
             "test_question": test_question
         }
 
+@router.post("/test-fallback-integration")
+def test_fallback_integration(
+    test_question: str = "Quel est le poids à 21 jours pour des Ross 308 mâles ?",
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Teste l'intégration complète RAG → Fallback OpenAI
+    """
+    try:
+        # Test avec une question qui devrait déclencher le fallback
+        payload = AskPayload(
+            session_id="test_fallback",
+            question=test_question,
+            lang="fr",
+            debug=True,
+            entities={"species": "broiler", "line": "ross308", "sex": "male", "age_days": 21}
+        )
+        
+        # Simulation d'une request basique
+        class MockRequest:
+            def __init__(self):
+                self.query_params = {}
+                self.client = type('obj', (object,), {'host': 'localhost'})
+                self.headers = {}
+        
+        mock_request = MockRequest()
+        
+        # Appel du système complet
+        result = _ask_internal(payload, mock_request, current_user)
+        
+        # Analyse du résultat pour vérifier si fallback activé
+        answer = result.get("answer", {})
+        source = answer.get("source", "unknown")
+        meta = answer.get("meta", {})
+        
+        return {
+            "test_question": test_question,
+            "result_source": source,
+            "fallback_activated": source == "openai_fallback",
+            "rag_attempted": meta.get("rag_attempted", False),
+            "result_preview": answer.get("text", "")[:200] + "..." if answer.get("text") else None,
+            "full_result": result,
+            "tester": current_user.get('email', 'unknown'),
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {
+            "error": f"Integration test failed: {str(e)}",
+            "test_question": test_question
+        }
+
+# ===== Endpoints existants (code original conservé) =====
 
 @router.get("/agricultural-validation-status")
 def agricultural_validation_status() -> Dict[str, Any]:
@@ -412,7 +466,7 @@ def agricultural_validation_status() -> Dict[str, Any]:
 def test_agricultural_validation(
     test_question: str,
     lang: str = "fr",
-    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
+    current_user: dict = Depends(get_current_user)  # 🔐 Auth requise pour les tests
 ) -> Dict[str, Any]:
     """Teste la validation agricole sur une question donnée."""
     if not AGRICULTURAL_VALIDATOR_AVAILABLE:
