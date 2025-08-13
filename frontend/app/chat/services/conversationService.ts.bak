@@ -236,63 +236,245 @@ export class ConversationService {
   }
 
   /**
-   * Récupère les conversations utilisateur - AVEC REGROUPEMENT
+   * 🔧 MÉTHODE CORRIGÉE - Essaie plusieurs endpoints jusqu'à trouver le bon
    */
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.loggingEnabled) {
-      console.log('🔍 Logging désactivé - conversations non récupérées')
+      console.log('📝 Logging désactivé - conversations non récupérées')
       return []
     }
 
-    try {
-      console.log('🔍 Récupération conversations pour:', userId)
-      console.log('📡 URL conversations:', `${this.baseUrl}/conversations/user/${userId}?limit=${limit}`)
+    // 🎯 Liste d'endpoints à tester (basé sur le diagnostic)
+    const endpointsToTry = [
+      // Endpoints qui fonctionnent selon le diagnostic
+      `/conversations`, // Base endpoint qui pourrait lister toutes
+      `/conversations/list`,
+      `/conversations/all`,
       
-      const response = await fetch(`${this.baseUrl}/conversations/user/${userId}?limit=${limit}`, {
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      })
+      // Endpoints spécifiques utilisateur
+      `/conversations/user/${userId}`,
+      `/expert/conversations/user/${userId}`,
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('✅ Conversations récupérées:', data.count)
-      
-      // ✅ CORRECTION: Les conversations sont maintenant regroupées côté backend
-      const conversations: Conversation[] = (data.conversations || []).map((conv: any) => {
-        // Extraire la première question pour le titre
-        const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
-        const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
+      // Fallback sur l'endpoint expert
+      `/expert/conversations`
+    ]
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        console.log(`🔍 Test endpoint: ${this.baseUrl}${endpoint}`)
         
-        // Extraire la dernière réponse pour l'aperçu
-        const responses = conv.response?.split('\n--- Réponse suivante ---\n') || [conv.response]
-        const lastResponse = responses[responses.length - 1] || 'Aucune réponse'
-        const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
+        const response = await fetch(`${this.baseUrl}${endpoint}?limit=${limit}`, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.getAuthToken()}`
+          }
+        })
+        
+        console.log(`📊 ${endpoint}: ${response.status} ${response.statusText}`)
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ ENDPOINT FONCTIONNEL: ${endpoint}`)
+          console.log(`📈 Données reçues:`, data)
+          
+          // 🔧 Adapter selon la structure de réponse
+          let conversations = []
+          
+          if (Array.isArray(data)) {
+            conversations = data
+          } else if (data.conversations && Array.isArray(data.conversations)) {
+            conversations = data.conversations
+          } else if (data.data && Array.isArray(data.data)) {
+            conversations = data.data
+          } else {
+            console.log(`⚠️ Structure de données inattendue pour ${endpoint}:`, Object.keys(data))
+            continue
+          }
+          
+          // 🔧 Filtrer par userId si l'endpoint ne le fait pas automatiquement
+          if (userId && conversations.length > 0) {
+            conversations = conversations.filter((conv: any) => 
+              conv.user_id === userId || conv.userId === userId
+            )
+          }
+          
+          console.log(`✅ ${conversations.length} conversations récupérées via ${endpoint}`)
+          
+          // Transformer en format Conversation[]
+          return conversations.map((conv: any) => {
+            const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
+            const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
+            
+            const responses = conv.response?.split('\n--- Réponse suivante ---\n') || [conv.response]
+            const lastResponse = responses[responses.length - 1] || 'Aucune réponse'
+            const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
 
-        return {
-          id: conv.conversation_id || conv.id,
-          title: title,
-          preview: firstQuestion,
-          message_count: conv.message_count || 2,
-          created_at: conv.timestamp || new Date().toISOString(),
-          updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
-          feedback: conv.feedback,
-          language: conv.language || 'fr',
-          last_message_preview: lastMessagePreview,
-          status: 'active'
+            return {
+              id: conv.conversation_id || conv.id || conv.session_id,
+              title: title,
+              preview: firstQuestion,
+              message_count: conv.message_count || 2,
+              created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
+              updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
+              feedback: conv.feedback,
+              language: conv.language || 'fr',
+              last_message_preview: lastMessagePreview,
+              status: 'active'
+            }
+          })
+        } else if (response.status === 401) {
+          console.log(`🔐 ${endpoint}: Authentification requise`)
+        } else if (response.status === 405) {
+          console.log(`❌ ${endpoint}: Méthode non autorisée`)
+        } else {
+          console.log(`❌ ${endpoint}: ${response.status}`)
         }
-      })
-      
-      return conversations
-      
-    } catch (error) {
-      console.error('❌ Erreur récupération conversations:', error)
+        
+      } catch (error) {
+        console.log(`❌ ${endpoint}: ${error.message}`)
+      }
+    }
+    
+    console.warn('⚠️ Aucun endpoint de listing trouvé - tentative de récupération alternative')
+    return await this.tryAlternativeConversationRetrieval(userId, limit)
+  }
+
+  /**
+   * 🆘 MÉTHODE ALTERNATIVE - Si aucun endpoint de listing ne fonctionne
+   * Utilise l'endpoint de récupération spécifique qui fonctionne
+   */
+  async tryAlternativeConversationRetrieval(userId: string, limit: number): Promise<Conversation[]> {
+    console.log('🆘 Méthode alternative: essai de reconstruction depuis les sessions récentes')
+    
+    // 🎯 Si on a des session IDs stockés quelque part (localStorage, etc.)
+    const recentSessionIds = this.getRecentSessionIds()
+    
+    if (recentSessionIds.length === 0) {
+      console.log('⚠️ Aucune session récente trouvée')
       return []
     }
+    
+    const conversations: Conversation[] = []
+    
+    for (const sessionId of recentSessionIds.slice(0, limit)) {
+      try {
+        // Utiliser l'endpoint qui fonctionne selon le diagnostic
+        const response = await fetch(`${this.baseUrl}/conversations/${sessionId}`, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.getAuthToken()}`
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (data.session_id && data.question) {
+            const conv = {
+              id: data.session_id,
+              title: data.question.substring(0, 100) + (data.question.length > 100 ? '...' : ''),
+              preview: data.question,
+              message_count: data.message_count || 2,
+              created_at: data.timestamp || new Date().toISOString(),
+              updated_at: data.updated_at || data.timestamp || new Date().toISOString(),
+              feedback: data.feedback,
+              language: data.language || 'fr',
+              last_message_preview: (data.response || '').substring(0, 300) + '...',
+              status: 'active' as const
+            }
+            
+            conversations.push(conv)
+          }
+        }
+      } catch (error) {
+        console.log(`❌ Erreur récupération session ${sessionId}:`, error)
+      }
+    }
+    
+    console.log(`✅ ${conversations.length} conversations récupérées via méthode alternative`)
+    return conversations
+  }
+
+  /**
+   * 🔧 UTILITAIRE - Récupère les session IDs récents depuis le localStorage
+   */
+  private getRecentSessionIds(): string[] {
+    try {
+      const stored = localStorage.getItem('recent_conversation_sessions')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          return parsed.slice(0, 20) // Max 20 sessions récentes
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lecture sessions récentes:', error)
+    }
+    
+    return []
+  }
+
+  /**
+   * 🔧 UTILITAIRE - Stocke un session ID pour la récupération future
+   * À appeler depuis apiService après création d'une conversation
+   */
+  storeRecentSessionId(sessionId: string): void {
+    try {
+      const existing = this.getRecentSessionIds()
+      const updated = [sessionId, ...existing.filter(id => id !== sessionId)].slice(0, 50)
+      localStorage.setItem('recent_conversation_sessions', JSON.stringify(updated))
+      console.log('📝 Session ID stocké pour historique:', sessionId.substring(0, 8) + '...')
+    } catch (error) {
+      console.warn('⚠️ Erreur stockage session ID:', error)
+    }
+  }
+
+  // 🔧 NOUVELLE MÉTHODE - Test tous les endpoints pour trouver le bon
+  async discoverWorkingEndpoints(): Promise<string[]> {
+    console.log('🔍 === DÉCOUVERTE DES ENDPOINTS FONCTIONNELS ===')
+    
+    const endpointsToTest = [
+      '/conversations',
+      '/conversations/list', 
+      '/conversations/all',
+      '/conversations/history',
+      '/expert/conversations',
+      '/expert/sessions',
+      '/expert/list',
+      '/sessions',
+      '/sessions/list',
+      '/history'
+    ]
+    
+    const workingEndpoints: string[] = []
+    
+    for (const endpoint of endpointsToTest) {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.getAuthToken()}`
+          }
+        })
+        
+        console.log(`📡 ${endpoint}: ${response.status} ${response.statusText}`)
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ ENDPOINT FONCTIONNEL: ${endpoint}`)
+          console.log(`📊 Structure:`, Array.isArray(data) ? `Array[${data.length}]` : Object.keys(data))
+          workingEndpoints.push(endpoint)
+        }
+      } catch (error) {
+        console.log(`❌ ${endpoint}: ${error.message}`)
+      }
+    }
+    
+    console.log('✅ Endpoints fonctionnels découverts:', workingEndpoints)
+    return workingEndpoints
   }
 
   /**
@@ -636,7 +818,7 @@ export class ConversationService {
 
   async testConnection(): Promise<boolean> {
     try {
-      console.log('🔍 Test connectivité service logging...')
+      console.log('🔌 Test connectivité service logging...')
       
       const response = await fetch(`${this.baseUrl}/test-comments`, {
         headers: { 
