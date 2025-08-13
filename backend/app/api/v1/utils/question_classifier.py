@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Intent & entity classifier.
+Intent & entity classifier with Chain-of-Thought complexity detection.
 - Provides Intention enum and REQUIRED_FIELDS_BY_TYPE
-- classify() returns {"intent": Intention, "entities": {...}}
+- classify() returns {"intent": Intention, "entities": {...}, "complexity": {...}}
 - Designed to be lightweight and robust with regex + keywords
+- 🆕 NEW: Complexity scoring for CoT routing
 """
 from enum import Enum
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 # --- Lexicons ---
 LINES = [
@@ -34,6 +35,12 @@ class Intention(str, Enum):
     Compliance = "Compliance"
     Operations = "Operations"
     AmbiguousGeneral = "AmbiguousGeneral"
+    # 🆕 NOUVELLES INTENTIONS COMPLEXES
+    HealthDiagnosis = "HealthDiagnosis"
+    OptimizationStrategy = "OptimizationStrategy"
+    TroubleshootingMultiple = "TroubleshootingMultiple"
+    ProductionAnalysis = "ProductionAnalysis"
+    MultiFactor = "MultiFactor"
 
 # Required fields per intent (fields ending with '?' are optional)
 REQUIRED_FIELDS_BY_TYPE: Dict[str, List[str]] = {
@@ -49,10 +56,50 @@ REQUIRED_FIELDS_BY_TYPE: Dict[str, List[str]] = {
     Intention.Economics: ["species", "target_weight?", "feed_price?", "FCR?"],
     Intention.Compliance: ["scheme", "species", "age_or_slaughter_age?"],
     Intention.Operations: ["housing", "flock_size?", "age?", "problem"],
-    Intention.AmbiguousGeneral: []
+    Intention.AmbiguousGeneral: [],
+    # 🆕 NOUVEAUX CHAMPS POUR INTENTIONS COMPLEXES
+    Intention.HealthDiagnosis: ["species", "age", "symptoms", "history?"],
+    Intention.OptimizationStrategy: ["species", "current_performance", "target?", "constraints?"],
+    Intention.TroubleshootingMultiple: ["species", "problems", "timeline?", "context?"],
+    Intention.ProductionAnalysis: ["species", "metrics", "timeframe?", "comparison?"],
+    Intention.MultiFactor: ["species", "factors", "objective?"]
 }
 
-# --- Regex helpers ---
+# 🆕 NOUVEAUX PATTERNS POUR DÉTECTION DE COMPLEXITÉ
+COMPLEXITY_INDICATORS = {
+    "multi_symptoms": [
+        r"\bet\b.*\bet\b",  # "symptôme A et symptôme B"
+        r"plusieurs.*(?:symptômes|problèmes|signes)",
+        r"(?:mortalité|ponte).*(?:baisse|chute).*(?:poids|fcr|croissance)"
+    ],
+    "optimization_keywords": [
+        "optimiser", "améliorer", "maximiser", "minimiser", "rentabilité",
+        "efficacité", "performance", "stratégie", "comment réduire",
+        "comment augmenter", "meilleure façon"
+    ],
+    "causal_reasoning": [
+        "pourquoi", "comment", "quelle.*cause", "qu'est-ce qui",
+        "facteurs", "raisons", "origine", "expliquer"
+    ],
+    "comparative_analysis": [
+        "comparer", "différence", "mieux que", "versus", "vs",
+        "par rapport", "comparé", "alternative"
+    ],
+    "multistep_indicators": [
+        "d'abord.*puis", "ensuite", "étapes", "procédure", "protocole",
+        "plan", "stratégie", "méthode", "approche"
+    ]
+}
+
+DIAGNOSTIC_COMPLEXITY_PATTERNS = [
+    r"diagnostic.*différentiel",
+    r"(?:mortalité|perte).*(?:\d+%|\d+\s*pour\s*cent)",
+    r"(?:baisse|chute|diminution).*(?:ponte|production|croissance)",
+    r"(?:symptômes?|signes?).*(?:multiples?|divers|variés)",
+    r"(?:analyse|évaluation).*(?:complète|approfondie|détaillée)"
+]
+
+# --- Regex helpers (code original conservé) ---
 AGE_DAYS_RE = re.compile(r"\b(\d{1,2})\s*(?:j|jours?|day|days)\b", re.I)
 AGE_WEEKS_RE = re.compile(r"\b(\d{1,2})\s*(?:sem|semaines?|wk|wks|weeks?)\b", re.I)
 FLOCK_RE = re.compile(r"\b(\d{2,6})\s*(?:oiseaux?|birds?|poulets?)\b", re.I)
@@ -114,36 +161,152 @@ def _detect_program_type(q: str) -> Optional[str]:
 def _has_any(ql: str, words: List[str]) -> bool:
     return any(w in ql for w in words)
 
-def _classify_intent(q: str) -> Intention:
+# 🆕 NOUVELLES FONCTIONS DE DÉTECTION DE COMPLEXITÉ
+
+def _detect_complexity_score(q: str) -> Dict[str, Any]:
+    """
+    Calcule un score de complexité pour déterminer si CoT est nécessaire
+    """
     ql = q.lower()
+    complexity_score = 0
+    complexity_factors = []
+    
+    # 1. Multi-symptômes / Multi-problèmes (+30 points)
+    for pattern in COMPLEXITY_INDICATORS["multi_symptoms"]:
+        if re.search(pattern, ql, re.I):
+            complexity_score += 30
+            complexity_factors.append("multi_symptoms")
+            break
+    
+    # 2. Mots-clés d'optimisation (+25 points)
+    optimization_matches = sum(1 for kw in COMPLEXITY_INDICATORS["optimization_keywords"] if kw in ql)
+    if optimization_matches > 0:
+        complexity_score += min(25, optimization_matches * 10)
+        complexity_factors.append("optimization")
+    
+    # 3. Raisonnement causal (+20 points)
+    causal_matches = sum(1 for pattern in COMPLEXITY_INDICATORS["causal_reasoning"] if re.search(pattern, ql, re.I))
+    if causal_matches > 0:
+        complexity_score += min(20, causal_matches * 8)
+        complexity_factors.append("causal_reasoning")
+    
+    # 4. Analyse comparative (+15 points)
+    comparative_matches = sum(1 for kw in COMPLEXITY_INDICATORS["comparative_analysis"] if kw in ql)
+    if comparative_matches > 0:
+        complexity_score += min(15, comparative_matches * 7)
+        complexity_factors.append("comparative")
+    
+    # 5. Indicateurs multi-étapes (+20 points)
+    multistep_matches = sum(1 for kw in COMPLEXITY_INDICATORS["multistep_indicators"] if kw in ql)
+    if multistep_matches > 0:
+        complexity_score += min(20, multistep_matches * 10)
+        complexity_factors.append("multistep")
+    
+    # 6. Patterns de diagnostic complexe (+25 points)
+    diagnostic_matches = sum(1 for pattern in DIAGNOSTIC_COMPLEXITY_PATTERNS if re.search(pattern, ql, re.I))
+    if diagnostic_matches > 0:
+        complexity_score += min(25, diagnostic_matches * 12)
+        complexity_factors.append("complex_diagnostic")
+    
+    # 7. Longueur de la question (+5-15 points)
+    word_count = len(q.split())
+    if word_count > 20:
+        complexity_score += 15
+        complexity_factors.append("long_question")
+    elif word_count > 12:
+        complexity_score += 8
+        complexity_factors.append("medium_question")
+    
+    # 8. Présence de chiffres/pourcentages dans contexte complexe (+10 points)
+    if re.search(r'\d+%|\d+\s*pour\s*cent', ql) and any(kw in ql for kw in ["baisse", "augmentation", "problème", "objectif"]):
+        complexity_score += 10
+        complexity_factors.append("quantified_problem")
+    
+    # Classification du niveau de complexité
+    if complexity_score >= 50:
+        complexity_level = "high"
+        needs_cot = True
+    elif complexity_score >= 25:
+        complexity_level = "medium"
+        needs_cot = True
+    else:
+        complexity_level = "simple"
+        needs_cot = False
+    
+    return {
+        "score": complexity_score,
+        "level": complexity_level,
+        "needs_cot": needs_cot,
+        "factors": complexity_factors,
+        "word_count": word_count
+    }
+
+def _classify_intent_enhanced(q: str) -> Tuple[Intention, Dict[str, Any]]:
+    """
+    Classification enrichie avec détection d'intentions complexes
+    """
+    ql = q.lower()
+    complexity_info = _detect_complexity_score(q)
+    
+    # 🆕 NOUVELLES INTENTIONS COMPLEXES (priorité haute si complexité détectée)
+    if complexity_info["needs_cot"]:
+        # Diagnostic complexe
+        if (_has_any(ql, ["diagnostic", "symptôme", "symptomes", "symptômes", "mortalité"]) and 
+            (complexity_info["score"] >= 40 or "complex_diagnostic" in complexity_info["factors"])):
+            return Intention.HealthDiagnosis, complexity_info
+        
+        # Optimisation/stratégie
+        if (_has_any(ql, ["optimiser", "améliorer", "stratégie", "rentabilité", "efficacité"]) and
+            complexity_info["score"] >= 35):
+            return Intention.OptimizationStrategy, complexity_info
+        
+        # Troubleshooting multiple
+        if ("multi_symptoms" in complexity_info["factors"] or 
+            _has_any(ql, ["plusieurs problèmes", "multiples", "divers problèmes"])):
+            return Intention.TroubleshootingMultiple, complexity_info
+        
+        # Analyse de production complexe
+        if (_has_any(ql, ["analyse", "évaluation", "performance", "comparaison"]) and
+            complexity_info["score"] >= 30):
+            return Intention.ProductionAnalysis, complexity_info
+        
+        # Multi-facteurs générique
+        if complexity_info["score"] >= 50:
+            return Intention.MultiFactor, complexity_info
+    
+    # 🔄 INTENTIONS CLASSIQUES (code original conservé)
     if _has_any(ql, ["dosage", "dose", "posologie", "enrofloxacine", "amoxicilline", "tylosine"]):
-        return Intention.Treatments
+        return Intention.Treatments, complexity_info
     if _has_any(ql, ["diagnostic", "symptôme", "symptomes", "symptômes", "diarrhée", "dyspnée", "coquilles molles", "picorent", "mortalité"]):
-        return Intention.Diagnostics
+        return Intention.Diagnostics, complexity_info
     if _has_any(ql, ["poids", "fcr", "indice de consommation", "gain de poids", "iep", "pourcentage de ponte", "poids d'œuf", "poids d'oeuf"]):
-        return Intention.PerfTargets
+        return Intention.PerfTargets, complexity_info
     if _has_any(ql, ["protéine", "lysine", "kcal/kg", "énergie", "calcium", "phosphore", "formulation"]):
-        return Intention.NutritionSpecs
-    if _has_any(ql, ["consommation d'eau", "débit d'eau", "consommation d’aliment", "consommation d'aliment"]):
-        return Intention.WaterFeedIntake
+        return Intention.NutritionSpecs, complexity_info
+    if _has_any(ql, ["consommation d'eau", "débit d'eau", "consommation d'aliment", "consommation d'aliment"]):
+        return Intention.WaterFeedIntake, complexity_info
     if _has_any(ql, ["température", "humidité", "co2", "nh3", "ammoniac", "éclairage", "lumens", "lux"]):
-        return Intention.EnvSetpoints
+        return Intention.EnvSetpoints, complexity_info
     if _has_any(ql, ["ventilation minimale", "débit d'air", "m³/h", "m3/h", "tunnel"]):
-        return Intention.VentilationSizing
+        return Intention.VentilationSizing, complexity_info
     if _has_any(ql, ["espace mangeoire", "mangeoires", "abreuvoirs", "nipples", "calibrage chaîne"]):
-        return Intention.EquipmentSizing
+        return Intention.EquipmentSizing, complexity_info
     if _detect_program_type(ql):
-        return Intention.Programs
+        return Intention.Programs, complexity_info
     if _has_any(ql, ["coût", "rentabilité", "combien coûte"]):
-        return Intention.Economics
+        return Intention.Economics, complexity_info
     if _has_any(ql, ["label rouge", "plein air", "catégorie a+", "enrichissements obligatoires", "densité maximale"]):
-        return Intention.Compliance
+        return Intention.Compliance, complexity_info
     if _has_any(ql, ["maintenance", "extracteurs", "condensation", "ammoniaque"]) or _has_any(ql, ["ventilation insuffisante"]):
-        return Intention.Operations
-    return Intention.AmbiguousGeneral
+        return Intention.Operations, complexity_info
+    
+    return Intention.AmbiguousGeneral, complexity_info
 
 def classify(question: str) -> Dict[str, Any]:
-    intent = _classify_intent(question)
+    """
+    Classification principale avec enrichissements CoT
+    """
+    intent, complexity_info = _classify_intent_enhanced(question)
     line = _normalize_line(question) or None
     species = _infer_species(question)
     sex = _detect_sex(question)
@@ -163,4 +326,32 @@ def classify(question: str) -> Dict[str, Any]:
         "program_type": program_type
     }
 
-    return {"intent": intent, "entities": entities}
+    return {
+        "intent": intent,
+        "entities": entities,
+        # 🆕 NOUVELLES MÉTADONNÉES DE COMPLEXITÉ
+        "complexity": complexity_info
+    }
+
+# 🆕 NOUVELLES FONCTIONS UTILITAIRES
+
+def should_use_cot(classification_result: Dict[str, Any]) -> bool:
+    """
+    Détermine si Chain-of-Thought doit être utilisé pour cette classification
+    """
+    complexity = classification_result.get("complexity", {})
+    return complexity.get("needs_cot", False)
+
+def get_complexity_level(classification_result: Dict[str, Any]) -> str:
+    """
+    Retourne le niveau de complexité: 'simple', 'medium', 'high'
+    """
+    complexity = classification_result.get("complexity", {})
+    return complexity.get("level", "simple")
+
+def get_complexity_factors(classification_result: Dict[str, Any]) -> List[str]:
+    """
+    Retourne la liste des facteurs de complexité détectés
+    """
+    complexity = classification_result.get("complexity", {})
+    return complexity.get("factors", [])
