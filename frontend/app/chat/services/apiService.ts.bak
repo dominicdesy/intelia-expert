@@ -1,4 +1,4 @@
-// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER ====================
+// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED ====================
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -136,7 +136,7 @@ interface EnhancedAIResponse {
   vague_entities?: string[]
   
   // 🚀 NOUVEAU : Support format DialogueManager
-  type?: 'answer' | 'clarification' | 'partial_answer'
+  type?: 'answer' | 'clarification' | 'partial_answer' | 'validation_rejected'
   questions?: string[]
   source?: string
   documents_used?: number
@@ -153,6 +153,16 @@ interface EnhancedAIResponse {
     options?: string[]
   }>
   
+  // 🌾 NOUVEAU : Support validation_rejected
+  message?: string
+  validation?: {
+    is_valid: boolean
+    confidence: number
+    suggested_topics?: string[]
+    detected_keywords?: string[]
+    rejected_keywords?: string[]
+  }
+  
   // 🚀 AJOUT : Champ pour compatibilité
   full_text?: string
 }
@@ -166,7 +176,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE CORRIGÉE : session_id dans le body !
+ * 🔧 FONCTION PRINCIPALE CORRIGÉE : session_id dans le body + validation_rejected !
  */
 export const generateAIResponse = async (
   question: string,
@@ -268,11 +278,12 @@ export const generateAIResponse = async (
       answer_text_exists: !!(data.answer?.text),
       has_general_answer: !!data.general_answer,
       has_questions: !!data.questions,
+      has_message: !!data.message,
       source: data.source,
       documents_used: data.documents_used
     })
 
-    // 🚨 CORRECTION CRITIQUE : Extraction du texte selon le type
+    // 🚨 CORRECTION CRITIQUE : Extraction du texte selon le type + validation_rejected
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
@@ -280,11 +291,15 @@ export const generateAIResponse = async (
     } else if (data.type === 'partial_answer' && data.general_answer?.text) {
       responseText = data.general_answer.text
       console.log('🎯 [apiService] Texte extrait de data.general_answer.text:', responseText.substring(0, 100))
+    } else if (data.type === 'validation_rejected') {
+      // 🌾 NOUVEAU : Gestion validation_rejected
+      responseText = data.message || "Cette question ne concerne pas le domaine agricole."
+      console.log('🚫 [apiService] Question rejetée par validation agricole:', responseText.substring(0, 100))
     } else {
       console.warn('⚠️ [apiService] Aucun texte trouvé dans la réponse!')
     }
 
-    // 🔧 CORRECTION FINALE : Construction processedData simplifiée
+    // 🔧 CORRECTION FINALE : Construction processedData simplifiée + validation_rejected
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
@@ -334,6 +349,21 @@ export const generateAIResponse = async (
         sources: [],
         mode: 'clarification_dialoguemanager',
         note: 'Clarification requise'
+      } : {}),
+
+      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type
+      ...(data.type === 'validation_rejected' ? {
+        type: 'validation_rejected',
+        message: data.message,
+        validation: data.validation,
+        response: responseText,
+        full_text: responseText,
+        requires_clarification: false,
+        rag_used: false,
+        sources: [],
+        mode: 'validation_rejected',
+        note: 'Question rejetée par validation agricole',
+        confidence_score: 0.0
       } : {})
     }
 
@@ -361,7 +391,8 @@ export const generateAIResponse = async (
       has_response: !!processedData.response,
       response_length: processedData.response?.length || 0,
       has_general_answer: !!processedData.general_answer,
-      has_versions: !!processedData.response_versions
+      has_versions: !!processedData.response_versions,
+      validation_rejected: processedData.type === 'validation_rejected'
     })
 
     return processedData
@@ -378,7 +409,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE CORRIGÉE : session_id dans le body aussi !
+ * 🔧 VERSION PUBLIQUE CORRIGÉE : session_id dans le body aussi + validation_rejected !
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -428,15 +459,20 @@ export const generateAIResponsePublic = async (
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
       has_general_answer: !!data.general_answer,
-      has_questions: !!data.questions
+      has_questions: !!data.questions,
+      has_message: !!data.message
     })
 
-    // 🚨 MÊME EXTRACTION que la version auth
+    // 🚨 MÊME EXTRACTION que la version auth + validation_rejected
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
     } else if (data.type === 'partial_answer' && data.general_answer?.text) {
       responseText = data.general_answer.text
+    } else if (data.type === 'validation_rejected') {
+      // 🌾 NOUVEAU : Gestion validation_rejected
+      responseText = data.message || "Cette question ne concerne pas le domaine agricole."
+      console.log('🚫 [apiService] Question rejetée par validation agricole (public):', responseText.substring(0, 100))
     }
 
     const processedData: EnhancedAIResponse = {
@@ -488,6 +524,21 @@ export const generateAIResponsePublic = async (
         sources: [],
         mode: 'clarification_dialoguemanager_public',
         note: 'Clarification requise'
+      } : {}),
+
+      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type (public)
+      ...(data.type === 'validation_rejected' ? {
+        type: 'validation_rejected',
+        message: data.message,
+        validation: data.validation,
+        response: responseText,
+        full_text: responseText,
+        requires_clarification: false,
+        rag_used: false,
+        sources: [],
+        mode: 'validation_rejected_public',
+        note: 'Question rejetée par validation agricole',
+        confidence_score: 0.0
       } : {})
     }
 
@@ -747,7 +798,7 @@ export const debugEnhancedConversationFlow = (
 }
 
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Système backend: DialogueManager + expert.py')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
@@ -758,6 +809,7 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Support type: "answer" avec data.answer.text')
   console.log('  ✅ Support type: "partial_answer"')
   console.log('  ✅ Support type: "clarification"')
+  console.log('  🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  ✅ Génération automatique response_versions')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
   console.log('  ✅ Authentification JWT')
@@ -847,23 +899,25 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE')
-  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER FIXED')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED')
+  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED FIXED')
   console.log('Base URL:', API_BASE_URL)
-  console.log('Backend: expert.py + DialogueManager')
+  console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
   console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
   console.log('  - 🚀 Utilisation endpoint /ask simplifié')
   console.log('  - 🔧 Session ID dans le BODY (corrigé !)')
   console.log('  - 🔧 Headers sans X-Session-ID (corrigé !)')
   console.log('  - 🚨 Extraction type: "answer" de data.answer.text (CORRIGÉ !)')
+  console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  - 🚀 Body: { session_id, question }')
-  console.log('  - 🚀 Support type: clarification/answer/partial_answer')
+  console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
   console.log('  - 🚀 Conversion automatique format')
   console.log('FONCTIONNALITÉS:')
   console.log('  - ✅ Clarification intelligente automatique')
   console.log('  - ✅ Gestion mémoire conversation Postgres')
   console.log('  - ✅ Pipeline RAG modulaire')
+  console.log('  - 🌾 Validation agricole intégrée (NOUVEAU !)')
   console.log('  - ✅ Toutes fonctions frontend préservées')
   console.log('  - ✅ Support PerfStore avec type: "answer"')
   console.groupEnd()

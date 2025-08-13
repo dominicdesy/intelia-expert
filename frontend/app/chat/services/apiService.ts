@@ -1,4 +1,7 @@
-// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED ====================
+// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION INTEGRATION ====================
+
+// 🔧 AJOUT : Import du conversationService pour stocker les session IDs
+import { conversationService } from './conversationService'
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -176,7 +179,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE CORRIGÉE : session_id dans le body + validation_rejected !
+ * 🔧 FONCTION PRINCIPALE AVEC STOCKAGE SESSION ID
  */
 export const generateAIResponse = async (
   question: string,
@@ -384,6 +387,14 @@ export const generateAIResponse = async (
       }
     }
 
+    // 🔧 NOUVEAU : Stocker le session ID pour l'historique
+    try {
+      conversationService.storeRecentSessionId(finalConversationId)
+      console.log('✅ [apiService] Session ID stocké pour historique')
+    } catch (error) {
+      console.warn('⚠️ [apiService] Erreur stockage session ID:', error)
+    }
+
     console.log('🎯 [apiService] Données traitées DialogueManager:', {
       type: processedData.type,
       requires_clarification: processedData.requires_clarification,
@@ -409,7 +420,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE CORRIGÉE : session_id dans le body aussi + validation_rejected !
+ * 🔧 VERSION PUBLIQUE AVEC STOCKAGE SESSION ID
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -554,6 +565,14 @@ export const generateAIResponsePublic = async (
         standard: mainResponse,
         detailed: mainResponse
       }
+    }
+
+    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (version publique aussi)
+    try {
+      conversationService.storeRecentSessionId(finalConversationId)
+      console.log('✅ [apiService] Session ID stocké pour historique (public)')
+    } catch (error) {
+      console.warn('⚠️ [apiService] Erreur stockage session ID (public):', error)
     }
 
     return processedData
@@ -798,7 +817,7 @@ export const debugEnhancedConversationFlow = (
 }
 
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Système backend: DialogueManager + expert.py')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
@@ -811,12 +830,14 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Support type: "clarification"')
   console.log('  🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  ✅ Génération automatique response_versions')
+  console.log('  🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
   console.log('  ✅ Authentification JWT')
   console.log('  ✅ Feedback, conversations, topics')
   console.log('  ✅ Gestion erreurs')
   console.log('  ✅ Health check')
   console.log('  ✅ Utilitaires clarification')
+  console.log('  ✅ Intégration ConversationService')
   console.groupEnd()
 }
 
@@ -863,7 +884,7 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService']
     }
     
   } catch (error) {
@@ -899,8 +920,8 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED')
-  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED FIXED')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE')
+  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE FIXED')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
   console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
@@ -909,6 +930,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🔧 Headers sans X-Session-ID (corrigé !)')
   console.log('  - 🚨 Extraction type: "answer" de data.answer.text (CORRIGÉ !)')
   console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
+  console.log('  - 🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
   console.log('  - 🚀 Body: { session_id, question }')
   console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
@@ -920,6 +942,7 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🌾 Validation agricole intégrée (NOUVEAU !)')
   console.log('  - ✅ Toutes fonctions frontend préservées')
   console.log('  - ✅ Support PerfStore avec type: "answer"')
+  console.log('  - 🔧 Intégration ConversationService pour historique (NOUVEAU !)')
   console.groupEnd()
 }
 
