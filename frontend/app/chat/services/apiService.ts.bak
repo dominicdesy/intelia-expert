@@ -1,4 +1,4 @@
-// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID ====================
+// ==================== API SERVICE UNIFIÉ - ADAPTÉ NOUVEAU BACKEND DialogueManager ====================
 
 // ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
@@ -101,7 +101,7 @@ const generateUUID = (): string => {
   })
 }
 
-// 📧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
+// 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
 interface EnhancedAIResponse {
   response?: string
   conversation_id: string
@@ -144,7 +144,7 @@ interface EnhancedAIResponse {
   documents_used?: number
   warning?: string
   
-  // 📧 AJOUT CRITIQUE : Support format partial_answer
+  // 🔧 AJOUT CRITIQUE : Support format partial_answer
   general_answer?: {
     text: string
     source?: string
@@ -168,7 +168,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE CORRIGÉE : session_id dans le body !
+ * 🔧 FONCTION PRINCIPALE ADAPTÉE : Compatible DialogueManager + garde compatibilité
  */
 export const generateAIResponse = async (
   question: string,
@@ -188,7 +188,7 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  // 📧 ADAPTÉ : Session ID pour DialogueManager
+  // 🔧 ADAPTÉ : Session ID pour DialogueManager
   const finalConversationId = conversationId || generateUUID()
 
   console.log('🎯 [apiService] Nouveau système DialogueManager:', {
@@ -198,7 +198,7 @@ export const generateAIResponse = async (
   })
 
   try {
-    // 📧 ADAPTÉ : Endpoint simplifié du nouveau système
+    // 🔧 ADAPTÉ : Endpoint simplifié du nouveau système
     const endpoint = `${API_BASE_URL}/expert/ask`
     
     // ✅ ENRICHISSEMENT CLARIFICATION CONSERVÉ (au cas où)
@@ -219,14 +219,16 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🔧 CORRECTION CRITIQUE : session_id dans le body, pas dans les headers !
+    // 🔧 ADAPTÉ : Body simplifié pour DialogueManager
     const requestBody = {
-      session_id: finalConversationId,  // ✅ CORRIGÉ !
       question: finalQuestion
     }
 
-    // 🔧 CORRECTION : Headers sans X-Session-ID
-    const headers = getAuthHeaders()  // ✅ CORRIGÉ !
+    // 🔧 ADAPTÉ : Headers avec session ID pour DialogueManager
+    const headers = {
+      ...getAuthHeaders(),
+      'X-Session-ID': finalConversationId
+    }
 
     console.log('📤 [apiService] Body DialogueManager:', requestBody)
     console.log('📤 [apiService] Session ID:', finalConversationId.substring(0, 8) + '...')
@@ -266,20 +268,19 @@ export const generateAIResponse = async (
     
     console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
-      has_answer: !!data.answer,
       has_general_answer: !!data.general_answer,
       has_questions: !!data.questions,
       source: data.source,
       documents_used: data.documents_used
     })
 
-    // 📧 CORRECTION CRITIQUE : Préserver le format selon le type de réponse
+    // 🔧 CORRECTION CRITIQUE : Préserver le format selon le type de réponse
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 📧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
@@ -294,7 +295,7 @@ export const generateAIResponse = async (
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
       } : {}),
       
-      // 📧 GESTION CLARIFICATION : Format DialogueManager
+      // 🔧 GESTION CLARIFICATION : Format DialogueManager
       ...(data.type === 'clarification' ? {
         type: 'clarification',
         requires_clarification: true,
@@ -313,7 +314,7 @@ export const generateAIResponse = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 📧 GESTION RÉPONSE ANSWER : Format DialogueManager - AVEC CORRECTION data.answer
+      // 🔧 GESTION RÉPONSE ANSWER : Format DialogueManager - AVEC CORRECTION data.answer
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
@@ -367,7 +368,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 📧 VERSION PUBLIQUE CORRIGÉE : session_id dans le body aussi !
+ * 🔧 VERSION PUBLIQUE ADAPTÉE : Compatible DialogueManager (sans auth) - AVEC CORRECTION
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -387,18 +388,16 @@ export const generateAIResponsePublic = async (
   })
 
   try {
-    // 📧 ADAPTÉ : Même endpoint que la version auth (DialogueManager gère)
-    const endpoint = `${API_BASE_URL}/expert/ask-public`
+    // 🔧 ADAPTÉ : Même endpoint que la version auth (DialogueManager gère)
+    const endpoint = `${API_BASE_URL}/expert/ask`
     
-    // 🔧 CORRECTION CRITIQUE : session_id dans le body !
     const requestBody = {
-      session_id: finalConversationId,  // ✅ CORRIGÉ !
       question: question.trim()
     }
 
-    // 🔧 CORRECTION : Headers sans X-Session-ID
     const headers = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Session-ID': finalConversationId
     }
 
     const response = await fetch(endpoint, {
@@ -417,18 +416,17 @@ export const generateAIResponsePublic = async (
     
     console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
-      has_answer: !!data.answer,
       has_general_answer: !!data.general_answer,
       has_questions: !!data.questions
     })
 
-    // 📧 MÊME CORRECTION que la version auth
+    // 🔧 MÊME CORRECTION que la version auth
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 📧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE  
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER - AVEC CRÉATION DU CHAMP RESPONSE  
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
@@ -443,7 +441,7 @@ export const generateAIResponsePublic = async (
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
       } : {}),
       
-      // 📧 GESTION CLARIFICATION
+      // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
         type: 'clarification',
         requires_clarification: true,
@@ -462,7 +460,7 @@ export const generateAIResponsePublic = async (
         note: 'Clarification requise'
       } : {}),
       
-      // 📧 GESTION RÉPONSE ANSWER - AVEC CORRECTION data.answer
+      // 🔧 GESTION RÉPONSE ANSWER - AVEC CORRECTION data.answer
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: data.answer?.text || data.answer || data.response?.answer || data.response || data.general_answer?.text || '',
@@ -732,13 +730,13 @@ export const debugEnhancedConversationFlow = (
 }
 
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Système backend: DialogueManager + expert.py')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
-  console.log('🔧 CORRECTIONS EFFECTUÉES:')
-  console.log('  ✅ Body avec session_id: { session_id, question }')
-  console.log('  ✅ Headers sans X-Session-ID (corrigé !)')
+  console.log('🔧 ADAPTATIONS EFFECTUÉES:')
+  console.log('  ✅ Body simplifié: { question }')
+  console.log('  ✅ Session ID via header X-Session-ID')
   console.log('  ✅ Conversion format DialogueManager vers format frontend')
   console.log('  ✅ Support clarification via type: "clarification"')
   console.log('  ✅ Support réponse via type: "answer"')
@@ -833,15 +831,14 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE')
-  console.log('Version:', 'DialogueManager v1.0 - Session ID FIXED')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration')
+  console.log('Version:', 'DialogueManager v1.0')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager')
-  console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
+  console.log('🔧 CHANGEMENTS MAJEURS:')
   console.log('  - 🚀 Utilisation endpoint /ask simplifié')
-  console.log('  - 🔧 Session ID dans le BODY (corrigé !)')
-  console.log('  - 🔧 Headers sans X-Session-ID (corrigé !)')
-  console.log('  - 🚀 Body: { session_id, question }')
+  console.log('  - 🚀 Session ID via header X-Session-ID')
+  console.log('  - 🚀 Body simplifié: { question }')
   console.log('  - 🚀 Support type: clarification/answer/partial_answer')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
   console.log('  - 🚀 Conversion automatique format')
