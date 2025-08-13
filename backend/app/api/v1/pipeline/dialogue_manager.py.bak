@@ -165,7 +165,9 @@ def _merge_conversation_context(current_entities: Dict[str, Any], session_contex
     """
     Fusionne le contexte de session avec les entités actuelles.
     Enrichit automatiquement depuis le texte de la question.
+    CORRECTION: Préserve l'âge du contexte précédent si non présent dans la nouvelle question.
     """
+    # CORRECTION: Commencer par le contexte de session (qui contient l'âge)
     merged = dict(session_context.get("entities", {}))
     
     # Enrichissement automatique depuis le texte
@@ -174,13 +176,18 @@ def _merge_conversation_context(current_entities: Dict[str, Any], session_contex
     auto_sex = _normalize_sex_from_text(question)
     auto_age = _extract_age_days_from_text(question)
     
+    # CORRECTION: Seulement remplacer si la nouvelle valeur existe
     if auto_species: merged["species"] = auto_species
     if auto_line: merged["line"] = auto_line
     if auto_sex: merged["sex"] = auto_sex
-    if auto_age: merged["age_days"] = auto_age
+    if auto_age: merged["age_days"] = auto_age  # Seulement si nouvel âge détecté
     
-    # Fusion avec entités détectées (priorité aux nouvelles)
-    merged.update(current_entities)
+    # CORRECTION: Fusion sélective - ne pas écraser l'âge s'il n'est pas dans current_entities
+    for key, value in current_entities.items():
+        if key == "age_days" and value is None and merged.get("age_days") is not None:
+            # Garder l'âge du contexte précédent si la nouvelle valeur est None
+            continue
+        merged[key] = value
     
     logger.info(f"🔗 Contexte fusionné: session={session_context.get('entities', {})} + auto={{'species':{auto_species}, 'line':{auto_line}, 'sex':{auto_sex}, 'age':{auto_age}}} + current={current_entities} → {merged}")
     

@@ -277,7 +277,7 @@ def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]
             _PERF_STORE = None
     return _PERF_STORE
 
-def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], question: str = "") -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """
     Essaie un match exact (line, unit, sex, age_days) puis nearest sur l'âge.
     Retourne (record, debug).
@@ -810,7 +810,7 @@ def handle(
                 rec = None
                 dbg = None
                 if store:
-                    rec, dbg = _perf_lookup_exact_or_nearest(store, norm)
+                    rec, dbg = _perf_lookup_exact_or_nearest(store, norm, question=question)
 
                 if rec:
                     line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
