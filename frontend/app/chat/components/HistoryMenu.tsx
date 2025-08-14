@@ -128,10 +128,12 @@ export const HistoryMenu = () => {
       console.warn('⚠️ Erreur formatage heure:', error)
       // Fallback si erreur
       return new Date(timestamp).toLocaleDateString('fr-CA', { 
-        day: 'numeric', 
-        month: 'short', 
-        hour: '2-digit', 
-        minute: '2-digit' 
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       })
     }
   }

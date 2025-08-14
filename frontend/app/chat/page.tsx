@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from './types'
 import { useAuthStore } from './hooks/useAuthStore'
@@ -8,6 +8,7 @@ import { useTranslation } from './hooks/useTranslation'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
+
 
 import {
   PaperAirplaneIcon,
@@ -1004,8 +1005,8 @@ export default function ChatInterface() {
                             }}
                           >
                             {/* 🔧 NOUVEAU : Appliquer le préprocesseur Markdown */}
-                            {preprocessMarkdown(message.content)}
-                          </ReactMarkdown>
+                            {useMemo(() => preprocessMarkdown(message.content), [message.content])}
+						  </ReactMarkdown>
                         )}
                       </div>
 
@@ -1146,6 +1147,15 @@ export default function ChatInterface() {
                   <PaperAirplaneIcon />
                 </button>
               </div>
+
+              {/* ✅ AJOUTEZ CES LIGNES ICI - EXACTEMENT APRÈS LA FERMETURE DU DIV PRÉCÉDENT */}
+              <div className="text-center mt-2">
+                <p className="text-xs text-gray-500">
+                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
+                </p>
+              </div>
+              {/* ✅ FIN DE L'AJOUT */}
+			  			  
             </div>
           </div>
         </div>
