@@ -87,43 +87,6 @@ class Settings:
         """Check if Supabase is configured."""
         return bool(self.supabase_url and self.supabase_anon_key)
     
-    # ==================== CONFIGURATION MODÈLES OPENAI ====================
-    
-    @property
-    def default_model(self) -> str:
-        """Get default OpenAI model."""
-        return self._get_secret("DEFAULT_MODEL", "gpt-5")
-    
-    @property
-    def clarification_model(self) -> str:
-        """Get clarification model."""
-        return self._get_secret("CLARIFICATION_MODEL", "gpt-5-mini")
-    
-    @property
-    def cot_model(self) -> str:
-        """Get Chain-of-Thought model."""
-        return self._get_secret("OPENAI_COT_MODEL", self.default_model)
-    
-    @property
-    def synthesis_model(self) -> str:
-        """Get synthesis model."""
-        return self._get_secret("OPENAI_SYNTHESIS_MODEL", self.default_model)
-    
-    @property
-    def chat_model(self) -> str:
-        """Get chat model."""
-        return self._get_secret("OPENAI_CHAT_MODEL", self.default_model)
-    
-    @property
-    def embedding_model(self) -> str:
-        """Get embedding model."""
-        return self._get_secret("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
-    
-    @property
-    def fallback_model(self) -> str:
-        """Get fallback model."""
-        return self._get_secret("OPENAI_FALLBACK_MODEL", "gpt-4o")
-    
     # ==================== CONFIGURATION VALIDATION AGRICOLE ====================
     
     @property
@@ -184,6 +147,11 @@ class Settings:
     def clarification_system_enabled(self) -> bool:
         """Check if question clarification system is enabled."""
         return self._get_secret("ENABLE_CLARIFICATION_SYSTEM", "true").lower() == "true"
+    
+    @property
+    def clarification_model(self) -> str:
+        """Get OpenAI model for clarification analysis."""
+        return self._get_secret("CLARIFICATION_MODEL", "gpt-4o-mini")
     
     @property
     def clarification_timeout(self) -> int:
@@ -313,16 +281,7 @@ class Settings:
             },
             "openai": {
                 "configured": self.is_openai_configured,
-                "api_key_present": bool(self.openai_api_key),
-                "models": {
-                    "default": self.default_model,
-                    "clarification": self.clarification_model,
-                    "cot": self.cot_model,
-                    "synthesis": self.synthesis_model,
-                    "chat": self.chat_model,
-                    "embedding": self.embedding_model,
-                    "fallback": self.fallback_model
-                }
+                "api_key_present": bool(self.openai_api_key)
             },
             "supabase": {
                 "configured": self.is_supabase_configured,

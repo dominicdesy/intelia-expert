@@ -14,6 +14,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import APIRouter, Depends, Query, HTTPException
 from enum import Enum
+from functools import wraps
 
 # Import authentification
 from app.api.v1.auth import get_current_user
@@ -33,6 +34,99 @@ class ResponseSource(str, Enum):
     TABLE_LOOKUP = "table_lookup"
     VALIDATION_REJECTED = "validation_rejected"
     QUOTA_EXCEEDED = "quota_exceeded"
+
+# 🆕 SYSTÈME DE RÔLES ET PERMISSIONS
+class UserRole(str, Enum):
+    USER = "user"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+
+class Permission(str, Enum):
+    VIEW_OWN_ANALYTICS = "view_own_analytics"
+    VIEW_ALL_ANALYTICS = "view_all_analytics"
+    VIEW_OPENAI_COSTS = "view_openai_costs"
+    VIEW_SERVER_PERFORMANCE = "view_server_performance"
+    MANAGE_SYSTEM = "manage_system"
+    ADMIN_DASHBOARD = "admin_dashboard"
+
+# 🆕 SYSTÈME DE PERMISSIONS PAR RÔLE
+ROLE_PERMISSIONS = {
+    UserRole.USER: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS
+    ],
+    UserRole.MODERATOR: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS,
+        Permission.VIEW_ALL_ANALYTICS
+    ],
+    UserRole.ADMIN: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_ALL_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS,
+        Permission.VIEW_SERVER_PERFORMANCE,
+        Permission.ADMIN_DASHBOARD
+    ],
+    UserRole.SUPER_ADMIN: [
+        Permission.VIEW_OWN_ANALYTICS,
+        Permission.VIEW_ALL_ANALYTICS,
+        Permission.VIEW_OPENAI_COSTS,
+        Permission.VIEW_SERVER_PERFORMANCE,
+        Permission.ADMIN_DASHBOARD,
+        Permission.MANAGE_SYSTEM
+    ]
+}
+
+# 🆕 FONCTIONS DE VÉRIFICATION DES PERMISSIONS
+def has_permission(user: Dict[str, Any], permission: Permission) -> bool:
+    """Vérifie si un utilisateur a une permission spécifique"""
+    user_type = user.get("user_type", "user")
+    
+    # Rétrocompatibilité : si is_admin=True, donner permissions admin
+    if user.get("is_admin", False) and user_type == "user":
+        user_type = "admin"
+    
+    try:
+        role = UserRole(user_type)
+        return permission in ROLE_PERMISSIONS.get(role, [])
+    except ValueError:
+        # Si user_type inconnu, traiter comme user normal
+        return permission in ROLE_PERMISSIONS.get(UserRole.USER, [])
+
+def require_permission(permission: Permission):
+    """Décorateur pour vérifier les permissions"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Récupérer current_user des kwargs ou args
+            current_user = kwargs.get('current_user')
+            if not current_user:
+                # Chercher dans les args (cas des dépendances FastAPI)
+                for arg in args:
+                    if isinstance(arg, dict) and 'user_id' in arg:
+                        current_user = arg
+                        break
+            
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required")
+            
+            if not has_permission(current_user, permission):
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Permission '{permission.value}' required. Your role: {current_user.get('user_type', 'unknown')}"
+                )
+            
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def is_admin_user(user: Dict[str, Any]) -> bool:
+    """Vérifie si un utilisateur est admin (rétrocompatibilité)"""
+    return (
+        user.get("is_admin", False) or 
+        user.get("user_type") in ["admin", "super_admin"]
+    )
 
 class AnalyticsManager:
     """
@@ -678,44 +772,53 @@ def track_openai_call(
     except Exception as e:
         logger.error(f"❌ Erreur track OpenAI call: {e}")
 
-# ========== ENDPOINTS ANALYTICS ==========
+# ========== ENDPOINTS ANALYTICS AVEC RÔLES ==========
 
 @router.get("/analytics/dashboard")
-def analytics_dashboard(
+async def analytics_dashboard(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Dashboard analytics (admin only)"""
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    """Dashboard analytics (admin+ only)"""
+    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Admin dashboard access required. Your role: {current_user.get('user_type', 'user')}"
+        )
     
     try:
         analytics = get_analytics_manager()
-        # Implémentation du dashboard admin
         return {
             "status": "dashboard_available",
-            "message": "Dashboard analytics à implémenter"
+            "message": "Dashboard analytics à implémenter",
+            "user_role": current_user.get("user_type"),
+            "permissions": [p.value for p in ROLE_PERMISSIONS.get(UserRole(current_user.get("user_type", "user")), [])]
         }
     except Exception as e:
         return {"error": str(e)}
 
 @router.get("/analytics/my-usage")
-def my_usage_analytics(
+async def my_usage_analytics(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Analytics personnelles de l'utilisateur"""
+    if not has_permission(current_user, Permission.VIEW_OWN_ANALYTICS):
+        raise HTTPException(status_code=403, detail="View analytics permission required")
+    
     user_email = current_user.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found")
     
     try:
         analytics = get_analytics_manager()
-        return analytics.get_user_analytics(user_email, days)
+        result = analytics.get_user_analytics(user_email, days)
+        result["user_role"] = current_user.get("user_type")
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 @router.get("/analytics/openai-costs")
-def openai_costs_analytics(
+async def openai_costs_analytics(
     days: int = Query(30, ge=1, le=365),
     user_email: str = Query(None),
     current_user: dict = Depends(get_current_user)
@@ -724,34 +827,75 @@ def openai_costs_analytics(
     
     # Si user_email spécifié, vérifier les permissions
     if user_email:
-        if current_user.get("email") != user_email and not current_user.get("is_admin", False):
-            raise HTTPException(status_code=403, detail="Access denied")
+        if (current_user.get("email") != user_email and 
+            not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)):
+            raise HTTPException(
+                status_code=403, 
+                detail="Permission to view other users' analytics required"
+            )
     else:
         user_email = current_user.get("email")
+    
+    if not has_permission(current_user, Permission.VIEW_OPENAI_COSTS):
+        raise HTTPException(status_code=403, detail="View OpenAI costs permission required")
     
     if not user_email:
         raise HTTPException(status_code=400, detail="User email required")
     
     try:
         analytics = get_analytics_manager()
-        return analytics.get_user_analytics(user_email, days)
+        result = analytics.get_user_analytics(user_email, days)
+        result["user_role"] = current_user.get("user_type")
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 @router.get("/analytics/performance")
-def server_performance_analytics(
-    hours: int = Query(24, ge=1, le=168),  # Max 7 jours
+async def server_performance_analytics(
+    hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Analytics de performance serveur (admin only)"""
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    """Analytics de performance serveur (admin+ only)"""
+    if not has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Server performance access required. Your role: {current_user.get('user_type', 'user')}"
+        )
     
     try:
         analytics = get_analytics_manager()
-        return analytics.get_server_performance_analytics(hours)
+        result = analytics.get_server_performance_analytics(hours)
+        result["requested_by_role"] = current_user.get("user_type")
+        return result
     except Exception as e:
         return {"error": str(e)}
+
+# 🆕 NOUVEL ENDPOINT pour voir ses permissions
+@router.get("/my-permissions")
+async def get_my_permissions(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Récupère les permissions de l'utilisateur connecté"""
+    user_type = current_user.get("user_type", "user")
+    
+    try:
+        role = UserRole(user_type)
+        permissions = ROLE_PERMISSIONS.get(role, [])
+    except ValueError:
+        permissions = ROLE_PERMISSIONS.get(UserRole.USER, [])
+    
+    return {
+        "user_email": current_user.get("email"),
+        "user_type": user_type,
+        "is_admin": current_user.get("is_admin", False),
+        "permissions": [p.value for p in permissions],
+        "available_endpoints": {
+            "analytics_dashboard": has_permission(current_user, Permission.ADMIN_DASHBOARD),
+            "my_usage": has_permission(current_user, Permission.VIEW_OWN_ANALYTICS),
+            "openai_costs": has_permission(current_user, Permission.VIEW_OPENAI_COSTS),
+            "server_performance": has_permission(current_user, Permission.VIEW_SERVER_PERFORMANCE)
+        }
+    }
 
 @router.get("/health-check")
 def analytics_health_check() -> Dict[str, Any]:

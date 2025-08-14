@@ -49,7 +49,7 @@ class DigitalOceanSecretsLoader:
             logger.info(f"✅ Secrets loaded from DigitalOcean environment ({configured_vars}/3 variables configured)")
             
         except Exception as e:
-            logger.error(f"⛔ Error loading environment variables: {e}")
+            logger.error(f"❌ Error loading environment variables: {e}")
             self.secrets = {}
     
     def get(self, key: str, default=None):
@@ -142,7 +142,7 @@ class OptimizedRAGManager:
                 
         except Exception as e:
             diagnostics["errors"].append(f"RAG setup error: {e}")
-            logger.error(f"⛔ RAG setup error: {e}")
+            logger.error(f"❌ RAG setup error: {e}")
         
         self.diagnostic_info = diagnostics
     
@@ -167,7 +167,7 @@ class OptimizedRAGManager:
                 }
                 
         except Exception as e:
-            logger.error(f"⛔ Force RAG configuration error: {e}")
+            logger.error(f"❌ Force RAG configuration error: {e}")
             return {
                 "success": False, 
                 "error": str(e),
@@ -228,12 +228,12 @@ class ExpertService:
                 self.openai_client = openai.OpenAI(api_key=openai_key)
                 logger.info("✅ OpenAI client initialized from environment")
             else:
-                logger.error("⛔ OPENAI_API_KEY not found in environment variables")
+                logger.error("❌ OPENAI_API_KEY not found in environment variables")
                 
         except ImportError:
-            logger.error("⛔ OpenAI package not available")
+            logger.error("❌ OpenAI package not available")
         except Exception as e:
-            logger.error(f"⛔ OpenAI initialization error: {e}")
+            logger.error(f"❌ OpenAI initialization error: {e}")
     
     def _initialize_expert_engine(self):
         """Initialize expert engine if available."""
@@ -244,7 +244,7 @@ class ExpertService:
         except ImportError:
             logger.warning("⚠️ Expert engine not available, using direct OpenAI")
         except Exception as e:
-            logger.error(f"⛔ Expert engine initialization error: {e}")
+            logger.error(f"❌ Expert engine initialization error: {e}")
     
     async def ask_expert(self, question: str, language: str = "en") -> Dict[str, Any]:
         """Ask question to expert with enhanced capabilities."""
@@ -254,7 +254,7 @@ class ExpertService:
             # Try expert engine first
             if self.expert_engine:
                 try:
-                    result = await self.expert_engine.process_query(question, os.getenv('DEFAULT_MODEL', 'gpt-5'))
+                    result = await self.expert_engine.process_query(question, "gpt-4o")
                     
                     return {
                         "success": True,
@@ -310,7 +310,7 @@ class ExpertService:
         
         try:
             response = self.openai_client.chat.completions.create(
-                model=os.getenv('DEFAULT_MODEL', 'gpt-5'),
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
