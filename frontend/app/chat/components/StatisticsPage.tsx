@@ -82,7 +82,8 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const { user, loading: authLoading } = useAuthStore()
+  // Fix: Remove the loading destructuring since it doesn't exist in AuthStore
+  const { user } = useAuthStore()
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
   const [billingStats, setBillingStats] = useState<BillingStats | null>(null)
@@ -102,10 +103,21 @@ export const StatisticsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
+  
+  // Add a separate state for auth loading since it's not available in the store
+  const [authLoading, setAuthLoading] = useState(true)
 
   // Vérification des permissions super_admin avec gestion du chargement
   const isSuperAdmin = user?.user_type === 'super_admin'
   const isAuthenticationReady = !authLoading
+
+  // Add useEffect to handle auth loading state
+  useEffect(() => {
+    // Set a timeout or check if user is defined to determine when auth is ready
+    if (user !== undefined) {
+      setAuthLoading(false)
+    }
+  }, [user])
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
