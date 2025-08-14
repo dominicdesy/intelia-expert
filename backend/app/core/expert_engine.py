@@ -1,5 +1,6 @@
 import sys
 import logging
+from ..api.v1.utils.openai_utils import complete
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
@@ -170,17 +171,16 @@ Répondez de manière précise et actionnable."""
             if self.rag_configured:
                 system_prompt += " Vous avez accès à une base de connaissances spécialisée."
             
-            response = client.chat.completions.create(
-                model=model,
+            response_dict = complete(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
                 ],
-                temperature=0.3,  # Réduit pour plus de directivité
-                max_tokens=150    # Réduit de 600 à 150
+                model=model,
+                temperature=0.3,
+                max_tokens=150
             )
-            
-            return response.choices[0].message.content
+            return response_dict["choices"][0]["message"]["content"]
             
         except Exception as e:
             logger.error(f"OpenAI direct call failed: {e}")

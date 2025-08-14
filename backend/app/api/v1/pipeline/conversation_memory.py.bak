@@ -164,7 +164,7 @@ def extract_signs_from_text(text: str) -> Optional[str]:
     
     # Si OpenAI disponible, extraction intelligente
     try:
-        from ..utils.openai_utils import complete_text as openai_complete
+        from ..utils.openai_utils import complete as openai_complete
         
         extraction_prompt = f"""Tu es un vétérinaire expert. Extrais UNIQUEMENT les signes cliniques mentionnés dans ce texte sur l'aviculture.
 

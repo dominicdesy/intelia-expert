@@ -1,4 +1,5 @@
 # app/middleware/auth_middleware.py
+# app/middleware/auth_middleware.py
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
@@ -144,7 +145,7 @@ async def auth_middleware(request: Request, call_next):
     Middleware d'authentification globale CORRIGÉ
     """
     
-    # 📝 LOG DE DEBUG
+    # 🔍 LOG DE DEBUG
     logger.debug(f"🔍 Auth middleware - Path: {request.url.path}, Method: {request.method}")
     
     # 🚨 CORRECTION CRITIQUE : Gérer les endpoints inexistants AVANT toute autre logique

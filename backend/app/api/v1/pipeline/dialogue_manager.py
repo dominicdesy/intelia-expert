@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION REFACTORISED CORRIGÉE + PERSISTANCE CONVERSATIONS
+Dialogue orchestration - VERSION REFACTORISÉE CORRIGÉE + PERSISTANCE CONVERSATIONS
 - Module principal utilisant les modules spécialisés
 - Imports des modules spécialisés pour langue, mémoire et CoT/fallback
 - Preserve la compatibilité avec l'API existante
 - CORRIGÉ: Utilise les fonctions des modules au lieu de les dupliquer
 - FIX: Auto-extraction systématique même pour nouvelles conversations
 - NOUVEAU: Persistance centralisée des conversations dans PostgreSQL
+- ✅ VÉRIFIÉ: Compatible avec nouvelle fonction complete() via cot_fallback_processor
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -44,6 +45,8 @@ from .conversation_memory import (
     get_memory_status
 )
 
+# ========== ✅ IMPORTS MODULES COT/FALLBACK - DÉJÀ COMPATIBLES ==========
+# Ces fonctions utilisent déjà la nouvelle signature complete() en interne
 from .cot_fallback_processor import (
     should_use_cot_analysis,
     generate_cot_analysis,
@@ -541,6 +544,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
 def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None, target_language: str = "fr") -> Dict[str, Any]:
     """
     Version améliorée de _rag_answer avec fallback OpenAI et support CoT
+    ✅ VÉRIFIÉ: Utilise les fonctions du module cot_fallback_processor qui gèrent déjà la nouvelle signature complete()
     """
     # Essai RAG standard d'abord
     rag_result = _rag_answer(question, k, entities)
@@ -554,10 +558,12 @@ def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict
         logger.debug("🚫 Fallback OpenAI désactivé par configuration")
         return rag_result
     
+    # ✅ CETTE FONCTION EST DÉJÀ COMPATIBLE avec nouvelle signature complete()
     if should_use_openai_fallback(rag_result, intent):
         logger.info("🤖 Activation fallback OpenAI après échec RAG")
         
         # Tenter fallback OpenAI avec la langue cible (possiblement avec CoT)
+        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
         openai_result = generate_openai_fallback_response(
             question=question,
             entities=entities or {},
@@ -614,9 +620,10 @@ def _final_sanitize(text: str) -> str:
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
     Mode hybride: réponse générale + questions de précision
+    ✅ VÉRIFIÉ: Utilise generate_clarification_response_advanced du module cot_fallback_processor
     """
     try:
-        # Essai avec la fonction spécialisée si disponible
+        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
         clarification_text = generate_clarification_response_advanced(intent, missing_fields)
         
         # Enrichir avec les boutons rapides
@@ -704,6 +711,7 @@ def handle(
     Préserve la compatibilité avec l'API existante
     FIX: Auto-extraction systématique même pour nouvelles conversations
     NOUVEAU: Persistance automatique des conversations
+    ✅ VÉRIFIÉ: Compatible avec nouvelle fonction complete() via modules spécialisés
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
@@ -781,6 +789,7 @@ def handle(
         # =================================================================
         # VÉRIFICATION PRIORITAIRE POUR ANALYSE COT
         # =================================================================
+        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
         if OPENAI_COT_AVAILABLE and should_use_cot_analysis(intent, entities, question):
             logger.info("🧠 Question complexe détectée → Analyse Chain-of-Thought prioritaire")
             
@@ -788,7 +797,7 @@ def handle(
             entities_with_intent = dict(entities)
             entities_with_intent["_intent"] = intent
             
-            # Tentative d'analyse CoT directe
+            # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
             cot_result = generate_cot_analysis(
                 question=question,
                 entities=entities,
@@ -1026,11 +1035,13 @@ def handle(
         entities_with_intent = dict(entities)
         entities_with_intent["_intent"] = intent
         
+        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
         rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent, target_language=effective_language)
         rag_text = _final_sanitize(rag.get("text", ""))
         
         # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI ou CoT
         if rag.get("source") not in ["openai_fallback", "cot_analysis"]:
+            # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
             rag_text = maybe_synthesize(question, rag_text)
 
         # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
