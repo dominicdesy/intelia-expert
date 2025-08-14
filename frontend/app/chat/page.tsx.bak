@@ -102,32 +102,61 @@ export default function ChatInterface() {
     return 'U'
   }
 
-  // 🔧 FONCTION AJOUTÉE : Préprocesseur Markdown pour corriger le formatage
+  // 🔧 FONCTION RENFORCÉE : Préprocesseur Markdown pour réparer le formatage cassé
   const preprocessMarkdown = (content: string): string => {
     if (!content) return ""
     
     let processed = content
+
+    // 🚨 CORRECTION CRITIQUE : Réparer les titres collés au texte suivant
+    // Exemple: "## Diagnostic PrincipalLa mortalité" → "## Diagnostic Principal\n\nLa mortalité"
+    processed = processed.replace(/(#{1,6})\s*([^#\n]+?)([A-Z][a-z])/g, '$1 $2\n\n$3')
     
-    // 🔨 CORRECTION PRINCIPALE : Ajouter sauts de ligne après les titres
-    processed = processed.replace(/^(#{1,6})\s*([^#\n]+)(?!\n\n)/gm, '$1 $2\n')
+    // 🚨 CORRECTION : Ajouter saut de ligne après tous les titres si manquant
+    processed = processed.replace(/^(#{1,6}[^\n]+)(?!\n)/gm, '$1\n')
+    
+    // 🚨 CORRECTION : Séparer les mots collés par une virgule manquante
+    // Exemple: "diarrhée hémorragique, suggère" au lieu de "diarrhée hémorragiquesugère"
+    processed = processed.replace(/([a-z])([A-Z])/g, '$1, $2')
+    
+    // 🚨 CORRECTION : Réparer les phrases collées après ponctuation
+    processed = processed.replace(/([.!?:])([A-Z])/g, '$1 $2')
+    
+    // 🚨 CORRECTION : Ajouter espaces avant les mots importants en gras
+    processed = processed.replace(/([a-z])(\*\*[A-Z])/g, '$1 $2')
+    
+    // 🚨 CORRECTION : Séparer les sections importantes collées
+    processed = processed.replace(/([.!?:])\s*(\*\*[^*]+\*\*)/g, '$1\n\n$2')
+    
+    // 🔨 CORRECTION : Structure en sections avec ### pour sous-parties
+    processed = processed.replace(/([.!?:])\s*-\s*([A-Z][^:]+:)/g, '$1\n\n### $2')
+    
+    // 🔨 CORRECTION : Améliorer la structure des listes
+    processed = processed.replace(/([.!?:])\s*-\s*([A-Z][^-]+)/g, '$1\n\n- $2')
     
     // 🔨 CORRECTION : Ajouter espacement avant les listes
     processed = processed.replace(/([^.\n])\n([•\-\*]\s)/g, '$1\n\n$2')
     
-    // 🔨 CORRECTION : Ajouter espacement avant les paragraphes après listes
+    // 🔨 CORRECTION : Ajouter espacement après les listes
     processed = processed.replace(/([•\-\*]\s[^\n]+)\n([A-Z][^•\-\*])/g, '$1\n\n$2')
     
-    // 🔨 CORRECTION : Ajouter espacement avant les sections importantes
-    processed = processed.replace(/([.!?])\n(\*\*[^*]+\*\*)/g, '$1\n\n$2')
+    // 🔨 CORRECTION : Gérer les sections spéciales (Causes, Recommandations, etc.)
+    processed = processed.replace(/(Causes Possibles|Recommandations|Prévention|Court terme|Long terme|Immédiat)([^-:])/g, '\n\n### $1\n\n$2')
+    
+    // 🔨 NORMALISATION : Nettoyer les espaces multiples
+    processed = processed.replace(/[ \t]+/g, ' ')
     
     // 🔨 NORMALISATION : Éviter les triples sauts de ligne
     processed = processed.replace(/\n\n\n+/g, '\n\n')
     
-    console.log('📝 [preprocessMarkdown] Contenu traité:', {
+    // 🔨 NETTOYAGE : Supprimer espaces en début/fin
+    processed = processed.trim()
+    
+    console.log('🔧 [preprocessMarkdown] Réparation intensive:', {
       original_length: content.length,
       processed_length: processed.length,
-      has_headings: /^#{1,6}\s/.test(processed),
-      preview: processed.substring(0, 200)
+      repairs_made: content !== processed,
+      preview: processed.substring(0, 300)
     })
     
     return processed
@@ -927,49 +956,49 @@ export default function ChatInterface() {
                           </p>
                         ) : (
                           <ReactMarkdown
-                            className="prose prose-sm max-w-none break-words prose-p:my-2 prose-li:my-1 prose-ul:my-3 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900 prose-h2:border-b prose-h2:border-gray-200 prose-h2:pb-2"
+                            className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
                             components={{
-                              // 🔨 TITRES H2 : Amélioration du style et espacement
+                              // 🔨 TITRES H2 : Style amélioré avec plus d'espacement
                               h2: ({node, ...props}) => (
-                                <h2 className="text-lg font-bold text-gray-900 mt-6 mb-4 border-b border-gray-200 pb-2 flex items-center gap-2" {...props} />
+                                <h2 className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg" {...props} />
                               ),
                               
-                              // 🔨 TITRES H3 : Amélioration du style et espacement  
+                              // 🔨 TITRES H3 : Style pour les sous-sections
                               h3: ({node, ...props}) => (
-                                <h3 className="text-base font-semibold text-gray-800 mt-4 mb-3" {...props} />
+                                <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2" {...props} />
                               ),
                               
-                              // 🔨 PARAGRAPHES : Amélioration de l'espacement
+                              // 🔨 PARAGRAPHES : Espacement généreux
                               p: ({node, ...props}) => (
-                                <p className="leading-relaxed text-gray-800 my-3" {...props} />
+                                <p className="leading-relaxed text-gray-800 my-4 text-justify" {...props} />
                               ),
                               
-                              // 🔨 LISTES : Amélioration de l'espacement et style
+                              // 🔨 LISTES : Style amélioré avec plus d'espace
                               ul: ({node, ...props}) => (
-                                <ul className="list-disc list-inside space-y-2 text-gray-800 my-4 ml-2" {...props} />
+                                <ul className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2" {...props} />
                               ),
                               
-                              // 🔨 ÉLÉMENTS DE LISTE : Amélioration du padding
+                              // 🔨 ÉLÉMENTS DE LISTE : Meilleur spacing
                               li: ({node, ...props}) => (
-                                <li className="leading-relaxed pl-2" {...props} />
+                                <li className="leading-relaxed pl-2 my-2" {...props} />
                               ),
                               
-                              // 🔨 TEXTE EN GRAS : Amélioration du contraste
+                              // 🔨 TEXTE EN GRAS : Plus visible
                               strong: ({node, ...props}) => (
-                                <strong className="font-semibold text-blue-800" {...props} />
+                                <strong className="font-bold text-blue-800 bg-blue-50 px-1 rounded" {...props} />
                               ),
                               
-                              // 🔄 NOUVEAU : Support pour les tableaux
+                              // 🔄 TABLEAUX : Style amélioré
                               table: ({node, ...props}) => (
-                                <div className="overflow-x-auto my-4 -mx-1 sm:mx-0">
-                                  <table className="min-w-full border border-gray-300 rounded-lg" {...props} />
+                                <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
+                                  <table className="min-w-full border border-gray-300 rounded-lg shadow-sm" {...props} />
                                 </div>
                               ),
                               th: ({node, ...props}) => (
-                                <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left" {...props} />
+                                <th className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900" {...props} />
                               ),
                               td: ({node, ...props}) => (
-                                <td className="border border-gray-300 px-3 py-2" {...props} />
+                                <td className="border border-gray-300 px-4 py-3 hover:bg-gray-50" {...props} />
                               ),
                             }}
                           >
