@@ -2,10 +2,19 @@ import json
 import math
 import os
 import psycopg2
-import asyncpg
-import asyncio
 import logging
+import time
 from typing import Dict, Any, Optional
+
+# Import conditionnel d'asyncpg pour éviter les erreurs
+try:
+    import asyncpg
+    import asyncio
+    ASYNC_AVAILABLE = True
+except ImportError:
+    ASYNC_AVAILABLE = False
+    asyncpg = None
+    asyncio = None
 
 def sanitize_for_json(obj):
     """
@@ -37,10 +46,17 @@ class PostgresMemory:
     def __init__(self, dsn=None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
         self.logger = logging.getLogger(__name__)
-        # Pool de connexions async pour de meilleures performances
+        # Pool de connexions async pour de meilleures performances (si disponible)
         self._async_pool = None
         # Cache local pour éviter les reconnexions
         self._pool_initialized = False
+        
+        # Log du statut async
+        if ASYNC_AVAILABLE:
+            self.logger.info("✅ Support async disponible (asyncpg installé)")
+        else:
+            self.logger.warning("⚠️ Support async indisponible (asyncpg manquant). Fonctionnement en mode sync uniquement.")
+        
         # Automatically ensure table exists on initialization
         self._ensure_table_exists()
 
@@ -53,6 +69,9 @@ class PostgresMemory:
         Initialise et retourne le pool de connexions asyncpg.
         Lazy loading pour éviter les problèmes d'initialisation.
         """
+        if not ASYNC_AVAILABLE:
+            raise RuntimeError("asyncpg n'est pas installé. Installez-le avec: pip install asyncpg")
+            
         if not self._pool_initialized:
             try:
                 # Conversion DSN de psycopg2 vers asyncpg si nécessaire
@@ -322,6 +341,10 @@ class PostgresMemory:
         🚀 Version async de get() pour optimisation de performance.
         Utilise le pool de connexions pour éviter la latence de connexion.
         """
+        if not ASYNC_AVAILABLE:
+            self.logger.warning("⚠️ Méthode async appelée mais asyncpg indisponible. Utilisation de la version sync.")
+            return self.get(session_id)
+            
         try:
             pool = await self._get_async_pool()
             async with pool.acquire() as conn:
@@ -355,6 +378,10 @@ class PostgresMemory:
         🚀 Version async de update() pour optimisation de performance.
         Gain estimé: 1-2s selon le plan d'optimisation.
         """
+        if not ASYNC_AVAILABLE:
+            self.logger.warning("⚠️ Méthode async appelée mais asyncpg indisponible. Utilisation de la version sync.")
+            return self.update(session_id, context, user_id)
+            
         try:
             # Nettoyer le contexte avant sérialisation
             clean_context = sanitize_for_json(context)
@@ -386,6 +413,10 @@ class PostgresMemory:
         """
         🚀 Version async de clear() pour optimisation de performance.
         """
+        if not ASYNC_AVAILABLE:
+            self.logger.warning("⚠️ Méthode async appelée mais asyncpg indisponible. Utilisation de la version sync.")
+            return self.clear(session_id)
+            
         try:
             pool = await self._get_async_pool()
             async with pool.acquire() as conn:
@@ -411,6 +442,27 @@ class PostgresMemory:
         🚀 NOUVELLE MÉTHODE: save_context_async() requise par expert.py
         Utilisée dans asyncio.gather() pour paralléliser les opérations DB.
         """
+        if not ASYNC_AVAILABLE:
+            self.logger.warning("⚠️ save_context_async appelée mais asyncpg indisponible. Utilisation de fallback sync.")
+            # Fallback sync pour éviter les erreurs
+            current_context = self.get(session_id)
+            
+            if 'history' not in current_context:
+                current_context['history'] = []
+            
+            current_context['history'].append({
+                'inputs': inputs,
+                'outputs': outputs,
+                'timestamp': time.time()
+            })
+            
+            # Limiter l'historique
+            if len(current_context['history']) > 50:
+                current_context['history'] = current_context['history'][-50:]
+            
+            self.update(session_id, current_context, user_id)
+            return
+            
         try:
             # Récupérer le contexte existant
             current_context = await self.get_async(session_id)
@@ -442,6 +494,10 @@ class PostgresMemory:
         """
         🚀 NOUVELLE MÉTHODE: persist_conversation_async() pour persistance optimisée.
         """
+        if not ASYNC_AVAILABLE:
+            self.logger.warning("⚠️ persist_conversation_async appelée mais asyncpg indisponible.")
+            return
+            
         try:
             pool = await self._get_async_pool()
             async with pool.acquire() as conn:
@@ -494,6 +550,9 @@ class PostgresMemory:
         """
         🚀 Version async du nettoyage pour les tâches de maintenance.
         """
+        if not ASYNC_AVAILABLE:
+            return self.cleanup_old_sessions(days_old)
+            
         try:
             pool = await self._get_async_pool()
             async with pool.acquire() as conn:
@@ -552,6 +611,9 @@ class PostgresMemory:
         """
         🚀 Version async des statistiques pour les dashboards en temps réel.
         """
+        if not ASYNC_AVAILABLE:
+            return self.get_stats()
+            
         try:
             pool = await self._get_async_pool()
             async with pool.acquire() as conn:
@@ -588,7 +650,7 @@ class PostgresMemory:
         """
         Fermeture propre du pool async lors de la destruction de l'objet.
         """
-        if self._async_pool and not self._async_pool.is_closed():
+        if ASYNC_AVAILABLE and self._async_pool and not self._async_pool.is_closed():
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():

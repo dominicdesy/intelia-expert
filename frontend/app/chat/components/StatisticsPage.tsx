@@ -82,7 +82,6 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  // Fix: Remove the loading destructuring since it doesn't exist in AuthStore
   const { user } = useAuthStore()
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
@@ -104,20 +103,65 @@ export const StatisticsPage: React.FC = () => {
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
   
-  // Add a separate state for auth loading since it's not available in the store
-  const [authLoading, setAuthLoading] = useState(true)
+  // ✅ AMÉLIORATION : État d'authentification unifié
+  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthorized' | 'access_denied'>('loading')
 
-  // Vérification des permissions super_admin avec gestion du chargement
-  const isSuperAdmin = user?.user_type === 'super_admin'
-  const isAuthenticationReady = !authLoading
-
-  // Add useEffect to handle auth loading state
+  // ✅ AMÉLIORATION : Effet unifié pour gérer l'authentification
   useEffect(() => {
-    // Set a timeout or check if user is defined to determine when auth is ready
-    if (user !== undefined) {
-      setAuthLoading(false)
+    const checkAuth = async () => {
+      try {
+        // Attendre un peu pour s'assurer que l'auth store est initialisé
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        if (user === null) {
+          // Utilisateur pas connecté
+          setAuthState('unauthorized')
+          setError("Vous devez être connecté pour accéder à cette page")
+          setLoading(false)
+          return
+        }
+        
+        if (user === undefined) {
+          // Auth store encore en train de charger
+          return
+        }
+        
+        // Utilisateur connecté, vérifier les permissions
+        if (user.user_type !== 'super_admin') {
+          setAuthState('access_denied')
+          setError("Accès refusé - Permissions super_admin requises")
+          setLoading(false)
+          return
+        }
+        
+        // Tout est OK
+        setAuthState('authenticated')
+        console.log('✅ Utilisateur super_admin authentifié:', user.email)
+        
+      } catch (err) {
+        console.error('Erreur vérification auth:', err)
+        setAuthState('unauthorized')
+        setError("Erreur de vérification d'authentification")
+        setLoading(false)
+      }
     }
+
+    checkAuth()
   }, [user])
+
+  // ✅ AMÉLIORATION : Charger les stats seulement quand authentifié
+  useEffect(() => {
+    if (authState === 'authenticated') {
+      loadAllStatistics()
+    }
+  }, [authState, selectedTimeRange])
+
+  // ✅ AMÉLIORATION : Charger les questions seulement quand authentifié
+  useEffect(() => {
+    if (authState === 'authenticated' && activeTab === 'questions') {
+      loadQuestionLogs()
+    }
+  }, [authState, activeTab, questionFilters, currentPage])
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -144,28 +188,8 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  useEffect(() => {
-    // Attendre que l'authentification soit prête avant de vérifier les permissions
-    if (!isAuthenticationReady) {
-      return
-    }
-
-    if (!isSuperAdmin) {
-      setError("Accès refusé - Permissions super_admin requises")
-      setLoading(false)
-      return
-    }
-
-    loadAllStatistics()
-  }, [isSuperAdmin, selectedTimeRange, isAuthenticationReady])
-
-  useEffect(() => {
-    if (activeTab === 'questions' && isAuthenticationReady && isSuperAdmin) {
-      loadQuestionLogs()
-    }
-  }, [activeTab, questionFilters, currentPage, isAuthenticationReady, isSuperAdmin])
-
   const loadAllStatistics = async () => {
+    console.log('🔄 Chargement des statistiques...')
     setLoading(true)
     setError(null)
 
@@ -378,7 +402,6 @@ export const StatisticsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Erreur générale lors du chargement des logs questions:', err)
-      // Fallback sur données mockées en cas d'erreur
       setQuestionLogs([])
     }
   }
@@ -389,8 +412,10 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
+  // ✅ AMÉLIORATION : États d'affichage plus clairs
+  
   // État de chargement de l'authentification
-  if (!isAuthenticationReady) {
+  if (authState === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -401,14 +426,40 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // Vérification des permissions uniquement après que l'auth soit prête
-  if (!isSuperAdmin) {
+  // Utilisateur non connecté
+  if (authState === 'unauthorized') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <div className="text-red-600 text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Connexion requise</h2>
+          <p className="text-gray-600 mb-6">Vous devez être connecté pour accéder à cette page.</p>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors mr-3"
+          >
+            Se connecter
+          </button>
+          <button
+            onClick={() => window.history.back()}
+            className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Retour
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Accès refusé (pas super_admin)
+  if (authState === 'access_denied') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
           <div className="text-red-600 text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Accès refusé</h2>
-          <p className="text-gray-600 mb-6">Cette page est réservée aux super administrateurs.</p>
+          <p className="text-gray-600 mb-2">Cette page est réservée aux super administrateurs.</p>
+          <p className="text-sm text-gray-500 mb-6">Votre rôle actuel : {user?.user_type || 'non défini'}</p>
           <button
             onClick={() => window.history.back()}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -420,6 +471,7 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
+  // Chargement des données
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -431,7 +483,8 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  if (error) {
+  // Erreur dans le chargement des données
+  if (error && authState === 'authenticated') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
@@ -449,6 +502,7 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
+  // ✅ PAGE PRINCIPALE - affiché seulement si authentifié et autorisé
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -465,6 +519,13 @@ export const StatisticsPage: React.FC = () => {
                 </svg>
               </button>
               <h1 className="text-2xl font-bold text-gray-900">Statistiques Administrateur</h1>
+              {/* ✅ AMÉLIORATION : Indicateur de statut utilisateur */}
+              <div className="text-sm text-gray-500">
+                Connecté en tant que <span className="font-medium text-green-600">{user?.email}</span> 
+                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                  {user?.user_type}
+                </span>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">
