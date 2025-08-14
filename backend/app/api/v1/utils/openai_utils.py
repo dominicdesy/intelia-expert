@@ -248,8 +248,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         }
         
         # Ajouter temperature seulement si supportée
-        if safe_temp is not None:
-            call_kwargs["temperature"] = safe_temp
+        call_kwargs["temperature"] = 1.0
         
         response = safe_chat_completion(**call_kwargs)
         
@@ -418,9 +417,7 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
     }
     
     # Ajouter temperature seulement si supportée
-    if safe_temp is not None:
-        payload["temperature"] = safe_temp
-
+    payload["temperature"] = 1.0
     headers = {
         "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
         "Content-Type": "application/json",
@@ -526,7 +523,7 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
     
     try:
         # 🔧 CORRECTIF: Utilise la fonction complete() corrigée
-        response = complete(messages, model, safe_temp if safe_temp is not None else 1.0, max_tokens)
+        response = complete(messages, model, 1.0, max_tokens)  # Force temperature=1.0
         
         if not response or not response.get("choices"):
             raise RuntimeError("Réponse OpenAI vide")
@@ -588,7 +585,8 @@ def safe_chat_completion(**kwargs) -> Any:
         logger.debug(f"🔧 Paramètre tokens: {correct_param}={max_tokens_value} pour {model}")
     
     # 🔧 CORRECTIF: Nettoyage temperature sécurisée
-    kwargs = _safe_kwargs_with_temperature(kwargs, model=model)
+    if 'temperature' in kwargs:
+        kwargs['temperature'] = 1.0
     
     logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature', 'default')}")
     

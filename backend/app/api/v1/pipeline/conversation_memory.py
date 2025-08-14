@@ -180,7 +180,6 @@ Signes cliniques détectés:"""
 
         response = openai_complete(
             prompt=extraction_prompt,
-            temperature=0.1,  # Très déterministe
             max_tokens=20     # Réponse courte
         )
         
