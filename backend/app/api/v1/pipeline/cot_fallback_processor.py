@@ -40,6 +40,26 @@ except ImportError as e:
         def openai_complete(*args, **kwargs): return None
         def get_openai_status(): return {"status": "unavailable"}
 
+
+# 🆕 AJOUTER après les imports
+FIELD_LABELS_FRENCH = {
+    "species": "espèce",
+    "line": "lignée", 
+    "sex": "sexe",
+    "age": "âge",
+    "age_days": "âge (jours)",
+    "age_weeks": "âge (semaines)",
+    "phase": "phase d'élevage", 
+    "flock_size": "effectif du lot",
+    "housing": "type de logement",
+    "program_type": "type de programme"
+}
+
+def get_french_field_label(field: str) -> str:
+    """Convertit un nom de champ technique en label français"""
+    return FIELD_LABELS_FRENCH.get(field, field.replace("_", " "))
+    
+
 # ---------------------------------------------------------------------------
 # DÉTECTION ET ANALYSE CHAIN-OF-THOUGHT
 # ---------------------------------------------------------------------------
@@ -501,6 +521,7 @@ Réponse synthétique BIEN FORMATÉE :"""
 def generate_clarification_response_advanced(intent, missing_fields: list, general_info: str = "") -> str:
     """
     Utilise generate_clarification_response si disponible, sinon fallback
+    🔧 CORRIGÉ: Affichage français des champs manquants
     """
     try:
         if OPENAI_FALLBACK_AVAILABLE and 'generate_clarification_response' in globals():
@@ -512,14 +533,18 @@ def generate_clarification_response_advanced(intent, missing_fields: list, gener
     except Exception as e:
         logger.warning(f"⚠️ Échec clarification spécialisée: {e}")
     
-    # Fallback basique avec formatage
+    # 🔧 CORRECTION: Convertir les champs en français AVANT la f-string
+    french_fields = [get_french_field_label(field) for field in missing_fields]
+    
+    # Fallback basique avec formatage français
     return f"""## Informations Supplémentaires Requises
 
 Pour vous donner une réponse précise, j'ai besoin de précisions sur :
 
-{chr(10).join(f'- **{field}**' for field in missing_fields)}
+{chr(10).join(f'- **{field}**' for field in french_fields)}
 
 Pouvez-vous me fournir ces informations pour une analyse complète ?"""
+
 
 # ---------------------------------------------------------------------------
 # FONCTIONS DE STATUT ET TEST
