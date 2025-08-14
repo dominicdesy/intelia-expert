@@ -1,26 +1,7 @@
 import json
-import math
 import os
 import psycopg2
 import logging
-
-def sanitize_for_json(obj):
-    """
-    Nettoie récursivement un objet pour la sérialisation JSON
-    Remplace NaN, Infinity par None tout en préservant les vraies valeurs
-    """
-    if isinstance(obj, dict):
-        return {k: sanitize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [sanitize_for_json(item) for item in obj]
-    elif isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None  # Convertir NaN/inf en None (valide JSON)
-        return obj
-    elif str(obj) in ['NaN', 'nan', 'inf', '-inf', 'Infinity', '-Infinity']:
-        return None
-    else:
-        return obj
 
 class PostgresMemory:
     """
@@ -183,11 +164,11 @@ class PostgresMemory:
         """
         Upsert the context dict for a session_id.
         Improved with better error handling and JSONB support.
-        CORRIGÉ: Nettoie les valeurs NaN avant sérialisation JSON.
         """
         try:
-            # ✅ NOUVEAU: Nettoyer le contexte avant sérialisation
-            clean_context = sanitize_for_json(context)
+            # Si la DB supporte JSONB natif, utiliser directement le dict
+            # Sinon, sérialiser en JSON string
+            ctx_value = context  # Pour JSONB natif
             
             with psycopg2.connect(self.dsn) as conn:
                 with conn.cursor() as cur:
@@ -197,12 +178,12 @@ class PostgresMemory:
                             INSERT INTO conversation_memory (session_id, context)
                             VALUES (%s, %s)
                             ON CONFLICT (session_id) DO UPDATE SET context = EXCLUDED.context
-                        """, (session_id, json.dumps(clean_context)))  # Utiliser clean_context
+                        """, (session_id, json.dumps(context)))  # Toujours sérialiser pour compatibilité
                         
                     except psycopg2.Error as e:
                         # Fallback en cas d'erreur avec JSONB
                         self.logger.warning(f"⚠️  Fallback vers JSON string pour session {session_id}: {e}")
-                        ctx_json = json.dumps(clean_context)  # Utiliser clean_context
+                        ctx_json = json.dumps(context)
                         cur.execute("""
                             INSERT INTO conversation_memory (session_id, context)
                             VALUES (%s, %s)
