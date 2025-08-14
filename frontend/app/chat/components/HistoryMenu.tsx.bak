@@ -4,6 +4,7 @@ import { useConversationGroups, useConversationActions, useCurrentConversation }
 import { useAuthStore } from '../hooks/useAuthStore'
 import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons'
 import { Conversation, ConversationGroup } from '../types'
+import { formatToLocalTime, simpleLocalTime } from '../services/apiService' // ✅ NOUVEAU: Import formatage heure
 
 // ==================== MENU HISTORIQUE CONVERSATIONS STYLE CLAUDE.AI ====================
 export const HistoryMenu = () => {
@@ -56,6 +57,9 @@ export const HistoryMenu = () => {
       await clearAllConversations(user.email || user.id)
       console.log('✅ [HistoryMenu] Toutes conversations supprimées')
       
+      // ✅ NOUVEAU: Refresh automatique après suppression
+      await refreshConversations(user.email || user.id)
+      
       setIsOpen(false)
       
     } catch (error) {
@@ -72,6 +76,13 @@ export const HistoryMenu = () => {
       console.log('🗑️ [HistoryMenu] Suppression conversation:', conversationId)
       await deleteConversation(conversationId)
       console.log('✅ [HistoryMenu] Conversation supprimée:', conversationId)
+      
+      // ✅ NOUVEAU: Refresh automatique après suppression d'une conversation
+      if (user) {
+        console.log('🔄 [HistoryMenu] Refresh automatique après suppression')
+        await refreshConversations(user.email || user.id)
+      }
+      
     } catch (error) {
       console.error('❌ [HistoryMenu] Erreur suppression conversation:', error)
       alert('Erreur lors de la suppression de la conversation')
@@ -106,6 +117,41 @@ export const HistoryMenu = () => {
     console.log('✨ [HistoryMenu] Nouvelle conversation')
     createNewConversation()
     setIsOpen(false)
+  }
+
+  // ✅ NOUVEAU: Fonction utilitaire pour formater la date en heure locale
+  const formatConversationTime = (timestamp: string): string => {
+    try {
+      // Utiliser la nouvelle fonction de formatage heure locale
+      return simpleLocalTime(timestamp)
+    } catch (error) {
+      console.warn('⚠️ Erreur formatage heure:', error)
+      // Fallback si erreur
+      return new Date(timestamp).toLocaleDateString('fr-CA', { 
+        day: 'numeric', 
+        month: 'short', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })
+    }
+  }
+
+  // ✅ NOUVEAU: Fonction pour formater la dernière activité
+  const formatLastActivity = (): string => {
+    try {
+      if (conversationGroups.length === 0) return ''
+      
+      const lastTimestamp = Math.max(
+        ...conversationGroups
+          .flatMap(g => g.conversations)
+          .map(c => new Date(c.updated_at).getTime())
+      )
+      
+      return simpleLocalTime(new Date(lastTimestamp).toISOString())
+    } catch (error) {
+      console.warn('⚠️ Erreur formatage dernière activité:', error)
+      return new Date().toLocaleDateString('fr-CA')
+    }
   }
 
   // Compter le nombre total de conversations
@@ -254,15 +300,11 @@ export const HistoryMenu = () => {
                                 {conv.preview}
                               </p>
                               
-                              {/* Métadonnées */}
+                              {/* Métadonnées avec HEURE LOCALE */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
                                 <span>
-                                  {new Date(conv.updated_at).toLocaleDateString('fr-FR', { 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
+                                  {/* ✅ CORRECTION: Utilisation formatage heure locale */}
+                                  {formatConversationTime(conv.updated_at)}
                                 </span>
                                 
                                 <span className="flex items-center space-x-1">
@@ -307,7 +349,7 @@ export const HistoryMenu = () => {
               )}
             </div>
 
-            {/* Footer avec statistiques */}
+            {/* Footer avec statistiques - HEURE LOCALE */}
             {totalConversations > 0 && (
               <div className="p-3 border-t border-gray-100 bg-gray-50">
                 <div className="flex items-center justify-between text-xs text-gray-500">
@@ -320,13 +362,8 @@ export const HistoryMenu = () => {
                   
                   {conversationGroups.length > 0 && (
                     <span>
-                      Dernière : {new Date(
-                        Math.max(
-                          ...conversationGroups
-                            .flatMap(g => g.conversations)
-                            .map(c => new Date(c.updated_at).getTime())
-                        )
-                      ).toLocaleDateString('fr-FR')}
+                      {/* ✅ CORRECTION: Utilisation formatage heure locale pour dernière activité */}
+                      Dernière : {formatLastActivity()}
                     </span>
                   )}
                 </div>
