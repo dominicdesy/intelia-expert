@@ -144,7 +144,7 @@ def _persist_conversation(
             ctx["created_at"] = now
             
         # Sauvegarder
-        _POSTGRES_MEMORY.set(session_id, ctx)
+        _POSTGRES_MEMORY.update(session_id, ctx)
         
         logger.info(f"💾 Conversation persistée: session={session_id}, user={user_id or 'anonymous'}, msgs={len(msgs)}")
         return True
