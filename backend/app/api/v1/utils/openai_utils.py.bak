@@ -11,6 +11,15 @@ import httpx
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
+# --- Helper de détection d'erreur "temperature non supportée" ---
+def _is_temp_unsupported_error(msg: str) -> bool:
+    """Détecte les messages style:
+    "Unsupported value: 'temperature' does not support 0.1 with this model. Only the default (1) value is supported."
+    """
+    if not msg:
+        return False
+    return bool(re.search(r"temperature.+(unsupported|does\s*not\s*support|only\s*the\s*default)", str(msg), re.I))
+
 
 # ==================== NOUVEAU: HELPERS COMPATIBILITY max_completion_tokens ====================
 # Familles de modèles qui exigent max_completion_tokens sur /chat/completions
@@ -196,7 +205,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         model = os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
     
     # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model)
+    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
     if safe_temp is None:
         logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
     
@@ -248,7 +257,8 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         }
         
         # Ajouter temperature seulement si supportée
-        call_kwargs["temperature"] = 1.0
+        if safe_temp is not None:
+            call_kwargs["temperature"] = safe_temp
         
         response = safe_chat_completion(**call_kwargs)
         
@@ -407,7 +417,7 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
     param_name = _completion_param_name(model)
     
     # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model)
+    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
     
     payload = {
         "model": model,
@@ -417,7 +427,8 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
     }
     
     # Ajouter temperature seulement si supportée
-    payload["temperature"] = 1.0
+    if safe_temp is not None:
+        payload["temperature"] = safe_temp
     headers = {
         "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
         "Content-Type": "application/json",
@@ -456,6 +467,19 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
             if r2.status_code == 200:
                 return r2.json()
 
+    # Retry si température non supportée
+    try:
+        err_msg_full = err.get("message", "") if isinstance(err, dict) else (r.text or "")
+    except Exception:
+        err_msg_full = r.text or ""
+    if _is_temp_unsupported_error(err_msg_full):
+        logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+        payload.pop("temperature", None)
+        with httpx.Client(timeout=timeout) as client:
+            r3 = client.post(url, headers=headers, json=payload)
+        if r3.status_code == 200:
+            return r3.json()
+    
     # Si on est là, on remonte l'erreur d'origine pour ton retry logic externe
     try:
         r.raise_for_status()
@@ -479,7 +503,7 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
         model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
     
     # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model)
+    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
     if safe_temp is None:
         logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
     
@@ -523,7 +547,7 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
     
     try:
         # 🔧 CORRECTIF: Utilise la fonction complete() corrigée
-        response = complete(messages, model, 1.0, max_tokens)  # Force temperature=1.0
+        response = complete(messages, model, safe_temp if safe_temp is not None else None, max_tokens)  # Force temperature=1.0
         
         if not response or not response.get("choices"):
             raise RuntimeError("Réponse OpenAI vide")
@@ -586,7 +610,12 @@ def safe_chat_completion(**kwargs) -> Any:
     
     # 🔧 CORRECTIF: Nettoyage temperature sécurisée
     if 'temperature' in kwargs:
-        kwargs['temperature'] = 1.0
+        t = kwargs['temperature']
+        safe = _get_safe_temperature(t, model)
+        if safe is None:
+            kwargs.pop('temperature', None)
+        else:
+            kwargs['temperature'] = safe
     
     logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature', 'default')}")
     
@@ -612,7 +641,14 @@ def safe_chat_completion(**kwargs) -> Any:
                 elif 'max_completion_tokens' in kwargs:
                     kwargs['max_tokens'] = kwargs.pop('max_completion_tokens')
                 
+                
+            # Retry si température non supportée par le modèle
+            if _is_temp_unsupported_error(error_msg):
+                logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+                kwargs.pop('temperature', None)
                 response = openai.chat.completions.create(**kwargs)
+                error_msg = ""  # reset to avoid re-raising
+        response = openai.chat.completions.create(**kwargs)
             else:
                 raise
         
