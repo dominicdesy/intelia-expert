@@ -9,7 +9,6 @@ email-validator==2.1.0.post1
 
 # Database
 psycopg2-binary>=2.9
-asyncpg>=0.29.0
 
 # Supabase - Compatible with httpx 0.26+
 supabase==2.9.1
