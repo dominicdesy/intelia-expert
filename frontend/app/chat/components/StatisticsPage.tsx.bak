@@ -397,7 +397,7 @@ export const StatisticsPage: React.FC = () => {
   )
 
   const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage)
-  const uniqueUsers = Array.from(new Set(questionLogs.map(q => q.user_email)))
+  const uniqueUsers = [...new Set(questionLogs.map(q => q.user_email))]
 
   if (!isSuperAdmin) {
     return (
