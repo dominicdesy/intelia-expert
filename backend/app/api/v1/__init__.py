@@ -8,6 +8,7 @@ from .health import router as health_router
 from .invitations import router as invitations_router
 from .logging import router as logging_router
 from .billing import router as billing_router  # 🆕 AJOUTÉ - SYSTÈME DE FACTURATION
+from .billing_openai import router as billing_openai_router  # 🔥 NOUVEAU - BILLING OPENAI
 from .expert import router as expert_router
 
 # Import conditionnel pour conversations (au cas où le fichier n'existe pas encore)
@@ -28,6 +29,7 @@ router.include_router(health_router, tags=["Health"])
 router.include_router(invitations_router, tags=["Invitations"])
 router.include_router(logging_router, tags=["Logging"])  # /v1/logging/*
 router.include_router(billing_router, tags=["Billing"])  # 🆕 /v1/billing/*
+router.include_router(billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"])  # 🔥 NOUVEAU - /v1/billing/openai-*
 
 # Conversations (conditionnel)
 if CONVERSATIONS_AVAILABLE:

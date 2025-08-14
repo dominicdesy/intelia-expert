@@ -5,6 +5,7 @@ Suppression de la dépendance secrets.toml et adaptation aux variables d'environ
 import os
 import sys
 import logging
+from ..api.v1.utils.openai_utils import complete
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -309,17 +310,16 @@ class ExpertService:
             user_message = f"{rag_context}\n\nQuestion: {question}"
         
         try:
-            response = self.openai_client.chat.completions.create(
-                model=os.getenv('DEFAULT_MODEL', 'gpt-5'),
+            response_dict = complete(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
+                model=os.getenv('DEFAULT_MODEL', 'gpt-5'),
                 temperature=0.3,
                 max_tokens=150
             )
-            
-            return response.choices[0].message.content
+            return response_dict["choices"][0]["message"]["content"]
             
         except Exception as e:
             logger.error(f"OpenAI API error: {e}")

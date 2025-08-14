@@ -500,6 +500,14 @@ except ImportError as e:
     except ImportError as e:
         logger.warning(f"⚠️ Billing router non disponible: {e}")
     
+    # 🔥 NOUVEAU: Ajout du billing OpenAI router
+    try:
+        from app.api.v1.billing_openai import router as billing_openai_router
+        temp_v1_router.include_router(billing_openai_router, prefix="/billing", tags=["billing-openai"])
+        logger.info("✅ Billing OpenAI router ajouté")
+    except ImportError as e:
+        logger.warning(f"⚠️ Billing OpenAI router non disponible: {e}")
+    
     # Monter le router temporaire
     app.include_router(temp_v1_router)
     logger.info("✅ Router v1 temporaire monté avec succès")
@@ -742,6 +750,22 @@ async def complete_health_check():
             "status": "configured" if openai_key else "not_configured"
         }
         
+        # 🔥 NOUVEAU: Check OpenAI Billing API
+        try:
+            from app.api.v1.billing_openai import get_openai_organization_id
+            org_id = get_openai_organization_id()
+            openai_billing_status = {
+                "status": "configured" if (openai_key and org_id) else "partially_configured" if openai_key else "not_configured",
+                "has_api_key": bool(openai_key),
+                "has_org_id": bool(org_id)
+            }
+            health_status["components"]["openai_billing"] = openai_billing_status
+        except Exception as e:
+            health_status["components"]["openai_billing"] = {
+                "status": "error",
+                "error": str(e)
+            }
+        
         # Check authentification
         try:
             jwt_secret = os.getenv("JWT_SECRET")
@@ -837,7 +861,8 @@ async def admin_statistics():
                 "analytics": bool(os.getenv("DATABASE_URL")),
                 "billing": True,
                 "authentication": bool(os.getenv("JWT_SECRET")),
-                "openai_fallback": bool(os.getenv("OPENAI_API_KEY"))
+                "openai_fallback": bool(os.getenv("OPENAI_API_KEY")),
+                "openai_billing_api": bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_ORG_ID"))  # 🔥 NOUVEAU
             }
         }
         
@@ -892,7 +917,8 @@ async def root():
             "cost_tracking": True,
             "user_behavior_analytics": True,
             "real_time_quota_limits": True,
-            "automated_invoicing": True
+            "automated_invoicing": True,
+            "openai_billing_integration": True  # 🔥 NOUVEAU
         },
         "uptime_hours": round(uptime_hours, 2),
         "requests_processed": request_counter

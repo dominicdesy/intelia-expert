@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Import conditionnel OpenAI
 try:
-    from ..utils.openai_utils import complete_text as openai_complete
+    from ..utils.openai_utils import complete as openai_complete
     OPENAI_AVAILABLE = True
     logger.info("✅ OpenAI disponible pour traitement linguistique")
 except ImportError as e:

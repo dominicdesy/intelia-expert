@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION REFACTORISÉE CORRIGÉE
+Dialogue orchestration - VERSION REFACTORISED CORRIGÉE + PERSISTANCE CONVERSATIONS
 - Module principal utilisant les modules spécialisés
 - Imports des modules spécialisés pour langue, mémoire et CoT/fallback
 - Preserve la compatibilité avec l'API existante
 - CORRIGÉ: Utilise les fonctions des modules au lieu de les dupliquer
 - FIX: Auto-extraction systématique même pour nouvelles conversations
+- NOUVEAU: Persistance centralisée des conversations dans PostgreSQL
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -13,6 +14,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,126 @@ from .cot_fallback_processor import (
     OPENAI_FALLBACK_AVAILABLE,
     OPENAI_COT_AVAILABLE
 )
+
+# ========== NOUVEAU: PERSISTANCE CONVERSATIONS ==========
+PERSIST_CONVERSATIONS = str(os.getenv("PERSIST_CONVERSATIONS", "1")).lower() in ("1", "true", "yes", "on")
+CLEAR_CONTEXT_AFTER_ASK = str(os.getenv("CLEAR_CONTEXT_AFTER_ASK", "0")).lower() in ("1", "true", "yes", "on")
+
+# Import PostgresMemory pour la persistance
+_POSTGRES_MEMORY = None
+try:
+    from .postgres_memory import PostgresMemory
+    _POSTGRES_MEMORY = PostgresMemory(dsn=os.getenv("DATABASE_URL"))
+    POSTGRES_AVAILABLE = True
+    logger.info("✅ PostgresMemory initialized for conversation persistence")
+except Exception as e:
+    POSTGRES_AVAILABLE = False
+    logger.warning(f"⚠️ PostgresMemory unavailable for persistence: {e}")
+
+def _persist_conversation(
+    session_id: str, 
+    question: str, 
+    answer_text: str,
+    language: Optional[str] = None, 
+    user_id: Optional[str] = None,
+    additional_context: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Persiste une conversation (question + réponse) dans PostgreSQL
+    
+    Args:
+        session_id: ID de la session
+        question: Question de l'utilisateur
+        answer_text: Réponse générée
+        language: Langue détectée/utilisée
+        user_id: ID utilisateur (peut être None pour public)
+        additional_context: Context additionnel (intent, route, etc.)
+    
+    Returns:
+        bool: True si persistance réussie, False sinon
+    """
+    if not PERSIST_CONVERSATIONS:
+        logger.debug("🔒 Persistance conversations désactivée (PERSIST_CONVERSATIONS=0)")
+        return False
+        
+    if not POSTGRES_AVAILABLE or _POSTGRES_MEMORY is None:
+        logger.warning("⚠️ PostgreSQL indisponible pour persistance")
+        return False
+    
+    try:
+        # Récupérer le contexte existant ou créer nouveau
+        ctx = _POSTGRES_MEMORY.get(session_id) or {}
+        msgs = list(ctx.get("messages", []))
+        now = datetime.utcnow().isoformat()
+        
+        # Ajouter le message utilisateur
+        user_message = {
+            "role": "user",
+            "content": question,
+            "timestamp": now,
+            "user_id": user_id or "anonymous"
+        }
+        msgs.append(user_message)
+        
+        # Ajouter la réponse assistant
+        assistant_message = {
+            "role": "assistant", 
+            "content": answer_text,
+            "timestamp": now
+        }
+        
+        # Enrichir avec contexte additionnel si fourni
+        if additional_context:
+            assistant_message["metadata"] = additional_context
+            
+        msgs.append(assistant_message)
+        
+        # Mettre à jour le contexte complet
+        ctx.update({
+            "user_id": user_id or "anonymous",
+            "language": language or ctx.get("language") or "fr",
+            "messages": msgs,
+            "updated_at": now,
+            "message_count": len(msgs)
+        })
+        
+        # Si nouveau contexte, ajouter created_at
+        if "created_at" not in ctx:
+            ctx["created_at"] = now
+            
+        # Sauvegarder
+        _POSTGRES_MEMORY.update(session_id, ctx)
+        
+        logger.info(f"💾 Conversation persistée: session={session_id}, user={user_id or 'anonymous'}, msgs={len(msgs)}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur persistance conversation {session_id}: {e}")
+        return False
+
+def _extract_answer_text(response: Dict[str, Any]) -> str:
+    """
+    Extrait le texte de réponse de façon robuste depuis la structure de réponse
+    """
+    if not response:
+        return ""
+        
+    # Cas 1: réponse directe avec answer.text
+    answer = response.get("answer", {})
+    if isinstance(answer, dict) and answer.get("text"):
+        return str(answer["text"])
+    
+    # Cas 2: réponse avec general_answer.text (mode hybride)
+    general_answer = response.get("general_answer", {})
+    if isinstance(general_answer, dict) and general_answer.get("text"):
+        return str(general_answer["text"])
+    
+    # Cas 3: message direct
+    if response.get("message"):
+        return str(response["message"])
+        
+    # Cas 4: fallback sur la structure complète convertie en string
+    return str(response.get("answer", response.get("general_answer", "")))
 
 # ========== PERF STORE & RAG - CODE ORIGINAL CONSERVÉ ==========
 try:
@@ -320,7 +442,7 @@ def _get_retriever():
     if _RAG_SINGLETON is None:
         try:
             _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
-            logger.info("📎 RAGRetriever initialisé")
+            logger.info("🔎 RAGRetriever initialisé")
         except Exception as e:
             logger.error(f"❌ Init RAGRetriever échoué: {e}")
             _RAG_SINGLETON = None
@@ -561,7 +683,7 @@ def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, An
     }
 
 # ---------------------------------------------------------------------------
-# FONCTION PRINCIPALE HANDLE - VERSION CORRIGÉE
+# FONCTION PRINCIPALE HANDLE - VERSION CORRIGÉE + PERSISTANCE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -574,11 +696,14 @@ def handle(
     intent_hint: Optional[str] = None,
     # Entities pass-through depuis l'API
     entities: Optional[Dict[str, Any]] = None,
+    # NOUVEAU: Info utilisateur pour persistance
+    user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION REFACTORISÉE CORRIGÉE
+    Fonction principale de traitement des questions - VERSION REFACTORISÉE CORRIGÉE + PERSISTANCE
     Préserve la compatibilité avec l'API existante
     FIX: Auto-extraction systématique même pour nouvelles conversations
+    NOUVEAU: Persistance automatique des conversations
     """
     try:
         logger.info(f"🤖 Processing question: {question[:120]}...")
@@ -674,7 +799,11 @@ def handle(
             
             if cot_result:
                 logger.info("✅ Analyse CoT réussie, retour direct")
-                clear_conversation_context(session_id)
+                
+                # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+                if CLEAR_CONTEXT_AFTER_ASK:
+                    clear_conversation_context(session_id)
+                    logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
                 
                 response = {
                     "type": "answer",
@@ -684,7 +813,20 @@ def handle(
                     "session_id": session_id
                 }
                 
-                return finalize_response_with_language(response, question, effective_language, detected_language)
+                # Finaliser la réponse avec adaptation linguistique
+                final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+                
+                # 💾 PERSISTANCE CONVERSATION
+                answer_text = _extract_answer_text(final_response)
+                additional_context = {
+                    "intent": str(intent),
+                    "route": "cot_analysis_priority",
+                    "language_detected": detected_language,
+                    "language_effective": effective_language
+                }
+                _persist_conversation(session_id, question, answer_text, effective_language, user_id, additional_context)
+                
+                return final_response
             else:
                 logger.info("⚠️ Analyse CoT échouée, continuation pipeline standard")
 
@@ -697,8 +839,10 @@ def handle(
         # Si conversation continue et complète maintenant, aller directement au traitement
         if should_continue_conversation(session_context, intent) and completeness_score >= 0.8:
             logger.info("🚀 Conversation continue avec données complètes → traitement direct")
-            # Effacer le contexte car on va donner la réponse finale
-            clear_conversation_context(session_id)
+            # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+            if CLEAR_CONTEXT_AFTER_ASK:
+                clear_conversation_context(session_id)
+                logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
             
         # HYBRIDE : si infos manquantes → synthèse courte + clarifications
         elif missing_fields and completeness_score < 0.8:
@@ -719,8 +863,22 @@ def handle(
                 "session_id": session_id
             }
             
-            # Appliquer adaptation linguistique
-            return finalize_response_with_language(response, question, effective_language, detected_language)
+            # Finaliser la réponse avec adaptation linguistique
+            final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+            
+            # 💾 PERSISTANCE CONVERSATION
+            answer_text = _extract_answer_text(final_response)
+            additional_context = {
+                "intent": str(intent),
+                "route": "hybrid_synthesis_clarification",
+                "completeness_score": completeness_score,
+                "missing_fields": missing_fields,
+                "language_detected": detected_language,
+                "language_effective": effective_language
+            }
+            _persist_conversation(session_id, question, answer_text, effective_language, user_id, additional_context)
+            
+            return final_response
 
         # Étape 4: Calcul direct si possible
         def _should_compute(i: Intention) -> bool:
@@ -737,9 +895,10 @@ def handle(
             result = _compute_answer(intent, entities)
             result["text"] = _final_sanitize(result.get("text", ""))
             
-            # Effacer le contexte après réponse finale
-            clear_conversation_context(session_id)
-            
+            # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+            if CLEAR_CONTEXT_AFTER_ASK:
+                clear_conversation_context(session_id)
+                logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
             
             response = {
                 "type": "answer",
@@ -749,8 +908,20 @@ def handle(
                 "session_id": session_id
             }
             
-            # Appliquer adaptation linguistique
-            return finalize_response_with_language(response, question, effective_language, detected_language)
+            # Finaliser la réponse avec adaptation linguistique
+            final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+            
+            # 💾 PERSISTANCE CONVERSATION
+            answer_text = _extract_answer_text(final_response)
+            additional_context = {
+                "intent": str(intent),
+                "route": "compute",
+                "language_detected": detected_language,
+                "language_effective": effective_language
+            }
+            _persist_conversation(session_id, question, answer_text, effective_language, user_id, additional_context)
+            
+            return final_response
 
         # Étape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
@@ -800,8 +971,10 @@ def handle(
                             }
                         })
                     
-                    # Effacer le contexte après réponse finale réussie
-                    clear_conversation_context(session_id)
+                    # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+                    if CLEAR_CONTEXT_AFTER_ASK:
+                        clear_conversation_context(session_id)
+                        logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
                     
                     response = {
                         "type": "answer",
@@ -825,8 +998,21 @@ def handle(
                         "session_id": session_id
                     }
                     
-                    # Appliquer adaptation linguistique
-                    return finalize_response_with_language(response, question, effective_language, detected_language)
+                    # Finaliser la réponse avec adaptation linguistique
+                    final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+                    
+                    # 💾 PERSISTANCE CONVERSATION
+                    answer_text = _extract_answer_text(final_response)
+                    additional_context = {
+                        "intent": str(intent),
+                        "route": "perfstore_hit",
+                        "lookup_data": rec,
+                        "language_detected": detected_language,
+                        "language_effective": effective_language
+                    }
+                    _persist_conversation(session_id, question, answer_text, effective_language, user_id, additional_context)
+                    
+                    return final_response
                 else:
                     logger.info("📊 PerfStore MISS → fallback RAG")
             except Exception as e:
@@ -847,8 +1033,10 @@ def handle(
         if rag.get("source") not in ["openai_fallback", "cot_analysis"]:
             rag_text = maybe_synthesize(question, rag_text)
 
-        # Effacer le contexte après réponse finale (même si RAG)
-        clear_conversation_context(session_id)
+        # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+        if CLEAR_CONTEXT_AFTER_ASK:
+            clear_conversation_context(session_id)
+            logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
 
         response = {
             "type": "answer",
@@ -864,8 +1052,21 @@ def handle(
             "session_id": session_id
         }
         
-        # Appliquer adaptation linguistique
-        return finalize_response_with_language(response, question, effective_language, detected_language)
+        # Finaliser la réponse avec adaptation linguistique
+        final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+        
+        # 💾 PERSISTANCE CONVERSATION
+        answer_text = _extract_answer_text(final_response)
+        additional_context = {
+            "intent": str(intent),
+            "route": rag.get("route", "rag_retriever"),
+            "rag_meta": rag.get("meta", {}),
+            "language_detected": detected_language,
+            "language_effective": effective_language
+        }
+        _persist_conversation(session_id, question, answer_text, effective_language, user_id, additional_context)
+        
+        return final_response
 
     except Exception as e:
         logger.exception(f"❌ Critical error in handle(): {e}")
@@ -880,7 +1081,20 @@ def handle(
         try:
             detected_language = detect_question_language(question) if question else "fr"
             effective_language = detected_language if detected_language != "fr" else "fr"
-            return finalize_response_with_language(response, question or "", effective_language, detected_language)
+            final_response = finalize_response_with_language(response, question or "", effective_language, detected_language)
+            
+            # 💾 PERSISTANCE CONVERSATION (même en cas d'erreur)
+            error_text = f"Erreur: {str(e)}"
+            additional_context = {
+                "intent": "error",
+                "route": "error_handling",
+                "error": str(e),
+                "language_detected": detected_language,
+                "language_effective": effective_language
+            }
+            _persist_conversation(session_id, question or "", error_text, effective_language, user_id, additional_context)
+            
+            return final_response
         except:
             return response
 
@@ -899,8 +1113,13 @@ def get_fallback_status() -> Dict[str, Any]:
     
     # Statut unifié
     unified_status = {
-        "dialogue_manager_version": "refactored_fixed",
+        "dialogue_manager_version": "refactored_fixed_with_persistence",
         "auto_extraction_fix": "applied",
+        "conversation_persistence": {
+            "enabled": PERSIST_CONVERSATIONS,
+            "postgres_available": POSTGRES_AVAILABLE,
+            "clear_context_after_ask": CLEAR_CONTEXT_AFTER_ASK
+        },
         "modules": {
             "language_processor": language_status,
             "conversation_memory": memory_status,
@@ -916,7 +1135,9 @@ def get_fallback_status() -> Dict[str, Any]:
         "configuration": {
             "rag_index_root": os.environ.get("RAG_INDEX_ROOT", "./rag_index"),
             "database_url": bool(os.getenv("DATABASE_URL")),
-            "openai_api_key": bool(os.getenv("OPENAI_API_KEY"))
+            "openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
+            "persist_conversations": PERSIST_CONVERSATIONS,
+            "clear_context_after_ask": CLEAR_CONTEXT_AFTER_ASK
         }
     }
     
@@ -953,19 +1174,44 @@ def get_cot_capabilities() -> Dict[str, Any]:
 
 def test_enhanced_pipeline() -> Dict[str, Any]:
     """
-    Test complet du pipeline refactorisé
+    Test complet du pipeline refactorisé + persistance
     """
     try:
         results = {}
         
         # Test fonction de base
         results["basic_status"] = {
-            "dialogue_manager": "refactored_fixed",
+            "dialogue_manager": "refactored_fixed_with_persistence",
             "auto_extraction_fix": "applied",
+            "persistence_enabled": PERSIST_CONVERSATIONS,
             "modules_imported": True,
             "rag_available": RAG_AVAILABLE,
-            "perfstore_available": PERF_AVAILABLE
+            "perfstore_available": PERF_AVAILABLE,
+            "postgres_available": POSTGRES_AVAILABLE
         }
+        
+        # Test persistance
+        try:
+            test_session = f"test_session_{int(time.time())}"
+            test_question = "Test de persistance"
+            test_answer = "Réponse de test"
+            
+            persistence_success = _persist_conversation(
+                session_id=test_session,
+                question=test_question,
+                answer_text=test_answer,
+                language="fr",
+                user_id="test_user"
+            )
+            
+            results["persistence_test"] = {
+                "status": "success" if persistence_success else "failed",
+                "test_session": test_session,
+                "postgres_available": POSTGRES_AVAILABLE,
+                "persist_conversations": PERSIST_CONVERSATIONS
+            }
+        except Exception as e:
+            results["persistence_test"] = {"status": "error", "error": str(e)}
         
         # Test modules spécialisés
         try:
@@ -988,14 +1234,18 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         
         return {
             "status": "success",
-            "message": "Pipeline refactorisé testé avec succès",
-            "fix_applied": "auto_extraction_systématique",
+            "message": "Pipeline refactorisé + persistance testé avec succès",
+            "fixes_applied": ["auto_extraction_systématique", "persistance_conversations"],
+            "feature_flags": {
+                "PERSIST_CONVERSATIONS": PERSIST_CONVERSATIONS,
+                "CLEAR_CONTEXT_AFTER_ASK": CLEAR_CONTEXT_AFTER_ASK
+            },
             "detailed_results": results
         }
         
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Échec test pipeline refactorisé: {str(e)}",
+            "message": f"Échec test pipeline refactorisé + persistance: {str(e)}",
             "error_type": type(e).__name__
         }

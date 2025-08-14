@@ -1,62 +1,13 @@
-def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
-    """
-    🆕 NOUVEAU: Génère des réponses de clarification intelligentes
-    """
-    
-    prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
-
-CONTEXTE :
-- Intention détectée : {intent}
-- Informations manquantes : {', '.join(missing_fields)}
-- Info générale disponible : {general_info[:200] if general_info else 'Aucune'}
-
-INSTRUCTIONS :
-- Réponse en 2-3 phrases maximum
-- Expliquer pourquoi ces infos sont importantes
-- Ton professionnel mais accessible
-- Pas de mention de sources
-
-Réponse de clarification :"""
-
-    try:
-        # Utilisation de la nouvelle fonction complete()
-        messages = [{"role": "user", "content": prompt}]
-        model = os.getenv('DEFAULT_MODEL', 'gpt-5')
-        response = complete(messages, model, temperature=0.3, max_tokens=150)
-        return response["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        logger.warning(f"⚠️ Échec génération clarification: {e}")
-        # Fallback générique
-        return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."import openai
-
+import openai
 import os
 import logging
 import re
 from typing import Any, Dict, List, Optional
 from functools import wraps
 import time
-import json
-import httpx
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
-
-# ==================== NOUVEAU: HELPERS COMPATIBILITY max_completion_tokens ====================
-# Familles de modèles qui exigent max_completion_tokens sur /chat/completions
-_MCT_PREFIXES = (
-    "gpt-4.1", "gpt-4o", "o4", "omni", "gpt-5", "gpt-4.1-mini",
-    "gpt-4o-mini", "gpt-4.1-nano"
-)
-
-def _uses_mct(model: str) -> bool:
-    if os.getenv("OPENAI_FORCE_COMPLETION_PARAM", "").lower() in ("mct", "max_completion_tokens"):
-        return True
-    if os.getenv("OPENAI_FORCE_COMPLETION_PARAM", "").lower() in ("mt", "max_tokens"):
-        return False
-    return any(model.startswith(p) for p in _MCT_PREFIXES)
-
-def _completion_param_name(model: str) -> str:
-    return "max_completion_tokens" if _uses_mct(model) else "max_tokens"
 
 # ==================== AMÉLIORATION MAJEURE: Gestion centralisée de l'API key ====================
 def _get_api_key() -> str:
@@ -365,79 +316,24 @@ INSTRUCTIONS:
 Question de suivi appropriée:"""
 
     try:
-        followup = complete_text(prompt, temperature=0.4, max_tokens=150)
+        followup = complete(prompt=prompt, temperature=0.4, max_tokens=150)
         return followup.strip()
     except Exception as e:
         logger.warning(f"⚠️ Échec génération followup CoT: {e}")
         return f"Pour approfondir l'analyse de votre situation avec {entities.get('species', 'ces animaux')}, pourriez-vous préciser les éléments mentionnés ci-dessus ?"
 
-# ==================== FONCTION CORRIGÉE: complete() avec httpx ====================
-def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 800,
-             timeout: float = 30.0, extra: dict | None = None) -> dict:
-    """
-    Envoie un appel /v1/chat/completions, compatible anciens & nouveaux modèles.
-    """
-    extra = extra or {}
-    param_name = _completion_param_name(model)
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        param_name: max_tokens,  # <-- clé choisie dynamiquement
-        **{k: v for k, v in extra.items() if v is not None}
-    }
-
-    headers = {
-        "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
-        "Content-Type": "application/json",
-    }
-
-    url = "https://api.openai.com/v1/chat/completions"
-
-    # 1er essai
-    with httpx.Client(timeout=timeout) as client:
-        r = client.post(url, headers=headers, json=payload)
-
-    if r.status_code == 200:
-        return r.json()
-
-    # Auto-rattrapage: paramètre non supporté → on bascule et on réessaie une fois
-    try:
-        err = r.json().get("error", {})
-    except Exception:
-        err = {}
-
-    unsupported = (r.status_code == 400 and err.get("code") == "unsupported_parameter")
-    wrong_param = err.get("param")
-    msg = (err.get("message") or "").lower()
-
-    if unsupported and wrong_param in ("max_tokens", "max_completion_tokens"):
-        # Swap de paramètre
-        other = "max_completion_tokens" if wrong_param == "max_tokens" else "max_tokens"
-        if other != param_name:
-            # reconstruire le payload proprement
-            payload.pop(param_name, None)
-            payload[other] = max_tokens
-            logger.warning("⚠️ OpenAI param '%s' non supporté pour %s — retry avec '%s'",
-                           wrong_param, model, other)
-            with httpx.Client(timeout=timeout) as client:
-                r2 = client.post(url, headers=headers, json=payload)
-            if r2.status_code == 200:
-                return r2.json()
-
-    # Si on est là, on remonte l'erreur d'origine pour ton retry logic externe
-    try:
-        r.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise RuntimeError(f"Requête OpenAI invalide: {e.response.text}") from None
-    return r.json()
-
-# ==================== WRAPPER DE COMPATIBILITÉ ====================
+# ==================== 🆕 AMÉLIORATION FUNCTION: complete() ====================
 @openai_retry(max_retries=2, delay=1.0)
-def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None, model: Optional[str] = None) -> str:
+def complete(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None, model: Optional[str] = None) -> str:
     """
-    Wrapper de compatibilité pour l'ancienne signature complete(prompt) -> str
+    🆕 AMÉLIORÉ: Wrapper simple pour completion de texte avec support CoT automatique
+    
+    NOUVEAUTÉS:
+    - Détection automatique de prompts CoT (avec balises XML)
+    - Routing intelligent vers complete_with_cot() si nécessaire
+    - Meilleure gestion des tokens pour prompts longs
     """
+    
     # Validation des paramètres
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt ne peut pas être vide")
@@ -446,11 +342,31 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
         logger.warning(f"⚠️ Temperature {temperature} hors limite [0.0-2.0], ajusté à 0.2")
         temperature = 0.2
     
+    # 🆕 DÉTECTION AUTOMATIQUE DE COT
+    cot_indicators = ["<thinking>", "<analysis>", "<reasoning>", "<factors>", "<recommendations>"]
+    is_cot_prompt = any(indicator in prompt for indicator in cot_indicators)
+    
+    if is_cot_prompt:
+        logger.debug("🧠 Prompt CoT détecté, routing vers complete_with_cot()")
+        try:
+            cot_result = complete_with_cot(
+                prompt=prompt, 
+                temperature=temperature, 
+                max_tokens=max_tokens, 
+                model=model,
+                parse_cot=True
+            )
+            # Retourner la réponse finale pour compatibilité
+            return cot_result.get("final_answer", cot_result.get("raw_response", ""))
+        except Exception as e:
+            logger.warning(f"⚠️ Fallback vers complete standard après échec CoT: {e}")
+            # Continuer avec completion standard en fallback
+    
     # Configuration standard
     if model is None:
         model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
     
-    # Calcul adaptatif de max_tokens
+    # Calcul adaptatif de max_tokens (amélioré)
     if max_tokens is None:
         prompt_length = len(prompt)
         if prompt_length < 500:
@@ -469,8 +385,10 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
         
         if available_tokens > 0:
             max_tokens = min(max_tokens, available_tokens)
+        
+        logger.debug(f"🎯 max_tokens calculé: {max_tokens}")
     
-    # Construction du message
+    # Construction du message optimisé
     messages = [
         {
             "role": "system",
@@ -486,26 +404,40 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
         }
     ]
     
-    logger.debug(f"🤖 Appel complete_text(): model={model}, temp={temperature}, max_tokens={max_tokens}")
+    logger.debug(f"🤖 Appel complete(): model={model}, temp={temperature}, max_tokens={max_tokens}")
     
     try:
-        response = complete(messages, model, temperature, max_tokens)
+        response = safe_chat_completion(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=0.9,
+            frequency_penalty=0.1,
+            presence_penalty=0.1
+        )
         
-        if not response or not response.get("choices"):
+        if not response or not response.choices:
             raise RuntimeError("Réponse OpenAI vide")
         
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         if not content:
             raise RuntimeError("Contenu de réponse vide")
         
-        logger.debug(f"✅ Complete_text terminé: {len(content)} caractères générés")
-        return content.strip()
+        content = content.strip()
+        
+        # Logging des métriques
+        if hasattr(response, 'usage') and response.usage:
+            logger.debug(f"📊 Complete tokens: {response.usage.total_tokens}")
+        
+        logger.debug(f"✅ Complete terminé: {len(content)} caractères générés")
+        return content
         
     except Exception as e:
-        logger.error(f"⛔ Erreur dans complete_text(): {type(e).__name__}: {e}")
+        logger.error(f"⛔ Erreur dans complete(): {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors de la synthèse LLM: {e}")
 
-# ==================== FONCTION AMÉLIORÉE: safe_chat_completion avec correctif max_completion_tokens ====================
+# ==================== FONCTION AMÉLIORÉE: safe_chat_completion ====================
 @openai_retry(max_retries=2, delay=1.0)
 def safe_chat_completion(**kwargs) -> Any:
     """
@@ -517,7 +449,6 @@ def safe_chat_completion(**kwargs) -> Any:
     - Gestion d'erreurs spécialisée par type
     - Validation des paramètres d'entrée
     - Logging détaillé pour debug
-    - NOUVEAU: Support automatique max_completion_tokens pour nouveaux modèles
     """
     
     # ✅ AMÉLIORATION: Validation des paramètres essentiels
@@ -540,15 +471,7 @@ def safe_chat_completion(**kwargs) -> Any:
         if key not in kwargs:
             kwargs[key] = value
     
-    # 🆕 CORRECTIF: Détection automatique du bon paramètre selon le modèle
-    model = kwargs.get('model', 'gpt-5')
-    if 'max_tokens' in kwargs:
-        max_tokens_value = kwargs.pop('max_tokens')
-        correct_param = _completion_param_name(model)
-        kwargs[correct_param] = max_tokens_value
-        logger.debug(f"🔧 Paramètre tokens: {correct_param}={max_tokens_value} pour {model}")
-    
-    logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature')}")
+    logger.debug(f"🤖 Appel OpenAI Chat: model={kwargs.get('model')}, temp={kwargs.get('temperature')}")
     
     try:
         # ✅ AMÉLIORATION: Configuration centralisée
@@ -556,26 +479,7 @@ def safe_chat_completion(**kwargs) -> Any:
         
         # ✅ AMÉLIORATION: Mesure du temps de réponse
         start_time = time.time()
-        
-        # 🆕 CORRECTIF: Appel avec auto-retry si mauvais paramètre
-        try:
-            response = openai.chat.completions.create(**kwargs)
-        except Exception as e:
-            # Auto-retry si erreur de paramètre non supporté
-            error_msg = str(e).lower()
-            if "unsupported_parameter" in error_msg and ("max_tokens" in error_msg or "max_completion_tokens" in error_msg):
-                logger.warning(f"⚠️ Paramètre tokens non supporté pour {model}, tentative avec paramètre alternatif")
-                
-                # Swap du paramètre et retry une fois
-                if 'max_tokens' in kwargs:
-                    kwargs['max_completion_tokens'] = kwargs.pop('max_tokens')
-                elif 'max_completion_tokens' in kwargs:
-                    kwargs['max_tokens'] = kwargs.pop('max_completion_tokens')
-                
-                response = openai.chat.completions.create(**kwargs)
-            else:
-                raise
-        
+        response = openai.chat.completions.create(**kwargs)
         elapsed_time = time.time() - start_time
         
         logger.debug(f"✅ Réponse OpenAI Chat reçue en {elapsed_time:.2f}s")
@@ -746,11 +650,11 @@ Contenu technique à synthétiser :
 Réponse synthétique (format Markdown, sans sources) :"""
 
     try:
-        # Utilisation de la nouvelle fonction complete()
-        messages = [{"role": "user", "content": synthesis_prompt}]
-        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
-        response = complete(messages, model, temperature=0.2, max_tokens=min(400, max_length + 100))
-        return response["choices"][0]["message"]["content"].strip()
+        return complete(
+            prompt=synthesis_prompt, 
+            temperature=0.2,  # Peu de créativité pour info technique
+            max_tokens=min(400, max_length + 100)  # Marge pour le formatage
+        )
     except Exception as e:
         logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
         # Fallback simple : nettoyage basique
@@ -780,7 +684,7 @@ INSTRUCTIONS :
 Réponse de clarification :"""
 
     try:
-        return complete_text(prompt, temperature=0.3, max_tokens=150)
+        return complete(prompt=prompt, temperature=0.3, max_tokens=150)
     except Exception as e:
         logger.warning(f"⚠️ Échec génération clarification: {e}")
         # Fallback générique
@@ -908,7 +812,7 @@ Réponse finale : Test CoT réussi."""
         has_final_answer = bool(cot_result.get("final_answer"))
         
         # Test complete() avec détection automatique
-        auto_cot_result = complete_text(
+        auto_cot_result = complete(
             prompt="<thinking>Test automatique</thinking>\n\nRéponse automatique CoT.",
             temperature=0.2,
             max_tokens=100
@@ -941,8 +845,8 @@ def test_synthesis_pipeline() -> Dict[str, Any]:
     🆕 AMÉLIORÉ: Test complet du pipeline de synthèse pour dialogue_manager
     """
     try:
-        # Test de la fonction complete_text()
-        test_response = complete_text(
+        # Test de la fonction complete()
+        test_response = complete(
             prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
             temperature=0.2,
             max_tokens=50
@@ -1025,11 +929,6 @@ def get_openai_status() -> Dict[str, Any]:
                 "validation", "problem_decomposition", "solution_pathway"
             ],
             "max_cot_tokens": 1000
-        },
-        "compatibility_config": {  # 🆕 NOUVEAU: Configuration compatibilité
-            "max_completion_tokens_support": True,
-            "auto_parameter_detection": True,
-            "supported_model_families": ["gpt-4.1", "gpt-4o", "o4", "omni", "gpt-5"]
         }
     }
 

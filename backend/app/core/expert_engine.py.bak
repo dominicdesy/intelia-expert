@@ -69,7 +69,7 @@ class InteliaExpertEngine:
                 if openai_key:
                     self.ai_analyzer = BroilerAnalyzer(
                         openai_api_key=openai_key,
-                        default_model="gpt-4o"
+                        default_model=os.getenv('DEFAULT_MODEL', 'gpt-5')
                     )
                     logger.info("AI Analyzer initialized")
             except Exception as e:
@@ -86,10 +86,14 @@ class InteliaExpertEngine:
             except Exception as e:
                 logger.error(f"API Client failed: {e}")
     
-    async def process_query(self, query: str, model: str = "gpt-4o") -> Dict:
+    async def process_query(self, query: str, model: str = None) -> Dict:
         """Process query."""
         try:
             start_time = datetime.now()
+            
+            # Use environment variable for model if not specified
+            if model is None:
+                model = os.getenv('DEFAULT_MODEL', 'gpt-5')
             
             if self.ai_analyzer:
                 response = self._get_ai_response(query, model)
