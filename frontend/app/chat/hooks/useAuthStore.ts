@@ -35,7 +35,7 @@ const fetchUserProfileFromBackend = async (session: any): Promise<Partial<User> 
     // 🎯 RETOURNER LES DONNÉES IMPORTANTES DU BACKEND
     return {
       user_type: backendProfile.user_type, // 🔥 C'est ici qu'on récupère "super_admin"
-      full_name: backendProfile.full_name,
+      backendName: backendProfile.full_name, // Renommé pour éviter le conflit de type
       preferences: backendProfile.preferences
     }
 
