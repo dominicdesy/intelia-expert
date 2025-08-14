@@ -1158,7 +1158,7 @@ export default function ChatInterface() {
               {/* âœ… AJOUTEZ CES LIGNES ICI - EXACTEMENT APRÃˆS LA FERMETURE DU DIV PRÃ‰CÃ‰DENT */}
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">
-                  Intelia Expert peut faire des erreurs. Faites vÃ©rifiez les rÃ©ponses par un professionnel au besoin.
+                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
                 </p>
               </div>
               {/* âœ… FIN DE L'AJOUT */}
