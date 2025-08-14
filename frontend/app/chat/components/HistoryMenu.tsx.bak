@@ -18,8 +18,8 @@ export const HistoryMenu = () => {
 
   const handleToggle = async () => {
     if (!isOpen && user) {
-      console.log('📂 [HistoryMenu] Ouverture menu - chargement conversations pour:', user.id)
-      await loadConversations(user.id)
+      console.log('📂 [HistoryMenu] Ouverture menu - chargement conversations pour:', user.email || user.id)
+	  await loadConversations(user.email || user.id)
     }
     setIsOpen(!isOpen)
   }
@@ -31,7 +31,7 @@ export const HistoryMenu = () => {
     if (!user) return
     
     console.log('🔄 [HistoryMenu] Rechargement manuel des conversations')
-    await refreshConversations(user.id)
+    await refreshConversations(user.email || user.id)
   }
 
   const handleClearAll = async (e: React.MouseEvent) => {
@@ -53,7 +53,7 @@ export const HistoryMenu = () => {
         return
       }
       
-      await clearAllConversations(user.id)
+      await clearAllConversations(user.email || user.id)
       console.log('✅ [HistoryMenu] Toutes conversations supprimées')
       
       setIsOpen(false)
