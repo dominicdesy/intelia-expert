@@ -1,19 +1,19 @@
-'use client';
-
-// useAuthStore.ts — Zustand + Supabase (final, relative import to /frontend/supabase.ts)
-// - Dedup in-flight /v1/auth/me calls
-// - TTL 60s cache
-// - Filter onAuthStateChange events (reload only when uid/token changed)
-// - Concurrency guard for reload()
-// - Safe logout with cache cleanup
+// useAuthStore.ts – rewrite (Zustand + Supabase v2)
+// -------------------------------------------------
+// ✅ Déduplication en vol des appels /v1/auth/me
+// ✅ TTL 60s pour éviter les rafales
+// ✅ Filtrage des events onAuthStateChange (no-op ignorés)
+// ✅ Garde de concurrence pour loadUser()
+// ✅ Nettoyage sûr au logout
+// ⚠️ Import corrigé du client Supabase
 
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client'; // ✅ CORRIGÉ : chemin correct
 
-// ⬇️ Your Supabase client is at the root of /frontend → import it relatively
-import { supabase } from '../../../supabase';
-// If your file instead has a default export, use this line and remove the one above:
-// import supabase from '../../../supabase';
+// ======================
+// Types & constantes
+// ======================
 
 export type User = {
   id: string;
@@ -42,26 +42,49 @@ type AuthState = {
   isLoggingOut: boolean;
   initialized: boolean;
 
+  // Actions
   init: () => Promise<void>;
   reload: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
+// Endpoint backend (conforme aux logs DigitalOcean)
 const BACKEND_ME_URL = '/v1/auth/me';
+
+// TTL du cache /v1/auth/me
 const ME_TTL_MS = 60_000;
 
-// Module-scoped caches/locks
+// ======================
+// Caches & verrous module-scoped
+// ======================
+
 let meCache: { value: BackendProfile; userId?: string; ts: number } = {
   value: null,
   userId: undefined,
   ts: 0,
 };
+
 let meInFlight: Promise<BackendProfile> | null = null;
 let loadUserInFlight: Promise<void> | null = null;
 let initStarted = false;
 
+// Dernière session connue (pour ignorer les no-ops d'events)
 let lastSessionRef: { uid?: string; token?: string } = {};
+
+// Subscription onAuthStateChange (une seule fois)
 let authSubscription: { unsubscribe: () => void } | null = null;
+
+// ======================
+// Helpers
+// ======================
+
+function safeGet<T>(obj: any, path: string, fallback?: T): T | undefined {
+  try {
+    return path.split('.').reduce<any>((o, k) => (o ? o[k] : undefined), obj) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function normalizeUser(session: Session, backendProfile: BackendProfile): User {
   const meta = session.user?.user_metadata || {};
@@ -84,6 +107,7 @@ function normalizeUser(session: Session, backendProfile: BackendProfile): User {
     companyName: meta.company_name || undefined,
     companyWebsite: meta.company_website || undefined,
     linkedinCorporate: meta.linkedin_corporate || undefined,
+    // priorité backend → corrige les cas super_admin
     user_type:
       (backendProfile?.user_type as string | undefined) ||
       (meta.role as string | undefined) ||
@@ -95,6 +119,9 @@ function normalizeUser(session: Session, backendProfile: BackendProfile): User {
   };
 }
 
+/**
+ * GET /v1/auth/me – dédupliqué + TTL
+ */
 async function fetchBackendProfile(session: Session): Promise<BackendProfile> {
   const token = session?.access_token;
   const userId = session?.user?.id;
@@ -105,9 +132,13 @@ async function fetchBackendProfile(session: Session): Promise<BackendProfile> {
   }
 
   const now = Date.now();
+
+  // TTL cache
   if (meCache.value && meCache.userId === userId && now - meCache.ts < ME_TTL_MS) {
     return meCache.value;
   }
+
+  // Déduplication des requêtes en vol
   if (meInFlight) return meInFlight;
 
   meInFlight = fetch(BACKEND_ME_URL, {
@@ -121,6 +152,7 @@ async function fetchBackendProfile(session: Session): Promise<BackendProfile> {
     .then(async (res) => {
       if (!res.ok) throw new Error(`GET ${BACKEND_ME_URL} → ${res.status}`);
       const data = await res.json();
+      // Normalisation minimale (le backend peut renvoyer role/user_type)
       const profile: BackendProfile = {
         user_type: (data?.user_type as string | undefined) || (data?.role as string | undefined),
       };
@@ -138,13 +170,23 @@ async function fetchBackendProfile(session: Session): Promise<BackendProfile> {
   return meInFlight;
 }
 
+/**
+ * Compare session courante vs dernière connue (uid + token).
+ * Renvoie true si changement réel.
+ */
 function hasSessionChanged(session: Session | null): boolean {
   const uid = session?.user?.id;
   const tok = session?.access_token;
   const changed = uid !== lastSessionRef.uid || tok !== lastSessionRef.token;
-  if (changed) lastSessionRef = { uid, token: tok };
+  if (changed) {
+    lastSessionRef = { uid, token: tok };
+  }
   return changed;
 }
+
+// ======================
+// Store Zustand
+// ======================
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -153,23 +195,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoggingOut: false,
   initialized: false,
 
+  /**
+   * init(): lance le chargement initial + souscrit aux events auth (une seule fois)
+   */
   init: async () => {
     if (initStarted) return;
     initStarted = true;
 
     await get().reload();
 
+    // Abonnement unique aux events d'auth
     if (!authSubscription) {
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (get().isLoggingOut) return;
+        // En cas de logout en cours, on ignore
+        if (get().isLoggingOut) {
+          // debug: console.log('[Auth] Ignoré car logout en cours:', event);
+          return;
+        }
 
+        // Gestion explicite du SIGNED_OUT
         if (event === 'SIGNED_OUT') {
+          // Clear immédiat
           meCache = { value: null, userId: undefined, ts: 0 };
           set({ user: null, isAuthenticated: false, isLoading: false });
+          // Reset last session ref
           lastSessionRef = { uid: undefined, token: undefined };
           return;
         }
 
+        // Pour les autres events: on recharge seulement si la session a VRAIMENT changé
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (hasSessionChanged(session || null)) {
             await get().reload();
@@ -184,7 +238,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ initialized: true });
   },
 
+  /**
+   * reload(): charge la session courante et met à jour l'état
+   * Protégé contre les appels concurrents.
+   */
   reload: async () => {
+    // Déduplication des rechargements concurrents
     if (loadUserInFlight) return loadUserInFlight;
 
     const run = (async () => {
@@ -200,16 +259,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         const session = data.session;
         if (!session?.user) {
+          // Pas de session → pas d'appel backend
           meCache = { value: null, userId: undefined, ts: 0 };
           lastSessionRef = { uid: undefined, token: undefined };
           set({ user: null, isAuthenticated: false, isLoading: false });
           return;
         }
 
+        // Dédupliqué + TTL
         const backendProfile = await fetchBackendProfile(session);
         const normalized = normalizeUser(session, backendProfile);
 
-        set({ user: normalized, isAuthenticated: true, isLoading: false });
+        set({
+          user: normalized,
+          isAuthenticated: true,
+          isLoading: false,
+        });
       } catch (e) {
         console.error('❌ reload() exception:', e);
         set({ user: null, isAuthenticated: false, isLoading: false });
@@ -221,18 +286,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     loadUserInFlight = null;
   },
 
+  /**
+   * logout(): déconnexion sûre + nettoyage des caches
+   */
   logout: async () => {
+    // Empêche les effets en parallèle pendant le signOut
     set({ isLoggingOut: true, isLoading: true });
+
     try {
       await supabase.auth.signOut();
     } catch (e) {
       console.error('❌ supabase.auth.signOut error:', e);
     } finally {
+      // Nettoyage local
       meCache = { value: null, userId: undefined, ts: 0 };
       lastSessionRef = { uid: undefined, token: undefined };
-      set({ user: null, isAuthenticated: false, isLoading: false, isLoggingOut: false });
+
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isLoggingOut: false,
+      });
     }
   },
 }));
 
-// (Optional) Call useAuthStore.getState().init() once from your root layout/page.
+// ======================
+// Auto-init optionnel
+// ======================
+// Si vous préférez initier depuis votre App (recommandé):
+//   useEffect(() => { useAuthStore.getState().init(); }, []);
+// Sinon, décommentez les 2 lignes ci-dessous pour auto-init
+// setTimeout(() => {
+//   useAuthStore.getState().init().catch(console.error);
+// }, 0);
