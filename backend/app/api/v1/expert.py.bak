@@ -9,7 +9,6 @@ import os
 import re
 import math
 import time  # NOUVEAU: Ajouté pour les endpoints de test
-import asyncio  # 🚀 NOUVEAU: Pour optimisations async
 
 # 🔒 Import authentification
 from app.api.v1.auth import get_current_user
@@ -170,98 +169,6 @@ def _extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = No
     
     return "authenticated_unknown"
 
-# 🚀 NOUVELLES FONCTIONS ASYNC POUR OPTIMISATION PERFORMANCE
-async def _increment_quota_async(user_email: str) -> bool:
-    """Version async pour l'incrémentation du quota"""
-    try:
-        # Pour l'instant, wrapper la fonction sync en thread
-        # TODO: Remplacer par vrai async quand billing.py sera optimisé
-        await asyncio.to_thread(increment_quota_usage, user_email, success=True)
-        logger.info(f"📊 Usage incrémenté pour {user_email}")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Erreur incrémentation quota (success): {e}")
-        raise
-
-async def _log_analytics_async(
-    current_user: Optional[Dict[str, Any]], 
-    payload: Any, 
-    result: Dict[str, Any], 
-    start_time: float
-) -> bool:
-    """Version async pour le logging analytics"""
-    try:
-        # Calculer le temps de traitement
-        processing_time = int((time.time() - start_time) * 1000)
-        
-        # Extraire le texte de réponse pour analytics
-        answer = result.get("answer", {})
-        general_answer = result.get("general_answer", {})
-        
-        if isinstance(answer, dict) and answer.get("text"):
-            response_text = answer["text"]
-        elif isinstance(general_answer, dict) and general_answer.get("text"):
-            response_text = general_answer["text"]
-        else:
-            response_text = str(result.get("message", ""))
-        
-        # Pour l'instant, wrapper la fonction sync en thread
-        # TODO: Remplacer par vrai async quand logging.py sera optimisé
-        await asyncio.to_thread(
-            log_question_to_analytics,
-            current_user=current_user,
-            payload=payload,
-            result=result,
-            response_text=response_text[:500],  # Limiter la taille pour analytics
-            processing_time_ms=processing_time
-        )
-        logger.info("📊 Question loggée dans analytics")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur logging analytics: {e}")
-        raise
-
-async def _execute_background_tasks_async(
-    user_email: Optional[str],
-    current_user: Optional[Dict[str, Any]],
-    payload: Any,
-    result: Dict[str, Any],
-    start_time: float
-) -> None:
-    """
-    🚀 OPTIMISATION PERFORMANCE: Exécute les tâches de fond en parallèle
-    
-    Gain estimé: 1-1.5 secondes par requête
-    """
-    tasks = []
-    
-    # Tâche 1: Incrément quota (si utilisateur authentifié)
-    if user_email:
-        tasks.append(_increment_quota_async(user_email))
-    
-    # Tâche 2: Logging analytics (toujours)
-    tasks.append(_log_analytics_async(current_user, payload, result, start_time))
-    
-    if not tasks:
-        return
-    
-    # Exécuter toutes les tâches en parallèle
-    # return_exceptions=True évite qu'une erreur interrompe les autres
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Traiter les erreurs individuellement (ne pas faire échouer la requête)
-    task_names = []
-    if user_email:
-        task_names.append("quota_increment")
-    task_names.append("analytics_logging")
-    
-    for i, task_result in enumerate(results):
-        if isinstance(task_result, Exception):
-            task_name = task_names[i] if i < len(task_names) else f"task_{i}"
-            logger.error(f"❌ Erreur tâche {task_name}: {task_result}")
-        # Les succès sont déjà loggés dans les fonctions individuelles
-
 # ===== Fonction de nettoyage JSON améliorée =====
 def clean_for_json(value):
     """Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
@@ -333,15 +240,10 @@ class AskPayload(BaseModel):
     model_config = {"extra": "allow"}
 
 # ===== Fonction interne partagée avec validation ET quota ET persistance =====
-async def _ask_internal_async(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    🚀 VERSION ASYNC OPTIMISÉE - Logique interne pour traiter les questions
-    
-    OPTIMISATIONS:
-    - Parallélisation des opérations DB finales
-    - Gain estimé: 1-1.5 secondes par requête
-    
-    CONSERVE: Toute la logique métier originale
+    Logique interne pour traiter les questions (avec ou sans auth) + validation agricole + quota + persistance.
+    VERSION MISE À JOUR pour supporter la persistance des conversations.
     """
     user_email = None
     start_time = time.time()  # 📊 NOUVEAU: Mesure du temps de traitement
@@ -390,7 +292,7 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
             user_email_display = current_user.get('email', 'unknown')
             logger.info(f"🔒 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
-            logger.info(f"🌐 Question publique: {payload.question[:120]}")
+            logger.info(f"🌍 Question publique: {payload.question[:120]}")
 
         # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
         validation_bypassed = False
@@ -407,17 +309,26 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                 # ❌ INCRÉMENT USAGE MÊME POUR VALIDATION ÉCHOUÉE
                 if user_email:
                     try:
-                        await _increment_quota_async(user_email)  # 🚀 ASYNC
+                        increment_quota_usage(user_email, success=False)
                     except Exception as e:
                         logger.error(f"❌ Erreur incrémentation quota (validation failed): {e}")
                 
                 # 📊 NOUVEAU: LOGGING VALIDATION ÉCHOUÉE
                 try:
-                    await _log_analytics_async(  # 🚀 ASYNC
+                    processing_time = int((time.time() - start_time) * 1000)
+                    validation_error = {
+                        "type": "ValidationError",
+                        "message": validation_result.reason,
+                        "category": "validation_error"
+                    }
+                    
+                    log_question_to_analytics(
                         current_user=current_user,
                         payload=payload,
                         result={"type": "validation_rejected"},
-                        start_time=start_time
+                        response_text="",
+                        processing_time_ms=processing_time,
+                        error_info=validation_error
                     )
                     logger.info("📊 Validation échouée loggée dans analytics")
                     
@@ -466,17 +377,42 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
             logger.warning("⚠️ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
 
-        # 🚀 OPTIMISATION PERFORMANCE: Tâches de fond en parallèle
-        # AVANT: 3 opérations séquentielles = 1.2s
-        # APRÈS: 3 opérations parallèles = 0.2s
-        # GAIN: ~1 seconde par requête
-        await _execute_background_tasks_async(
-            user_email=user_email,
-            current_user=current_user,
-            payload=payload,
-            result=result,
-            start_time=start_time
-        )
+        # ✅ SUCCÈS: Incrément usage après traitement réussi
+        if user_email:
+            try:
+                increment_quota_usage(user_email, success=True)
+                logger.info(f"📊 Usage incrémenté pour {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Erreur incrémentation quota (success): {e}")
+
+        # 📊 NOUVEAU: LOGGING ANALYTICS DÉTAILLÉ
+        try:
+            # Calculer le temps de traitement
+            processing_time = int((time.time() - start_time) * 1000)
+            
+            # Extraire le texte de réponse pour analytics
+            answer = result.get("answer", {})
+            general_answer = result.get("general_answer", {})
+            
+            if isinstance(answer, dict) and answer.get("text"):
+                response_text = answer["text"]
+            elif isinstance(general_answer, dict) and general_answer.get("text"):
+                response_text = general_answer["text"]
+            else:
+                response_text = str(result.get("message", ""))
+            
+            # Logger dans le système analytics
+            log_question_to_analytics(
+                current_user=current_user,
+                payload=payload,
+                result=result,
+                response_text=response_text[:500],  # Limiter la taille pour analytics
+                processing_time_ms=processing_time
+            )
+            logger.info("📊 Question loggée dans analytics")
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur logging analytics: {e}")
 
         # Ajouter les infos utilisateur et de validation dans la réponse
         if current_user:
@@ -505,27 +441,27 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
         # ❌ ERREUR: Incrément usage même en cas d'erreur de traitement
         if user_email:
             try:
-                await _increment_quota_async(user_email)  # 🚀 ASYNC
+                increment_quota_usage(user_email, success=False)
                 logger.info(f"📊 Usage incrémenté pour {user_email} (erreur)")
             except Exception as quota_e:
                 logger.error(f"❌ Erreur incrémentation quota (error): {quota_e}")
         
         # 📊 NOUVEAU: LOGGING DES ERREURS DANS ANALYTICS
         try:
-            error_result = {
-                "type": "system_error",
-                "error": {
-                    "type": type(e).__name__,
-                    "message": str(e),
-                    "category": "system_error"
-                }
+            processing_time = int((time.time() - start_time) * 1000)
+            error_info = {
+                "type": type(e).__name__,
+                "message": str(e),
+                "category": "system_error"
             }
             
-            await _log_analytics_async(  # 🚀 ASYNC
+            log_question_to_analytics(
                 current_user=current_user,
                 payload=payload,
-                result=error_result,
-                start_time=start_time
+                result={},
+                response_text="",
+                processing_time_ms=processing_time,
+                error_info=error_info
             )
             logger.info("📊 Erreur loggée dans analytics")
             
@@ -535,37 +471,26 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
-# 🔄 VERSION SYNC PRÉSERVÉE (pour rétrocompatibilité)
-def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    VERSION SYNC ORIGINALE - Conservée pour rétrocompatibilité
-    
-    Wrapper qui appelle la version async en interne
-    """
-    return asyncio.run(_ask_internal_async(payload, request, current_user))
-
 # ===== Endpoints principaux (code original conservé + améliorations) =====
 @router.post("/ask")
-async def ask(  # 🚀 ASYNC
+def ask(
     payload: AskPayload, 
     request: Request,
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
     """
-    🚀 ENDPOINT OPTIMISÉ - Poser des questions avec validation agricole, quota et persistance.
-    
-    OPTIMISATIONS:
-    - Opérations DB parallélisées
-    - Gain estimé: 1-1.5 secondes par requête
+    Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole, quota et persistance.
+    VERSION MISE À JOUR avec support persistance conversations.
     """
-    return await _ask_internal_async(payload, request, current_user)
+    return _ask_internal(payload, request, current_user)
 
 @router.post("/ask-public")
-async def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:  # 🚀 ASYNC
+def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
     """
-    🚀 ENDPOINT PUBLIC OPTIMISÉ - Pas d'authentification requise
+    Endpoint public (pas d'authentification requise) avec validation agricole et persistance.
+    VERSION MISE À JOUR avec support persistance conversations.
     """
-    return await _ask_internal_async(payload, request, None)
+    return _ask_internal(payload, request, None)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
@@ -586,7 +511,6 @@ def system_status() -> Dict[str, Any]:
         "billing_system_available": True,  # 🦆 NOUVEAU
         "analytics_system_available": True,  # 📊 NOUVEAU
         "conversation_persistence_available": persistence_available,  # 💾 NOUVEAU
-        "performance_optimizations_enabled": True,  # 🚀 NOUVEAU
         "service": "expert_api",
     }
 
@@ -608,7 +532,7 @@ def fallback_status() -> Dict[str, Any]:
         }
 
 @router.post("/test-openai-fallback")
-async def test_openai_fallback(  # 🚀 ASYNC
+def test_openai_fallback(
     test_question: str,
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
@@ -628,9 +552,7 @@ async def test_openai_fallback(  # 🚀 ASYNC
             "age_days": 21
         }
         
-        # Exécuter en thread pour éviter de bloquer
-        result = await asyncio.to_thread(
-            generate_openai_fallback_response,
+        result = generate_openai_fallback_response(
             question=test_question,
             entities=test_entities,
             intent=Intention.PerfTargets,  # Intent par défaut pour test
@@ -651,7 +573,7 @@ async def test_openai_fallback(  # 🚀 ASYNC
         }
 
 @router.post("/test-fallback-integration")
-async def test_fallback_integration(  # 🚀 ASYNC
+def test_fallback_integration(
     test_question: str = "Quel est le poids à 21 jours pour des Ross 308 mâles ?",
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
@@ -677,8 +599,8 @@ async def test_fallback_integration(  # 🚀 ASYNC
         
         mock_request = MockRequest()
         
-        # Appel du système complet optimisé
-        result = await _ask_internal_async(payload, mock_request, current_user)
+        # Appel du système complet
+        result = _ask_internal(payload, mock_request, current_user)
         
         # Analyse du résultat pour vérifier si fallback activé
         answer = result.get("answer", {})
@@ -706,7 +628,7 @@ async def test_fallback_integration(  # 🚀 ASYNC
 # ===== 💾 NOUVEAUX ENDPOINTS: Test persistance conversations =====
 
 @router.post("/test-conversation-persistence")
-async def test_conversation_persistence(  # 🚀 ASYNC
+def test_conversation_persistence(
     test_question: str = "Test de persistance des conversations",
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
@@ -720,9 +642,8 @@ async def test_conversation_persistence(  # 🚀 ASYNC
         test_answer = "Réponse de test pour vérifier la persistance"
         user_id = _extract_user_id_for_persistence(current_user)
         
-        # Test de la fonction de persistance en thread
-        persistence_success = await asyncio.to_thread(
-            _persist_conversation,
+        # Test de la fonction de persistance
+        persistence_success = _persist_conversation(
             session_id=test_session_id,
             question=test_question,
             answer_text=test_answer,
@@ -805,7 +726,7 @@ def agricultural_validation_status() -> Dict[str, Any]:
         }
 
 @router.post("/test-agricultural-validation")
-async def test_agricultural_validation(  # 🚀 ASYNC
+def test_agricultural_validation(
     test_question: str,
     lang: str = "fr",
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
@@ -819,9 +740,7 @@ async def test_agricultural_validation(  # 🚀 ASYNC
     user_id = current_user.get('email', current_user.get('user_id', 'test_user'))
     
     try:
-        # Exécuter en thread pour éviter de bloquer
-        validation_result = await asyncio.to_thread(
-            validate_agricultural_question,
+        validation_result = validate_agricultural_question(
             question=test_question,
             language=lang,
             user_id=str(user_id),
@@ -842,7 +761,7 @@ async def test_agricultural_validation(  # 🚀 ASYNC
 
 # 🦆 NOUVEAUX ENDPOINTS QUOTA
 @router.get("/quota-status")
-async def quota_status(  # 🚀 ASYNC
+def quota_status(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Récupère le statut du quota pour l'utilisateur connecté."""
@@ -851,10 +770,7 @@ async def quota_status(  # 🚀 ASYNC
         raise HTTPException(status_code=400, detail="Email utilisateur non trouvé")
     
     try:
-        # Exécuter en thread pour éviter de bloquer
-        quota_allowed, quota_details = await asyncio.to_thread(
-            check_quota_middleware, user_email
-        )
+        quota_allowed, quota_details = check_quota_middleware(user_email)
         return {
             "user_email": user_email,
             "quota_allowed": quota_allowed,
@@ -869,7 +785,7 @@ async def quota_status(  # 🚀 ASYNC
         }
 
 @router.post("/test-quota-increment")
-async def test_quota_increment(  # 🚀 ASYNC
+def test_quota_increment(
     success: bool = True,
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
@@ -879,16 +795,10 @@ async def test_quota_increment(  # 🚀 ASYNC
         raise HTTPException(status_code=400, detail="Email utilisateur non trouvé")
     
     try:
-        # Utiliser la fonction async optimisée
-        if success:
-            await _increment_quota_async(user_email)
-        else:
-            await asyncio.to_thread(increment_quota_usage, user_email, success=False)
+        increment_quota_usage(user_email, success=success)
         
         # Récupération du statut mis à jour
-        quota_allowed, quota_details = await asyncio.to_thread(
-            check_quota_middleware, user_email
-        )
+        quota_allowed, quota_details = check_quota_middleware(user_email)
         
         return {
             "message": f"Quota incrémenté (success={success})",
@@ -911,7 +821,6 @@ def debug_imports() -> Dict[str, Any]:
         "agricultural_validator_available": AGRICULTURAL_VALIDATOR_AVAILABLE,
         "billing_system_available": True,  # 🦆 NOUVEAU
         "analytics_system_available": True,  # 📊 NOUVEAU
-        "performance_optimizations_enabled": True,  # 🚀 NOUVEAU
         "imports_tested": []
     }
     
@@ -945,15 +854,12 @@ def debug_imports() -> Dict[str, Any]:
     return debug_info
 
 @router.post("/force-import-test")
-async def force_import_test():  # 🚀 ASYNC
+def force_import_test():
     """Teste l'import et un appel basique de handle() sans casser l'API."""
     import traceback
     try:
         from .pipeline.dialogue_manager import handle as _handle  # type: ignore
-        # Exécuter en thread pour éviter de bloquer
-        test_result = await asyncio.to_thread(
-            _handle, "test", "test question", "fr", debug=True, user_id="test_user"
-        )
+        test_result = _handle("test", "test question", "fr", debug=True, user_id="test_user")  # NOUVEAU: user_id
         return {"status": "✅ SUCCESS", "result": test_result, "import_successful": True}
     except Exception as e:
         return {

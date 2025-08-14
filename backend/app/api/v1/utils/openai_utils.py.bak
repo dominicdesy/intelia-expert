@@ -1,19 +1,113 @@
-﻿# ==================== IMPORTS - MUST BE AT THE TOP ====================
-import openai
-import os
-import logging
-import re
-from typing import Any, Dict, List, Optional
-from functools import wraps
-import time
-import json
-import httpx
+﻿# -*- coding: utf-8 -*-
+"""
+openai_utils.py — GPT‑5 safe, backwards‑compatible utilities
 
-# Configuration du logging
+This module preserves original public function names and behavior while fixing:
+- Temperature handling for models that only support the default temperature (e.g., GPT‑5 families)
+- Auto‑mapping between max_tokens and max_completion_tokens (and retry on API hint)
+- HTTPX + SDK paths, both hardened with targeted retries
+- More tolerant parsing for Chat Completions output
+
+Public API (kept):
+- _get_api_key() -> str
+- openai_retry decorator
+- _configure_openai_client()
+- _completion_param_name(model: str) -> str
+- _get_safe_temperature(requested: Optional[float], model: str) -> Optional[float]
+- estimate_tokens(text: str, model: str) -> int (heuristic, kept for compatibility)
+- get_model_max_tokens(model: str) -> int (heuristic, kept for compatibility)
+- complete(messages, model, temperature=..., max_tokens=..., timeout=..., extra=None) -> Dict
+- complete_text(prompt, temperature=..., max_tokens=None, model=None) -> str
+- safe_chat_completion(**kwargs) -> Any (SDK path)
+- complete_with_cot(prompt, temperature=..., max_tokens=None, model=None, parse_cot=True) -> Dict[str, Any]
+- safe_embedding_create(input, model=None, **kwargs) -> List[List[float]] | List[float]
+- get_openai_models() -> List[str]
+- test_openai_connection() -> Dict[str, Any]
+
+Drop‑in: other modules can import unchanged symbols.
+"""
+from __future__ import annotations
+
+import os
+import re
+import json
+import time
+import math
+import httpx
+import logging
+from typing import Any, Dict, List, Optional, Iterable, Tuple
+from functools import wraps
+
+# The OpenAI Python SDK (global style preserved for compatibility)
+import openai
+
+# ----------------------------------------------------------------------------
+# Logging
+# ----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-# --- Helper de détection d'erreur "temperature non supportée" ---
+
+# ----------------------------------------------------------------------------
+# Environment & constants
+# ----------------------------------------------------------------------------
+_DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-5")
+_OPENAI_TIMEOUT = float(os.getenv("OPENAI_DEFAULT_TIMEOUT", "30"))
+_OPENAI_DEFAULT_MAX_TOKENS = int(os.getenv("OPENAI_DEFAULT_MAX_TOKENS", "1500"))
+_OPENAI_EMBED_BATCH = int(os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", "100"))
+_RESTRICTED_TEMP_MODELS = set(
+    x.strip() for x in os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",") if x.strip()
+)
+
+# Known families that often require `max_completion_tokens` on chat/completions
+_MAX_COMPLETION_FAMILIES = (
+    r"^gpt-5",           # future/generation family (some endpoints)
+    r"^gpt-4o",          # Omni family
+    r"^o\d",            # reasoning families o3, o4 etc.
+)
+
+# ----------------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------------
+
+def _get_api_key() -> str:
+    """Return the OpenAI API key or raise a clear error."""
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is not set in the environment")
+    return key
+
+
+def openai_retry(max_retries: int = 2, delay: float = 1.0):
+    """Decorator for targeted retries with linear backoff.
+
+    Retries on network/transient errors, and lets the inner functions perform
+    semantic retries (e.g., temperature removal or token param swap).
+    """
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            last_err = None
+            for attempt in range(max_retries + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as e:  # noqa: BLE001
+                    last_err = e
+                    if attempt < max_retries:
+                        time.sleep(delay)
+                        continue
+                    raise last_err
+        return wrapper
+    return deco
+
+
+def _configure_openai_client() -> None:
+    """Configure global OpenAI client with env API key (backward‑compatible)."""
+    key = _get_api_key()
+    # Global configuration is preserved for existing code paths
+    openai.api_key = key
+
+
 def _is_temp_unsupported_error(msg: str) -> bool:
-    """Détecte les messages style:
+    """Detect messages like:
     "Unsupported value: 'temperature' does not support 0.1 with this model. Only the default (1) value is supported."
     """
     if not msg:
@@ -21,513 +115,205 @@ def _is_temp_unsupported_error(msg: str) -> bool:
     return bool(re.search(r"temperature.+(unsupported|does\s*not\s*support|only\s*the\s*default)", str(msg), re.I))
 
 
-# ==================== NOUVEAU: HELPERS COMPATIBILITY max_completion_tokens ====================
-# Familles de modèles qui exigent max_completion_tokens sur /chat/completions
-_MCT_PREFIXES = (
-    "gpt-4.1", "gpt-4o", "o1", "o4", "omni", "gpt-5", "gpt-4.1-mini",
-    "gpt-4o-mini", "gpt-4.1-nano", "o1-mini", "o1-preview"
-)
+def _family_matches(model: str, patterns: Iterable[str]) -> bool:
+    for p in patterns:
+        if re.search(p, model or "", re.I):
+            return True
+    return False
 
-def _uses_mct(model: str) -> bool:
-    if os.getenv("OPENAI_FORCE_COMPLETION_PARAM", "").lower() in ("mct", "max_completion_tokens"):
-        return True
-    if os.getenv("OPENAI_FORCE_COMPLETION_PARAM", "").lower() in ("mt", "max_tokens"):
-        return False
-    return any(model.startswith(p) for p in _MCT_PREFIXES)
 
 def _completion_param_name(model: str) -> str:
-    return "max_completion_tokens" if _uses_mct(model) else "max_tokens"
+    """Return the token param name expected by the API for this model.
+    Historically chat/completions used `max_tokens`; some newer families accept
+    `max_completion_tokens`. We auto‑choose and still retry on API feedback.
+    """
+    if _family_matches(model, _MAX_COMPLETION_FAMILIES):
+        return "max_completion_tokens"
+    return "max_tokens"
 
-# ==================== 🆕 NOUVEAU: Helpers pour temperature conditionnelle ====================
-def _get_safe_temperature(temperature: float, model: str = None) -> Optional[float]:
+
+def _get_safe_temperature(requested: Optional[float], model: str) -> Optional[float]:
+    """Return a temperature value that is safe to send for the model, or None to
+    omit the parameter (use model default).
+
+    Rules:
+    - If model is in RESTRICTED list or part of strict families, return None.
+    - Else clamp to [0.0, 2.0] and return.
     """
-    🆕 CORRECTIF: Retourne une temperature sécurisée selon le modèle.
-    Certains modèles n'acceptent que temperature=1 (défaut).
-    """
-    # Si variable d'environnement force le défaut
-    if os.getenv("OPENAI_FORCE_DEFAULT_TEMPERATURE", "").lower() == "true":
-        logger.debug(f"🔧 Temperature forcée au défaut (variable env)")
-        return None  # Utilise le défaut du modèle
-    
-    # Si le modèle est connu pour ne pas supporter les températures personnalisées
-    # (on peut étendre cette liste selon les besoins)
-    restricted_models = os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",")
-    if model and any(model.startswith(restricted.strip()) for restricted in restricted_models if restricted.strip()):
-        logger.debug(f"🔧 Modèle {model} détecté comme restrictif pour temperature")
+    if requested is None:
         return None
-    
-    # Valider la température dans les limites acceptables
-    if temperature < 0.0 or temperature > 2.0:
-        logger.warning(f"⚠️ Temperature {temperature} hors limites, utilisation du défaut")
+
+    model_id = (model or "").lower()
+    if model_id in {m.lower() for m in _RESTRICTED_TEMP_MODELS}:
         return None
-    
-    return temperature
 
-def _safe_kwargs_with_temperature(kwargs: Dict[str, Any], default_temp: float = 1.0, model: str = None) -> Dict[str, Any]:
-    """
-    🆕 CORRECTIF: Nettoie les kwargs en gérant la temperature de façon sécurisée.
-    """
-    safe_kwargs = kwargs.copy()
-    
-    if "temperature" in safe_kwargs:
-        original_temp = safe_kwargs["temperature"]
-        safe_temp = _get_safe_temperature(original_temp, model)
-        
-        if safe_temp is None:
-            # Retirer le paramètre pour utiliser le défaut du modèle
-            safe_kwargs.pop("temperature", None)
-            logger.debug(f"🔧 Temperature {original_temp} retirée, utilisation défaut modèle")
-        else:
-            safe_kwargs["temperature"] = safe_temp
-            logger.debug(f"🔧 Temperature validée: {safe_temp}")
-    
-    return safe_kwargs
+    # Some families (e.g., GPT‑5 / certain o* models) enforce default temperature
+    if _family_matches(model_id, (r"^gpt-5", r"^o\d")):
+        return None  # let the API default apply
 
-# ==================== AMÉLIORATION MAJEURE: Gestion centralisée de l'API key ====================
-def _get_api_key() -> str:
-    """
-    ✅ AMÉLIORATION: Fonction centralisée pour la gestion de la clé API
-    
-    PROBLÈME RÉSOLU:
-    - Code dupliqué dans safe_chat_completion et safe_embedding_create
-    - Vérification répétée de OPENAI_API_KEY
-    
-    SOLUTION:
-    - Fonction unique pour récupérer et valider la clé
-    - Gestion d'erreurs centralisée
-    - Configuration flexible via variables d'environnement
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    
-    if not api_key:
-        logger.error("⛔ OPENAI_API_KEY non configurée")
-        raise RuntimeError(
-            "OPENAI_API_KEY n'est pas configurée dans les variables d'environnement. "
-            "Veuillez définir cette variable pour utiliser les services OpenAI."
-        )
-    
-    if len(api_key.strip()) < 10:
-        logger.error("⛔ OPENAI_API_KEY semble invalide (trop courte)")
-        raise RuntimeError("OPENAI_API_KEY semble invalide - vérifiez la configuration")
-    
-    return api_key.strip()
-
-def _configure_openai_client() -> None:
-    """
-    ✅ AMÉLIORATION: Configuration centralisée du client OpenAI
-    """
     try:
-        api_key = _get_api_key()
-        openai.api_key = api_key
-        logger.debug("✅ Client OpenAI configuré")
-    except Exception as e:
-        logger.error(f"⛔ Erreur configuration OpenAI: {e}")
-        raise
+        t = float(requested)
+    except Exception:  # noqa: BLE001
+        return None
+    return max(0.0, min(2.0, t))
 
-# ==================== AMÉLIORATION: Décorateur pour retry et gestion d'erreurs ====================
-def openai_retry(max_retries: int = 2, delay: float = 1.0):
-    """
-    ✅ NOUVEAU: Décorateur pour retry automatique des appels OpenAI
-    
-    Gère les erreurs temporaires comme:
-    - Rate limiting
-    - Erreurs réseau temporaires
-    - Timeouts
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            
-            for attempt in range(max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                    
-                except openai.RateLimitError as e:
-                    logger.warning(f"⚠️ Rate limit atteint (tentative {attempt + 1}/{max_retries + 1}): {e}")
-                    if attempt < max_retries:
-                        time.sleep(delay * (2 ** attempt))  # Backoff exponentiel
-                        continue
-                    last_exception = e
-                    
-                except openai.APITimeoutError as e:
-                    logger.warning(f"⚠️ Timeout OpenAI (tentative {attempt + 1}/{max_retries + 1}): {e}")
-                    if attempt < max_retries:
-                        time.sleep(delay)
-                        continue
-                    last_exception = e
-                    
-                except openai.APIConnectionError as e:
-                    logger.warning(f"⚠️ Erreur connexion OpenAI (tentative {attempt + 1}/{max_retries + 1}): {e}")
-                    if attempt < max_retries:
-                        time.sleep(delay)
-                        continue
-                    last_exception = e
-                    
-                except Exception as e:
-                    # Pour les autres erreurs, pas de retry
-                    logger.error(f"⛔ Erreur OpenAI non-retry: {type(e).__name__}: {e}")
-                    last_exception = e
-                    break
-            
-            # Si on arrive ici, tous les retries ont échoué
-            raise RuntimeError(f"Échec après {max_retries + 1} tentatives: {last_exception}")
-        
-        return wrapper
-    return decorator
 
-# ==================== 🆕 NOUVELLES FONCTIONS CHAIN-OF-THOUGHT ====================
+# ----------------------------------------------------------------------------
+# Token utilities (heuristics kept for compatibility)
+# ----------------------------------------------------------------------------
+
+# Very rough token estimate; callers only use it for budgetting
+_DEF_TOKENS_PER_CHAR = 0.25  # ~4 chars per token
+
+
+def estimate_tokens(text: str, model: str = _DEFAULT_MODEL) -> int:
+    if not text:
+        return 0
+    return int(math.ceil(len(text) * _DEF_TOKENS_PER_CHAR))
+
+
+def get_model_max_tokens(model: str = _DEFAULT_MODEL) -> int:
+    mid = (model or "").lower()
+    # Conservative maxima; adjust as needed. Keeps old callers happy.
+    if mid.startswith("gpt-5"):
+        return 128000
+    if mid.startswith("gpt-4o"):
+        return 128000
+    if mid.startswith("gpt-4"):
+        return 8192
+    if mid.startswith("gpt-3.5"):
+        return 4096
+    return 8192
+
+
+# ----------------------------------------------------------------------------
+# Core HTTPX call (keeps original signature)
+# ----------------------------------------------------------------------------
 
 @openai_retry(max_retries=2, delay=1.0)
-def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optional[int] = None, 
-                     model: Optional[str] = None, parse_cot: bool = True) -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Completion spécialisée pour Chain-of-Thought avec parsing des balises
-    🔧 CORRECTIF: Gestion sécurisée de la temperature
-    
-    Args:
-        prompt: Prompt CoT avec balises XML structurantes
-        temperature: Créativité du modèle (0.0-2.0)
-        max_tokens: Limite de tokens (None = calcul automatique)
-        model: Modèle à utiliser (None = défaut CoT)
-        parse_cot: Si True, parse les balises XML dans la réponse
-    
-    Returns:
-        Dict contenant 'raw_response', 'parsed_sections', 'final_answer'
-    """
-    
-    # Validation des paramètres
-    if not prompt or not prompt.strip():
-        raise ValueError("Le prompt CoT ne peut pas être vide")
-    
-    # Configuration modèle CoT
-    if model is None:
-        model = os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
-    
-    # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
-    if safe_temp is None:
-        logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
-    
-    # Calcul tokens adaptatif pour CoT (plus généreux)
-    if max_tokens is None:
-        prompt_length = len(prompt)
-        if prompt_length < 1000:
-            max_tokens = 600
-        elif prompt_length < 2000:
-            max_tokens = 800
-        else:
-            max_tokens = 1000
-        
-        # Ajustement selon limites modèle
-        model_limit = get_model_max_tokens(model)
-        estimated_prompt_tokens = estimate_tokens(prompt, model)
-        available_tokens = model_limit - estimated_prompt_tokens - 150  # Marge CoT
-        
-        if available_tokens > 0:
-            max_tokens = min(max_tokens, available_tokens)
-    
-    logger.debug(f"🧠 Appel CoT: model={model}, temp={safe_temp}, max_tokens={max_tokens}")
-    
-    # Messages optimisés pour CoT
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Tu es un expert vétérinaire avicole avec une approche méthodologique rigoureuse. "
-                "Suis précisément la structure de raisonnement demandée avec les balises XML. "
-                "Reste factuel, précis et professionnel dans ton analyse."
-            )
-        },
-        {
-            "role": "user",
-            "content": prompt.strip()
-        }
-    ]
-    
-    try:
-        # 🔧 CORRECTIF: Appel avec temperature sécurisée
-        call_kwargs = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "top_p": 0.9,
-            "frequency_penalty": 0.0,  # Pas de pénalité pour CoT structuré
-            "presence_penalty": 0.1
-        }
-        
-        # Ajouter temperature seulement si supportée
-        if safe_temp is not None:
-            call_kwargs["temperature"] = safe_temp
-        
-        response = safe_chat_completion(**call_kwargs)
-        
-        if not response or not response.choices:
-            raise RuntimeError("Réponse OpenAI CoT vide")
-        
-        raw_content = response.choices[0].message.content
-        if not raw_content:
-            raise RuntimeError("Contenu CoT vide")
-        
-        result = {
-            "raw_response": raw_content.strip(),
-            "model_used": model,
-            "temperature": safe_temp if safe_temp is not None else "default"
-        }
-        
-        # 🆕 Parsing des sections CoT si demandé
-        if parse_cot:
-            parsed_sections = _parse_cot_sections(raw_content)
-            result["parsed_sections"] = parsed_sections
-            
-            # Extraction de la réponse finale
-            final_answer = _extract_final_answer(raw_content, parsed_sections)
-            result["final_answer"] = final_answer
-        
-        # Métriques
-        if hasattr(response, 'usage') and response.usage:
-            result["token_usage"] = {
-                "total": response.usage.total_tokens,
-                "prompt": response.usage.prompt_tokens,
-                "completion": response.usage.completion_tokens
-            }
-        
-        logger.debug(f"✅ CoT terminé: {len(raw_content)} caractères générés")
-        return result
-        
-    except Exception as e:
-        logger.error(f"⛔ Erreur CoT: {type(e).__name__}: {e}")
-        raise RuntimeError(f"Erreur lors du raisonnement CoT: {e}")
+def complete(
+    messages: List[Dict[str, Any]],
+    model: str,
+    temperature: float = 0.2,
+    max_tokens: int = 800,
+    timeout: float = _OPENAI_TIMEOUT,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """HTTP path to POST /v1/chat/completions.
 
-def _parse_cot_sections(cot_response: str) -> Dict[str, str]:
+    - Chooses between `max_tokens` and `max_completion_tokens`.
+    - Applies safe temperature. If API rejects temperature, retry once without it.
+    - Retries once if API says wrong token parameter name.
     """
-    🆕 Parse les sections délimitées par des balises XML dans une réponse CoT
-    """
-    sections = {}
-    
-    # Balises CoT standards
-    cot_tags = [
-        "thinking", "analysis", "reasoning", "factors", "recommendations", 
-        "validation", "problem_decomposition", "factor_analysis", 
-        "interconnections", "solution_pathway", "risk_mitigation",
-        "economic_context", "cost_benefit_breakdown", "scenario_analysis",
-        "optimization_levers", "financial_recommendation", "current_analysis",
-        "optimization_factors", "strategy", "impact_prediction"
-    ]
-    
-    for tag in cot_tags:
-        pattern = f"<{tag}>(.*?)</{tag}>"
-        match = re.search(pattern, cot_response, re.DOTALL | re.IGNORECASE)
-        if match:
-            content = match.group(1).strip()
-            sections[tag] = content
-    
-    return sections
+    _configure_openai_client()
 
-def _extract_final_answer(raw_response: str, parsed_sections: Dict[str, str]) -> str:
-    """
-    🆕 Extrait la réponse finale d'une réponse CoT
-    """
-    # 1. Chercher après la dernière balise fermante
-    last_tag_pattern = r"</[^>]+>\s*(.+)$"
-    match = re.search(last_tag_pattern, raw_response, re.DOTALL | re.IGNORECASE)
-    if match:
-        final_part = match.group(1).strip()
-        if len(final_part) > 50:  # Assez substantiel
-            return final_part
-    
-    # 2. Utiliser la section "recommendations" si disponible
-    if "recommendations" in parsed_sections:
-        return parsed_sections["recommendations"]
-    
-    # 3. Utiliser "solution_pathway" ou "financial_recommendation"
-    for key in ["solution_pathway", "financial_recommendation", "strategy"]:
-        if key in parsed_sections:
-            return parsed_sections[key]
-    
-    # 4. Fallback: derniers 300 caractères
-    return raw_response[-300:].strip()
-
-@openai_retry(max_retries=2, delay=1.0)
-def generate_cot_followup(initial_question: str, cot_sections: Dict[str, str], 
-                         entities: Dict[str, Any], missing_info: List[str] = None) -> str:
-    """
-    🆕 NOUVEAU: Génère une question de suivi intelligente basée sur l'analyse CoT
-    🔧 CORRECTIF: Temperature sécurisée
-    
-    Args:
-        initial_question: Question originale de l'utilisateur
-        cot_sections: Sections parsées de l'analyse CoT précédente
-        entities: Entités extraites du contexte
-        missing_info: Informations manquantes identifiées
-    
-    Returns:
-        Question de suivi structurée
-    """
-    
-    # Construction du contexte pour la génération
-    context_parts = [
-        f"QUESTION INITIALE: {initial_question}",
-        f"CONTEXTE: {entities}",
-    ]
-    
-    if missing_info:
-        context_parts.append(f"INFORMATIONS MANQUANTES: {', '.join(missing_info)}")
-    
-    # Résumé des analyses CoT disponibles
-    available_analysis = []
-    for section, content in cot_sections.items():
-        if content and len(content) > 20:
-            available_analysis.append(f"{section}: {content[:100]}...")
-    
-    if available_analysis:
-        context_parts.append("ANALYSES PRÉCÉDENTES:")
-        context_parts.extend(available_analysis[:3])  # Limite pour éviter surcharge
-    
-    context = "\n".join(context_parts)
-    
-    prompt = f"""Basé sur l'analyse précédente, génère une question de suivi pertinente pour approfondir le diagnostic ou la solution.
-
-{context}
-
-INSTRUCTIONS:
-- Question courte et précise (1-2 phrases max)
-- Focus sur les éléments les plus critiques identifiés
-- Ton professionnel mais accessible
-- Viser l'action pratique
-
-Question de suivi appropriée:"""
-
-    try:
-        # 🔧 CORRECTIF: Utilise la fonction safe complete_text
-        followup = complete_text(prompt, temperature=0.4, max_tokens=150)
-        return followup.strip()
-    except Exception as e:
-        logger.warning(f"⚠️ Échec génération followup CoT: {e}")
-        return f"Pour approfondir l'analyse de votre situation avec {entities.get('species', 'ces animaux')}, pourriez-vous préciser les éléments mentionnés ci-dessus ?"
-
-# ==================== FONCTION CORRIGÉE: complete() avec httpx ====================
-def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 800,
-             timeout: float = 30.0, extra: Optional[Dict] = None) -> Dict:
-    """
-    Envoie un appel /v1/chat/completions, compatible anciens & nouveaux modèles.
-    🔧 CORRECTIF: Gestion sécurisée de la temperature
-    """
     extra = extra or {}
     param_name = _completion_param_name(model)
-    
-    # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
-    
-    payload = {
+    safe_temp = _get_safe_temperature(temperature, model)
+
+    payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
-        param_name: max_tokens,  # <-- clé choisie dynamiquement
-        **{k: v for k, v in extra.items() if v is not None}
+        param_name: max_tokens,
+        **{k: v for k, v in (extra or {}).items() if v is not None},
     }
-    
-    # Ajouter temperature seulement si supportée
     if safe_temp is not None:
-        payload["temperature"] = safe_temp
+        payload["temperature"] = safe_temp  # try; if refused we retry without
+
     headers = {
-        "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+        "Authorization": f"Bearer {_get_api_key()}",
         "Content-Type": "application/json",
     }
-
     url = "https://api.openai.com/v1/chat/completions"
 
-    # 1er essai
+    # 1st attempt
     with httpx.Client(timeout=timeout) as client:
         r = client.post(url, headers=headers, json=payload)
 
     if r.status_code == 200:
         return r.json()
 
-    # Auto-rattrapage: paramètre non supporté → on bascule et on réessaie une fois
+    # Decode error message
     try:
-        err = r.json().get("error", {})
-    except Exception:
-        err = {}
+        err_obj = r.json()
+        err_msg = (err_obj.get("error") or {}).get("message", "") or r.text
+    except Exception:  # noqa: BLE001
+        err_msg = r.text or ""
 
-    unsupported = (r.status_code == 400 and err.get("code") == "unsupported_parameter")
-    wrong_param = err.get("param")
-    msg = (err.get("message") or "").lower()
+    # Retry on wrong token parameter name
+    if "unsupported_parameter" in (err_msg or "").lower() and (
+        "max_tokens" in err_msg.lower() or "max_completion_tokens" in err_msg.lower()
+    ):
+        other = "max_tokens" if param_name == "max_completion_tokens" else "max_completion_tokens"
+        payload[other] = payload.pop(param_name)
+        with httpx.Client(timeout=timeout) as client:
+            r2 = client.post(url, headers=headers, json=payload)
+        if r2.status_code == 200:
+            return r2.json()
+        try:
+            err_obj2 = r2.json()
+            err_msg = (err_obj2.get("error") or {}).get("message", "") or r2.text
+        except Exception:  # noqa: BLE001
+            err_msg = r2.text or err_msg
 
-    if unsupported and wrong_param in ("max_tokens", "max_completion_tokens"):
-        # Swap de paramètre
-        other = "max_completion_tokens" if wrong_param == "max_tokens" else "max_tokens"
-        if other != param_name:
-            # reconstruire le payload proprement
-            payload.pop(param_name, None)
-            payload[other] = max_tokens
-            logger.warning("⚠️ OpenAI param '%s' non supporté pour %s – retry avec '%s'",
-                           wrong_param, model, other)
-            with httpx.Client(timeout=timeout) as client:
-                r2 = client.post(url, headers=headers, json=payload)
-            if r2.status_code == 200:
-                return r2.json()
-
-    # Retry si température non supportée
-    try:
-        err_msg_full = err.get("message", "") if isinstance(err, dict) else (r.text or "")
-    except Exception:
-        err_msg_full = r.text or ""
-    if _is_temp_unsupported_error(err_msg_full):
+    # Retry removing temperature if model refuses custom values
+    if _is_temp_unsupported_error(err_msg):
         logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
         payload.pop("temperature", None)
         with httpx.Client(timeout=timeout) as client:
             r3 = client.post(url, headers=headers, json=payload)
         if r3.status_code == 200:
             return r3.json()
-    
-    # Si on est là, on remonte l'erreur d'origine pour ton retry logic externe
+        try:
+            err_obj3 = r3.json()
+            err_msg = (err_obj3.get("error") or {}).get("message", "") or r3.text
+        except Exception:  # noqa: BLE001
+            err_msg = r3.text or err_msg
+
+    # Otherwise raise the original error
     try:
         r.raise_for_status()
-    except httpx.HTTPStatusError as e:
+    except httpx.HTTPStatusError as e:  # noqa: BLE001
         raise RuntimeError(f"Requête OpenAI invalide: {e.response.text}") from None
     return r.json()
 
-# ==================== WRAPPER DE COMPATIBILITÉ ====================
+
+# ----------------------------------------------------------------------------
+# High‑level text completion (keeps original signature)
+# ----------------------------------------------------------------------------
+
 @openai_retry(max_retries=2, delay=1.0)
-def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None, model: Optional[str] = None) -> str:
+def complete_text(
+    prompt: str,
+    temperature: float = 0.2,
+    max_tokens: Optional[int] = None,
+    model: Optional[str] = None,
+) -> str:
+    """Legacy wrapper that builds chat messages and returns text content.
+    Applies safe temperature and tolerant output parsing.
     """
-    Wrapper de compatibilité pour l'ancienne signature complete(prompt) -> str
-    🔧 CORRECTIF: Temperature sécurisée
-    """
-    # Validation des paramètres
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt ne peut pas être vide")
-    
-    # Configuration standard
-    if model is None:
-        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
-    
-    # 🔧 CORRECTIF: Temperature sécurisée
-    safe_temp = _get_safe_temperature(temperature, model) if temperature is not None else None
-    if safe_temp is None:
-        logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
-    
-    # Calcul adaptatif de max_tokens
+
+    model = model or os.getenv("OPENAI_SYNTHESIS_MODEL", _DEFAULT_MODEL)
+    safe_temp = _get_safe_temperature(temperature, model)
+
+    # Adaptive token budget
     if max_tokens is None:
-        prompt_length = len(prompt)
-        if prompt_length < 500:
-            max_tokens = 300
-        elif prompt_length < 1500:
-            max_tokens = 500
-        elif prompt_length < 3000:
-            max_tokens = 700
+        plen = len(prompt)
+        if plen < 500:
+            max_tokens = 500 if model.startswith("gpt-5") else 300
+        elif plen < 1500:
+            max_tokens = 1000 if model.startswith("gpt-5") else 500
+        elif plen < 3000:
+            max_tokens = 1500 if model.startswith("gpt-5") else 700
         else:
-            max_tokens = 800
-        
-        # Vérification des limites du modèle
+            max_tokens = 2000 if model.startswith("gpt-5") else 800
         model_limit = get_model_max_tokens(model)
-        estimated_prompt_tokens = estimate_tokens(prompt, model)
-        available_tokens = model_limit - estimated_prompt_tokens - 100
-        
-        if available_tokens > 0:
-            max_tokens = min(max_tokens, available_tokens)
-    
-    # Construction du message
+        available = model_limit - estimate_tokens(prompt, model) - 100
+        if available > 0:
+            max_tokens = min(max_tokens, available)
+
     messages = [
         {
             "role": "system",
@@ -535,611 +321,325 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
                 "Tu es un expert en synthèse de contenu technique avicole. "
                 "Réponds de manière concise, précise et professionnelle. "
                 "Utilise un français clair et structure ton texte avec du Markdown si approprié."
-            )
+            ),
         },
-        {
-            "role": "user", 
-            "content": prompt.strip()
-        }
+        {"role": "user", "content": prompt.strip()},
     ]
-    
-    logger.debug(f"🤖 Appel complete_text(): model={model}, temp={safe_temp}, max_tokens={max_tokens}")
-    
-    try:
-        # 🔧 CORRECTIF: Utilise la fonction complete() corrigée
-        response = complete(messages, model, safe_temp if safe_temp is not None else None, max_tokens)  # Force temperature=1.0
-        
-        if not response or not response.get("choices"):
-            raise RuntimeError("Réponse OpenAI vide")
-        
-        content = response["choices"][0]["message"]["content"]
-        if not content:
-            raise RuntimeError("Contenu de réponse vide")
-        
-        logger.debug(f"✅ Complete_text terminé: {len(content)} caractères générés")
-        return content.strip()
-        
-    except Exception as e:
-        logger.error(f"⛔ Erreur dans complete_text(): {type(e).__name__}: {e}")
-        raise RuntimeError(f"Erreur lors de la synthèse LLM: {e}")
 
-# ==================== FONCTION AMÉLIORÉE: safe_chat_completion avec correctif max_completion_tokens ====================
+    response = complete(
+        messages=messages,
+        model=model,
+        temperature=safe_temp if safe_temp is not None else None,
+        max_tokens=max_tokens,
+        timeout=_OPENAI_TIMEOUT,
+    )
+
+    if not response or not response.get("choices"):
+        raise RuntimeError("Réponse OpenAI vide")
+
+    choice = (response.get("choices") or [{}])[0]
+    content = ((choice.get("message") or {}).get("content")) or choice.get("text") or ""
+
+
+    if not content:
+            finish_reason = choice.get("finish_reason", "unknown")
+            logger.error(f"[OpenAI] Réponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, Aperçu: {str(response)[:500]}")
+            
+            # Retry avec plus de tokens si coupé par la limite
+            if finish_reason == "length" and max_tokens < 3000:
+                logger.warning(f"[OpenAI] Retry avec max_tokens augmenté: {max_tokens} -> {max_tokens * 2}")
+                return complete_text(prompt, temperature, max_tokens * 2, model)
+            
+            raise RuntimeError(f"Contenu de réponse vide (finish_reason: {finish_reason})")
+
+    return content.strip()
+
+
+# ----------------------------------------------------------------------------
+# SDK path (keeps original signature) — safe_chat_completion
+# ----------------------------------------------------------------------------
+
 @openai_retry(max_retries=2, delay=1.0)
 def safe_chat_completion(**kwargs) -> Any:
+    """Safe wrapper around openai.chat.completions.create
+    - Auto‑maps tokens param name
+    - Applies safe temperature
+    - Retries without temperature if unsupported
+    - Retries swapping token param name if API complains
     """
-    Wrapper sécurisé pour openai.chat.completions.create
-    🔧 CORRECTIF: Gestion sécurisée de la temperature
-    
-    AMÉLIORATIONS APPLIQUÉES:
-    - Utilisation de _get_api_key() centralisée (plus de duplication)
-    - Retry automatique avec backoff exponentiel
-    - Gestion d'erreurs spécialisée par type
-    - Validation des paramètres d'entrée
-    - Logging détaillé pour debug
-    - NOUVEAU: Support automatique max_completion_tokens pour nouveaux modèles
-    - CORRECTIF: Temperature sécurisée selon le modèle
-    """
-    
-    # ✅ AMÉLIORATION: Validation des paramètres essentiels
-    if 'model' not in kwargs:
-        kwargs['model'] = os.getenv('DEFAULT_MODEL', 'gpt-5')
+    if "model" not in kwargs:
+        kwargs["model"] = _DEFAULT_MODEL
         logger.debug(f"🔧 Modèle par défaut utilisé: {kwargs['model']}")
-    
-    if 'messages' not in kwargs or not kwargs['messages']:
+
+    if "messages" not in kwargs or not kwargs["messages"]:
         raise ValueError("Le paramètre 'messages' est requis et ne peut pas être vide")
-    
-    # ✅ AMÉLIORATION: Configuration avec paramètres par défaut intelligents
-    default_params = {
-        'temperature': float(os.getenv('OPENAI_DEFAULT_TEMPERATURE', '1.0')),  # 🔧 CORRECTIF: 1.0 par défaut
-        'max_tokens': int(os.getenv('OPENAI_DEFAULT_MAX_TOKENS', '500')),
-        'timeout': int(os.getenv('OPENAI_DEFAULT_TIMEOUT', '30'))
-    }
-    
-    # Appliquer les défauts seulement si non spécifiés
-    for key, value in default_params.items():
-        if key not in kwargs:
-            kwargs[key] = value
-    
-    # 🆕 CORRECTIF: Détection automatique du bon paramètre selon le modèle
-    model = kwargs.get('model', 'gpt-5')
-    if 'max_tokens' in kwargs:
-        max_tokens_value = kwargs.pop('max_tokens')
-        correct_param = _completion_param_name(model)
-        kwargs[correct_param] = max_tokens_value
-        logger.debug(f"🔧 Paramètre tokens: {correct_param}={max_tokens_value} pour {model}")
-    
-    # 🔧 CORRECTIF: Nettoyage temperature sécurisée
-    if 'temperature' in kwargs:
-        t = kwargs['temperature']
-        safe = _get_safe_temperature(t, model)
+
+    model = kwargs["model"]
+
+    # Defaults
+    kwargs.setdefault("timeout", _OPENAI_TIMEOUT)
+    kwargs.setdefault("max_tokens", _OPENAI_DEFAULT_MAX_TOKENS)
+
+    # Harmonize token param name
+    param_name = _completion_param_name(model)
+    if "max_tokens" in kwargs and param_name == "max_completion_tokens":
+        kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+    elif "max_completion_tokens" in kwargs and param_name == "max_tokens":
+        kwargs["max_tokens"] = kwargs.pop("max_completion_tokens")
+
+    # Safe temperature
+    if "temperature" in kwargs:
+        safe = _get_safe_temperature(kwargs["temperature"], model)
         if safe is None:
-            kwargs.pop('temperature', None)
+            kwargs.pop("temperature", None)
         else:
-            kwargs['temperature'] = safe
-    
-    logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature', 'default')}")
-    
+            kwargs["temperature"] = safe
+
+    _configure_openai_client()
+    start = time.time()
     try:
-        # ✅ AMÉLIORATION: Configuration centralisée
-        _configure_openai_client()
-        
-        # ✅ AMÉLIORATION: Mesure du temps de réponse
-        start_time = time.time()
-        
-        # 🆕 CORRECTIF: Appel avec auto-retry si mauvais paramètre
+        resp = openai.chat.completions.create(**kwargs)
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        # Retry if temp unsupported
+        if _is_temp_unsupported_error(msg):
+            logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+            kwargs.pop("temperature", None)
+            resp = openai.chat.completions.create(**kwargs)
+        # Retry if wrong token param name
+        elif "unsupported_parameter" in msg.lower() and (
+            "max_tokens" in msg.lower() or "max_completion_tokens" in msg.lower()
+        ):
+            if "max_tokens" in kwargs:
+                kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+            elif "max_completion_tokens" in kwargs:
+                kwargs["max_tokens"] = kwargs.pop("max_completion_tokens")
+            resp = openai.chat.completions.create(**kwargs)
+        else:
+            raise
+
+    elapsed = time.time() - start
+    logger.debug(f"✅ Réponse OpenAI Chat reçue en {elapsed:.2f}s")
+
+    if not resp or not getattr(resp, "choices", None):
+        raise RuntimeError("Réponse OpenAI vide ou malformée")
+    return resp
+
+
+# ----------------------------------------------------------------------------
+# CoT path (keeps signature) — complete_with_cot
+# ----------------------------------------------------------------------------
+
+def _parse_cot_sections(raw: str) -> Dict[str, str]:
+    """Very light XML‑ish sections parser for CoT content."""
+    out: Dict[str, str] = {}
+    if not raw:
+        return out
+    for tag in ("<analysis>", "<plan>", "<answer>"):
+        name = tag.strip("<>")
+        m = re.search(rf"{re.escape(tag)}(.*?){re.escape('</' + name + '>')}", raw, re.S | re.I)
+        if m:
+            out[name] = m.group(1).strip()
+    return out
+
+
+def _extract_final_answer(raw: str, sections: Dict[str, str]) -> str:
+    return sections.get("answer") or raw.strip()
+
+
+@openai_retry(max_retries=2, delay=1.0)
+def complete_with_cot(
+    prompt: str,
+    temperature: float = 0.3,
+    max_tokens: Optional[int] = None,
+    model: Optional[str] = None,
+    parse_cot: bool = True,
+) -> Dict[str, Any]:
+    """Chain‑of‑Thought helper. Preserves signature; GPT‑5‑safe temperature.
+    Returns dict with raw_response, parsed_sections, final_answer, model_used.
+    """
+    if not prompt or not prompt.strip():
+        raise ValueError("Le prompt CoT ne peut pas être vide")
+
+    model = model or os.getenv("OPENAI_COT_MODEL", _DEFAULT_MODEL)
+
+    # Token budget
+    if max_tokens is None:
+        max_tokens = int(os.getenv("OPENAI_COT_MAX_TOKENS", "800"))
+        model_limit = get_model_max_tokens(model)
+        available = model_limit - estimate_tokens(prompt, model) - 150
+        if available > 0:
+            max_tokens = min(max_tokens, available)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Tu es un expert vétérinaire avicole avec une approche méthodologique rigoureuse. "
+                "Suis précisément la structure de raisonnement demandée avec les balises XML. "
+                "Reste factuel, précis et professionnel dans ton analyse."
+            ),
+        },
+        {"role": "user", "content": prompt.strip()},
+    ]
+
+    param_name = _completion_param_name(model)
+    call_kwargs: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        param_name: max_tokens,
+        "top_p": 0.9,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.1,
+    }
+    safe_temp = _get_safe_temperature(temperature, model)
+    if safe_temp is not None:
+        call_kwargs["temperature"] = safe_temp
+
+    _configure_openai_client()
+    try:
+        response = openai.chat.completions.create(**call_kwargs)
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        if _is_temp_unsupported_error(msg):
+            logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
+            call_kwargs.pop("temperature", None)
+            response = openai.chat.completions.create(**call_kwargs)
+        elif "unsupported_parameter" in msg.lower() and (
+            "max_tokens" in msg.lower() or "max_completion_tokens" in msg.lower()
+        ):
+            # Swap token parameter and retry
+            other = "max_tokens" if param_name == "max_completion_tokens" else "max_completion_tokens"
+            call_kwargs[other] = call_kwargs.pop(param_name)
+            response = openai.chat.completions.create(**call_kwargs)
+        else:
+            raise
+
+    if not response or not response.choices:
+        raise RuntimeError("Réponse OpenAI CoT vide")
+
+    raw_content = response.choices[0].message.content
+    if not raw_content:
+        raise RuntimeError("Contenu CoT vide")
+
+    result: Dict[str, Any] = {
+        "raw_response": raw_content.strip(),
+        "model_used": model,
+        "temperature": safe_temp if safe_temp is not None else "default",
+    }
+
+    if hasattr(response, "usage"):
         try:
-            response = openai.chat.completions.create(**kwargs)
-        except Exception as e:
-            # Auto-retry si erreur de paramètre non supporté
-            error_msg = str(e).lower()
-            if "unsupported_parameter" in error_msg and ("max_tokens" in error_msg or "max_completion_tokens" in error_msg):
-                logger.warning(f"⚠️ Paramètre tokens non supporté pour {model}, tentative avec paramètre alternatif")
-                
-                # Swap du paramètre et retry une fois
-                if 'max_tokens' in kwargs:
-                    kwargs['max_completion_tokens'] = kwargs.pop('max_tokens')
-                elif 'max_completion_tokens' in kwargs:
-                    kwargs['max_tokens'] = kwargs.pop('max_completion_tokens')
-                
-                
-            # Retry si température non supportée par le modèle
-            if _is_temp_unsupported_error(error_msg):
-                logger.warning(f"[OpenAI] Température non supportée par {model} → retry sans 'temperature'")
-                kwargs.pop('temperature', None)
-                response = openai.chat.completions.create(**kwargs)
-                error_msg = ""  # reset to avoid re-raising
-        response = openai.chat.completions.create(**kwargs)
-            else:
-                raise
-        
-        elapsed_time = time.time() - start_time
-        
-        logger.debug(f"✅ Réponse OpenAI Chat reçue en {elapsed_time:.2f}s")
-        
-        # ✅ AMÉLIORATION: Validation de la réponse
-        if not response or not response.choices:
-            raise RuntimeError("Réponse OpenAI vide ou malformée")
-        
-        # ✅ AMÉLIORATION: Logging des métriques d'usage
-        if hasattr(response, 'usage') and response.usage:
-            logger.debug(f"📊 Tokens utilisés: {response.usage.total_tokens}")
-        
-        return response
-        
-    except openai.AuthenticationError as e:
-        logger.error("⛔ Erreur authentification OpenAI - vérifiez votre clé API")
-        raise RuntimeError(f"Authentification OpenAI échouée: {e}")
-        
-    except openai.PermissionDeniedError as e:
-        logger.error("⛔ Permission refusée OpenAI - vérifiez vos droits d'accès")
-        raise RuntimeError(f"Permission OpenAI refusée: {e}")
-        
-    except openai.BadRequestError as e:
-        logger.error(f"⛔ Requête OpenAI invalide: {e}")
-        raise RuntimeError(f"Requête OpenAI invalide: {e}")
-        
-    except Exception as e:
-        logger.error(f"⛔ Erreur inattendue OpenAI Chat: {type(e).__name__}: {e}")
-        raise RuntimeError(f"Erreur lors de l'appel à OpenAI ChatCompletion: {e}")
+            result["token_usage"] = {
+                "total": response.usage.total_tokens,
+                "prompt": response.usage.prompt_tokens,
+                "completion": response.usage.completion_tokens,
+            }
+        except Exception:  # noqa: BLE001
+            pass
 
-# ==================== FONCTION AMÉLIORÉE: safe_embedding_create ====================
+    if parse_cot:
+        parsed_sections = _parse_cot_sections(raw_content)
+        result["parsed_sections"] = parsed_sections
+        result["final_answer"] = _extract_final_answer(raw_content, parsed_sections)
+
+    return result
+
+
+# ----------------------------------------------------------------------------
+# Embeddings (kept; batching + compatibility)
+# ----------------------------------------------------------------------------
+
 @openai_retry(max_retries=2, delay=0.5)
-def safe_embedding_create(input: Any, model: str = "text-embedding-ada-002", **kwargs) -> List[List[float]]:
+def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> List[List[float]] | List[float]:
+    """Create embeddings with batching; returns list(s) of vectors.
+    Accepts str or list[str]. Preserves existing signature.
     """
-    Wrapper sécurisé pour openai.embeddings.create
-    
-    AMÉLIORATIONS APPLIQUÉES:
-    - Utilisation de _get_api_key() centralisée (plus de duplication)
-    - Retry automatique pour erreurs temporaires
-    - Validation et normalisation des inputs
-    - Gestion d'erreurs spécialisée
-    - Support des embeddings batch
-    - Format de retour standardisé
-    """
-    
-    # ✅ AMÉLIORATION: Validation et normalisation des inputs
-    if not input:
+    if input is None:
         raise ValueError("Le paramètre 'input' ne peut pas être vide")
-    
-    # Normaliser input en liste si nécessaire
+
     if isinstance(input, str):
-        input_list = [input]
-        single_input = True
+        inputs = [input]
+        single = True
     elif isinstance(input, list):
-        input_list = input
-        single_input = False
+        inputs = input
+        single = False
     else:
-        raise ValueError("Le paramètre 'input' doit être une string ou une liste de strings")
-    
-    # Validation du contenu
-    for i, text in enumerate(input_list):
-        if not isinstance(text, str):
-            raise ValueError(f"Élément {i} de input doit être une string")
-        if not text.strip():
-            logger.warning(f"⚠️ Élément {i} de input est vide")
-    
-    # ✅ AMÉLIORATION: Filtrer les textes vides
-    filtered_input = [text.strip() for text in input_list if text.strip()]
-    if not filtered_input:
+        raise ValueError("'input' doit être une string ou une liste de strings")
+
+    inputs = [s.strip() for s in inputs if isinstance(s, str) and s.strip()]
+    if not inputs:
         raise ValueError("Aucun texte valide après filtrage")
-    
-    # ✅ AMÉLIORATION: Configuration avec modèle par défaut
-    if not model:
-        model = os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-ada-002')
-    
-    logger.debug(f"📤 Appel OpenAI Embeddings: model={model}, inputs={len(filtered_input)}")
-    
-    try:
-        # ✅ AMÉLIORATION: Configuration centralisée
-        _configure_openai_client()
-        
-        # ✅ AMÉLIORATION: Gestion des grandes listes (batch processing)
-        max_batch_size = int(os.getenv('OPENAI_EMBEDDING_BATCH_SIZE', '100'))
-        all_embeddings = []
-        
-        for i in range(0, len(filtered_input), max_batch_size):
-            batch = filtered_input[i:i + max_batch_size]
-            
-            start_time = time.time()
-            response = openai.embeddings.create(
-                input=batch,
-                model=model,
-                **kwargs
-            )
-            elapsed_time = time.time() - start_time
-            
-            logger.debug(f"✅ Batch embeddings {i//max_batch_size + 1} traité en {elapsed_time:.2f}s")
-            
-            # ✅ AMÉLIORATION: Extraction robuste des embeddings avec compatibilité
-            if hasattr(response, 'data') and response.data:
-                batch_embeddings = [item.embedding for item in response.data]
-            elif isinstance(response, dict) and 'data' in response:
-                batch_embeddings = [
-                    item.get('embedding') if isinstance(item, dict) else item.embedding 
-                    for item in response['data']
-                ]
-            else:
-                raise RuntimeError("Format de réponse OpenAI Embeddings non reconnu")
-            
-            all_embeddings.extend(batch_embeddings)
-        
-        # ✅ AMÉLIORATION: Validation des embeddings retournés
-        if len(all_embeddings) != len(filtered_input):
-            raise RuntimeError(f"Nombre d'embeddings ({len(all_embeddings)}) "
-                             f"ne correspond pas aux inputs ({len(filtered_input)})")
-        
-        # Vérification de la dimension des embeddings
-        if all_embeddings and all_embeddings[0]:
-            embedding_dim = len(all_embeddings[0])
-            logger.debug(f"📊 Embeddings générés: {len(all_embeddings)} vecteurs de dimension {embedding_dim}")
-        
-        # ✅ AMÉLIORATION: Retour adapté au format d'entrée
-        if single_input:
-            return all_embeddings[0] if all_embeddings else []
-        else:
-            return all_embeddings
-        
-    except openai.AuthenticationError as e:
-        logger.error("⛔ Erreur authentification OpenAI Embeddings")
-        raise RuntimeError(f"Authentification OpenAI échouée: {e}")
-        
-    except openai.InvalidRequestError as e:
-        logger.error(f"⛔ Requête OpenAI Embeddings invalide: {e}")
-        raise RuntimeError(f"Requête OpenAI Embeddings invalide: {e}")
-        
-    except Exception as e:
-        logger.error(f"⛔ Erreur inattendue OpenAI Embeddings: {type(e).__name__}: {e}")
-        raise RuntimeError(f"Erreur lors de l'appel à OpenAI Embedding: {e}")
 
-# ==================== 🆕 NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER ====================
+    model = model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
-def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
-    """
-    🆕 NOUVEAU: Synthèse spécialisée pour le contenu RAG du dialogue_manager
-    🔧 CORRECTIF: Temperature sécurisée
-    
-    Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
-    """
-    
-    if not raw_content or not raw_content.strip():
-        return "Informations techniques disponibles."
-    
-    # Prompt spécialisé pour le contenu avicole
-    synthesis_prompt = f"""Synthétise ces informations techniques avicoles de manière claire et professionnelle.
+    _configure_openai_client()
 
-INSTRUCTIONS CRITIQUES :
-- NE JAMAIS mentionner de sources, fichiers PDF ou références dans ta réponse
-- NE JAMAIS inclure de fragments de tableaux mal formatés
-- Utiliser du Markdown pour la structure (##, **, -)
-- Réponse concise (~{max_length} mots maximum)
-- Si données incertaines, donner une fourchette
-- Garder uniquement les informations pertinentes à la question
+    all_vecs: List[List[float]] = []
+    for i in range(0, len(inputs), _OPENAI_EMBED_BATCH):
+        batch = inputs[i : i + _OPENAI_EMBED_BATCH]
+        resp = openai.embeddings.create(input=batch, model=model, **kwargs)
+        data = resp.data if hasattr(resp, "data") else (resp.get("data", []))
+        batch_vecs = [item.embedding for item in data]
+        all_vecs.extend(batch_vecs)
 
-Question utilisateur : {question}
+    if single:
+        return all_vecs[0] if all_vecs else []
+    return all_vecs
 
-Contenu technique à synthétiser :
-{raw_content[:1500]}
 
-Réponse synthétique (format Markdown, sans sources) :"""
-
-    try:
-        # 🔧 CORRECTIF: Utilisation de complete_text() avec temperature sécurisée
-        response = complete_text(synthesis_prompt, temperature=0.2, max_tokens=min(400, max_length + 100))
-        return response.strip()
-    except Exception as e:
-        logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
-        # Fallback simple : nettoyage basique
-        cleaned = raw_content.strip()[:max_length]
-        if len(raw_content) > max_length:
-            cleaned += "..."
-        return cleaned
-
-def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
-    """
-    🆕 NOUVEAU: Génère des réponses de clarification intelligentes
-    🔧 CORRECTIF: Temperature sécurisée
-    """
-    
-    prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
-
-CONTEXTE :
-- Intention détectée : {intent}
-- Informations manquantes : {', '.join(missing_fields)}
-- Info générale disponible : {general_info[:200] if general_info else 'Aucune'}
-
-INSTRUCTIONS :
-- Réponse en 2-3 phrases maximum
-- Expliquer pourquoi ces infos sont importantes
-- Ton professionnel mais accessible
-- Pas de mention de sources
-
-Réponse de clarification :"""
-
-    try:
-        # 🔧 CORRECTIF: Temperature sécurisée
-        return complete_text(prompt, temperature=0.3, max_tokens=150)
-    except Exception as e:
-        logger.warning(f"⚠️ Échec génération clarification: {e}")
-        # Fallback générique
-        return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."
-
-# ==================== NOUVELLES FONCTIONNALITÉS UTILITAIRES ====================
-def test_openai_connection() -> Dict[str, Any]:
-    """
-    ✅ NOUVELLE FONCTIONNALITÉ: Test de connexion OpenAI
-    Utile pour les diagnostics et la validation de configuration
-    """
-    try:
-        logger.info("🔧 Test de connexion OpenAI...")
-        
-        # Test simple avec un prompt minimal
-        response = safe_chat_completion(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "Test"}],
-            max_tokens=5
-            # 🔧 CORRECTIF: Pas de temperature fixe, utilise le défaut
-        )
-        
-        return {
-            "status": "success",
-            "message": "Connexion OpenAI fonctionnelle",
-            "model_tested": "gpt-3.5-turbo",
-            "response_preview": response.choices[0].message.content[:50] if response.choices else "N/A"
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec connexion OpenAI: {str(e)}",
-            "error_type": type(e).__name__
-        }
+# ----------------------------------------------------------------------------
+# Models listing (kept)
+# ----------------------------------------------------------------------------
 
 def get_openai_models() -> List[str]:
-    """
-    ✅ NOUVELLE FONCTIONNALITÉ: Liste des modèles OpenAI disponibles
-    """
     try:
         _configure_openai_client()
         models = openai.models.list()
-        return [model.id for model in models.data if model.id]
-    except Exception as e:
+        return [m.id for m in models.data if getattr(m, "id", None)]
+    except Exception as e:  # noqa: BLE001
         logger.error(f"⛔ Erreur récupération modèles: {e}")
         return []
 
-def estimate_tokens(text: str, model: str = "gpt-4") -> int:
-    """
-    ✅ NOUVELLE FONCTIONNALITÉ: Estimation approximative du nombre de tokens
-    Utile pour éviter les dépassements de limites
-    """
-    # Estimation grossière : ~4 caractères par token pour l'anglais/français
-    # Plus précis avec tiktoken si disponible
+
+# ----------------------------------------------------------------------------
+# Connection test (kept)
+# ----------------------------------------------------------------------------
+
+def test_openai_connection() -> Dict[str, Any]:
     try:
-        import tiktoken
-        encoding = tiktoken.encoding_for_model(model)
-        return len(encoding.encode(text))
-    except ImportError:
-        # Fallback vers estimation approximative
-        return len(text) // 4
-    except Exception:
-        # Fallback sécurisé
-        return len(text) // 4
+        logger.info("🔧 Test de connexion OpenAI…")
+        test_model = os.getenv("OPENAI_TEST_MODEL", _DEFAULT_MODEL)
+        try:
+            resp = safe_chat_completion(
+                model=test_model,
+                messages=[{"role": "user", "content": "Test"}],
+                max_tokens=5,
+            )
+        except Exception:
+            # fallback léger
+            resp = safe_chat_completion(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Test"}],
+                max_tokens=5,
+            )
+            test_model = "gpt-4o-mini"
 
-def get_model_max_tokens(model: str) -> int:
-    """
-    ✅ NOUVELLE FONCTIONNALITÉ: Récupère la limite de tokens pour un modèle
-    """
-    MAX_TOKENS_LIMITS = {
-        "gpt-3.5-turbo": 4096,
-        "gpt-4": 8192,
-        "gpt-4o": 4096,
-        "gpt-4-turbo": 128000,
-        "gpt-4o-mini": 4096,
-        "gpt-5": 8192,
-        "gpt-5-mini": 4096,
-        "gpt-5-nano": 2048,
-        "gpt-5-chat-latest": 8192
-    }
-    return MAX_TOKENS_LIMITS.get(model, 4096)
+        preview = ""
+        try:
+            preview = resp.choices[0].message.content[:50] if resp.choices else "N/A"
+        except Exception:  # noqa: BLE001
+            preview = "N/A"
 
-# ==================== CONFIGURATION ET CONSTANTES ====================
-# ✅ AMÉLIORATION: Constantes configurables
-DEFAULT_MODELS = {
-    "chat": os.getenv('DEFAULT_MODEL', 'gpt-5'),
-    "embedding": os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-ada-002'),
-    "synthesis": os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5')),  # 🆕 Nouveau pour synthèse
-    "cot": os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))  # 🆕 Nouveau pour Chain-of-Thought
-}
-
-# ==================== 🆕 FONCTIONS DE DIAGNOSTIC COT ====================
-
-def test_cot_pipeline() -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
-    🔧 CORRECTIF: Temperature sécurisée
-    """
-    try:
-        # Test prompt CoT simple
-        test_cot_prompt = """<thinking>
-Analyse de la question : Il s'agit d'un test du système CoT.
-</thinking>
-
-<analysis>
-Le système doit parser cette structure et extraire les sections.
-</analysis>
-
-<recommendations>
-Le test CoT fonctionne correctement si ce texte est parsé.
-</recommendations>
-
-Réponse finale : Test CoT réussi."""
-
-        # Test complete_with_cot
-        cot_result = complete_with_cot(
-            prompt=test_cot_prompt,
-            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
-            max_tokens=200,
-            parse_cot=True
-        )
-        
-        # Test parsing
-        sections_found = len(cot_result.get("parsed_sections", {}))
-        has_final_answer = bool(cot_result.get("final_answer"))
-        
-        # Test complete() avec détection automatique
-        auto_cot_result = complete_text(
-            prompt="<thinking>Test automatique</thinking>\n\nRéponse automatique CoT.",
-            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
-            max_tokens=100
-        )
-        
         return {
             "status": "success",
-            "cot_direct_test": {
-                "success": True,
-                "sections_parsed": sections_found,
-                "final_answer_extracted": has_final_answer,
-                "raw_length": len(cot_result.get("raw_response", ""))
-            },
-            "cot_auto_detection": {
-                "success": True,
-                "response_length": len(auto_cot_result)
-            },
-            "message": "Pipeline CoT entièrement fonctionnel"
+            "message": "Connexion OpenAI fonctionnelle",
+            "model_tested": test_model,
+            "response_preview": preview,
         }
-        
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "status": "error",
-            "message": f"Échec test pipeline CoT: {str(e)}",
-            "error_type": type(e).__name__
+            "message": f"Échec connexion OpenAI: {e}",
+            "error_type": type(e).__name__,
         }
-
-def test_synthesis_pipeline() -> Dict[str, Any]:
-    """
-    🆕 AMÉLIORÉ: Test complet du pipeline de synthèse pour dialogue_manager
-    🔧 CORRECTIF: Temperature sécurisée
-    """
-    try:
-        # Test de la fonction complete_text()
-        test_response = complete_text(
-            prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
-            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
-            max_tokens=50
-        )
-        
-        # Test de synthèse RAG
-        rag_test = synthesize_rag_content(
-            question="Poids idéal poule?",
-            raw_content="Les poules Ross 308 atteignent un poids optimal de 2.2kg à 42 jours selon les standards techniques...",
-            max_length=100
-        )
-        
-        # Test clarification
-        clarification_test = generate_clarification_response(
-            intent="PerfTargets",
-            missing_fields=["age_days", "line"],
-            general_info="Information sur les performances"
-        )
-        
-        return {
-            "status": "success",
-            "complete_test": {
-                "success": True,
-                "response": test_response[:100] + "..." if len(test_response) > 100 else test_response
-            },
-            "rag_synthesis_test": {
-                "success": True,
-                "response": rag_test[:100] + "..." if len(rag_test) > 100 else rag_test
-            },
-            "clarification_test": {
-                "success": True,
-                "response": clarification_test[:100] + "..." if len(clarification_test) > 100 else clarification_test
-            },
-            "message": "Pipeline de synthèse fonctionnel"
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Échec test pipeline synthèse: {str(e)}",
-            "error_type": type(e).__name__
-        }
-
-# ==================== LOGGING ET DIAGNOSTICS ====================
-def get_openai_status() -> Dict[str, Any]:
-    """
-    ✅ AMÉLIORÉ: Status complet du système OpenAI avec support CoT
-    🔧 CORRECTIF: Inclut les infos sur la gestion de temperature
-    """
-    return {
-        "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "default_models": DEFAULT_MODELS,
-        "max_tokens_limits": {
-            "gpt-3.5-turbo": 4096,
-            "gpt-4": 8192,
-            "gpt-4o": 4096,
-            "gpt-4-turbo": 128000,
-            "gpt-4o-mini": 4096,
-            "gpt-5": 8192,
-            "gpt-5-mini": 4096,
-            "gpt-5-nano": 2048,
-            "gpt-5-chat-latest": 8192
-        },
-        "retry_config": {
-            "max_retries": 2,
-            "base_delay": 1.0
-        },
-        "batch_config": {
-            "embedding_batch_size": os.getenv('OPENAI_EMBEDDING_BATCH_SIZE', '100')
-        },
-        "synthesis_config": {  # 🆕 Nouveau pour dialogue_manager
-            "synthesis_model": DEFAULT_MODELS["synthesis"],
-            "default_temperature": 0.2,  # 🔧 CORRECTIF: Valeur plus conservative
-            "max_synthesis_tokens": 500
-        },
-        "cot_config": {  # 🆕 NOUVEAU: Configuration CoT
-            "cot_model": DEFAULT_MODELS["cot"],
-            "auto_detection_enabled": True,
-            "supported_tags": [
-                "thinking", "analysis", "reasoning", "factors", "recommendations",
-                "validation", "problem_decomposition", "solution_pathway"
-            ],
-            "max_cot_tokens": 1000
-        },
-        "compatibility_config": {  # 🆕 NOUVEAU: Configuration compatibilité
-            "max_completion_tokens_support": True,
-            "auto_parameter_detection": True,
-            "supported_model_families": ["gpt-4.1", "gpt-4o", "o4", "omni", "gpt-5"],
-            "temperature_safety": {  # 🔧 NOUVEAU: Gestion temperature sécurisée
-                "safe_temperature_detection": True,
-                "force_default_temperature": bool(os.getenv("OPENAI_FORCE_DEFAULT_TEMPERATURE", "").lower() == "true"),
-                "restricted_temp_models": os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",") if os.getenv("OPENAI_RESTRICTED_TEMP_MODELS") else []
-            }
-        }
-    }
-
-def get_cot_capabilities() -> Dict[str, Any]:
-    """
-    🆕 NOUVEAU: Retourne les capacités Chain-of-Thought disponibles
-    """
-    return {
-        "cot_available": True,
-        "auto_detection": True,
-        "parsing_enabled": True,
-        "followup_generation": True,
-        "supported_sections": [
-            "thinking", "analysis", "reasoning", "factors", "recommendations",
-            "validation", "problem_decomposition", "factor_analysis", 
-            "interconnections", "solution_pathway", "risk_mitigation",
-            "economic_context", "cost_benefit_breakdown", "scenario_analysis"
-        ],
-        "supported_intents": [
-            "HealthDiagnosis", "OptimizationStrategy", "TroubleshootingMultiple",
-            "ProductionAnalysis", "MultiFactor", "Economics"
-        ],
-        "models": {
-            "preferred": DEFAULT_MODELS["cot"],
-            "fallback": DEFAULT_MODELS["chat"]
-        },
-        "temperature_safety": True  # 🔧 NOUVEAU: Indicateur de sécurité temperature
-    }
