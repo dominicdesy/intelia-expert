@@ -77,9 +77,52 @@ async def login(request: LoginRequest):
     token = create_access_token({"user_id": user.id, "email": request.email}, expires)
     return {"access_token": token, "expires_at": datetime.utcnow() + expires}
 
+# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase
+async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
+    """
+    Récupère le profil utilisateur depuis la table Supabase users
+    """
+    try:
+        if not SUPABASE_AVAILABLE:
+            logger.warning("Supabase non disponible - rôle par défaut")
+            return {"user_type": "user"}
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        
+        if not supabase_url or not supabase_key:
+            logger.warning("Config Supabase manquante - rôle par défaut")
+            return {"user_type": "user"}
+        
+        supabase = create_client(supabase_url, supabase_key)
+        
+        # Chercher par auth_user_id d'abord (si c'est comme ça que c'est lié)
+        response = supabase.table('users').select('*').eq('auth_user_id', user_id).execute()
+        
+        # Si pas trouvé par auth_user_id, essayer par email
+        if not response.data:
+            response = supabase.table('users').select('*').eq('email', email).execute()
+        
+        if response.data and len(response.data) > 0:
+            profile = response.data[0]
+            logger.debug(f"✅ Profil trouvé pour {email}: {profile.get('user_type', 'user')}")
+            return {
+                "user_type": profile.get('user_type', 'user'),
+                "full_name": profile.get('full_name'),
+                "preferences": profile.get('preferences', {}),
+                "profile_id": profile.get('id')
+            }
+        else:
+            logger.warning(f"⚠️ Aucun profil trouvé pour {email} - rôle par défaut")
+            return {"user_type": "user"}
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération profil Supabase: {e}")
+        return {"user_type": "user"}
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
-    ✅ CORRECTION MAJEURE: Decode JWT tokens Supabase
+    ✅ VERSION ÉTENDUE : Decode JWT tokens Supabase + récupération user_type
     """
     token = credentials.credentials
     
@@ -128,21 +171,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             logger.info(f"✅ Token décodé avec succès avec {secret_name}")
             
             # Extraire les informations utilisateur du payload Supabase
-            user_data = {
-                "user_id": payload.get("sub"),  # Supabase utilise 'sub' pour user_id
-                "email": payload.get("email"),
-                "iss": payload.get("iss"),  # Issuer pour vérification
-                "aud": payload.get("aud"),  # Audience
-                "exp": payload.get("exp"),  # Expiration
-                "jwt_secret_used": secret_name  # Pour debug
-            }
+            user_id = payload.get("sub")
+            email = payload.get("email")
             
             # Vérification de base
-            if not user_data.get("user_id"):
+            if not user_id:
                 logger.warning("⚠️ Token sans user_id (sub) valide")
                 continue
                 
-            if not user_data.get("email"):
+            if not email:
                 logger.warning("⚠️ Token sans email valide")
                 continue
             
@@ -152,7 +189,29 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 logger.warning(f"⚠️ Token pas émis par Supabase: {iss}")
                 continue
             
-            logger.info(f"✅ Utilisateur authentifié: {user_data['email']} (secret: {secret_name})")
+            # 🆕 NOUVEAU : Récupérer le profil utilisateur depuis Supabase
+            profile = await get_user_profile_from_supabase(user_id, email)
+            
+            # 🆕 Construire la réponse avec rôles
+            user_data = {
+                "user_id": user_id,
+                "email": email,
+                "iss": payload.get("iss"),
+                "aud": payload.get("aud"),
+                "exp": payload.get("exp"),
+                "jwt_secret_used": secret_name,
+                
+                # 🆕 NOUVEAUX CHAMPS DE RÔLES
+                "user_type": profile.get("user_type", "user"),
+                "full_name": profile.get("full_name"),
+                "preferences": profile.get("preferences", {}),
+                "profile_id": profile.get("profile_id"),
+                
+                # ✅ RÉTROCOMPATIBILITÉ : Maintenir is_admin pour l'existant
+                "is_admin": profile.get("user_type") in ["admin", "super_admin"]
+            }
+            
+            logger.info(f"✅ Utilisateur authentifié: {email} (rôle: {user_data['user_type']}, secret: {secret_name})")
             return user_data
             
         except jwt.ExpiredSignatureError:
@@ -204,6 +263,20 @@ async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_us
         "message": "Demande de suppression enregistrée",
         "note": "Vos données seront supprimées sous 30 jours",
         "timestamp": datetime.utcnow()
+    }
+
+# 🆕 NOUVEL ENDPOINT pour voir son profil
+@router.get("/me")
+async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Récupère le profil de l'utilisateur connecté"""
+    return {
+        "user_id": current_user.get("user_id"),
+        "email": current_user.get("email"),
+        "user_type": current_user.get("user_type"),
+        "full_name": current_user.get("full_name"),
+        "is_admin": current_user.get("is_admin"),
+        "preferences": current_user.get("preferences", {}),
+        "profile_id": current_user.get("profile_id")
     }
 
 # ✅ ENDPOINT DE DEBUG
