@@ -226,7 +226,7 @@ export const StatisticsPage: React.FC = () => {
         time_range: selectedTimeRange
       })
 
-      // 📄 NOUVEAU: Essayer plusieurs endpoints pour récupérer les données réelles
+      // 🔄 NOUVEAU: Essayer plusieurs endpoints pour récupérer les données réelles
       const endpointsToTry = [
         `/api/v1/logging/analytics/conversations-with-feedback?${params}`, // Endpoint idéal pour récupérer conversations + feedback
         `/api/v1/logging/analytics/questions?${params}`, // Endpoint questions seules
@@ -637,28 +637,28 @@ export const StatisticsPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Uptime</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {systemStats?.system_health?.uptime_hours?.toFixed(1) || '0.0'}h
+                      {systemStats?.system_health.uptime_hours.toFixed(1)}h
                     </span>
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Taux d'erreur</span>
-                    <span className={`text-sm font-medium ${(systemStats?.system_health?.error_rate || 0) < 5 ? 'text-green-600' : 'text-red-600'}`}>
-                      {systemStats?.system_health?.error_rate?.toFixed(1) || '0.0'}%
+                    <span className={`text-sm font-medium ${systemStats?.system_health.error_rate && systemStats.system_health.error_rate < 5 ? 'text-green-600' : 'text-red-600'}`}>
+                      {systemStats?.system_health.error_rate.toFixed(1)}%
                     </span>
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Cache Hit Rate</span>
                     <span className="text-sm font-medium text-green-600">
-                      {performanceStats?.cache_hit_rate?.toFixed(1) || '0.0'}%
+                      {performanceStats?.cache_hit_rate.toFixed(1)}%
                     </span>
                   </div>
                   
                   <div className="mt-4 pt-4 border-t">
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Services RAG</h4>
                     <div className="space-y-2">
-                      {systemStats?.system_health?.rag_status && Object.entries(systemStats.system_health.rag_status).map(([service, status]) => (
+                      {systemStats?.system_health.rag_status && Object.entries(systemStats.system_health.rag_status).map(([service, status]) => (
                         <div key={service} className="flex items-center justify-between">
                           <span className="text-xs text-gray-600 capitalize">{service}</span>
                           <span className={`text-xs px-2 py-1 rounded-full ${status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -687,7 +687,7 @@ export const StatisticsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {billingStats?.top_users?.map((user, index) => (
+                      {billingStats?.top_users.map((user, index) => (
                         <tr key={user.email} className="border-b border-gray-100">
                           <td className="py-3 text-sm text-gray-900">{user.email}</td>
                           <td className="py-3 text-sm text-gray-600">{user.question_count}</td>
@@ -701,7 +701,7 @@ export const StatisticsPage: React.FC = () => {
                             </span>
                           </td>
                         </tr>
-                      )) || []}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -732,19 +732,19 @@ export const StatisticsPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Coûts et Performance</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
+                  <p className="text-2xl font-bold text-red-600">${performanceStats?.openai_costs.toFixed(2)}</p>
                   <p className="text-sm text-gray-600">Coûts OpenAI</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">{performanceStats?.error_count || 0}</p>
+                  <p className="text-2xl font-bold text-yellow-600">{performanceStats?.error_count}</p>
                   <p className="text-sm text-gray-600">Erreurs</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">{systemStats?.system_health?.total_requests || 0}</p>
+                  <p className="text-2xl font-bold text-green-600">{systemStats?.system_health.total_requests}</p>
                   <p className="text-sm text-gray-600">Requêtes Totales</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">{usageStats?.questions_today || 0}</p>
+                  <p className="text-2xl font-bold text-blue-600">{usageStats?.questions_today}</p>
                   <p className="text-sm text-gray-600">Questions Aujourd'hui</p>
                 </div>
               </div>
@@ -1153,6 +1153,10 @@ export const StatisticsPage: React.FC = () => {
                   <h4 className="text-lg font-medium text-gray-900 mb-3">📊 Métriques</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <p className="text-sm text-gray-600">Source</p>
+                      <p className="font-medium">{selectedQuestion.response_source.replace('_', ' ')}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
                       <p className="text-sm text-gray-600">Confiance</p>
                       <p className="font-medium">{(selectedQuestion.confidence_score * 100).toFixed(1)}%</p>
                     </div>
@@ -1194,7 +1198,3 @@ export const StatisticsPage: React.FC = () => {
     </div>
   )
 }
-                      <p className="text-sm text-gray-600">Source</p>
-                      <p className="font-medium">{selectedQuestion.response_source.replace('_', ' ')}</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg text-center">

@@ -29,6 +29,51 @@ def _uses_mct(model: str) -> bool:
 def _completion_param_name(model: str) -> str:
     return "max_completion_tokens" if _uses_mct(model) else "max_tokens"
 
+# ==================== 🆕 NOUVEAU: Helpers pour temperature conditionnelle ====================
+def _get_safe_temperature(temperature: float, model: str = None) -> Optional[float]:
+    """
+    🆕 CORRECTIF: Retourne une temperature sécurisée selon le modèle.
+    Certains modèles n'acceptent que temperature=1 (défaut).
+    """
+    # Si variable d'environnement force le défaut
+    if os.getenv("OPENAI_FORCE_DEFAULT_TEMPERATURE", "").lower() == "true":
+        logger.debug(f"🔧 Temperature forcée au défaut (variable env)")
+        return None  # Utilise le défaut du modèle
+    
+    # Si le modèle est connu pour ne pas supporter les températures personnalisées
+    # (on peut étendre cette liste selon les besoins)
+    restricted_models = os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",")
+    if model and any(model.startswith(restricted.strip()) for restricted in restricted_models if restricted.strip()):
+        logger.debug(f"🔧 Modèle {model} détecté comme restrictif pour temperature")
+        return None
+    
+    # Valider la température dans les limites acceptables
+    if temperature < 0.0 or temperature > 2.0:
+        logger.warning(f"⚠️ Temperature {temperature} hors limites, utilisation du défaut")
+        return None
+    
+    return temperature
+
+def _safe_kwargs_with_temperature(kwargs: Dict[str, Any], default_temp: float = 1.0, model: str = None) -> Dict[str, Any]:
+    """
+    🆕 CORRECTIF: Nettoie les kwargs en gérant la temperature de façon sécurisée.
+    """
+    safe_kwargs = kwargs.copy()
+    
+    if "temperature" in safe_kwargs:
+        original_temp = safe_kwargs["temperature"]
+        safe_temp = _get_safe_temperature(original_temp, model)
+        
+        if safe_temp is None:
+            # Retirer le paramètre pour utiliser le défaut du modèle
+            safe_kwargs.pop("temperature", None)
+            logger.debug(f"🔧 Temperature {original_temp} retirée, utilisation défaut modèle")
+        else:
+            safe_kwargs["temperature"] = safe_temp
+            logger.debug(f"🔧 Temperature validée: {safe_temp}")
+    
+    return safe_kwargs
+
 # ==================== AMÉLIORATION MAJEURE: Gestion centralisée de l'API key ====================
 def _get_api_key() -> str:
     """
@@ -129,6 +174,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
                      model: Optional[str] = None, parse_cot: bool = True) -> Dict[str, Any]:
     """
     🆕 NOUVEAU: Completion spécialisée pour Chain-of-Thought avec parsing des balises
+    🔧 CORRECTIF: Gestion sécurisée de la temperature
     
     Args:
         prompt: Prompt CoT avec balises XML structurantes
@@ -145,13 +191,14 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt CoT ne peut pas être vide")
     
-    if not 0.0 <= temperature <= 2.0:
-        logger.warning(f"⚠️ Temperature {temperature} ajustée à 0.3")
-        temperature = 0.3
-    
     # Configuration modèle CoT
     if model is None:
         model = os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
+    
+    # 🔧 CORRECTIF: Temperature sécurisée
+    safe_temp = _get_safe_temperature(temperature, model)
+    if safe_temp is None:
+        logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
     
     # Calcul tokens adaptatif pour CoT (plus généreux)
     if max_tokens is None:
@@ -171,7 +218,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         if available_tokens > 0:
             max_tokens = min(max_tokens, available_tokens)
     
-    logger.debug(f"🧠 Appel CoT: model={model}, temp={temperature}, max_tokens={max_tokens}")
+    logger.debug(f"🧠 Appel CoT: model={model}, temp={safe_temp}, max_tokens={max_tokens}")
     
     # Messages optimisés pour CoT
     messages = [
@@ -190,15 +237,21 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
     ]
     
     try:
-        response = safe_chat_completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=0.9,
-            frequency_penalty=0.0,  # Pas de pénalité pour CoT structuré
-            presence_penalty=0.1
-        )
+        # 🔧 CORRECTIF: Appel avec temperature sécurisée
+        call_kwargs = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "top_p": 0.9,
+            "frequency_penalty": 0.0,  # Pas de pénalité pour CoT structuré
+            "presence_penalty": 0.1
+        }
+        
+        # Ajouter temperature seulement si supportée
+        if safe_temp is not None:
+            call_kwargs["temperature"] = safe_temp
+        
+        response = safe_chat_completion(**call_kwargs)
         
         if not response or not response.choices:
             raise RuntimeError("Réponse OpenAI CoT vide")
@@ -210,7 +263,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         result = {
             "raw_response": raw_content.strip(),
             "model_used": model,
-            "temperature": temperature
+            "temperature": safe_temp if safe_temp is not None else "default"
         }
         
         # 🆕 Parsing des sections CoT si demandé
@@ -291,6 +344,7 @@ def generate_cot_followup(initial_question: str, cot_sections: Dict[str, str],
                          entities: Dict[str, Any], missing_info: List[str] = None) -> str:
     """
     🆕 NOUVEAU: Génère une question de suivi intelligente basée sur l'analyse CoT
+    🔧 CORRECTIF: Temperature sécurisée
     
     Args:
         initial_question: Question originale de l'utilisateur
@@ -336,6 +390,7 @@ INSTRUCTIONS:
 Question de suivi appropriée:"""
 
     try:
+        # 🔧 CORRECTIF: Utilise la fonction safe complete_text
         followup = complete_text(prompt, temperature=0.4, max_tokens=150)
         return followup.strip()
     except Exception as e:
@@ -347,16 +402,24 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
              timeout: float = 30.0, extra: Optional[Dict] = None) -> Dict:
     """
     Envoie un appel /v1/chat/completions, compatible anciens & nouveaux modèles.
+    🔧 CORRECTIF: Gestion sécurisée de la temperature
     """
     extra = extra or {}
     param_name = _completion_param_name(model)
+    
+    # 🔧 CORRECTIF: Temperature sécurisée
+    safe_temp = _get_safe_temperature(temperature, model)
+    
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": temperature,
         param_name: max_tokens,  # <-- clé choisie dynamiquement
         **{k: v for k, v in extra.items() if v is not None}
     }
+    
+    # Ajouter temperature seulement si supportée
+    if safe_temp is not None:
+        payload["temperature"] = safe_temp
 
     headers = {
         "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
@@ -408,18 +471,20 @@ def complete(messages, model: str, temperature: float = 0.2, max_tokens: int = 8
 def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None, model: Optional[str] = None) -> str:
     """
     Wrapper de compatibilité pour l'ancienne signature complete(prompt) -> str
+    🔧 CORRECTIF: Temperature sécurisée
     """
     # Validation des paramètres
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt ne peut pas être vide")
     
-    if not 0.0 <= temperature <= 2.0:
-        logger.warning(f"⚠️ Temperature {temperature} hors limite [0.0-2.0], ajusté à 0.2")
-        temperature = 0.2
-    
     # Configuration standard
     if model is None:
         model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
+    
+    # 🔧 CORRECTIF: Temperature sécurisée
+    safe_temp = _get_safe_temperature(temperature, model)
+    if safe_temp is None:
+        logger.debug(f"🔧 Temperature {temperature} non supportée pour {model}, utilisation défaut")
     
     # Calcul adaptatif de max_tokens
     if max_tokens is None:
@@ -457,10 +522,11 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
         }
     ]
     
-    logger.debug(f"🤖 Appel complete_text(): model={model}, temp={temperature}, max_tokens={max_tokens}")
+    logger.debug(f"🤖 Appel complete_text(): model={model}, temp={safe_temp}, max_tokens={max_tokens}")
     
     try:
-        response = complete(messages, model, temperature, max_tokens)
+        # 🔧 CORRECTIF: Utilise la fonction complete() corrigée
+        response = complete(messages, model, safe_temp if safe_temp is not None else 1.0, max_tokens)
         
         if not response or not response.get("choices"):
             raise RuntimeError("Réponse OpenAI vide")
@@ -481,6 +547,7 @@ def complete_text(prompt: str, temperature: float = 0.2, max_tokens: Optional[in
 def safe_chat_completion(**kwargs) -> Any:
     """
     Wrapper sécurisé pour openai.chat.completions.create
+    🔧 CORRECTIF: Gestion sécurisée de la temperature
     
     AMÉLIORATIONS APPLIQUÉES:
     - Utilisation de _get_api_key() centralisée (plus de duplication)
@@ -489,6 +556,7 @@ def safe_chat_completion(**kwargs) -> Any:
     - Validation des paramètres d'entrée
     - Logging détaillé pour debug
     - NOUVEAU: Support automatique max_completion_tokens pour nouveaux modèles
+    - CORRECTIF: Temperature sécurisée selon le modèle
     """
     
     # ✅ AMÉLIORATION: Validation des paramètres essentiels
@@ -501,7 +569,7 @@ def safe_chat_completion(**kwargs) -> Any:
     
     # ✅ AMÉLIORATION: Configuration avec paramètres par défaut intelligents
     default_params = {
-        'temperature': float(os.getenv('OPENAI_DEFAULT_TEMPERATURE', '0.7')),
+        'temperature': float(os.getenv('OPENAI_DEFAULT_TEMPERATURE', '1.0')),  # 🔧 CORRECTIF: 1.0 par défaut
         'max_tokens': int(os.getenv('OPENAI_DEFAULT_MAX_TOKENS', '500')),
         'timeout': int(os.getenv('OPENAI_DEFAULT_TIMEOUT', '30'))
     }
@@ -519,7 +587,10 @@ def safe_chat_completion(**kwargs) -> Any:
         kwargs[correct_param] = max_tokens_value
         logger.debug(f"🔧 Paramètre tokens: {correct_param}={max_tokens_value} pour {model}")
     
-    logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature')}")
+    # 🔧 CORRECTIF: Nettoyage temperature sécurisée
+    kwargs = _safe_kwargs_with_temperature(kwargs, model=model)
+    
+    logger.debug(f"🤖 Appel OpenAI Chat: model={model}, temp={kwargs.get('temperature', 'default')}")
     
     try:
         # ✅ AMÉLIORATION: Configuration centralisée
@@ -691,6 +762,7 @@ def safe_embedding_create(input: Any, model: str = "text-embedding-ada-002", **k
 def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
     """
     🆕 NOUVEAU: Synthèse spécialisée pour le contenu RAG du dialogue_manager
+    🔧 CORRECTIF: Temperature sécurisée
     
     Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
     """
@@ -717,11 +789,9 @@ Contenu technique à synthétiser :
 Réponse synthétique (format Markdown, sans sources) :"""
 
     try:
-        # Utilisation de la nouvelle fonction complete()
-        messages = [{"role": "user", "content": synthesis_prompt}]
-        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
-        response = complete(messages, model, temperature=0.2, max_tokens=min(400, max_length + 100))
-        return response["choices"][0]["message"]["content"].strip()
+        # 🔧 CORRECTIF: Utilisation de complete_text() avec temperature sécurisée
+        response = complete_text(synthesis_prompt, temperature=0.2, max_tokens=min(400, max_length + 100))
+        return response.strip()
     except Exception as e:
         logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
         # Fallback simple : nettoyage basique
@@ -733,6 +803,7 @@ Réponse synthétique (format Markdown, sans sources) :"""
 def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
     """
     🆕 NOUVEAU: Génère des réponses de clarification intelligentes
+    🔧 CORRECTIF: Temperature sécurisée
     """
     
     prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
@@ -751,6 +822,7 @@ INSTRUCTIONS :
 Réponse de clarification :"""
 
     try:
+        # 🔧 CORRECTIF: Temperature sécurisée
         return complete_text(prompt, temperature=0.3, max_tokens=150)
     except Exception as e:
         logger.warning(f"⚠️ Échec génération clarification: {e}")
@@ -770,8 +842,8 @@ def test_openai_connection() -> Dict[str, Any]:
         response = safe_chat_completion(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Test"}],
-            max_tokens=5,
-            temperature=0
+            max_tokens=5
+            # 🔧 CORRECTIF: Pas de temperature fixe, utilise le défaut
         )
         
         return {
@@ -849,6 +921,7 @@ DEFAULT_MODELS = {
 def test_cot_pipeline() -> Dict[str, Any]:
     """
     🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
+    🔧 CORRECTIF: Temperature sécurisée
     """
     try:
         # Test prompt CoT simple
@@ -869,7 +942,7 @@ Réponse finale : Test CoT réussi."""
         # Test complete_with_cot
         cot_result = complete_with_cot(
             prompt=test_cot_prompt,
-            temperature=0.2,
+            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
             max_tokens=200,
             parse_cot=True
         )
@@ -881,7 +954,7 @@ Réponse finale : Test CoT réussi."""
         # Test complete() avec détection automatique
         auto_cot_result = complete_text(
             prompt="<thinking>Test automatique</thinking>\n\nRéponse automatique CoT.",
-            temperature=0.2,
+            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
             max_tokens=100
         )
         
@@ -910,12 +983,13 @@ Réponse finale : Test CoT réussi."""
 def test_synthesis_pipeline() -> Dict[str, Any]:
     """
     🆕 AMÉLIORÉ: Test complet du pipeline de synthèse pour dialogue_manager
+    🔧 CORRECTIF: Temperature sécurisée
     """
     try:
         # Test de la fonction complete_text()
         test_response = complete_text(
             prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
-            temperature=0.2,
+            temperature=0.2,  # 🔧 CORRECTIF: Temperature plus conservative
             max_tokens=50
         )
         
@@ -961,6 +1035,7 @@ def test_synthesis_pipeline() -> Dict[str, Any]:
 def get_openai_status() -> Dict[str, Any]:
     """
     ✅ AMÉLIORÉ: Status complet du système OpenAI avec support CoT
+    🔧 CORRECTIF: Inclut les infos sur la gestion de temperature
     """
     return {
         "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
@@ -985,7 +1060,7 @@ def get_openai_status() -> Dict[str, Any]:
         },
         "synthesis_config": {  # 🆕 Nouveau pour dialogue_manager
             "synthesis_model": DEFAULT_MODELS["synthesis"],
-            "default_temperature": 0.2,
+            "default_temperature": 0.2,  # 🔧 CORRECTIF: Valeur plus conservative
             "max_synthesis_tokens": 500
         },
         "cot_config": {  # 🆕 NOUVEAU: Configuration CoT
@@ -1000,7 +1075,12 @@ def get_openai_status() -> Dict[str, Any]:
         "compatibility_config": {  # 🆕 NOUVEAU: Configuration compatibilité
             "max_completion_tokens_support": True,
             "auto_parameter_detection": True,
-            "supported_model_families": ["gpt-4.1", "gpt-4o", "o4", "omni", "gpt-5"]
+            "supported_model_families": ["gpt-4.1", "gpt-4o", "o4", "omni", "gpt-5"],
+            "temperature_safety": {  # 🔧 NOUVEAU: Gestion temperature sécurisée
+                "safe_temperature_detection": True,
+                "force_default_temperature": bool(os.getenv("OPENAI_FORCE_DEFAULT_TEMPERATURE", "").lower() == "true"),
+                "restricted_temp_models": os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",") if os.getenv("OPENAI_RESTRICTED_TEMP_MODELS") else []
+            }
         }
     }
 
@@ -1026,5 +1106,6 @@ def get_cot_capabilities() -> Dict[str, Any]:
         "models": {
             "preferred": DEFAULT_MODELS["cot"],
             "fallback": DEFAULT_MODELS["chat"]
-        }
+        },
+        "temperature_safety": True  # 🔧 NOUVEAU: Indicateur de sécurité temperature
     }
