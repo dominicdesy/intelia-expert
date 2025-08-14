@@ -43,7 +43,6 @@ Language code:"""
 
         language_code = openai_complete(
             prompt=detection_prompt,
-            temperature=0.1,  # Très déterministe
             max_tokens=5     # Juste le code langue
         )
         
@@ -172,7 +171,6 @@ Analysis in user's language:"""
         # Adaptation via OpenAI améliorée
         adapted_text = openai_complete(
             prompt=prompt,
-            temperature=0.3,  # Légèrement créatif pour naturel
             max_tokens=600    # Assez pour réponses complètes
         )
         
