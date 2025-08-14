@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuthStore } from '../hooks/useAuthStore'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { StatisticsDashboard } from './StatisticsDashboard'
+import { QuestionsTab } from './QuestionsTab'
 
 // Types pour les données de statistiques
 interface SystemStats {
@@ -104,7 +106,7 @@ export const StatisticsPage: React.FC = () => {
   // Vérification des permissions super_admin
   const isSuperAdmin = user?.user_type === 'super_admin'
 
-  // 🔥 NOUVELLE FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
+  // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
     try {
       const supabase = createClientComponentClient()
@@ -112,19 +114,19 @@ export const StatisticsPage: React.FC = () => {
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error || !session) {
-        console.error('❌ Erreur récupération session:', error)
+        console.error('Erreur récupération session:', error)
         return {}
       }
       
       const token = session.access_token
-      console.log('🔑 Token récupéré:', token ? 'OK' : 'MISSING')
+      console.log('Token récupéré:', token ? 'OK' : 'MISSING')
       
       return {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     } catch (error) {
-      console.error('❌ Erreur getAuthHeaders:', error)
+      console.error('Erreur getAuthHeaders:', error)
       return {}
     }
   }
@@ -150,14 +152,13 @@ export const StatisticsPage: React.FC = () => {
     setError(null)
 
     try {
-      // 🔥 UTILISER LA NOUVELLE FONCTION D'AUTHENTIFICATION
       const headers = await getAuthHeaders()
 
       // Charger toutes les statistiques en parallèle
       const [systemRes, usageRes, billingRes, performanceRes] = await Promise.allSettled([
         fetch('/api/admin/stats', { headers }),
         fetch('/api/v1/logging/analytics/dashboard', { headers }),
-        fetch('/api/v1/billing/admin/stats', { headers }), // Endpoint hypothétique
+        fetch('/api/v1/billing/admin/stats', { headers }),
         fetch('/api/v1/logging/analytics/performance', { headers })
       ])
 
@@ -211,7 +212,6 @@ export const StatisticsPage: React.FC = () => {
 
   const loadQuestionLogs = async () => {
     try {
-      // 🔥 UTILISER LA NOUVELLE FONCTION D'AUTHENTIFICATION
       const headers = await getAuthHeaders()
 
       // Construire les paramètres de requête
@@ -226,26 +226,26 @@ export const StatisticsPage: React.FC = () => {
         time_range: selectedTimeRange
       })
 
-      // 📄 NOUVEAU: Essayer plusieurs endpoints pour récupérer les données réelles
+      // Essayer plusieurs endpoints pour récupérer les données réelles
       const endpointsToTry = [
-        `/api/v1/logging/analytics/conversations-with-feedback?${params}`, // Endpoint idéal pour récupérer conversations + feedback
-        `/api/v1/logging/analytics/questions?${params}`, // Endpoint questions seules
-        `/api/v1/conversations/all-with-feedback?${params}`, // Alternative conversations
-        `/api/v1/logging/analytics/user-interactions?${params}` // Alternative interactions
+        `/api/v1/logging/analytics/conversations-with-feedback?${params}`,
+        `/api/v1/logging/analytics/questions?${params}`,
+        `/api/v1/conversations/all-with-feedback?${params}`,
+        `/api/v1/logging/analytics/user-interactions?${params}`
       ]
 
       let questionsLoaded = false
 
       for (const endpoint of endpointsToTry) {
         try {
-          console.log(`🔍 Tentative endpoint: ${endpoint}`)
+          console.log(`Tentative endpoint: ${endpoint}`)
           const response = await fetch(endpoint, { headers })
           
           if (response.ok) {
             const data = await response.json()
-            console.log(`✅ Données récupérées via ${endpoint}:`, data)
+            console.log(`Données récupérées via ${endpoint}:`, data)
             
-            // 🔧 Adapter selon la structure de réponse
+            // Adapter selon la structure de réponse
             let questions = []
             
             if (Array.isArray(data)) {
@@ -260,7 +260,7 @@ export const StatisticsPage: React.FC = () => {
               questions = data.data
             }
 
-            // 🔧 Transformer les données si nécessaire
+            // Transformer les données si nécessaire
             const transformedQuestions = questions.map((item: any) => ({
               id: item.id || item.conversation_id || item.session_id,
               timestamp: item.timestamp || item.created_at || item.updated_at,
@@ -279,20 +279,20 @@ export const StatisticsPage: React.FC = () => {
 
             setQuestionLogs(transformedQuestions)
             questionsLoaded = true
-            console.log(`✅ ${transformedQuestions.length} questions chargées depuis ${endpoint}`)
+            console.log(`${transformedQuestions.length} questions chargées depuis ${endpoint}`)
             break
 
           } else {
-            console.log(`❌ ${endpoint}: ${response.status} ${response.statusText}`)
+            console.log(`${endpoint}: ${response.status} ${response.statusText}`)
           }
         } catch (err) {
-          console.log(`❌ Erreur ${endpoint}:`, err)
+          console.log(`Erreur ${endpoint}:`, err)
         }
       }
 
       // Si aucun endpoint ne fonctionne, utiliser des données mockées pour demo
       if (!questionsLoaded) {
-        console.log('⚠️ Aucun endpoint disponible, utilisation de données mockées')
+        console.log('Aucun endpoint disponible, utilisation de données mockées')
         const mockQuestions: QuestionLog[] = [
           {
             id: '1',
@@ -356,28 +356,12 @@ export const StatisticsPage: React.FC = () => {
           }
         ]
         setQuestionLogs(mockQuestions)
-        console.log('📝 Données mockées chargées pour démo')
+        console.log('Données mockées chargées pour démo')
       }
     } catch (err) {
-      console.error('❌ Erreur générale lors du chargement des logs questions:', err)
+      console.error('Erreur générale lors du chargement des logs questions:', err)
       // Fallback sur données mockées en cas d'erreur
       setQuestionLogs([])
-    }
-  }
-
-  const getConfidenceColor = (score: number) => {
-    if (score >= 0.9) return 'text-green-600 bg-green-100'
-    if (score >= 0.7) return 'text-yellow-600 bg-yellow-100'
-    return 'text-red-600 bg-red-100'
-  }
-
-  const getSourceColor = (source: string) => {
-    switch (source) {
-      case 'rag_retriever': return 'text-blue-600 bg-blue-100'
-      case 'openai_fallback': return 'text-purple-600 bg-purple-100'
-      case 'perfstore': return 'text-green-600 bg-green-100'
-      case 'agricultural_validator': return 'text-orange-600 bg-orange-100'
-      default: return 'text-gray-600 bg-gray-100'
     }
   }
 
@@ -386,38 +370,6 @@ export const StatisticsPage: React.FC = () => {
     if (feedback === -1) return '👎'
     return '❓'
   }
-
-  const filteredQuestions = questionLogs.filter(q => {
-    if (questionFilters.search && !q.question.toLowerCase().includes(questionFilters.search.toLowerCase()) && 
-        !q.response.toLowerCase().includes(questionFilters.search.toLowerCase()) &&
-        !q.user_email.toLowerCase().includes(questionFilters.search.toLowerCase())) {
-      return false
-    }
-    if (questionFilters.source !== 'all' && q.response_source !== questionFilters.source) return false
-    if (questionFilters.confidence !== 'all') {
-      const score = q.confidence_score
-      if (questionFilters.confidence === 'high' && score < 0.9) return false
-      if (questionFilters.confidence === 'medium' && (score < 0.7 || score >= 0.9)) return false
-      if (questionFilters.confidence === 'low' && score >= 0.7) return false
-    }
-    if (questionFilters.feedback !== 'all') {
-      if (questionFilters.feedback === 'positive' && q.feedback !== 1) return false
-      if (questionFilters.feedback === 'negative' && q.feedback !== -1) return false
-      if (questionFilters.feedback === 'none' && q.feedback !== null) return false
-      if (questionFilters.feedback === 'with_comments' && !q.feedback_comment) return false
-      if (questionFilters.feedback === 'no_comments' && q.feedback_comment) return false
-    }
-    if (questionFilters.user !== 'all' && q.user_email !== questionFilters.user) return false
-    return true
-  })
-
-  const paginatedQuestions = filteredQuestions.slice(
-    (currentPage - 1) * questionsPerPage,
-    currentPage * questionsPerPage
-  )
-
-  const totalPages = Math.ceil(filteredQuestions.length / questionsPerPage)
-  const uniqueUsers = Array.from(new Set(questionLogs.map(q => q.user_email)))
 
   if (!isSuperAdmin) {
     return (
@@ -536,570 +488,25 @@ export const StatisticsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
         {activeTab === 'dashboard' ? (
-          <>
-            {/* KPIs Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM9 3a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Utilisateurs Actifs</p>
-                    <p className="text-2xl font-bold text-gray-900">{usageStats?.unique_users || 0}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Questions ce mois</p>
-                    <p className="text-2xl font-bold text-gray-900">{usageStats?.questions_this_month || 0}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Revenus Totaux</p>
-                    <p className="text-2xl font-bold text-gray-900">${billingStats?.total_revenue || 0}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <div className="flex items-center">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Temps de Réponse</p>
-                    <p className="text-2xl font-bold text-gray-900">{performanceStats?.avg_response_time || 0}s</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Usage Sources Chart */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Sources des Réponses</h3>
-                <div className="space-y-4">
-                  {usageStats?.source_distribution && Object.entries(usageStats.source_distribution).map(([source, count]) => {
-                    const total = Object.values(usageStats.source_distribution).reduce((a, b) => a + b, 0)
-                    const percentage = total > 0 ? (count / total * 100).toFixed(1) : 0
-                    
-                    return (
-                      <div key={source} className="flex items-center">
-                        <div className="w-32 text-sm text-gray-600 capitalize">
-                          {source.replace('_', ' ')}
-                        </div>
-                        <div className="flex-1 mx-4">
-                          <div className="bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${percentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <div className="w-16 text-sm text-gray-900 font-medium text-right">
-                          {count} ({percentage}%)
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* System Health */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Santé du Système</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Uptime</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {systemStats?.system_health?.uptime_hours?.toFixed(1) || '0.0'}h
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Taux d'erreur</span>
-                    <span className={`text-sm font-medium ${(systemStats?.system_health?.error_rate || 0) < 5 ? 'text-green-600' : 'text-red-600'}`}>
-                      {systemStats?.system_health?.error_rate?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Cache Hit Rate</span>
-                    <span className="text-sm font-medium text-green-600">
-                      {performanceStats?.cache_hit_rate?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Services RAG</h4>
-                    <div className="space-y-2">
-                      {systemStats?.system_health?.rag_status && Object.entries(systemStats.system_health.rag_status).map(([service, status]) => (
-                        <div key={service} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 capitalize">{service}</span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {status ? 'Actif' : 'Inactif'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tables Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Users */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Utilisateurs les Plus Actifs</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left text-sm font-medium text-gray-600 pb-2">Utilisateur</th>
-                        <th className="text-left text-sm font-medium text-gray-600 pb-2">Questions</th>
-                        <th className="text-left text-sm font-medium text-gray-600 pb-2">Plan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billingStats?.top_users?.map((user, index) => (
-                        <tr key={user.email} className="border-b border-gray-100">
-                          <td className="py-3 text-sm text-gray-900">{user.email}</td>
-                          <td className="py-3 text-sm text-gray-600">{user.question_count}</td>
-                          <td className="py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              user.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                              user.plan === 'professional' ? 'bg-blue-100 text-blue-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {user.plan}
-                            </span>
-                          </td>
-                        </tr>
-                      )) || []}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Plans Distribution */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition des Plans</h3>
-                <div className="space-y-4">
-                  {billingStats?.plans && Object.entries(billingStats.plans).map(([planName, data]) => (
-                    <div key={planName} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 capitalize">{planName}</p>
-                        <p className="text-xs text-gray-600">{data.user_count} utilisateurs</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">${data.revenue}</p>
-                        <p className="text-xs text-gray-600">revenus</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Costs Section */}
-            <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Coûts et Performance</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
-                  <p className="text-sm text-gray-600">Coûts OpenAI</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">{performanceStats?.error_count || 0}</p>
-                  <p className="text-sm text-gray-600">Erreurs</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">{systemStats?.system_health?.total_requests || 0}</p>
-                  <p className="text-sm text-gray-600">Requêtes Totales</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">{usageStats?.questions_today || 0}</p>
-                  <p className="text-sm text-gray-600">Questions Aujourd'hui</p>
-                </div>
-              </div>
-            </div>
-          </>
+          <StatisticsDashboard
+            systemStats={systemStats}
+            usageStats={usageStats}
+            billingStats={billingStats}
+            performanceStats={performanceStats}
+          />
         ) : (
-          /* Questions & Réponses Tab */
-          <div className="space-y-6">
-            {/* Filtres */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtres et Recherche</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
-                  <input
-                    type="text"
-                    value={questionFilters.search}
-                    onChange={(e) => setQuestionFilters(prev => ({ ...prev, search: e.target.value }))}
-                    placeholder="Rechercher dans questions/réponses..."
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
-                  <select
-                    value={questionFilters.source}
-                    onChange={(e) => setQuestionFilters(prev => ({ ...prev, source: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">Toutes les sources</option>
-                    <option value="rag_retriever">RAG Retriever</option>
-                    <option value="openai_fallback">OpenAI Fallback</option>
-                    <option value="perfstore">PerfStore</option>
-                    <option value="agricultural_validator">Validator</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Confiance</label>
-                  <select
-                    value={questionFilters.confidence}
-                    onChange={(e) => setQuestionFilters(prev => ({ ...prev, confidence: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">Tous niveaux</option>
-                    <option value="high">Élevée (≥90%)</option>
-                    <option value="medium">Moyenne (70-89%)</option>
-                    <option value="low">Faible (&lt;70%)</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Feedback</label>
-                  <select
-                    value={questionFilters.feedback}
-                    onChange={(e) => setQuestionFilters(prev => ({ ...prev, feedback: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">Tous feedback</option>
-                    <option value="positive">Positif 👍</option>
-                    <option value="negative">Négatif 👎</option>
-                    <option value="none">Aucun feedback</option>
-                    <option value="with_comments">Avec commentaires 💬</option>
-                    <option value="no_comments">Sans commentaires</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Utilisateur</label>
-                  <select
-                    value={questionFilters.user}
-                    onChange={(e) => setQuestionFilters(prev => ({ ...prev, user: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">Tous utilisateurs</option>
-                    {uniqueUsers.map(email => (
-                      <option key={email} value={email}>{email}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Période</label>
-                  <select
-                    value={selectedTimeRange}
-                    onChange={(e) => setSelectedTimeRange(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="day">Aujourd'hui</option>
-                    <option value="week">Cette semaine</option>
-                    <option value="month">Ce mois</option>
-                    <option value="year">Cette année</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  {filteredQuestions.length} question(s) trouvée(s) sur {questionLogs.length} au total
-                </p>
-                <button
-                  onClick={() => {
-                    setQuestionFilters({
-                      search: '',
-                      source: 'all',
-                      confidence: 'all',
-                      feedback: 'all',
-                      user: 'all'
-                    })
-                    setCurrentPage(1)
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Réinitialiser les filtres
-                </button>
-              </div>
-            </div>
-
-            {/* Section Analyse des Commentaires */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Analyse des Commentaires de Feedback</h3>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Statistiques des commentaires */}
-                <div>
-                  <h4 className="text-md font-medium text-gray-800 mb-3">Statistiques Générales</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Total des feedback:</span>
-                      <span className="font-medium">{questionLogs.filter(q => q.feedback !== null).length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Avec commentaires:</span>
-                      <span className="font-medium">{questionLogs.filter(q => q.feedback_comment).length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Feedback positifs:</span>
-                      <span className="font-medium text-green-600">{questionLogs.filter(q => q.feedback === 1).length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Feedback négatifs:</span>
-                      <span className="font-medium text-red-600">{questionLogs.filter(q => q.feedback === -1).length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Taux de satisfaction:</span>
-                      <span className="font-medium">
-                        {questionLogs.filter(q => q.feedback !== null).length > 0 ? 
-                          ((questionLogs.filter(q => q.feedback === 1).length / 
-                            questionLogs.filter(q => q.feedback !== null).length) * 100).toFixed(1) + '%' 
-                          : '0%'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Commentaires récents */}
-                <div>
-                  <h4 className="text-md font-medium text-gray-800 mb-3">Commentaires Récents</h4>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {questionLogs
-                      .filter(q => q.feedback_comment)
-                      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                      .slice(0, 5)
-                      .map((question) => (
-                        <div key={question.id} className="border border-gray-200 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-gray-500">{question.user_email}</span>
-                            <span className="text-lg">{getFeedbackIcon(question.feedback)}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 italic">"{question.feedback_comment}"</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(question.timestamp).toLocaleDateString('fr-FR')}
-                          </p>
-                        </div>
-                      ))}
-                    
-                    {questionLogs.filter(q => q.feedback_comment).length === 0 && (
-                      <p className="text-sm text-gray-500 italic">Aucun commentaire disponible</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bouton pour exporter les commentaires */}
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    const commentsData = questionLogs
-                      .filter(q => q.feedback_comment)
-                      .map(q => ({
-                        date: new Date(q.timestamp).toLocaleDateString('fr-FR'),
-                        user: q.user_email,
-                        question: q.question.substring(0, 100) + '...',
-                        feedback: q.feedback === 1 ? 'Positif' : 'Négatif',
-                        comment: q.feedback_comment,
-                        source: q.response_source,
-                        confidence: (q.confidence_score * 100).toFixed(1) + '%'
-                      }))
-                    
-                    const csvContent = "data:text/csv;charset=utf-8," + 
-                      "Date,Utilisateur,Question,Feedback,Commentaire,Source,Confiance\n" +
-                      commentsData.map(row => 
-                        Object.values(row).map(field => `"${field}"`).join(',')
-                      ).join('\n')
-                    
-                    const encodedUri = encodeURI(csvContent)
-                    const link = document.createElement("a")
-                    link.setAttribute("href", encodedUri)
-                    link.setAttribute("download", `commentaires_feedback_${new Date().toISOString().split('T')[0]}.csv`)
-                    document.body.appendChild(link)
-                    link.click()
-                    document.body.removeChild(link)
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                >
-                  📊 Exporter les Commentaires (CSV)
-                </button>
-              </div>
-            </div>
-
-            {/* Liste des Questions */}
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Questions et Réponses</h3>
-              </div>
-              
-              <div className="divide-y divide-gray-200">
-                {paginatedQuestions.map((question) => (
-                  <div key={question.id} className="p-6 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        {/* En-tête de la question */}
-                        <div className="flex items-center space-x-3 mb-3">
-                          <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-blue-600 text-sm font-medium">
-                                {question.user_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900">{question.user_name}</p>
-                            <p className="text-xs text-gray-500">{question.user_email}</p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getSourceColor(question.response_source)}`}>
-                              {question.response_source.replace('_', ' ')}
-                            </span>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(question.confidence_score)}`}>
-                              {(question.confidence_score * 100).toFixed(0)}%
-                            </span>
-                            <span className="text-lg" title={`Feedback: ${question.feedback === 1 ? 'Positif' : question.feedback === -1 ? 'Négatif' : 'Aucun'}`}>
-                              {getFeedbackIcon(question.feedback)}
-                            </span>
-                            {/* 💬 NOUVEAU: Indicateur de commentaire */}
-                            {question.feedback_comment && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300" title="Contient un commentaire détaillé">
-                                💬 Commentaire
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Question */}
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-900 mb-2">❓ Question:</p>
-                          <p className="text-sm text-gray-700 bg-blue-50 p-3 rounded-md">
-                            {question.question}
-                          </p>
-                        </div>
-                        
-                        {/* Réponse */}
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-900 mb-2">💬 Réponse:</p>
-                          <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md max-h-40 overflow-y-auto">
-                            {question.response.split('\n').map((line, index) => (
-                              <p key={index} className={line.startsWith('**') ? 'font-semibold' : ''}>
-                                {line}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* Métadonnées */}
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <div className="flex items-center space-x-4">
-                            <span>🕒 {new Date(question.timestamp).toLocaleString('fr-FR')}</span>
-                            <span>⚡ {question.response_time}s</span>
-                            <span>🌐 {question.language.toUpperCase()}</span>
-                            <span>🔗 {question.session_id}</span>
-                          </div>
-                          <button
-                            onClick={() => setSelectedQuestion(question)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Voir détails →
-                          </button>
-                        </div>
-                        
-                        {/* Commentaire de feedback */}
-                        {question.feedback_comment && (
-                          <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 rounded-r-lg">
-                            <div className="flex items-start space-x-3">
-                              <div className="flex-shrink-0">
-                                <span className="text-2xl">{getFeedbackIcon(question.feedback)}</span>
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-blue-900 mb-1">Commentaire utilisateur:</p>
-                                <p className="text-sm text-blue-800 italic leading-relaxed">
-                                  "{question.feedback_comment}"
-                                </p>
-                                <p className="text-xs text-blue-600 mt-2">
-                                  Feedback {question.feedback === 1 ? 'positif' : 'négatif'} • {new Date(question.timestamp).toLocaleDateString('fr-FR')}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1 border rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Précédent
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      Page {currentPage} sur {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1 border rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Suivant
-                    </button>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Affichage de {(currentPage - 1) * questionsPerPage + 1} à {Math.min(currentPage * questionsPerPage, filteredQuestions.length)} sur {filteredQuestions.length}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <QuestionsTab
+            questionLogs={questionLogs}
+            questionFilters={questionFilters}
+            setQuestionFilters={setQuestionFilters}
+            selectedTimeRange={selectedTimeRange}
+            setSelectedTimeRange={setSelectedTimeRange}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            questionsPerPage={questionsPerPage}
+            setSelectedQuestion={setSelectedQuestion}
+          />
         )}
 
         {/* Modal de détail de question */}
@@ -1164,6 +571,10 @@ export const StatisticsPage: React.FC = () => {
                       <p className="text-sm text-gray-600">Langue</p>
                       <p className="font-medium">{selectedQuestion.language.toUpperCase()}</p>
                     </div>
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <p className="text-sm text-gray-600">Source</p>
+                      <p className="font-medium">{selectedQuestion.response_source.replace('_', ' ')}</p>
+                    </div>
                   </div>
                 </div>
                 
@@ -1194,7 +605,3 @@ export const StatisticsPage: React.FC = () => {
     </div>
   )
 }
-                      <p className="text-sm text-gray-600">Source</p>
-                      <p className="font-medium">{selectedQuestion.response_source.replace('_', ' ')}</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg text-center">
