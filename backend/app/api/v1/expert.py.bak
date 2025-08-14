@@ -10,7 +10,7 @@ import re
 import math
 import time  # NOUVEAU: Ajouté pour les endpoints de test
 
-# 🔒 Import authentification
+# 🔑 Import authentification
 from app.api.v1.auth import get_current_user
 
 # 🦆 Import système de quota
@@ -153,22 +153,6 @@ def _get_user_info_for_validation(request: Request, current_user: Optional[Dict[
     
     return str(user_id), str(request_ip)
 
-# ===== NOUVEAU: Fonction d'extraction user_id pour persistance =====
-def _extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    """
-    Extrait l'user_id pour la persistance des conversations
-    Retourne None pour les utilisateurs non authentifiés (publics)
-    """
-    if not current_user:
-        return None
-    
-    # Priorité: email > user_id > sub > id
-    for key in ['email', 'user_id', 'sub', 'id']:
-        if current_user.get(key):
-            return str(current_user[key])
-    
-    return "authenticated_unknown"
-
 # ===== Fonction de nettoyage JSON améliorée =====
 def clean_for_json(value):
     """Nettoie seulement les valeurs problématiques pour JSON avec protection robuste"""
@@ -239,21 +223,15 @@ class AskPayload(BaseModel):
     bypass_validation: Optional[bool] = False  # 🌾 NOUVEAU: pour bypass administrateur
     model_config = {"extra": "allow"}
 
-# ===== Fonction interne partagée avec validation ET quota ET persistance =====
+# ===== Fonction interne partagée avec validation ET quota =====
 def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Logique interne pour traiter les questions (avec ou sans auth) + validation agricole + quota + persistance.
-    VERSION MISE À JOUR pour supporter la persistance des conversations.
-    """
+    """Logique interne pour traiter les questions (avec ou sans auth) + validation agricole + quota."""
     user_email = None
     start_time = time.time()  # 📊 NOUVEAU: Mesure du temps de traitement
     
     try:
         # Extraction des infos utilisateur pour la validation
         user_id, request_ip = _get_user_info_for_validation(request, current_user)
-        
-        # 💾 NOUVEAU: Extraction user_id pour persistance
-        persistence_user_id = _extract_user_id_for_persistence(current_user)
         
         # Extraction de l'email pour le quota
         if current_user:
@@ -292,7 +270,7 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             user_email_display = current_user.get('email', 'unknown')
             logger.info(f"🔒 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
-            logger.info(f"🌍 Question publique: {payload.question[:120]}")
+            logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
         # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
         validation_bypassed = False
@@ -362,7 +340,6 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         force_perf = bool(payload.force_perfstore) or (fp_qs in ("1", "true", "True", "yes"))
 
         if DIALOGUE_AVAILABLE:
-            # 💾 NOUVEAU: Passer user_id au dialogue manager pour persistance
             result = handle(
                 session_id=payload.session_id or "default",
                 question=payload.question,
@@ -371,7 +348,6 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
                 force_perfstore=force_perf,
                 intent_hint=(payload.intent_hint or None),
                 entities=(payload.entities or {}),
-                user_id=persistence_user_id  # NOUVEAU: Paramètre pour persistance
             )
         else:
             logger.warning("⚠️ Dialogue manager not available, using fallback")
@@ -390,23 +366,16 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
             # Calculer le temps de traitement
             processing_time = int((time.time() - start_time) * 1000)
             
-            # Extraire le texte de réponse pour analytics
+            # Extraire le texte de réponse
             answer = result.get("answer", {})
-            general_answer = result.get("general_answer", {})
-            
-            if isinstance(answer, dict) and answer.get("text"):
-                response_text = answer["text"]
-            elif isinstance(general_answer, dict) and general_answer.get("text"):
-                response_text = general_answer["text"]
-            else:
-                response_text = str(result.get("message", ""))
+            response_text = answer.get("text", "")
             
             # Logger dans le système analytics
             log_question_to_analytics(
                 current_user=current_user,
                 payload=payload,
                 result=result,
-                response_text=response_text[:500],  # Limiter la taille pour analytics
+                response_text=response_text,
                 processing_time_ms=processing_time
             )
             logger.info("📊 Question loggée dans analytics")
@@ -421,17 +390,10 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
                 "user_id": current_user.get('user_id')
             }
         
-        # Ajouter les métadonnées de validation et persistance
+        # Ajouter les métadonnées de validation
         result["validation_metadata"] = {
             "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
             "validation_bypassed": validation_bypassed
-        }
-        
-        # 💾 NOUVEAU: Métadonnées de persistance
-        result["persistence_metadata"] = {
-            "conversation_persistence_enabled": True,  # Toujours ON dans cette version
-            "user_id_for_persistence": persistence_user_id,
-            "is_authenticated": bool(current_user)
         }
 
         logger.info(f"✅ Réponse générée: type={result.get('type')}")
@@ -471,38 +433,24 @@ def _ask_internal(payload: AskPayload, request: Request, current_user: Optional[
         logger.exception("❌ Erreur dans le traitement de la question")
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 
-# ===== Endpoints principaux (code original conservé + améliorations) =====
+# ===== Endpoints principaux (code original conservé) =====
 @router.post("/ask")
 def ask(
     payload: AskPayload, 
     request: Request,
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
-    """
-    Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole, quota et persistance.
-    VERSION MISE À JOUR avec support persistance conversations.
-    """
+    """Endpoint principal SÉCURISÉ pour poser des questions avec validation agricole et quota."""
     return _ask_internal(payload, request, current_user)
 
 @router.post("/ask-public")
 def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:
-    """
-    Endpoint public (pas d'authentification requise) avec validation agricole et persistance.
-    VERSION MISE À JOUR avec support persistance conversations.
-    """
+    """Endpoint public (pas d'authentification requise) avec validation agricole."""
     return _ask_internal(payload, request, None)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
-    """État synthétique du service avec info persistance."""
-    # Vérifier la disponibilité de la persistance
-    persistence_available = False
-    try:
-        from .pipeline.dialogue_manager import POSTGRES_AVAILABLE, PERSIST_CONVERSATIONS
-        persistence_available = POSTGRES_AVAILABLE and PERSIST_CONVERSATIONS
-    except ImportError:
-        pass
-    
+    """État synthétique du service."""
     return {
         "status": "ok" if DIALOGUE_AVAILABLE else "degraded",
         "dialogue_manager_available": DIALOGUE_AVAILABLE,
@@ -510,7 +458,6 @@ def system_status() -> Dict[str, Any]:
         "agricultural_validation_enabled": AGRICULTURAL_VALIDATOR_AVAILABLE and is_agricultural_validation_enabled(),
         "billing_system_available": True,  # 🦆 NOUVEAU
         "analytics_system_available": True,  # 📊 NOUVEAU
-        "conversation_persistence_available": persistence_available,  # 💾 NOUVEAU
         "service": "expert_api",
     }
 
@@ -519,7 +466,7 @@ def system_status() -> Dict[str, Any]:
 @router.get("/fallback-status")
 def fallback_status() -> Dict[str, Any]:
     """
-    Status détaillé du système de fallback OpenAI + persistance.
+    Status détaillé du système de fallback OpenAI.
     """
     try:
         from .pipeline.dialogue_manager import get_fallback_status
@@ -541,8 +488,8 @@ def test_openai_fallback(
     """
     try:
         # Import correct de la fonction et de l'Intention
-        from .pipeline.dialogue_manager import generate_openai_fallback_response  # Correction import
-        from .pipeline.utils.question_classifier import Intention  # Import correct
+        from .pipeline.dialogue_manager import _generate_openai_fallback_response
+        from .utils.question_classifier import Intention  # Import correct
         
         # Entités de test basiques
         test_entities = {
@@ -552,7 +499,7 @@ def test_openai_fallback(
             "age_days": 21
         }
         
-        result = generate_openai_fallback_response(
+        result = _generate_openai_fallback_response(
             question=test_question,
             entities=test_entities,
             intent=Intention.PerfTargets,  # Intent par défaut pour test
@@ -578,7 +525,7 @@ def test_fallback_integration(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Teste l'intégration complète RAG → Fallback OpenAI + persistance
+    Teste l'intégration complète RAG → Fallback OpenAI
     """
     try:
         # Test avec une question qui devrait déclencher le fallback
@@ -613,7 +560,6 @@ def test_fallback_integration(
             "fallback_activated": source == "openai_fallback",
             "rag_attempted": meta.get("rag_attempted", False),
             "result_preview": answer.get("text", "")[:200] + "..." if answer.get("text") else None,
-            "persistence_metadata": result.get("persistence_metadata", {}),
             "full_result": result,
             "tester": current_user.get('email', 'unknown'),
             "timestamp": time.time()
@@ -623,83 +569,6 @@ def test_fallback_integration(
         return {
             "error": f"Integration test failed: {str(e)}",
             "test_question": test_question
-        }
-
-# ===== 💾 NOUVEAUX ENDPOINTS: Test persistance conversations =====
-
-@router.post("/test-conversation-persistence")
-def test_conversation_persistence(
-    test_question: str = "Test de persistance des conversations",
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Teste la persistance des conversations directement.
-    """
-    try:
-        from .pipeline.dialogue_manager import _persist_conversation
-        
-        test_session_id = f"test_persistence_{int(time.time())}"
-        test_answer = "Réponse de test pour vérifier la persistance"
-        user_id = _extract_user_id_for_persistence(current_user)
-        
-        # Test de la fonction de persistance
-        persistence_success = _persist_conversation(
-            session_id=test_session_id,
-            question=test_question,
-            answer_text=test_answer,
-            language="fr",
-            user_id=user_id,
-            additional_context={
-                "test": True,
-                "intent": "test_persistence",
-                "route": "test_endpoint"
-            }
-        )
-        
-        return {
-            "status": "success" if persistence_success else "failed",
-            "test_session_id": test_session_id,
-            "test_question": test_question,
-            "test_answer": test_answer,
-            "user_id": user_id,
-            "persistence_success": persistence_success,
-            "tester": current_user.get('email', 'unknown'),
-            "timestamp": time.time()
-        }
-        
-    except Exception as e:
-        return {
-            "error": f"Persistence test failed: {str(e)}",
-            "test_question": test_question
-        }
-
-@router.get("/conversation-persistence-status")
-def conversation_persistence_status() -> Dict[str, Any]:
-    """
-    Status détaillé de la persistance des conversations.
-    """
-    try:
-        from .pipeline.dialogue_manager import (
-            POSTGRES_AVAILABLE, 
-            PERSIST_CONVERSATIONS, 
-            CLEAR_CONTEXT_AFTER_ASK,
-            _POSTGRES_MEMORY
-        )
-        
-        return {
-            "postgres_available": POSTGRES_AVAILABLE,
-            "persist_conversations": PERSIST_CONVERSATIONS,
-            "clear_context_after_ask": CLEAR_CONTEXT_AFTER_ASK,
-            "postgres_memory_initialized": _POSTGRES_MEMORY is not None,
-            "database_url_configured": bool(os.getenv("DATABASE_URL")),
-            "status": "operational" if (POSTGRES_AVAILABLE and PERSIST_CONVERSATIONS) else "limited"
-        }
-        
-    except ImportError as e:
-        return {
-            "error": "Could not import persistence modules",
-            "message": str(e),
-            "status": "unavailable"
         }
 
 # ===== Endpoints existants (code original conservé) =====
@@ -824,13 +693,6 @@ def debug_imports() -> Dict[str, Any]:
         "imports_tested": []
     }
     
-    # 💾 NOUVEAU: Test import persistance
-    try:
-        from .pipeline.dialogue_manager import POSTGRES_AVAILABLE, PERSIST_CONVERSATIONS
-        debug_info["conversation_persistence_available"] = POSTGRES_AVAILABLE and PERSIST_CONVERSATIONS
-    except ImportError:
-        debug_info["conversation_persistence_available"] = False
-    
     imports_to_test: List[str] = [
         "app.api.v1.utils.question_classifier",
         "app.api.v1.pipeline.context_extractor",
@@ -841,7 +703,6 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.agricultural_domain_validator",  # 🌾
         "app.api.v1.billing",  # 🦆 NOUVEAU
         "app.api.v1.logging",  # 📊 NOUVEAU
-        "app.api.v1.pipeline.postgres_memory",  # 💾 NOUVEAU
     ]
     
     for import_path in imports_to_test:
@@ -859,7 +720,7 @@ def force_import_test():
     import traceback
     try:
         from .pipeline.dialogue_manager import handle as _handle  # type: ignore
-        test_result = _handle("test", "test question", "fr", debug=True, user_id="test_user")  # NOUVEAU: user_id
+        test_result = _handle("test", "test question", "fr", debug=True)
         return {"status": "✅ SUCCESS", "result": test_result, "import_successful": True}
     except Exception as e:
         return {
