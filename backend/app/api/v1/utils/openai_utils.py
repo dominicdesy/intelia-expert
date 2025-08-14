@@ -23,6 +23,8 @@ Public API (kept):
 - safe_embedding_create(input, model=None, **kwargs) -> List[List[float]] | List[float]
 - get_openai_models() -> List[str]
 - test_openai_connection() -> Dict[str, Any]
+- synthesize_rag_content(question, raw_content, max_length) -> str  ✨ AJOUTÉ
+- generate_clarification_response(intent, missing_fields, general_info) -> str  ✨ AJOUTÉ
 
 Drop‑in: other modules can import unchanged symbols.
 """
@@ -590,6 +592,164 @@ def safe_embedding_create(input: Any, model: str | None = None, **kwargs) -> Lis
     if single:
         return all_vecs[0] if all_vecs else []
     return all_vecs
+
+
+# ----------------------------------------------------------------------------
+# ✨ NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER (MANQUANTES)
+# ----------------------------------------------------------------------------
+
+def synthesize_rag_content(question: str, raw_content: str, max_length: int = 300) -> str:
+    """
+    ✨ NOUVEAU: Synthèse spécialisée pour le contenu RAG du dialogue_manager
+    
+    Optimisée pour nettoyer et reformater le contenu brut des PDFs avicoles.
+    Cette fonction était manquante dans le fichier actuel !
+    """
+    if not raw_content or not raw_content.strip():
+        return "Informations techniques disponibles."
+    
+    # Prompt spécialisé pour le contenu avicole
+    synthesis_prompt = f"""Synthétise ces informations techniques avicoles de manière claire et professionnelle.
+
+INSTRUCTIONS CRITIQUES :
+- NE JAMAIS mentionner de sources, fichiers PDF ou références dans ta réponse
+- NE JAMAIS inclure de fragments de tableaux mal formatés
+- Utiliser du Markdown pour la structure (##, **, -)
+- Réponse concise (~{max_length} mots maximum)
+- Si données incertaines, donner une fourchette
+- Garder uniquement les informations pertinentes à la question
+
+Question utilisateur : {question}
+
+Contenu technique à synthétiser :
+{raw_content[:1500]}
+
+Réponse synthétique (format Markdown, sans sources) :"""
+
+    try:
+        return complete_text(
+            prompt=synthesis_prompt, 
+            temperature=0.2,  # Peu de créativité pour info technique
+            max_tokens=min(400, max_length + 100)  # Marge pour le formatage
+        )
+    except Exception as e:
+        logger.warning(f"⚠️ Échec synthèse RAG, fallback: {e}")
+        # Fallback simple : nettoyage basique
+        cleaned = raw_content.strip()[:max_length]
+        if len(raw_content) > max_length:
+            cleaned += "..."
+        return cleaned
+
+
+def generate_clarification_response(intent: str, missing_fields: List[str], general_info: str = "") -> str:
+    """
+    ✨ NOUVEAU: Génère des réponses de clarification intelligentes
+    Cette fonction était aussi manquante !
+    """
+    prompt = f"""Génère une réponse de clarification courte et utile pour un système d'expertise avicole.
+
+CONTEXTE :
+- Intention détectée : {intent}
+- Informations manquantes : {', '.join(missing_fields)}
+- Info générale disponible : {general_info[:200] if general_info else 'Aucune'}
+
+INSTRUCTIONS :
+- Réponse en 2-3 phrases maximum
+- Expliquer pourquoi ces infos sont importantes
+- Ton professionnel mais accessible
+- Pas de mention de sources
+
+Réponse de clarification :"""
+
+    try:
+        return complete_text(prompt=prompt, temperature=0.3, max_tokens=150)
+    except Exception as e:
+        logger.warning(f"⚠️ Échec génération clarification: {e}")
+        # Fallback générique
+        return f"Pour vous donner une réponse précise sur {intent}, j'aurais besoin de quelques précisions supplémentaires."
+
+
+def test_synthesis_pipeline() -> Dict[str, Any]:
+    """
+    ✨ NOUVEAU: Test complet du pipeline de synthèse pour dialogue_manager
+    """
+    try:
+        # Test de la fonction complete_text()
+        test_response = complete_text(
+            prompt="Test de synthèse : résume en une phrase que les poules pondent des œufs.",
+            temperature=0.2,
+            max_tokens=50
+        )
+        
+        # Test de synthèse RAG
+        rag_test = synthesize_rag_content(
+            question="Poids idéal poule?",
+            raw_content="Les poules Ross 308 atteignent un poids optimal de 2.2kg à 42 jours selon les standards techniques...",
+            max_length=100
+        )
+        
+        # Test clarification
+        clarification_test = generate_clarification_response(
+            intent="PerfTargets",
+            missing_fields=["age_days", "line"],
+            general_info="Information sur les performances"
+        )
+        
+        return {
+            "status": "success",
+            "complete_test": {
+                "success": True,
+                "response": test_response[:100] + "..." if len(test_response) > 100 else test_response
+            },
+            "rag_synthesis_test": {
+                "success": True,
+                "response": rag_test[:100] + "..." if len(rag_test) > 100 else rag_test
+            },
+            "clarification_test": {
+                "success": True,
+                "response": clarification_test[:100] + "..." if len(clarification_test) > 100 else clarification_test
+            },
+            "message": "Pipeline de synthèse fonctionnel"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Échec test pipeline synthèse: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+
+def get_openai_status() -> Dict[str, Any]:
+    """
+    ✨ AMÉLIORÉ: Status complet du système OpenAI avec support nouvelles fonctions
+    """
+    return {
+        "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "models": {
+            "default": _DEFAULT_MODEL,
+            "synthesis": os.getenv("OPENAI_SYNTHESIS_MODEL", _DEFAULT_MODEL),
+            "cot": os.getenv("OPENAI_COT_MODEL", _DEFAULT_MODEL),
+            "embedding": os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+        },
+        "max_tokens_limits": {
+            "gpt-3.5-turbo": 4096,
+            "gpt-4": 8192,
+            "gpt-4o": 128000,
+            "gpt-4-turbo": 128000,
+            "gpt-4o-mini": 4096,
+            "gpt-5": 128000
+        },
+        "new_functions_available": {
+            "synthesize_rag_content": True,
+            "generate_clarification_response": True,
+            "test_synthesis_pipeline": True
+        },
+        "retry_config": {
+            "max_retries": 2,
+            "base_delay": 1.0
+        }
+    }
 
 
 # ----------------------------------------------------------------------------
