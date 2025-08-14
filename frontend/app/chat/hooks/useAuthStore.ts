@@ -7,7 +7,7 @@ import { User, AuthStore, ProfileUpdateData } from '../types'
 const supabase = createClientComponentClient()
 
 // 🆕 FONCTION POUR RÉCUPÉRER LE PROFIL DEPUIS VOTRE API BACKEND
-const fetchUserProfileFromBackend = async (session: any): Promise<Partial<User> | null> => {
+const fetchUserProfileFromBackend = async (session: any): Promise<{ user_type?: string } | null> => {
   try {
     const token = session.access_token
     if (!token) {
@@ -32,11 +32,9 @@ const fetchUserProfileFromBackend = async (session: any): Promise<Partial<User> 
     const backendProfile = await response.json()
     console.log('✅ Profil récupéré depuis backend:', backendProfile)
 
-    // 🎯 RETOURNER LES DONNÉES IMPORTANTES DU BACKEND
+    // 🎯 RETOURNER SEULEMENT USER_TYPE POUR ÉVITER LES CONFLITS DE TYPE
     return {
-      user_type: backendProfile.user_type, // 🔥 C'est ici qu'on récupère "super_admin"
-      backendName: backendProfile.full_name, // Renommé pour éviter le conflit de type
-      preferences: backendProfile.preferences
+      user_type: backendProfile.user_type // 🔥 C'est ici qu'on récupère "super_admin"
     }
 
   } catch (error) {
