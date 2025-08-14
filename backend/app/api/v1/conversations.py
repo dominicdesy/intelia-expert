@@ -932,4 +932,3 @@ async def admin_autocommit_status(
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
-                "
