@@ -82,7 +82,7 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const { user } = useAuthStore()
+  const { user, loading: authLoading } = useAuthStore()
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
   const [billingStats, setBillingStats] = useState<BillingStats | null>(null)
@@ -103,8 +103,9 @@ export const StatisticsPage: React.FC = () => {
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
 
-  // Vérification des permissions super_admin
+  // Vérification des permissions super_admin avec gestion du chargement
   const isSuperAdmin = user?.user_type === 'super_admin'
+  const isAuthenticationReady = !authLoading
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -132,6 +133,11 @@ export const StatisticsPage: React.FC = () => {
   }
 
   useEffect(() => {
+    // Attendre que l'authentification soit prête avant de vérifier les permissions
+    if (!isAuthenticationReady) {
+      return
+    }
+
     if (!isSuperAdmin) {
       setError("Accès refusé - Permissions super_admin requises")
       setLoading(false)
@@ -139,13 +145,13 @@ export const StatisticsPage: React.FC = () => {
     }
 
     loadAllStatistics()
-  }, [isSuperAdmin, selectedTimeRange])
+  }, [isSuperAdmin, selectedTimeRange, isAuthenticationReady])
 
   useEffect(() => {
-    if (activeTab === 'questions') {
+    if (activeTab === 'questions' && isAuthenticationReady && isSuperAdmin) {
       loadQuestionLogs()
     }
-  }, [activeTab, questionFilters, currentPage])
+  }, [activeTab, questionFilters, currentPage, isAuthenticationReady, isSuperAdmin])
 
   const loadAllStatistics = async () => {
     setLoading(true)
@@ -371,6 +377,19 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
+  // État de chargement de l'authentification
+  if (!isAuthenticationReady) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification des permissions...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Vérification des permissions uniquement après que l'auth soit prête
   if (!isSuperAdmin) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
