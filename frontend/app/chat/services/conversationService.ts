@@ -77,7 +77,7 @@ export class ConversationService {
     try {
       console.log('📖 [ConversationService] Chargement conversation complète:', conversationId)
       
-      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
@@ -656,9 +656,9 @@ export class ConversationService {
 
     try {
       console.log('📊 Envoi feedback:', conversationId, feedback)
-      console.log('📡 URL feedback:', `${this.baseUrl}/conversation/${conversationId}/feedback`)
+      console.log('📡 URL feedback:', `${this.baseUrl}/conversations/${conversationId}/feedback`)
       
-      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/feedback`, {
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -690,9 +690,9 @@ export class ConversationService {
 
     try {
       console.log('💬 Envoi commentaire feedback:', conversationId, comment.substring(0, 50) + '...')
-      console.log('📡 URL commentaire:', `${this.baseUrl}/conversation/${conversationId}/comment`)
+      console.log('📡 URL commentaire:', `${this.baseUrl}/conversations/${conversationId}/comment`)
       
-      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/comment`, {
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/comment`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -734,9 +734,9 @@ export class ConversationService {
 
     try {
       console.log('📊💬 Envoi feedback avec commentaire:', conversationId, feedback, comment ? 'avec commentaire' : 'sans commentaire')
-      console.log('📡 URL feedback combiné:', `${this.baseUrl}/conversation/${conversationId}/feedback-with-comment`)
+      console.log('📡 URL feedback combiné:', `${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`)
       
-      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}/feedback-with-comment`, {
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -780,9 +780,9 @@ export class ConversationService {
 
     try {
       console.log('🗑️ Suppression conversation serveur:', conversationId)
-      console.log('📡 URL suppression:', `${this.baseUrl}/conversation/${conversationId}`)
+      console.log('📡 URL suppression:', `${this.baseUrl}/conversations/${conversationId}`)
       
-      const response = await fetch(`${this.baseUrl}/conversation/${conversationId}`, {
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
         method: 'DELETE',
         headers: { 
           'Accept': 'application/json',
