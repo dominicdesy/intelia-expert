@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase'; // <— adapte ce chemin si besoin
+import { supabase } from '@/supabase'; // <— adapte ce chemin si besoin
 
 // ======================
 // Types & constantes

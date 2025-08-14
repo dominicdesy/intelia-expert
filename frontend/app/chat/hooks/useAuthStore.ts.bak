@@ -1,559 +1,323 @@
-// hooks/useAuthStore.ts - FIX PERMANENT POUR SUPER_ADMIN
+// useAuthStore.ts — rewrite (Zustand + Supabase v2)
+// -------------------------------------------------
+// ✅ Déduplication en vol des appels /v1/auth/me
+// ✅ TTL 60s pour éviter les rafales
+// ✅ Filtrage des events onAuthStateChange (no-op ignorés)
+// ✅ Garde de concurrence pour loadUser()
+// ✅ Nettoyage sûr au logout
+// ⚠️ Ajuster l'import du client Supabase selon votre projet
 
-import { useState, useEffect, useRef } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { User, AuthStore, ProfileUpdateData } from '../types'
+import { create } from 'zustand';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase'; // <— adapte ce chemin si besoin
 
-const supabase = createClientComponentClient()
+// ======================
+// Types & constantes
+// ======================
 
-// 🆕 FONCTION POUR RÉCUPÉRER LE PROFIL DEPUIS VOTRE API BACKEND
-const fetchUserProfileFromBackend = async (session: any): Promise<{ user_type?: string } | null> => {
+export type User = {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  linkedinProfile?: string;
+  companyName?: string;
+  companyWebsite?: string;
+  linkedinCorporate?: string;
+  user_type?: string; // super_admin, admin, producer, etc.
+  language?: string;
+  created_at?: string;
+  plan?: 'essential' | 'pro' | 'enterprise';
+  name?: string;
+};
+
+type BackendProfile = { user_type?: string } | null;
+
+type AuthState = {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isLoggingOut: boolean;
+  initialized: boolean;
+
+  // Actions
+  init: () => Promise<void>;
+  reload: () => Promise<void>;
+  logout: () => Promise<void>;
+};
+
+// Endpoint backend (conforme aux logs DigitalOcean)
+const BACKEND_ME_URL = '/v1/auth/me';
+
+// TTL du cache /v1/auth/me
+const ME_TTL_MS = 60_000;
+
+// ======================
+// Caches & verrous module-scoped
+// ======================
+
+let meCache: { value: BackendProfile; userId?: string; ts: number } = {
+  value: null,
+  userId: undefined,
+  ts: 0,
+};
+
+let meInFlight: Promise<BackendProfile> | null = null;
+let loadUserInFlight: Promise<void> | null = null;
+let initStarted = false;
+
+// Dernière session connue (pour ignorer les no-ops d'events)
+let lastSessionRef: { uid?: string; token?: string } = {};
+
+// Subscription onAuthStateChange (une seule fois)
+let authSubscription: { unsubscribe: () => void } | null = null;
+
+// ======================
+// Helpers
+// ======================
+
+function safeGet<T>(obj: any, path: string, fallback?: T): T | undefined {
   try {
-    const token = session.access_token
-    if (!token) {
-      console.warn('⚠️ Pas de token pour récupérer le profil backend')
-      return null
-    }
-
-    // 🎯 APPEL À VOTRE API BACKEND
-    const response = await fetch('/api/v1/auth/me', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.warn('⚠️ Erreur API backend profil:', response.status)
-      return null
-    }
-
-    const backendProfile = await response.json()
-    console.log('✅ Profil récupéré depuis backend:', backendProfile)
-
-    // 🎯 RETOURNER SEULEMENT USER_TYPE POUR ÉVITER LES CONFLITS DE TYPE
-    return {
-      user_type: backendProfile.user_type // 🔥 C'est ici qu'on récupère "super_admin"
-    }
-
-  } catch (error) {
-    console.warn('⚠️ Erreur récupération profil backend:', error)
-    return null
+    return path.split('.').reduce<any>((o, k) => (o ? o[k] : undefined), obj) ?? fallback;
+  } catch {
+    return fallback;
   }
 }
 
-export const useAuthStore = (): AuthStore => {
-  const [user, setUser] = useState<User | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  
-  // ✅ REF POUR ÉVITER LES ACTIONS APRÈS UNMOUNT
-  const isMountedRef = useRef(true)
-  const isLoggingOutRef = useRef(false)
+function normalizeUser(session: Session, backendProfile: BackendProfile): User {
+  const meta = session.user?.user_metadata || {};
+  const fn = (meta.first_name || meta.firstName || '').toString();
+  const ln = (meta.last_name || meta.lastName || '').toString();
 
-  useEffect(() => {
-    isMountedRef.current = true
-    
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        // ✅ VÉRIFIER SI LE COMPOSANT EST TOUJOURS MONTÉ
-        if (!isMountedRef.current || isLoggingOutRef.current) return
-
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error('❌ Erreur récupération session:', error)
-          if (isMountedRef.current && !isLoggingOutRef.current) {
-            setIsAuthenticated(false)
-            setIsLoading(false)
-          }
-          return
-        }
-
-        if (session?.user && isMountedRef.current && !isLoggingOutRef.current) {
-          console.log('✅ Utilisateur connecté:', session.user.email)
-          
-          // 🆕 RÉCUPÉRER LE PROFIL DEPUIS VOTRE BACKEND
-          const backendProfile = await fetchUserProfileFromBackend(session)
-          
-          // 🎯 CONSTRUIRE L'OBJET USER EN COMBINANT SUPABASE + BACKEND
-          const userData: User = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: `${session.user.user_metadata?.first_name || ''} ${session.user.user_metadata?.last_name || ''}`.trim() || session.user.email?.split('@')[0] || '',
-            firstName: session.user.user_metadata?.first_name || '',
-            lastName: session.user.user_metadata?.last_name || '',
-            phone: session.user.user_metadata?.phone || '',
-            country: session.user.user_metadata?.country || '',
-            linkedinProfile: session.user.user_metadata?.linkedin_profile || '',
-            companyName: session.user.user_metadata?.company_name || '',
-            companyWebsite: session.user.user_metadata?.company_website || '',
-            linkedinCorporate: session.user.user_metadata?.linkedin_corporate || '',
-            
-            // 🔥 PRIORITÉ AU BACKEND POUR USER_TYPE (fix super_admin)
-            user_type: backendProfile?.user_type || session.user.user_metadata?.role || 'producer',
-            
-            language: session.user.user_metadata?.language || 'fr',
-            created_at: session.user.created_at || '',
-            plan: 'essential'
-          }
-          
-          // 🆕 LOG POUR DEBUG
-          console.log('🔍 User final:', {
-            email: userData.email,
-            user_type: userData.user_type,
-            backend_user_type: backendProfile?.user_type,
-            supabase_role: session.user.user_metadata?.role
-          })
-          
-          setUser(userData)
-          setIsAuthenticated(true)
-        } else if (isMountedRef.current && !isLoggingOutRef.current) {
-          console.log('ℹ️ Aucun utilisateur connecté')
-          setIsAuthenticated(false)
-        }
-      } catch (error) {
-        console.error('❌ Erreur chargement utilisateur:', error)
-        if (isMountedRef.current && !isLoggingOutRef.current) {
-          setIsAuthenticated(false)
-        }
-      } finally {
-        if (isMountedRef.current && !isLoggingOutRef.current) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // ✅ IGNORER LES ÉVÉNEMENTS PENDANT LE LOGOUT
-        if (isLoggingOutRef.current) {
-          console.log('🚫 Événement auth ignoré (logout en cours):', event)
-          return
-        }
-
-        if (!isMountedRef.current) {
-          console.log('🚫 Événement auth ignoré (composant démonté):', event)
-          return
-        }
-
-        console.log('🔄 Changement auth:', event, session?.user?.email)
-        
-        if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setIsAuthenticated(false)
-        } else if (event === 'SIGNED_IN' && session?.user) {
-          loadUser()
-        }
-      }
-    )
-
-    return () => {
-      if (subscription?.unsubscribe) {
-        subscription.unsubscribe()
-      }
-    }
-  }, [])
-
-  // ✅ FONCTION UTILITAIRE POUR REMEMBER ME
-  const rememberMeUtils = {
-    // Sauvegarder les préférences remember me
-    save: (email: string, remember = true) => {
-      if (remember && email) {
-        localStorage.setItem('intelia-remember-me', 'true')
-        localStorage.setItem('intelia-last-email', email.trim())
-        console.log('💾 [RememberMe] Email sauvegardé:', email)
-      } else {
-        localStorage.removeItem('intelia-remember-me')
-        localStorage.removeItem('intelia-last-email')
-        console.log('🗑️ [RememberMe] Préférences supprimées')
-      }
-    },
-    
-    // Charger les préférences remember me
-    load: () => {
-      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-      const lastEmail = localStorage.getItem('intelia-last-email') || ''
-      
-      return {
-        rememberMe,
-        lastEmail: rememberMe ? lastEmail : '',
-        hasRememberedEmail: rememberMe && lastEmail.length > 0
-      }
-    },
-    
-    // Effacer complètement (pour déconnexion définitive si besoin)
-    clear: () => {
-      localStorage.removeItem('intelia-remember-me')
-      localStorage.removeItem('intelia-last-email')
-      console.log('🧹 [RememberMe] Nettoyage complet')
-    }
-  }
-
-  // ✅ DÉCONNEXION CORRIGÉE - PRÉSERVE REMEMBER ME
-  const logout = async (): Promise<void> => {
-    try {
-      console.log('🚪 [Logout] Début déconnexion sécurisée')
-      
-      // ✅ MARQUER LE LOGOUT COMME EN COURS
-      isLoggingOutRef.current = true
-      
-      // ✅ ÉTAPE 1: SAUVEGARDER les préférences AVANT nettoyage
-      let savedRememberMe = false
-      let savedLastEmail = ''
-      let savedLanguage = ''
-      
-      try {
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          savedRememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-          savedLastEmail = localStorage.getItem('intelia-last-email') || ''
-          savedLanguage = localStorage.getItem('intelia-language') || ''
-          
-          console.log('💾 [Logout] Sauvegarde préférences:', { 
-            savedRememberMe, 
-            savedLastEmail: savedLastEmail ? savedLastEmail.substring(0, 10) + '...' : 'none',
-            savedLanguage 
-          })
-        }
-      } catch (error) {
-        console.warn('⚠️ [Logout] Erreur sauvegarde préférences:', error)
-      }
-      
-      // ✅ ÉTAPE 2: Réinitialiser l'état local IMMÉDIATEMENT
-      if (isMountedRef.current) {
-        setUser(null)
-        setIsAuthenticated(false)
-        setIsLoading(true) // Mettre en loading pendant la déconnexion
-      }
-      
-      // ✅ ÉTAPE 3: Nettoyage stockage local SÉLECTIF
-      try {
-        if (typeof window !== 'undefined') {
-          // ✅ Nettoyer localStorage - SEULEMENT les données de session/auth
-          if (typeof localStorage !== 'undefined') {
-            const keysToRemove = Object.keys(localStorage).filter(key => {
-              // ✅ GARDER les préférences utilisateur importantes
-              if (key === 'intelia-remember-me') return false
-              if (key === 'intelia-last-email') return false
-              if (key === 'intelia-language') return false
-              
-              // ✅ SUPPRIMER seulement les données de session/auth
-              return (
-                key.includes('supabase') || 
-                key.includes('sb-') || 
-                key.includes('auth') ||
-                key.includes('session') ||
-                key.includes('token') ||
-                key.startsWith('intelia-auth') ||
-                key.startsWith('intelia-chat') ||
-                key.startsWith('intelia-user')
-              )
-            })
-            
-            keysToRemove.forEach(key => {
-              try {
-                localStorage.removeItem(key)
-                console.log('🗑️ [Logout] Supprimé localStorage (auth only):', key)
-              } catch (e) {
-                console.warn('⚠️ [Logout] Impossible de supprimer:', key)
-              }
-            })
-          }
-          
-          // ✅ Nettoyer sessionStorage (tout peut être supprimé)
-          if (typeof sessionStorage !== 'undefined') {
-            try {
-              sessionStorage.clear()
-              console.log('🗑️ [Logout] SessionStorage nettoyé')
-            } catch (e) {
-              console.warn('⚠️ [Logout] Erreur nettoyage sessionStorage:', e)
-            }
-          }
-        }
-      } catch (storageError) {
-        console.warn('⚠️ [Logout] Erreur nettoyage stockage:', storageError)
-      }
-
-      // ✅ ÉTAPE 4: RESTAURER les préférences utilisateur sauvegardées
-      try {
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          // Restaurer remember me seulement si activé
-          if (savedRememberMe && savedLastEmail) {
-            localStorage.setItem('intelia-remember-me', 'true')
-            localStorage.setItem('intelia-last-email', savedLastEmail)
-            console.log('✅ [Logout] Préférences remember me restaurées')
-          }
-          
-          // Restaurer langue
-          if (savedLanguage) {
-            localStorage.setItem('intelia-language', savedLanguage)
-            console.log('✅ [Logout] Langue restaurée:', savedLanguage)
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ [Logout] Erreur restauration préférences:', error)
-      }
-
-      // ✅ ÉTAPE 5: Déconnexion Supabase (silencieuse)
-      try {
-        const { error } = await supabase.auth.signOut({ scope: 'global' })
-        if (error) {
-          console.warn('⚠️ [Logout] Avertissement Supabase (ignoré):', error.message)
-        } else {
-          console.log('✅ [Logout] Déconnexion Supabase réussie')
-        }
-      } catch (supabaseError) {
-        console.warn('⚠️ [Logout] Erreur Supabase (ignorée):', supabaseError)
-        // Continuer même si Supabase échoue
-      }
-      
-      // ✅ ÉTAPE 6: Attendre un peu pour que les changements soient appliqués
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // ✅ ÉTAPE 7: Redirection FORCÉE et IMMÉDIATE
-      console.log('🏠 [Logout] Redirection immédiate vers accueil')
-      
-      // Redirection la plus fiable possible
-      if (typeof window !== 'undefined') {
-        // Empêcher tout autre traitement
-        window.onbeforeunload = null
-        
-        // Redirection immédiate avec rechargement complet
-        window.location.replace('/')
-        
-        // Fallback au cas où replace ne fonctionne pas
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 50)
-        
-        // Fallback ultime
-        setTimeout(() => {
-          window.location.reload()
-        }, 200)
-      }
-      
-    } catch (error) {
-      console.error('❌ [Logout] Erreur critique (récupération):', error)
-      
-      // ✅ RÉCUPÉRATION D'URGENCE - préserver remember me
-      try {
-        // Marquer comme déconnecté même en cas d'erreur
-        if (isMountedRef.current) {
-          setUser(null)
-          setIsAuthenticated(false)
-        }
-        
-        // Nettoyage d'urgence SÉLECTIF
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          // Sauvegarder remember me avant nettoyage d'urgence
-          const emergencyRememberMe = localStorage.getItem('intelia-remember-me')
-          const emergencyLastEmail = localStorage.getItem('intelia-last-email') 
-          const emergencyLanguage = localStorage.getItem('intelia-language')
-          
-          try {
-            // Nettoyage d'urgence
-            const keysToKeep = ['intelia-remember-me', 'intelia-last-email', 'intelia-language']
-            const allKeys = Object.keys(localStorage)
-            
-            allKeys.forEach(key => {
-              if (!keysToKeep.includes(key)) {
-                localStorage.removeItem(key)
-              }
-            })
-            
-            // Restaurer les préférences importantes
-            if (emergencyRememberMe === 'true' && emergencyLastEmail) {
-              localStorage.setItem('intelia-remember-me', 'true')
-              localStorage.setItem('intelia-last-email', emergencyLastEmail)
-            }
-            if (emergencyLanguage) {
-              localStorage.setItem('intelia-language', emergencyLanguage)
-            }
-            
-          } catch (clearError) {
-            console.warn('⚠️ [Logout] Nettoyage d\'urgence échoué:', clearError)
-          }
-          
-          // Redirection forcée même en cas d'erreur
-          window.location.replace('/')
-        }
-      } catch (emergencyError) {
-        console.error('❌ [Logout] Récupération d\'urgence échouée:', emergencyError)
-        
-        // Dernier recours - rechargement de la page
-        if (typeof window !== 'undefined') {
-          window.location.reload()
-        }
-      }
-    }
-  }
-
-  const updateProfile = async (data: ProfileUpdateData): Promise<{ success: boolean; error?: string }> => {
-    try {
-      console.log('📝 Mise à jour profil:', data)
-      
-      const updates = {
-        data: {
-          first_name: data.firstName,
-          last_name: data.lastName,
-          phone: data.phone,
-          country: data.country,
-          linkedin_profile: data.linkedinProfile,
-          company_name: data.companyName,
-          company_website: data.companyWebsite,
-          linkedin_corporate: data.linkedinCorporate,
-          language: data.language
-        }
-      }
-      
-      const { error } = await supabase.auth.updateUser(updates)
-      
-      if (error) {
-        console.error('❌ Erreur mise à jour profil:', error)
-        return { success: false, error: error.message }
-      }
-      
-      if (user && isMountedRef.current) {
-        const updatedUser: User = {
-          ...user,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-          country: data.country,
-          linkedinProfile: data.linkedinProfile,
-          companyName: data.companyName,
-          companyWebsite: data.companyWebsite,
-          linkedinCorporate: data.linkedinCorporate,
-          name: `${data.firstName} ${data.lastName}`.trim(),
-          language: data.language || user.language
-        }
-        
-        setUser(updatedUser)
-        console.log('✅ Profil mis à jour localement:', updatedUser)
-      }
-      
-      return { success: true }
-    } catch (error: any) {
-      console.error('❌ Erreur critique mise à jour:', error)
-      return { success: false, error: error.message }
-    }
-  }
-
-  // ✅ FONCTION LOGIN AVEC REMEMBER ME (à utiliser dans votre composant login)
-  const login = async (email: string, password: string): Promise<void> => {
-    try {
-      console.log('🔐 Connexion pour:', email)
-      setIsLoading(true)
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password
-      })
-      
-      if (error) {
-        console.error('❌ Erreur connexion:', error)
-        throw error
-      }
-      
-      if (data.user) {
-        console.log('✅ Connexion réussie pour:', email)
-        // La mise à jour de l'état sera gérée par onAuthStateChange
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Erreur login:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // ✅ FONCTION REGISTER AVEC METADATA
-  const register = async (email: string, password: string, userData?: Partial<User>): Promise<void> => {
-    try {
-      console.log('📝 Inscription pour:', email)
-      setIsLoading(true)
-      
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-        options: {
-          data: {
-            first_name: userData?.firstName || '',
-            last_name: userData?.lastName || '',
-            role: userData?.user_type || 'producer',
-            language: userData?.language || 'fr'
-          }
-        }
-      })
-      
-      if (error) {
-        console.error('❌ Erreur inscription:', error)
-        throw error
-      }
-      
-      console.log('✅ Inscription réussie pour:', email)
-      
-    } catch (error: any) {
-      console.error('❌ Erreur register:', error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // ✅ FONCTION D'INITIALISATION SESSION
-  const initializeSession = async (): Promise<boolean> => {
-    try {
-      console.log('🔄 Initialisation session...')
-      
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.error('❌ Erreur récupération utilisateur:', error)
-        return false
-      }
-      
-      if (session) {
-        console.log('✅ Session restaurée pour:', session.user.email)
-        return true
-      } else {
-        console.log('❌ Aucune session à initialiser')
-        return false
-      }
-      
-    } catch (error) {
-      console.error('❌ Erreur initialisation session:', error)
-      return false
-    }
-  }
-
-  // ✅ ÉTAT POUR VÉRIFIER SI LE STORE EST HYDRATÉ
-  const [hasHydrated, setHasHydrated] = useState(false)
-  
-  useEffect(() => {
-    setHasHydrated(true)
-  }, [])
+  const name =
+    `${fn} ${ln}`.trim() ||
+    (session.user?.email?.split?.('@')?.[0] ?? '') ||
+    undefined;
 
   return {
-    user,
-    isAuthenticated,
-    isLoading,
-    hasHydrated,
-    logout,
-    login,
-    register,
-    updateProfile,
-    initializeSession
-  }
+    id: session.user.id,
+    email: session.user.email || '',
+    firstName: fn || undefined,
+    lastName: ln || undefined,
+    phone: meta.phone || undefined,
+    country: meta.country || undefined,
+    linkedinProfile: meta.linkedin_profile || undefined,
+    companyName: meta.company_name || undefined,
+    companyWebsite: meta.company_website || undefined,
+    linkedinCorporate: meta.linkedin_corporate || undefined,
+    // priorité backend → corrige les cas super_admin
+    user_type:
+      (backendProfile?.user_type as string | undefined) ||
+      (meta.role as string | undefined) ||
+      'producer',
+    language: meta.language || 'fr',
+    created_at: session.user.created_at || undefined,
+    plan: 'essential',
+    name,
+  };
 }
+
+/**
+ * GET /v1/auth/me — dédupliqué + TTL
+ */
+async function fetchBackendProfile(session: Session): Promise<BackendProfile> {
+  const token = session?.access_token;
+  const userId = session?.user?.id;
+
+  if (!token || !userId) {
+    console.warn('⚠️ fetchBackendProfile: token ou userId manquant');
+    return null;
+  }
+
+  const now = Date.now();
+
+  // TTL cache
+  if (meCache.value && meCache.userId === userId && now - meCache.ts < ME_TTL_MS) {
+    return meCache.value;
+  }
+
+  // Déduplication des requêtes en vol
+  if (meInFlight) return meInFlight;
+
+  meInFlight = fetch(BACKEND_ME_URL, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`GET ${BACKEND_ME_URL} → ${res.status}`);
+      const data = await res.json();
+      // Normalisation minimale (le backend peut renvoyer role/user_type)
+      const profile: BackendProfile = {
+        user_type: (data?.user_type as string | undefined) || (data?.role as string | undefined),
+      };
+      meCache = { value: profile, userId, ts: Date.now() };
+      return profile;
+    })
+    .catch((err) => {
+      console.warn('⚠️ Profil backend indisponible :', err);
+      return null;
+    })
+    .finally(() => {
+      meInFlight = null;
+    });
+
+  return meInFlight;
+}
+
+/**
+ * Compare session courante vs dernière connue (uid + token).
+ * Renvoie true si changement réel.
+ */
+function hasSessionChanged(session: Session | null): boolean {
+  const uid = session?.user?.id;
+  const tok = session?.access_token;
+  const changed = uid !== lastSessionRef.uid || tok !== lastSessionRef.token;
+  if (changed) {
+    lastSessionRef = { uid, token: tok };
+  }
+  return changed;
+}
+
+// ======================
+// Store Zustand
+// ======================
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  isLoggingOut: false,
+  initialized: false,
+
+  /**
+   * init(): lance le chargement initial + souscrit aux events auth (une seule fois)
+   */
+  init: async () => {
+    if (initStarted) return;
+    initStarted = true;
+
+    await get().reload();
+
+    // Abonnement unique aux events d'auth
+    if (!authSubscription) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // En cas de logout en cours, on ignore
+        if (get().isLoggingOut) {
+          // debug: console.log('[Auth] Ignoré car logout en cours:', event);
+          return;
+        }
+
+        // Gestion explicite du SIGNED_OUT
+        if (event === 'SIGNED_OUT') {
+          // Clear immédiat
+          meCache = { value: null, userId: undefined, ts: 0 };
+          set({ user: null, isAuthenticated: false, isLoading: false });
+          // Reset last session ref
+          lastSessionRef = { uid: undefined, token: undefined };
+          return;
+        }
+
+        // Pour les autres events: on recharge seulement si la session a VRAIMENT changé
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          if (hasSessionChanged(session || null)) {
+            await get().reload();
+          }
+          return;
+        }
+      });
+
+      authSubscription = data.subscription;
+    }
+
+    set({ initialized: true });
+  },
+
+  /**
+   * reload(): charge la session courante et met à jour l'état
+   * Protégé contre les appels concurrents.
+   */
+  reload: async () => {
+    // Déduplication des rechargements concurrents
+    if (loadUserInFlight) return loadUserInFlight;
+
+    const run = (async () => {
+      try {
+        set({ isLoading: true });
+
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('❌ supabase.auth.getSession error:', error);
+          set({ user: null, isAuthenticated: false, isLoading: false });
+          return;
+        }
+
+        const session = data.session;
+        if (!session?.user) {
+          // Pas de session → pas d’appel backend
+          meCache = { value: null, userId: undefined, ts: 0 };
+          lastSessionRef = { uid: undefined, token: undefined };
+          set({ user: null, isAuthenticated: false, isLoading: false });
+          return;
+        }
+
+        // Dédupliqué + TTL
+        const backendProfile = await fetchBackendProfile(session);
+        const normalized = normalizeUser(session, backendProfile);
+
+        set({
+          user: normalized,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (e) {
+        console.error('❌ reload() exception:', e);
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      }
+    })();
+
+    loadUserInFlight = run;
+    await run;
+    loadUserInFlight = null;
+  },
+
+  /**
+   * logout(): déconnexion sûre + nettoyage des caches
+   */
+  logout: async () => {
+    // Empêche les effets en parallèle pendant le signOut
+    set({ isLoggingOut: true, isLoading: true });
+
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('❌ supabase.auth.signOut error:', e);
+    } finally {
+      // Nettoyage local
+      meCache = { value: null, userId: undefined, ts: 0 };
+      lastSessionRef = { uid: undefined, token: undefined };
+
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isLoggingOut: false,
+      });
+    }
+  },
+}));
+
+// ======================
+// Auto-init optionnel
+// ======================
+// Si vous préférez initier depuis votre App (recommandé):
+//   useEffect(() => { useAuthStore.getState().init(); }, []);
+// Sinon, décommentez les 2 lignes ci-dessous pour auto-init
+// setTimeout(() => {
+//   useAuthStore.getState().init().catch(console.error);
+// }, 0);
