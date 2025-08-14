@@ -1,4 +1,4 @@
-// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION INTEGRATION ====================
+// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION INTEGRATION + DELETE FIX + HEURE LOCALE ====================
 
 // 🔧 AJOUT : Import du conversationService pour stocker les session IDs
 import { conversationService } from './conversationService'
@@ -100,6 +100,47 @@ const generateUUID = (): string => {
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
   })
+}
+
+// 🆕 NOUVEAU : FONCTIONS FORMATAGE HEURE LOCALE
+export const formatToLocalTime = (utcTimestamp: string): string => {
+  try {
+    const date = new Date(utcTimestamp);
+    
+    // Options pour l'affichage en français canadien
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Heure locale auto
+      hour12: false // Format 24h
+    };
+    
+    return date.toLocaleString('fr-CA', options);
+  } catch (error) {
+    console.warn('Erreur formatage date:', error);
+    return utcTimestamp; // Fallback
+  }
+}
+
+// Version plus simple si préférée
+export const simpleLocalTime = (utcTimestamp: string): string => {
+  try {
+    return new Date(utcTimestamp).toLocaleString('fr-CA', {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  } catch (error) {
+    console.warn('Erreur formatage date simple:', error);
+    return utcTimestamp;
+  }
 }
 
 // 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
@@ -443,7 +484,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌐 [apiService] DialogueManager public:', {
+  console.log('🌍 [apiService] DialogueManager public:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
@@ -616,45 +657,6 @@ const saveConversationExplicitly = async (
   // Les conversations sont automatiquement créées par /v1/expert/ask
   // Pas besoin de sauvegarde explicite supplémentaire
   return
-
-  /* ❌ CODE DÉSACTIVÉ car endpoint manquant - conservé pour référence
-  if (!processedData.response && !processedData.general_answer?.text) {
-    console.log('⚠️ [saveConversationExplicitly] Pas de contenu à sauvegarder')
-    return
-  }
-
-  try {
-    const conversationData = {
-      user_id: userId,
-      conversation_id: processedData.conversation_id,
-      question: question,
-      response: processedData.response || processedData.general_answer?.text || '',
-      full_text: processedData.full_text || processedData.response || processedData.general_answer?.text || '',
-      confidence_score: processedData.confidence_score || 0.8,
-      response_time_ms: processedData.response_time || 1000,
-      language: processedData.language || 'fr',
-      rag_used: processedData.rag_used || true,
-      timestamp: processedData.timestamp || new Date().toISOString()
-    }
-
-    const headers = getAuthHeaders()
-
-    const response = await fetch(`${API_BASE_URL}/conversation`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(conversationData)
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`)
-    }
-
-    console.log('✅ [saveConversationExplicitly] Conversation sauvegardée en base')
-  } catch (error) {
-    console.error('❌ [saveConversationExplicitly] Erreur:', error)
-    throw error
-  }
-  */
 }
 
 const saveConversationPublic = async (
@@ -668,49 +670,96 @@ const saveConversationPublic = async (
   // Les conversations sont automatiquement créées par /v1/expert/ask
   // Pas besoin de sauvegarde explicite supplémentaire
   return
+}
 
-  /* ❌ CODE DÉSACTIVÉ car endpoint manquant - conservé pour référence
-  if (!processedData.response && !processedData.general_answer?.text) {
-    console.log('⚠️ [saveConversationPublic] Pas de contenu à sauvegarder')
-    return
+/**
+ * 🆕 NOUVEAU : FONCTION DELETE CONVERSATION CORRIGÉE
+ */
+export const deleteConversation = async (conversationId: string): Promise<void> => {
+  if (!conversationId) {
+    throw new Error('ID de conversation requis')
   }
+
+  console.log('🗑️ [apiService] Suppression conversation:', conversationId)
 
   try {
-    // Pour les conversations publiques, on utilise un user_id générique ou on skip la sauvegarde
-    console.log('ℹ️ [saveConversationPublic] Conversation publique - sauvegarde optionnelle')
-    
-    // Optionnel: sauvegarder avec un user_id anonyme
-    const conversationData = {
-      user_id: 'anonymous',
-      conversation_id: processedData.conversation_id,
-      question: question,
-      response: processedData.response || processedData.general_answer?.text || '',
-      full_text: processedData.full_text || processedData.response || processedData.general_answer?.text || '',
-      confidence_score: processedData.confidence_score || 0.8,
-      response_time_ms: processedData.response_time || 1000,
-      language: processedData.language || 'fr',
-      rag_used: processedData.rag_used || true,
-      timestamp: processedData.timestamp || new Date().toISOString()
-    }
+    const headers = getAuthHeaders()
 
-    const response = await fetch(`${API_BASE_URL}/conversation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(conversationData)
+    // ✅ CORRECTION : URL corrigée avec conversations (au pluriel)
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+      method: 'DELETE',
+      headers
     })
 
+    console.log('📡 [apiService] Delete statut:', response.status)
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+      const errorText = await response.text()
+      console.error('❌ [apiService] Erreur delete conversation:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
+      }
+      
+      if (response.status === 404) {
+        console.warn('⚠️ [apiService] Conversation déjà supprimée ou inexistante')
+        return // Ne pas lever d'erreur pour un 404
+      }
+      
+      throw new Error(`Erreur suppression conversation: ${response.status}`)
     }
 
-    console.log('✅ [saveConversationPublic] Conversation publique sauvegardée')
+    const result = await response.json()
+    console.log('✅ [apiService] Conversation supprimée:', result.message || 'Succès')
+
   } catch (error) {
-    console.error('❌ [saveConversationPublic] Erreur:', error)
+    console.error('❌ [apiService] Erreur suppression conversation:', error)
     throw error
   }
-  */
+}
+
+/**
+ * 🆕 NOUVEAU : FONCTION CLEAR ALL CONVERSATIONS CORRIGÉE
+ */
+export const clearAllUserConversations = async (userId: string): Promise<void> => {
+  if (!userId) {
+    throw new Error('User ID requis')
+  }
+
+  console.log('🗑️ [apiService] Suppression toutes conversations pour:', userId)
+
+  try {
+    const headers = getAuthHeaders()
+
+    // ✅ CORRECTION : URL corrigée
+    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
+      method: 'DELETE',
+      headers
+    })
+
+    console.log('📡 [apiService] Clear all statut:', response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [apiService] Erreur clear all conversations:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
+      }
+      
+      throw new Error(`Erreur suppression conversations: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('✅ [apiService] Toutes conversations supprimées:', {
+      message: result.message,
+      deleted_count: result.deleted_count || 0
+    })
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur suppression toutes conversations:', error)
+    throw error
+  }
 }
 
 /**
@@ -947,7 +996,7 @@ export const debugEnhancedConversationFlow = (
 }
 
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Système backend: DialogueManager + expert.py')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
@@ -962,6 +1011,9 @@ export const debugEnhancedAPI = () => {
   console.log('  ✅ Génération automatique response_versions')
   console.log('  🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
   console.log('  ✅ Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
+  console.log('  🆕 DELETE conversation corrigé (/conversations au pluriel)')
+  console.log('  🆕 CLEAR ALL conversations ajouté')
+  console.log('  🆕 Formatage heure locale (formatToLocalTime, simpleLocalTime)')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
   console.log('  ✅ Authentification JWT')
   console.log('  ✅ Feedback, conversations, topics')
@@ -1015,7 +1067,7 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale']
     }
     
   } catch (error) {
@@ -1051,8 +1103,8 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE')
-  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE FIXED')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
+  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE FIXED')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
   console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
@@ -1063,6 +1115,9 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  - 🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
   console.log('  - 🚀 Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
+  console.log('  - 🆕 DELETE conversation corrigé (/conversations au pluriel)')
+  console.log('  - 🆕 CLEAR ALL conversations ajouté')
+  console.log('  - 🆕 Formatage heure locale (formatToLocalTime, simpleLocalTime)')
   console.log('  - 🚀 Body: { session_id, question }')
   console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
@@ -1076,6 +1131,8 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Support PerfStore avec type: "answer"')
   console.log('  - 🔧 Intégration ConversationService pour historique (NOUVEAU !)')
   console.log('  - ✅ Sauvegarde automatique via /expert/ask (CORRIGÉ !)')
+  console.log('  - 🆕 Gestion DELETE conversations (NOUVEAU !)')
+  console.log('  - 🆕 Formatage heure locale automatique (NOUVEAU !)')
   console.groupEnd()
 }
 
