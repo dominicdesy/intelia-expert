@@ -26,14 +26,14 @@ def _get_api_key() -> str:
     api_key = os.getenv("OPENAI_API_KEY")
     
     if not api_key:
-        logger.error("❌ OPENAI_API_KEY non configurée")
+        logger.error("⛔ OPENAI_API_KEY non configurée")
         raise RuntimeError(
             "OPENAI_API_KEY n'est pas configurée dans les variables d'environnement. "
             "Veuillez définir cette variable pour utiliser les services OpenAI."
         )
     
     if len(api_key.strip()) < 10:
-        logger.error("❌ OPENAI_API_KEY semble invalide (trop courte)")
+        logger.error("⛔ OPENAI_API_KEY semble invalide (trop courte)")
         raise RuntimeError("OPENAI_API_KEY semble invalide - vérifiez la configuration")
     
     return api_key.strip()
@@ -47,7 +47,7 @@ def _configure_openai_client() -> None:
         openai.api_key = api_key
         logger.debug("✅ Client OpenAI configuré")
     except Exception as e:
-        logger.error(f"❌ Erreur configuration OpenAI: {e}")
+        logger.error(f"⛔ Erreur configuration OpenAI: {e}")
         raise
 
 # ==================== AMÉLIORATION: Décorateur pour retry et gestion d'erreurs ====================
@@ -92,7 +92,7 @@ def openai_retry(max_retries: int = 2, delay: float = 1.0):
                     
                 except Exception as e:
                     # Pour les autres erreurs, pas de retry
-                    logger.error(f"❌ Erreur OpenAI non-retry: {type(e).__name__}: {e}")
+                    logger.error(f"⛔ Erreur OpenAI non-retry: {type(e).__name__}: {e}")
                     last_exception = e
                     break
             
@@ -131,7 +131,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
     
     # Configuration modèle CoT
     if model is None:
-        model = os.getenv('OPENAI_COT_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o'))
+        model = os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
     
     # Calcul tokens adaptatif pour CoT (plus généreux)
     if max_tokens is None:
@@ -214,7 +214,7 @@ def complete_with_cot(prompt: str, temperature: float = 0.3, max_tokens: Optiona
         return result
         
     except Exception as e:
-        logger.error(f"❌ Erreur CoT: {type(e).__name__}: {e}")
+        logger.error(f"⛔ Erreur CoT: {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors du raisonnement CoT: {e}")
 
 def _parse_cot_sections(cot_response: str) -> Dict[str, str]:
@@ -364,7 +364,7 @@ def complete(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = 
     
     # Configuration standard
     if model is None:
-        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o'))
+        model = os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))
     
     # Calcul adaptatif de max_tokens (amélioré)
     if max_tokens is None:
@@ -434,7 +434,7 @@ def complete(prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = 
         return content
         
     except Exception as e:
-        logger.error(f"❌ Erreur dans complete(): {type(e).__name__}: {e}")
+        logger.error(f"⛔ Erreur dans complete(): {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors de la synthèse LLM: {e}")
 
 # ==================== FONCTION AMÉLIORÉE: safe_chat_completion ====================
@@ -453,7 +453,7 @@ def safe_chat_completion(**kwargs) -> Any:
     
     # ✅ AMÉLIORATION: Validation des paramètres essentiels
     if 'model' not in kwargs:
-        kwargs['model'] = os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o')
+        kwargs['model'] = os.getenv('DEFAULT_MODEL', 'gpt-5')
         logger.debug(f"🔧 Modèle par défaut utilisé: {kwargs['model']}")
     
     if 'messages' not in kwargs or not kwargs['messages']:
@@ -495,19 +495,19 @@ def safe_chat_completion(**kwargs) -> Any:
         return response
         
     except openai.AuthenticationError as e:
-        logger.error("❌ Erreur authentification OpenAI - vérifiez votre clé API")
+        logger.error("⛔ Erreur authentification OpenAI - vérifiez votre clé API")
         raise RuntimeError(f"Authentification OpenAI échouée: {e}")
         
     except openai.PermissionDeniedError as e:
-        logger.error("❌ Permission refusée OpenAI - vérifiez vos droits d'accès")
+        logger.error("⛔ Permission refusée OpenAI - vérifiez vos droits d'accès")
         raise RuntimeError(f"Permission OpenAI refusée: {e}")
         
     except openai.BadRequestError as e:
-        logger.error(f"❌ Requête OpenAI invalide: {e}")
+        logger.error(f"⛔ Requête OpenAI invalide: {e}")
         raise RuntimeError(f"Requête OpenAI invalide: {e}")
         
     except Exception as e:
-        logger.error(f"❌ Erreur inattendue OpenAI Chat: {type(e).__name__}: {e}")
+        logger.error(f"⛔ Erreur inattendue OpenAI Chat: {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors de l'appel à OpenAI ChatCompletion: {e}")
 
 # ==================== FONCTION AMÉLIORÉE: safe_embedding_create ====================
@@ -608,15 +608,15 @@ def safe_embedding_create(input: Any, model: str = "text-embedding-ada-002", **k
             return all_embeddings
         
     except openai.AuthenticationError as e:
-        logger.error("❌ Erreur authentification OpenAI Embeddings")
+        logger.error("⛔ Erreur authentification OpenAI Embeddings")
         raise RuntimeError(f"Authentification OpenAI échouée: {e}")
         
     except openai.InvalidRequestError as e:
-        logger.error(f"❌ Requête OpenAI Embeddings invalide: {e}")
+        logger.error(f"⛔ Requête OpenAI Embeddings invalide: {e}")
         raise RuntimeError(f"Requête OpenAI Embeddings invalide: {e}")
         
     except Exception as e:
-        logger.error(f"❌ Erreur inattendue OpenAI Embeddings: {type(e).__name__}: {e}")
+        logger.error(f"⛔ Erreur inattendue OpenAI Embeddings: {type(e).__name__}: {e}")
         raise RuntimeError(f"Erreur lors de l'appel à OpenAI Embedding: {e}")
 
 # ==================== 🆕 NOUVELLES FONCTIONS POUR DIALOGUE_MANAGER ====================
@@ -730,7 +730,7 @@ def get_openai_models() -> List[str]:
         models = openai.models.list()
         return [model.id for model in models.data if model.id]
     except Exception as e:
-        logger.error(f"❌ Erreur récupération modèles: {e}")
+        logger.error(f"⛔ Erreur récupération modèles: {e}")
         return []
 
 def estimate_tokens(text: str, model: str = "gpt-4") -> int:
@@ -760,17 +760,21 @@ def get_model_max_tokens(model: str) -> int:
         "gpt-4": 8192,
         "gpt-4o": 4096,
         "gpt-4-turbo": 128000,
-        "gpt-4o-mini": 4096
+        "gpt-4o-mini": 4096,
+        "gpt-5": 8192,
+        "gpt-5-mini": 4096,
+        "gpt-5-nano": 2048,
+        "gpt-5-chat-latest": 8192
     }
     return MAX_TOKENS_LIMITS.get(model, 4096)
 
 # ==================== CONFIGURATION ET CONSTANTES ====================
 # ✅ AMÉLIORATION: Constantes configurables
 DEFAULT_MODELS = {
-    "chat": os.getenv('OPENAI_DEFAULT_CHAT_MODEL', 'gpt-4o'),
-    "embedding": os.getenv('OPENAI_DEFAULT_EMBEDDING_MODEL', 'text-embedding-ada-002'),
-    "synthesis": os.getenv('OPENAI_SYNTHESIS_MODEL', 'gpt-4o'),  # 🆕 Nouveau pour synthèse
-    "cot": os.getenv('OPENAI_COT_MODEL', 'gpt-4o')  # 🆕 Nouveau pour Chain-of-Thought
+    "chat": os.getenv('DEFAULT_MODEL', 'gpt-5'),
+    "embedding": os.getenv('OPENAI_EMBEDDING_MODEL', 'text-embedding-ada-002'),
+    "synthesis": os.getenv('OPENAI_SYNTHESIS_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5')),  # 🆕 Nouveau pour synthèse
+    "cot": os.getenv('OPENAI_COT_MODEL', os.getenv('DEFAULT_MODEL', 'gpt-5'))  # 🆕 Nouveau pour Chain-of-Thought
 }
 
 # ==================== 🆕 FONCTIONS DE DIAGNOSTIC COT ====================
@@ -899,7 +903,11 @@ def get_openai_status() -> Dict[str, Any]:
             "gpt-4": 8192,
             "gpt-4o": 4096,
             "gpt-4-turbo": 128000,
-            "gpt-4o-mini": 4096
+            "gpt-4o-mini": 4096,
+            "gpt-5": 8192,
+            "gpt-5-mini": 4096,
+            "gpt-5-nano": 2048,
+            "gpt-5-chat-latest": 8192
         },
         "retry_config": {
             "max_retries": 2,

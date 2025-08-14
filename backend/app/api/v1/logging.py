@@ -136,7 +136,7 @@ class AnalyticsManager:
     def __init__(self, dsn=None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
         if not self.dsn:
-            raise ValueError("❌ DATABASE_URL manquant - stockage persistant requis")
+            raise ValueError("⛔ DATABASE_URL manquant - stockage persistant requis")
         self._ensure_analytics_tables()
     
     def _ensure_analytics_tables(self):
@@ -312,7 +312,7 @@ class AnalyticsManager:
                     logger.info("✅ Tables d'analytics et logging créées")
                     
         except Exception as e:
-            logger.error(f"❌ Erreur création tables analytics: {e}")
+            logger.error(f"⛔ Erreur création tables analytics: {e}")
             raise
     
     def log_question_response(
@@ -357,7 +357,7 @@ class AnalyticsManager:
             return question_id
             
         except Exception as e:
-            logger.error(f"❌ Erreur log question/réponse: {e}")
+            logger.error(f"⛔ Erreur log question/réponse: {e}")
             return "error"
     
     def log_system_error(
@@ -390,7 +390,7 @@ class AnalyticsManager:
                     conn.commit()
                     
         except Exception as e:
-            logger.error(f"❌ Erreur log system error: {e}")
+            logger.error(f"⛔ Erreur log system error: {e}")
     
     def track_openai_call(
         self,
@@ -398,7 +398,7 @@ class AnalyticsManager:
         session_id: str = None,
         question_id: str = None,
         call_type: str = "completion",
-        model: str = "gpt-3.5-turbo",
+        model: str = None,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
         purpose: str = "fallback",
@@ -410,11 +410,25 @@ class AnalyticsManager:
     ) -> None:
         """Track un appel OpenAI avec calcul des coûts"""
         try:
-            # Calcul des coûts (tarifs OpenAI approximatifs)
+            # ✅ MODIFICATION: Use environment variable for default model if not specified
+            if model is None:
+                model = os.getenv('DEFAULT_MODEL', 'gpt-5')
+            
+            # Calcul des coûts (tarifs OpenAI mis à jour pour GPT-5)
             total_tokens = prompt_tokens + completion_tokens
             
-            # Tarifs approximatifs GPT-3.5-turbo (USD pour 1K tokens)
-            if "gpt-4" in model.lower():
+            # ✅ MODIFICATION: Tarifs mis à jour pour les nouveaux modèles GPT-5
+            if "gpt-5" in model.lower():
+                if "mini" in model.lower():
+                    cost_per_1k_prompt = 0.00025  # GPT-5 mini
+                    cost_per_1k_completion = 0.002
+                elif "nano" in model.lower():
+                    cost_per_1k_prompt = 0.00005  # GPT-5 nano
+                    cost_per_1k_completion = 0.0004
+                else:
+                    cost_per_1k_prompt = 0.00125  # GPT-5
+                    cost_per_1k_completion = 0.01
+            elif "gpt-4" in model.lower():
                 cost_per_1k_prompt = 0.03
                 cost_per_1k_completion = 0.06
             else:  # GPT-3.5-turbo
@@ -446,7 +460,7 @@ class AnalyticsManager:
                     conn.commit()
                     
         except Exception as e:
-            logger.error(f"❌ Erreur track OpenAI call: {e}")
+            logger.error(f"⛔ Erreur track OpenAI call: {e}")
     
     def _update_daily_openai_summary(self, cur, user_email, cost_usd, cost_eur, tokens, purpose, success, response_time_ms):
         """Met à jour le résumé quotidien OpenAI"""
@@ -476,7 +490,7 @@ class AnalyticsManager:
             ))
             
         except Exception as e:
-            logger.error(f"❌ Erreur update daily summary: {e}")
+            logger.error(f"⛔ Erreur update daily summary: {e}")
     
     def get_user_analytics(self, user_email: str, days: int = 30) -> Dict[str, Any]:
         """Analytics complètes pour un utilisateur"""
@@ -536,7 +550,7 @@ class AnalyticsManager:
                     }
                     
         except Exception as e:
-            logger.error(f"❌ Erreur get user analytics: {e}")
+            logger.error(f"⛔ Erreur get user analytics: {e}")
             return {"error": str(e)}
     
     def log_server_performance(
@@ -586,7 +600,7 @@ class AnalyticsManager:
                     conn.commit()
                     
         except Exception as e:
-            logger.error(f"❌ Erreur log server performance: {e}")
+            logger.error(f"⛔ Erreur log server performance: {e}")
     
     def get_server_performance_analytics(self, hours: int = 24) -> Dict[str, Any]:
         """Analytics de performance serveur sur les dernières heures"""
@@ -645,7 +659,7 @@ class AnalyticsManager:
                     }
                     
         except Exception as e:
-            logger.error(f"❌ Erreur get server performance analytics: {e}")
+            logger.error(f"⛔ Erreur get server performance analytics: {e}")
             return {"error": str(e)}
 
 # Singleton
@@ -682,7 +696,7 @@ def log_server_performance(**kwargs) -> None:
         analytics = get_analytics_manager()
         analytics.log_server_performance(**kwargs)
     except Exception as e:
-        logger.error(f"❌ Erreur log server performance helper: {e}")
+        logger.error(f"⛔ Erreur log server performance helper: {e}")
 
 def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
     """Fonction helper pour récupérer les analytics serveur depuis main.py"""
@@ -690,7 +704,7 @@ def get_server_analytics(hours: int = 24) -> Dict[str, Any]:
         analytics = get_analytics_manager()
         return analytics.get_server_performance_analytics(hours)
     except Exception as e:
-        logger.error(f"❌ Erreur get server analytics: {e}")
+        logger.error(f"⛔ Erreur get server analytics: {e}")
         return {"error": str(e)}
 
 # ========== FONCTIONS MIDDLEWARE POUR EXPERT.PY ==========
@@ -740,14 +754,14 @@ def log_question_to_analytics(
         )
         
     except Exception as e:
-        logger.error(f"❌ Erreur log question to analytics: {e}")
+        logger.error(f"⛔ Erreur log question to analytics: {e}")
 
 def track_openai_call(
     user_email: str = None,
     session_id: str = None,
     question_id: str = None,
     call_type: str = "completion",
-    model: str = "gpt-3.5-turbo",
+    model: str = None,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
     purpose: str = "fallback",
@@ -762,7 +776,7 @@ def track_openai_call(
             session_id=session_id,
             question_id=question_id,
             call_type=call_type,
-            model=model,
+            model=model or os.getenv('DEFAULT_MODEL', 'gpt-5'),  # ✅ MODIFICATION: Use DEFAULT_MODEL
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             purpose=purpose,
@@ -770,7 +784,7 @@ def track_openai_call(
             success=success
         )
     except Exception as e:
-        logger.error(f"❌ Erreur track OpenAI call: {e}")
+        logger.error(f"⛔ Erreur track OpenAI call: {e}")
 
 # ========== ENDPOINTS ANALYTICS AVEC RÔLES ==========
 

@@ -1,9 +1,10 @@
-﻿from pydantic import BaseModel, Field
+﻿import os
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class ExpertQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000, description="User question")
-    model: Optional[str] = Field("gpt-4o", description="AI model to use")
+    model: Optional[str] = Field(os.getenv('DEFAULT_MODEL', 'gpt-5'), description="AI model to use")
     language: Optional[str] = Field("fr", description="Response language")
 
 class FeedbackRequest(BaseModel):

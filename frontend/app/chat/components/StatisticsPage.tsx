@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuthStore } from '../hooks/useAuthStore'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 // Types pour les données de statistiques
 interface SystemStats {
@@ -103,6 +104,31 @@ export const StatisticsPage: React.FC = () => {
   // Vérification des permissions super_admin
   const isSuperAdmin = user?.user_type === 'super_admin'
 
+  // 🔥 NOUVELLE FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION
+  const getAuthHeaders = async () => {
+    try {
+      const supabase = createClientComponentClient()
+      
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error || !session) {
+        console.error('❌ Erreur récupération session:', error)
+        return {}
+      }
+      
+      const token = session.access_token
+      console.log('🔑 Token récupéré:', token ? 'OK' : 'MISSING')
+      
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    } catch (error) {
+      console.error('❌ Erreur getAuthHeaders:', error)
+      return {}
+    }
+  }
+
   useEffect(() => {
     if (!isSuperAdmin) {
       setError("Accès refusé - Permissions super_admin requises")
@@ -124,11 +150,8 @@ export const StatisticsPage: React.FC = () => {
     setError(null)
 
     try {
-      const token = localStorage.getItem('supabase_token') || sessionStorage.getItem('supabase_token')
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      // 🔥 UTILISER LA NOUVELLE FONCTION D'AUTHENTIFICATION
+      const headers = await getAuthHeaders()
 
       // Charger toutes les statistiques en parallèle
       const [systemRes, usageRes, billingRes, performanceRes] = await Promise.allSettled([
@@ -188,11 +211,8 @@ export const StatisticsPage: React.FC = () => {
 
   const loadQuestionLogs = async () => {
     try {
-      const token = localStorage.getItem('supabase_token') || sessionStorage.getItem('supabase_token')
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      // 🔥 UTILISER LA NOUVELLE FONCTION D'AUTHENTIFICATION
+      const headers = await getAuthHeaders()
 
       // Construire les paramètres de requête
       const params = new URLSearchParams({
@@ -847,7 +867,7 @@ export const StatisticsPage: React.FC = () => {
 
             {/* Section Analyse des Commentaires */}
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Analyse des Commentaires de Feedback</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Analyse des Commentaires de Feedback</h3>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Statistiques des commentaires */}
