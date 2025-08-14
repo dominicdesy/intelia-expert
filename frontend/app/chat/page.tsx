@@ -461,8 +461,9 @@ export default function ChatInterface() {
     if (isAuthenticated && user?.id && isMountedRef.current) {
       const loadTimer = setTimeout(() => {
         if (isMountedRef.current) {
-          console.log('[ChatInterface] Chargement historique pour:', user.id)
-          loadConversations(user.id)
+          console.log('[ChatInterface] Chargement historique pour:', user.email || user.id)
+		  loadConversations(user.email || user.id)
+		  
             .then(() => {
               if (isMountedRef.current) {
                 console.log('Historique conversations chargé')
