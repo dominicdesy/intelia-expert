@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------
 _DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-5")
 _OPENAI_TIMEOUT = float(os.getenv("OPENAI_DEFAULT_TIMEOUT", "30"))
-_OPENAI_DEFAULT_MAX_TOKENS = int(os.getenv("OPENAI_DEFAULT_MAX_TOKENS", "500"))
+_OPENAI_DEFAULT_MAX_TOKENS = int(os.getenv("OPENAI_DEFAULT_MAX_TOKENS", "1500"))
 _OPENAI_EMBED_BATCH = int(os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", "100"))
 _RESTRICTED_TEMP_MODELS = set(
     x.strip() for x in os.getenv("OPENAI_RESTRICTED_TEMP_MODELS", "").split(",") if x.strip()
@@ -302,13 +302,13 @@ def complete_text(
     if max_tokens is None:
         plen = len(prompt)
         if plen < 500:
-            max_tokens = 300
+            max_tokens = 500 if model.startswith("gpt-5") else 300
         elif plen < 1500:
-            max_tokens = 500
+            max_tokens = 1000 if model.startswith("gpt-5") else 500
         elif plen < 3000:
-            max_tokens = 700
+            max_tokens = 1500 if model.startswith("gpt-5") else 700
         else:
-            max_tokens = 800
+            max_tokens = 2000 if model.startswith("gpt-5") else 800
         model_limit = get_model_max_tokens(model)
         available = model_limit - estimate_tokens(prompt, model) - 100
         if available > 0:
@@ -334,14 +334,27 @@ def complete_text(
         timeout=_OPENAI_TIMEOUT,
     )
 
+    # Debug logging pour GPT-5
+    if model.startswith("gpt-5"):
+        logger.info(f"[GPT-5-DEBUG] model={model}, max_tokens={max_tokens}, temp={safe_temp}, prompt_len={len(prompt)}")
+
     if not response or not response.get("choices"):
         raise RuntimeError("Réponse OpenAI vide")
 
     choice = (response.get("choices") or [{}])[0]
     content = ((choice.get("message") or {}).get("content")) or choice.get("text") or ""
+
+
     if not content:
-        logger.error(f"[OpenAI] Réponse sans 'content'. Aperçu: {str(response)[:500]}")
-        raise RuntimeError("Contenu de réponse vide")
+            finish_reason = choice.get("finish_reason", "unknown")
+            logger.error(f"[OpenAI] Réponse sans 'content'. Model: {model}, finish_reason: {finish_reason}, Aperçu: {str(response)[:500]}")
+            
+            # Retry avec plus de tokens si coupé par la limite
+            if finish_reason == "length" and max_tokens < 3000:
+                logger.warning(f"[OpenAI] Retry avec max_tokens augmenté: {max_tokens} -> {max_tokens * 2}")
+                return complete_text(prompt, temperature, max_tokens * 2, model)
+            
+            raise RuntimeError(f"Contenu de réponse vide (finish_reason: {finish_reason})")
 
     return content.strip()
 
