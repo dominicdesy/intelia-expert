@@ -3,7 +3,6 @@
 Router pour la gestion des conversations avec intégration PostgreSQL optimisée.
 Version avec requêtes JSONB fiables + retour messages + index de performance.
 VERSION MISE À JOUR pour support persistance conversations complète.
-🔧 CORRECTIF: Index CONCURRENTLY en mode autocommit
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, List, Optional
@@ -46,19 +45,14 @@ if not MEMORY_AVAILABLE:
 # ===== Fonction utilitaire pour créer l'index JSONB =====
 def ensure_user_id_index():
     """
-    🔧 CORRECTIF: Crée l'index JSONB sur user_id en mode autocommit.
-    Résout le problème "CREATE INDEX CONCURRENTLY cannot run inside a transaction block"
+    Crée l'index JSONB sur user_id si il n'existe pas déjà.
     Fonction idempotente et safe.
     """
     if not MEMORY_AVAILABLE or not memory:
         return False
     
     try:
-        # 🔧 CORRECTIF: Connexion en mode autocommit pour CONCURRENTLY
-        conn = psycopg2.connect(memory.dsn)
-        conn.autocommit = True  # Mode autocommit nécessaire pour CONCURRENTLY
-        
-        try:
+        with psycopg2.connect(memory.dsn) as conn:
             with conn.cursor() as cur:
                 # Vérifier si l'index existe déjà
                 cur.execute("""
@@ -69,7 +63,6 @@ def ensure_user_id_index():
                 
                 if not cur.fetchone():
                     # Créer l'index si il n'existe pas
-                    logger.info("🔧 Création de l'index JSONB ix_conv_user_id en mode autocommit...")
                     cur.execute("""
                         CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_conv_user_id
                         ON conversation_memory ((context->>'user_id'))
@@ -78,18 +71,10 @@ def ensure_user_id_index():
                 else:
                     logger.debug("ℹ️ Index JSONB ix_conv_user_id déjà existant")
                     
-        finally:
-            # 🔧 CORRECTIF: Fermeture propre de la connexion
-            conn.close()
-            
         return True
         
     except Exception as e:
-        # 🔧 AMÉLIORATION: Logging plus détaillé pour diagnostic
-        if "cannot run inside a transaction block" in str(e):
-            logger.error(f"⛔ Erreur transaction block résolue par autocommit: {e}")
-        else:
-            logger.warning(f"⚠️ Impossible de créer l'index JSONB: {e}")
+        logger.warning(f"⚠️ Impossible de créer l'index JSONB: {e}")
         return False
 
 # ===== Fonction utilitaire pour parsing contexte =====
@@ -247,7 +232,6 @@ async def health_check() -> Dict[str, Any]:
                 "total_conversations": stats.get("total_sessions", 0),
                 "index_jsonb_status": index_status,
                 "persistence_enabled": True,
-                "autocommit_fix_applied": True,  # 🔧 NOUVEAU: Indicateur fix autocommit
                 "timestamp": datetime.utcnow().isoformat()
             }
         elif conversation_tracker:
@@ -347,7 +331,6 @@ async def test_public() -> Dict[str, Any]:
         "router": "conversations",
         "backend_available": MEMORY_AVAILABLE,
         "persistence_optimized": True,
-        "autocommit_fix": True,  # 🔧 NOUVEAU: Indicateur fix autocommit
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -601,7 +584,7 @@ async def admin_ensure_index(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    🔧 CORRECTIF: Force la création de l'index JSONB en mode autocommit.
+    Force la création de l'index JSONB pour optimiser les performances.
     Réservé aux administrateurs.
     """
     # Vérification admin
@@ -614,7 +597,6 @@ async def admin_ensure_index(
         return {
             "status": "success" if success else "failed",
             "index_created": success,
-            "autocommit_mode": True,  # 🔧 NOUVEAU: Indicateur mode autocommit
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -686,7 +668,6 @@ async def admin_database_info(
         return {
             "status": "success",
             "database_info": db_info,
-            "autocommit_fix_applied": True,  # 🔧 NOUVEAU: Indicateur fix
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -832,7 +813,6 @@ async def test_query_performance(
             "status": "success",
             "user_id": user_id,
             "performance_results": performance_results,
-            "autocommit_fix_status": "applied",  # 🔧 NOUVEAU: Status fix
             "tester": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -846,90 +826,3 @@ async def test_query_performance(
             "tester": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
-
-# 🔧 NOUVEAU: Endpoint de diagnostic pour autocommit fix
-@router.get("/admin/autocommit-status")
-async def admin_autocommit_status(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    🔧 NOUVEAU: Diagnostic du status autocommit fix pour les index CONCURRENTLY.
-    Réservé aux administrateurs.
-    """
-    # Vérification admin
-    if not current_user.get('is_admin', False):
-        raise HTTPException(status_code=403, detail="Accès administrateur requis")
-    
-    try:
-        if not MEMORY_AVAILABLE or not memory:
-            return {
-                "status": "unavailable",
-                "message": "PostgreSQL memory not available",
-                "autocommit_fix": "n/a"
-            }
-        
-        # Vérifier le statut de l'index
-        index_info = {}
-        try:
-            with psycopg2.connect(memory.dsn) as conn:
-                with conn.cursor() as cur:
-                    # Vérifier l'existence de l'index
-                    cur.execute("""
-                        SELECT 
-                            indexname, 
-                            indexdef,
-                            schemaname,
-                            tablename
-                        FROM pg_indexes 
-                        WHERE tablename = 'conversation_memory' 
-                        AND indexname = 'ix_conv_user_id'
-                    """)
-                    
-                    index_row = cur.fetchone()
-                    if index_row:
-                        index_info = {
-                            "exists": True,
-                            "name": index_row[0],
-                            "definition": index_row[1],
-                            "schema": index_row[2],
-                            "table": index_row[3]
-                        }
-                    else:
-                        index_info = {"exists": False}
-                    
-                    # Test de performance simple
-                    start_time = time.time()
-                    cur.execute("""
-                        SELECT COUNT(*) FROM conversation_memory 
-                        WHERE context->>'user_id' = 'test_performance'
-                    """)
-                    performance_time = (time.time() - start_time) * 1000
-                    
-        except Exception as e:
-            index_info = {"error": str(e)}
-            performance_time = -1
-        
-        return {
-            "status": "success",
-            "autocommit_fix": {
-                "applied": True,
-                "description": "CREATE INDEX CONCURRENTLY now uses autocommit mode",
-                "function": "ensure_user_id_index()",
-                "solution": "conn.autocommit = True before CONCURRENTLY operations"
-            },
-            "index_status": index_info,
-            "performance_test_ms": round(performance_time, 2) if performance_time >= 0 else "error",
-            "admin": current_user.get('email', 'unknown'),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur diagnostic autocommit: {e}")
-        return {
-            "status": "error",
-            "error": str(e),
-            "autocommit_fix": "unknown",
-            "admin": current_user.get('email', 'unknown'),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-                "
