@@ -224,7 +224,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         // Pour les autres events: on recharge seulement si la session a VRAIMENT changé
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (hasSessionChanged(session || null)) {
             await get().reload();
           }
