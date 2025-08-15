@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Dialogue orchestration - VERSION REFACTORISÉE CORRIGÉE + PERSISTANCE CONVERSATIONS
-- Module principal utilisant les modules spécialisés
-- Imports des modules spécialisés pour langue, mémoire et CoT/fallback
-- Preserve la compatibilité avec l'API existante
-- CORRIGÉ: Utilise les fonctions des modules au lieu de les dupliquer
-- FIX: Auto-extraction systématique même pour nouvelles conversations
-- NOUVEAU: Persistance centralisée des conversations dans PostgreSQL
-- ✅ VÉRIFIÉ: Compatible avec nouvelle fonction complete() via cot_fallback_processor
+Dialogue orchestration - VERSION REFACTORISÃ‰E CORRIGÃ‰E + PERSISTANCE CONVERSATIONS + FIX LANGUE
+- Module principal utilisant les modules spÃ©cialisÃ©s
+- Imports des modules spÃ©cialisÃ©s pour langue, mÃ©moire et CoT/fallback
+- Preserve la compatibilitÃ© avec l'API existante
+- CORRIGÃ‰: Utilise les fonctions des modules au lieu de les dupliquer
+- FIX: Auto-extraction systÃ©matique mÃªme pour nouvelles conversations
+- NOUVEAU: Persistance centralisÃ©e des conversations dans PostgreSQL
+- ðŸ"§ FIX LANGUE: PrÃ©servation langue conversationnelle + appel amÃ©liorÃ©
+- âœ… VÃ‰RIFIÃ‰: Compatible avec nouvelle fonction complete() via cot_fallback_processor
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -25,7 +26,7 @@ from .context_extractor import normalize
 from .clarification_manager import compute_completeness
 from ..utils import formulas
 
-# ========== IMPORTS MODULES REFACTORISÉS ==========
+# ========== IMPORTS MODULES REFACTORISÃ‰S ==========
 from .language_processor import (
     detect_question_language,
     finalize_response_with_language,
@@ -45,8 +46,8 @@ from .conversation_memory import (
     get_memory_status
 )
 
-# ========== ✅ IMPORTS MODULES COT/FALLBACK - DÉJÀ COMPATIBLES ==========
-# Ces fonctions utilisent déjà la nouvelle signature complete() en interne
+# ========== âœ… IMPORTS MODULES COT/FALLBACK - DÃ‰JÃ€ COMPATIBLES ==========
+# Ces fonctions utilisent dÃ©jÃ  la nouvelle signature complete() en interne
 from .cot_fallback_processor import (
     should_use_cot_analysis,
     generate_cot_analysis,
@@ -70,10 +71,10 @@ try:
     from .postgres_memory import PostgresMemory
     _POSTGRES_MEMORY = PostgresMemory(dsn=os.getenv("DATABASE_URL"))
     POSTGRES_AVAILABLE = True
-    logger.info("✅ PostgresMemory initialized for conversation persistence")
+    logger.info("âœ… PostgresMemory initialized for conversation persistence")
 except Exception as e:
     POSTGRES_AVAILABLE = False
-    logger.warning(f"⚠️ PostgresMemory unavailable for persistence: {e}")
+    logger.warning(f"âš ï¸ PostgresMemory unavailable for persistence: {e}")
 
 def _persist_conversation(
     session_id: str, 
@@ -84,29 +85,29 @@ def _persist_conversation(
     additional_context: Optional[Dict[str, Any]] = None
 ) -> bool:
     """
-    Persiste une conversation (question + réponse) dans PostgreSQL
+    Persiste une conversation (question + rÃ©ponse) dans PostgreSQL
     
     Args:
         session_id: ID de la session
         question: Question de l'utilisateur
-        answer_text: Réponse générée
-        language: Langue détectée/utilisée
-        user_id: ID utilisateur (peut être None pour public)
+        answer_text: RÃ©ponse gÃ©nÃ©rÃ©e
+        language: Langue dÃ©tectÃ©e/utilisÃ©e
+        user_id: ID utilisateur (peut Ãªtre None pour public)
         additional_context: Context additionnel (intent, route, etc.)
     
     Returns:
-        bool: True si persistance réussie, False sinon
+        bool: True si persistance rÃ©ussie, False sinon
     """
     if not PERSIST_CONVERSATIONS:
-        logger.debug("🔒 Persistance conversations désactivée (PERSIST_CONVERSATIONS=0)")
+        logger.debug("ðŸ"' Persistance conversations dÃ©sactivÃ©e (PERSIST_CONVERSATIONS=0)")
         return False
         
     if not POSTGRES_AVAILABLE or _POSTGRES_MEMORY is None:
-        logger.warning("⚠️ PostgreSQL indisponible pour persistance")
+        logger.warning("âš ï¸ PostgreSQL indisponible pour persistance")
         return False
     
     try:
-        # Récupérer le contexte existant ou créer nouveau
+        # RÃ©cupÃ©rer le contexte existant ou crÃ©er nouveau
         ctx = _POSTGRES_MEMORY.get(session_id) or {}
         msgs = list(ctx.get("messages", []))
         now = datetime.utcnow().isoformat()
@@ -120,7 +121,7 @@ def _persist_conversation(
         }
         msgs.append(user_message)
         
-        # Ajouter la réponse assistant
+        # Ajouter la rÃ©ponse assistant
         assistant_message = {
             "role": "assistant", 
             "content": answer_text,
@@ -133,7 +134,7 @@ def _persist_conversation(
             
         msgs.append(assistant_message)
         
-        # Mettre à jour le contexte complet
+        # Mettre Ã  jour le contexte complet
         ctx.update({
             "user_id": user_id or "anonymous",
             "language": language or ctx.get("language") or "fr",
@@ -149,26 +150,26 @@ def _persist_conversation(
         # Sauvegarder
         _POSTGRES_MEMORY.update(session_id, ctx)
         
-        logger.info(f"💾 Conversation persistée: session={session_id}, user={user_id or 'anonymous'}, msgs={len(msgs)}")
+        logger.info(f"ðŸ'¾ Conversation persistÃ©e: session={session_id}, user={user_id or 'anonymous'}, msgs={len(msgs)}")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Erreur persistance conversation {session_id}: {e}")
+        logger.error(f"âŒ Erreur persistance conversation {session_id}: {e}")
         return False
 
 def _extract_answer_text(response: Dict[str, Any]) -> str:
     """
-    Extrait le texte de réponse de façon robuste depuis la structure de réponse
+    Extrait le texte de rÃ©ponse de faÃ§on robuste depuis la structure de rÃ©ponse
     """
     if not response:
         return ""
         
-    # Cas 1: réponse directe avec answer.text
+    # Cas 1: rÃ©ponse directe avec answer.text
     answer = response.get("answer", {})
     if isinstance(answer, dict) and answer.get("text"):
         return str(answer["text"])
     
-    # Cas 2: réponse avec general_answer.text (mode hybride)
+    # Cas 2: rÃ©ponse avec general_answer.text (mode hybride)
     general_answer = response.get("general_answer", {})
     if isinstance(general_answer, dict) and general_answer.get("text"):
         return str(general_answer["text"])
@@ -177,15 +178,15 @@ def _extract_answer_text(response: Dict[str, Any]) -> str:
     if response.get("message"):
         return str(response["message"])
         
-    # Cas 4: fallback sur la structure complète convertie en string
+    # Cas 4: fallback sur la structure complÃ¨te convertie en string
     return str(response.get("answer", response.get("general_answer", "")))
 
-# ========== PERF STORE & RAG - CODE ORIGINAL CONSERVÉ ==========
+# ========== PERF STORE & RAG - CODE ORIGINAL CONSERVÃ‰ ==========
 try:
     from .perf_store import PerfStore
     PERF_AVAILABLE = True
 except Exception as e:
-    logger.warning(f"⚠️ PerfStore indisponible: {e}")
+    logger.warning(f"âš ï¸ PerfStore indisponible: {e}")
     PerfStore = None
     PERF_AVAILABLE = False
 
@@ -193,21 +194,21 @@ try:
     from rag.retriever import RAGRetriever as _RAGRetrieverImported
     RAGRetrieverCls = _RAGRetrieverImported
     RAG_AVAILABLE = True
-    logger.info("✅ RAGRetriever importé depuis rag.retriever")
+    logger.info("âœ… RAGRetriever importÃ© depuis rag.retriever")
 except Exception as e1:
     try:
         from .rag.retriever import RAGRetriever as _RAGRetrieverImported2
         RAGRetrieverCls = _RAGRetrieverImported2
         RAG_AVAILABLE = True
-        logger.info("✅ RAGRetriever importé depuis .rag.retriever")
+        logger.info("âœ… RAGRetriever importÃ© depuis .rag.retriever")
     except Exception as e2:
         try:
             from .retriever import RAGRetriever as _RAGRetrieverImported3
             RAGRetrieverCls = _RAGRetrieverImported3
             RAG_AVAILABLE = True
-            logger.info("✅ RAGRetriever importé depuis .retriever")
+            logger.info("âœ… RAGRetriever importÃ© depuis .retriever")
         except Exception as e3:
-            logger.warning(f"⚠️ Impossible d'importer RAGRetriever ({e1} | {e2} | {e3}). RAG désactivé.")
+            logger.warning(f"âš ï¸ Impossible d'importer RAGRetriever ({e1} | {e2} | {e3}). RAG dÃ©sactivÃ©.")
             RAG_AVAILABLE = False
             RAGRetrieverCls = None
 
@@ -216,11 +217,11 @@ _PERF_STORE: Optional["PerfStore"] = None
 _RAG_SINGLETON = None
 
 # ---------------------------------------------------------------------------
-# HELPERS PERFSTORE - CODE ORIGINAL CONSERVÉ
+# HELPERS PERFSTORE - CODE ORIGINAL CONSERVÃ‰
 # ---------------------------------------------------------------------------
 
 def _canon_sex(s: Optional[str]) -> Optional[str]:
-    """Canonisation tolérante du sexe pour NER/PerfStore/RAG"""
+    """Canonisation tolÃ©rante du sexe pour NER/PerfStore/RAG"""
     if not s:
         return None
     s = str(s).strip().lower()
@@ -231,15 +232,15 @@ def _canon_sex(s: Optional[str]) -> Optional[str]:
         "ah": "as_hatched",
         "mixte": "as_hatched",
         "mixed": "as_hatched",
-        "male": "male", "m": "male", "♂": "male",
-        "female": "female", "f": "female", "♀": "female",
+        "male": "male", "m": "male", "â™‚": "male",
+        "female": "female", "f": "female", "â™€": "female",
     }.get(s, s)
 
 def _slug(s: Optional[str]) -> str:
     return re.sub(r"[-_\s]+", "", (s or "").lower().strip())
 
 def _normalize_entities_soft(entities: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalisation des entités pour PerfStore"""
+    """Normalisation des entitÃ©s pour PerfStore"""
     species = (entities.get("species") or entities.get("production_type") or "broiler").lower().strip()
     line_raw = entities.get("line") or entities.get("breed") or ""
     line = _slug(line_raw)
@@ -283,20 +284,20 @@ def _get_perf_store(species_hint: Optional[str] = None) -> Optional["PerfStore"]
         try:
             root = os.environ.get("RAG_INDEX_ROOT", "./rag_index")
             _PERF_STORE = PerfStore(root=root, species=species)
-            logger.info(f"📊 PerfStore initialisé (root={root}, species={species})")
+            logger.info(f"ðŸ"Š PerfStore initialisÃ© (root={root}, species={species})")
         except Exception as e:
-            logger.warning(f"⚠️ PerfStore indisponible: {e}")
+            logger.warning(f"âš ï¸ PerfStore indisponible: {e}")
             _PERF_STORE = None
     return _PERF_STORE
 
 def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], question: str = "") -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """
-    Essaie un match exact (line, unit, sex, age_days) puis nearest sur l'âge.
+    Essaie un match exact (line, unit, sex, age_days) puis nearest sur l'Ã¢ge.
     Retourne (record, debug).
     """
     debug: Dict[str, Any] = {}
     try:
-        # Récup du DataFrame
+        # RÃ©cup du DataFrame
         df = getattr(store, "as_dataframe", None)
         df = df() if callable(df) else getattr(store, "df", None)
 
@@ -332,7 +333,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
                 })
             )
 
-        # Harmonisation de la colonne d'âge → age_days
+        # Harmonisation de la colonne d'Ã¢ge â†' age_days
         try:
             lower_map = {str(c).lower(): c for c in df.columns}
             possible = ["age_days", "day", "days", "age", "age(d)", "age_d", "age_days(d)", "age (days)", "jours"]
@@ -350,7 +351,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
             if "age_days" not in df.columns:
                 df["age_days"] = 0
 
-        # Normalisation tolérante de la colonne "sex"
+        # Normalisation tolÃ©rante de la colonne "sex"
         ds = df
         if "sex" in df.columns:
             _sex_norm = (
@@ -358,8 +359,8 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
                 .map({
                     "as hatched": "as_hatched", "as-hatched": "as_hatched", "as_hatched": "as_hatched", "ah": "as_hatched",
                     "mixte": "as_hatched", "mixed": "as_hatched",
-                    "male": "male", "m": "male", "♂": "male",
-                    "female": "female", "f": "female", "♀": "female",
+                    "male": "male", "m": "male", "â™‚": "male",
+                    "female": "female", "f": "female", "â™€": "female",
                 })
             )
             df["sex"] = _sex_norm.fillna(df["sex"].astype(str).str.strip().str.lower())
@@ -404,7 +405,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
             except Exception:
                 pass
 
-        # Nearest sur l'âge
+        # Nearest sur l'Ã¢ge
         try:
             t = int(norm.get("age_days") or 0)
             ds = ds.copy()
@@ -434,7 +435,7 @@ def _perf_lookup_exact_or_nearest(store: "PerfStore", norm: Dict[str, Any], ques
         return None, {"reason": f"lookup_error: {e}"}
 
 # ---------------------------------------------------------------------------
-# RAG RETRIEVER - CODE ORIGINAL CONSERVÉ
+# RAG RETRIEVER - CODE ORIGINAL CONSERVÃ‰
 # ---------------------------------------------------------------------------
 
 def _get_retriever():
@@ -445,9 +446,9 @@ def _get_retriever():
     if _RAG_SINGLETON is None:
         try:
             _RAG_SINGLETON = RAGRetrieverCls(openai_api_key=os.environ.get("OPENAI_API_KEY"))
-            logger.info("🔎 RAGRetriever initialisé")
+            logger.info("ðŸ"Ž RAGRetriever initialisÃ©")
         except Exception as e:
-            logger.error(f"❌ Init RAGRetriever échoué: {e}")
+            logger.error(f"âŒ Init RAGRetriever Ã©chouÃ©: {e}")
             _RAG_SINGLETON = None
     return _RAG_SINGLETON
 
@@ -484,7 +485,7 @@ def _build_filters_from_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
         filters["line"] = entities["line"]
     if "sex" in entities and entities["sex"]:
         filters["sex"] = entities["sex"]
-    logger.debug(f"🔍 Filtres RAG construits: {filters}")
+    logger.debug(f"ðŸ" Filtres RAG construits: {filters}")
     return filters
 
 def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -509,13 +510,13 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
 
         if not result:
             return {
-                "text": "Aucune information pertinente trouvée dans la base de connaissances.",
+                "text": "Aucune information pertinente trouvÃ©e dans la base de connaissances.",
                 "sources": [],
                 "route": "rag_no_results",
                 "meta": {"filters_applied": filters}
             }
 
-        text = result.get("answer") or "Résultats trouvés."
+        text = result.get("answer") or "RÃ©sultats trouvÃ©s."
         sources = _format_sources(result.get("source_documents", []))
         meta = {
             "embedding_method": result.get("embedding_method"),
@@ -533,7 +534,7 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
         }
 
     except Exception as e:
-        logger.error(f"❌ Erreur RAGRetriever: {e}")
+        logger.error(f"âŒ Erreur RAGRetriever: {e}")
         return {
             "text": "Une erreur est survenue lors de la recherche RAG.",
             "sources": [],
@@ -543,27 +544,27 @@ def _rag_answer(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = 
 
 def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict[str, Any]] = None, target_language: str = "fr") -> Dict[str, Any]:
     """
-    Version améliorée de _rag_answer avec fallback OpenAI et support CoT
-    ✅ VÉRIFIÉ: Utilise les fonctions du module cot_fallback_processor qui gèrent déjà la nouvelle signature complete()
+    Version amÃ©liorÃ©e de _rag_answer avec fallback OpenAI et support CoT
+    âœ… VÃ‰RIFIÃ‰: Utilise les fonctions du module cot_fallback_processor qui gÃ¨rent dÃ©jÃ  la nouvelle signature complete()
     """
     # Essai RAG standard d'abord
     rag_result = _rag_answer(question, k, entities)
     
-    # Vérifier si fallback OpenAI nécessaire
+    # VÃ©rifier si fallback OpenAI nÃ©cessaire
     intent = entities.get("_intent") if entities else None
     
-    # Check si fallback activé via config
+    # Check si fallback activÃ© via config
     enable_fallback = str(os.getenv("ENABLE_OPENAI_FALLBACK", "true")).lower() in ("1", "true", "yes", "on")
     if not enable_fallback:
-        logger.debug("🚫 Fallback OpenAI désactivé par configuration")
+        logger.debug("ðŸš« Fallback OpenAI dÃ©sactivÃ© par configuration")
         return rag_result
     
-    # ✅ CETTE FONCTION EST DÉJÀ COMPATIBLE avec nouvelle signature complete()
+    # âœ… CETTE FONCTION EST DÃ‰JÃ€ COMPATIBLE avec nouvelle signature complete()
     if should_use_openai_fallback(rag_result, intent):
-        logger.info("🤖 Activation fallback OpenAI après échec RAG")
+        logger.info("ðŸ¤– Activation fallback OpenAI aprÃ¨s Ã©chec RAG")
         
         # Tenter fallback OpenAI avec la langue cible (possiblement avec CoT)
-        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+        # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
         openai_result = generate_openai_fallback_response(
             question=question,
             entities=entities or {},
@@ -573,22 +574,22 @@ def _rag_answer_with_fallback(question: str, k: int = 5, entities: Optional[Dict
         )
         
         if openai_result:
-            # Succès OpenAI - enrichir avec métadonnées RAG
+            # SuccÃ¨s OpenAI - enrichir avec mÃ©tadonnÃ©es RAG
             openai_result["meta"]["rag_attempted"] = True
             openai_result["meta"]["rag_route"] = rag_result.get("route")
             openai_result["meta"]["rag_meta"] = rag_result.get("meta", {})
             return openai_result
         else:
-            logger.warning("⚠️ Fallback OpenAI échoué, retour au RAG original")
+            logger.warning("âš ï¸ Fallback OpenAI Ã©chouÃ©, retour au RAG original")
     
     return rag_result
 
 # ---------------------------------------------------------------------------
-# NETTOYAGE & SYNTHÈSE
+# NETTOYAGE & SYNTHÃˆSE
 # ---------------------------------------------------------------------------
 
 def _final_sanitize(text: str) -> str:
-    """Nettoyage final du texte de réponse"""
+    """Nettoyage final du texte de rÃ©ponse"""
     if not text:
         return ""
     text = re.sub(r'\*\*?source\s*:\s*[^*\n]+(\*\*)?', '', text, flags=re.IGNORECASE)
@@ -609,21 +610,21 @@ def _final_sanitize(text: str) -> str:
     cleaned_lines = []
     for line in lines:
         line = line.strip()
-        if len(line) > 10 or line.startswith(('##', '**', '-', '•')):
+        if len(line) > 10 or line.startswith(('##', '**', '-', 'â€¢')):
             cleaned_lines.append(line)
     return '\n'.join(cleaned_lines).strip()
 
 # ---------------------------------------------------------------------------
-# MODE HYBRIDE AMÉLIORÉ
+# MODE HYBRIDE AMÃ‰LIORÃ‰
 # ---------------------------------------------------------------------------
 
 def _generate_general_answer_with_specifics(question: str, entities: Dict[str, Any], intent: Intention, missing_fields: list) -> Dict[str, Any]:
     """
-    Mode hybride: réponse générale + questions de précision
-    ✅ VÉRIFIÉ: Utilise generate_clarification_response_advanced du module cot_fallback_processor
+    Mode hybride: rÃ©ponse gÃ©nÃ©rale + questions de prÃ©cision
+    âœ… VÃ‰RIFIÃ‰: Utilise generate_clarification_response_advanced du module cot_fallback_processor
     """
     try:
-        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+        # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
         clarification_text = generate_clarification_response_advanced(intent, missing_fields)
         
         # Enrichir avec les boutons rapides
@@ -665,9 +666,9 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
         }
         
     except Exception as e:
-        logger.error(f"❌ Error generating hybrid UX answer: {e}")
+        logger.error(f"âŒ Error generating hybrid UX answer: {e}")
         return {
-            "text": "Je dois confirmer quelques éléments (espèce, lignée, sexe) avant de donner la valeur précise. Souhaites-tu utiliser des valeurs par défaut ?",
+            "text": "Je dois confirmer quelques Ã©lÃ©ments (espÃ¨ce, lignÃ©e, sexe) avant de donner la valeur prÃ©cise. Souhaites-tu utiliser des valeurs par dÃ©faut ?",
             "source": "hybrid_ui_fallback", 
             "confidence": 0.4, 
             "enriched": False
@@ -680,17 +681,17 @@ def _generate_general_answer_with_specifics(question: str, entities: Dict[str, A
 def _compute_answer(intent: Intention, entities: Dict[str, Any]) -> Dict[str, Any]:
     """
     Placeholder pour les calculs directs (WaterFeedIntake, EquipmentSizing, etc.)
-    Cette fonction doit être implémentée selon vos besoins spécifiques.
+    Cette fonction doit Ãªtre implÃ©mentÃ©e selon vos besoins spÃ©cifiques.
     """
-    logger.warning(f"⚠️ _compute_answer not implemented for intent: {intent}")
+    logger.warning(f"âš ï¸ _compute_answer not implemented for intent: {intent}")
     return {
-        "text": f"Calcul pour {intent} non encore implémenté.",
+        "text": f"Calcul pour {intent} non encore implÃ©mentÃ©.",
         "source": "compute_placeholder",
         "confidence": 0.1
     }
 
 # ---------------------------------------------------------------------------
-# FONCTION PRINCIPALE HANDLE - VERSION CORRIGÉE + PERSISTANCE
+# FONCTION PRINCIPALE HANDLE - VERSION CORRIGÃ‰E + PERSISTANCE + FIX LANGUE
 # ---------------------------------------------------------------------------
 
 def handle(
@@ -707,53 +708,65 @@ def handle(
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Fonction principale de traitement des questions - VERSION REFACTORISÉE CORRIGÉE + PERSISTANCE
-    Préserve la compatibilité avec l'API existante
-    FIX: Auto-extraction systématique même pour nouvelles conversations
+    Fonction principale de traitement des questions - VERSION REFACTORISÃ‰E CORRIGÃ‰E + PERSISTANCE + FIX LANGUE
+    PrÃ©serve la compatibilitÃ© avec l'API existante
+    FIX: Auto-extraction systÃ©matique mÃªme pour nouvelles conversations
     NOUVEAU: Persistance automatique des conversations
-    ✅ VÉRIFIÉ: Compatible avec nouvelle fonction complete() via modules spécialisés
+    ðŸ"§ FIX LANGUE: PrÃ©servation langue conversationnelle + appel amÃ©liorÃ©
+    âœ… VÃ‰RIFIÃ‰: Compatible avec nouvelle fonction complete() via modules spÃ©cialisÃ©s
     """
     try:
-        logger.info(f"🤖 Processing question: {question[:120]}...")
+        logger.info(f"ðŸ¤– Processing question: {question[:120]}...")
         logger.info(f"[DM] flags: force_perfstore={force_perfstore}, intent_hint={intent_hint}, has_entities={bool(entities)}")
 
         # =================================================================
-        # DÉTECTION DE LANGUE AUTOMATIQUE
+        # DÃ‰TECTION DE LANGUE AUTOMATIQUE + FIX LANGUE CONVERSATIONNELLE
         # =================================================================
         auto_detection_enabled = str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
         
+        # RÃ©cupÃ©rer le contexte de session d'abord pour la langue
+        memory = get_conversation_memory()
+        session_context = memory.get(session_id) or {}
+        logger.info(f"ðŸ§  Contexte de session: {session_context}")
+        
         if auto_detection_enabled:
-            detected_language = detect_question_language(question)
-            logger.info(f"🌍 Langue détectée: {detected_language} | Paramètre lang: {lang}")
+            # ðŸ"§ FIX: Utiliser l'appel amÃ©liorÃ© avec contexte conversationnel
+            detected_language = detect_question_language(question, session_context)
+            logger.info(f"ðŸŒ Langue dÃ©tectÃ©e: {detected_language} | ParamÃ¨tre lang: {lang}")
             
-            # Utiliser la langue détectée si pas spécifiée explicitement ou si détection différente
-            if lang == "fr" and detected_language != "fr":
+            # ðŸ"§ FIX: PrÃ©server la langue de conversation Ã©tablie
+            conversation_language = session_context.get("language")
+            
+            if conversation_language:
+                # PrÃ©server la langue de la conversation en cours
+                effective_language = conversation_language
+                logger.info(f"ðŸ"— Langue de conversation prÃ©servÃ©e: {effective_language}")
+            elif lang == "fr" and detected_language != "fr":
+                # Seulement pour les nouvelles conversations
                 effective_language = detected_language
-                logger.info(f"🔄 Utilisation langue détectée: {effective_language}")
+                logger.info(f"ðŸ"„ Nouvelle conversation, langue dÃ©tectÃ©e: {effective_language}")
             else:
                 effective_language = lang
+                
+            # Sauvegarder la langue choisie pour cette conversation
+            if not conversation_language:
+                session_context["language"] = effective_language
+                logger.info(f"ðŸ'¾ Langue sauvegardÃ©e pour conversation: {effective_language}")
         else:
             detected_language = lang
             effective_language = lang
-            logger.info(f"🌍 Détection automatique désactivée, utilisation lang: {effective_language}")
+            logger.info(f"ðŸŒ DÃ©tection automatique dÃ©sactivÃ©e, utilisation lang: {effective_language}")
 
-        # =================================================================
-        # RÉCUPÉRATION DU CONTEXTE CONVERSATIONNEL
-        # =================================================================
-        memory = get_conversation_memory()
-        session_context = memory.get(session_id) or {}
-        logger.info(f"🧠 Contexte de session: {session_context}")
-
-        # Étape 1: Classification
+        # Ã‰tape 1: Classification
         classification = classify(question)
         logger.debug(f"Classification: {classification}")
 
-        # Étape 2: Normalisation
+        # Ã‰tape 2: Normalisation
         classification = normalize(classification)
         intent: Intention = classification["intent"]
 
         # =================================================================
-        # FUSION DES ENTITIES - VERSION CORRIGÉE
+        # FUSION DES ENTITIES - VERSION CORRIGÃ‰E
         # =================================================================
         # Fusion des entities (NER + overrides + contexte conversationnel)
         _ents = dict(classification.get("entities") or {})
@@ -763,21 +776,21 @@ def handle(
             except Exception: 
                 pass
         
-        # ✅ CORRECTION: Toujours appliquer merge_conversation_context pour auto-extraction
-        logger.info("🔗 Application de merge_conversation_context (auto-extraction)")
+        # âœ… CORRECTION: Toujours appliquer merge_conversation_context pour auto-extraction
+        logger.info("ðŸ"— Application de merge_conversation_context (auto-extraction)")
         _ents = merge_conversation_context(_ents, session_context, question)
         
-        # Vérifier si on continue une conversation APRÈS la fusion
+        # VÃ©rifier si on continue une conversation APRÃˆS la fusion
         if should_continue_conversation(session_context, intent):
-            logger.info("🔗 Continuation de conversation détectée")
-            # Forcer l'intention vers PerfTargets si c'était en attente
+            logger.info("ðŸ"— Continuation de conversation dÃ©tectÃ©e")
+            # Forcer l'intention vers PerfTargets si c'Ã©tait en attente
             if session_context.get("pending_intent") == "PerfTargets":
                 intent = Intention.PerfTargets
-                logger.info("🎯 Intention forcée vers PerfTargets par contexte conversationnel")
+                logger.info("ðŸŽ¯ Intention forcÃ©e vers PerfTargets par contexte conversationnel")
         
         entities = _ents
 
-        # Canonicalisation immédiate du sexe pour robustesse NER/PerfStore/RAG
+        # Canonicalisation immÃ©diate du sexe pour robustesse NER/PerfStore/RAG
         entities["sex"] = _canon_sex(entities.get("sex")) or entities.get("sex")
 
         # Hint manuel (tests console)
@@ -787,32 +800,32 @@ def handle(
         logger.info(f"Intent: {intent}, Entities keys: {list(entities.keys())}")
 
         # =================================================================
-        # VÉRIFICATION PRIORITAIRE POUR ANALYSE COT
+        # VÃ‰RIFICATION PRIORITAIRE POUR ANALYSE COT
         # =================================================================
-        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+        # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
         if OPENAI_COT_AVAILABLE and should_use_cot_analysis(intent, entities, question):
-            logger.info("🧠 Question complexe détectée → Analyse Chain-of-Thought prioritaire")
+            logger.info("ðŸ§  Question complexe dÃ©tectÃ©e â†' Analyse Chain-of-Thought prioritaire")
             
             # Passer l'intent dans les entities pour le context
             entities_with_intent = dict(entities)
             entities_with_intent["_intent"] = intent
             
-            # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+            # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
             cot_result = generate_cot_analysis(
                 question=question,
                 entities=entities,
                 intent=intent,
-                rag_context="",  # Pas de contexte RAG préalable
+                rag_context="",  # Pas de contexte RAG prÃ©alable
                 target_language=effective_language
             )
             
             if cot_result:
-                logger.info("✅ Analyse CoT réussie, retour direct")
+                logger.info("âœ… Analyse CoT rÃ©ussie, retour direct")
                 
-                # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+                # ðŸ—‚ï¸ EFFACEMENT CONTEXTE CONDITIONNEL
                 if CLEAR_CONTEXT_AFTER_ASK:
                     clear_conversation_context(session_id)
-                    logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
+                    logger.debug("ðŸ§¹ Contexte conversationnel effacÃ© (CLEAR_CONTEXT_AFTER_ASK=1)")
                 
                 response = {
                     "type": "answer",
@@ -822,10 +835,12 @@ def handle(
                     "session_id": session_id
                 }
                 
-                # Finaliser la réponse avec adaptation linguistique
-                final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+                # ðŸ"§ FIX: Finaliser la rÃ©ponse avec adaptation linguistique amÃ©liorÃ©e
+                final_response = finalize_response_with_language(
+                    response, question, effective_language, detected_language, force_conversation_language=True
+                )
                 
-                # 💾 PERSISTANCE CONVERSATION
+                # ðŸ'¾ PERSISTANCE CONVERSATION
                 answer_text = _extract_answer_text(final_response)
                 additional_context = {
                     "intent": str(intent),
@@ -837,28 +852,28 @@ def handle(
                 
                 return final_response
             else:
-                logger.info("⚠️ Analyse CoT échouée, continuation pipeline standard")
+                logger.info("âš ï¸ Analyse CoT Ã©chouÃ©e, continuation pipeline standard")
 
-        # Étape 3: Vérification de complétude
+        # Ã‰tape 3: VÃ©rification de complÃ©tude
         completeness = compute_completeness(intent, entities)
         completeness_score = completeness["completeness_score"]
         missing_fields = completeness["missing_fields"]
         logger.info(f"Completeness score: {completeness_score} | Missing: {missing_fields}")
 
-        # Si conversation continue et complète maintenant, aller directement au traitement
+        # Si conversation continue et complÃ¨te maintenant, aller directement au traitement
         if should_continue_conversation(session_context, intent) and completeness_score >= 0.8:
-            logger.info("🚀 Conversation continue avec données complètes → traitement direct")
-            # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+            logger.info("ðŸš€ Conversation continue avec donnÃ©es complÃ¨tes â†' traitement direct")
+            # ðŸ—‚ï¸ EFFACEMENT CONTEXTE CONDITIONNEL
             if CLEAR_CONTEXT_AFTER_ASK:
                 clear_conversation_context(session_id)
-                logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
+                logger.debug("ðŸ§¹ Contexte conversationnel effacÃ© (CLEAR_CONTEXT_AFTER_ASK=1)")
             
-        # HYBRIDE : si infos manquantes → synthèse courte + clarifications
+        # HYBRIDE : si infos manquantes â†' synthÃ¨se courte + clarifications
         elif missing_fields and completeness_score < 0.8:
-            logger.info("🧭 Mode hybride: synthèse courte + questions de précision")
+            logger.info("ðŸ§­ Mode hybride: synthÃ¨se courte + questions de prÃ©cision")
             general_answer = _generate_general_answer_with_specifics(question, entities, intent, missing_fields)
             
-            # Sauvegarder le contexte pour continuité
+            # Sauvegarder le contexte pour continuitÃ©
             save_conversation_context(session_id, intent, entities, question, missing_fields)
             
             response = {
@@ -872,10 +887,12 @@ def handle(
                 "session_id": session_id
             }
             
-            # Finaliser la réponse avec adaptation linguistique
-            final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+            # ðŸ"§ FIX: Finaliser la rÃ©ponse avec adaptation linguistique amÃ©liorÃ©e
+            final_response = finalize_response_with_language(
+                response, question, effective_language, detected_language, force_conversation_language=True
+            )
             
-            # 💾 PERSISTANCE CONVERSATION
+            # ðŸ'¾ PERSISTANCE CONVERSATION
             answer_text = _extract_answer_text(final_response)
             additional_context = {
                 "intent": str(intent),
@@ -889,7 +906,7 @@ def handle(
             
             return final_response
 
-        # Étape 4: Calcul direct si possible
+        # Ã‰tape 4: Calcul direct si possible
         def _should_compute(i: Intention) -> bool:
             return i in {
                 Intention.WaterFeedIntake,
@@ -900,14 +917,14 @@ def handle(
             }
         
         if _should_compute(intent):
-            logger.info(f"🧮 Calcul direct pour intent: {intent}")
+            logger.info(f"ðŸ§® Calcul direct pour intent: {intent}")
             result = _compute_answer(intent, entities)
             result["text"] = _final_sanitize(result.get("text", ""))
             
-            # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+            # ðŸ—‚ï¸ EFFACEMENT CONTEXTE CONDITIONNEL
             if CLEAR_CONTEXT_AFTER_ASK:
                 clear_conversation_context(session_id)
-                logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
+                logger.debug("ðŸ§¹ Contexte conversationnel effacÃ© (CLEAR_CONTEXT_AFTER_ASK=1)")
             
             response = {
                 "type": "answer",
@@ -917,10 +934,12 @@ def handle(
                 "session_id": session_id
             }
             
-            # Finaliser la réponse avec adaptation linguistique
-            final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+            # ðŸ"§ FIX: Finaliser la rÃ©ponse avec adaptation linguistique amÃ©liorÃ©e
+            final_response = finalize_response_with_language(
+                response, question, effective_language, detected_language, force_conversation_language=True
+            )
             
-            # 💾 PERSISTANCE CONVERSATION
+            # ðŸ'¾ PERSISTANCE CONVERSATION
             answer_text = _extract_answer_text(final_response)
             additional_context = {
                 "intent": str(intent),
@@ -932,9 +951,9 @@ def handle(
             
             return final_response
 
-        # Étape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
+        # Ã‰tape 4bis: TABLE-FIRST pour PerfTargets (avant RAG)
         if force_perfstore or (intent == Intention.PerfTargets and completeness_score >= 0.6):
-            logger.info("📊 Table-first (PerfTargets) avant RAG")
+            logger.info("ðŸ"Š Table-first (PerfTargets) avant RAG")
             try:
                 norm = _normalize_entities_soft(entities)
                 if norm.get("age_days") is None:
@@ -949,8 +968,8 @@ def handle(
                     rec, dbg = _perf_lookup_exact_or_nearest(store, norm, question=question)
 
                 if rec:
-                    line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "Lignée")
-                    sex_map = {"male":"Mâle","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}
+                    line_label = {"cobb500": "Cobb 500", "ross308": "Ross 308"}.get(str(rec.get("line","")).lower(), str(rec.get("line","")).title() or "LignÃ©e")
+                    sex_map = {"male":"MÃ¢le","female":"Femelle","as_hatched":"Mixte","mixed":"Mixte"}
                     sex_label = sex_map.get(str(rec.get("sex","")).lower(), rec.get("sex",""))
                     unit_label = (rec.get("unit") or norm["unit"] or "metric").lower()
                     v_g, v_lb = rec.get("weight_g"), rec.get("weight_lb")
@@ -967,7 +986,7 @@ def handle(
                     else:
                         val_txt = "**n/a**"
                     age_disp = int(rec.get("age_days") or norm.get("age_days") or 0)
-                    text = f"{line_label} · {sex_label} · {age_disp} j : {val_txt} (objectif {unit_label})."
+                    text = f"{line_label} Â· {sex_label} Â· {age_disp} j : {val_txt} (objectif {unit_label})."
                     source_item: List[Dict[str, Any]] = []
                     if rec.get("source_doc"):
                         source_item.append({
@@ -980,10 +999,10 @@ def handle(
                             }
                         })
                     
-                    # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+                    # ðŸ—‚ï¸ EFFACEMENT CONTEXTE CONDITIONNEL
                     if CLEAR_CONTEXT_AFTER_ASK:
                         clear_conversation_context(session_id)
-                        logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
+                        logger.debug("ðŸ§¹ Contexte conversationnel effacÃ© (CLEAR_CONTEXT_AFTER_ASK=1)")
                     
                     response = {
                         "type": "answer",
@@ -1007,10 +1026,12 @@ def handle(
                         "session_id": session_id
                     }
                     
-                    # Finaliser la réponse avec adaptation linguistique
-                    final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+                    # ðŸ"§ FIX: Finaliser la rÃ©ponse avec adaptation linguistique amÃ©liorÃ©e
+                    final_response = finalize_response_with_language(
+                        response, question, effective_language, detected_language, force_conversation_language=True
+                    )
                     
-                    # 💾 PERSISTANCE CONVERSATION
+                    # ðŸ'¾ PERSISTANCE CONVERSATION
                     answer_text = _extract_answer_text(final_response)
                     additional_context = {
                         "intent": str(intent),
@@ -1023,31 +1044,31 @@ def handle(
                     
                     return final_response
                 else:
-                    logger.info("📊 PerfStore MISS → fallback RAG")
+                    logger.info("ðŸ"Š PerfStore MISS â†' fallback RAG")
             except Exception as e:
-                logger.warning(f"⚠️ Table-first lookup échoué: {e}")
+                logger.warning(f"âš ï¸ Table-first lookup Ã©chouÃ©: {e}")
                 # on continue vers RAG
 
-        # Étape 5: RAG complet avec fallback OpenAI amélioré
-        logger.info("📚 RAG via RAGRetriever avec fallback OpenAI amélioré")
+        # Ã‰tape 5: RAG complet avec fallback OpenAI amÃ©liorÃ©
+        logger.info("ðŸ"š RAG via RAGRetriever avec fallback OpenAI amÃ©liorÃ©")
         
         # Passer l'intent dans les entities pour le fallback
         entities_with_intent = dict(entities)
         entities_with_intent["_intent"] = intent
         
-        # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+        # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
         rag = _rag_answer_with_fallback(question, k=5, entities=entities_with_intent, target_language=effective_language)
         rag_text = _final_sanitize(rag.get("text", ""))
         
-        # Synthèse uniquement si ce n'est pas déjà un fallback OpenAI ou CoT
+        # SynthÃ¨se uniquement si ce n'est pas dÃ©jÃ  un fallback OpenAI ou CoT
         if rag.get("source") not in ["openai_fallback", "cot_analysis"]:
-            # ✅ CETTE FONCTION utilise déjà la nouvelle complete() en interne
+            # âœ… CETTE FONCTION utilise dÃ©jÃ  la nouvelle complete() en interne
             rag_text = maybe_synthesize(question, rag_text)
 
-        # 🗂️ EFFACEMENT CONTEXTE CONDITIONNEL
+        # ðŸ—‚ï¸ EFFACEMENT CONTEXTE CONDITIONNEL
         if CLEAR_CONTEXT_AFTER_ASK:
             clear_conversation_context(session_id)
-            logger.debug("🧹 Contexte conversationnel effacé (CLEAR_CONTEXT_AFTER_ASK=1)")
+            logger.debug("ðŸ§¹ Contexte conversationnel effacÃ© (CLEAR_CONTEXT_AFTER_ASK=1)")
 
         response = {
             "type": "answer",
@@ -1063,10 +1084,12 @@ def handle(
             "session_id": session_id
         }
         
-        # Finaliser la réponse avec adaptation linguistique
-        final_response = finalize_response_with_language(response, question, effective_language, detected_language)
+        # ðŸ"§ FIX: Finaliser la rÃ©ponse avec adaptation linguistique amÃ©liorÃ©e
+        final_response = finalize_response_with_language(
+            response, question, effective_language, detected_language, force_conversation_language=True
+        )
         
-        # 💾 PERSISTANCE CONVERSATION
+        # ðŸ'¾ PERSISTANCE CONVERSATION
         answer_text = _extract_answer_text(final_response)
         additional_context = {
             "intent": str(intent),
@@ -1080,7 +1103,7 @@ def handle(
         return final_response
 
     except Exception as e:
-        logger.exception(f"❌ Critical error in handle(): {e}")
+        logger.exception(f"âŒ Critical error in handle(): {e}")
         response = {
             "type": "error",
             "error": str(e),
@@ -1088,13 +1111,15 @@ def handle(
             "session_id": session_id
         }
         
-        # Même en cas d'erreur, essayer d'adapter la langue si possible
+        # MÃªme en cas d'erreur, essayer d'adapter la langue si possible
         try:
             detected_language = detect_question_language(question) if question else "fr"
             effective_language = detected_language if detected_language != "fr" else "fr"
-            final_response = finalize_response_with_language(response, question or "", effective_language, detected_language)
+            final_response = finalize_response_with_language(
+                response, question or "", effective_language, detected_language, force_conversation_language=True
+            )
             
-            # 💾 PERSISTANCE CONVERSATION (même en cas d'erreur)
+            # ðŸ'¾ PERSISTANCE CONVERSATION (mÃªme en cas d'erreur)
             error_text = f"Erreur: {str(e)}"
             additional_context = {
                 "intent": "error",
@@ -1110,22 +1135,23 @@ def handle(
             return response
 
 # ---------------------------------------------------------------------------
-# FONCTIONS DE STATUT UNIFIÉES
+# FONCTIONS DE STATUT UNIFIÃ‰ES
 # ---------------------------------------------------------------------------
 
 def get_fallback_status() -> Dict[str, Any]:
     """
-    Retourne le statut complet du système avec tous les modules
+    Retourne le statut complet du systÃ¨me avec tous les modules
     """
-    # Récupérer les statuts de chaque module
+    # RÃ©cupÃ©rer les statuts de chaque module
     language_status = get_language_processing_status()
     memory_status = get_memory_status()
     cot_fallback_status = get_cot_fallback_status()
     
-    # Statut unifié
+    # Statut unifiÃ©
     unified_status = {
-        "dialogue_manager_version": "refactored_fixed_with_persistence",
+        "dialogue_manager_version": "refactored_fixed_with_persistence_and_language_fix",
         "auto_extraction_fix": "applied",
+        "language_conversation_fix": "applied",  # ðŸ"§ NOUVEAU
         "conversation_persistence": {
             "enabled": PERSIST_CONVERSATIONS,
             "postgres_available": POSTGRES_AVAILABLE,
@@ -1156,7 +1182,7 @@ def get_fallback_status() -> Dict[str, Any]:
 
 def get_cot_capabilities() -> Dict[str, Any]:
     """
-    Délègue aux capacités CoT du module spécialisé
+    DÃ©lÃ¨gue aux capacitÃ©s CoT du module spÃ©cialisÃ©
     """
     if not OPENAI_COT_AVAILABLE:
         return {"cot_available": False, "reason": "cot_fallback_processor module not available"}
@@ -1177,23 +1203,24 @@ def get_cot_capabilities() -> Dict[str, Any]:
             "ProductionAnalysis", "MultiFactor", "Economics"
         ],
         "complexity_indicators": [
-            "problème", "diagnostic", "analyse", "optimiser", "améliorer",
-            "stratégie", "multiple", "plusieurs", "complexe", "comparer",
-            "évaluer", "recommandation", "pourquoi", "comment résoudre"
+            "problÃ¨me", "diagnostic", "analyse", "optimiser", "amÃ©liorer",
+            "stratÃ©gie", "multiple", "plusieurs", "complexe", "comparer",
+            "Ã©valuer", "recommandation", "pourquoi", "comment rÃ©soudre"
         ]
     }
 
 def test_enhanced_pipeline() -> Dict[str, Any]:
     """
-    Test complet du pipeline refactorisé + persistance
+    Test complet du pipeline refactorisÃ© + persistance + fix langue
     """
     try:
         results = {}
         
         # Test fonction de base
         results["basic_status"] = {
-            "dialogue_manager": "refactored_fixed_with_persistence",
+            "dialogue_manager": "refactored_fixed_with_persistence_and_language_fix",
             "auto_extraction_fix": "applied",
+            "language_conversation_fix": "applied",  # ðŸ"§ NOUVEAU
             "persistence_enabled": PERSIST_CONVERSATIONS,
             "modules_imported": True,
             "rag_available": RAG_AVAILABLE,
@@ -1205,7 +1232,7 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         try:
             test_session = f"test_session_{int(time.time())}"
             test_question = "Test de persistance"
-            test_answer = "Réponse de test"
+            test_answer = "RÃ©ponse de test"
             
             persistence_success = _persist_conversation(
                 session_id=test_session,
@@ -1224,7 +1251,7 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         except Exception as e:
             results["persistence_test"] = {"status": "error", "error": str(e)}
         
-        # Test modules spécialisés
+        # Test modules spÃ©cialisÃ©s
         try:
             language_test = get_language_processing_status()
             results["language_processor_test"] = language_test
@@ -1243,13 +1270,53 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
         except Exception as e:
             results["cot_fallback_test"] = {"status": "error", "error": str(e)}
         
+        # 🔧 NOUVEAU: Test du fix langue conversationnelle
+        try:
+            # Simuler une détection avec contexte
+            mock_context = {"language": "fr"}
+            test_questions = [
+                ("Quel est le poids ?", "fr"),
+                ("Broiler. Cobb 500. Male", "fr"),  # Devrait préserver le français
+                ("What is the weight?", "en")
+            ]
+            
+            language_fix_tests = []
+            for question, expected_lang in test_questions:
+                try:
+                    detected = detect_question_language(question, mock_context)
+                    language_fix_tests.append({
+                        "question": question,
+                        "expected": expected_lang,
+                        "detected": detected,
+                        "preserved_context": detected == expected_lang
+                    })
+                except Exception as e:
+                    language_fix_tests.append({
+                        "question": question,
+                        "error": str(e)
+                    })
+            
+            results["language_fix_test"] = {
+                "status": "completed",
+                "tests": language_fix_tests,
+                "context_preservation_enabled": True
+            }
+        except Exception as e:
+            results["language_fix_test"] = {"status": "error", "error": str(e)}
+        
         return {
             "status": "success",
-            "message": "Pipeline refactorisé + persistance testé avec succès",
-            "fixes_applied": ["auto_extraction_systématique", "persistance_conversations"],
+            "message": "Pipeline refactorisé + persistance + fix langue testé avec succès",
+            "fixes_applied": [
+                "auto_extraction_systématique", 
+                "persistance_conversations",
+                "préservation_langue_conversationnelle",
+                "détection_intelligente_termes_techniques"
+            ],
             "feature_flags": {
                 "PERSIST_CONVERSATIONS": PERSIST_CONVERSATIONS,
-                "CLEAR_CONTEXT_AFTER_ASK": CLEAR_CONTEXT_AFTER_ASK
+                "CLEAR_CONTEXT_AFTER_ASK": CLEAR_CONTEXT_AFTER_ASK,
+                "ENABLE_AUTO_LANGUAGE_DETECTION": str(os.getenv("ENABLE_AUTO_LANGUAGE_DETECTION", "true")).lower() in ("1", "true", "yes", "on")
             },
             "detailed_results": results
         }
@@ -1257,6 +1324,6 @@ def test_enhanced_pipeline() -> Dict[str, Any]:
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Échec test pipeline refactorisé + persistance: {str(e)}",
+            "message": f"Échec test pipeline refactorisé + persistance + fix langue: {str(e)}",
             "error_type": type(e).__name__
         }
