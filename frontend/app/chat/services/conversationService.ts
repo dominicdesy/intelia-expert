@@ -73,7 +73,7 @@ function createConversation(data: {
   }
 }
 
-// SERVICE CONVERSATIONS COMPLET AVEC FALLBACK LOCALSTORAGE + CIRCUIT BREAKER
+// SERVICE CONVERSATIONS CORRIGÉ - HEADERS GET NETTOYÉS POUR ÉVITER CORS PREFLIGHT
 export class ConversationService {
   private baseUrl: string
   private loggingEnabled = true
@@ -130,16 +130,33 @@ export class ConversationService {
     }
   }
 
+  // ✅ CORRECTION: Headers GET nettoyés - pas de Content-Type pour éviter preflight CORS
+  private getHeaders(method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET'): Record<string, string> {
+    const token = this.getAuthToken()
+    
+    if (method === 'GET') {
+      // ✅ PATCH 2: Seulement Authorization et Accept pour GET - pas de Content-Type
+      return {
+        'Accept': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    } else {
+      // Pour POST/PATCH/DELETE: headers complets
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    }
+  }
+
   async getConversationWithMessages(conversationId: string): Promise<ConversationWithMessages | null> {
     try {
       console.log('[ConversationService] Chargement conversation complète:', conversationId)
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
         method: 'GET',
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
       })
       
       if (response.ok) {
@@ -194,10 +211,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/history/${userId}?${params}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.getAuthToken()}`
-          }
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         }
       )
 
@@ -224,10 +238,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/${conversationId}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.getAuthToken()}`
-          }
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         }
       )
 
@@ -280,7 +291,7 @@ export class ConversationService {
     return groups.filter(group => group.conversations.length > 0)
   }
 
-  // MÉTHODE CORRIGÉE AVEC FALLBACK LOCALSTORAGE + CIRCUIT BREAKER
+  // ✅ MÉTHODE CORRIGÉE AVEC HEADERS GET NETTOYÉS + CIRCUIT BREAKER
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.circuitBreaker.canAttempt()) {
       console.warn('[ConversationService] Circuit breaker actif - tentatives bloquées temporairement')
@@ -301,10 +312,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/user/${userId}?limit=${limit}`, {
         method: 'GET',
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
       })
       
       console.log(`Backend endpoint: ${response.status} ${response.statusText}`)
@@ -408,10 +416,7 @@ export class ConversationService {
           
           const response = await fetch(`${this.baseUrl}/conversations/${sessionId}`, {
             method: 'GET',
-            headers: { 
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${this.getAuthToken()}`
-            }
+            headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
           })
           
           if (response.ok) {
@@ -565,10 +570,7 @@ export class ConversationService {
       try {
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method: 'GET',
-          headers: { 
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${this.getAuthToken()}`
-          }
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         })
         
         console.log(`${endpoint}: ${response.status} ${response.statusText}`)
@@ -643,7 +645,7 @@ export class ConversationService {
     }
   }
 
-  // Toutes les autres méthodes restent identiques
+  // ✅ MÉTHODES AVEC HEADERS APPROPRIÉS SELON LE TYPE DE REQUÊTE
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non sauvegardée:', data.conversation_id)
@@ -656,11 +658,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversation`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        },
+        headers: this.getHeaders('POST'), // ✅ Headers POST complets
         body: JSON.stringify({
           user_id: data.user_id,
           question: data.question,
@@ -699,11 +697,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        },
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
         body: JSON.stringify({ feedback })
       })
       
@@ -733,11 +727,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/comment`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        },
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
         body: JSON.stringify({ 
           comment: comment,
           timestamp: new Date().toISOString()
@@ -777,11 +767,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        },
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
         body: JSON.stringify({ 
           feedback,
           comment: comment || null,
@@ -823,10 +809,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
         method: 'DELETE',
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('DELETE') // ✅ Headers DELETE appropriés
       })
       
       if (!response.ok) {
@@ -859,10 +842,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/user/${userId}`, {
         method: 'DELETE',
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('DELETE') // ✅ Headers DELETE appropriés
       })
       
       if (!response.ok) {
@@ -894,10 +874,7 @@ export class ConversationService {
       console.log('Récupération stats feedback:', url)
       
       const response = await fetch(url, {
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('GET') // ✅ Headers GET nettoyés
       })
       
       if (!response.ok) {
@@ -923,10 +900,7 @@ export class ConversationService {
       console.log('Test connectivité service logging...')
       
       const response = await fetch(`${this.baseUrl}/test-comments`, {
-        headers: { 
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
+        headers: this.getHeaders('GET') // ✅ Headers GET nettoyés
       })
       
       if (response.ok) {
