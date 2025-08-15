@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
-import { useUser } from '@/lib/stores/auth' 
+import { useAuthStore } from '../../hooks/useAuthStore'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface InviteFriendModalProps {
@@ -91,7 +91,7 @@ const invitationService = {
 // ==================== MODAL INVITATION AMI CORRIGÉE ====================
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
-  const { user } = useUser() 
+  const { user } = useAuthStore()
   const [emails, setEmails] = useState('')
   const [personalMessage, setPersonalMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -252,7 +252,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         errorMessage = error.message
       }
       
-      // Messages d'erreur spécifiques pour debug
+      // Messages d'erreur spécifiques pour débug
       if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
         setErrors([
           'Erreur d\'autorisation - Vérifiez que vous êtes bien connecté',

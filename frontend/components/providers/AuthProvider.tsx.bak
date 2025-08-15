@@ -2,15 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { useAuth, useUser } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 
 interface AuthProviderProps {
   children: React.ReactNode
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { checkAuth } = useAuth()
-  const { isLoading } = useUser()
+  const { checkAuth, isLoading } = useAuthStore()
   const pathname = usePathname()
 
   // 🛡️ PROTECTION ANTI-BOUCLE
@@ -70,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } else {
       console.log('ℹ️ [AuthProvider] Page ni publique ni protégée, skip:', pathname)
     }
-  }, [pathname, isPublicPage, isProtectedPage, checkAuth])
+  }, [pathname, isPublicPage, isProtectedPage]) // 🛡️ RETIRER checkAuth des dépendances !
 
   // 🛡️ Reset le flag quand on change de page
   useEffect(() => {

@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser, useAuth } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 
 // Icônes
 const ChevronDownIcon = ({ className }: { className?: string }) => (
@@ -57,8 +57,7 @@ interface UserMenuProps {
 
 export default function UserMenu({ className = '' }: UserMenuProps) {
   const router = useRouter()
-  const { user } = useUser()
-  const { logout, exportUserData, deleteUserData, updateProfile } = useAuth()
+  const { user, logout, exportUserData, deleteUserData, updateProfile } = useAuthStore()
   
   // États pour les modals
   const [isOpen, setIsOpen] = useState(false)

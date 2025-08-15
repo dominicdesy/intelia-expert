@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useAuth } from '@/lib/stores/auth'
+import { useAuthStore } from '../../hooks/useAuthStore'
 import { useTranslation } from '../../hooks/useTranslation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { UserInfoModalProps } from '../../types'
@@ -9,7 +9,7 @@ const supabase = createClientComponentClient()
 
 // ==================== MODAL PROFIL REDESIGNÉ COMPLÈTEMENT ====================
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
-  const { updateProfile } = useAuth()
+  const { updateProfile } = useAuthStore()
   const { t } = useTranslation()
   const { validatePhoneFields } = usePhoneValidation()
   const [isLoading, setIsLoading] = useState(false)

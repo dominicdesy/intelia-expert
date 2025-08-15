@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from './types'
-import { useAuthStore } from './hooks/useAuthStore'
+import { useUser } from './hooks/useAuthStore'
 import { useTranslation } from './hooks/useTranslation'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
 import { conversationService } from './services/conversationService'
-
 
 import {
   PaperAirplaneIcon,
@@ -26,7 +25,7 @@ import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
 export default function ChatInterface() {
-  const { user, isAuthenticated, isLoading } = useAuthStore()
+  const { user, isAuthenticated, isLoading } = useUser()
   const { t, currentLanguage } = useTranslation()
 
   const currentConversation = useChatStore(state => state.currentConversation)
@@ -1158,7 +1157,7 @@ export default function ChatInterface() {
               {/* âœ… AJOUTEZ CES LIGNES ICI - EXACTEMENT APRÃˆS LA FERMETURE DU DIV PRÃ‰CÃ‰DENT */}
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">
-                  Intelia Expert peut faire des erreurs. Faites vÃ©rifiez les rÃ©ponses par un professionnel au besoin.
+                  Intelia Expert peut faire des erreurs. Faites vérifiez les réponses par un professionnel au besoin.
                 </p>
               </div>
               {/* âœ… FIN DE L'AJOUT */}

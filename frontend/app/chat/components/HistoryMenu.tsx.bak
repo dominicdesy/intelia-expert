@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
 import { useConversationGroups, useConversationActions, useCurrentConversation } from '../hooks/useChatStore'
-import { useUser } from '@/lib/stores/auth' // ✅ CHANGÉ: Utiliser useUser helper
+import { useAuthStore } from '../hooks/useAuthStore'
 import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons'
 import { Conversation, ConversationGroup } from '../types'
 import { formatToLocalTime, simpleLocalTime } from '../services/apiService' // ✅ NOUVEAU: Import formatage heure
@@ -10,7 +10,7 @@ import { formatToLocalTime, simpleLocalTime } from '../services/apiService' // �
 export const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
-  const { user } = useUser() 
+  const { user } = useAuthStore()
   
   // Hooks pour conversations
   const { conversationGroups, isLoadingHistory, loadConversations } = useConversationGroups()

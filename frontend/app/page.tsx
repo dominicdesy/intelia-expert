@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuthStore } from '@/lib/stores/auth'
+import { useUser, useAuth } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
 
 const translations = {
@@ -366,14 +366,8 @@ function PageContent() {
   const router = useRouter()
   const searchParams = useSearchParams() // âœ… Maintenant autorisÃ© dans Suspense
   
-  const { 
-    login, 
-    register, 
-    isLoading, 
-    isAuthenticated,
-    hasHydrated,
-    initializeSession 
-  } = useAuthStore()
+  const { user, isAuthenticated, isLoading, hasHydrated } = useUser() // Données
+  const { login, register, initializeSession } = useAuth() // Actions
 
   // ðŸ›¡ï¸ PROTECTION + REMEMBER ME FEATURES
   const hasInitialized = useRef(false)

@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth, useUser } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 import ClientOnly from './ClientOnly'
 
 interface ProtectedRouteProps {
@@ -23,8 +23,7 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, isAuthenticated, hasHydrated } = useUser()
-  const { checkAuth } = useAuth()
+  const { user, isAuthenticated, hasHydrated, checkAuth } = useAuthStore()
   const [isChecking, setIsChecking] = useState(true)
 
   // Fallback par défaut
@@ -158,7 +157,7 @@ export default function ProtectedRoute({
 
 // Hook utilitaire pour vérifier les permissions
 export function usePermissions() {
-  const { user } = useUser()
+  const { user } = useAuthStore()
   
   return {
     isProducer: user?.user_type === 'producer',
