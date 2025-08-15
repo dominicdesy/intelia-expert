@@ -929,3 +929,222 @@ def analytics_health_check() -> Dict[str, Any]:
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+        
+
+
+
+# À ajouter dans app/api/v1/logging.py après les autres endpoints
+
+@router.get("/questions")
+async def get_questions(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: str = Query(""),
+    source: str = Query("all"),
+    confidence: str = Query("all"), 
+    feedback: str = Query("all"),
+    user: str = Query("all"),
+    time_range: str = Query("month"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Récupérer la liste des questions avec filtres (admin+ only)"""
+    
+    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"View all analytics permission required. Your role: {current_user.get('user_type', 'user')}"
+        )
+    
+    try:
+        analytics = get_analytics_manager()
+        
+        # Calculer la période basée sur time_range
+        now = datetime.now()
+        if time_range == "day":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif time_range == "week":
+            start_date = now - timedelta(days=7)
+        elif time_range == "month":
+            start_date = now - timedelta(days=30)
+        elif time_range == "year":
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = now - timedelta(days=30)  # default
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Construire la requête avec les filtres
+                conditions = ["created_at >= %s"]
+                params = [start_date]
+                
+                if search:
+                    conditions.append("(question ILIKE %s OR response_text ILIKE %s OR user_email ILIKE %s)")
+                    search_param = f"%{search}%"
+                    params.extend([search_param, search_param, search_param])
+                
+                if source != "all":
+                    conditions.append("response_source = %s")
+                    params.append(source)
+                
+                if confidence != "all":
+                    if confidence == "high":
+                        conditions.append("response_confidence >= 0.9")
+                    elif confidence == "medium":
+                        conditions.append("response_confidence >= 0.7 AND response_confidence < 0.9")
+                    elif confidence == "low":
+                        conditions.append("response_confidence < 0.7")
+                
+                # Note: les champs feedback et feedback_comment n'existent pas dans user_questions_complete
+                # Il faudrait les ajouter à la table ou créer une table séparée pour les feedbacks
+                
+                if user != "all":
+                    conditions.append("user_email = %s")
+                    params.append(user)
+                
+                where_clause = " AND ".join(conditions)
+                
+                # Compter le total
+                count_query = f"SELECT COUNT(*) FROM user_questions_complete WHERE {where_clause}"
+                cur.execute(count_query, params)
+                total_count = cur.fetchone()[0]
+                
+                # Récupérer les questions avec pagination
+                offset = (page - 1) * limit
+                query = f"""
+                    SELECT 
+                        id,
+                        created_at as timestamp,
+                        user_email,
+                        COALESCE(user_email, 'Utilisateur Inconnu') as user_name,
+                        question,
+                        response_text as response,
+                        response_source,
+                        response_confidence as confidence_score,
+                        processing_time_ms as response_time,
+                        language,
+                        session_id,
+                        NULL as feedback,
+                        NULL as feedback_comment
+                    FROM user_questions_complete 
+                    WHERE {where_clause}
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                
+                params.extend([limit, offset])
+                cur.execute(query, params)
+                questions = [dict(row) for row in cur.fetchall()]
+                
+                # Formatage des données pour correspondre au format attendu par le frontend
+                formatted_questions = []
+                for q in questions:
+                    formatted_questions.append({
+                        "id": str(q["id"]),
+                        "timestamp": q["timestamp"].isoformat() if q["timestamp"] else None,
+                        "user_email": q["user_email"] or "",
+                        "user_name": q["user_name"] or "Utilisateur Inconnu",
+                        "question": q["question"] or "",
+                        "response": q["response"] or "",
+                        "response_source": q["response_source"] or "unknown",
+                        "confidence_score": float(q["confidence_score"] or 0),
+                        "response_time": int(q["response_time"] or 0) / 1000,  # Convertir ms en secondes
+                        "language": q["language"] or "fr",
+                        "session_id": q["session_id"] or "",
+                        "feedback": q["feedback"],
+                        "feedback_comment": q["feedback_comment"]
+                    })
+                
+                return {
+                    "questions": formatted_questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "filters_applied": {
+                        "search": search,
+                        "source": source,
+                        "confidence": confidence,
+                        "feedback": feedback,
+                        "user": user,
+                        "time_range": time_range
+                    }
+                }
+                    
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération questions: {e}")
+        return {"error": str(e)}
+
+# ========== ENDPOINT POUR LES STATS BILLING ADMIN ==========
+
+@router.get("/admin/stats")
+async def billing_admin_stats(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Statistiques de facturation pour admin (super_admin only)"""
+    
+    if not has_permission(current_user, Permission.ADMIN_DASHBOARD):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Admin dashboard access required. Your role: {current_user.get('user_type', 'user')}"
+        )
+    
+    try:
+        # Importer le billing manager
+        from app.api.v1.billing import get_billing_manager
+        billing = get_billing_manager()
+        
+        analytics = get_analytics_manager()
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Stats par plan
+                cur.execute("""
+                    SELECT 
+                        ubi.plan_name,
+                        COUNT(*) as user_count,
+                        AVG(bp.price_per_month) as avg_revenue
+                    FROM user_billing_info ubi
+                    LEFT JOIN billing_plans bp ON ubi.plan_name = bp.plan_name
+                    GROUP BY ubi.plan_name, bp.price_per_month
+                """)
+                
+                plan_stats = {}
+                total_revenue = 0
+                for row in cur.fetchall():
+                    plan_name = row['plan_name']
+                    user_count = row['user_count']
+                    avg_revenue = float(row['avg_revenue'] or 0)
+                    revenue = user_count * avg_revenue
+                    
+                    plan_stats[plan_name] = {
+                        "user_count": user_count,
+                        "revenue": revenue
+                    }
+                    total_revenue += revenue
+                
+                # Top utilisateurs
+                cur.execute("""
+                    SELECT 
+                        ubi.user_email,
+                        COALESCE(SUM(mut.questions_used), 0) as question_count,
+                        ubi.plan_name
+                    FROM user_billing_info ubi
+                    LEFT JOIN monthly_usage_tracking mut ON ubi.user_email = mut.user_email
+                    GROUP BY ubi.user_email, ubi.plan_name
+                    ORDER BY question_count DESC
+                    LIMIT 10
+                """)
+                
+                top_users = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "plans": plan_stats,
+                    "total_revenue": total_revenue,
+                    "top_users": top_users
+                }
+                
+    except Exception as e:
+        logger.error(f"❌ Erreur billing admin stats: {e}")
+        return {"error": str(e)}

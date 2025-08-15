@@ -1148,3 +1148,53 @@ async def billing_admin_stats(
     except Exception as e:
         logger.error(f"❌ Erreur billing admin stats: {e}")
         return {"error": str(e)}
+        
+        
+        
+@router.get("/debug-questions")
+async def debug_questions(current_user: dict = Depends(get_current_user)):
+    """Debug temporaire pour voir ce qui se passe"""
+    try:
+        analytics = get_analytics_manager()
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor() as cur:
+                # Test 1: La table existe-t-elle ?
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_name = 'user_questions_complete'
+                """)
+                table_exists = cur.fetchone()[0] > 0
+                
+                # Test 2: Y a-t-il des données ?
+                if table_exists:
+                    cur.execute("SELECT COUNT(*) FROM user_questions_complete")
+                    total_rows = cur.fetchone()[0]
+                    
+                    # Colonnes de la table
+                    cur.execute("""
+                        SELECT column_name, data_type 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_questions_complete' 
+                        ORDER BY ordinal_position
+                    """)
+                    columns = cur.fetchall()
+                    
+                    # Sample data
+                    cur.execute("SELECT * FROM user_questions_complete ORDER BY created_at DESC LIMIT 1")
+                    sample_row = cur.fetchone()
+                else:
+                    total_rows = 0
+                    columns = []
+                    sample_row = None
+                
+                return {
+                    "table_exists": table_exists,
+                    "total_rows": total_rows,
+                    "columns": columns,
+                    "sample_row": str(sample_row) if sample_row else None,
+                    "user_role": current_user.get("user_type")
+                }
+                
+    except Exception as e:
+        return {"debug_error": str(e)}
