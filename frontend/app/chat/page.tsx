@@ -70,6 +70,7 @@ export default function ChatInterface() {
   const lastMessageCountRef = useRef(0)
   const isMountedRef = useRef(true)
   const hasRedirectedRef = useRef(false)
+  const hasLoadedConversationsRef = useRef(false)
 
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
