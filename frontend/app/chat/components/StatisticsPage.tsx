@@ -143,16 +143,22 @@ export const StatisticsPage: React.FC = () => {
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
 
-  // 🚀 LOGIQUE D'AUTHENTIFICATION ULTRA-ROBUSTE
+  // 🚀 LOGIQUE D'AUTHENTIFICATION OPTIMISÉE
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const performAuthCheck = () => {
+      // Éviter les vérifications multiples si déjà prêt
+      if (authStatus === 'ready' && authCheckRef.current) {
+        return
+      }
+
       console.log('🔍 [StatisticsPage] Auth check:', { 
         user: user === undefined ? 'undefined' : user === null ? 'null' : 'defined',
         email: user?.email,
         user_type: user?.user_type,
-        stabilityCounter: stabilityCounterRef.current
+        stabilityCounter: stabilityCounterRef.current,
+        currentAuthStatus: authStatus
       })
 
       // Phase 1: Initialisation - attendre que user ne soit plus undefined
@@ -171,11 +177,13 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      // Incrémenter le compteur de stabilité
-      stabilityCounterRef.current++
+      // Incrémenter le compteur de stabilité seulement si pas encore prêt
+      if (authStatus !== 'ready') {
+        stabilityCounterRef.current++
+      }
 
       // Attendre au moins 2 vérifications consécutives avec les mêmes données
-      if (stabilityCounterRef.current < 2) {
+      if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
         console.log(`⏳ [StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
         setAuthStatus('checking')
         // Programmer une nouvelle vérification
@@ -198,7 +206,7 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      // Phase 4: Succès !
+      // Phase 4: Succès ! (Une seule fois)
       if (!authCheckRef.current) {
         console.log('✅ [StatisticsPage] Authentification réussie:', user.email)
         setAuthStatus('ready')
@@ -213,7 +221,7 @@ export const StatisticsPage: React.FC = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [user])
+  }, [user, authStatus]) // 🚀 AJOUTÉ: authStatus dans les dépendances pour éviter boucles
 
   // Charger les statistiques uniquement quand tout est prêt
   useEffect(() => {
@@ -225,11 +233,11 @@ export const StatisticsPage: React.FC = () => {
 
   // Charger les questions si nécessaire
   useEffect(() => {
-    if (authStatus === 'ready' && activeTab === 'questions') {
+    if (authStatus === 'ready' && activeTab === 'questions' && !questionsLoading) {
       console.log('📊 [StatisticsPage] Lancement chargement des questions')
       loadQuestionLogs()
     }
-  }, [authStatus, activeTab, questionFilters, currentPage])
+  }, [authStatus, activeTab, currentPage]) // 🚀 RETIRÉ: questionFilters pour éviter boucle
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -322,29 +330,84 @@ export const StatisticsPage: React.FC = () => {
         const dashData = await dashboardRes.value.json()
         console.log('✅ Dashboard data:', dashData)
         
-        // Adapter les données du dashboard pour l'UI
-        setUsageStats({
-          unique_users: 25, // À calculer à partir des vraies données
-          total_questions: totalQuestions || 55,
-          questions_today: 12,
-          questions_this_month: 45,
-          source_distribution: {
-            rag_retriever: 35,
-            openai_fallback: 15,
-            perfstore: 5
-          },
-          monthly_breakdown: {
-            "2025-08": 45,
-            "2025-07": 38,
-            "2025-06": 29
+        // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
+        // D'abord, récupérer les vraies questions pour calculer les stats
+        try {
+          const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
+          const questionsData = await questionsResponse.json()
+          
+          if (questionsData.questions) {
+            const questions = questionsData.questions
+            const uniqueUsers = new Set(questions.map((q: any) => q.user_email)).size
+            const today = new Date().toDateString()
+            const thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0')
+            
+            // Calculer les vraies sources
+            const sourceStats = questions.reduce((acc: any, q: any) => {
+              const source = q.response_source || 'unknown'
+              acc[source] = (acc[source] || 0) + 1
+              return acc
+            }, {})
+            
+            // Questions aujourd'hui
+            const questionsToday = questions.filter((q: any) => 
+              new Date(q.timestamp).toDateString() === today
+            ).length
+            
+            // Questions ce mois
+            const questionsThisMonth = questions.filter((q: any) => 
+              q.timestamp.startsWith(thisMonth)
+            ).length
+            
+            setUsageStats({
+              unique_users: uniqueUsers,
+              total_questions: questionsData.pagination?.total || questions.length,
+              questions_today: questionsToday,
+              questions_this_month: questionsThisMonth,
+              source_distribution: {
+                rag_retriever: sourceStats.rag || 0,
+                openai_fallback: sourceStats.openai_fallback || 0,
+                perfstore: sourceStats.table_lookup || 0
+              },
+              monthly_breakdown: {
+                [thisMonth]: questionsThisMonth,
+                "2025-07": 0, // TODO: Calculer les mois précédents
+                "2025-06": 0
+              }
+            })
+            
+            console.log('📊 Stats calculées:', {
+              uniqueUsers,
+              totalQuestions: questionsData.pagination?.total,
+              questionsToday,
+              questionsThisMonth,
+              sourceStats
+            })
           }
-        })
+        } catch (questionsError) {
+          console.error('❌ Erreur récupération questions pour stats:', questionsError)
+          // Fallback aux données par défaut
+          setUsageStats({
+            unique_users: 1, // Au minimum vous
+            total_questions: totalQuestions || 0,
+            questions_today: 0,
+            questions_this_month: totalQuestions || 0,
+            source_distribution: {
+              rag_retriever: 0,
+              openai_fallback: 0,
+              perfstore: 0
+            },
+            monthly_breakdown: {
+              "2025-08": totalQuestions || 0
+            }
+          })
+        }
 
         setSystemStats({
           system_health: {
             uptime_hours: 24 * 7, // Une semaine
             total_requests: 1250,
-            error_rate: 2.1,
+            error_rate: performanceStats?.current_status?.error_rate_percent || 2.1,
             rag_status: {
               global: true,
               broiler: true,
@@ -384,6 +447,8 @@ export const StatisticsPage: React.FC = () => {
         page: currentPage.toString(),
         limit: questionsPerPage.toString()
       })
+
+      console.log('🔍 [StatisticsPage] Chargement questions:', { page: currentPage, limit: questionsPerPage })
 
       // 🚀 UTILISER LE VRAI ENDPOINT DES QUESTIONS
       const response = await fetch(`/api/v1/logging/questions?${params}`, { headers })
