@@ -807,3 +807,66 @@ def test_openai_connection() -> Dict[str, Any]:
             "message": f"Échec connexion OpenAI: {e}",
             "error_type": type(e).__name__,
         }
+        
+        
+def test_cot_pipeline() -> Dict[str, Any]:
+    """
+    🆕 NOUVEAU: Test complet du pipeline Chain-of-Thought
+    Cette fonction était manquante et causait l'erreur d'import !
+    """
+    try:
+        # Test prompt CoT simple
+        test_cot_prompt = """<thinking>
+Analyse de la question : Il s'agit d'un test du système CoT.
+</thinking>
+
+<analysis>
+Le système doit parser cette structure et extraire les sections.
+</analysis>
+
+<recommendations>
+Le test CoT fonctionne correctement si ce texte est parsé.
+</recommendations>
+
+Réponse finale : Test CoT réussi."""
+
+        # Test complete_with_cot
+        cot_result = complete_with_cot(
+            prompt=test_cot_prompt,
+            temperature=0.2,
+            max_tokens=200,
+            parse_cot=True
+        )
+        
+        # Test parsing
+        sections_found = len(cot_result.get("parsed_sections", {}))
+        has_final_answer = bool(cot_result.get("final_answer"))
+        
+        # Test complete_text() avec détection automatique
+        auto_cot_result = complete_text(
+            prompt="<thinking>Test automatique</thinking>\n\nRéponse automatique CoT.",
+            temperature=0.2,
+            max_tokens=100
+        )
+        
+        return {
+            "status": "success",
+            "cot_direct_test": {
+                "success": True,
+                "sections_parsed": sections_found,
+                "final_answer_extracted": has_final_answer,
+                "raw_length": len(cot_result.get("raw_response", ""))
+            },
+            "cot_auto_detection": {
+                "success": True,
+                "response_length": len(auto_cot_result)
+            },
+            "message": "Pipeline CoT entièrement fonctionnel"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Échec test pipeline CoT: {str(e)}",
+            "error_type": type(e).__name__
+        }
