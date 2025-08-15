@@ -9,8 +9,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { checkAuth } = useAuth()
-  const { isLoading } = useUser()
+  const { checkAuth } = useAuthStore()
+  const { isLoading } = useAuthStore()
   const pathname = usePathname()
 
   // 🛡️ PROTECTION ANTI-BOUCLE

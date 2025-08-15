@@ -23,8 +23,8 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, isAuthenticated, hasHydrated } = useUser()
-  const { checkAuth } = useAuth()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
+  const { checkAuth } = useAuthStore()
   const [isChecking, setIsChecking] = useState(true)
 
   // Fallback par défaut
@@ -158,7 +158,7 @@ export default function ProtectedRoute({
 
 // Hook utilitaire pour vérifier les permissions
 export function usePermissions() {
-  const { user } = useUser()
+  const { user } = useAuthStore()
   
   return {
     isProducer: user?.user_type === 'producer',

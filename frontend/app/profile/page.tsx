@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useUser, useAuth } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 import Link from 'next/link'
 
 // Icônes SVG
@@ -35,8 +35,8 @@ const ArrowLeftIcon = ({ className }: { className?: string }) => (
 function ProfilePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
-  const { user, isLoading } = useUser() // Données utilisateur
-  const { updateProfile, exportUserData, deleteUserData, logout } = useAuth() // Actions
+  const { user, isLoading } = useAuthStore() // Données utilisateur
+  const { updateProfile, exportUserData, deleteUserData, logout } = useAuthStore() // Actions
 
   const [activeTab, setActiveTab] = useState('profile')
   const [formData, setFormData] = useState({
