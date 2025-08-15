@@ -934,34 +934,30 @@ async def admin_autocommit_status(
         }
 
 
+# Remplacez COMPLÈTEMENT l'endpoint @router.get("/questions") dans logging.py
 
-@router.get("/admin/all-conversations")
-async def get_all_conversations_admin(
+@router.get("/questions")
+async def get_questions(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(""),
+    source: str = Query("all"),
+    confidence: str = Query("all"), 
+    feedback: str = Query("all"),
+    user: str = Query("all"),
     time_range: str = Query("month"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """
-    Récupérer TOUTES les conversations de TOUS les utilisateurs (super_admin only)
-    Version FINALE adaptée à votre structure conversation_memory + JSONB
-    """
+    """Récupérer la liste des questions avec filtres - VERSION SIMPLIFIÉE QUI MARCHE"""
     
-    # Vérifier les permissions super admin
-    if current_user.get("user_type") != "super_admin":
+    if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
         raise HTTPException(
             status_code=403, 
-            detail=f"Super admin access required. Your role: {current_user.get('user_type', 'user')}"
+            detail=f"View all analytics permission required. Your role: {current_user.get('user_type', 'user')}"
         )
     
     try:
-        if not MEMORY_AVAILABLE or not memory:
-            return {
-                "error": "PostgreSQL memory not available",
-                "questions": [],
-                "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
-            }
+        analytics = get_analytics_manager()
         
         # Calculer la période
         now = datetime.now()
@@ -976,148 +972,80 @@ async def get_all_conversations_admin(
         else:
             start_date = now - timedelta(days=30)
         
-        with psycopg2.connect(memory.dsn) as conn:
+        with psycopg2.connect(analytics.dsn) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
-                # Construction de la requête avec filtres
-                conditions = ["created_at >= %s"]
-                params = [start_date]
+                # REQUÊTE SIMPLE SANS FILTRES COMPLEXES POUR COMMENCER
+                logger.info(f"🔍 Recherche questions depuis {start_date}")
                 
-                if search:
-                    # Recherche dans le contexte JSON et session_id
-                    conditions.append("(context::text ILIKE %s OR session_id ILIKE %s)")
-                    search_param = f"%{search}%"
-                    params.extend([search_param, search_param])
-                
-                where_clause = " AND ".join(conditions)
-                
-                # Compter le total
-                count_query = f"""
+                # Test: récupérer TOUTES les questions sans filtres d'abord
+                cur.execute("""
                     SELECT COUNT(*) 
-                    FROM conversation_memory 
-                    WHERE {where_clause}
-                """
-                cur.execute(count_query, params)
+                    FROM user_questions_complete 
+                    WHERE created_at >= %s
+                """, (start_date,))
+                
                 total_count = cur.fetchone()[0]
+                logger.info(f"📊 Total questions trouvées: {total_count}")
                 
-                # Récupérer les conversations avec pagination
-                offset = (page - 1) * limit
-                query = f"""
+                if total_count == 0:
+                    logger.warning("⚠️ Aucune question dans user_questions_complete")
+                    return {
+                        "questions": [],
+                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
+                        "debug": "no_questions_in_period"
+                    }
+                
+                # Récupérer les questions de base
+                cur.execute("""
                     SELECT 
-                        session_id,
-                        context,
+                        id,
                         created_at,
-                        updated_at
-                    FROM conversation_memory
-                    WHERE {where_clause}
-                    ORDER BY updated_at DESC
+                        user_email,
+                        question,
+                        response_text,
+                        response_source,
+                        COALESCE(response_confidence, 0) as confidence,
+                        COALESCE(processing_time_ms, 0) as response_time_ms,
+                        COALESCE(language, 'fr') as language,
+                        COALESCE(session_id, '') as session_id,
+                        status
+                    FROM user_questions_complete 
+                    WHERE created_at >= %s
+                    ORDER BY created_at DESC
                     LIMIT %s OFFSET %s
-                """
+                """, (start_date, limit, (page - 1) * limit))
                 
-                params.extend([limit, offset])
-                cur.execute(query, params)
-                conversations_raw = cur.fetchall()
+                questions_raw = cur.fetchall()
+                logger.info(f"📊 Questions récupérées: {len(questions_raw)}")
                 
-                logger.info(f"📊 Trouvé {len(conversations_raw)} conversations dans conversation_memory")
-                
-                # Formater les données pour le frontend
-                formatted_conversations = []
-                for row in conversations_raw:
+                # Formatage SIMPLE
+                formatted_questions = []
+                for row in questions_raw:
                     try:
-                        # Parser le contexte JSONB
-                        context = parse_conversation_context(row["context"])
-                        messages = context.get("messages", [])
-                        
-                        # Extraire user_id (qui dans votre cas = email)
-                        user_id = context.get("user_id", "unknown")
-                        if user_id == "unknown":
-                            # Fallback: chercher dans les messages
-                            for msg in messages:
-                                if msg.get("user_id"):
-                                    user_id = msg["user_id"]
-                                    break
-                        
-                        # Extraire première question utilisateur
-                        first_question = ""
-                        last_response = ""
-                        user_message_count = 0
-                        assistant_message_count = 0
-                        
-                        for msg in messages:
-                            role = msg.get("role", "")
-                            content = msg.get("content", "")
-                            
-                            if role == "user":
-                                if not first_question:  # Première question seulement
-                                    first_question = content
-                                user_message_count += 1
-                            elif role == "assistant":
-                                last_response = content  # Dernière réponse
-                                assistant_message_count += 1
-                        
-                        # Générer un nom d'utilisateur lisible
-                        user_name = "Utilisateur Inconnu"
-                        if user_id and user_id != "unknown":
-                            if "@" in user_id:
-                                user_name = user_id.split('@')[0].replace('.', ' ').title()
-                            else:
-                                user_name = user_id.title()
-                        
-                        # Formater selon la structure attendue par le frontend
-                        formatted_conversations.append({
-                            "id": row["session_id"],
-                            "timestamp": row["updated_at"].isoformat() if row["updated_at"] else None,
-                            "user_email": user_id,
-                            "user_name": user_name,
-                            "question": (first_question or "Pas de question")[:200] + ("..." if len(first_question or "") > 200 else ""),
-                            "response": (last_response or "Pas de réponse")[:200] + ("..." if len(last_response or "") > 200 else ""),
-                            "response_source": "conversation",
-                            "confidence_score": 0.0,
-                            "response_time": 0,
-                            "language": context.get("language", "fr"),
-                            "session_id": row["session_id"],
-                            "feedback": None,  # Pas de système de feedback dans conversation_memory
-                            "feedback_comment": None,
-                            "message_count": len(messages),
-                            "user_message_count": user_message_count,
-                            "assistant_message_count": assistant_message_count,
-                            "entities": context.get("entities", {}),  # Bonus: entités extraites
-                            "created_at": row["created_at"].isoformat() if row["created_at"] else None
+                        formatted_questions.append({
+                            "id": str(row["id"]),
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title() if row["user_email"] else "Utilisateur",
+                            "question": row["question"] or "",
+                            "response": row["response_text"] or "",
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["confidence"] or 0),
+                            "response_time": int(row["response_time_ms"] or 0) / 1000,  # ms vers secondes
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "feedback": None,  # À implémenter si besoin
+                            "feedback_comment": None
                         })
-                        
-                    except Exception as parse_error:
-                        logger.warning(f"⚠️ Erreur parsing conversation {row['session_id']}: {parse_error}")
-                        # Ajouter quand même une entrée basique
-                        formatted_conversations.append({
-                            "id": row["session_id"],
-                            "timestamp": row["updated_at"].isoformat() if row["updated_at"] else None,
-                            "user_email": "parsing_error",
-                            "user_name": "Erreur de parsing",
-                            "question": "Erreur lors du parsing",
-                            "response": str(parse_error),
-                            "response_source": "error",
-                            "confidence_score": 0.0,
-                            "response_time": 0,
-                            "language": "fr",
-                            "session_id": row["session_id"],
-                            "feedback": None,
-                            "feedback_comment": None,
-                            "message_count": 0
-                        })
+                    except Exception as format_error:
+                        logger.error(f"❌ Erreur formatage question {row['id']}: {format_error}")
                         continue
                 
-                # Statistiques supplémentaires
-                stats = {
-                    "total_conversations": total_count,
-                    "conversations_returned": len(formatted_conversations),
-                    "conversations_with_errors": len([c for c in formatted_conversations if c["response_source"] == "error"]),
-                    "unique_users": len(set(c["user_email"] for c in formatted_conversations if c["user_email"] != "parsing_error")),
-                    "total_messages": sum(c["message_count"] for c in formatted_conversations),
-                    "avg_messages_per_conversation": round(sum(c["message_count"] for c in formatted_conversations) / max(len(formatted_conversations), 1), 1)
-                }
+                logger.info(f"✅ Questions formatées: {len(formatted_questions)}")
                 
                 return {
-                    "questions": formatted_conversations,  # Nommé "questions" pour compatibilité frontend
+                    "questions": formatted_questions,
                     "pagination": {
                         "page": page,
                         "limit": limit,
@@ -1126,25 +1054,24 @@ async def get_all_conversations_admin(
                     },
                     "filters_applied": {
                         "search": search,
+                        "source": source,
+                        "confidence": confidence,
+                        "feedback": feedback,
+                        "user": user,
                         "time_range": time_range
                     },
-                    "metadata": {
-                        "source": "conversation_memory",
-                        "table_used": "conversation_memory",
-                        "context_format": "jsonb",
-                        "requested_by": current_user.get("email"),
-                        "stats": stats
+                    "debug": {
+                        "total_found": total_count,
+                        "formatted_count": len(formatted_questions),
+                        "start_date": start_date.isoformat()
                     }
                 }
-                
+                    
     except Exception as e:
-        logger.error(f"❌ Erreur récupération conversations admin: {e}")
+        logger.error(f"❌ Erreur récupération questions: {e}")
         return {
             "error": str(e),
             "questions": [],
             "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
-            "metadata": {
-                "source": "conversation_memory",
-                "error_details": str(e)
-            }
+            "debug": {"error_type": type(e).__name__, "error_message": str(e)}
         }
