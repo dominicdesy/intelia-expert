@@ -101,13 +101,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         return
       }
 
-      const result = await updateProfile(formData)
-      if (result.success) {
-        alert(t('profile.title') + ' mis à jour avec succès!')
-        onClose()
-      } else {
-        alert('Erreur lors de la mise à jour: ' + (result.error || 'Erreur inconnue'))
-      }
+      try { await updateProfile(formData); alert(t('profile.title') + ' mis � jour avec succ�s!'); onClose(); } catch (error) { alert('Erreur lors de la mise � jour: ' + (error?.message || 'Erreur inconnue')); }
     } catch (error) {
       console.error('❌ Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour du profil')
