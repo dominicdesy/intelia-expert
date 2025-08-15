@@ -407,7 +407,7 @@ export const StatisticsPage: React.FC = () => {
           system_health: {
             uptime_hours: 24 * 7, // Une semaine
             total_requests: 1250,
-            error_rate: performanceStats?.current_status?.error_rate_percent || 2.1,
+            error_rate: 2.1, // Valeur par défaut car performanceStats n'a plus current_status
             rag_status: {
               global: true,
               broiler: true,
