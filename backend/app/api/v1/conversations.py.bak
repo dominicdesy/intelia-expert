@@ -932,3 +932,248 @@ async def admin_autocommit_status(
             "admin": current_user.get('email', 'unknown'),
             "timestamp": datetime.utcnow().isoformat()
         }
+
+# À ajouter dans app/api/v1/conversations.py
+
+@router.get("/admin/all-conversations")
+async def get_all_conversations_admin(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: str = Query(""),
+    time_range: str = Query("month"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Récupérer TOUTES les conversations de TOUS les utilisateurs (super_admin only)
+    Pour le dashboard administrateur
+    """
+    
+    # Vérifier les permissions super admin
+    if current_user.get("user_type") != "super_admin":
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Super admin access required. Your role: {current_user.get('user_type', 'user')}"
+        )
+    
+    try:
+        from app.api.v1.pipeline.postgres_memory import PostgresMemory
+        memory = PostgresMemory()
+        
+        # Calculer la période
+        now = datetime.now()
+        if time_range == "day":
+            start_date = now - timedelta(days=1)
+        elif time_range == "week":
+            start_date = now - timedelta(days=7)
+        elif time_range == "month":
+            start_date = now - timedelta(days=30)
+        elif time_range == "year":
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = now - timedelta(days=30)
+        
+        # Récupérer toutes les conversations depuis la base
+        with psycopg2.connect(memory.dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                
+                # Construction de la requête avec filtres
+                conditions = ["created_at >= %s"]
+                params = [start_date]
+                
+                if search:
+                    conditions.append("(user_email ILIKE %s OR session_id ILIKE %s)")
+                    search_param = f"%{search}%"
+                    params.extend([search_param, search_param])
+                
+                where_clause = " AND ".join(conditions)
+                
+                # Compter le total
+                count_query = f"""
+                    SELECT COUNT(DISTINCT session_id) 
+                    FROM conversation_sessions 
+                    WHERE {where_clause}
+                """
+                cur.execute(count_query, params)
+                total_count = cur.fetchone()[0]
+                
+                # Récupérer les conversations avec pagination
+                offset = (page - 1) * limit
+                query = f"""
+                    SELECT DISTINCT
+                        session_id,
+                        user_email,
+                        created_at,
+                        updated_at,
+                        (SELECT COUNT(*) FROM conversation_messages cm 
+                         WHERE cm.session_id = cs.session_id) as message_count,
+                        (SELECT cm.content 
+                         FROM conversation_messages cm 
+                         WHERE cm.session_id = cs.session_id 
+                         AND cm.role = 'user'
+                         ORDER BY cm.created_at ASC 
+                         LIMIT 1) as first_question,
+                        (SELECT cm.content 
+                         FROM conversation_messages cm 
+                         WHERE cm.session_id = cs.session_id 
+                         ORDER BY cm.created_at DESC 
+                         LIMIT 1) as last_message
+                    FROM conversation_sessions cs
+                    WHERE {where_clause}
+                    ORDER BY updated_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                
+                params.extend([limit, offset])
+                cur.execute(query, params)
+                conversations_raw = cur.fetchall()
+                
+                # Formater les données pour le frontend
+                formatted_conversations = []
+                for row in conversations_raw:
+                    # Simuler la structure attendue par le frontend questions
+                    formatted_conversations.append({
+                        "id": row["session_id"],
+                        "timestamp": row["updated_at"].isoformat() if row["updated_at"] else None,
+                        "user_email": row["user_email"] or "",
+                        "user_name": (row["user_email"] or "").split('@')[0].title(),
+                        "question": (row["first_question"] or "")[:200] + ("..." if len(row["first_question"] or "") > 200 else ""),
+                        "response": (row["last_message"] or "")[:200] + ("..." if len(row["last_message"] or "") > 200 else ""),
+                        "response_source": "conversation",  # Ou determiner depuis les métadonnées
+                        "confidence_score": 0.0,  # À calculer si disponible
+                        "response_time": 0,  # À calculer si disponible  
+                        "language": "fr",  # Ou détecter
+                        "session_id": row["session_id"],
+                        "feedback": None,  # Si vous avez une table de feedback
+                        "feedback_comment": None,
+                        "message_count": row["message_count"] or 0
+                    })
+                
+                return {
+                    "questions": formatted_conversations,  # Nommé "questions" pour compatibilité frontend
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit if limit > 0 else 1
+                    },
+                    "filters_applied": {
+                        "search": search,
+                        "time_range": time_range
+                    },
+                    "metadata": {
+                        "source": "conversations_admin",
+                        "total_conversations": total_count,
+                        "requested_by": current_user.get("email")
+                    }
+                }
+                
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération conversations admin: {e}")
+        return {
+            "error": str(e),
+            "questions": [],  # Retour d'urgence
+            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
+        }
+
+# Alternative si la table conversations a une structure différente
+@router.get("/admin/all-questions")  
+async def get_all_questions_admin(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: str = Query(""),
+    time_range: str = Query("month"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Récupérer TOUTES les questions de TOUS les utilisateurs depuis user_questions_complete
+    Version alternative si la table logging existe
+    """
+    
+    if current_user.get("user_type") != "super_admin":
+        raise HTTPException(status_code=403, detail="Super admin access required")
+    
+    try:
+        # Utiliser le système de logging existant
+        from app.api.v1.logging import get_analytics_manager
+        analytics = get_analytics_manager()
+        
+        # Période
+        now = datetime.now()
+        if time_range == "day":
+            start_date = now - timedelta(days=1)
+        elif time_range == "week":
+            start_date = now - timedelta(days=7) 
+        elif time_range == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=30)
+        
+        with psycopg2.connect(analytics.dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                
+                # Requête simple pour récupérer TOUTES les questions
+                cur.execute("""
+                    SELECT 
+                        id,
+                        created_at,
+                        user_email,
+                        question,
+                        response_text,
+                        response_source,
+                        response_confidence,
+                        processing_time_ms,
+                        language,
+                        session_id,
+                        status
+                    FROM user_questions_complete 
+                    WHERE created_at >= %s
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """, (start_date, limit, (page - 1) * limit))
+                
+                questions_raw = cur.fetchall()
+                
+                # Compter le total
+                cur.execute("""
+                    SELECT COUNT(*) 
+                    FROM user_questions_complete 
+                    WHERE created_at >= %s
+                """, (start_date,))
+                total_count = cur.fetchone()[0]
+                
+                # Formater pour le frontend
+                formatted_questions = []
+                for row in questions_raw:
+                    formatted_questions.append({
+                        "id": str(row["id"]),
+                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                        "user_email": row["user_email"] or "",
+                        "user_name": (row["user_email"] or "").split('@')[0].title(),
+                        "question": row["question"] or "",
+                        "response": row["response_text"] or "",
+                        "response_source": row["response_source"] or "unknown",
+                        "confidence_score": float(row["response_confidence"] or 0),
+                        "response_time": int(row["processing_time_ms"] or 0) / 1000,  # ms vers secondes
+                        "language": row["language"] or "fr",
+                        "session_id": row["session_id"] or "",
+                        "feedback": None,
+                        "feedback_comment": None
+                    })
+                
+                return {
+                    "questions": formatted_questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit if limit > 0 else 1
+                    },
+                    "metadata": {
+                        "source": "user_questions_complete",
+                        "total_questions": total_count
+                    }
+                }
+                
+    except Exception as e:
+        logger.error(f"❌ Erreur admin questions: {e}")
+        return {"error": str(e), "questions": []}
