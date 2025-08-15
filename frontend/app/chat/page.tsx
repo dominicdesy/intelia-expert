@@ -117,6 +117,10 @@ export default function ChatInterface() {
   const isMountedRef = useRef(true)
   const hasRedirectedRef = useRef(false)
   
+  // ✅ PATCH 1: Nouveaux refs pour contrôler la redirection avec délai
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Refs pour éviter les re-chargements multiples et contrôler les tentatives
   const hasLoadedConversationsRef = useRef(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -398,23 +402,80 @@ export default function ChatInterface() {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      // Nettoyer les timeouts
+      // ✅ PATCH 1: Nettoyer TOUS les timeouts
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
+      }
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current)
+      }
+      if (authCheckTimeoutRef.current) {
+        clearTimeout(authCheckTimeoutRef.current)
       }
     }
   }, [])
 
+  // ✅ PATCH 1: useEffect CORRIGÉ avec délai de redirection 1,2s
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !hasRedirectedRef.current) {
-      hasRedirectedRef.current = true
-      console.log('[ChatInterface] Redirection - utilisateur non authentifié')
+    // Nettoyer les timeouts précédents
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current)
+    }
+    if (authCheckTimeoutRef.current) {
+      clearTimeout(authCheckTimeoutRef.current)
+    }
 
-      if (typeof window !== 'undefined') {
-        window.location.replace('/')
+    // Si chargement en cours, ne rien faire
+    if (isLoading) {
+      console.log('[ChatInterface] Auth en cours de chargement...')
+      return
+    }
+
+    // Si déjà redirigé, ne pas refaire
+    if (hasRedirectedRef.current) {
+      console.log('[ChatInterface] Redirection déjà effectuée, skip')
+      return
+    }
+
+    // Si utilisateur authentifié, tout va bien
+    if (isAuthenticated) {
+      console.log('[ChatInterface] Utilisateur authentifié, pas de redirection')
+      return
+    }
+
+    // ✅ PATCH 1: Délai de 1,2s pour laisser Supabase se stabiliser
+    console.log('[ChatInterface] Utilisateur non authentifié - délai de stabilisation Supabase...')
+    
+    authCheckTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return
+      
+      // Double-check après le délai
+      const authStore = useAuthStore.getState()
+      console.log('[ChatInterface] Après délai - État auth:', {
+        isLoading: authStore.isLoading,
+        isAuthenticated: authStore.isAuthenticated,
+        hasUser: !!authStore.user
+      })
+      
+      // Si toujours pas authentifié après le délai, rediriger
+      if (!authStore.isLoading && !authStore.isAuthenticated && !hasRedirectedRef.current) {
+        hasRedirectedRef.current = true
+        console.log('[ChatInterface] Redirection après vérification - utilisateur non authentifié')
+        
+        if (typeof window !== 'undefined') {
+          window.location.replace('/')
+        }
+      } else if (authStore.isAuthenticated) {
+        console.log('[ChatInterface] Utilisateur finalement authentifié après délai')
+      }
+    }, 1200) // ✅ PATCH 1: Délai de 1,2s exactement comme identifié
+
+    return () => {
+      if (authCheckTimeoutRef.current) {
+        clearTimeout(authCheckTimeoutRef.current)
       }
     }
-  }, [isLoading, isAuthenticated])
+  }, [isLoading, isAuthenticated]) // Dépendances inchangées
 
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -582,6 +643,7 @@ export default function ChatInterface() {
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
+      hasRedirectedRef.current = false // ✅ PATCH 1: Reset aussi le flag de redirection
       console.log('[ChatInterface] Reset circuit breaker pour nouvel utilisateur:', user.id)
     }
   }, [user?.id])
