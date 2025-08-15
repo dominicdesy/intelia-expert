@@ -1132,4 +1132,369 @@ async def debug_questions(current_user: dict = Depends(get_current_user)):
                 }
                 
     except Exception as e:
-        return {"debug_error": str(e)}
+        return {"debug_error": str(e)
+        
+# Ajoutez TOUS ces endpoints à la fin de logging.py avant le dernier }
+
+# ========== BATTERIE DE TESTS COMPLÈTE ==========
+
+@router.get("/simple-test")
+async def simple_test():
+    """Test 1: Endpoint ultra-simple sans dépendances"""
+    return {"test": "success", "message": "Endpoint works", "timestamp": datetime.now().isoformat()}
+
+@router.get("/test-db-direct")
+async def test_db_direct():
+    """Test 2: Connexion DB directe sans analytics manager"""
+    try:
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                result = cur.fetchone()
+                
+                cur.execute("SELECT id, user_email, question FROM user_questions_complete ORDER BY created_at DESC LIMIT 3")
+                samples = [dict(row) for row in cur.fetchall()]
+                
+                return {
+                    "count": result["count"],
+                    "samples": samples,
+                    "success": True,
+                    "dsn_available": bool(dsn)
+                }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__, "dsn": bool(os.getenv("DATABASE_URL"))}
+
+@router.get("/test-analytics-manager")
+async def test_analytics_manager():
+    """Test 3: Analytics manager seul"""
+    try:
+        analytics = get_analytics_manager()
+        return {
+            "analytics_available": analytics is not None,
+            "dsn": bool(analytics.dsn) if analytics else False,
+            "type": type(analytics).__name__ if analytics else None
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/test-permissions")
+async def test_permissions(current_user: dict = Depends(get_current_user)):
+    """Test 4: Système de permissions"""
+    try:
+        user_type = current_user.get("user_type", "unknown")
+        email = current_user.get("email", "unknown")
+        
+        # Test permissions individuelles
+        perms = {}
+        try:
+            perms["view_all"] = has_permission(current_user, Permission.VIEW_ALL_ANALYTICS)
+        except Exception as e:
+            perms["view_all_error"] = str(e)
+            
+        try:
+            perms["admin_dashboard"] = has_permission(current_user, Permission.ADMIN_DASHBOARD)
+        except Exception as e:
+            perms["admin_dashboard_error"] = str(e)
+        
+        return {
+            "user_type": user_type,
+            "email": email,
+            "permissions": perms,
+            "raw_user": current_user
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/test-questions-step-by-step")
+async def test_questions_step_by_step(current_user: dict = Depends(get_current_user)):
+    """Test 5: Questions endpoint étape par étape"""
+    steps = {}
+    
+    try:
+        # Étape 1: User check
+        steps["step1_user"] = {
+            "user_type": current_user.get("user_type"),
+            "email": current_user.get("email"),
+            "is_super_admin": current_user.get("user_type") == "super_admin"
+        }
+        
+        # Étape 2: Analytics manager
+        analytics = get_analytics_manager()
+        steps["step2_analytics"] = {
+            "manager_available": analytics is not None,
+            "has_dsn": bool(analytics.dsn) if analytics else False
+        }
+        
+        # Étape 3: DB Connection
+        with psycopg2.connect(analytics.dsn) as conn:
+            steps["step3_connection"] = {"success": True}
+            
+            # Étape 4: Cursor
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                steps["step4_cursor"] = {"success": True}
+                
+                # Étape 5: Count query
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                count_result = cur.fetchone()
+                steps["step5_count"] = {"count": count_result["count"] if count_result else 0}
+                
+                # Étape 6: Data query
+                cur.execute("""
+                    SELECT id, user_email, question, response_text, created_at
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT 2
+                """)
+                rows = cur.fetchall()
+                steps["step6_data"] = {
+                    "rows_found": len(rows),
+                    "sample": [dict(row) for row in rows]
+                }
+                
+                # Étape 7: Formatting
+                formatted = []
+                for row in rows:
+                    try:
+                        formatted.append({
+                            "id": str(row["id"]),
+                            "user_email": row["user_email"],
+                            "question": row["question"][:100] if row["question"] else "",
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None
+                        })
+                    except Exception as format_error:
+                        steps["step7_format_error"] = str(format_error)
+                        break
+                
+                steps["step7_formatted"] = {
+                    "formatted_count": len(formatted),
+                    "sample": formatted
+                }
+        
+        return {"success": True, "steps": steps}
+        
+    except Exception as e:
+        steps["error"] = {"message": str(e), "type": type(e).__name__}
+        return {"success": False, "steps": steps}
+
+@router.get("/test-questions-bypass-all")
+async def test_questions_bypass_all():
+    """Test 6: Questions sans aucune dépendance"""
+    try:
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            return {"error": "No DATABASE_URL"}
+        
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                
+                # Count
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                total = cur.fetchone()["count"]
+                
+                # Data
+                cur.execute("""
+                    SELECT 
+                        id, user_email, question, response_text, 
+                        response_source, created_at
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """)
+                
+                rows = cur.fetchall()
+                
+                questions = []
+                for row in rows:
+                    questions.append({
+                        "id": str(row["id"]),
+                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                        "user_email": row["user_email"] or "",
+                        "user_name": (row["user_email"] or "").split('@')[0].title(),
+                        "question": row["question"] or "",
+                        "response": row["response_text"] or "",
+                        "response_source": row["response_source"] or "unknown"
+                    })
+                
+                return {
+                    "questions": questions,
+                    "pagination": {
+                        "total": total,
+                        "returned": len(questions)
+                    },
+                    "success": True
+                }
+                
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@router.get("/debug-error-zero")
+async def debug_error_zero():
+    """Test 7: Reproduire l'erreur '0'"""
+    # Tester différentes façons de produire '0'
+    tests = {}
+    
+    # Test division par zéro
+    try:
+        result = 10 / 0
+        tests["division"] = result
+    except Exception as e:
+        tests["division_error"] = str(e)
+    
+    # Test retour de 0 en string
+    tests["zero_string"] = str(0)
+    tests["zero_int"] = 0
+    tests["zero_dict"] = {"error": "0"}
+    
+    # Test avec analytics manager qui pourrait retourner 0
+    try:
+        analytics = get_analytics_manager()
+        # Voir si quelque chose dans analytics retourne 0
+        if hasattr(analytics, 'get_stats'):
+            stats = analytics.get_stats()
+            tests["analytics_stats"] = stats
+    except Exception as e:
+        tests["analytics_error"] = str(e)
+    
+    return {"tests": tests}
+
+# ========== ENDPOINT QUESTIONS FINAL ULTRA-ROBUSTE ==========
+
+@router.get("/questions-final")
+async def questions_final(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """ENDPOINT FINAL - Version ultra-robuste avec logs détaillés"""
+    
+    debug_info = {
+        "step": "start",
+        "user_type": current_user.get("user_type"),
+        "email": current_user.get("email")
+    }
+    
+    try:
+        # Vérification super admin
+        if current_user.get("user_type") != "super_admin":
+            debug_info["step"] = "permission_denied"
+            raise HTTPException(status_code=403, detail="Super admin required")
+        
+        debug_info["step"] = "getting_analytics"
+        
+        # Import direct pour éviter problèmes
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            debug_info["step"] = "no_dsn"
+            return {"error": "No DATABASE_URL", "debug": debug_info}
+        
+        debug_info["step"] = "connecting"
+        
+        with psycopg2.connect(dsn) as conn:
+            debug_info["step"] = "connected"
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                debug_info["step"] = "cursor_ready"
+                
+                # Count total
+                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
+                total_result = cur.fetchone()
+                total_count = total_result["count"] if total_result else 0
+                
+                debug_info["step"] = "count_done"
+                debug_info["total_found"] = total_count
+                
+                if total_count == 0:
+                    return {
+                        "questions": [],
+                        "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0},
+                        "debug": debug_info
+                    }
+                
+                # Récupérer les données
+                offset = (page - 1) * limit
+                cur.execute("""
+                    SELECT 
+                        id, user_email, question, response_text, 
+                        response_source, response_confidence, processing_time_ms,
+                        language, session_id, created_at, status
+                    FROM user_questions_complete 
+                    ORDER BY created_at DESC 
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+                
+                rows = cur.fetchall()
+                debug_info["step"] = "data_retrieved"
+                debug_info["rows_found"] = len(rows)
+                
+                # Formatage
+                questions = []
+                for i, row in enumerate(rows):
+                    try:
+                        questions.append({
+                            "id": str(row["id"]),
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                            "question": row["question"] or "",
+                            "response": row["response_text"] or "",
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["response_confidence"] or 0),
+                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "feedback": None,
+                            "feedback_comment": None
+                        })
+                    except Exception as format_error:
+                        debug_info[f"format_error_{i}"] = str(format_error)
+                        continue
+                
+                debug_info["step"] = "formatting_done"
+                debug_info["questions_formatted"] = len(questions)
+                
+                return {
+                    "questions": questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "debug": debug_info,
+                    "success": True
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        debug_info["step"] = "exception"
+        debug_info["exception_type"] = type(e).__name__
+        debug_info["exception_message"] = str(e)
+        
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "debug": debug_info,
+            "questions": [],
+            "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
+        }        
+        
+        
+        
+        
+        
+        
+        }
