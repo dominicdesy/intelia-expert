@@ -852,7 +852,7 @@ def handle(
             _persist_conversation(session_id, question or "", error_text, effective_language, user_id, additional_context)
             
             return final_response
-        except:
+        except Exception:
             return response
 
 # ---------------------------------------------------------------------------
