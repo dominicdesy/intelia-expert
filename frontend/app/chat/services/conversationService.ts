@@ -444,7 +444,7 @@ export class ConversationService {
                 feedback: data.feedback,
                 language: data.language || 'fr',
                 last_message_preview: this.extractLastMessagePreview(data),
-                status: 'active'
+                status: 'active' as const
               }
               
               conversations.push(conversation)
@@ -681,7 +681,7 @@ export class ConversationService {
       feedback: conversationData.feedback,
       language: conversationData.language || 'fr',
       last_message_preview: lastMessagePreview,
-      status: 'active',
+      status: 'active' as const,
       messages
     }
   }
