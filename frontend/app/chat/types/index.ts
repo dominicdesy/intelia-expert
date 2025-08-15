@@ -1194,10 +1194,10 @@ export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
   return {
     id: backendUser.id,
     email: backendUser.email,
-    name: backendUser.name || ${backendUser.firstName || ''} .trim() || backendUser.email,
+    name: backendUser.name || `${backendUser.firstName || ""} ${backendUser.lastName || ""}`.trim() || backendUser.email,
     firstName: backendUser.firstName || '',
     lastName: backendUser.lastName || '',
-    phone: ${backendUser.country_code || ''},
+    phone: `${backendUser.country_code || ""}${backendUser.area_code || ""}${backendUser.phone_number || ""}`,
     country: backendUser.country || '',
     linkedinProfile: backendUser.linkedinProfile || '',
     companyName: backendUser.companyName || '',
