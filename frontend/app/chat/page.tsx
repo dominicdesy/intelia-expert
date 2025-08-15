@@ -89,6 +89,11 @@ export default function ChatInterface() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [showConcisionSettings, setShowConcisionSettings] = useState(false)
 
+  // ✅ NOUVEAUX ÉTATS pour gestion clavier mobile
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(0)
+
   // États existants inchangés
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
@@ -117,7 +122,7 @@ export default function ChatInterface() {
   const isMountedRef = useRef(true)
   const hasRedirectedRef = useRef(false)
   
-  // ✅ PATCH 1: Nouveaux refs pour contrôler la redirection avec délai
+  // Nouveaux refs pour contrôler la redirection avec délai
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -125,6 +130,9 @@ export default function ChatInterface() {
   const hasLoadedConversationsRef = useRef(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const conversationLoadingAttemptsRef = useRef(0)
+
+  // ✅ NOUVEAU REF pour l'input mobile
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const messages: Message[] = currentConversation?.messages || []
   const hasMessages = messages.length > 0
@@ -397,12 +405,109 @@ export default function ChatInterface() {
     }
   }
 
+  // ✅ NOUVEAU useEffect pour gérer le clavier mobile
+  useEffect(() => {
+    if (!isMobileDevice) return
+
+    let initialViewportHeight = window.visualViewport?.height || window.innerHeight
+    setViewportHeight(initialViewportHeight)
+    
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const currentHeight = window.visualViewport.height
+        const heightDifference = initialViewportHeight - currentHeight
+        
+        setViewportHeight(currentHeight)
+        
+        // Si la différence est significative (> 150px), le clavier est probablement ouvert
+        if (heightDifference > 150) {
+          setIsKeyboardVisible(true)
+          setKeyboardHeight(heightDifference)
+          
+          // Scroll automatique vers le bas quand le clavier s'ouvre
+          setTimeout(() => {
+            if (messagesEndRef.current && isMountedRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
+            }
+          }, 100)
+        } else {
+          setIsKeyboardVisible(false)
+          setKeyboardHeight(0)
+        }
+      }
+    }
+
+    // Fallback pour les anciens navigateurs iOS
+    const handleResize = () => {
+      const currentHeight = window.innerHeight
+      const heightDifference = initialViewportHeight - currentHeight
+      
+      setViewportHeight(currentHeight)
+      
+      if (heightDifference > 150) {
+        setIsKeyboardVisible(true)
+        setKeyboardHeight(heightDifference)
+      } else {
+        setIsKeyboardVisible(false)
+        setKeyboardHeight(0)
+      }
+    }
+
+    // Écouter les changements de viewport (iOS 13+)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange)
+    } else {
+      // Fallback pour iOS plus anciens
+      window.addEventListener('resize', handleResize)
+    }
+
+    // Focus/blur sur l'input pour détecter le clavier
+    const inputElement = inputRef.current
+    
+    const handleFocus = () => {
+      setIsKeyboardVisible(true)
+      setTimeout(() => {
+        if (messagesEndRef.current && isMountedRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
+        }
+      }, 300) // Délai pour laisser le clavier s'ouvrir
+    }
+
+    const handleBlur = () => {
+      // Délai avant de cacher pour éviter les flickers
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setIsKeyboardVisible(false)
+          setKeyboardHeight(0)
+        }
+      }, 100)
+    }
+
+    if (inputElement) {
+      inputElement.addEventListener('focus', handleFocus)
+      inputElement.addEventListener('blur', handleBlur)
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange)
+      } else {
+        window.removeEventListener('resize', handleResize)
+      }
+      
+      if (inputElement) {
+        inputElement.removeEventListener('focus', handleFocus)
+        inputElement.removeEventListener('blur', handleBlur)
+      }
+    }
+  }, [isMobileDevice])
+
   // Tous les useEffect existants
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      // ✅ PATCH 1: Nettoyer TOUS les timeouts
+      // Nettoyer TOUS les timeouts
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
@@ -415,7 +520,7 @@ export default function ChatInterface() {
     }
   }, [])
 
-  // ✅ PATCH 1: useEffect CORRIGÉ avec délai de redirection 1,2s
+  // useEffect CORRIGÉ avec délai de redirection 1,2s
   useEffect(() => {
     // Nettoyer les timeouts précédents
     if (redirectTimeoutRef.current) {
@@ -443,7 +548,7 @@ export default function ChatInterface() {
       return
     }
 
-    // ✅ PATCH 1: Délai de 1,2s pour laisser Supabase se stabiliser
+    // Délai de 1,2s pour laisser Supabase se stabiliser
     console.log('[ChatInterface] Utilisateur non authentifié - délai de stabilisation Supabase...')
     
     authCheckTimeoutRef.current = setTimeout(() => {
@@ -468,7 +573,7 @@ export default function ChatInterface() {
       } else if (authStore.isAuthenticated) {
         console.log('[ChatInterface] Utilisateur finalement authentifié après délai')
       }
-    }, 1200) // ✅ PATCH 1: Délai de 1,2s exactement comme identifié
+    }, 1200) // Délai de 1,2s exactement comme identifié
 
     return () => {
       if (authCheckTimeoutRef.current) {
@@ -643,7 +748,7 @@ export default function ChatInterface() {
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
-      hasRedirectedRef.current = false // ✅ PATCH 1: Reset aussi le flag de redirection
+      hasRedirectedRef.current = false // Reset aussi le flag de redirection
       console.log('[ChatInterface] Reset circuit breaker pour nouvel utilisateur:', user.id)
     }
   }, [user?.id])
@@ -1014,12 +1119,37 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // ✅ CALCUL des styles dynamiques pour mobile
+  const containerStyle = isMobileDevice ? {
+    height: isKeyboardVisible 
+      ? `${viewportHeight}px`
+      : '100vh',
+    minHeight: isKeyboardVisible 
+      ? `${viewportHeight}px`
+      : '100vh',
+    maxHeight: isKeyboardVisible 
+      ? `${viewportHeight}px`
+      : '100vh'
+  } : {}
+
+  const chatScrollStyle = isMobileDevice && isKeyboardVisible ? {
+    height: `${viewportHeight - 140}px`,
+    maxHeight: `${viewportHeight - 140}px`,
+    overflow: 'auto'
+  } : {
+    scrollPaddingBottom: '7rem'
+  }
+
   return (
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-      <div className="min-h-dvh h-screen bg-gray-50 flex flex-col">
-        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3">
+      {/* ✅ CONTAINER PRINCIPAL avec styles dynamiques mobile */}
+      <div 
+        className={`bg-gray-50 flex flex-col ${isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
+        style={containerStyle}
+      >
+        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HistoryMenu />
@@ -1070,11 +1200,12 @@ export default function ChatInterface() {
           )}
         </header>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* ✅ ZONE CHAT avec styles dynamiques mobile */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain"
-            style={{ scrollPaddingBottom: '7rem' }}
+            className={`flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain ${isMobileDevice ? 'chat-scroll-area' : ''}`}
+            style={chatScrollStyle}
           >
             <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
               {hasMessages && (
@@ -1228,8 +1359,23 @@ export default function ChatInterface() {
             </div>
           )}
 
-          <div className="px-2 sm:px-4 py-2 bg-white border-t border-gray-100 sticky bottom-0 z-20 pb-[env(safe-area-inset-bottom)] sm:pb-2">
-            <div className="max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4">
+          {/* ✅ BARRE DE SAISIE avec correction mobile complète */}
+          <div 
+            className={`px-2 sm:px-4 py-2 bg-white border-t border-gray-100 z-20 ${isMobileDevice ? 'chat-input-fixed' : 'sticky bottom-0'}`}
+            style={{
+              paddingBottom: isMobileDevice 
+                ? `calc(env(safe-area-inset-bottom) + 8px)`
+                : 'calc(env(safe-area-inset-bottom) + 8px)',
+              position: isMobileDevice && isKeyboardVisible ? 'fixed' : 'sticky',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: 'white',
+              borderTop: '1px solid rgb(243 244 246)',
+              zIndex: 1000
+            }}
+          >
+            <div className="max-w-full sm:max-w-4xl mx-auto">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
@@ -1249,9 +1395,11 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              <div className="flex items-center space-x-3 min-h-[48px]">
-                <div className="flex-1">
+              {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ */}
+              <div className={`flex items-center min-h-[48px] ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
+                <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
                   <input
+                    ref={inputRef}
                     type="text"
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
@@ -1262,18 +1410,28 @@ export default function ChatInterface() {
                       }
                     }}
                     placeholder={clarificationState ? "Répondez à la question ci-dessus..." : t('chat.placeholder')}
-                    className="w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center"
+                    className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? 'ios-input-fix' : ''}`}
                     disabled={isLoadingChat}
                     aria-label={t('chat.placeholder')}
+                    style={{
+                      fontSize: isMobileDevice ? '16px' : '14px', // Évite le zoom iOS
+                      WebkitAppearance: 'none', // Supprime le style iOS par défaut
+                      borderRadius: isMobileDevice ? '25px' : '9999px'
+                    }}
                   />
                 </div>
 
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={isLoadingChat || !inputMessage.trim()}
-                  className="flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50"
+                  className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? 'mobile-send-button' : ''}`}
                   title={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
                   aria-label={isLoadingChat ? 'Envoi en cours...' : 'Envoyer le message'}
+                  style={{
+                    minWidth: '48px',
+                    width: '48px',
+                    height: '48px'
+                  }}
                 >
                   <PaperAirplaneIcon />
                 </button>
