@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useUser } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth' 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
@@ -82,7 +82,7 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const { user } = useUser() 
+  const { user } = useAuthStore() 
   
   // 🚀 NOUVELLE APPROCHE : Utiliser un délai d'attente plus intelligent
   const [authStatus, setAuthStatus] = useState<'initializing' | 'checking' | 'ready' | 'unauthorized' | 'forbidden'>('initializing')

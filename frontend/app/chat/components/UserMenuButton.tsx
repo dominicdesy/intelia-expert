@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useUser, useAuth } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -11,8 +11,8 @@ import { PLAN_CONFIGS } from '../types'
 
 // ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
 export const UserMenuButton = () => {
-  const { user } = useUser() 
-  const { logout } = useAuth() // ✅ CHANGÉ: useAuth pour les actions
+  const { user } = useAuthStore() 
+  const { logout } = useAuthStore() // ✅ CHANGÉ: useAuth pour les actions
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)

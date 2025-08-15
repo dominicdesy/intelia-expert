@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Message } from './types'
-import { useUser } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from './hooks/useTranslation'
 import { useChatStore } from './hooks/useChatStore'
 import { generateAIResponse } from './services/apiService'
@@ -25,7 +25,7 @@ import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
 export default function ChatInterface() {
-  const { user, isAuthenticated, isLoading } = useUser()
+  const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
 
   const currentConversation = useChatStore(state => state.currentConversation)

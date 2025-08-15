@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
-import { useAuth } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth' 
 import { CheckIcon } from '../../utils/icons'
 
 // ==================== MODAL LANGUE ====================
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { t, changeLanguage, currentLanguage } = useTranslation()
-  const { updateProfile } = useAuth() 
+  const { updateProfile } = useAuthStore() 
   const [isUpdating, setIsUpdating] = useState(false)
   
   const languages = [
