@@ -2,9 +2,9 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { User, AuthState, BackendUserData, mapBackendUserToUser } from '../types'
+import { User, BackendUserData, mapBackendUserToUser } from '../types'
 
-interface AuthStore extends AuthState {
+interface AuthStore {
   // Actions d'authentification
   login: (email: string, password: string) => Promise<void>
   loginWithToken: (token: string) => Promise<void>
