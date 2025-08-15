@@ -7,15 +7,14 @@
 export interface User {
   id: string
   email: string
-  name?: string  // 🔄 CHANGÉ: Maintenant optionnel pour refléter la réalité
+  name: string
   avatar_url?: string
-  user_type: 'producer' | 'professional' | 'super_admin'  // 🔄 AJOUTÉ: super_admin
+  user_type: 'producer' | 'professional'
   language: Language
   created_at: string
   updated_at: string
   consent_given: boolean
   consent_date?: string
-  plan?: string  // 🔄 AJOUTÉ: plan pour les abonnements
 }
 
 export interface AuthState {
