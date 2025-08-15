@@ -5,24 +5,22 @@ import { persist } from 'zustand/middleware'
 import { User, BackendUserData, mapBackendUserToUser } from '../types'
 
 interface AuthStore {
+  // �tat d'authentification
+  user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  hasHydrated: boolean
+  error: string | null
+  
   // Actions d'authentification
   login: (email: string, password: string) => Promise<void>
-  loginWithToken: (token: string) => Promise<void>
-  logout: () => void
-  register: (email: string, password: string, name?: string) => Promise<void>
-  
-  // Gestion utilisateur
-  setUser: (user: User | null) => void
-  updateUser: (userData: Partial<User>) => void
-  refreshUser: () => Promise<void>
-  
-  // Récupération automatique au démarrage
-  initializeAuth: () => Promise<void>
-  
-  // Gestion des erreurs
-  error: string | null
-  setError: (error: string | null) => void
-  clearError: () => void
+  register: (email: string, password: string, userData?: Partial<User>) => Promise<void>
+  logout: () => Promise<void>
+  updateProfile: (data: any) => Promise<void>
+  exportUserData: () => Promise<any>
+  deleteUserData: () => Promise<void>
+  checkAuth: () => Promise<void>
+  initializeSession: () => Promise<boolean>
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
