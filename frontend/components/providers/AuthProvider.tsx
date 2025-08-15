@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { useAuth, useUser } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 
 interface AuthProviderProps {
   children: React.ReactNode
