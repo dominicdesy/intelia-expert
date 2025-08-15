@@ -1160,3 +1160,55 @@ export const CONVERSATION_UTILS = {
     })
   }
 } as const
+// ==================== TYPES MANQUANTS POUR useAuthStore ====================
+
+export interface AuthState {
+  user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  hasHydrated: boolean
+}
+
+export interface BackendUserData {
+  id: string
+  email: string
+  name?: string
+  firstName?: string
+  lastName?: string
+  user_type?: string
+  created_at: string
+  updated_at: string
+  language?: string
+  plan?: string
+  country_code?: string
+  area_code?: string
+  phone_number?: string
+  country?: string
+  linkedinProfile?: string
+  companyName?: string
+  companyWebsite?: string
+  linkedinCorporate?: string
+}
+
+export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
+  return {
+    id: backendUser.id,
+    email: backendUser.email,
+    name: backendUser.name || ${backendUser.firstName || ''} .trim() || backendUser.email,
+    firstName: backendUser.firstName || '',
+    lastName: backendUser.lastName || '',
+    phone: ${backendUser.country_code || ''},
+    country: backendUser.country || '',
+    linkedinProfile: backendUser.linkedinProfile || '',
+    companyName: backendUser.companyName || '',
+    companyWebsite: backendUser.companyWebsite || '',
+    linkedinCorporate: backendUser.linkedinCorporate || '',
+    user_type: backendUser.user_type || 'producer',
+    language: backendUser.language || 'fr',
+    created_at: backendUser.created_at,
+    plan: backendUser.plan || 'essential',
+    country_code: backendUser.country_code,
+    area_code: backendUser.area_code,
+    phone_number: backendUser.phone_number
+  }
+}
