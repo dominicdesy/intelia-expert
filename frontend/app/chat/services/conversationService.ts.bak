@@ -9,54 +9,13 @@ import {
   ConversationData
 } from '../types'
 
-// ✅ NOUVEAU : Circuit breaker pour éviter les boucles infinies
-class ConversationLoadingCircuitBreaker {
-  private attempts = 0
-  private lastAttempt = 0
-  private readonly MAX_ATTEMPTS = 3
-  private readonly RESET_INTERVAL = 30000 // 30 secondes
-
-  canAttempt(): boolean {
-    const now = Date.now()
-    
-    // Reset après interval
-    if (now - this.lastAttempt > this.RESET_INTERVAL) {
-      this.attempts = 0
-    }
-
-    if (this.attempts >= this.MAX_ATTEMPTS) {
-      console.warn('🚫 [ConversationService] Circuit breaker: trop de tentatives, arrêt temporaire')
-      return false
-    }
-
-    return true
-  }
-
-  recordAttempt(): void {
-    this.attempts++
-    this.lastAttempt = Date.now()
-    console.log(`🔄 [ConversationService] Circuit breaker: tentative ${this.attempts}/${this.MAX_ATTEMPTS}`)
-  }
-
-  recordSuccess(): void {
-    this.attempts = 0
-    console.log('✅ [ConversationService] Circuit breaker: reset après succès')
-  }
-
-  recordFailure(): void {
-    console.log(`❌ [ConversationService] Circuit breaker: échec ${this.attempts}/${this.MAX_ATTEMPTS}`)
-  }
-}
-
-// ==================== SERVICE CONVERSATIONS COMPLET AVEC FALLBACK LOCALSTORAGE + CIRCUIT BREAKER ====================
+// ==================== SERVICE CONVERSATIONS COMPLET AVEC FALLBACK LOCALSTORAGE ====================
 export class ConversationService {
   private baseUrl: string
   private loggingEnabled = true
-  // ✅ NOUVEAU : Circuit breaker intégré
-  private circuitBreaker = new ConversationLoadingCircuitBreaker()
 
   constructor() {
-    // ✅ SÉCURISÉ: Configuration depuis variables d'environnement (INCHANGÉ)
+    // ✅ SÉCURISÉ: Configuration depuis variables d'environnement
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
     const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
     
@@ -71,11 +30,11 @@ export class ConversationService {
     console.log('✅ ConversationService configuré:', this.baseUrl)
   }
 
-  // ==================== NOUVELLES MÉTHODES POUR CONVERSATIONS (INCHANGÉES) ====================
+  // ==================== NOUVELLES MÉTHODES POUR CONVERSATIONS ====================
 
   private getAuthToken(): string {
     try {
-      // 1. Essayer le token depuis les cookies (comme dans apiService) - INCHANGÉ
+      // 1. Essayer le token depuis les cookies (comme dans apiService)
       const cookies = document.cookie.split(';')
       const sbCookie = cookies.find(cookie => 
         cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
@@ -91,7 +50,7 @@ export class ConversationService {
         }
       }
 
-      // 2. Fallback vers localStorage - INCHANGÉ
+      // 2. Fallback vers localStorage
       const sbToken = localStorage.getItem('sb-cdrmjshmkdfwwtsfdvbl-auth-token')
       if (sbToken) {
         try {
@@ -112,7 +71,7 @@ export class ConversationService {
   }
 
   /**
-   * ✅ MÉTHODE CORRIGÉE - Récupère une conversation avec messages complets (INCHANGÉE)
+   * ✅ MÉTHODE CORRIGÉE - Récupère une conversation avec messages complets
    */
   async getConversationWithMessages(conversationId: string): Promise<ConversationWithMessages | null> {
     try {
@@ -129,14 +88,14 @@ export class ConversationService {
       if (response.ok) {
         const data = await response.json()
         
-        // ✅ CORRECTION: Accéder aux données dans data.conversation - INCHANGÉ
+        // ✅ CORRECTION: Accéder aux données dans data.conversation
         console.log('✅ [ConversationService] Données récupérées:', {
           id: data.conversation?.conversation_id,
           questionLength: data.conversation?.question?.length || 0,
           responseLength: (data.conversation?.full_text ?? data.conversation?.response)?.length || 0
         })
         
-        // ✅ CORRECTION: Passer data.conversation à la méthode transform - INCHANGÉ
+        // ✅ CORRECTION: Passer data.conversation à la méthode transform
         if (data.conversation && data.conversation.question && data.conversation.response) {
           const conversationWithMessages = this.transformToConversationWithMessages(data.conversation)
           
@@ -157,7 +116,7 @@ export class ConversationService {
   }
 
   /**
-   * Récupère l'historique des conversations groupées par date (INCHANGÉE)
+   * Récupère l'historique des conversations groupées par date
    */
   async getConversationHistory(
     userId: string, 
@@ -206,7 +165,7 @@ export class ConversationService {
   }
 
   /**
-   * Récupère une conversation complète avec tous ses messages (INCHANGÉE)
+   * Récupère une conversation complète avec tous ses messages
    */
   async getConversationDetail(conversationId: string): Promise<ConversationDetailResponse> {
     try {
@@ -239,7 +198,7 @@ export class ConversationService {
   }
 
   /**
-   * Groupe les conversations par date (utilitaire côté client) (INCHANGÉE)
+   * Groupe les conversations par date (utilitaire côté client)
    */
   groupConversationsByDate(conversations: Conversation[]): ConversationGroup[] {
     const now = new Date()
@@ -277,24 +236,15 @@ export class ConversationService {
   }
 
   /**
-   * 🔧 MÉTHODE CORRIGÉE AVEC FALLBACK LOCALSTORAGE + CIRCUIT BREAKER
+   * 🔧 MÉTHODE CORRIGÉE AVEC FALLBACK LOCALSTORAGE
    */
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
-    // ✅ NOUVEAU : Vérification circuit breaker
-    if (!this.circuitBreaker.canAttempt()) {
-      console.warn('🚫 [ConversationService] Circuit breaker actif - tentatives bloquées temporairement')
-      return []
-    }
-
     if (!this.loggingEnabled) {
       console.log('📝 Logging désactivé - conversations non récupérées')
       return []
     }
 
     console.log('📂 [ConversationService] Récupération conversations pour:', userId)
-
-    // ✅ NOUVEAU : Enregistrer la tentative
-    this.circuitBreaker.recordAttempt()
 
     // 1️⃣ ESSAYER L'ENDPOINT BACKEND D'ABORD
     try {
@@ -314,7 +264,7 @@ export class ConversationService {
         const data = await response.json()
         console.log(`✅ Backend data:`, data)
         
-        // Adapter selon la structure de réponse - INCHANGÉ
+        // Adapter selon la structure de réponse
         let conversations = []
         
         if (Array.isArray(data)) {
@@ -328,8 +278,8 @@ export class ConversationService {
         if (conversations.length > 0) {
           console.log(`✅ ${conversations.length} conversations backend récupérées`)
           
-          // Transformer en format Conversation[] - INCHANGÉ
-          const formattedConversations = conversations.map((conv: any) => {
+          // Transformer en format Conversation[]
+          return conversations.map((conv: any) => {
             const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
             const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
             
@@ -350,57 +300,23 @@ export class ConversationService {
               status: 'active'
             }
           })
-          
-          // ✅ NOUVEAU : Enregistrer le succès et retourner immédiatement
-          this.circuitBreaker.recordSuccess()
-          return formattedConversations
         } else {
           console.log('⚠️ Backend retourne 0 conversations, essai fallback localStorage...')
-          // ✅ CORRECTION CRITIQUE : RETOURNER le fallback, ne pas continuer
-          const fallbackResult = await this.getConversationsFromLocalStorage(limit)
-          if (fallbackResult.length > 0) {
-            this.circuitBreaker.recordSuccess()
-          } else {
-            this.circuitBreaker.recordFailure()
-          }
-          return fallbackResult
         }
       } else {
         console.log(`❌ Backend endpoint failed: ${response.status}, essai fallback localStorage...`)
-        // ✅ CORRECTION CRITIQUE : RETOURNER le fallback, ne pas continuer
-        const fallbackResult = await this.getConversationsFromLocalStorage(limit)
-        if (fallbackResult.length > 0) {
-          this.circuitBreaker.recordSuccess()
-        } else {
-          this.circuitBreaker.recordFailure()
-        }
-        return fallbackResult
       }
     } catch (error) {
       console.log(`❌ Backend endpoint error: ${error.message}, essai fallback localStorage...`)
-      
-      // ✅ CORRECTION CRITIQUE : RETOURNER le fallback, ne pas continuer
-      try {
-        const fallbackResult = await this.getConversationsFromLocalStorage(limit)
-        if (fallbackResult.length > 0) {
-          this.circuitBreaker.recordSuccess()
-        } else {
-          this.circuitBreaker.recordFailure()
-        }
-        return fallbackResult
-      } catch (fallbackError) {
-        console.error('❌ Erreur fallback localStorage:', fallbackError)
-        this.circuitBreaker.recordFailure()
-        return []
-      }
     }
 
-    // ❌ ANCIEN CODE PROBLÉMATIQUE SUPPRIMÉ
-    // Plus de fallback automatique ici qui causait la boucle !
+    // 2️⃣ FALLBACK LOCALSTORAGE : Récupérer depuis les sessions stockées
+    console.log('🔄 Fallback: Récupération depuis localStorage...')
+    return await this.getConversationsFromLocalStorage(limit)
   }
 
   /**
-   * 🚀 NOUVELLE MÉTHODE: Récupération depuis localStorage comme fallback (INCHANGÉE)
+   * 🚀 NOUVELLE MÉTHODE: Récupération depuis localStorage comme fallback
    */
   async getConversationsFromLocalStorage(limit: number): Promise<Conversation[]> {
     try {
@@ -411,11 +327,11 @@ export class ConversationService {
         return []
       }
       
-      console.log(`🔍 ${recentSessionIds.length} sessions localStorage trouvées`)
+      console.log(`📝 ${recentSessionIds.length} sessions localStorage trouvées`)
       
       const conversations: Conversation[] = []
       
-      // Récupérer les détails de chaque session - INCHANGÉ
+      // Récupérer les détails de chaque session
       for (const sessionId of recentSessionIds.slice(0, limit)) {
         try {
           console.log(`🔍 Récupération session: ${sessionId}`)
@@ -474,7 +390,7 @@ export class ConversationService {
   }
 
   /**
-   * 🔧 MÉTHODES UTILITAIRES POUR EXTRACTION DE DONNÉES (INCHANGÉES)
+   * 🔧 MÉTHODES UTILITAIRES POUR EXTRACTION DE DONNÉES
    */
   private extractTitleFromConversation(data: any): string {
     // Essayer d'extraire le titre depuis différentes sources
@@ -545,7 +461,7 @@ export class ConversationService {
   }
 
   /**
-   * 🔧 UTILITAIRE - Récupère les session IDs récents depuis le localStorage (INCHANGÉ)
+   * 🔧 UTILITAIRE - Récupère les session IDs récents depuis le localStorage
    */
   private getRecentSessionIds(): string[] {
     try {
@@ -564,7 +480,7 @@ export class ConversationService {
   }
 
   /**
-   * 🔧 UTILITAIRE - Stocke un session ID pour la récupération future (INCHANGÉ)
+   * 🔧 UTILITAIRE - Stocke un session ID pour la récupération future
    * À appeler depuis apiService après création d'une conversation
    */
   storeRecentSessionId(sessionId: string): void {
@@ -572,13 +488,13 @@ export class ConversationService {
       const existing = this.getRecentSessionIds()
       const updated = [sessionId, ...existing.filter(id => id !== sessionId)].slice(0, 50)
       localStorage.setItem('recent_conversation_sessions', JSON.stringify(updated))
-      console.log('🔍 Session ID stocké pour historique:', sessionId.substring(0, 8) + '...')
+      console.log('📝 Session ID stocké pour historique:', sessionId.substring(0, 8) + '...')
     } catch (error) {
       console.warn('⚠️ Erreur stockage session ID:', error)
     }
   }
 
-  // 🔧 NOUVELLE MÉTHODE - Test tous les endpoints pour trouver le bon (INCHANGÉE)
+  // 🔧 NOUVELLE MÉTHODE - Test tous les endpoints pour trouver le bon
   async discoverWorkingEndpoints(): Promise<string[]> {
     console.log('🔍 === DÉCOUVERTE DES ENDPOINTS FONCTIONNELS ===')
     
@@ -625,7 +541,7 @@ export class ConversationService {
   }
 
   /**
-   * Transforme une conversation en ConversationWithMessages - AVEC PARSING DES MESSAGES MULTIPLES (INCHANGÉE)
+   * Transforme une conversation en ConversationWithMessages - AVEC PARSING DES MESSAGES MULTIPLES
    */
   transformToConversationWithMessages(conversationData: any): ConversationWithMessages {
     const messages: Message[] = []
@@ -686,7 +602,7 @@ export class ConversationService {
     }
   }
 
-  // ==================== MÉTHODES EXISTANTES CONSERVÉES (TOUTES INCHANGÉES) ====================
+  // ==================== MÉTHODES EXISTANTES CONSERVÉES ====================
 
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
@@ -986,19 +902,6 @@ export class ConversationService {
     } catch (error) {
       console.error('❌ Erreur test connectivité:', error)
       return false
-    }
-  }
-
-  // ✅ NOUVEAU : Méthodes utilitaires pour le circuit breaker
-  resetCircuitBreaker(): void {
-    this.circuitBreaker = new ConversationLoadingCircuitBreaker()
-    console.log('🔄 [ConversationService] Circuit breaker resetté manuellement')
-  }
-
-  getCircuitBreakerStatus(): { attempts: number, canAttempt: boolean } {
-    return {
-      attempts: (this.circuitBreaker as any).attempts,
-      canAttempt: this.circuitBreaker.canAttempt()
     }
   }
 }
