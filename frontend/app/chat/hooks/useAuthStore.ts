@@ -1,4 +1,4 @@
-// hooks/useAuthStore.ts - STORE COMPLET AVEC NOUVEAUX TYPES
+
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'

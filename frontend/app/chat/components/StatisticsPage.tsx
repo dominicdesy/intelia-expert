@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useAuthStore } from '../hooks/useAuthStore'
+import { useUser } from '@/lib/stores/auth' 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
@@ -82,7 +82,7 @@ interface QuestionLog {
 }
 
 export const StatisticsPage: React.FC = () => {
-  const { user } = useAuthStore()
+  const { user } = useUser() 
   
   // 🚀 NOUVELLE APPROCHE : Utiliser un délai d'attente plus intelligent
   const [authStatus, setAuthStatus] = useState<'initializing' | 'checking' | 'ready' | 'unauthorized' | 'forbidden'>('initializing')
@@ -189,7 +189,7 @@ export const StatisticsPage: React.FC = () => {
   // Charger les statistiques uniquement quand tout est prêt
   useEffect(() => {
     if (authStatus === 'ready' && !statsLoading) {
-      console.log('🔄 [StatisticsPage] Lancement chargement des statistiques')
+      console.log('📊 [StatisticsPage] Lancement chargement des statistiques')
       loadAllStatistics()
     }
   }, [authStatus, selectedTimeRange])
@@ -197,7 +197,7 @@ export const StatisticsPage: React.FC = () => {
   // Charger les questions si nécessaire
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'questions') {
-      console.log('🔄 [StatisticsPage] Lancement chargement des questions')
+      console.log('📊 [StatisticsPage] Lancement chargement des questions')
       loadQuestionLogs()
     }
   }, [authStatus, activeTab, questionFilters, currentPage])

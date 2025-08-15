@@ -35,9 +35,8 @@ const ArrowLeftIcon = ({ className }: { className?: string }) => (
 function ProfilePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
-  const { user, isLoading } = useUser() // Données utilisateur
-  const { updateProfile, exportUserData, deleteUserData, logout } = useAuth() // Actions
-
+  const { user, updateProfile, exportUserData, deleteUserData, logout, isLoading } = useAuthStore()
+  
   const [activeTab, setActiveTab] = useState('profile')
   const [formData, setFormData] = useState({
     fullName: '',
