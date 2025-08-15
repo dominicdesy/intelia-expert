@@ -101,7 +101,14 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         return
       }
 
-      try { await updateProfile(formData); alert(t('profile.title') + ' mis � jour avec succ�s!'); onClose(); } catch (error) { alert('Erreur lors de la mise � jour: ' + (error?.message || 'Erreur inconnue')); }
+      // 🔧 CORRECTION: updateProfile retourne void, pas un objet
+      try {
+        await updateProfile(formData)
+        alert(t('profile.title') + ' mis à jour avec succès!')
+        onClose()
+      } catch (error: any) {
+        alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
+      }
     } catch (error) {
       console.error('❌ Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour du profil')
@@ -163,7 +170,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
   const tabs = [
     { id: 'profile', label: t('nav.profile'), icon: '👤' },
-    { id: 'password', label: t('profile.password'), icon: '🔒' }
+    { id: 'password', label: t('profile.password'), icon: '🔑' }
   ]
 
   return (
