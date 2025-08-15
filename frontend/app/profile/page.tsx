@@ -58,7 +58,7 @@ function ProfilePageContent() {
     setFormData({
       fullName: user.name,           // CORRIGÉ: user.name au lieu de user.fullName
       email: user.email,
-      userType: user.user_type       // CORRIGÉ: user.user_type au lieu de user.userType
+      userType: (user.user_type as 'producer' | 'professional')       // CORRIGÉ: user.user_type au lieu de user.userType
     })
 
     // Gérer l'onglet depuis l'URL

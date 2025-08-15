@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth, useUser } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth'
 import ClientOnly from './ClientOnly'
 
 interface ProtectedRouteProps {
