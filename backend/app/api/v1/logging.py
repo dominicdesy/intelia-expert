@@ -929,11 +929,6 @@ def analytics_health_check() -> Dict[str, Any]:
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
-        
-
-
-
-# À ajouter dans app/api/v1/logging.py après les autres endpoints
 
 @router.get("/questions")
 async def get_questions(
@@ -941,7 +936,7 @@ async def get_questions(
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Version corrigée avec les vrais noms de colonnes"""
+    """Récupère les questions avec pagination"""
     
     if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
         raise HTTPException(status_code=403, detail="Permission required")
@@ -956,7 +951,7 @@ async def get_questions(
                 cur.execute("SELECT COUNT(*) FROM user_questions_complete")
                 total_count = cur.fetchone()[0]
                 
-                # Récupérer les questions avec les VRAIS noms de colonnes
+                # Récupérer les questions
                 offset = (page - 1) * limit
                 cur.execute("""
                     SELECT 
@@ -1009,9 +1004,6 @@ async def get_questions(
                 
     except Exception as e:
         return {"error": str(e)}
-        
-
-# ========== ENDPOINT POUR LES STATS BILLING ADMIN ==========
 
 @router.get("/admin/stats")
 async def billing_admin_stats(
@@ -1081,11 +1073,9 @@ async def billing_admin_stats(
                 }
                 
     except Exception as e:
-        logger.error(f"❌ Erreur billing admin stats: {e}")
+        logger.error(f"⌫ Erreur billing admin stats: {e}")
         return {"error": str(e)}
-        
-        
-        
+
 @router.get("/debug-questions")
 async def debug_questions(current_user: dict = Depends(get_current_user)):
     """Debug temporaire pour voir ce qui se passe"""
@@ -1132,11 +1122,9 @@ async def debug_questions(current_user: dict = Depends(get_current_user)):
                 }
                 
     except Exception as e:
-        return {"debug_error": str(e)
-        
-# Ajoutez TOUS ces endpoints à la fin de logging.py avant le dernier }
+        return {"debug_error": str(e)}
 
-# ========== BATTERIE DE TESTS COMPLÈTE ==========
+# ========== ENDPOINTS DE TEST ==========
 
 @router.get("/simple-test")
 async def simple_test():
@@ -1209,164 +1197,6 @@ async def test_permissions(current_user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
-
-@router.get("/test-questions-step-by-step")
-async def test_questions_step_by_step(current_user: dict = Depends(get_current_user)):
-    """Test 5: Questions endpoint étape par étape"""
-    steps = {}
-    
-    try:
-        # Étape 1: User check
-        steps["step1_user"] = {
-            "user_type": current_user.get("user_type"),
-            "email": current_user.get("email"),
-            "is_super_admin": current_user.get("user_type") == "super_admin"
-        }
-        
-        # Étape 2: Analytics manager
-        analytics = get_analytics_manager()
-        steps["step2_analytics"] = {
-            "manager_available": analytics is not None,
-            "has_dsn": bool(analytics.dsn) if analytics else False
-        }
-        
-        # Étape 3: DB Connection
-        with psycopg2.connect(analytics.dsn) as conn:
-            steps["step3_connection"] = {"success": True}
-            
-            # Étape 4: Cursor
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                steps["step4_cursor"] = {"success": True}
-                
-                # Étape 5: Count query
-                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
-                count_result = cur.fetchone()
-                steps["step5_count"] = {"count": count_result["count"] if count_result else 0}
-                
-                # Étape 6: Data query
-                cur.execute("""
-                    SELECT id, user_email, question, response_text, created_at
-                    FROM user_questions_complete 
-                    ORDER BY created_at DESC 
-                    LIMIT 2
-                """)
-                rows = cur.fetchall()
-                steps["step6_data"] = {
-                    "rows_found": len(rows),
-                    "sample": [dict(row) for row in rows]
-                }
-                
-                # Étape 7: Formatting
-                formatted = []
-                for row in rows:
-                    try:
-                        formatted.append({
-                            "id": str(row["id"]),
-                            "user_email": row["user_email"],
-                            "question": row["question"][:100] if row["question"] else "",
-                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None
-                        })
-                    except Exception as format_error:
-                        steps["step7_format_error"] = str(format_error)
-                        break
-                
-                steps["step7_formatted"] = {
-                    "formatted_count": len(formatted),
-                    "sample": formatted
-                }
-        
-        return {"success": True, "steps": steps}
-        
-    except Exception as e:
-        steps["error"] = {"message": str(e), "type": type(e).__name__}
-        return {"success": False, "steps": steps}
-
-@router.get("/test-questions-bypass-all")
-async def test_questions_bypass_all():
-    """Test 6: Questions sans aucune dépendance"""
-    try:
-        import os
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        
-        dsn = os.getenv("DATABASE_URL")
-        if not dsn:
-            return {"error": "No DATABASE_URL"}
-        
-        with psycopg2.connect(dsn) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                
-                # Count
-                cur.execute("SELECT COUNT(*) as count FROM user_questions_complete")
-                total = cur.fetchone()["count"]
-                
-                # Data
-                cur.execute("""
-                    SELECT 
-                        id, user_email, question, response_text, 
-                        response_source, created_at
-                    FROM user_questions_complete 
-                    ORDER BY created_at DESC 
-                    LIMIT 5
-                """)
-                
-                rows = cur.fetchall()
-                
-                questions = []
-                for row in rows:
-                    questions.append({
-                        "id": str(row["id"]),
-                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
-                        "user_email": row["user_email"] or "",
-                        "user_name": (row["user_email"] or "").split('@')[0].title(),
-                        "question": row["question"] or "",
-                        "response": row["response_text"] or "",
-                        "response_source": row["response_source"] or "unknown"
-                    })
-                
-                return {
-                    "questions": questions,
-                    "pagination": {
-                        "total": total,
-                        "returned": len(questions)
-                    },
-                    "success": True
-                }
-                
-    except Exception as e:
-        return {"error": str(e), "type": type(e).__name__}
-
-@router.get("/debug-error-zero")
-async def debug_error_zero():
-    """Test 7: Reproduire l'erreur '0'"""
-    # Tester différentes façons de produire '0'
-    tests = {}
-    
-    # Test division par zéro
-    try:
-        result = 10 / 0
-        tests["division"] = result
-    except Exception as e:
-        tests["division_error"] = str(e)
-    
-    # Test retour de 0 en string
-    tests["zero_string"] = str(0)
-    tests["zero_int"] = 0
-    tests["zero_dict"] = {"error": "0"}
-    
-    # Test avec analytics manager qui pourrait retourner 0
-    try:
-        analytics = get_analytics_manager()
-        # Voir si quelque chose dans analytics retourne 0
-        if hasattr(analytics, 'get_stats'):
-            stats = analytics.get_stats()
-            tests["analytics_stats"] = stats
-    except Exception as e:
-        tests["analytics_error"] = str(e)
-    
-    return {"tests": tests}
-
-# ========== ENDPOINT QUESTIONS FINAL ULTRA-ROBUSTE ==========
 
 @router.get("/questions-final")
 async def questions_final(
@@ -1490,11 +1320,4 @@ async def questions_final(
             "debug": debug_info,
             "questions": [],
             "pagination": {"page": 1, "limit": limit, "total": 0, "pages": 0}
-        }        
-        
-        
-        
-        
-        
-        
         }
