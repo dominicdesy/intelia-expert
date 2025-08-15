@@ -1,21 +1,43 @@
-// types/index.ts
+// types/index.ts - SOLUTION FINALE
 
 // ============================================================================
-// USER & AUTHENTICATION TYPES
+// USER & AUTHENTICATION TYPES - ALIGNÉS AVEC LE BACKEND
 // ============================================================================
 
 export interface User {
   id: string
   email: string
-  name?: string  // 🔄 CHANGÉ: Maintenant optionnel pour refléter la réalité
+  name?: string                    // ✅ Optionnel (peut venir de full_name ou être undefined)
+  full_name?: string              // ✅ Correspondance backend
   avatar_url?: string
-  user_type: 'producer' | 'professional' | 'super_admin'  // 🔄 AJOUTÉ: super_admin
-  language: Language
-  created_at: string
-  updated_at: string
-  consent_given: boolean
+  user_type?: 'producer' | 'professional' | 'super_admin' | 'user' | 'admin'  // ✅ Aligné backend
+  language?: Language             // ✅ Optionnel car peut ne pas être défini
+  created_at?: string            // ✅ Optionnel
+  updated_at?: string            // ✅ Optionnel
+  consent_given?: boolean        // ✅ Optionnel
   consent_date?: string
-  plan?: string  // 🔄 AJOUTÉ: plan pour les abonnements
+  plan?: string                  // ✅ Pour les abonnements
+  
+  // ✅ NOUVEAUX CHAMPS DU BACKEND
+  user_id?: string               // Backend utilise user_id
+  profile_id?: string            // ID du profil Supabase
+  preferences?: Record<string, any>  // Préférences utilisateur
+  is_admin?: boolean             // Rétrocompatibilité backend
+}
+
+// ✅ INTERFACE SÉPARÉE POUR LES DONNÉES REÇUES DU BACKEND
+export interface BackendUserData {
+  user_id: string
+  email: string
+  user_type: string
+  full_name?: string
+  is_admin: boolean
+  preferences?: Record<string, any>
+  profile_id?: string
+  iss?: string
+  aud?: string
+  exp?: number
+  jwt_secret_used?: string
 }
 
 export interface AuthState {
@@ -187,4 +209,28 @@ export interface AppError {
   timestamp: string
   user_id?: string
   context?: string
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS POUR CONVERSION BACKEND -> FRONTEND
+// ============================================================================
+
+/**
+ * ✅ Fonction utilitaire pour convertir les données backend en User frontend
+ */
+export function mapBackendUserToUser(backendUser: BackendUserData): User {
+  return {
+    id: backendUser.user_id,
+    email: backendUser.email,
+    name: backendUser.full_name || backendUser.email,
+    full_name: backendUser.full_name,
+    user_type: backendUser.user_type as User['user_type'],
+    profile_id: backendUser.profile_id,
+    preferences: backendUser.preferences,
+    is_admin: backendUser.is_admin,
+    language: 'fr', // Défaut - à récupérer des préférences si disponible
+    created_at: new Date().toISOString(), // Défaut
+    updated_at: new Date().toISOString(), // Défaut
+    consent_given: true // Défaut - à ajuster selon vos besoins
+  }
 }
