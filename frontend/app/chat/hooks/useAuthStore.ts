@@ -20,6 +20,7 @@ interface AuthStore {
   exportUserData: () => Promise<any>
   deleteUserData: () => Promise<void>
   checkAuth: () => Promise<void>
+  loginWithToken: (token: string) => Promise<void>
   initializeSession: () => Promise<boolean>
 }
 
