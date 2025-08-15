@@ -930,16 +930,24 @@ def analytics_health_check() -> Dict[str, Any]:
             "timestamp": datetime.now().isoformat()
         }
 
+
+# Correction de l'endpoint /questions dans logging.py
+# Remplacez la fonction get_questions par cette version corrigée :
+
 @router.get("/questions")
 async def get_questions(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Récupère les questions avec pagination"""
+    """Récupère les questions avec pagination - VERSION CORRIGÉE"""
+    
+    # Log de debug
+    logger.info(f"Endpoint /questions appelé par {current_user.get('email')} (page={page}, limit={limit})")
     
     if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
-        raise HTTPException(status_code=403, detail="Permission required")
+        logger.warning(f"Permission refusée pour {current_user.get('email')}")
+        raise HTTPException(status_code=403, detail="Permission VIEW_ALL_ANALYTICS required")
     
     try:
         analytics = get_analytics_manager()
@@ -947,63 +955,149 @@ async def get_questions(
         with psycopg2.connect(analytics.dsn) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 
-                # Compter le total
-                cur.execute("SELECT COUNT(*) FROM user_questions_complete")
-                total_count = cur.fetchone()[0]
+                # Compter le total avec gestion d'erreur
+                try:
+                    cur.execute("SELECT COUNT(*) as total FROM user_questions_complete")
+                    count_result = cur.fetchone()
+                    total_count = count_result["total"] if count_result else 0
+                    logger.info(f"Total questions trouvées: {total_count}")
+                except Exception as count_error:
+                    logger.error(f"Erreur count: {count_error}")
+                    return {
+                        "error": f"Count failed: {str(count_error)}",
+                        "questions": [],
+                        "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0}
+                    }
                 
-                # Récupérer les questions
-                offset = (page - 1) * limit
-                cur.execute("""
-                    SELECT 
-                        id,
-                        user_email,
-                        question,
-                        response_text,
-                        response_source,
-                        response_confidence,
-                        processing_time_ms,
-                        language,
-                        session_id,
-                        created_at,
-                        status
-                    FROM user_questions_complete 
-                    ORDER BY created_at DESC
-                    LIMIT %s OFFSET %s
-                """, (limit, offset))
+                if total_count == 0:
+                    return {
+                        "questions": [],
+                        "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0},
+                        "message": "Aucune question trouvée"
+                    }
                 
-                rows = cur.fetchall()
+                # Récupérer les questions avec gestion d'erreur
+                try:
+                    offset = (page - 1) * limit
+                    cur.execute("""
+                        SELECT 
+                            id,
+                            user_email,
+                            question,
+                            response_text,
+                            response_source,
+                            response_confidence,
+                            processing_time_ms,
+                            language,
+                            session_id,
+                            created_at,
+                            status
+                        FROM user_questions_complete 
+                        ORDER BY created_at DESC
+                        LIMIT %s OFFSET %s
+                    """, (limit, offset))
+                    
+                    rows = cur.fetchall()
+                    logger.info(f"Questions récupérées: {len(rows)}")
+                    
+                except Exception as query_error:
+                    logger.error(f"Erreur query: {query_error}")
+                    return {
+                        "error": f"Query failed: {str(query_error)}",
+                        "questions": [],
+                        "pagination": {"page": page, "limit": limit, "total": total_count, "pages": 0}
+                    }
                 
-                # Formatage
+                # Formatage avec gestion d'erreur
                 questions = []
-                for row in rows:
-                    questions.append({
-                        "id": str(row["id"]),
-                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
-                        "user_email": row["user_email"] or "",
-                        "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
-                        "question": row["question"] or "",
-                        "response": row["response_text"] or "",
-                        "response_source": row["response_source"] or "unknown",
-                        "confidence_score": float(row["response_confidence"] or 0),
-                        "response_time": int(row["processing_time_ms"] or 0) / 1000,
-                        "language": row["language"] or "fr",
-                        "session_id": row["session_id"] or "",
-                        "feedback": None,
-                        "feedback_comment": None
-                    })
+                for i, row in enumerate(rows):
+                    try:
+                        formatted_question = {
+                            "id": str(row["id"]) if row["id"] is not None else f"unknown_{i}",
+                            "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                            "user_email": row["user_email"] or "",
+                            "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                            "question": (row["question"] or "")[:500],  # Limiter la longueur
+                            "response": (row["response_text"] or "")[:1000],  # Limiter la longueur
+                            "response_source": row["response_source"] or "unknown",
+                            "confidence_score": float(row["response_confidence"] or 0),
+                            "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                            "language": row["language"] or "fr",
+                            "session_id": row["session_id"] or "",
+                            "status": row["status"] or "unknown",
+                            "feedback": None,
+                            "feedback_comment": None
+                        }
+                        questions.append(formatted_question)
+                        
+                    except Exception as format_error:
+                        logger.error(f"Erreur formatage question {i}: {format_error}")
+                        # Ajouter une question d'erreur au lieu d'ignorer
+                        questions.append({
+                            "id": f"error_{i}",
+                            "timestamp": None,
+                            "user_email": "FORMAT_ERROR",
+                            "user_name": "Error",
+                            "question": f"Erreur formatage: {str(format_error)}",
+                            "response": "",
+                            "response_source": "error",
+                            "confidence_score": 0,
+                            "response_time": 0,
+                            "language": "fr",
+                            "session_id": "",
+                            "status": "error",
+                            "feedback": None,
+                            "feedback_comment": None
+                        })
                 
-                return {
+                # Calculer pagination
+                total_pages = (total_count + limit - 1) // limit
+                
+                result = {
                     "questions": questions,
                     "pagination": {
                         "page": page,
                         "limit": limit,
                         "total": total_count,
-                        "pages": (total_count + limit - 1) // limit
+                        "pages": total_pages,
+                        "has_next": page < total_pages,
+                        "has_prev": page > 1
+                    },
+                    "meta": {
+                        "retrieved": len(questions),
+                        "user_role": current_user.get("user_type"),
+                        "timestamp": datetime.now().isoformat()
                     }
                 }
                 
+                logger.info(f"Questions endpoint réussi: {len(questions)} questions retournées")
+                return result
+                
+    except psycopg2.Error as db_error:
+        logger.error(f"Erreur PostgreSQL: {db_error}")
+        return {
+            "error": f"Database error: {str(db_error)}",
+            "error_type": "database",
+            "questions": [],
+            "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0}
+        }
+        
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Erreur inattendue endpoint questions: {e}")
+        error_msg = str(e) if str(e) and str(e) != "0" else "Unknown error occurred"
+        return {
+            "error": error_msg,
+            "error_type": type(e).__name__,
+            "questions": [],
+            "pagination": {"page": page, "limit": limit, "total": 0, "pages": 0},
+            "debug": {
+                "user": current_user.get("email"),
+                "params": {"page": page, "limit": limit}
+            }
+        }
+
+
+
 
 @router.get("/admin/stats")
 async def billing_admin_stats(
