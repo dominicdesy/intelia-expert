@@ -939,142 +939,77 @@ def analytics_health_check() -> Dict[str, Any]:
 async def get_questions(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    search: str = Query(""),
-    source: str = Query("all"),
-    confidence: str = Query("all"), 
-    feedback: str = Query("all"),
-    user: str = Query("all"),
-    time_range: str = Query("month"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Récupérer la liste des questions avec filtres (admin+ only)"""
+    """Version corrigée avec les vrais noms de colonnes"""
     
     if not has_permission(current_user, Permission.VIEW_ALL_ANALYTICS):
-        raise HTTPException(
-            status_code=403, 
-            detail=f"View all analytics permission required. Your role: {current_user.get('user_type', 'user')}"
-        )
+        raise HTTPException(status_code=403, detail="Permission required")
     
     try:
         analytics = get_analytics_manager()
         
-        # Calculer la période basée sur time_range
-        now = datetime.now()
-        if time_range == "day":
-            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif time_range == "week":
-            start_date = now - timedelta(days=7)
-        elif time_range == "month":
-            start_date = now - timedelta(days=30)
-        elif time_range == "year":
-            start_date = now - timedelta(days=365)
-        else:
-            start_date = now - timedelta(days=30)  # default
-        
         with psycopg2.connect(analytics.dsn) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Construire la requête avec les filtres
-                conditions = ["created_at >= %s"]
-                params = [start_date]
-                
-                if search:
-                    conditions.append("(question ILIKE %s OR response_text ILIKE %s OR user_email ILIKE %s)")
-                    search_param = f"%{search}%"
-                    params.extend([search_param, search_param, search_param])
-                
-                if source != "all":
-                    conditions.append("response_source = %s")
-                    params.append(source)
-                
-                if confidence != "all":
-                    if confidence == "high":
-                        conditions.append("response_confidence >= 0.9")
-                    elif confidence == "medium":
-                        conditions.append("response_confidence >= 0.7 AND response_confidence < 0.9")
-                    elif confidence == "low":
-                        conditions.append("response_confidence < 0.7")
-                
-                # Note: les champs feedback et feedback_comment n'existent pas dans user_questions_complete
-                # Il faudrait les ajouter à la table ou créer une table séparée pour les feedbacks
-                
-                if user != "all":
-                    conditions.append("user_email = %s")
-                    params.append(user)
-                
-                where_clause = " AND ".join(conditions)
                 
                 # Compter le total
-                count_query = f"SELECT COUNT(*) FROM user_questions_complete WHERE {where_clause}"
-                cur.execute(count_query, params)
+                cur.execute("SELECT COUNT(*) FROM user_questions_complete")
                 total_count = cur.fetchone()[0]
                 
-                # Récupérer les questions avec pagination
+                # Récupérer les questions avec les VRAIS noms de colonnes
                 offset = (page - 1) * limit
-                query = f"""
+                cur.execute("""
                     SELECT 
                         id,
-                        created_at as timestamp,
                         user_email,
-                        COALESCE(user_email, 'Utilisateur Inconnu') as user_name,
                         question,
-                        response_text as response,
+                        response_text,
                         response_source,
-                        response_confidence as confidence_score,
-                        processing_time_ms as response_time,
+                        response_confidence,
+                        processing_time_ms,
                         language,
                         session_id,
-                        NULL as feedback,
-                        NULL as feedback_comment
+                        created_at,
+                        status
                     FROM user_questions_complete 
-                    WHERE {where_clause}
                     ORDER BY created_at DESC
                     LIMIT %s OFFSET %s
-                """
+                """, (limit, offset))
                 
-                params.extend([limit, offset])
-                cur.execute(query, params)
-                questions = [dict(row) for row in cur.fetchall()]
+                rows = cur.fetchall()
                 
-                # Formatage des données pour correspondre au format attendu par le frontend
-                formatted_questions = []
-                for q in questions:
-                    formatted_questions.append({
-                        "id": str(q["id"]),
-                        "timestamp": q["timestamp"].isoformat() if q["timestamp"] else None,
-                        "user_email": q["user_email"] or "",
-                        "user_name": q["user_name"] or "Utilisateur Inconnu",
-                        "question": q["question"] or "",
-                        "response": q["response"] or "",
-                        "response_source": q["response_source"] or "unknown",
-                        "confidence_score": float(q["confidence_score"] or 0),
-                        "response_time": int(q["response_time"] or 0) / 1000,  # Convertir ms en secondes
-                        "language": q["language"] or "fr",
-                        "session_id": q["session_id"] or "",
-                        "feedback": q["feedback"],
-                        "feedback_comment": q["feedback_comment"]
+                # Formatage
+                questions = []
+                for row in rows:
+                    questions.append({
+                        "id": str(row["id"]),
+                        "timestamp": row["created_at"].isoformat() if row["created_at"] else None,
+                        "user_email": row["user_email"] or "",
+                        "user_name": (row["user_email"] or "").split('@')[0].replace('.', ' ').title(),
+                        "question": row["question"] or "",
+                        "response": row["response_text"] or "",
+                        "response_source": row["response_source"] or "unknown",
+                        "confidence_score": float(row["response_confidence"] or 0),
+                        "response_time": int(row["processing_time_ms"] or 0) / 1000,
+                        "language": row["language"] or "fr",
+                        "session_id": row["session_id"] or "",
+                        "feedback": None,
+                        "feedback_comment": None
                     })
                 
                 return {
-                    "questions": formatted_questions,
+                    "questions": questions,
                     "pagination": {
                         "page": page,
                         "limit": limit,
                         "total": total_count,
                         "pages": (total_count + limit - 1) // limit
-                    },
-                    "filters_applied": {
-                        "search": search,
-                        "source": source,
-                        "confidence": confidence,
-                        "feedback": feedback,
-                        "user": user,
-                        "time_range": time_range
                     }
                 }
-                    
+                
     except Exception as e:
-        logger.error(f"❌ Erreur récupération questions: {e}")
         return {"error": str(e)}
+        
 
 # ========== ENDPOINT POUR LES STATS BILLING ADMIN ==========
 
