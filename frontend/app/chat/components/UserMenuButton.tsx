@@ -199,7 +199,7 @@ export const UserMenuButton = () => {
           onClose={() => setShowAccountModal(false)}
           title={t('subscription.title')}
         >
-          <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+          <AccountModal user={user as any} onClose={() => setShowAccountModal(false)} />
         </Modal>
       )}
 
@@ -208,7 +208,7 @@ export const UserMenuButton = () => {
         onClose={() => setShowUserInfoModal(false)}
         title={t('profile.title')}
       >
-        <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+        <UserInfoModal user={user as any} onClose={() => setShowUserInfoModal(false)} />
       </Modal>
 
       <Modal
