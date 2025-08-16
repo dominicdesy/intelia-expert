@@ -290,11 +290,9 @@ export const StatisticsPage: React.FC = () => {
       const openaiCostsRes = await fetch('/api/v1/billing/openai-usage/current-month', { headers })
       
       console.log('🔄 Chargement health et métriques...')
-      const [systemHealthRes, billingPlansRes, systemMetricsRes] = await Promise.allSettled([
-        fetch('/api/v1/health/detailed', { headers }),
-        fetch('/api/v1/billing/plans', { headers }),
-        fetch('/api/v1/system/metrics', { headers })
-      ])
+      const systemHealthRes = await fetch('/api/v1/health/detailed', { headers })
+      const billingPlansRes = await fetch('/api/v1/billing/plans', { headers })
+      const systemMetricsRes = await fetch('/api/v1/system/metrics', { headers })
 
       // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
@@ -433,8 +431,8 @@ export const StatisticsPage: React.FC = () => {
       }
 
       // Dashboard/Usage stats  
-      if (dashboardRes.status === 'fulfilled' && dashboardRes.value.ok) {
-        const dashData = await dashboardRes.value.json()
+      if (dashboardRes.ok) {
+        const dashData = await dashboardRes.json()
         console.log('✅ Dashboard data:', dashData)
         
         // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
@@ -555,19 +553,19 @@ export const StatisticsPage: React.FC = () => {
         let systemMetricsData = null
         let realPlans = {}
 
-        if (systemHealthRes.status === 'fulfilled' && systemHealthRes.value.ok) {
-          systemHealthData = await systemHealthRes.value.json()
+        if (systemHealthRes.ok) {
+          systemHealthData = await systemHealthRes.json()
           console.log('✅ System health récupéré:', systemHealthData)
         }
 
-        if (systemMetricsRes.status === 'fulfilled' && systemMetricsRes.value.ok) {
-          systemMetricsData = await systemMetricsRes.value.json()
+        if (systemMetricsRes.ok) {
+          systemMetricsData = await systemMetricsRes.json()
           console.log('✅ System metrics récupérés:', systemMetricsData)
         }
 
-        // 🆕 RÉCUPÉRATION DES VRAIS PLANS (à nouveau pour cette portée)
-        if (billingPlansRes.status === 'fulfilled' && billingPlansRes.value.ok) {
-          const plansData = await billingPlansRes.value.json()
+        // 🆕 RÉCUPÉRATION DES VRAIS PLANS
+        if (billingPlansRes.ok) {
+          const plansData = await billingPlansRes.json()
           realPlans = plansData.plans || {}
           console.log('✅ Plans réels récupérés pour system stats:', realPlans)
         }
@@ -590,7 +588,7 @@ export const StatisticsPage: React.FC = () => {
           },
           features_enabled: {
             analytics: true, // Prouvé par le fait qu'on récupère les données
-            billing: billingRes.status === 'fulfilled' && billingRes.value.ok,
+            billing: billingRes.ok,
             authentication: true, // On est connecté
             openai_fallback: systemHealthData?.openai_configured || true
           }
