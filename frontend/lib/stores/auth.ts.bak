@@ -1,4 +1,4 @@
-// lib/stores/auth.ts - Store d'authentification CORRIGÉ pour éviter la boucle infinie
+// lib/stores/auth.ts - Store d'authentification CORRIGÉ pour éviter l'erreur de déconnexion
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { User, RGPDConsent } from '@/types'
@@ -30,10 +30,6 @@ interface AuthState {
   clearAuth: () => void
 }
 
-// 🔥 PROTECTION ANTI-BOUCLE GLOBALE
-let isListenerActive = false
-let authCheckInProgress = false
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -60,14 +56,7 @@ export const useAuthStore = create<AuthState>()(
 
       // 🔄 INITIALISATION SESSION
       initializeSession: async (): Promise<boolean> => {
-        // 🔥 PROTECTION: Éviter les appels multiples
-        if (authCheckInProgress) {
-          console.log('⚠️ [Auth] Initialisation déjà en cours, abandon')
-          return false
-        }
-
         try {
-          authCheckInProgress = true
           console.log('🔄 Initialisation session...')
           set({ isLoading: true })
 
@@ -110,16 +99,14 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false 
           })
           return false
-        } finally {
-          authCheckInProgress = false
         }
       },
 
-      // 🔑 CONNEXION ORIGINALE (Supabase direct)
+      // 🔐 CONNEXION ORIGINALE (Supabase direct)
       login: async (email: string, password: string) => {
         try {
           set({ isLoading: true })
-          console.log('🔑 Connexion pour:', email)
+          console.log('🔐 Connexion pour:', email)
 
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -267,10 +254,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🚪 DÉCONNEXION CORRIGÉE
+      // 🚪 DÉCONNEXION CORRIGÉE - Solution principale pour éviter l'erreur "Application error"
       logout: async () => {
         console.log('🚪 [Auth] Début déconnexion sécurisée')
         
+        // Éviter les appels multiples
         const { isLoading } = get()
         if (isLoading) {
           console.log('⚠️ [Auth] Déconnexion déjà en cours, ignorée')
@@ -280,15 +268,18 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true })
 
         try {
+          // 1. Nettoyer l'état local IMMÉDIATEMENT
           console.log('🧹 [Auth] Nettoyage état local prioritaire')
           get().clearAuth()
           
+          // 2. Nettoyer localStorage
           try {
             localStorage.removeItem('intelia-remember-me')
             localStorage.removeItem('intelia-last-email')
             localStorage.removeItem('supabase.auth.token')
             localStorage.removeItem('intelia-auth-storage')
             
+            // Nettoyer toutes les clés Supabase
             Object.keys(localStorage).forEach(key => {
               if (key.startsWith('sb-') || key.includes('supabase')) {
                 localStorage.removeItem(key)
@@ -298,7 +289,9 @@ export const useAuthStore = create<AuthState>()(
             console.warn('⚠️ [Auth] Erreur nettoyage localStorage:', localStorageError)
           }
 
+          // 3. Appels de déconnexion avec gestion d'erreur robuste
           try {
+            // Votre méthode auth.signOut()
             console.log('🔄 [Auth] Appel auth.signOut()')
             const result = await auth.signOut()
             
@@ -312,9 +305,10 @@ export const useAuthStore = create<AuthState>()(
           }
 
           try {
+            // Supabase direct en backup
             console.log('🔄 [Auth] Appel supabase.auth.signOut()')
             const { error } = await supabase.auth.signOut({
-              scope: 'local'
+              scope: 'local' // Déconnexion locale uniquement
             })
             
             if (error) {
@@ -326,12 +320,14 @@ export const useAuthStore = create<AuthState>()(
             console.warn('⚠️ [Auth] Erreur Supabase logout (non bloquante):', supabaseError)
           }
 
+          // 4. S'assurer que l'état est bien nettoyé
           set({
             user: null,
             isAuthenticated: false,
             isLoading: false
           })
 
+          // 5. Toast de succès
           toast.success('Déconnexion réussie', {
             icon: '👋',
             duration: 2000
@@ -342,28 +338,24 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error('❌ [Auth] Erreur critique during logout:', error)
           
+          // Même en cas d'erreur, forcer le nettoyage complet
           get().clearAuth()
           set({ isLoading: false })
           
+          // Toast d'erreur mais on continue
           toast.error('Erreur de déconnexion, mais vous êtes déconnecté localement', {
             icon: '⚠️',
             duration: 3000
           })
           
+          // ❌ NE PAS THROW - C'est ça qui causait l'Application error !
           console.log('🔧 [Auth] Déconnexion forcée malgré erreur - pas de throw')
         }
       },
 
-      // 🔍 VÉRIFICATION SESSION - CORRIGÉE
+      // 🔍 VÉRIFICATION SESSION
       checkAuth: async () => {
-        // 🔥 PROTECTION: Éviter les appels multiples
-        if (authCheckInProgress) {
-          console.log('⚠️ [Auth] Vérification auth déjà en cours, abandon')
-          return
-        }
-
         try {
-          authCheckInProgress = true
           console.log('🔍 Vérification session...')
           
           const user = await auth.getCurrentUser()
@@ -393,8 +385,6 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error('❌ Erreur vérification auth:', error)
           set({ user: null, isAuthenticated: false })
-        } finally {
-          authCheckInProgress = false
         }
       },
 
@@ -576,19 +566,10 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-// 🔥 LISTENER SUPABASE CORRIGÉ - SANS BOUCLE !
+// 🔄 Listener pour les changements d'auth Supabase
 if (typeof window !== 'undefined') {
   supabase.auth.onAuthStateChange((event, session) => {
-    // 🔥 PROTECTION: Éviter les appels en cascade
-    if (isListenerActive) {
-      console.log('⚠️ [Auth] Listener déjà actif, abandon événement:', event)
-      return
-    }
-
     console.log('🔔 [Auth] État changé:', event)
-    
-    // 🔥 VERROUILLER LE LISTENER
-    isListenerActive = true
     
     const store = useAuthStore.getState()
     
@@ -597,38 +578,27 @@ if (typeof window !== 'undefined') {
       store.clearAuth()
     } else if (event === 'SIGNED_IN' && session) {
       console.log('🔑 [Auth] Événement SIGNED_IN détecté')
-      
-      // 🔥 CORRECTION: Seulement mettre à jour si pas déjà authentifié
-      if (!store.isAuthenticated) {
-        const user: User = {
-          id: session.user.id,
-          email: session.user.email!,
-          name: session.user.user_metadata?.name || session.user.email!.split('@')[0],
-          user_type: session.user.user_metadata?.user_type || 'producer',
-          language: session.user.user_metadata?.language || 'fr',
-          avatar_url: session.user.user_metadata?.avatar_url || undefined,
-          created_at: session.user.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          consent_given: true,
-          consent_date: new Date().toISOString()
-        }
-        
-        useAuthStore.setState({
-          user: user,
-          isAuthenticated: true,
-          isLoading: false
-        })
-      } else {
-        console.log('⚠️ [Auth] Utilisateur déjà authentifié, skip mise à jour')
+      const user: User = {
+        id: session.user.id,
+        email: session.user.email!,
+        name: session.user.user_metadata?.name || session.user.email!.split('@')[0],
+        user_type: session.user.user_metadata?.user_type || 'producer',
+        language: session.user.user_metadata?.language || 'fr',
+        avatar_url: session.user.user_metadata?.avatar_url || undefined,
+        created_at: session.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        consent_given: true,
+        consent_date: new Date().toISOString()
       }
+      
+      useAuthStore.setState({
+        user: user,
+        isAuthenticated: true,
+        isLoading: false
+      })
     } else if (event === 'TOKEN_REFRESHED' && session) {
       console.log('🔄 [Auth] Token rafraîchi')
       // Pas besoin de mettre à jour l'utilisateur pour un refresh
     }
-    
-    // 🔥 DÉBLOQUER LE LISTENER après un délai
-    setTimeout(() => {
-      isListenerActive = false
-    }, 100)
   })
 }
