@@ -546,9 +546,11 @@ function PageContent() {
 
     hasCheckedAuth.current = true
 
-    // Redirect immediately if already authenticated
+    // Only redirect if already authenticated AND not on chat page
     if (isAuthenticated) {
-      handleRedirectToChat()
+      if (window.location.pathname !== '/chat' && !window.location.pathname.startsWith('/chat/')) {
+        handleRedirectToChat()
+      }
       return
     }
 
@@ -574,8 +576,12 @@ function PageContent() {
       return
     }
 
+    // Only redirect if authenticated AND not already redirecting AND not already on chat page
     if (isAuthenticated && !isLoading && !redirectInProgress.current) {
-      handleRedirectToChat()
+      // Check if we're not already on the chat page to prevent loops
+      if (window.location.pathname !== '/chat' && !window.location.pathname.startsWith('/chat/')) {
+        handleRedirectToChat()
+      }
     }
   }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
 
