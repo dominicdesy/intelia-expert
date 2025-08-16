@@ -434,8 +434,8 @@ export const StatisticsPage: React.FC = () => {
         // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
         // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
         try {
-          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS, pas seulement un échantillon
-          const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=1000', { headers })
+          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS, mais avec une limite raisonnable
+          const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=200', { headers })
           questionsData = await allQuestionsResponse.json()
           
           if (questionsData && questionsData.questions) {
@@ -571,7 +571,7 @@ export const StatisticsPage: React.FC = () => {
           system_health: {
             uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
             total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED avec null check
-            error_rate: backendData?.current_status?.error_rate_percent || 2.1, // Fix: remove performanceStats reference
+            error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1, // Fix: Ensure it's a number
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
