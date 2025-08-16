@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
 
@@ -122,20 +122,20 @@ const translations = {
   es: {
     title: 'Intelia Expert',
     email: 'Email',
-    password: 'ContraseÃ±a',
-    confirmPassword: 'Confirmar contraseÃ±a',
-    login: 'Iniciar sesiÃ³n',
+    password: 'Contraseña',
+    confirmPassword: 'Confirmar contraseña',
+    login: 'Iniciar sesión',
     signup: 'Crear cuenta',
     rememberMe: 'Recordar mi email',
-    forgotPassword: 'Â¿Olvidaste tu contraseÃ±a?',
-    newToIntelia: 'Â¿Nuevo en Intelia?',
-    connecting: 'Iniciando sesiÃ³n...',
+    forgotPassword: '¿Olvidaste tu contraseña?',
+    newToIntelia: '¿Nuevo en Intelia?',
+    connecting: 'Iniciando sesión...',
     creating: 'Creando cuenta...',
-    loginError: 'Error de inicio de sesiÃ³n',
+    loginError: 'Error de inicio de sesión',
     signupError: 'Error de registro',
-    emailRequired: 'La direcciÃ³n de correo es requerida',
-    emailInvalid: 'Por favor ingresa una direcciÃ³n de correo vÃ¡lida',
-    passwordRequired: 'La contraseÃ±a es requerida',
+    emailRequired: 'La dirección de correo es requerida',
+    emailInvalid: 'Por favor ingresa una dirección de correo válida',
+    passwordRequired: 'La contraseña es requerida',
     passwordTooShort: 'La contraseña debe tener al menos 8 caracteres con una mayúscula y un número',
     passwordMismatch: 'Las contraseñas no coinciden',
     firstNameRequired: 'El nombre es requerido',
@@ -178,18 +178,18 @@ const translations = {
     title: 'Intelia Expert',
     email: 'E-Mail',
     password: 'Passwort',
-    confirmPassword: 'Passwort bestÃ¤tigen',
+    confirmPassword: 'Passwort bestätigen',
     login: 'Anmelden',
     signup: 'Konto erstellen',
     rememberMe: 'E-Mail merken',
     forgotPassword: 'Passwort vergessen?',
     newToIntelia: 'Neu bei Intelia?',
-    connecting: 'Anmeldung lÃ¤uft...',
+    connecting: 'Anmeldung läuft...',
     creating: 'Konto wird erstellt...',
     loginError: 'Anmeldefehler',
     signupError: 'Registrierungsfehler',
     emailRequired: 'E-Mail-Adresse ist erforderlich',
-    emailInvalid: 'Bitte geben Sie eine gÃ¼ltige E-Mail-Adresse ein',
+    emailInvalid: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
     passwordRequired: 'Passwort ist erforderlich',
     passwordTooShort: 'Passwort muss mindestens 8 Zeichen mit einem Großbuchstaben und einer Zahl haben',
     passwordMismatch: 'Passwörter stimmen nicht überein',
@@ -221,7 +221,7 @@ const translations = {
     companyLinkedin: 'Unternehmens-LinkedIn-Seite',
     optional: '(optional)',
     required: '*',
-    close: 'SchlieÃŸen',
+    close: 'Schließen',
     alreadyHaveAccount: 'Bereits ein Konto?',
     authSuccess: 'Erfolgreich angemeldet!',
     authError: 'Anmeldefehler, bitte versuchen Sie es erneut.',
@@ -316,7 +316,7 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
   const errors: string[] = []
   
   if (password.length < 8) {
-    errors.push('Au moins 8 caractÃ¨res')
+    errors.push('Au moins 8 caractères')
   }
   if (!/[A-Z]/.test(password)) {
     errors.push('Une majuscule')
@@ -363,20 +363,20 @@ const validateWebsite = (url: string): boolean => {
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// ðŸ"§ 1. Votre contenu existant devient PageContent
+// 🔧 1. Votre contenu existant devient PageContent
 function PageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams() // âœ… Maintenant autorisÃ© dans Suspense
+  const pathname = usePathname()
+  const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
   
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Données
   const { login, register, initializeSession } = useAuthStore() // Actions
 
-  // ðŸ›¡ï¸ PROTECTION + REMEMBER ME FEATURES
+  // 🛡️ PROTECTION + REMEMBER ME FEATURES + FIX REDIRECTION
   const hasInitialized = useRef(false)
   const hasCheckedAuth = useRef(false)
-  const redirectInProgress = useRef(false)
+  const redirectLock = useRef(false) // 🔧 Protection contre la boucle
   const sessionInitialized = useRef(false)
-  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const t = translations[currentLanguage]
@@ -411,7 +411,7 @@ function PageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
-  // âœ… UTILITAIRES REMEMBER ME CORRIGÃ‰S
+  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS
   const rememberMeUtils = {
     save: (email: string, remember = true) => {
       if (remember && email) {
@@ -435,26 +435,32 @@ function PageContent() {
     }
   }
 
-  // ðŸ›¡ï¸ FONCTION DE REDIRECTION SÃ‰CURISÃ‰E + REMEMBER ME
-  const handleRedirectToChat = useCallback(() => {
-    if (redirectInProgress.current || isRedirecting) {
+  // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE (FIX PRINCIPAL)
+  const safeRedirectToChat = useCallback(() => {
+    if (redirectLock.current) {
+      console.log('🔒 [Redirect] Déjà en cours de redirection, ignoré')
       return
     }
-
-    redirectInProgress.current = true
-    setIsRedirecting(true)
     
-    // Utiliser window.location pour une redirection complÃ¨te
-    setTimeout(() => {
-      window.location.href = '/chat'
-    }, 100)
-  }, [isRedirecting])
+    // 🔧 NE PAS rediriger si on est déjà sur /chat
+    if (pathname?.startsWith("/chat")) {
+      console.log('🔧 [Redirect] Déjà sur /chat, pas de redirection')
+      return
+    }
+    
+    console.log('🚀 [Redirect] Redirection vers /chat depuis:', pathname)
+    redirectLock.current = true
+    
+    // ✅ Utiliser router.replace au lieu de window.location
+    // pour éviter le reload et donc la re-montée des providers
+    router.replace('/chat')
+  }, [pathname, router])
 
-  // âœ… INITIALISATION CORRIGÃ‰E AVEC REMEMBER ME
+  // ✅ INITIALISATION CORRIGÉE AVEC REMEMBER ME
   useEffect(() => {
     if (hasInitialized.current) return
     
-    // Charger les prÃ©fÃ©rences utilisateur
+    // Charger les préférences utilisateur
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -465,13 +471,13 @@ function PageContent() {
       }
     }
 
-    // âœ… RESTAURER EMAIL avec fonction utilitaire
+    // ✅ RESTAURER EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
     
     if (hasRememberedEmail) {
       setLoginData({
         email: lastEmail,
-        password: '', // âœ… Toujours vider le mot de passe
+        password: '', // ✅ Toujours vider le mot de passe
         rememberMe: true
       })
       
@@ -482,7 +488,7 @@ function PageContent() {
     hasInitialized.current = true
   }, [])
 
-  // âœ… FOCUS AUTOMATIQUE sur mot de passe si email prÃ©-rempli
+  // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -493,46 +499,54 @@ function PageContent() {
     }
   }, [loginData.email, loginData.password])
 
-  // ðŸ›¡ï¸ VÃ‰RIFICATION AUTH UNE SEULE FOIS
+  // 🛡️ VÉRIFICATION AUTH UNE SEULE FOIS (FIX PRINCIPAL)
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
       return
     }
 
     hasCheckedAuth.current = true
+    console.log('🔍 [Auth] Vérification unique de l\'authentification')
 
-    // Si dÃ©jÃ  connectÃ©, rediriger immÃ©diatement
+    // Si déjà connecté, rediriger immédiatement
     if (isAuthenticated) {
-      handleRedirectToChat()
+      console.log('✅ [Auth] Déjà connecté, redirection immédiate')
+      safeRedirectToChat()
       return
     }
 
     // Sinon, initialiser la session une seule fois
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
+      console.log('🔄 [Session] Initialisation unique de la session')
       
       initializeSession().then((sessionFound) => {
         if (sessionFound) {
-          // La redirection sera gÃ©rÃ©e par le changement d'Ã©tat isAuthenticated
+          console.log('✅ [Session] Session trouvée, redirection automatique')
+          // La redirection sera gérée par le changement d'état isAuthenticated
+        } else {
+          console.log('❌ [Session] Aucune session trouvée')
         }
       }).catch(error => {
-        console.error('âŒ [Session] Erreur initialisation:', error)
+        console.error('❌ [Session] Erreur initialisation:', error)
       })
     }
-  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, handleRedirectToChat])
+  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, safeRedirectToChat])
 
-  // ðŸ›¡ï¸ SURVEILLANCE CHANGEMENT AUTH
+  // 🛡️ SURVEILLANCE CHANGEMENT AUTH (FIX PRINCIPAL)
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
       return
     }
 
-    if (isAuthenticated && !isLoading && !redirectInProgress.current) {
-      handleRedirectToChat()
+    // 🔧 Uniquement quand l'auth est prête ET valide
+    if (!isLoading && isAuthenticated) {
+      console.log('🔄 [Auth] État auth changé, redirection sécurisée')
+      safeRedirectToChat()
     }
-  }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
+  }, [isAuthenticated, isLoading, hasHydrated, safeRedirectToChat])
 
-  // ðŸ›¡ï¸ GESTION URL CALLBACK
+  // 🛡️ GESTION URL CALLBACK
   useEffect(() => {
     if (!hasInitialized.current) return
 
@@ -552,7 +566,7 @@ function PageContent() {
     url.searchParams.delete('auth')
     window.history.replaceState({}, '', url.pathname)
     
-    // Masquer les messages aprÃ¨s 3 secondes
+    // Masquer les messages après 3 secondes
     const timer = setTimeout(() => {
       setLocalSuccess('')
       setLocalError('')
@@ -561,7 +575,7 @@ function PageContent() {
     return () => clearTimeout(timer)
   }, [searchParams, t])
 
-  // âœ… AFFICHAGE CONDITIONNEL + Ã‰CRAN DE REDIRECTION
+  // ✅ AFFICHAGE CONDITIONNEL
   if (!hasHydrated || !hasInitialized.current) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -569,27 +583,6 @@ function PageContent() {
           <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Initialisation...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (isRedirecting || redirectInProgress.current) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-6 text-lg font-medium text-gray-900">Connexion réussie !</p>
-          <p className="mt-2 text-gray-600">Redirection vers votre chat...</p>
-          <div className="mt-4 bg-blue-50 rounded-lg p-4 max-w-sm mx-auto">
-            <div className="flex items-center justify-center">
-              <svg className="animate-pulse h-5 w-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-sm text-blue-700">Chargement en cours...</span>
-            </div>
-          </div>
         </div>
       </div>
     )
@@ -646,7 +639,7 @@ function PageContent() {
     return null
   }
 
-  // âœ… LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÃ‰E
+  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÉE
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -674,15 +667,17 @@ function PageContent() {
     try {
       await login(loginData.email.trim(), loginData.password)
       
-      // âœ… GESTION "Se souvenir de moi" avec fonction utilitaire
+      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
+      // 🔧 Pas de redirection manuelle ici, elle sera gérée par useEffect
+      
     } catch (error: any) {
-      setIsRedirecting(false)
-      redirectInProgress.current = false
+      // 🔧 Réinitialiser les verrous en cas d'erreur
+      redirectLock.current = false
       
       if (error.message?.includes('Invalid login credentials')) {
-        setLocalError('Email ou mot de passe incorrect. VÃ©rifiez vos identifiants.')
+        setLocalError('Email ou mot de passe incorrect. Vérifiez vos identifiants.')
       } else if (error.message?.includes('Email not confirmed')) {
         setLocalError('Email non confirmé. Vérifiez votre boîte mail.')
       } else if (error.message?.includes('Too many requests')) {
@@ -704,7 +699,7 @@ function PageContent() {
     }
 
     try {
-      console.log('ðŸ" [Signup] Tentative d\'inscription:', signupData.email)
+      console.log('📝 [Signup] Tentative d\'inscription:', signupData.email)
       
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
@@ -716,7 +711,7 @@ function PageContent() {
       
       setLocalSuccess(t.accountCreated)
       
-      // RÃ©initialiser le formulaire
+      // Réinitialiser le formulaire
       setSignupData({
         email: '', password: '', confirmPassword: '',
         firstName: '', lastName: '', linkedinProfile: '',
@@ -724,20 +719,20 @@ function PageContent() {
         companyName: '', companyWebsite: '', companyLinkedin: ''
       })
       
-      // Passer en mode login aprÃ¨s 4 secondes
+      // Passer en mode login après 4 secondes
       setTimeout(() => {
         setIsSignupMode(false)
         setLocalSuccess('')
       }, 4000)
       
     } catch (error: any) {
-      console.error('âŒ [Signup] Erreur:', error)
-      setLocalError(error.message || 'Erreur lors de la crÃ©ation du compte')
+      console.error('❌ [Signup] Erreur:', error)
+      setLocalError(error.message || 'Erreur lors de la création du compte')
     }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isLoading && !isRedirecting) {
+    if (e.key === 'Enter' && !isLoading) {
       if (isSignupMode) {
         handleSignup()
       } else {
@@ -746,30 +741,30 @@ function PageContent() {
     }
   }
 
-  // âœ… GESTION MODES AVEC REMEMBER EMAIL CORRIGÃ‰E
+  // ✅ GESTION MODES AVEC REMEMBER EMAIL CORRIGÉE
   const handleCloseSignup = () => {
     setIsSignupMode(false)
     setLocalError('')
     setLocalSuccess('')
     
-    // âœ… Restaurer EMAIL avec fonction utilitaire
+    // ✅ Restaurer EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
-    console.log('ðŸ"„ [Signup] Fermeture signup - restore email:', lastEmail)
+    console.log('📝 [Signup] Fermeture signup - restore email:', lastEmail)
     
     setLoginData({ 
       email: lastEmail, 
-      password: '', // âœ… Toujours vider mot de passe
+      password: '', // ✅ Toujours vider mot de passe
       rememberMe 
     })
     
-    // Message si email restaurÃ©
+    // Message si email restauré
     if (rememberMe && lastEmail) {
       setLocalSuccess(`Email restauré : ${lastEmail}`)
       setTimeout(() => setLocalSuccess(''), 3000)
     }
     
-    // RÃ©initialiser le formulaire d'inscription
+    // Réinitialiser le formulaire d'inscription
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
@@ -790,15 +785,15 @@ function PageContent() {
       // Retour en mode login - restaurer EMAIL avec fonction utilitaire
       const { rememberMe, lastEmail } = rememberMeUtils.load()
       
-      console.log('ðŸ"„ [Toggle] Retour login - restore email:', lastEmail)
+      console.log('📝 [Toggle] Retour login - restore email:', lastEmail)
       
       setLoginData({ 
         email: lastEmail, 
-        password: '', // âœ… Toujours vider mot de passe
+        password: '', // ✅ Toujours vider mot de passe
         rememberMe 
       })
       
-      // Message si email restaurÃ©
+      // Message si email restauré
       if (rememberMe && lastEmail) {
         setLocalSuccess(`Email restauré : ${lastEmail}`)
         setTimeout(() => setLocalSuccess(''), 3000)
@@ -845,7 +840,7 @@ function PageContent() {
             </button>
           )}
           
-          {/* Messages d'erreur et succÃ¨s */}
+          {/* Messages d'erreur et succès */}
           {localError && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex">
@@ -902,7 +897,7 @@ function PageContent() {
                     onKeyPress={handleKeyPress}
                     className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
                     placeholder="votre@email.com"
-                    disabled={isLoading || isRedirecting}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -923,14 +918,14 @@ function PageContent() {
                     onChange={(e) => handleLoginChange('password', e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder={loginData.email ? "Entrez votre mot de passe" : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
-                    disabled={isLoading || isRedirecting}
+                    placeholder={loginData.email ? "Entrez votre mot de passe" : "••••••••"}
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 transition-colors"
-                    disabled={isLoading || isRedirecting}
+                    disabled={isLoading}
                     tabIndex={-1}
                   >
                     {showPassword ? (
@@ -955,18 +950,18 @@ function PageContent() {
                     type="checkbox"
                     checked={loginData.rememberMe}
                     onChange={(e) => {
-                      console.log('ðŸŽ¯ [Checkbox] Ã‰vÃ©nement onChange dÃ©clenchÃ©!')
-                      console.log('ðŸŽ¯ [Checkbox] e.target.checked:', e.target.checked)
-                      console.log('ðŸŽ¯ [Checkbox] e.target.value:', e.target.value)
-                      console.log('ðŸŽ¯ [Checkbox] Ã‰tat actuel rememberMe:', loginData.rememberMe)
+                      console.log('🛯 [Checkbox] Événement onChange déclenché!')
+                      console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
+                      console.log('🛯 [Checkbox] e.target.value:', e.target.value)
+                      console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
                       
                       // Test direct
                       const newValue = e.target.checked
-                      console.log('ðŸŽ¯ [Checkbox] Appel handleLoginChange avec:', newValue)
+                      console.log('🛯 [Checkbox] Appel handleLoginChange avec:', newValue)
                       handleLoginChange('rememberMe', newValue)
                     }}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    disabled={isLoading || isRedirecting}
+                    disabled={isLoading}
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                     {t.rememberMe}
@@ -987,18 +982,13 @@ function PageContent() {
                 <button
                   type="button"
                   onClick={handleLogin}
-                  disabled={isLoading || isRedirecting || !loginData.email || !loginData.password}
+                  disabled={isLoading || !loginData.email || !loginData.password}
                   className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? (
                     <div className="flex items-center space-x-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>{t.connecting}</span>
-                    </div>
-                  ) : isRedirecting ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Redirection...</span>
                     </div>
                   ) : (
                     t.login
@@ -1204,7 +1194,7 @@ function PageContent() {
                         value={signupData.password}
                         onChange={(e) => handleSignupChange('password', e.target.value)}
                         className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                        placeholder="••••••••"
                         disabled={isLoading}
                       />
                       <button
@@ -1256,7 +1246,7 @@ function PageContent() {
                         value={signupData.confirmPassword}
                         onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
                         className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                        placeholder="••••••••"
                         disabled={isLoading}
                       />
                       <button
@@ -1385,7 +1375,7 @@ function PageContent() {
                     type="button"
                     onClick={toggleMode}
                     className="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                    disabled={isLoading || isRedirecting}
+                    disabled={isLoading}
                   >
                     {t.createAccount}
                   </button>
@@ -1473,7 +1463,7 @@ function PageContent() {
   )
 }
 
-// ðŸ"§ 2. Export principal avec Suspense
+// 🔧 2. Export principal avec Suspense
 export default function Page() {
   return (
     <Suspense fallback={

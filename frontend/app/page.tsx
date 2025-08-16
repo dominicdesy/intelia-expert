@@ -411,26 +411,37 @@ function PageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
-  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS
+  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS + AMÉLIORÉS
   const rememberMeUtils = {
     save: (email: string, remember = true) => {
-      if (remember && email) {
-        localStorage.setItem('intelia-remember-me', 'true')
-        localStorage.setItem('intelia-last-email', email.trim())
-      } else {
-        localStorage.removeItem('intelia-remember-me')
-        localStorage.removeItem('intelia-last-email')
+      try {
+        if (remember && email?.trim()) {
+          localStorage.setItem('intelia-remember-me', 'true')
+          localStorage.setItem('intelia-last-email', email.trim())
+          console.log('✅ [RememberMe] Email sauvegardé:', email.trim())
+        } else {
+          localStorage.removeItem('intelia-remember-me')
+          localStorage.removeItem('intelia-last-email')
+          console.log('🗑️ [RememberMe] Préférences effacées')
+        }
+      } catch (error) {
+        console.error('❌ [RememberMe] Erreur sauvegarde:', error)
       }
     },
     
     load: () => {
-      const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
-      const lastEmail = localStorage.getItem('intelia-last-email') || ''
-      
-      return {
-        rememberMe,
-        lastEmail: rememberMe ? lastEmail : '',
-        hasRememberedEmail: rememberMe && lastEmail.length > 0
+      try {
+        const rememberMe = localStorage.getItem('intelia-remember-me') === 'true'
+        const lastEmail = localStorage.getItem('intelia-last-email') || ''
+        
+        return {
+          rememberMe,
+          lastEmail: rememberMe ? lastEmail : '',
+          hasRememberedEmail: rememberMe && lastEmail.length > 0
+        }
+      } catch (error) {
+        console.error('❌ [RememberMe] Erreur chargement:', error)
+        return { rememberMe: false, lastEmail: '', hasRememberedEmail: false }
       }
     }
   }
@@ -473,6 +484,8 @@ function PageContent() {
 
     // ✅ RESTAURER EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
+    
+    console.log('🔄 [Init] Chargement remember me:', { rememberMe, lastEmail, hasRememberedEmail })
     
     if (hasRememberedEmail) {
       setLoginData({
@@ -593,9 +606,38 @@ function PageContent() {
     localStorage.setItem('intelia-language', newLanguage)
   }
 
+  // ✅ FONCTION HANDLELOGINCHANGE CORRIGÉE AVEC PERSISTENCE EN TEMPS RÉEL
   const handleLoginChange = (field: string, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
+      
+      // 🔧 NOUVELLE LOGIQUE : Gestion spéciale pour rememberMe
+      if (field === 'rememberMe') {
+        const isRememberChecked = value as boolean
+        console.log('🛯 [HandleChange] RememberMe changé:', isRememberChecked)
+        
+        // Persistence en temps réel du statut rememberMe
+        if (isRememberChecked && prev.email?.trim()) {
+          // Si on coche ET qu'il y a un email, sauvegarder
+          rememberMeUtils.save(prev.email.trim(), true)
+          console.log('✅ [HandleChange] Email sauvegardé immédiatement:', prev.email.trim())
+        } else if (!isRememberChecked) {
+          // Si on décoche, effacer immédiatement
+          rememberMeUtils.save('', false)
+          console.log('🗑️ [HandleChange] Remember Me désactivé')
+        }
+      }
+      
+      // 🔧 NOUVELLE LOGIQUE : Gestion spéciale pour l'email quand rememberMe est actif
+      if (field === 'email' && prev.rememberMe) {
+        const emailValue = (value as string).trim()
+        if (emailValue && validateEmail(emailValue)) {
+          // Sauvegarder le nouvel email si remember est actif et email valide
+          rememberMeUtils.save(emailValue, true)
+          console.log('✅ [HandleChange] Nouvel email sauvegardé:', emailValue)
+        }
+      }
+      
       return newData
     })
     
@@ -667,8 +709,10 @@ function PageContent() {
     try {
       await login(loginData.email.trim(), loginData.password)
       
-      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire
+      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire CORRIGÉE
+      // Note: La persistence a déjà été faite dans handleLoginChange, mais on confirme ici pour sécurité
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
+      console.log('✅ [Login] Confirmation persistence remember me:', loginData.rememberMe)
       
       // 🔧 Pas de redirection manuelle ici, elle sera gérée par useEffect
       
@@ -699,7 +743,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📝 [Signup] Tentative d\'inscription:', signupData.email)
+      console.log('🔍 [Signup] Tentative d\'inscription:', signupData.email)
       
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
@@ -750,7 +794,7 @@ function PageContent() {
     // ✅ Restaurer EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
-    console.log('📝 [Signup] Fermeture signup - restore email:', lastEmail)
+    console.log('🔍 [Signup] Fermeture signup - restore email:', lastEmail)
     
     setLoginData({ 
       email: lastEmail, 
@@ -785,7 +829,7 @@ function PageContent() {
       // Retour en mode login - restaurer EMAIL avec fonction utilitaire
       const { rememberMe, lastEmail } = rememberMeUtils.load()
       
-      console.log('📝 [Toggle] Retour login - restore email:', lastEmail)
+      console.log('🔍 [Toggle] Retour login - restore email:', lastEmail)
       
       setLoginData({ 
         email: lastEmail, 
@@ -952,13 +996,10 @@ function PageContent() {
                     onChange={(e) => {
                       console.log('🛯 [Checkbox] Événement onChange déclenché!')
                       console.log('🛯 [Checkbox] e.target.checked:', e.target.checked)
-                      console.log('🛯 [Checkbox] e.target.value:', e.target.value)
                       console.log('🛯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
                       
-                      // Test direct
-                      const newValue = e.target.checked
-                      console.log('🛯 [Checkbox] Appel handleLoginChange avec:', newValue)
-                      handleLoginChange('rememberMe', newValue)
+                      // ✅ APPEL SIMPLIFIÉ ET DIRECT
+                      handleLoginChange('rememberMe', e.target.checked)
                     }}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     disabled={isLoading}
