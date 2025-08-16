@@ -406,11 +406,14 @@ function PageContent() {
   const store = useAuthStore()
   const { user, isAuthenticated, isLoading, hasHydrated, login, register, initializeSession } = store
 
-  // Prevent multiple initializations and redirects
-  const hasInitialized = useRef(false)
-  const hasCheckedAuth = useRef(false)
-  const redirectInProgress = useRef(false)
+  // 🔥 NOUVEAU: Système de verrouillage pour éviter les boucles
+  const initializationLock = useRef(false)
+  const redirectLock = useRef(false)
+  const authCheckLock = useRef(false)
   const sessionInitialized = useRef(false)
+  
+  // 🔥 NOUVEAU: États d'initialisation et redirection
+  const [isInitialized, setIsInitialized] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
@@ -470,25 +473,54 @@ function PageContent() {
     }
   }
 
-  // Redirect to chat page after successful authentication
-  const handleRedirectToChat = useCallback(() => {
-    if (redirectInProgress.current || isRedirecting) {
+  // 🔥 NOUVEAU: Fonction de redirection sécurisée
+  const handleRedirectToChat = useCallback(async () => {
+    if (redirectLock.current || isRedirecting) {
+      if (isDevelopment) {
+        console.log('🚫 Redirection déjà en cours, abandon')
+      }
       return
     }
 
-    redirectInProgress.current = true
+    redirectLock.current = true
     setIsRedirecting(true)
     
-    // Use window.location for complete page reload to avoid hydration issues
-    setTimeout(() => {
+    if (isDevelopment) {
+      console.log('🚀 Début redirection vers /chat')
+    }
+
+    try {
+      // Attendre un peu pour s'assurer que l'état est stable
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Nettoyer les paramètres d'URL avant redirection
+      const url = new URL(window.location.href)
+      url.search = '' // Supprimer tous les paramètres
+      window.history.replaceState({}, '', url.pathname)
+      
+      // Redirection forcée
       window.location.href = '/chat'
-    }, 100)
+    } catch (error) {
+      if (isDevelopment) {
+        console.error('❌ Erreur lors de la redirection:', error)
+      }
+      redirectLock.current = false
+      setIsRedirecting(false)
+    }
   }, [isRedirecting])
 
-  // Initialize component state and restore user preferences
+  // 🔥 NOUVEAU: Initialisation une seule fois
   useEffect(() => {
-    if (hasInitialized.current) return
-    
+    if (initializationLock.current || isInitialized) {
+      return
+    }
+
+    initializationLock.current = true
+
+    if (isDevelopment) {
+      console.log('🔧 Initialisation du composant auth')
+    }
+
     // Load saved language preference or detect browser language
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
@@ -524,7 +556,11 @@ function PageContent() {
       }))
     }
 
-    hasInitialized.current = true
+    setIsInitialized(true)
+
+    if (isDevelopment) {
+      console.log('✅ Initialisation terminée')
+    }
   }, [])
 
   // Auto-focus password field when email is pre-filled
@@ -538,50 +574,82 @@ function PageContent() {
     }
   }, [loginData.email, loginData.password])
 
-  // Initialize authentication session once component is ready
+  // 🔥 NOUVEAU: Vérification d'authentification avec protection contre les boucles
   useEffect(() => {
-    if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
+    if (!hasHydrated || !isInitialized || authCheckLock.current) {
       return
     }
 
-    hasCheckedAuth.current = true
+    authCheckLock.current = true
 
-    // Redirect immediately if already authenticated
-    if (isAuthenticated) {
+    if (isDevelopment) {
+      console.log('🔍 Vérification état auth - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
+    }
+
+    // Si déjà authentifié, rediriger immédiatement
+    if (isAuthenticated && !isLoading) {
+      if (isDevelopment) {
+        console.log('✅ Utilisateur déjà authentifié, redirection')
+      }
       handleRedirectToChat()
       return
     }
 
-    // Initialize session if not already done
-    if (!sessionInitialized.current) {
+    // Sinon, essayer d'initialiser la session une seule fois
+    if (!isAuthenticated && !isLoading && !sessionInitialized.current) {
       sessionInitialized.current = true
       
-      initializeSession().then((sessionFound) => {
-        if (sessionFound) {
-          // Redirect will be handled by authentication state change
-        }
-      }).catch(error => {
-        if (isDevelopment) {
-          console.error('Session initialization error:', error)
-        }
-      })
-    }
-  }, [hasHydrated, isAuthenticated, initializeSession, handleRedirectToChat])
+      if (isDevelopment) {
+        console.log('🔄 Tentative d\'initialisation de session')
+      }
 
-  // Monitor authentication state changes for redirect
+      initializeSession()
+        .then((sessionFound) => {
+          if (isDevelopment) {
+            console.log('📋 Résultat initialisation session:', sessionFound)
+          }
+          
+          if (sessionFound) {
+            // La redirection sera gérée par le changement d'état isAuthenticated
+            if (isDevelopment) {
+              console.log('✅ Session trouvée, attente du changement d\'état')
+            }
+          } else {
+            if (isDevelopment) {
+              console.log('❌ Aucune session trouvée')
+            }
+          }
+        })
+        .catch(error => {
+          if (isDevelopment) {
+            console.error('❌ Erreur initialisation session:', error)
+          }
+        })
+        .finally(() => {
+          authCheckLock.current = false
+        })
+    } else {
+      authCheckLock.current = false
+    }
+  }, [hasHydrated, isInitialized, isAuthenticated, isLoading, initializeSession, handleRedirectToChat])
+
+  // 🔥 NOUVEAU: Surveillance des changements d'état d'authentification
   useEffect(() => {
-    if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
+    if (!isInitialized || redirectLock.current) {
       return
     }
 
-    if (isAuthenticated && !isLoading && !redirectInProgress.current) {
+    if (isAuthenticated && !isLoading) {
+      if (isDevelopment) {
+        console.log('🔄 État auth changé: utilisateur connecté, redirection')
+      }
       handleRedirectToChat()
     }
-  }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
+  }, [isAuthenticated, isLoading, isInitialized, handleRedirectToChat])
 
   // Handle authentication status from URL parameters
   useEffect(() => {
-    if (!hasInitialized.current) return
+    if (!isInitialized) return
 
     const authStatus = searchParams.get('auth')
     if (!authStatus) return
@@ -606,10 +674,12 @@ function PageContent() {
     }, 3000)
     
     return () => clearTimeout(timer)
-  }, [searchParams, t])
+  }, [searchParams, t, isInitialized])
 
-  // Show loading screen during initialization or redirect
-  if (!hasHydrated || !hasInitialized.current) {
+  // 🔥 ÉCRANS DE CHARGEMENT AMÉLIORÉS
+
+  // Show loading screen during initialization
+  if (!hasHydrated || !isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
@@ -621,7 +691,8 @@ function PageContent() {
     )
   }
 
-  if (isRedirecting || redirectInProgress.current) {
+  // Show redirection screen
+  if (isRedirecting || redirectLock.current) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
@@ -637,6 +708,22 @@ function PageContent() {
               <span className="text-sm text-blue-700">Chargement en cours...</span>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 🔥 NOUVEAU: Utilisateur déjà connecté mais pas encore redirigé
+  if (isAuthenticated && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-pulse">
+            <div className="h-4 bg-blue-200 rounded w-32 mx-auto mb-2"></div>
+            <div className="h-4 bg-blue-200 rounded w-24 mx-auto"></div>
+          </div>
+          <p className="mt-4 text-gray-600">Redirection en cours...</p>
         </div>
       </div>
     )
@@ -697,8 +784,12 @@ function PageContent() {
     return null
   }
 
-  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÉE
+  // 🔥 AMÉLIORÉ: Login avec gestion d'erreur et protection contre multiples appels
   const handleLogin = async () => {
+    if (isLoading || isRedirecting) {
+      return
+    }
+
     setLocalError('')
     setLocalSuccess('')
     
@@ -722,15 +813,18 @@ function PageContent() {
       return
     }
 
-    // Save remember me preference and email if requested
     try {
       await login(loginData.email.trim(), loginData.password)
       
+      // Save remember me preference and email if requested
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
+      // La redirection sera gérée par le useEffect qui surveille isAuthenticated
+      
     } catch (error: any) {
-      setIsRedirecting(false)
-      redirectInProgress.current = false
+      if (isDevelopment) {
+        console.error('❌ Erreur login:', error)
+      }
       
       if (error.message?.includes('Invalid login credentials')) {
         setLocalError('Email ou mot de passe incorrect. Vérifiez vos identifiants.')
