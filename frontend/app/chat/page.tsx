@@ -1135,18 +1135,18 @@ export default function ChatInterface() {
 
   // ✅ CALCUL des styles dynamiques pour mobile
   const containerStyle = isMobileDevice ? {
-    height: '100vh',
-    minHeight: '100vh',
-    maxHeight: '100vh'
+    height: '100dvh',
+    minHeight: '100dvh',
+    maxHeight: '100dvh'
   } : {}
 
   const chatScrollStyle = isMobileDevice ? {
     height: isKeyboardVisible 
-      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
-      : 'calc(100vh - 140px)',
+      ? `calc(100dvh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100dvh - 140px)',
     maxHeight: isKeyboardVisible 
-      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
-      : 'calc(100vh - 140px)',
+      ? `calc(100dvh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100dvh - 140px)',
     overflow: 'auto',
     paddingBottom: '1rem'
   } : {
@@ -1381,7 +1381,7 @@ export default function ChatInterface() {
                 : 'calc(env(safe-area-inset-bottom) + 8px)',
               // Force la position fixed sur mobile quand clavier ouvert
               position: isMobileDevice ? 'fixed' : 'sticky',
-              bottom: 0,
+              bottom: isMobileDevice ? `${keyboardHeight}px` : 0,
               left: 0,
               right: 0,
               backgroundColor: 'white',

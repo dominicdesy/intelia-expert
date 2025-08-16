@@ -424,6 +424,9 @@ export default function ChatInterface() {
           setIsKeyboardVisible(true)
           setKeyboardHeight(heightDifference)
           
+          // Ajouter classe pour CSS
+          document.body.classList.add('keyboard-open')
+          
           // Scroll automatique vers le bas quand le clavier s'ouvre
           setTimeout(() => {
             if (messagesEndRef.current && isMountedRef.current) {
@@ -433,6 +436,9 @@ export default function ChatInterface() {
         } else {
           setIsKeyboardVisible(false)
           setKeyboardHeight(0)
+          
+          // Retirer classe CSS
+          document.body.classList.remove('keyboard-open')
         }
       }
     }
@@ -447,9 +453,11 @@ export default function ChatInterface() {
       if (heightDifference > 150) {
         setIsKeyboardVisible(true)
         setKeyboardHeight(heightDifference)
+        document.body.classList.add('keyboard-open')
       } else {
         setIsKeyboardVisible(false)
         setKeyboardHeight(0)
+        document.body.classList.remove('keyboard-open')
       }
     }
 
@@ -466,6 +474,8 @@ export default function ChatInterface() {
     
     const handleFocus = () => {
       setIsKeyboardVisible(true)
+      document.body.classList.add('keyboard-open')
+      
       setTimeout(() => {
         if (messagesEndRef.current && isMountedRef.current) {
           messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
@@ -479,6 +489,7 @@ export default function ChatInterface() {
         if (isMountedRef.current) {
           setIsKeyboardVisible(false)
           setKeyboardHeight(0)
+          document.body.classList.remove('keyboard-open')
         }
       }, 100)
     }
@@ -494,6 +505,9 @@ export default function ChatInterface() {
       } else {
         window.removeEventListener('resize', handleResize)
       }
+      
+      // Nettoyer classe CSS
+      document.body.classList.remove('keyboard-open')
       
       if (inputElement) {
         inputElement.removeEventListener('focus', handleFocus)
@@ -1121,21 +1135,20 @@ export default function ChatInterface() {
 
   // ✅ CALCUL des styles dynamiques pour mobile
   const containerStyle = isMobileDevice ? {
-    height: isKeyboardVisible 
-      ? `${viewportHeight}px`
-      : '100vh',
-    minHeight: isKeyboardVisible 
-      ? `${viewportHeight}px`
-      : '100vh',
-    maxHeight: isKeyboardVisible 
-      ? `${viewportHeight}px`
-      : '100vh'
+    height: '100vh',
+    minHeight: '100vh',
+    maxHeight: '100vh'
   } : {}
 
-  const chatScrollStyle = isMobileDevice && isKeyboardVisible ? {
-    height: `${viewportHeight - 140}px`,
-    maxHeight: `${viewportHeight - 140}px`,
-    overflow: 'auto'
+  const chatScrollStyle = isMobileDevice ? {
+    height: isKeyboardVisible 
+      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100vh - 140px)',
+    maxHeight: isKeyboardVisible 
+      ? `calc(100vh - 140px - ${keyboardHeight}px)` 
+      : 'calc(100vh - 140px)',
+    overflow: 'auto',
+    paddingBottom: '1rem'
   } : {
     scrollPaddingBottom: '7rem'
   }
@@ -1366,13 +1379,21 @@ export default function ChatInterface() {
               paddingBottom: isMobileDevice 
                 ? `calc(env(safe-area-inset-bottom) + 8px)`
                 : 'calc(env(safe-area-inset-bottom) + 8px)',
-              position: isMobileDevice && isKeyboardVisible ? 'fixed' : 'sticky',
+              // Force la position fixed sur mobile quand clavier ouvert
+              position: isMobileDevice ? 'fixed' : 'sticky',
               bottom: 0,
               left: 0,
               right: 0,
               backgroundColor: 'white',
               borderTop: '1px solid rgb(243 244 246)',
-              zIndex: 1000
+              zIndex: 1000,
+              minHeight: isMobileDevice ? '70px' : 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              // Assurer visibilité avec clavier
+              transform: 'translateY(0)',
+              visibility: 'visible',
+              opacity: 1
             }}
           >
             <div className="max-w-full sm:max-w-4xl mx-auto">
