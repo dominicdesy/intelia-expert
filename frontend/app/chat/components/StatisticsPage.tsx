@@ -64,6 +64,11 @@ interface BackendPerformanceStats {
     overall_health: string
     avg_response_time_ms: number
     error_rate_percent: number
+    total_errors?: number
+  }
+  averages?: {
+    avg_response_time_ms: number
+    avg_error_rate_percent: number
   }
   global_stats: any
   hourly_usage_patterns: Array<any>
