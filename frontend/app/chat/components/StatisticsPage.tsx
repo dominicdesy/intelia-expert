@@ -289,6 +289,9 @@ export const StatisticsPage: React.FC = () => {
         fetch('/api/v1/system/metrics', { headers }) // 🆕 MÉTRIQUES SYSTÈME
       ])
 
+      // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
+      let questionsData: QuestionsApiResponse | null = null
+
       // Traitement des performances
       if (performanceRes.status === 'fulfilled' && performanceRes.value.ok) {
         const backendData: BackendPerformanceStats = await performanceRes.value.json()
@@ -374,9 +377,9 @@ export const StatisticsPage: React.FC = () => {
         // D'abord, récupérer les vraies questions pour calculer les stats
         try {
           const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
-          const questionsData = await questionsResponse.json()
+          questionsData = await questionsResponse.json()
           
-          if (questionsData.questions) {
+          if (questionsData && questionsData.questions) {
             const questions = questionsData.questions
             
             // 🚀 FILTRER les utilisateurs avec email valide
@@ -470,8 +473,8 @@ export const StatisticsPage: React.FC = () => {
         setSystemStats({
           system_health: {
             uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
-            total_requests: questionsData.pagination?.total || 0, // 🆕 VRAIES DONNÉES
-            error_rate: performanceStats?.current_status?.error_rate_percent || 2.1,
+            total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED
+            error_rate: (performanceStats as any)?.current_status?.error_rate_percent || 2.1,
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
