@@ -767,9 +767,9 @@ export default function ChatInterface() {
     }
     
     // Si pas en loading et pas authentifié = déconnexion ou session expirée
-    // Rediriger vers la page de login
+    // Rediriger vers la page de login (racine)
     if (typeof window !== 'undefined') {
-      window.location.replace('/auth')
+      window.location.replace('/')
       return null
     }
     
