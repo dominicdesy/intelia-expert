@@ -296,10 +296,11 @@ export const StatisticsPage: React.FC = () => {
 
       // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
+      let backendData: BackendPerformanceStats | null = null
 
       // Traitement des performances - RÉCUPÉRER LES VRAIES DONNÉES
       if (performanceRes.status === 'fulfilled' && performanceRes.value.ok) {
-        const backendData: BackendPerformanceStats = await performanceRes.value.json()
+        backendData = await performanceRes.value.json()
         console.log('📊 Données de performance reçues:', backendData)
         
         // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI
@@ -313,17 +314,17 @@ export const StatisticsPage: React.FC = () => {
         }
         
         // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND
-        const realResponseTime = backendData.current_status?.avg_response_time_ms 
+        const realResponseTime = backendData?.current_status?.avg_response_time_ms 
           ? backendData.current_status.avg_response_time_ms / 1000  // Convertir ms en secondes
-          : backendData.averages?.avg_response_time_ms 
+          : backendData?.averages?.avg_response_time_ms 
           ? backendData.averages.avg_response_time_ms / 1000
           : null // Aucune donnée disponible
         
         const adaptedPerfStats: PerformanceStats = {
           avg_response_time: realResponseTime || 0, // Utiliser 0 si aucune donnée (sera affiché comme "Aucune donnée")
           openai_costs: realOpenaiCosts,
-          error_count: backendData.global_stats?.total_failures || 
-                      backendData.current_status?.total_errors || 0,
+          error_count: backendData?.global_stats?.total_failures || 
+                      backendData?.current_status?.total_errors || 0,
           cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données quand disponible
         }
         
@@ -546,6 +547,7 @@ export const StatisticsPage: React.FC = () => {
         // 🚀 RÉCUPÉRATION DES VRAIES DONNÉES SYSTÈME
         let systemHealthData = null
         let systemMetricsData = null
+        let realPlans = {}
 
         if (systemHealthRes.status === 'fulfilled' && systemHealthRes.value.ok) {
           systemHealthData = await systemHealthRes.value.json()
@@ -557,12 +559,19 @@ export const StatisticsPage: React.FC = () => {
           console.log('✅ System metrics récupérés:', systemMetricsData)
         }
 
+        // 🆕 RÉCUPÉRATION DES VRAIS PLANS (à nouveau pour cette portée)
+        if (billingPlansRes.status === 'fulfilled' && billingPlansRes.value.ok) {
+          const plansData = await billingPlansRes.value.json()
+          realPlans = plansData.plans || {}
+          console.log('✅ Plans réels récupérés pour system stats:', realPlans)
+        }
+
         // 🚀 CONSTRUIRE LES VRAIES STATISTICS SYSTÈME
         setSystemStats({
           system_health: {
             uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
-            total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED
-            error_rate: (performanceStats as any)?.current_status?.error_rate_percent || 2.1,
+            total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED avec null check
+            error_rate: backendData?.current_status?.error_rate_percent || 2.1, // Fix: remove performanceStats reference
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
