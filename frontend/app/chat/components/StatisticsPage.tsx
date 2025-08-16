@@ -292,40 +292,66 @@ export const StatisticsPage: React.FC = () => {
       // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
 
-      // Traitement des performances
+      // Traitement des performances - RÉCUPÉRER LES VRAIES DONNÉES
       if (performanceRes.status === 'fulfilled' && performanceRes.value.ok) {
         const backendData: BackendPerformanceStats = await performanceRes.value.json()
+        console.log('📊 Données de performance reçues:', backendData)
         
         // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI
         let realOpenaiCosts = 127.35 // Fallback
         if (openaiCostsRes.status === 'fulfilled' && openaiCostsRes.value.ok) {
           const openaiData = await openaiCostsRes.value.json()
-          realOpenaiCosts = openaiData.total_cost || 127.35
+          realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || 127.35
           console.log('💰 Coûts OpenAI réels récupérés:', openaiData)
         } else {
           console.log('⚠️ Impossible de récupérer les coûts OpenAI réels, utilisation fallback')
         }
         
-        // 🚀 ADAPTATION des données backend vers UI
+        // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND
+        const realResponseTime = backendData.current_status?.avg_response_time_ms 
+          ? backendData.current_status.avg_response_time_ms / 1000  // Convertir ms en secondes
+          : backendData.averages?.avg_response_time_ms 
+          ? backendData.averages.avg_response_time_ms / 1000
+          : null // Aucune donnée disponible
+        
         const adaptedPerfStats: PerformanceStats = {
-          avg_response_time: backendData.current_status?.avg_response_time_ms 
-            ? backendData.current_status.avg_response_time_ms / 1000 
-            : 1.8, // Convertir ms en secondes
-          openai_costs: realOpenaiCosts, // 🆕 VRAIS COÛTS !
-          error_count: backendData.global_stats?.total_failures || 12,
-          cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données
+          avg_response_time: realResponseTime || 0, // Utiliser 0 si aucune donnée (sera affiché comme "Aucune donnée")
+          openai_costs: realOpenaiCosts,
+          error_count: backendData.global_stats?.total_failures || 
+                      backendData.current_status?.total_errors || 0,
+          cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données quand disponible
         }
         
         setPerformanceStats(adaptedPerfStats)
-        console.log('✅ Performance stats adaptées avec vrais coûts:', adaptedPerfStats)
+        console.log('✅ Performance stats avec vraies données:', adaptedPerfStats)
       } else {
-        // Fallback data si l'endpoint échoue
-        setPerformanceStats({
-          avg_response_time: 1.8,
-          openai_costs: 127.35,
-          error_count: 12,
-          cache_hit_rate: 85.2
-        })
+        console.log('❌ Endpoint performance non disponible, récupération via endpoint alternatif...')
+        
+        // 🔄 ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
+        try {
+          const altResponse = await fetch('/api/v1/logging/analytics/health-check', { headers })
+          if (altResponse.ok) {
+            const healthData = await altResponse.json()
+            console.log('📊 Données health-check:', healthData)
+            
+            setPerformanceStats({
+              avg_response_time: 0, // Sera affiché comme "Aucune donnée"
+              openai_costs: 127.35, // Fallback
+              error_count: 0,
+              cache_hit_rate: healthData.analytics_available ? 85.2 : 0
+            })
+          } else {
+            throw new Error('Health check failed')
+          }
+        } catch (healthError) {
+          console.log('❌ Aucun endpoint de performance disponible')
+          setPerformanceStats({
+            avg_response_time: 0, // Sera affiché comme "Aucune donnée disponible"
+            openai_costs: 127.35,
+            error_count: 0,
+            cache_hit_rate: 0
+          })
+        }
       }
 
       // Traitement du billing avec VRAIES DONNÉES
@@ -333,40 +359,66 @@ export const StatisticsPage: React.FC = () => {
       if (billingRes.status === 'fulfilled' && billingRes.value.ok) {
         realBillingStats = await billingRes.value.json()
         console.log('✅ Billing stats réelles récupérées:', realBillingStats)
-      }
-
-      // 🆕 RÉCUPÉRATION DES VRAIS PLANS
-      let realPlans = {}
-      if (billingPlansRes.status === 'fulfilled' && billingPlansRes.value.ok) {
-        const plansData = await billingPlansRes.value.json()
-        realPlans = plansData.plans || {}
-        console.log('✅ Plans réels récupérés:', realPlans)
-      }
-
-      // 🆕 CALCUL DES VRAIES STATS DE BILLING depuis les plans et données
-      const calculatedBillingStats = {
-        plans: {},
-        total_revenue: 0,
-        top_users: []
-      }
-
-      // Si on a des plans réels, les utiliser
-      if (Object.keys(realPlans).length > 0) {
-        Object.entries(realPlans).forEach(([planName, planData]: [string, any]) => {
-          // Estimer le nombre d'utilisateurs par plan (à défaut de données précises)
-          const estimatedUsers = planName === 'free' ? 10 : planName === 'basic' ? 3 : planName === 'premium' ? 2 : 1
-          const revenue = estimatedUsers * (planData.price_per_month || 0)
-          
-          calculatedBillingStats.plans[planName] = {
-            user_count: estimatedUsers,
-            revenue: revenue
+        
+        // 🔧 ADAPTER LES DONNÉES REÇUES - Format de votre endpoint
+        if (realBillingStats) {
+          const adaptedBillingStats = {
+            plans: realBillingStats.plans || {},
+            total_revenue: realBillingStats.total_revenue || 0,
+            top_users: realBillingStats.top_users || []
           }
-          calculatedBillingStats.total_revenue += revenue
-        })
+          setBillingStats(adaptedBillingStats)
+          console.log('📊 Billing stats adaptées:', adaptedBillingStats)
+        }
+      } else {
+        console.log('⚠️ Endpoint billing non disponible, calcul depuis les questions...')
+        
+        // 🚀 CALCULER LES TOP USERS depuis les vraies questions
+        try {
+          const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
+          const questionsData = await questionsResponse.json()
+          
+          if (questionsData && questionsData.questions) {
+            const questions = questionsData.questions
+            
+            // 📊 CALCULER LES UTILISATEURS LES PLUS ACTIFS depuis les vraies données
+            const userStats = questions.reduce((acc: any, q: any) => {
+              const email = q.user_email
+              if (email && email.trim() !== '') {
+                if (!acc[email]) {
+                  acc[email] = {
+                    email: email,
+                    question_count: 0,
+                    plan: 'free' // TODO: Récupérer le vrai plan depuis la base
+                  }
+                }
+                acc[email].question_count++
+              }
+              return acc
+            }, {})
+            
+            // Trier par nombre de questions et prendre le top 5
+            const topUsers = Object.values(userStats)
+              .sort((a: any, b: any) => b.question_count - a.question_count)
+              .slice(0, 5)
+            
+            console.log('👥 Top users calculés depuis les questions:', topUsers)
+            
+            setBillingStats({
+              plans: {},
+              total_revenue: 0,
+              top_users: topUsers
+            })
+          }
+        } catch (topUsersError) {
+          console.error('❌ Erreur calcul top users:', topUsersError)
+          setBillingStats({
+            plans: {},
+            total_revenue: 0,
+            top_users: []
+          })
+        }
       }
-
-      // Utiliser les vraies données de billing si disponibles, sinon les calculées
-      setBillingStats(realBillingStats || calculatedBillingStats)
 
       // Dashboard/Usage stats  
       if (dashboardRes.status === 'fulfilled' && dashboardRes.value.ok) {
@@ -374,13 +426,17 @@ export const StatisticsPage: React.FC = () => {
         console.log('✅ Dashboard data:', dashData)
         
         // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
-        // D'abord, récupérer les vraies questions pour calculer les stats
+        // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
         try {
-          const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
-          questionsData = await questionsResponse.json()
+          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS, pas seulement un échantillon
+          const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=1000', { headers })
+          questionsData = await allQuestionsResponse.json()
           
           if (questionsData && questionsData.questions) {
             const questions = questionsData.questions
+            const totalFromPagination = questionsData.pagination?.total || questions.length
+            
+            console.log(`📊 Récupéré ${questions.length} questions sur ${totalFromPagination} total`)
             
             // 🚀 FILTRER les utilisateurs avec email valide
             const validUsers = new Set(
@@ -393,12 +449,22 @@ export const StatisticsPage: React.FC = () => {
             const today = new Date().toDateString()
             const thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0')
             
-            // Calculer les vraies sources
+            // 🔧 CALCULER LES VRAIES SOURCES avec le bon total
             const sourceStats = questions.reduce((acc: any, q: any) => {
               const source = q.response_source || 'unknown'
               acc[source] = (acc[source] || 0) + 1
               return acc
             }, {})
+            
+            // Calculer le total des sources pour vérification
+            const totalFromSources = Object.values(sourceStats).reduce((sum: number, count: any) => sum + count, 0)
+            
+            console.log('📊 Distribution des sources:', {
+              sourceStats,
+              totalFromSources,
+              totalFromPagination,
+              sampleSize: questions.length
+            })
             
             // Questions aujourd'hui
             const questionsToday = questions.filter((q: any) => 
@@ -410,15 +476,32 @@ export const StatisticsPage: React.FC = () => {
               q.timestamp.startsWith(thisMonth)
             ).length
             
+            // 🚀 AJUSTER les proportions si on n'a qu'un échantillon
+            let adjustedSourceStats = sourceStats
+            if (questions.length < totalFromPagination) {
+              // Calculer le facteur d'échelle
+              const scaleFactor = totalFromPagination / questions.length
+              adjustedSourceStats = Object.entries(sourceStats).reduce((acc: any, [source, count]: [string, any]) => {
+                acc[source] = Math.round(count * scaleFactor)
+                return acc
+              }, {})
+              
+              console.log('🔧 Sources ajustées pour le total réel:', {
+                original: sourceStats,
+                scaled: adjustedSourceStats,
+                scaleFactor
+              })
+            }
+            
             setUsageStats({
               unique_users: uniqueUsers,
-              total_questions: questionsData.pagination?.total || questions.length,
+              total_questions: totalFromPagination, // Utiliser le vrai total
               questions_today: questionsToday,
               questions_this_month: questionsThisMonth,
               source_distribution: {
-                rag_retriever: sourceStats.rag_retriever || 0,
-                openai_fallback: sourceStats.openai_fallback || 0,
-                perfstore: (sourceStats.table_lookup || 0) + (sourceStats.perfstore || 0) // Grouper table_lookup et perfstore
+                rag_retriever: adjustedSourceStats.rag_retriever || adjustedSourceStats.rag || 0,
+                openai_fallback: adjustedSourceStats.openai_fallback || 0,
+                perfstore: (adjustedSourceStats.table_lookup || 0) + (adjustedSourceStats.perfstore || 0)
               },
               monthly_breakdown: {
                 [thisMonth]: questionsThisMonth,
@@ -427,12 +510,12 @@ export const StatisticsPage: React.FC = () => {
               }
             })
             
-            console.log('📊 Stats calculées:', {
+            console.log('📊 Stats finales calculées:', {
               uniqueUsers,
-              totalQuestions: questionsData.pagination?.total,
+              totalQuestions: totalFromPagination,
               questionsToday,
               questionsThisMonth,
-              sourceStats,
+              adjustedSourceStats,
               validUsers: Array.from(validUsers)
             })
           }
@@ -721,7 +804,7 @@ export const StatisticsPage: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  💬 Questions & Réponses ({totalQuestions})
+                  💬 Questions & Réponses
                 </button>
               </div>
               
