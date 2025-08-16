@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/components/providers/AuthProvider'
@@ -7,6 +7,15 @@ import { LanguageProvider } from '@/components/providers/LanguageProvider'
 import { Toaster } from 'react-hot-toast'
 
 const inter = Inter({ subsets: ['latin'] })
+
+// ✅ Export séparé pour le viewport (nouvelle méthode)
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover'
+}
 
 export const metadata: Metadata = {
   title: 'Intelia Expert - AI Advisor',
@@ -49,14 +58,8 @@ export const metadata: Metadata = {
       },
     ],
   },
-  // ✅ AJOUT: Viewport optimisé pour mobile
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover'
-  }
+  // ❌ SUPPRIMER cette section viewport d'ici
+  // viewport: { ... }
 }
 
 export default function RootLayout({

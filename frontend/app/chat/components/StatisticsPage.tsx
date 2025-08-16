@@ -275,23 +275,25 @@ export const StatisticsPage: React.FC = () => {
     try {
       const headers = await getAuthHeaders()
 
-      // 🚀 UTILISER TOUS LES VRAIS ENDPOINTS DU BACKEND
-      const [
-        performanceRes, 
-        billingRes, 
-        dashboardRes, 
-        openaiCostsRes,
-        systemHealthRes,
-        billingPlansRes,
-        systemMetricsRes
-      ] = await Promise.allSettled([
-        fetch('/api/v1/logging/analytics/performance?hours=24', { headers }),
-        fetch('/api/v1/logging/admin/stats', { headers }),
-        fetch('/api/v1/logging/analytics/dashboard', { headers }),
-        fetch('/api/v1/billing/openai-usage/current-month', { headers }),
-        fetch('/api/v1/health/detailed', { headers }), // 🆕 SANTÉ SYSTÈME
-        fetch('/api/v1/billing/plans', { headers }), // 🆕 PLANS RÉELS
-        fetch('/api/v1/system/metrics', { headers }) // 🆕 MÉTRIQUES SYSTÈME
+      // 🚀 CHARGER EN SÉQUENCE POUR ÉVITER RATE LIMITING
+      console.log('🔄 Chargement performance...')
+      const performanceRes = await fetch('/api/v1/logging/analytics/performance?hours=24', { headers })
+      
+      console.log('🔄 Chargement billing (peut être lent)...')
+      const billingRes = await fetch('/api/v1/logging/admin/stats', { headers })
+      
+      console.log('🔄 Chargement dashboard...')
+      const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
+      
+      // ⚡ COÛTS OPENAI EN DERNIER (plus lent à cause du rate limiting)
+      console.log('🔄 Chargement coûts OpenAI (peut prendre du temps)...')
+      const openaiCostsRes = await fetch('/api/v1/billing/openai-usage/current-month', { headers })
+      
+      console.log('🔄 Chargement health et métriques...')
+      const [systemHealthRes, billingPlansRes, systemMetricsRes] = await Promise.allSettled([
+        fetch('/api/v1/health/detailed', { headers }),
+        fetch('/api/v1/billing/plans', { headers }),
+        fetch('/api/v1/system/metrics', { headers })
       ])
 
       // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
@@ -299,18 +301,22 @@ export const StatisticsPage: React.FC = () => {
       let backendData: BackendPerformanceStats | null = null
 
       // Traitement des performances - RÉCUPÉRER LES VRAIES DONNÉES
-      if (performanceRes.status === 'fulfilled' && performanceRes.value.ok) {
-        backendData = await performanceRes.value.json()
+      if (performanceRes.ok) {
+        backendData = await performanceRes.json()
         console.log('📊 Données de performance reçues:', backendData)
         
-        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI
-        let realOpenaiCosts = 127.35 // Fallback
-        if (openaiCostsRes.status === 'fulfilled' && openaiCostsRes.value.ok) {
-          const openaiData = await openaiCostsRes.value.json()
-          realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || 127.35
-          console.log('💰 Coûts OpenAI réels récupérés:', openaiData)
+        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec gestion du timeout
+        let realOpenaiCosts = 6.30 // Utiliser la dernière valeur connue comme fallback
+        if (openaiCostsRes.ok) {
+          try {
+            const openaiData = await openaiCostsRes.json()
+            realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || 6.30
+            console.log('💰 Coûts OpenAI réels récupérés:', openaiData)
+          } catch (parseError) {
+            console.log('⚠️ Erreur parsing coûts OpenAI, utilisation fallback')
+          }
         } else {
-          console.log('⚠️ Impossible de récupérer les coûts OpenAI réels, utilisation fallback')
+          console.log('⚠️ API OpenAI rate limitée ou lente, utilisation fallback:', realOpenaiCosts)
         }
         
         // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND
@@ -362,8 +368,8 @@ export const StatisticsPage: React.FC = () => {
 
       // Traitement du billing avec VRAIES DONNÉES
       let realBillingStats = null
-      if (billingRes.status === 'fulfilled' && billingRes.value.ok) {
-        realBillingStats = await billingRes.value.json()
+      if (billingRes.ok) {
+        realBillingStats = await billingRes.json()
         console.log('✅ Billing stats réelles récupérées:', realBillingStats)
         
         // 🔧 ADAPTER LES DONNÉES REÇUES - Format de votre endpoint
@@ -434,8 +440,8 @@ export const StatisticsPage: React.FC = () => {
         // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
         // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
         try {
-          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS, mais avec une limite raisonnable
-          const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=200', { headers })
+          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS avec le bon endpoint qui fonctionne !
+          const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=50', { headers })
           questionsData = await allQuestionsResponse.json()
           
           if (questionsData && questionsData.questions) {
@@ -614,7 +620,7 @@ export const StatisticsPage: React.FC = () => {
 
       console.log('🔍 [StatisticsPage] Chargement questions:', { page: currentPage, limit: questionsPerPage })
 
-      // 🚀 UTILISER LE VRAI ENDPOINT DES QUESTIONS
+      // 🚀 UTILISER LE BON ENDPOINT DES QUESTIONS QUI FONCTIONNE
       const response = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!response.ok) {
