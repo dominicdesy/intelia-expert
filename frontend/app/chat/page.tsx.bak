@@ -23,7 +23,7 @@ import { UserMenuButton } from './components/UserMenuButton'
 import { ZohoSalesIQ } from './components/ZohoSalesIQ'
 import { FeedbackModal } from './components/modals/FeedbackModal'
 
-// Circuit breaker global pour éviter les boucles infinies de chargement
+// Circuit breaker global pour éviter les boucles infinies de chargement - CODE ORIGINAL CONSERVÉ
 class PageLoadingCircuitBreaker {
   private attempts = 0
   private lastAttempt = 0
@@ -68,7 +68,7 @@ class PageLoadingCircuitBreaker {
   }
 }
 
-// Instance globale du circuit breaker pour la page
+// Instance globale du circuit breaker pour la page - CODE ORIGINAL CONSERVÉ
 const pageLoadingBreaker = new PageLoadingCircuitBreaker()
 
 export default function ChatInterface() {
@@ -81,7 +81,7 @@ export default function ChatInterface() {
   const updateMessage = useChatStore(state => state.updateMessage)
   const createNewConversation = useChatStore(state => state.createNewConversation)
 
-  // Default config for now since we can't see the original hook
+  // Default config for now since we can't see the original hook - CODE ORIGINAL CONSERVÉ
   const config = { level: 'standard' }
 
   const [inputMessage, setInputMessage] = useState('')
@@ -89,12 +89,12 @@ export default function ChatInterface() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [showConcisionSettings, setShowConcisionSettings] = useState(false)
 
-  // ✅ NOUVEAUX ÉTATS pour gestion clavier mobile
+  // ✅ NOUVEAUX ÉTATS pour gestion clavier mobile - CODE ORIGINAL CONSERVÉ
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
 
-  // États existants inchangés
+  // États existants inchangés - CODE ORIGINAL CONSERVÉ
   const [clarificationState, setClarificationState] = useState<{
     messageId: string
     originalQuestion: string
@@ -120,18 +120,20 @@ export default function ChatInterface() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
   const isMountedRef = useRef(true)
-  const hasRedirectedRef = useRef(false)
   
-  // Nouveaux refs pour contrôler la redirection avec délai
+  // 🔥 SUPPRIMÉ: hasRedirectedRef - plus de redirection dans cette page
+  // const hasRedirectedRef = useRef(false)
+  
+  // Nouveaux refs pour contrôler la redirection avec délai - CODE ORIGINAL CONSERVÉ (mais logique modifiée)
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Refs pour éviter les re-chargements multiples et contrôler les tentatives
+  // Refs pour éviter les re-chargements multiples et contrôler les tentatives - CODE ORIGINAL CONSERVÉ
   const hasLoadedConversationsRef = useRef(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const conversationLoadingAttemptsRef = useRef(0)
 
-  // ✅ NOUVEAU REF pour l'input mobile
+  // ✅ NOUVEAU REF pour l'input mobile - CODE ORIGINAL CONSERVÉ
   const inputRef = useRef<HTMLInputElement>(null)
 
   const messages: Message[] = currentConversation?.messages || []
@@ -139,7 +141,7 @@ export default function ChatInterface() {
 
   console.log('[Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur
+  // FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur - CODE ORIGINAL CONSERVÉ
   const getUserInitials = (user: any): string => {
     if (!user) return 'U'
 
@@ -165,7 +167,7 @@ export default function ChatInterface() {
     return 'U'
   }
 
-  // FONCTION RENFORCÉE : Préprocesseur Markdown pour réparer le formatage cassé
+  // FONCTION RENFORCÉE : Préprocesseur Markdown pour réparer le formatage cassé - CODE ORIGINAL CONSERVÉ
   const preprocessMarkdown = (content: string): string => {
     if (!content) return ""
 
@@ -223,7 +225,7 @@ export default function ChatInterface() {
     return processed
   }
 
-  // Calculer le contenu préprocessé avant le rendu
+  // Calculer le contenu préprocessé avant le rendu - CODE ORIGINAL CONSERVÉ
   const processedMessages = useMemo(() => {
     return messages.map(message => ({
       ...message,
@@ -231,7 +233,7 @@ export default function ChatInterface() {
     }))
   }, [messages])
 
-  // FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions
+  // FONCTION NOUVELLE : Reprocesser tous les messages avec nouvelles versions - CODE ORIGINAL CONSERVÉ
   const reprocessAllMessages = () => {
     if (!currentConversation?.messages) return
 
@@ -271,7 +273,7 @@ export default function ChatInterface() {
     console.log('[reprocessAllMessages] Tous les messages retraités avec niveau:', config.level)
   }
 
-  // FONCTION ÉTENDUE : Nettoyer le texte de réponse
+  // FONCTION ÉTENDUE : Nettoyer le texte de réponse - CODE ORIGINAL CONSERVÉ
   const cleanResponseText = (text: string): string => {
     if (!text) return ""
 
@@ -358,7 +360,7 @@ export default function ChatInterface() {
     return cleaned.trim()
   }
 
-  // Fonction wrapper pour charger les conversations avec circuit breaker
+  // Fonction wrapper pour charger les conversations avec circuit breaker - CODE ORIGINAL CONSERVÉ
   const loadConversationsWithBreaker = async (userId: string) => {
     // Vérification du circuit breaker
     if (!pageLoadingBreaker.canAttempt()) {
@@ -405,7 +407,7 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVEAU useEffect pour gérer le clavier mobile
+  // ✅ NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (!isMobileDevice) return
 
@@ -516,7 +518,7 @@ export default function ChatInterface() {
     }
   }, [isMobileDevice])
 
-  // Tous les useEffect existants
+  // Tous les useEffect existants - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -534,7 +536,7 @@ export default function ChatInterface() {
     }
   }, [])
 
-  // useEffect CORRIGÉ avec délai de redirection 1,2s
+  // 🔥 useEffect CORRIGÉ - SUPPRESSION de la redirection automatique
   useEffect(() => {
     // Nettoyer les timeouts précédents
     if (redirectTimeoutRef.current) {
@@ -544,50 +546,21 @@ export default function ChatInterface() {
       clearTimeout(authCheckTimeoutRef.current)
     }
 
-    // Si chargement en cours, ne rien faire
-    if (isLoading) {
-      console.log('[ChatInterface] Auth en cours de chargement...')
-      return
-    }
-
-    // Si déjà redirigé, ne pas refaire
-    if (hasRedirectedRef.current) {
-      console.log('[ChatInterface] Redirection déjà effectuée, skip')
-      return
-    }
-
-    // Si utilisateur authentifié, tout va bien
-    if (isAuthenticated) {
-      console.log('[ChatInterface] Utilisateur authentifié, pas de redirection')
-      return
-    }
-
-    // Délai de 1,2s pour laisser Supabase se stabiliser
-    console.log('[ChatInterface] Utilisateur non authentifié - délai de stabilisation Supabase...')
+    // ✅ NOUVELLE LOGIQUE: Plus de redirection automatique
+    // Cette page suppose maintenant que l'utilisateur est déjà authentifié
+    // La protection se fait via AuthProvider au niveau layout
     
-    authCheckTimeoutRef.current = setTimeout(() => {
-      if (!isMountedRef.current) return
-      
-      // Double-check après le délai
-      const authStore = useAuthStore.getState()
-      console.log('[ChatInterface] Après délai - État auth:', {
-        isLoading: authStore.isLoading,
-        isAuthenticated: authStore.isAuthenticated,
-        hasUser: !!authStore.user
-      })
-      
-      // Si toujours pas authentifié après le délai, rediriger
-      if (!authStore.isLoading && !authStore.isAuthenticated && !hasRedirectedRef.current) {
-        hasRedirectedRef.current = true
-        console.log('[ChatInterface] Redirection après vérification - utilisateur non authentifié')
-        
-        if (typeof window !== 'undefined') {
-          window.location.replace('/')
-        }
-      } else if (authStore.isAuthenticated) {
-        console.log('[ChatInterface] Utilisateur finalement authentifié après délai')
-      }
-    }, 1200) // Délai de 1,2s exactement comme identifié
+    console.log('[ChatInterface] État auth:', {
+      isLoading,
+      isAuthenticated,
+      hasUser: !!user
+    })
+
+    // Si pas authentifié après chargement, on affiche juste un message
+    // mais on ne redirige PAS pour éviter les boucles
+    if (!isLoading && !isAuthenticated) {
+      console.log('[ChatInterface] Utilisateur non authentifié - affichage message')
+    }
 
     return () => {
       if (authCheckTimeoutRef.current) {
@@ -721,7 +694,7 @@ export default function ChatInterface() {
     }
   }, [currentLanguage, t])
 
-  // useEffect pour charger les conversations SANS loadConversations dans les dépendances
+  // useEffect pour charger les conversations SANS loadConversations dans les dépendances - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (isAuthenticated && user?.id && isMountedRef.current && !hasLoadedConversationsRef.current) {
       // Nettoyer le timeout précédent si existant
@@ -755,18 +728,19 @@ export default function ChatInterface() {
     }
   }, [isAuthenticated, user?.id]) // loadConversations RETIRÉ des dépendances !
 
-  // useEffect pour reset le circuit breaker quand l'utilisateur change
+  // useEffect pour reset le circuit breaker quand l'utilisateur change - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (user?.id) {
       // Reset les flags et circuit breaker pour un nouvel utilisateur
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
-      hasRedirectedRef.current = false // Reset aussi le flag de redirection
+      // 🔥 SUPPRIMÉ: hasRedirectedRef.current = false
       console.log('[ChatInterface] Reset circuit breaker pour nouvel utilisateur:', user.id)
     }
   }, [user?.id])
 
+  // 🔥 ÉTATS DE CHARGEMENT AMÉLIORÉS
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -778,12 +752,33 @@ export default function ChatInterface() {
     )
   }
 
-  if (!isAuthenticated) {
+  // ✅ NOUVEAU: Gestion intelligente de l'état non-authentifié
+  if (!isAuthenticated || !user) {
+    // Si on est en train de charger, afficher le loading
+    if (isLoading) {
+      return (
+        <div className="h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse h-8 w-8 bg-gray-300 rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Authentification en cours...</p>
+          </div>
+        </div>
+      )
+    }
+    
+    // Si pas en loading et pas authentifié = déconnexion ou session expirée
+    // Rediriger vers la page de login (racine)
+    if (typeof window !== 'undefined') {
+      window.location.replace('/')
+      return null
+    }
+    
+    // Fallback pour SSR
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Redirection...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirection vers la connexion...</p>
         </div>
       </div>
     )
@@ -797,7 +792,7 @@ export default function ChatInterface() {
     })
   }
 
-  // FONCTION CORRIGÉE : extractAnswerAndSources avec support validation_rejected
+  // FONCTION CORRIGÉE : extractAnswerAndSources avec support validation_rejected - CODE ORIGINAL CONSERVÉ
   const extractAnswerAndSources = (result: any): [string, any[]] => {
     let answerText = ""
     let sources: any[] = []
@@ -866,7 +861,7 @@ export default function ChatInterface() {
     return [answerText, []]
   }
 
-  // FONCTION : handleSendMessage avec nettoyage du texte
+  // FONCTION : handleSendMessage avec nettoyage du texte - CODE ORIGINAL CONSERVÉ
   const handleSendMessage = async (text: string = inputMessage) => {
     if (!text.trim() || !isMountedRef.current) return
 
@@ -1020,7 +1015,7 @@ export default function ChatInterface() {
     }
   }
 
-  // Toutes les autres fonctions restent identiques
+  // Toutes les autres fonctions restent identiques - CODE ORIGINAL CONSERVÉ
   const handleFeedbackClick = (messageId: string, feedback: 'positive' | 'negative') => {
     if (!isMountedRef.current) return
 
@@ -1133,7 +1128,7 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // ✅ CALCUL des styles dynamiques pour mobile
+  // ✅ CALCUL des styles dynamiques pour mobile - CODE ORIGINAL CONSERVÉ
   const containerStyle = isMobileDevice ? {
     height: '100vh',
     minHeight: '100vh',
@@ -1157,7 +1152,7 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-      {/* ✅ CONTAINER PRINCIPAL avec styles dynamiques mobile */}
+      {/* ✅ CONTAINER PRINCIPAL avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
       <div 
         className={`bg-gray-50 flex flex-col ${isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
         style={containerStyle}
@@ -1214,7 +1209,7 @@ export default function ChatInterface() {
         </header>
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-          {/* ✅ ZONE CHAT avec styles dynamiques mobile */}
+          {/* ✅ ZONE CHAT avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
           <div
             ref={chatContainerRef}
             className={`flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain ${isMobileDevice ? 'chat-scroll-area' : ''}`}
@@ -1372,7 +1367,7 @@ export default function ChatInterface() {
             </div>
           )}
 
-          {/* ✅ BARRE DE SAISIE avec correction mobile complète */}
+          {/* ✅ BARRE DE SAISIE avec correction mobile complète - CODE ORIGINAL CONSERVÉ */}
           <div 
             className={`px-2 sm:px-4 py-2 bg-white border-t border-gray-100 z-20 ${isMobileDevice ? 'chat-input-fixed' : 'sticky bottom-0'}`}
             style={{
@@ -1416,7 +1411,7 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ */}
+              {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ - CODE ORIGINAL CONSERVÉ */}
               <div className={`flex items-center min-h-[48px] ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
                 <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
                   <input

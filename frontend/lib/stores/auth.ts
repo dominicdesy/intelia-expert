@@ -1,4 +1,4 @@
-// lib/stores/auth.ts - Store d'authentification CORRIGÉ pour éviter la boucle infinie
+// lib/stores/auth.ts - Store d'authentification AMÉLIORÉ avec toutes les corrections
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { User, RGPDConsent } from '@/types'
@@ -6,11 +6,17 @@ import { supabase, auth } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface AuthState {
-  // État
+  // État existant
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
   hasHydrated: boolean
+  
+  // ✅ NOUVEAUX ÉTATS pour gestion améliorée
+  lastAuthCheck: number
+  authErrors: string[]
+  isRecovering: boolean
+  sessionCheckCount: number
   
   // Actions principales
   login: (email: string, password: string) => Promise<void>
@@ -26,13 +32,19 @@ interface AuthState {
   exportUserData: () => Promise<any>
   updateConsent: (consent: RGPDConsent) => Promise<void>
   
+  // ✅ NOUVELLES ACTIONS pour gestion erreurs
+  handleAuthError: (error: any) => void
+  clearAuthErrors: () => void
+  
   // Action de nettoyage
   clearAuth: () => void
 }
 
-// 🔥 PROTECTION ANTI-BOUCLE GLOBALE
+// 🔥 PROTECTION ANTI-BOUCLE GLOBALE RENFORCÉE
 let isListenerActive = false
 let authCheckInProgress = false
+let lastAuthStateChange = 0
+const AUTH_THROTTLE_DELAY = 1000 // 1 seconde entre les changements d'état
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -42,14 +54,74 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       isAuthenticated: false,
       hasHydrated: false,
+      
+      // ✅ NOUVEAUX ÉTATS
+      lastAuthCheck: 0,
+      authErrors: [],
+      isRecovering: false,
+      sessionCheckCount: 0,
 
-      // Nettoyage complet de l'authentification
+      // ✅ NOUVELLE FONCTION : Gestion intelligente des erreurs auth
+      handleAuthError: (error: any) => {
+        console.log('🔧 [Auth] Gestion erreur auth:', error)
+        
+        const { authErrors } = get()
+        const errorMessage = error?.message || error?.toString() || 'Erreur inconnue'
+        
+        // Détecter les erreurs de session expirée
+        if (error?.status === 403 || 
+            error?.message?.includes('Auth session missing') ||
+            error?.message?.includes('Forbidden') ||
+            error?.message?.includes('JWT expired') ||
+            error?.message?.includes('Invalid token')) {
+          
+          console.log('🔄 [Auth] Session expirée détectée, nettoyage en cours')
+          
+          set({ 
+            user: null, 
+            isAuthenticated: false, 
+            isRecovering: true,
+            authErrors: [...authErrors, `Session expirée: ${errorMessage}`]
+          })
+          
+          // Nettoyer automatiquement après 5 secondes
+          setTimeout(() => {
+            const currentState = get()
+            if (currentState.isRecovering) {
+              set({ 
+                isRecovering: false, 
+                authErrors: [] 
+              })
+            }
+          }, 5000)
+          
+        } else {
+          // Autres erreurs non critiques
+          set({ 
+            authErrors: [...authErrors, errorMessage].slice(-3) // Garder seulement les 3 dernières
+          })
+          
+          // Nettoyer après 10 secondes
+          setTimeout(() => {
+            set({ authErrors: [] })
+          }, 10000)
+        }
+      },
+
+      // ✅ NOUVELLE FONCTION : Nettoyer les erreurs
+      clearAuthErrors: () => {
+        set({ authErrors: [], isRecovering: false })
+      },
+
+      // Nettoyage complet de l'authentification - AMÉLIORÉ
       clearAuth: () => {
         console.log('🧹 [Auth] Nettoyage complet de l\'authentification')
         set({
           user: null,
           isAuthenticated: false,
-          isLoading: false
+          isLoading: false,
+          isRecovering: false,
+          authErrors: []
         })
       },
 
@@ -58,8 +130,17 @@ export const useAuthStore = create<AuthState>()(
         set({ hasHydrated })
       },
 
-      // 🔄 INITIALISATION SESSION
+      // 🔄 INITIALISATION SESSION AMÉLIORÉE
       initializeSession: async (): Promise<boolean> => {
+        const { lastAuthCheck, sessionCheckCount } = get()
+        const now = Date.now()
+        
+        // ✅ PROTECTION : Éviter les vérifications trop fréquentes
+        if (now - lastAuthCheck < 2000) {
+          console.log('🔄 [Auth] Vérification auth trop récente, skip')
+          return false
+        }
+        
         // 🔥 PROTECTION: Éviter les appels multiples
         if (authCheckInProgress) {
           console.log('⚠️ [Auth] Initialisation déjà en cours, abandon')
@@ -68,7 +149,12 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           authCheckInProgress = true
-          console.log('🔄 Initialisation session...')
+          set({ 
+            lastAuthCheck: now,
+            sessionCheckCount: sessionCheckCount + 1
+          })
+          
+          console.log('🔄 Initialisation session... (tentative', sessionCheckCount + 1, ')')
           set({ isLoading: true })
 
           const currentUser = await auth.getCurrentUser()
@@ -96,7 +182,8 @@ export const useAuthStore = create<AuthState>()(
           set({ 
             user: mappedUser, 
             isAuthenticated: true, 
-            isLoading: false 
+            isLoading: false,
+            authErrors: [] // Nettoyer les erreurs en cas de succès
           })
 
           console.log('✅ Session initialisée pour:', mappedUser.email)
@@ -104,6 +191,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur initialisation session:', error)
+          
+          // ✅ UTILISER LA NOUVELLE GESTION D'ERREUR
+          get().handleAuthError(error)
+          
           set({ 
             user: null, 
             isAuthenticated: false, 
@@ -115,10 +206,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔑 CONNEXION ORIGINALE (Supabase direct)
+      // 🔑 CONNEXION ORIGINALE (Supabase direct) - AMÉLIORÉE
       login: async (email: string, password: string) => {
         try {
-          set({ isLoading: true })
+          set({ isLoading: true, authErrors: [] }) // Nettoyer les erreurs précédentes
           console.log('🔑 Connexion pour:', email)
 
           const { data, error } = await supabase.auth.signInWithPassword({
@@ -128,6 +219,9 @@ export const useAuthStore = create<AuthState>()(
 
           if (error) {
             console.error('❌ Erreur connexion:', error.message)
+            
+            // ✅ GESTION D'ERREUR AMÉLIORÉE
+            get().handleAuthError(error)
             
             const errorMessages: Record<string, string> = {
               'Invalid login credentials': 'Email ou mot de passe incorrect',
@@ -163,7 +257,9 @@ export const useAuthStore = create<AuthState>()(
           set({ 
             user, 
             isAuthenticated: true, 
-            isLoading: false 
+            isLoading: false,
+            authErrors: [], // Nettoyer les erreurs
+            isRecovering: false
           })
 
           toast.success(`Bienvenue ${user.name} !`, {
@@ -173,6 +269,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur connexion:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           set({ 
             user: null, 
             isAuthenticated: false, 
@@ -186,10 +286,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📝 INSCRIPTION
+      // 📝 INSCRIPTION - AMÉLIORÉE
       register: async (email: string, password: string, userData: Partial<User>) => {
         try {
-          set({ isLoading: true })
+          set({ isLoading: true, authErrors: [] })
           console.log('📝 Création compte pour:', email)
 
           const fullName = userData.name?.trim() || ''
@@ -224,6 +324,9 @@ export const useAuthStore = create<AuthState>()(
           if (error) {
             console.error('❌ Erreur création compte:', error)
             
+            // ✅ GESTION D'ERREUR AMÉLIORÉE
+            get().handleAuthError(error)
+            
             const errorMessages: Record<string, string> = {
               'User already registered': 'Un compte existe déjà avec cet email',
               'Password should be at least': 'Le mot de passe doit contenir au moins 8 caractères',
@@ -242,7 +345,7 @@ export const useAuthStore = create<AuthState>()(
 
           console.log('✅ Compte créé avec succès')
           
-          set({ isLoading: false })
+          set({ isLoading: false, authErrors: [] })
           
           if (data.user.email_confirmed_at) {
             toast.success('Compte créé et confirmé ! Vous pouvez vous connecter.', {
@@ -258,6 +361,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur inscription:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           set({ isLoading: false })
           toast.error(error.message || 'Erreur lors de la création du compte', {
             icon: '⚠️',
@@ -267,7 +374,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🚪 DÉCONNEXION CORRIGÉE
+      // 🚪 DÉCONNEXION CORRIGÉE - SANS MODIFICATION (déjà optimisée)
       logout: async () => {
         console.log('🚪 [Auth] Début déconnexion sécurisée')
         
@@ -329,7 +436,9 @@ export const useAuthStore = create<AuthState>()(
           set({
             user: null,
             isAuthenticated: false,
-            isLoading: false
+            isLoading: false,
+            authErrors: [],
+            isRecovering: false
           })
 
           toast.success('Déconnexion réussie', {
@@ -354,8 +463,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔍 VÉRIFICATION SESSION - CORRIGÉE
+      // 🔍 VÉRIFICATION SESSION - AMÉLIORÉE
       checkAuth: async () => {
+        const { lastAuthCheck, sessionCheckCount } = get()
+        const now = Date.now()
+        
+        // ✅ PROTECTION : Éviter les vérifications trop fréquentes
+        if (now - lastAuthCheck < 3000) {
+          console.log('🔄 [Auth] Vérification auth trop récente, skip')
+          return
+        }
+        
         // 🔥 PROTECTION: Éviter les appels multiples
         if (authCheckInProgress) {
           console.log('⚠️ [Auth] Vérification auth déjà en cours, abandon')
@@ -364,7 +482,12 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           authCheckInProgress = true
-          console.log('🔍 Vérification session...')
+          set({ 
+            lastAuthCheck: now,
+            sessionCheckCount: sessionCheckCount + 1
+          })
+          
+          console.log('🔍 Vérification session... (check', sessionCheckCount + 1, ')')
           
           const user = await auth.getCurrentUser()
 
@@ -387,18 +510,26 @@ export const useAuthStore = create<AuthState>()(
             consent_date: new Date().toISOString()
           }
 
-          set({ user: userMapped, isAuthenticated: true })
+          set({ 
+            user: userMapped, 
+            isAuthenticated: true,
+            authErrors: [] // Nettoyer les erreurs en cas de succès
+          })
           console.log('✅ Session restaurée pour:', userMapped.email)
 
         } catch (error: any) {
           console.error('❌ Erreur vérification auth:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           set({ user: null, isAuthenticated: false })
         } finally {
           authCheckInProgress = false
         }
       },
 
-      // 👤 MISE À JOUR PROFIL
+      // 👤 MISE À JOUR PROFIL - AMÉLIORÉE
       updateProfile: async (data: Partial<User>) => {
         try {
           const { user } = get()
@@ -416,6 +547,10 @@ export const useAuthStore = create<AuthState>()(
 
           if (error) {
             console.error('❌ Erreur mise à jour Supabase:', error)
+            
+            // ✅ GESTION D'ERREUR AMÉLIORÉE
+            get().handleAuthError(error)
+            
             throw new Error(error.message)
           }
 
@@ -424,7 +559,7 @@ export const useAuthStore = create<AuthState>()(
             ...data,
             updated_at: new Date().toISOString()
           }
-          set({ user: updatedUser })
+          set({ user: updatedUser, authErrors: [] })
 
           toast.success('Profil mis à jour avec succès', {
             icon: '✅',
@@ -434,6 +569,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur mise à jour profil:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           toast.error(error.message || 'Erreur mise à jour profil', {
             icon: '⚠️',
             duration: 4000
@@ -442,7 +581,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🗑️ SUPPRESSION COMPTE
+      // 🗑️ SUPPRESSION COMPTE - INCHANGÉE
       deleteUserData: async () => {
         try {
           const { user } = get()
@@ -460,6 +599,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur suppression compte:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           toast.error(error.message || 'Erreur suppression compte', {
             icon: '⚠️',
             duration: 4000
@@ -468,7 +611,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📄 EXPORT DONNÉES
+      // 📄 EXPORT DONNÉES - INCHANGÉE
       exportUserData: async () => {
         try {
           const { user } = get()
@@ -511,6 +654,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur export données:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           toast.error(error.message || 'Erreur export données', {
             icon: '⚠️',
             duration: 4000
@@ -519,7 +666,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📋 MISE À JOUR CONSENTEMENTS
+      // 📋 MISE À JOUR CONSENTEMENTS - INCHANGÉE
       updateConsent: async (consent: RGPDConsent) => {
         try {
           const { user } = get()
@@ -533,7 +680,7 @@ export const useAuthStore = create<AuthState>()(
             consent_date: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }
-          set({ user: updatedUser })
+          set({ user: updatedUser, authErrors: [] })
 
           toast.success('Consentements mis à jour', {
             icon: '📋',
@@ -543,6 +690,10 @@ export const useAuthStore = create<AuthState>()(
 
         } catch (error: any) {
           console.error('❌ Erreur mise à jour consentements:', error)
+          
+          // ✅ GESTION D'ERREUR AMÉLIORÉE
+          get().handleAuthError(error)
+          
           toast.error(error.message || 'Erreur mise à jour consentements', {
             icon: '⚠️',
             duration: 4000
@@ -576,9 +727,19 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-// 🔥 LISTENER SUPABASE CORRIGÉ - SANS BOUCLE !
+// 🔥 LISTENER SUPABASE ULTRA-SÉCURISÉ - AVEC THROTTLING RENFORCÉ
 if (typeof window !== 'undefined') {
   supabase.auth.onAuthStateChange((event, session) => {
+    const now = Date.now()
+    
+    // ✅ PROTECTION TEMPORELLE : Éviter les événements trop rapprochés
+    if (now - lastAuthStateChange < AUTH_THROTTLE_DELAY) {
+      console.log('🔄 [Auth] Événement trop rapide, ignoré:', event)
+      return
+    }
+    
+    lastAuthStateChange = now
+    
     // 🔥 PROTECTION: Éviter les appels en cascade
     if (isListenerActive) {
       console.log('⚠️ [Auth] Listener déjà actif, abandon événement:', event)
@@ -616,7 +777,9 @@ if (typeof window !== 'undefined') {
         useAuthStore.setState({
           user: user,
           isAuthenticated: true,
-          isLoading: false
+          isLoading: false,
+          authErrors: [], // ✅ NETTOYER LES ERREURS
+          isRecovering: false
         })
       } else {
         console.log('⚠️ [Auth] Utilisateur déjà authentifié, skip mise à jour')
@@ -624,11 +787,17 @@ if (typeof window !== 'undefined') {
     } else if (event === 'TOKEN_REFRESHED' && session) {
       console.log('🔄 [Auth] Token rafraîchi')
       // Pas besoin de mettre à jour l'utilisateur pour un refresh
+    } else if (event === 'INITIAL_SESSION') {
+      // ✅ GESTION AMÉLIORÉE de la session initiale
+      if (!store.isAuthenticated && session) {
+        console.log('🔄 [Auth] Session initiale détectée')
+        // Laisser initializeSession() gérer cela
+      }
     }
     
-    // 🔥 DÉBLOQUER LE LISTENER après un délai
+    // 🔥 DÉBLOQUER LE LISTENER après un délai plus court
     setTimeout(() => {
       isListenerActive = false
-    }, 100)
+    }, 50) // Réduit de 100ms à 50ms
   })
 }
