@@ -394,16 +394,19 @@ const validateWebsite = (url: string): boolean => {
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-// 📧 1. Votre contenu existant devient PageContent
+/**
+ * Main authentication page content
+ * Handles login/signup forms, session management, and redirects
+ */
 function PageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams() // ✅ Maintenant autorisé dans Suspense
+  const searchParams = useSearchParams()
   
-  // Optimisation : Un seul appel au store au lieu de deux
-  const store = useAuthStore()
-  const { user, isAuthenticated, isLoading, hasHydrated, login, register, initializeSession } = store
+  // Single store call for better performance - FIXED: separate calls like backup
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Data
+  const { login, register, initializeSession } = useAuthStore() // Actions
 
-  // 🛡️ PROTECTION + REMEMBER ME FEATURES
+  // Prevent multiple initializations and redirects
   const hasInitialized = useRef(false)
   const hasCheckedAuth = useRef(false)
   const redirectInProgress = useRef(false)
@@ -443,7 +446,7 @@ function PageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
-  // ✅ UTILITAIRES REMEMBER ME CORRIGÉS
+  // LocalStorage utilities for remember me functionality
   const rememberMeUtils = {
     save: (email: string, remember = true) => {
       if (remember && email) {
@@ -467,7 +470,7 @@ function PageContent() {
     }
   }
 
-  // 🛡️ FONCTION DE REDIRECTION SÉCURISÉE + REMEMBER ME
+  // Redirect to chat page after successful authentication
   const handleRedirectToChat = useCallback(() => {
     if (redirectInProgress.current || isRedirecting) {
       return
@@ -476,17 +479,17 @@ function PageContent() {
     redirectInProgress.current = true
     setIsRedirecting(true)
     
-    // Utiliser window.location pour une redirection complète
+    // Use window.location for complete page reload to avoid hydration issues
     setTimeout(() => {
       window.location.href = '/chat'
-    }, 100)
+    }, 100) // Back to original working delay
   }, [isRedirecting])
 
-  // ✅ INITIALISATION CORRIGÉE AVEC REMEMBER ME
+  // Initialize component state and restore user preferences
   useEffect(() => {
     if (hasInitialized.current) return
     
-    // Charger les préférences utilisateur
+    // Load saved language preference or detect browser language
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -497,24 +500,34 @@ function PageContent() {
       }
     }
 
-    // ✅ RESTAURER EMAIL avec fonction utilitaire
+    // Restore remembered email if available
     const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
+    
+    if (isDevelopment) {
+      console.log('Initializing - rememberMe:', rememberMe, 'lastEmail:', lastEmail)
+    }
     
     if (hasRememberedEmail) {
       setLoginData({
         email: lastEmail,
-        password: '', // ✅ Toujours vider le mot de passe
+        password: '', // Always clear password for security
         rememberMe: true
       })
       
       setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
       setTimeout(() => setLocalSuccess(''), 4000)
+    } else {
+      // Set initial state even if no remembered email
+      setLoginData(prev => ({
+        ...prev,
+        rememberMe: false
+      }))
     }
 
     hasInitialized.current = true
   }, [])
 
-  // ✅ FOCUS AUTOMATIQUE sur mot de passe si email pré-rempli
+  // Auto-focus password field when email is pre-filled
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -525,7 +538,7 @@ function PageContent() {
     }
   }, [loginData.email, loginData.password])
 
-  // 🛡️ VÉRIFICATION AUTH UNE SEULE FOIS
+  // Initialize authentication session once component is ready
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
       return
@@ -533,29 +546,29 @@ function PageContent() {
 
     hasCheckedAuth.current = true
 
-    // Si déjà connecté, rediriger immédiatement
+    // Redirect immediately if already authenticated
     if (isAuthenticated) {
       handleRedirectToChat()
       return
     }
 
-    // Sinon, initialiser la session une seule fois
+    // Initialize session if not already done
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
       
       initializeSession().then((sessionFound) => {
         if (sessionFound) {
-          // La redirection sera gérée par le changement d'état isAuthenticated
+          // Redirect will be handled by authentication state change
         }
       }).catch(error => {
         if (isDevelopment) {
-          console.error('❌ [Session] Erreur initialisation:', error)
+          console.error('Session initialization error:', error)
         }
       })
     }
   }, [hasHydrated, isAuthenticated, initializeSession, handleRedirectToChat])
 
-  // 🛡️ SURVEILLANCE CHANGEMENT AUTH
+  // Monitor authentication state changes for redirect
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
       return
@@ -566,7 +579,7 @@ function PageContent() {
     }
   }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
 
-  // 🛡️ GESTION URL CALLBACK
+  // Handle authentication status from URL parameters
   useEffect(() => {
     if (!hasInitialized.current) return
 
@@ -581,12 +594,12 @@ function PageContent() {
       setLocalError(t.authIncomplete)
     }
     
-    // Nettoyer l'URL
+    // Clean URL parameters after processing
     const url = new URL(window.location.href)
     url.searchParams.delete('auth')
     window.history.replaceState({}, '', url.pathname)
     
-    // Masquer les messages après 3 secondes
+    // Hide messages after 3 seconds
     const timer = setTimeout(() => {
       setLocalSuccess('')
       setLocalError('')
@@ -595,7 +608,7 @@ function PageContent() {
     return () => clearTimeout(timer)
   }, [searchParams, t])
 
-  // ✅ AFFICHAGE CONDITIONNEL + ÉCRAN DE REDIRECTION
+  // Show loading screen during initialization or redirect
   if (!hasHydrated || !hasInitialized.current) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -637,6 +650,10 @@ function PageContent() {
   const handleLoginChange = (field: string, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
+      if (isDevelopment) {
+        console.log('Login data updated:', field, '=', value)
+        console.log('New state:', newData)
+      }
       return newData
     })
     
@@ -705,10 +722,10 @@ function PageContent() {
       return
     }
 
+    // Save remember me preference and email if requested
     try {
       await login(loginData.email.trim(), loginData.password)
       
-      // ✅ GESTION "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
     } catch (error: any) {
@@ -739,7 +756,7 @@ function PageContent() {
 
     try {
       if (isDevelopment) {
-        console.log('📝 [Signup] Tentative d\'inscription:', signupData.email)
+        console.log('Signup attempt for:', signupData.email)
       }
       
       const userData: Partial<User> = {
@@ -752,7 +769,7 @@ function PageContent() {
       
       setLocalSuccess(t.accountCreated)
       
-      // Réinitialiser le formulaire
+      // Reset form after successful signup
       setSignupData({
         email: '', password: '', confirmPassword: '',
         firstName: '', lastName: '', linkedinProfile: '',
@@ -760,7 +777,7 @@ function PageContent() {
         companyName: '', companyWebsite: '', companyLinkedin: ''
       })
       
-      // Passer en mode login après 4 secondes
+      // Switch to login mode after delay
       setTimeout(() => {
         setIsSignupMode(false)
         setLocalSuccess('')
@@ -768,13 +785,13 @@ function PageContent() {
       
     } catch (error: any) {
       if (isDevelopment) {
-        console.error('❌ [Signup] Erreur:', error)
+        console.error('Signup error:', error)
       }
       setLocalError(error.message || 'Erreur lors de la création du compte')
     }
   }
 
-  // ✅ CORRECTION: onKeyPress → onKeyDown (API moderne)
+  // Handle Enter key for form submission
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading && !isRedirecting) {
       if (isSignupMode) {
@@ -785,32 +802,32 @@ function PageContent() {
     }
   }
 
-  // ✅ GESTION MODES AVEC REMEMBER EMAIL CORRIGÉE
+  // Close signup form and restore login state
   const handleCloseSignup = () => {
     setIsSignupMode(false)
     setLocalError('')
     setLocalSuccess('')
     
-    // ✅ Restaurer EMAIL avec fonction utilitaire
+    // Restore remembered email
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
     if (isDevelopment) {
-      console.log('📞 [Signup] Fermeture signup - restore email:', lastEmail)
+      console.log('Closing signup, restoring email:', lastEmail)
     }
     
     setLoginData({ 
       email: lastEmail, 
-      password: '', // ✅ Toujours vider mot de passe
+      password: '', // Always clear password for security
       rememberMe 
     })
     
-    // Message si email restauré
+    // Show restoration message if email was restored
     if (rememberMe && lastEmail) {
       setLocalSuccess(`Email restauré : ${lastEmail}`)
       setTimeout(() => setLocalSuccess(''), 3000)
     }
     
-    // Réinitialiser le formulaire d'inscription
+    // Reset signup form
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
@@ -825,23 +842,23 @@ function PageContent() {
     setLocalSuccess('')
     
     if (!isSignupMode) {
-      // Passage en mode signup - vider login
+      // Switch to signup mode - clear login form
       setLoginData({ email: '', password: '', rememberMe: false })
     } else {
-      // Retour en mode login - restaurer EMAIL avec fonction utilitaire
+      // Return to login mode - restore remembered email
       const { rememberMe, lastEmail } = rememberMeUtils.load()
       
       if (isDevelopment) {
-        console.log('📞 [Toggle] Retour login - restore email:', lastEmail)
+        console.log('Returning to login, restoring email:', lastEmail)
       }
       
       setLoginData({ 
         email: lastEmail, 
-        password: '', // ✅ Toujours vider mot de passe
+        password: '', // Always clear password for security
         rememberMe 
       })
       
-      // Message si email restauré
+      // Show restoration message if email was restored
       if (rememberMe && lastEmail) {
         setLocalSuccess(`Email restauré : ${lastEmail}`)
         setTimeout(() => setLocalSuccess(''), 3000)
@@ -874,7 +891,7 @@ function PageContent() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
           
-          {/* Bouton de fermeture pour le mode inscription */}
+          {/* Close button for signup mode */}
           {isSignupMode && (
             <button
               onClick={handleCloseSignup}
@@ -888,7 +905,7 @@ function PageContent() {
             </button>
           )}
           
-          {/* ✅ CORRECTION: Messages d'erreur et succès avec accessibilité */}
+          {/* Error and success messages with screen reader support */}
           {localError && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4" role="alert" aria-live="assertive">
               <div className="flex">
@@ -926,7 +943,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* Formulaire de connexion */}
+          {/* Login form */}
           {!isSignupMode && (
             <div className="space-y-6">
               <div>
@@ -999,16 +1016,9 @@ function PageContent() {
                     checked={loginData.rememberMe}
                     onChange={(e) => {
                       if (isDevelopment) {
-                        console.log('🔯 [Checkbox] Événement onChange déclenché!')
-                        console.log('🔯 [Checkbox] e.target.checked:', e.target.checked)
-                        console.log('🔯 [Checkbox] État actuel rememberMe:', loginData.rememberMe)
+                        console.log('Remember me checkbox clicked:', e.target.checked)
                       }
-                      
-                      const newValue = e.target.checked
-                      if (isDevelopment) {
-                        console.log('🔯 [Checkbox] Appel handleLoginChange avec:', newValue)
-                      }
-                      handleLoginChange('rememberMe', newValue)
+                      handleLoginChange('rememberMe', e.target.checked)
                     }}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     disabled={isLoading || isRedirecting}
@@ -1053,10 +1063,10 @@ function PageContent() {
             </div>
           )}
 
-          {/* Formulaire d'inscription - COMPLET de votre sauvegarde */}
+          {/* Signup form with complete user information */}
           {isSignupMode && (
             <div className="space-y-6 pt-2">
-              {/* Section: Informations personnelles */}
+              {/* Personal Information section */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.personalInfo}
@@ -1110,7 +1120,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Section: Contact */}
+              {/* Contact section */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.contact}
@@ -1234,7 +1244,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Section: Mots de passe */}
+              {/* Password fields section */}
               <div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -1339,7 +1349,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Section: Entreprise */}
+              {/* Company information section */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.company}
@@ -1410,7 +1420,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* Section des boutons de basculement - seulement visible en mode connexion */}
+          {/* Mode toggle buttons - only visible in login mode */}
           {!isSignupMode && (
             <>
               <div className="mt-6">
@@ -1439,7 +1449,7 @@ function PageContent() {
             </>
           )}
 
-          {/* Toggle pour revenir au login depuis signup */}
+          {/* Return to login toggle from signup mode */}
           {isSignupMode && (
             <div className="mt-6">
               <div className="relative">
@@ -1466,7 +1476,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* ✅ CORRECTION: Section RGPD améliorée avec rel="noopener noreferrer" */}
+          {/* GDPR compliance notice with secure external links */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex-shrink-0 mt-0.5">
@@ -1503,7 +1513,7 @@ function PageContent() {
         </div>
       </div>
 
-      {/* Section d'aide */}
+      {/* Support contact section */}
       <div className="mt-8 text-center">
         <p className="text-xs text-gray-500">
           {t.needHelp}{' '}
@@ -1520,7 +1530,10 @@ function PageContent() {
   )
 }
 
-// 📧 2. Export principal avec Suspense
+/**
+ * Main page component wrapped with Suspense for Next.js compatibility
+ * Provides loading fallback during component initialization
+ */
 export default function Page() {
   return (
     <Suspense fallback={
