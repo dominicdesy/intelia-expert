@@ -423,6 +423,10 @@ export const StatisticsPage: React.FC = () => {
             
             setPerformanceStats({
               avg_response_time: 0, // Sera affiché comme "Aucune donnée"
+              median_response_time: 0,
+              min_response_time: 0,
+              max_response_time: 0,
+              response_time_count: 0,
               openai_costs: 127.35, // Fallback
               error_count: 0,
               cache_hit_rate: healthData.analytics_available ? 85.2 : 0
