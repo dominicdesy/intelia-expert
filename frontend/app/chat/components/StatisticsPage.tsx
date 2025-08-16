@@ -238,7 +238,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des statistiques')
       loadAllStatistics()
     }
-  }, [authStatus, selectedTimeRange])
+  }, [authStatus, selectedTimeRange]) // Retirer authStatus des deps pour éviter boucles
 
   // Charger les questions si nécessaire
   useEffect(() => {
@@ -246,7 +246,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des questions')
       loadQuestionLogs()
     }
-  }, [authStatus, activeTab, currentPage]) // 🚀 RETIRÉ: questionFilters pour éviter boucle
+  }, [authStatus, activeTab, currentPage]) // Garder authStatus pour sécurité
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -438,6 +438,10 @@ export const StatisticsPage: React.FC = () => {
           console.log('❌ Aucun endpoint de performance disponible')
           setPerformanceStats({
             avg_response_time: 0, // Sera affiché comme "Aucune donnée disponible"
+            median_response_time: 0,
+            min_response_time: 0,
+            max_response_time: 0,
+            response_time_count: 0,
             openai_costs: 127.35,
             error_count: 0,
             cache_hit_rate: 0
