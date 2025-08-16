@@ -403,9 +403,9 @@ export const StatisticsPage: React.FC = () => {
             }, {})
             
             // Trier par nombre de questions et prendre le top 5
-            const topUsers = Object.values(userStats)
+            const topUsers: Array<{email: string, question_count: number, plan: string}> = Object.values(userStats)
               .sort((a: any, b: any) => b.question_count - a.question_count)
-              .slice(0, 5)
+              .slice(0, 5) as Array<{email: string, question_count: number, plan: string}>
             
             console.log('👥 Top users calculés depuis les questions:', topUsers)
             
