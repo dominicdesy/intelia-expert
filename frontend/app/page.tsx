@@ -1,8 +1,3 @@
-/**
- * Authentication page component with login/signup forms
- * Supports multi-language interface and remember me functionality
- * Redirects authenticated users to /chat
- */
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -11,9 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
 
-const isDevelopment = process.env.NODE_ENV === 'development'
-
-// Multi-language translations for UI text
 const translations = {
   fr: {
     title: 'Intelia Expert',
@@ -128,20 +120,20 @@ const translations = {
   es: {
     title: 'Intelia Expert',
     email: 'Email',
-    password: 'Contraseña',
-    confirmPassword: 'Confirmar contraseña',
-    login: 'Iniciar sesión',
+    password: 'ContraseÃ±a',
+    confirmPassword: 'Confirmar contraseÃ±a',
+    login: 'Iniciar sesiÃ³n',
     signup: 'Crear cuenta',
     rememberMe: 'Recordar mi email',
-    forgotPassword: '¿Olvidaste tu contraseña?',
-    newToIntelia: '¿Nuevo en Intelia?',
-    connecting: 'Iniciando sesión...',
+    forgotPassword: 'Â¿Olvidaste tu contraseÃ±a?',
+    newToIntelia: 'Â¿Nuevo en Intelia?',
+    connecting: 'Iniciando sesiÃ³n...',
     creating: 'Creando cuenta...',
-    loginError: 'Error de inicio de sesión',
+    loginError: 'Error de inicio de sesiÃ³n',
     signupError: 'Error de registro',
-    emailRequired: 'La dirección de correo es requerida',
-    emailInvalid: 'Por favor ingresa una dirección de correo válida',
-    passwordRequired: 'La contraseña es requerida',
+    emailRequired: 'La direcciÃ³n de correo es requerida',
+    emailInvalid: 'Por favor ingresa una direcciÃ³n de correo vÃ¡lida',
+    passwordRequired: 'La contraseÃ±a es requerida',
     passwordTooShort: 'La contraseña debe tener al menos 8 caracteres con una mayúscula y un número',
     passwordMismatch: 'Las contraseñas no coinciden',
     firstNameRequired: 'El nombre es requerido',
@@ -184,18 +176,18 @@ const translations = {
     title: 'Intelia Expert',
     email: 'E-Mail',
     password: 'Passwort',
-    confirmPassword: 'Passwort bestätigen',
+    confirmPassword: 'Passwort bestÃ¤tigen',
     login: 'Anmelden',
     signup: 'Konto erstellen',
     rememberMe: 'E-Mail merken',
     forgotPassword: 'Passwort vergessen?',
     newToIntelia: 'Neu bei Intelia?',
-    connecting: 'Anmeldung läuft...',
+    connecting: 'Anmeldung lÃ¤uft...',
     creating: 'Konto wird erstellt...',
     loginError: 'Anmeldefehler',
     signupError: 'Registrierungsfehler',
     emailRequired: 'E-Mail-Adresse ist erforderlich',
-    emailInvalid: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
+    emailInvalid: 'Bitte geben Sie eine gÃ¼ltige E-Mail-Adresse ein',
     passwordRequired: 'Passwort ist erforderlich',
     passwordTooShort: 'Passwort muss mindestens 8 Zeichen mit einem Großbuchstaben und einer Zahl haben',
     passwordMismatch: 'Passwörter stimmen nicht überein',
@@ -227,7 +219,7 @@ const translations = {
     companyLinkedin: 'Unternehmens-LinkedIn-Seite',
     optional: '(optional)',
     required: '*',
-    close: 'Schließen',
+    close: 'SchlieÃŸen',
     alreadyHaveAccount: 'Bereits ein Konto?',
     authSuccess: 'Erfolgreich angemeldet!',
     authError: 'Anmeldefehler, bitte versuchen Sie es erneut.',
@@ -237,7 +229,6 @@ const translations = {
   }
 }
 
-// Available countries for signup form
 const countries = [
   { value: 'CA', label: 'Canada' },
   { value: 'US', label: 'États-Unis' },
@@ -248,9 +239,6 @@ const countries = [
   { value: 'BR', label: 'Brésil' }
 ]
 
-/**
- * Displays Intelia logo with configurable styling
- */
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   <img 
     src="/images/favicon.png" 
@@ -259,10 +247,6 @@ const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   />
 )
 
-/**
- * Language selector dropdown component
- * Updates interface language and persists selection to localStorage
- */
 const LanguageSelector = ({ onLanguageChange, currentLanguage }: { 
   onLanguageChange: (lang: Language) => void
   currentLanguage: Language 
@@ -322,22 +306,15 @@ const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
   )
 }
 
-/**
- * Validates email format using RFC-compliant regex
- */
 const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-/**
- * Validates password strength requirements
- * Returns validation status and list of specific errors
- */
 const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
   
   if (password.length < 8) {
-    errors.push('Au moins 8 caractères')
+    errors.push('Au moins 8 caractÃ¨res')
   }
   if (!/[A-Z]/.test(password)) {
     errors.push('Une majuscule')
@@ -352,10 +329,6 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
   }
 }
 
-/**
- * Validates phone number format or allows empty fields
- * All three fields (country code, area code, number) required if any is filled
- */
 const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
     return true
@@ -378,35 +351,25 @@ const validatePhone = (countryCode: string, areaCode: string, phoneNumber: strin
   return true
 }
 
-/**
- * Validates LinkedIn profile URL format or allows empty
- */
 const validateLinkedIn = (url: string): boolean => {
   if (!url.trim()) return true
   return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
 }
 
-/**
- * Validates website URL format or allows empty
- */
 const validateWebsite = (url: string): boolean => {
   if (!url.trim()) return true
   return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
-/**
- * Main authentication page content
- * Handles login/signup forms, session management, and redirects
- */
+// ðŸ"§ 1. Votre contenu existant devient PageContent
 function PageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams() // âœ… Maintenant autorisÃ© dans Suspense
   
-  // Single store call for better performance
-  const store = useAuthStore()
-  const { user, isAuthenticated, isLoading, hasHydrated, login, register, initializeSession } = store
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Données
+  const { login, register, initializeSession } = useAuthStore() // Actions
 
-  // Prevent multiple initializations and redirects
+  // ðŸ›¡ï¸ PROTECTION + REMEMBER ME FEATURES
   const hasInitialized = useRef(false)
   const hasCheckedAuth = useRef(false)
   const redirectInProgress = useRef(false)
@@ -446,7 +409,7 @@ function PageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
-  // LocalStorage utilities for remember me functionality
+  // âœ… UTILITAIRES REMEMBER ME CORRIGÃ‰S
   const rememberMeUtils = {
     save: (email: string, remember = true) => {
       if (remember && email) {
@@ -470,7 +433,7 @@ function PageContent() {
     }
   }
 
-  // Redirect to chat page after successful authentication
+  // ðŸ›¡ï¸ FONCTION DE REDIRECTION SÃ‰CURISÃ‰E + REMEMBER ME
   const handleRedirectToChat = useCallback(() => {
     if (redirectInProgress.current || isRedirecting) {
       return
@@ -479,17 +442,17 @@ function PageContent() {
     redirectInProgress.current = true
     setIsRedirecting(true)
     
-    // Use window.location for complete page reload to avoid hydration issues
+    // Utiliser window.location pour une redirection complÃ¨te
     setTimeout(() => {
       window.location.href = '/chat'
-    }, 100) // Back to original working delay
+    }, 100)
   }, [isRedirecting])
 
-  // Initialize component state and restore user preferences
+  // âœ… INITIALISATION CORRIGÃ‰E AVEC REMEMBER ME
   useEffect(() => {
     if (hasInitialized.current) return
     
-    // Load saved language preference or detect browser language
+    // Charger les prÃ©fÃ©rences utilisateur
     const savedLanguage = localStorage.getItem('intelia-language') as Language
     if (savedLanguage && translations[savedLanguage]) {
       setCurrentLanguage(savedLanguage)
@@ -500,34 +463,24 @@ function PageContent() {
       }
     }
 
-    // Restore remembered email if available
+    // âœ… RESTAURER EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail, hasRememberedEmail } = rememberMeUtils.load()
-    
-    if (isDevelopment) {
-      console.log('Initializing - rememberMe:', rememberMe, 'lastEmail:', lastEmail)
-    }
     
     if (hasRememberedEmail) {
       setLoginData({
         email: lastEmail,
-        password: '', // Always clear password for security
+        password: '', // âœ… Toujours vider le mot de passe
         rememberMe: true
       })
       
       setLocalSuccess(`Email restauré : ${lastEmail}. Entrez votre mot de passe.`)
       setTimeout(() => setLocalSuccess(''), 4000)
-    } else {
-      // Set initial state even if no remembered email
-      setLoginData(prev => ({
-        ...prev,
-        rememberMe: false
-      }))
     }
 
     hasInitialized.current = true
   }, [])
 
-  // Auto-focus password field when email is pre-filled
+  // âœ… FOCUS AUTOMATIQUE sur mot de passe si email prÃ©-rempli
   useEffect(() => {
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
@@ -538,7 +491,7 @@ function PageContent() {
     }
   }, [loginData.email, loginData.password])
 
-  // Initialize authentication session once component is ready
+  // ðŸ›¡ï¸ VÃ‰RIFICATION AUTH UNE SEULE FOIS
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || hasCheckedAuth.current) {
       return
@@ -546,29 +499,27 @@ function PageContent() {
 
     hasCheckedAuth.current = true
 
-    // Redirect immediately if already authenticated
+    // Si dÃ©jÃ  connectÃ©, rediriger immÃ©diatement
     if (isAuthenticated) {
       handleRedirectToChat()
       return
     }
 
-    // Initialize session if not already done
+    // Sinon, initialiser la session une seule fois
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
       
       initializeSession().then((sessionFound) => {
         if (sessionFound) {
-          // Redirect will be handled by authentication state change
+          // La redirection sera gÃ©rÃ©e par le changement d'Ã©tat isAuthenticated
         }
       }).catch(error => {
-        if (isDevelopment) {
-          console.error('Session initialization error:', error)
-        }
+        console.error('âŒ [Session] Erreur initialisation:', error)
       })
     }
-  }, [hasHydrated, isAuthenticated, initializeSession, handleRedirectToChat])
+  }, [hasHydrated, hasInitialized.current, isAuthenticated, initializeSession, handleRedirectToChat])
 
-  // Monitor authentication state changes for redirect
+  // ðŸ›¡ï¸ SURVEILLANCE CHANGEMENT AUTH
   useEffect(() => {
     if (!hasHydrated || !hasInitialized.current || !hasCheckedAuth.current) {
       return
@@ -579,7 +530,7 @@ function PageContent() {
     }
   }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
 
-  // Handle authentication status from URL parameters
+  // ðŸ›¡ï¸ GESTION URL CALLBACK
   useEffect(() => {
     if (!hasInitialized.current) return
 
@@ -594,12 +545,12 @@ function PageContent() {
       setLocalError(t.authIncomplete)
     }
     
-    // Clean URL parameters after processing
+    // Nettoyer l'URL
     const url = new URL(window.location.href)
     url.searchParams.delete('auth')
     window.history.replaceState({}, '', url.pathname)
     
-    // Hide messages after 3 seconds
+    // Masquer les messages aprÃ¨s 3 secondes
     const timer = setTimeout(() => {
       setLocalSuccess('')
       setLocalError('')
@@ -608,7 +559,7 @@ function PageContent() {
     return () => clearTimeout(timer)
   }, [searchParams, t])
 
-  // Show loading screen during initialization or redirect
+  // âœ… AFFICHAGE CONDITIONNEL + Ã‰CRAN DE REDIRECTION
   if (!hasHydrated || !hasInitialized.current) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -650,10 +601,6 @@ function PageContent() {
   const handleLoginChange = (field: string, value: string | boolean) => {
     setLoginData(prev => {
       const newData = { ...prev, [field]: value }
-      if (isDevelopment) {
-        console.log('Login data updated:', field, '=', value)
-        console.log('New state:', newData)
-      }
       return newData
     })
     
@@ -697,7 +644,7 @@ function PageContent() {
     return null
   }
 
-  // ✅ LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÉE
+  // âœ… LOGIN AVEC GESTION "SE SOUVENIR DE MOI" CORRIGÃ‰E
   const handleLogin = async () => {
     setLocalError('')
     setLocalSuccess('')
@@ -722,10 +669,10 @@ function PageContent() {
       return
     }
 
-    // Save remember me preference and email if requested
     try {
       await login(loginData.email.trim(), loginData.password)
       
+      // âœ… GESTION "Se souvenir de moi" avec fonction utilitaire
       rememberMeUtils.save(loginData.email.trim(), loginData.rememberMe)
       
     } catch (error: any) {
@@ -733,7 +680,7 @@ function PageContent() {
       redirectInProgress.current = false
       
       if (error.message?.includes('Invalid login credentials')) {
-        setLocalError('Email ou mot de passe incorrect. Vérifiez vos identifiants.')
+        setLocalError('Email ou mot de passe incorrect. VÃ©rifiez vos identifiants.')
       } else if (error.message?.includes('Email not confirmed')) {
         setLocalError('Email non confirmé. Vérifiez votre boîte mail.')
       } else if (error.message?.includes('Too many requests')) {
@@ -755,9 +702,7 @@ function PageContent() {
     }
 
     try {
-      if (isDevelopment) {
-        console.log('Signup attempt for:', signupData.email)
-      }
+      console.log('ðŸ" [Signup] Tentative d\'inscription:', signupData.email)
       
       const userData: Partial<User> = {
         name: `${signupData.firstName.trim()} ${signupData.lastName.trim()}`,
@@ -769,7 +714,7 @@ function PageContent() {
       
       setLocalSuccess(t.accountCreated)
       
-      // Reset form after successful signup
+      // RÃ©initialiser le formulaire
       setSignupData({
         email: '', password: '', confirmPassword: '',
         firstName: '', lastName: '', linkedinProfile: '',
@@ -777,22 +722,19 @@ function PageContent() {
         companyName: '', companyWebsite: '', companyLinkedin: ''
       })
       
-      // Switch to login mode after delay
+      // Passer en mode login aprÃ¨s 4 secondes
       setTimeout(() => {
         setIsSignupMode(false)
         setLocalSuccess('')
       }, 4000)
       
     } catch (error: any) {
-      if (isDevelopment) {
-        console.error('Signup error:', error)
-      }
-      setLocalError(error.message || 'Erreur lors de la création du compte')
+      console.error('âŒ [Signup] Erreur:', error)
+      setLocalError(error.message || 'Erreur lors de la crÃ©ation du compte')
     }
   }
 
-  // Handle Enter key for form submission
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading && !isRedirecting) {
       if (isSignupMode) {
         handleSignup()
@@ -802,32 +744,30 @@ function PageContent() {
     }
   }
 
-  // Close signup form and restore login state
+  // âœ… GESTION MODES AVEC REMEMBER EMAIL CORRIGÃ‰E
   const handleCloseSignup = () => {
     setIsSignupMode(false)
     setLocalError('')
     setLocalSuccess('')
     
-    // Restore remembered email
+    // âœ… Restaurer EMAIL avec fonction utilitaire
     const { rememberMe, lastEmail } = rememberMeUtils.load()
     
-    if (isDevelopment) {
-      console.log('Closing signup, restoring email:', lastEmail)
-    }
+    console.log('ðŸ"„ [Signup] Fermeture signup - restore email:', lastEmail)
     
     setLoginData({ 
       email: lastEmail, 
-      password: '', // Always clear password for security
+      password: '', // âœ… Toujours vider mot de passe
       rememberMe 
     })
     
-    // Show restoration message if email was restored
+    // Message si email restaurÃ©
     if (rememberMe && lastEmail) {
       setLocalSuccess(`Email restauré : ${lastEmail}`)
       setTimeout(() => setLocalSuccess(''), 3000)
     }
     
-    // Reset signup form
+    // RÃ©initialiser le formulaire d'inscription
     setSignupData({
       email: '', password: '', confirmPassword: '',
       firstName: '', lastName: '', linkedinProfile: '',
@@ -842,23 +782,21 @@ function PageContent() {
     setLocalSuccess('')
     
     if (!isSignupMode) {
-      // Switch to signup mode - clear login form
+      // Passage en mode signup - vider login
       setLoginData({ email: '', password: '', rememberMe: false })
     } else {
-      // Return to login mode - restore remembered email
+      // Retour en mode login - restaurer EMAIL avec fonction utilitaire
       const { rememberMe, lastEmail } = rememberMeUtils.load()
       
-      if (isDevelopment) {
-        console.log('Returning to login, restoring email:', lastEmail)
-      }
+      console.log('ðŸ"„ [Toggle] Retour login - restore email:', lastEmail)
       
       setLoginData({ 
         email: lastEmail, 
-        password: '', // Always clear password for security
+        password: '', // âœ… Toujours vider mot de passe
         rememberMe 
       })
       
-      // Show restoration message if email was restored
+      // Message si email restaurÃ©
       if (rememberMe && lastEmail) {
         setLocalSuccess(`Email restauré : ${lastEmail}`)
         setTimeout(() => setLocalSuccess(''), 3000)
@@ -891,7 +829,7 @@ function PageContent() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
           
-          {/* Close button for signup mode */}
+          {/* Bouton de fermeture pour le mode inscription */}
           {isSignupMode && (
             <button
               onClick={handleCloseSignup}
@@ -905,9 +843,9 @@ function PageContent() {
             </button>
           )}
           
-          {/* Error and success messages with screen reader support */}
+          {/* Messages d'erreur et succÃ¨s */}
           {localError && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4" role="alert" aria-live="assertive">
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -927,7 +865,7 @@ function PageContent() {
           )}
 
           {localSuccess && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4" role="alert" aria-live="polite">
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -943,7 +881,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* Login form */}
+          {/* Formulaire de connexion */}
           {!isSignupMode && (
             <div className="space-y-6">
               <div>
@@ -959,7 +897,7 @@ function PageContent() {
                     required
                     value={loginData.email}
                     onChange={(e) => handleLoginChange('email', e.target.value)}
-                    onKeyDown={handleKeyDown}
+                    onKeyPress={handleKeyPress}
                     className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
                     placeholder="votre@email.com"
                     disabled={isLoading || isRedirecting}
@@ -981,9 +919,9 @@ function PageContent() {
                     required
                     value={loginData.password}
                     onChange={(e) => handleLoginChange('password', e.target.value)}
-                    onKeyDown={handleKeyDown}
+                    onKeyPress={handleKeyPress}
                     className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm transition-colors"
-                    placeholder={loginData.email ? "Entrez votre mot de passe" : "••••••••"}
+                    placeholder={loginData.email ? "Entrez votre mot de passe" : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
                     disabled={isLoading || isRedirecting}
                   />
                   <button
@@ -1015,10 +953,15 @@ function PageContent() {
                     type="checkbox"
                     checked={loginData.rememberMe}
                     onChange={(e) => {
-                      if (isDevelopment) {
-                        console.log('Remember me checkbox clicked:', e.target.checked)
-                      }
-                      handleLoginChange('rememberMe', e.target.checked)
+                      console.log('ðŸŽ¯ [Checkbox] Ã‰vÃ©nement onChange dÃ©clenchÃ©!')
+                      console.log('ðŸŽ¯ [Checkbox] e.target.checked:', e.target.checked)
+                      console.log('ðŸŽ¯ [Checkbox] e.target.value:', e.target.value)
+                      console.log('ðŸŽ¯ [Checkbox] Ã‰tat actuel rememberMe:', loginData.rememberMe)
+                      
+                      // Test direct
+                      const newValue = e.target.checked
+                      console.log('ðŸŽ¯ [Checkbox] Appel handleLoginChange avec:', newValue)
+                      handleLoginChange('rememberMe', newValue)
                     }}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     disabled={isLoading || isRedirecting}
@@ -1063,10 +1006,10 @@ function PageContent() {
             </div>
           )}
 
-          {/* Signup form with complete user information */}
+          {/* Formulaire d'inscription - COMPLET de votre sauvegarde */}
           {isSignupMode && (
             <div className="space-y-6 pt-2">
-              {/* Personal Information section */}
+              {/* Section: Informations personnelles */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.personalInfo}
@@ -1120,7 +1063,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Contact section */}
+              {/* Section: Contact */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.contact}
@@ -1244,7 +1187,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Password fields section */}
+              {/* Section: Mots de passe */}
               <div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -1259,7 +1202,7 @@ function PageContent() {
                         value={signupData.password}
                         onChange={(e) => handleSignupChange('password', e.target.value)}
                         className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="••••••••"
+                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                         disabled={isLoading}
                       />
                       <button
@@ -1311,7 +1254,7 @@ function PageContent() {
                         value={signupData.confirmPassword}
                         onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
                         className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        placeholder="••••••••"
+                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                         disabled={isLoading}
                       />
                       <button
@@ -1349,7 +1292,7 @@ function PageContent() {
                 </div>
               </div>
 
-              {/* Company information section */}
+              {/* Section: Entreprise */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
                   {t.company}
@@ -1420,7 +1363,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* Mode toggle buttons - only visible in login mode */}
+          {/* Section des boutons de basculement - seulement visible en mode connexion */}
           {!isSignupMode && (
             <>
               <div className="mt-6">
@@ -1449,7 +1392,7 @@ function PageContent() {
             </>
           )}
 
-          {/* Return to login toggle from signup mode */}
+          {/* Toggle pour revenir au login depuis signup */}
           {isSignupMode && (
             <div className="mt-6">
               <div className="relative">
@@ -1476,7 +1419,7 @@ function PageContent() {
             </div>
           )}
 
-          {/* GDPR compliance notice with secure external links */}
+          {/* Section RGPD améliorée */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex-shrink-0 mt-0.5">
@@ -1492,7 +1435,6 @@ function PageContent() {
                     href="/terms" 
                     className="text-blue-700 hover:text-blue-900 underline font-medium transition-colors"
                     target="_blank"
-                    rel="noopener noreferrer"
                   >
                     {t.terms}
                   </Link>{' '}
@@ -1501,7 +1443,6 @@ function PageContent() {
                     href="/privacy" 
                     className="text-blue-700 hover:text-blue-900 underline font-medium transition-colors"
                     target="_blank"
-                    rel="noopener noreferrer"
                   >
                     {t.privacy}
                   </Link>
@@ -1513,7 +1454,7 @@ function PageContent() {
         </div>
       </div>
 
-      {/* Support contact section */}
+      {/* Section d'aide */}
       <div className="mt-8 text-center">
         <p className="text-xs text-gray-500">
           {t.needHelp}{' '}
@@ -1530,10 +1471,7 @@ function PageContent() {
   )
 }
 
-/**
- * Main page component wrapped with Suspense for Next.js compatibility
- * Provides loading fallback during component initialization
- */
+// ðŸ"§ 2. Export principal avec Suspense
 export default function Page() {
   return (
     <Suspense fallback={
