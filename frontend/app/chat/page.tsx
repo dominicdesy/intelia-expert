@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { useRouter } from 'next/navigation' // ✅ AJOUTÉ pour router.push
 import { Message } from './types'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from './hooks/useTranslation'
@@ -72,6 +73,7 @@ class PageLoadingCircuitBreaker {
 const pageLoadingBreaker = new PageLoadingCircuitBreaker()
 
 export default function ChatInterface() {
+  const router = useRouter() // ✅ AJOUTÉ pour navigation propre
   const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
 
@@ -93,6 +95,12 @@ export default function ChatInterface() {
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
+
+  // ✅ NOUVEAUX ÉTATS pour gestion authentification améliorée
+  const [authGracePeriod, setAuthGracePeriod] = useState(true)
+  const [authCheckCount, setAuthCheckCount] = useState(0)
+  const [lastAuthCheck, setLastAuthCheck] = useState(0)
+  const [showAuthMessage, setShowAuthMessage] = useState(false)
 
   // États existants inchangés - CODE ORIGINAL CONSERVÉ
   const [clarificationState, setClarificationState] = useState<{
@@ -121,12 +129,16 @@ export default function ChatInterface() {
   const lastMessageCountRef = useRef(0)
   const isMountedRef = useRef(true)
   
-  // 🔥 SUPPRIMÉ: hasRedirectedRef - plus de redirection dans cette page
+  // 🔥 SUPPRIMÉ: hasRedirectedRef - plus de redirection brutale dans cette page
   // const hasRedirectedRef = useRef(false)
   
   // Nouveaux refs pour contrôler la redirection avec délai - CODE ORIGINAL CONSERVÉ (mais logique modifiée)
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // ✅ NOUVEAUX REFS pour gestion auth améliorée
+  const gracePeriodTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const authMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Refs pour éviter les re-chargements multiples et contrôler les tentatives - CODE ORIGINAL CONSERVÉ
   const hasLoadedConversationsRef = useRef(false)
@@ -140,6 +152,48 @@ export default function ChatInterface() {
   const hasMessages = messages.length > 0
 
   console.log('[Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
+
+  // ✅ NOUVELLE FONCTION : Gestion intelligente des erreurs auth
+  const handleAuthError = (error: any) => {
+    console.log('🔧 [Auth] Gestion erreur auth:', error)
+    
+    if (error?.status === 403 || 
+        error?.message?.includes('Auth session missing') ||
+        error?.message?.includes('Forbidden')) {
+      
+      console.log('🔄 [Auth] Session expirée détectée, mise à jour état')
+      setShowAuthMessage(true)
+      
+      // Nettoyer le message après 5 secondes
+      if (authMessageTimeoutRef.current) {
+        clearTimeout(authMessageTimeoutRef.current)
+      }
+      
+      authMessageTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setShowAuthMessage(false)
+        }
+      }, 5000)
+    }
+  }
+
+  // ✅ NOUVELLE FONCTION : Redirection intelligente vers login
+  const handleRedirectToLogin = useCallback((reason: string = 'Session expirée') => {
+    console.log('🔄 [Auth] Redirection vers login:', reason)
+    
+    // Nettoyer tous les timeouts
+    if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current)
+    if (authCheckTimeoutRef.current) clearTimeout(authCheckTimeoutRef.current)
+    if (gracePeriodTimeoutRef.current) clearTimeout(gracePeriodTimeoutRef.current)
+    
+    // Utiliser router au lieu de window.location pour éviter les boucles
+    try {
+      router.replace('/') // Plus propre que window.location
+    } catch (error) {
+      console.error('🔧 [Auth] Erreur redirection router, fallback window.location')
+      window.location.href = '/'
+    }
+  }, [router])
 
   // FONCTION UTILITAIRE : Extraire les initiales de l'utilisateur - CODE ORIGINAL CONSERVÉ
   const getUserInitials = (user: any): string => {
@@ -394,6 +448,9 @@ export default function ChatInterface() {
       pageLoadingBreaker.recordFailure()
       console.error(`[loadConversationsWithBreaker] Tentative ${conversationLoadingAttemptsRef.current} échouée:`, error)
       
+      // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
+      handleAuthError(error)
+      
       // Reset le flag pour permettre une nouvelle tentative
       hasLoadedConversationsRef.current = false
       
@@ -406,6 +463,73 @@ export default function ChatInterface() {
       throw error
     }
   }
+
+  // ✅ NOUVEAU useEffect pour période de grâce authentification
+  useEffect(() => {
+    // Période de grâce de 3 secondes pour éviter les redirections prématurées
+    if (gracePeriodTimeoutRef.current) {
+      clearTimeout(gracePeriodTimeoutRef.current)
+    }
+    
+    gracePeriodTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setAuthGracePeriod(false)
+        console.log('🔄 [Auth] Période de grâce terminée')
+      }
+    }, 3000)
+
+    return () => {
+      if (gracePeriodTimeoutRef.current) {
+        clearTimeout(gracePeriodTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // ✅ NOUVEAU useEffect pour gestion intelligente auth
+  useEffect(() => {
+    const now = Date.now()
+    
+    // Éviter les vérifications trop fréquentes
+    if (now - lastAuthCheck < 2000) {
+      return
+    }
+    
+    setLastAuthCheck(now)
+    setAuthCheckCount(prev => prev + 1)
+    
+    console.log('🔍 [Auth] Vérification état:', {
+      isLoading,
+      isAuthenticated,
+      hasUser: !!user,
+      authGracePeriod,
+      checkCount: authCheckCount
+    })
+    
+    // Pas d'action pendant la période de grâce ou le chargement
+    if (authGracePeriod || isLoading) {
+      return
+    }
+    
+    // Si pas authentifié après la période de grâce, gérer selon le contexte
+    if (!isAuthenticated || !user) {
+      // Si c'est la première vérification, attendre un peu plus
+      if (authCheckCount === 1) {
+        console.log('🔄 [Auth] Première vérification non-auth, attente supplémentaire')
+        const extraWaitTimeout = setTimeout(() => {
+          if (isMountedRef.current && (!isAuthenticated || !user)) {
+            console.log('🔄 [Auth] Toujours non-auth après attente, redirection')
+            handleRedirectToLogin('Utilisateur non authentifié')
+          }
+        }, 2000)
+        
+        return () => clearTimeout(extraWaitTimeout)
+      } else {
+        // Redirection après plusieurs vérifications
+        console.log('🔄 [Auth] Redirection après vérifications multiples')
+        handleRedirectToLogin('Session expirée après vérifications')
+      }
+    }
+  }, [isLoading, isAuthenticated, user, authGracePeriod, authCheckCount, handleRedirectToLogin])
 
   // ✅ NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
@@ -533,41 +657,14 @@ export default function ChatInterface() {
       if (authCheckTimeoutRef.current) {
         clearTimeout(authCheckTimeoutRef.current)
       }
-    }
-  }, [])
-
-  // 🔥 useEffect CORRIGÉ - SUPPRESSION de la redirection automatique
-  useEffect(() => {
-    // Nettoyer les timeouts précédents
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current)
-    }
-    if (authCheckTimeoutRef.current) {
-      clearTimeout(authCheckTimeoutRef.current)
-    }
-
-    // ✅ NOUVELLE LOGIQUE: Plus de redirection automatique
-    // Cette page suppose maintenant que l'utilisateur est déjà authentifié
-    // La protection se fait via AuthProvider au niveau layout
-    
-    console.log('[ChatInterface] État auth:', {
-      isLoading,
-      isAuthenticated,
-      hasUser: !!user
-    })
-
-    // Si pas authentifié après chargement, on affiche juste un message
-    // mais on ne redirige PAS pour éviter les boucles
-    if (!isLoading && !isAuthenticated) {
-      console.log('[ChatInterface] Utilisateur non authentifié - affichage message')
-    }
-
-    return () => {
-      if (authCheckTimeoutRef.current) {
-        clearTimeout(authCheckTimeoutRef.current)
+      if (gracePeriodTimeoutRef.current) {
+        clearTimeout(gracePeriodTimeoutRef.current)
+      }
+      if (authMessageTimeoutRef.current) {
+        clearTimeout(authMessageTimeoutRef.current)
       }
     }
-  }, [isLoading, isAuthenticated]) // Dépendances inchangées
+  }, [])
 
   useEffect(() => {
     const detectMobileDevice = () => {
@@ -735,12 +832,11 @@ export default function ChatInterface() {
       hasLoadedConversationsRef.current = false
       conversationLoadingAttemptsRef.current = 0
       pageLoadingBreaker.reset()
-      // 🔥 SUPPRIMÉ: hasRedirectedRef.current = false
       console.log('[ChatInterface] Reset circuit breaker pour nouvel utilisateur:', user.id)
     }
   }, [user?.id])
 
-  // 🔥 ÉTATS DE CHARGEMENT AMÉLIORÉS
+  // ✅ ÉTATS DE CHARGEMENT AMÉLIORÉS
   if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -752,33 +848,47 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ NOUVEAU: Gestion intelligente de l'état non-authentifié
-  if (!isAuthenticated || !user) {
-    // Si on est en train de charger, afficher le loading
-    if (isLoading) {
-      return (
-        <div className="h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-pulse h-8 w-8 bg-gray-300 rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Authentification en cours...</p>
+  // ✅ NOUVELLE GESTION INTELLIGENTE AUTH - Période de grâce
+  if (authGracePeriod) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-pulse h-8 w-8 bg-blue-300 rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification de l'authentification...</p>
+          <div className="mt-2 text-xs text-gray-500">
+            Patientez quelques instants
           </div>
         </div>
-      )
-    }
-    
-    // Si pas en loading et pas authentifié = déconnexion ou session expirée
-    // Rediriger vers la page de login (racine)
-    if (typeof window !== 'undefined') {
-      window.location.replace('/')
-      return null
-    }
-    
-    // Fallback pour SSR
+      </div>
+    )
+  }
+
+  // ✅ NOUVELLE GESTION INTELLIGENTE AUTH - Pas d'authentification
+  if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection vers la connexion...</p>
+          <p className="text-gray-600">Session expirée, redirection...</p>
+          
+          {showAuthMessage && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                Votre session a expiré. Redirection en cours...
+              </p>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => handleRedirectToLogin('Bouton utilisateur')}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retourner à la connexion
+          </button>
+          
+          <div className="mt-2 text-xs text-gray-500">
+            Redirection automatique dans quelques instants
+          </div>
         </div>
       </div>
     )
@@ -999,6 +1109,9 @@ export default function ChatInterface() {
     } catch (error) {
       console.error('[handleSendMessage] Erreur:', error)
 
+      // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
+      handleAuthError(error)
+
       if (isMountedRef.current) {
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -1057,6 +1170,10 @@ export default function ChatInterface() {
         }
       } catch (feedbackError) {
         console.error('Erreur envoi feedback:', feedbackError)
+        
+        // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
+        handleAuthError(feedbackError)
+        
         if (isMountedRef.current) {
           updateMessage(messageId, {
             feedback: null,
