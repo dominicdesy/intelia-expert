@@ -402,9 +402,9 @@ function PageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Single store call for better performance - FIXED: separate calls like backup
-  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore() // Data
-  const { login, register, initializeSession } = useAuthStore() // Actions
+  // Single store call for better performance
+  const store = useAuthStore()
+  const { user, isAuthenticated, isLoading, hasHydrated, login, register, initializeSession } = store
 
   // Prevent multiple initializations and redirects
   const hasInitialized = useRef(false)
@@ -546,11 +546,9 @@ function PageContent() {
 
     hasCheckedAuth.current = true
 
-    // Only redirect if already authenticated AND not on chat page
+    // Redirect immediately if already authenticated
     if (isAuthenticated) {
-      if (window.location.pathname !== '/chat' && !window.location.pathname.startsWith('/chat/')) {
-        handleRedirectToChat()
-      }
+      handleRedirectToChat()
       return
     }
 
@@ -576,12 +574,8 @@ function PageContent() {
       return
     }
 
-    // Only redirect if authenticated AND not already redirecting AND not already on chat page
     if (isAuthenticated && !isLoading && !redirectInProgress.current) {
-      // Check if we're not already on the chat page to prevent loops
-      if (window.location.pathname !== '/chat' && !window.location.pathname.startsWith('/chat/')) {
-        handleRedirectToChat()
-      }
+      handleRedirectToChat()
     }
   }, [isAuthenticated, isLoading, hasHydrated, handleRedirectToChat])
 
