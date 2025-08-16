@@ -752,14 +752,33 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ NOUVEAU: Fallback si pas d'utilisateur - SANS redirection
+  // ✅ NOUVEAU: Gestion intelligente de l'état non-authentifié
   if (!isAuthenticated || !user) {
+    // Si on est en train de charger, afficher le loading
+    if (isLoading) {
+      return (
+        <div className="h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse h-8 w-8 bg-gray-300 rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Authentification en cours...</p>
+          </div>
+        </div>
+      )
+    }
+    
+    // Si pas en loading et pas authentifié = déconnexion ou session expirée
+    // Rediriger vers la page de login
+    if (typeof window !== 'undefined') {
+      window.location.replace('/auth')
+      return null
+    }
+    
+    // Fallback pour SSR
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-pulse h-8 w-8 bg-gray-300 rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Authentification en cours...</p>
-          <p className="text-sm text-gray-500 mt-2">Si cette page persiste, veuillez vous reconnecter.</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirection vers la connexion...</p>
         </div>
       </div>
     )
