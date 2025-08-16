@@ -349,6 +349,16 @@ export const StatisticsPage: React.FC = () => {
           console.log('⚠️ Tous les endpoints OpenAI ont échoué, utilisation fallback:', realOpenaiCosts)
         }
         
+        // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND + CALCUL DEPUIS LES QUESTIONS
+        let realResponseTime = null
+        
+        // D'abord essayer les données du backend performance
+        if (backendData?.current_status?.avg_response_time_ms) {
+          realResponseTime = backendData.current_status.avg_response_time_ms / 1000
+        } else if (backendData?.averages?.avg_response_time_ms) {
+          realResponseTime = backendData.averages.avg_response_time_ms / 1000
+        }
+        
         // 🎯 CALCUL DU VRAI TEMPS depuis vos questions réelles (plus précis)
         let questionBasedMetrics = null
         if (questionsData && questionsData.questions) {
