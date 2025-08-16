@@ -285,9 +285,32 @@ export const StatisticsPage: React.FC = () => {
       console.log('🔄 Chargement dashboard...')
       const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
       
-      // ⚡ COÛTS OPENAI EN DERNIER (plus lent à cause du rate limiting)
-      console.log('🔄 Chargement coûts OpenAI (peut prendre du temps)...')
-      const openaiCostsRes = await fetch('/api/v1/billing/openai-usage/current-month', { headers })
+      // ⚡ COÛTS OPENAI OPTIMISÉS - Utiliser les nouveaux endpoints rapides
+      console.log('🔄 Chargement coûts OpenAI (optimisé)...')
+      
+      // 🚀 PRIORISER les endpoints rapides dans l'ordre
+      const openaiEndpoints = [
+        '/api/v1/billing/openai-usage/last-week',        // ⚡ RAPIDE - 7 jours
+        '/api/v1/billing/openai-usage/current-month-light', // 🛡️ SÉCURISÉ - 10 jours max
+        '/api/v1/billing/openai-usage/fallback',         // 🆘 SECOURS - données simulées
+        '/api/v1/billing/openai-usage/current-month'     // 🐌 LEGACY - en dernier recours
+      ]
+      
+      let openaiCostsRes = null
+      for (const endpoint of openaiEndpoints) {
+        try {
+          console.log(`🔍 Tentative: ${endpoint}`)
+          openaiCostsRes = await fetch(endpoint, { headers })
+          if (openaiCostsRes.ok) {
+            console.log(`✅ Succès via: ${endpoint}`)
+            break
+          } else {
+            console.log(`❌ Échec ${endpoint}: ${openaiCostsRes.status}`)
+          }
+        } catch (error) {
+          console.log(`💥 Erreur ${endpoint}:`, error)
+        }
+      }
       
       console.log('🔄 Chargement health et métriques...')
       const systemHealthRes = await fetch('/api/v1/health/detailed', { headers })
@@ -303,18 +326,23 @@ export const StatisticsPage: React.FC = () => {
         backendData = await performanceRes.json()
         console.log('📊 Données de performance reçues:', backendData)
         
-        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec gestion du timeout
-        let realOpenaiCosts = 6.30 // Utiliser la dernière valeur connue comme fallback
-        if (openaiCostsRes.ok) {
+        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec endpoints optimisés
+        let realOpenaiCosts = 6.30 // Valeur connue comme fallback
+        
+        if (openaiCostsRes && openaiCostsRes.ok) {
           try {
             const openaiData = await openaiCostsRes.json()
-            realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || 6.30
-            console.log('💰 Coûts OpenAI réels récupérés:', openaiData)
+            realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || openaiData.total_usage || 6.30
+            console.log('💰 Coûts OpenAI optimisés récupérés:', {
+              cost: realOpenaiCosts,
+              source: openaiData.source || 'api',
+              cached: openaiData.cached || false
+            })
           } catch (parseError) {
-            console.log('⚠️ Erreur parsing coûts OpenAI, utilisation fallback')
+            console.log('⚠️ Erreur parsing coûts OpenAI, utilisation fallback:', realOpenaiCosts)
           }
         } else {
-          console.log('⚠️ API OpenAI rate limitée ou lente, utilisation fallback:', realOpenaiCosts)
+          console.log('⚠️ Tous les endpoints OpenAI ont échoué, utilisation fallback:', realOpenaiCosts)
         }
         
         // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND

@@ -76,6 +76,10 @@ interface BackendPerformanceStats {
 
 interface PerformanceStats {
   avg_response_time: number
+  median_response_time: number
+  min_response_time: number
+  max_response_time: number
+  response_time_count: number
   openai_costs: number
   error_count: number
   cache_hit_rate: number
@@ -345,15 +349,50 @@ export const StatisticsPage: React.FC = () => {
           console.log('⚠️ Tous les endpoints OpenAI ont échoué, utilisation fallback:', realOpenaiCosts)
         }
         
-        // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND
-        const realResponseTime = backendData?.current_status?.avg_response_time_ms 
-          ? backendData.current_status.avg_response_time_ms / 1000  // Convertir ms en secondes
-          : backendData?.averages?.avg_response_time_ms 
-          ? backendData.averages.avg_response_time_ms / 1000
-          : null // Aucune donnée disponible
+        // 🎯 CALCUL DU VRAI TEMPS depuis vos questions réelles (plus précis)
+        let questionBasedMetrics = null
+        if (questionsData && questionsData.questions) {
+          const validTimes = questionsData.questions
+            .map(q => q.response_time)
+            .filter(t => t && t > 0)
+            .sort((a, b) => a - b) // Trier pour calculer la médiane
+          
+          if (validTimes.length > 0) {
+            const average = validTimes.reduce((a, b) => a + b, 0) / validTimes.length
+            const median = validTimes.length % 2 === 0 
+              ? (validTimes[validTimes.length / 2 - 1] + validTimes[validTimes.length / 2]) / 2
+              : validTimes[Math.floor(validTimes.length / 2)]
+            const min = validTimes[0]
+            const max = validTimes[validTimes.length - 1]
+            
+            questionBasedMetrics = {
+              average,
+              median, 
+              min,
+              max,
+              count: validTimes.length
+            }
+            
+            console.log('📊 Métriques temps de réponse calculées:', {
+              count: validTimes.length,
+              average: average.toFixed(2) + 's',
+              median: median.toFixed(2) + 's',
+              min: min.toFixed(2) + 's',
+              max: max.toFixed(2) + 's',
+              backendReported: realResponseTime ? realResponseTime.toFixed(2) + 's' : 'N/A'
+            })
+          }
+        }
+        
+        // Prioriser le calcul depuis vos vraies questions (plus précis)
+        const finalResponseTime = questionBasedMetrics?.average || realResponseTime || 0
         
         const adaptedPerfStats: PerformanceStats = {
-          avg_response_time: realResponseTime || 0, // Utiliser 0 si aucune donnée (sera affiché comme "Aucune donnée")
+          avg_response_time: finalResponseTime,
+          median_response_time: questionBasedMetrics?.median || 0, // 🆕 MÉDIANE
+          min_response_time: questionBasedMetrics?.min || 0,       // 🆕 MINIMUM  
+          max_response_time: questionBasedMetrics?.max || 0,       // 🆕 MAXIMUM
+          response_time_count: questionBasedMetrics?.count || 0,   // 🆕 NOMBRE D'ÉCHANTILLONS
           openai_costs: realOpenaiCosts,
           error_count: backendData?.global_stats?.total_failures || 
                       backendData?.current_status?.total_errors || 0,
@@ -440,7 +479,11 @@ export const StatisticsPage: React.FC = () => {
               .sort((a: any, b: any) => b.question_count - a.question_count)
               .slice(0, 5) as Array<{email: string, question_count: number, plan: string}>
             
-            console.log('👥 Top users calculés depuis les questions:', topUsers)
+            console.log('👥 Top users calculés depuis les questions:', {
+              userStats,
+              topUsers,
+              totalUsers: Object.keys(userStats).length
+            })
             
             setBillingStats({
               plans: {},
