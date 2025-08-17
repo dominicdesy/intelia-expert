@@ -190,7 +190,7 @@ export const HistoryMenu = () => {
                               {/* Métadonnées */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
                                 <span>{formatConversationTime(conv.updated_at)}</span>
-                                {conv.messages_count != null && <span>{conv.messages_count} msg</span>}
+				{conv.message_count != null && <span>{conv.message_count} msg</span>}
                               </div>
                             </div>
 
