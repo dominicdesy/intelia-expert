@@ -1508,7 +1508,7 @@ export default function ChatInterface() {
               opacity: 1
             }}
           >
-            <div className="max-w-full sm:max-w-4xl mx-auto">
+			<div className="max-w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full sm:w-[90%] lg:w-[75%] xl:w-[60%]">
               {clarificationState && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
@@ -1528,8 +1528,9 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ - CODE ORIGINAL CONSERVÉ */}
-              <div className={`flex items-center min-h-[48px] ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
+			  {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
+			  <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
+			  
                 <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
                   <input
                     ref={inputRef}
