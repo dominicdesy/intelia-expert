@@ -119,18 +119,22 @@ export const HistoryMenu = () => {
     setIsOpen(false)
   }
 
-  // ✅ SOLUTION FINALE: Correction du problème de timezone
+  // ✅ SOLUTION FORCÉE: Bypasser simpleLocalTime complètement
   const formatConversationTime = (timestamp: string): string => {
+    // 🔍 DEBUG: Afficher le timestamp reçu
+    console.log('🔍 [formatConversationTime] Timestamp reçu:', timestamp, typeof timestamp)
+    
     try {
       let processedTimestamp = timestamp
       
       // 🔧 CORRECTION: Si le timestamp n'a pas de timezone, on assume qu'il est UTC
       if (timestamp && !timestamp.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(timestamp)) {
         processedTimestamp = timestamp + 'Z'
-        console.log('🔧 [HistoryMenu] Timestamp corrigé pour UTC:', processedTimestamp)
+        console.log('🔧 [formatConversationTime] Timestamp corrigé pour UTC:', processedTimestamp)
       }
       
       const date = new Date(processedTimestamp)
+      console.log('📅 [formatConversationTime] Date parsée:', date.toString())
       
       if (isNaN(date.getTime())) {
         console.warn('⚠️ Timestamp invalide:', timestamp)
@@ -144,16 +148,22 @@ export const HistoryMenu = () => {
       const hours = date.getHours().toString().padStart(2, '0')
       const minutes = date.getMinutes().toString().padStart(2, '0')
       
-      return `${year}-${month}-${day} ${hours}:${minutes}`
+      const result = `${year}-${month}-${day} ${hours}:${minutes}`
+      console.log('🎯 [formatConversationTime] Résultat final:', result)
+      
+      return result
       
     } catch (error) {
       console.warn('⚠️ Erreur formatage heure:', error)
-      // Fallback vers l'ancienne méthode si erreur
-      try {
-        return simpleLocalTime(timestamp)
-      } catch (fallbackError) {
-        return 'Erreur affichage'
-      }
+      // 🚫 NE PAS utiliser simpleLocalTime, utiliser fallback direct
+      return new Date(timestamp).toLocaleDateString('fr-CA', { 
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
     }
   }
 
@@ -307,8 +317,25 @@ export const HistoryMenu = () => {
                               {/* Métadonnées avec HEURE LOCALE CORRIGÉE */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
                                 <span>
-                                  {/* ✅ CORRECTION: Utilisation du nouveau formatage heure locale */}
-                                  {formatConversationTime(conv.updated_at)}
+                                  {/* ✅ FORCE: Appel direct de notre fonction avec debug */}
+                                  {(() => {
+                                    const timestamp = conv.updated_at
+                                    console.log('🔍 [FORCE] Timestamp brut:', timestamp)
+                                    
+                                    let processedTimestamp = timestamp
+                                    if (timestamp && !timestamp.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(timestamp)) {
+                                      processedTimestamp = timestamp + 'Z'
+                                      console.log('🔧 [FORCE] Timestamp corrigé:', processedTimestamp)
+                                    }
+                                    
+                                    const date = new Date(processedTimestamp)
+                                    console.log('📅 [FORCE] Date parsée:', date.toString())
+                                    
+                                    const result = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+                                    console.log('🎯 [FORCE] Résultat:', result)
+                                    
+                                    return result
+                                  })()}
                                 </span>
                                 
                                 <span className="flex items-center space-x-1">
