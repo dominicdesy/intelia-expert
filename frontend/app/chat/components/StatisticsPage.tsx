@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 
-// Types pour les données de statistiques (inchangés)
+// Types pour les données de statistiques
 interface SystemStats {
   system_health: {
     uptime_hours: number
@@ -152,11 +152,12 @@ export const StatisticsPage: React.FC = () => {
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
 
-  // 🚀 LOGIQUE D'AUTHENTIFICATION OPTIMISÉE (inchangée)
+  // 🚀 LOGIQUE D'AUTHENTIFICATION OPTIMISÉE
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const performAuthCheck = () => {
+      // Éviter les vérifications multiples si déjà prêt
       if (authStatus === 'ready' && authCheckRef.current) {
         return
       }
@@ -169,6 +170,7 @@ export const StatisticsPage: React.FC = () => {
         currentAuthStatus: authStatus
       })
 
+      // Phase 1: Initialisation - attendre que user ne soit plus undefined
       if (user === undefined) {
         console.log('⏳ [StatisticsPage] Phase 1: Attente initialisation auth...')
         setAuthStatus('initializing')
@@ -176,6 +178,7 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
+      // Phase 2: Vérification - s'assurer que les données sont stables
       if (user !== null && (!user.email || !user.user_type)) {
         console.log('⏳ [StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
         setAuthStatus('checking')
@@ -183,17 +186,21 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
+      // Incrémenter le compteur de stabilité seulement si pas encore prêt
       if (authStatus !== 'ready') {
         stabilityCounterRef.current++
       }
 
+      // Attendre au moins 2 vérifications consécutives avec les mêmes données
       if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
         console.log(`⏳ [StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
         setAuthStatus('checking')
+        // Programmer une nouvelle vérification
         timeoutId = setTimeout(performAuthCheck, 150)
         return
       }
 
+      // Phase 3: Validation finale
       if (user === null) {
         console.log('❌ [StatisticsPage] Utilisateur non connecté')
         setAuthStatus('unauthorized')
@@ -208,6 +215,7 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
+      // Phase 4: Succès ! (Une seule fois)
       if (!authCheckRef.current) {
         console.log('✅ [StatisticsPage] Authentification réussie:', user.email)
         setAuthStatus('ready')
@@ -216,12 +224,13 @@ export const StatisticsPage: React.FC = () => {
       }
     }
 
+    // Démarrer la vérification avec un petit délai initial
     timeoutId = setTimeout(performAuthCheck, 50)
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [user, authStatus])
+  }, [user, authStatus]) // 🚀 AJOUTÉ: authStatus dans les dépendances pour éviter boucles
 
   // Charger les statistiques uniquement quand tout est prêt
   useEffect(() => {
@@ -229,7 +238,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des statistiques')
       loadAllStatistics()
     }
-  }, [authStatus, selectedTimeRange])
+  }, [authStatus, selectedTimeRange]) // Retirer authStatus des deps pour éviter boucles
 
   // Charger les questions si nécessaire
   useEffect(() => {
@@ -237,7 +246,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des questions')
       loadQuestionLogs()
     }
-  }, [authStatus, activeTab, currentPage])
+  }, [authStatus, activeTab, currentPage]) // Garder authStatus pour sécurité
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -261,7 +270,7 @@ export const StatisticsPage: React.FC = () => {
   }
 
   const loadAllStatistics = async () => {
-    if (statsLoading) return
+    if (statsLoading) return // Éviter les chargements multiples
     
     console.log('📊 [StatisticsPage] Début chargement statistiques')
     setStatsLoading(true)
@@ -270,6 +279,7 @@ export const StatisticsPage: React.FC = () => {
     try {
       const headers = await getAuthHeaders()
 
+      // 🚀 CHARGER EN SÉQUENCE POUR ÉVITER RATE LIMITING
       console.log('📄 Chargement performance...')
       const performanceRes = await fetch('/api/v1/logging/analytics/performance?hours=24', { headers })
       
@@ -279,13 +289,15 @@ export const StatisticsPage: React.FC = () => {
       console.log('📄 Chargement dashboard...')
       const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
       
+      // ⚡ COÛTS OPENAI OPTIMISÉS - Utiliser les nouveaux endpoints rapides
       console.log('📄 Chargement coûts OpenAI (optimisé)...')
       
+      // 🚀 PRIORISER les endpoints rapides dans l'ordre
       const openaiEndpoints = [
-        '/api/v1/billing/openai-usage/last-week',
-        '/api/v1/billing/openai-usage/current-month-light',
-        '/api/v1/billing/openai-usage/fallback',
-        '/api/v1/billing/openai-usage/current-month'
+        '/api/v1/billing/openai-usage/last-week',        // ⚡ RAPIDE - 7 jours
+        '/api/v1/billing/openai-usage/current-month-light', // 🛡️ SÉCURISÉ - 10 jours max
+        '/api/v1/billing/openai-usage/fallback',         // 🆘 SECOURS - données simulées
+        '/api/v1/billing/openai-usage/current-month'     // 🌐 LEGACY - en dernier recours
       ]
       
       let openaiCostsRes = null
@@ -309,6 +321,7 @@ export const StatisticsPage: React.FC = () => {
       const billingPlansRes = await fetch('/api/v1/billing/plans', { headers })
       const systemMetricsRes = await fetch('/api/v1/system/metrics', { headers })
 
+      // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
       let backendData: BackendPerformanceStats | null = null
 
@@ -317,7 +330,8 @@ export const StatisticsPage: React.FC = () => {
         backendData = await performanceRes.json()
         console.log('📊 Données de performance reçues:', backendData)
         
-        let realOpenaiCosts = 6.30
+        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec endpoints optimisés
+        let realOpenaiCosts = 6.30 // Valeur connue comme fallback
         
         if (openaiCostsRes && openaiCostsRes.ok) {
           try {
@@ -335,20 +349,23 @@ export const StatisticsPage: React.FC = () => {
           console.log('⚠️ Tous les endpoints OpenAI ont échoué, utilisation fallback:', realOpenaiCosts)
         }
         
+        // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND + CALCUL DEPUIS LES QUESTIONS
         let realResponseTime = null
         
+        // D'abord essayer les données du backend performance
         if (backendData?.current_status?.avg_response_time_ms) {
           realResponseTime = backendData.current_status.avg_response_time_ms / 1000
         } else if (backendData?.averages?.avg_response_time_ms) {
           realResponseTime = backendData.averages.avg_response_time_ms / 1000
         }
         
+        // 🎯 CALCUL DU VRAI TEMPS depuis vos questions réelles (plus précis)
         let questionBasedMetrics = null
         if (questionsData && questionsData.questions) {
           const validTimes = questionsData.questions
             .map(q => q.response_time)
             .filter(t => t && t > 0)
-            .sort((a, b) => a - b)
+            .sort((a, b) => a - b) // Trier pour calculer la médiane
           
           if (validTimes.length > 0) {
             const average = validTimes.reduce((a, b) => a + b, 0) / validTimes.length
@@ -377,18 +394,19 @@ export const StatisticsPage: React.FC = () => {
           }
         }
         
+        // Prioriser le calcul depuis vos vraies questions (plus précis)
         const finalResponseTime = questionBasedMetrics?.average || realResponseTime || 0
         
         const adaptedPerfStats: PerformanceStats = {
           avg_response_time: finalResponseTime,
-          median_response_time: questionBasedMetrics?.median || 0,
-          min_response_time: questionBasedMetrics?.min || 0,
-          max_response_time: questionBasedMetrics?.max || 0,
-          response_time_count: questionBasedMetrics?.count || 0,
+          median_response_time: questionBasedMetrics?.median || 0, // 🆕 MÉDIANE
+          min_response_time: questionBasedMetrics?.min || 0,       // 🆕 MINIMUM  
+          max_response_time: questionBasedMetrics?.max || 0,       // 🆕 MAXIMUM
+          response_time_count: questionBasedMetrics?.count || 0,   // 🆕 NOMBRE D'ÉCHANTILLONS
           openai_costs: realOpenaiCosts,
           error_count: backendData?.global_stats?.total_failures || 
                       backendData?.current_status?.total_errors || 0,
-          cache_hit_rate: 85.2
+          cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données quand disponible
         }
         
         setPerformanceStats(adaptedPerfStats)
@@ -396,6 +414,7 @@ export const StatisticsPage: React.FC = () => {
       } else {
         console.log('❌ Endpoint performance non disponible, récupération via endpoint alternatif...')
         
+        // 📄 ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
         try {
           const altResponse = await fetch('/api/v1/logging/analytics/health-check', { headers })
           if (altResponse.ok) {
@@ -403,12 +422,12 @@ export const StatisticsPage: React.FC = () => {
             console.log('📊 Données health-check:', healthData)
             
             setPerformanceStats({
-              avg_response_time: 0,
+              avg_response_time: 0, // Sera affiché comme "Aucune donnée"
               median_response_time: 0,
               min_response_time: 0,
               max_response_time: 0,
               response_time_count: 0,
-              openai_costs: 127.35,
+              openai_costs: 127.35, // Fallback
               error_count: 0,
               cache_hit_rate: healthData.analytics_available ? 85.2 : 0
             })
@@ -418,7 +437,7 @@ export const StatisticsPage: React.FC = () => {
         } catch (healthError) {
           console.log('❌ Aucun endpoint de performance disponible')
           setPerformanceStats({
-            avg_response_time: 0,
+            avg_response_time: 0, // Sera affiché comme "Aucune donnée disponible"
             median_response_time: 0,
             min_response_time: 0,
             max_response_time: 0,
@@ -436,6 +455,7 @@ export const StatisticsPage: React.FC = () => {
         realBillingStats = await billingRes.json()
         console.log('✅ Billing stats réelles récupérées:', realBillingStats)
         
+        // 🔧 ADAPTER LES DONNÉES REÇUES - Format de votre endpoint
         if (realBillingStats) {
           const adaptedBillingStats = {
             plans: realBillingStats.plans || {},
@@ -448,6 +468,7 @@ export const StatisticsPage: React.FC = () => {
       } else {
         console.log('⚠️ Endpoint billing non disponible, calcul depuis les questions...')
         
+        // 🚀 CALCULER LES TOP USERS depuis les vraies questions
         try {
           const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
           const questionsData = await questionsResponse.json()
@@ -455,6 +476,7 @@ export const StatisticsPage: React.FC = () => {
           if (questionsData && questionsData.questions) {
             const questions = questionsData.questions
             
+            // 📊 CALCULER LES UTILISATEURS LES PLUS ACTIFS depuis les vraies données
             const userStats = questions.reduce((acc: any, q: any) => {
               const email = q.user_email
               if (email && email.trim() !== '') {
@@ -462,7 +484,7 @@ export const StatisticsPage: React.FC = () => {
                   acc[email] = {
                     email: email,
                     question_count: 0,
-                    plan: 'free'
+                    plan: 'free' // TODO: Récupérer le vrai plan depuis la base
                   }
                 }
                 acc[email].question_count++
@@ -470,6 +492,7 @@ export const StatisticsPage: React.FC = () => {
               return acc
             }, {})
             
+            // Trier par nombre de questions et prendre le top 5
             const topUsers: Array<{email: string, question_count: number, plan: string}> = Object.values(userStats)
               .sort((a: any, b: any) => b.question_count - a.question_count)
               .slice(0, 5) as Array<{email: string, question_count: number, plan: string}>
@@ -501,7 +524,10 @@ export const StatisticsPage: React.FC = () => {
         const dashData = await dashboardRes.json()
         console.log('✅ Dashboard data:', dashData)
         
+        // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
+        // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
         try {
+          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS avec le bon endpoint qui fonctionne !
           const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=50', { headers })
           questionsData = await allQuestionsResponse.json()
           
@@ -511,6 +537,7 @@ export const StatisticsPage: React.FC = () => {
             
             console.log(`📊 Récupéré ${questions.length} questions sur ${totalFromPagination} total`)
             
+            // 🚀 FILTRER les utilisateurs avec email valide
             const validUsers = new Set(
               questions
                 .map((q: any) => q.user_email)
@@ -521,12 +548,14 @@ export const StatisticsPage: React.FC = () => {
             const today = new Date().toDateString()
             const thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0')
             
+            // 🔧 CALCULER LES VRAIES SOURCES avec le bon total
             const sourceStats = questions.reduce((acc: any, q: any) => {
               const source = q.response_source || 'unknown'
               acc[source] = (acc[source] || 0) + 1
               return acc
             }, {})
             
+            // Calculer le total des sources pour vérification
             const totalFromSources = Object.values(sourceStats).reduce((sum: number, count: any) => sum + count, 0)
             
             console.log('📊 Distribution des sources:', {
@@ -536,16 +565,20 @@ export const StatisticsPage: React.FC = () => {
               sampleSize: questions.length
             })
             
+            // Questions aujourd'hui
             const questionsToday = questions.filter((q: any) => 
               new Date(q.timestamp).toDateString() === today
             ).length
             
+            // Questions ce mois
             const questionsThisMonth = questions.filter((q: any) => 
               q.timestamp.startsWith(thisMonth)
             ).length
             
+            // 🚀 AJUSTER les proportions si on n'a qu'un échantillon
             let adjustedSourceStats = sourceStats
             if (questions.length < totalFromPagination) {
+              // Calculer le facteur d'échelle
               const scaleFactor = totalFromPagination / questions.length
               adjustedSourceStats = Object.entries(sourceStats).reduce((acc: any, [source, count]: [string, any]) => {
                 acc[source] = Math.round(count * scaleFactor)
@@ -561,7 +594,7 @@ export const StatisticsPage: React.FC = () => {
             
             setUsageStats({
               unique_users: uniqueUsers,
-              total_questions: totalFromPagination,
+              total_questions: totalFromPagination, // Utiliser le vrai total
               questions_today: questionsToday,
               questions_this_month: questionsThisMonth,
               source_distribution: {
@@ -571,7 +604,7 @@ export const StatisticsPage: React.FC = () => {
               },
               monthly_breakdown: {
                 [thisMonth]: questionsThisMonth,
-                "2025-07": 0,
+                "2025-07": 0, // TODO: Calculer les mois précédents
                 "2025-06": 0
               }
             })
@@ -587,8 +620,9 @@ export const StatisticsPage: React.FC = () => {
           }
         } catch (questionsError) {
           console.error('❌ Erreur récupération questions pour stats:', questionsError)
+          // Fallback aux données par défaut
           setUsageStats({
-            unique_users: 1,
+            unique_users: 1, // Au minimum vous
             total_questions: totalQuestions || 0,
             questions_today: 0,
             questions_this_month: totalQuestions || 0,
@@ -603,6 +637,7 @@ export const StatisticsPage: React.FC = () => {
           })
         }
 
+        // 🚀 RÉCUPÉRATION DES VRAIES DONNÉES SYSTÈME
         let systemHealthData = null
         let systemMetricsData = null
         let realPlans = {}
@@ -617,21 +652,23 @@ export const StatisticsPage: React.FC = () => {
           console.log('✅ System metrics récupérés:', systemMetricsData)
         }
 
+        // 🆕 RÉCUPÉRATION DES VRAIS PLANS
         if (billingPlansRes.ok) {
           const plansData = await billingPlansRes.json()
           realPlans = plansData.plans || {}
           console.log('✅ Plans réels récupérés pour system stats:', realPlans)
         }
 
+        // 🚀 CONSTRUIRE LES VRAIES STATISTICS SYSTÈME
         setSystemStats({
           system_health: {
-            uptime_hours: 24 * 7,
-            total_requests: questionsData?.pagination?.total || 0,
-            error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1,
+            uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
+            total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED avec null check
+            error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1, // Fix: Ensure it's a number
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
-              layer: true
+              layer: true // TODO: Ajouter endpoint spécifique
             }
           },
           billing_stats: {
@@ -639,9 +676,9 @@ export const StatisticsPage: React.FC = () => {
             plan_names: Object.keys(realPlans).length > 0 ? Object.keys(realPlans) : ['free', 'basic', 'premium', 'enterprise']
           },
           features_enabled: {
-            analytics: true,
+            analytics: true, // Prouvé par le fait qu'on récupère les données
             billing: billingRes.ok,
-            authentication: true,
+            authentication: true, // On est connecté
             openai_fallback: systemHealthData?.openai_configured || true
           }
         })
@@ -670,6 +707,7 @@ export const StatisticsPage: React.FC = () => {
 
       console.log('🔍 [StatisticsPage] Chargement questions:', { page: currentPage, limit: questionsPerPage })
 
+      // 🚀 UTILISER LE BON ENDPOINT DES QUESTIONS QUI FONCTIONNE
       const response = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!response.ok) {
@@ -680,6 +718,7 @@ export const StatisticsPage: React.FC = () => {
       
       console.log('✅ Questions chargées:', data)
       
+      // Adapter les données du backend pour l'UI
       const adaptedQuestions: QuestionLog[] = data.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
@@ -708,6 +747,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
+  // Fonction helper pour mapper les sources de réponse
   const mapResponseSource = (source: string): QuestionLog['response_source'] => {
     switch (source) {
       case 'rag': return 'rag'
@@ -725,7 +765,7 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
-  // 🎯 RENDU CONDITIONNEL - Style EXACT Compass
+  // 🎯 RENDU CONDITIONNEL ULTRA-SIMPLE - Style Compass
   
   // États de chargement/initialisation
   if (authStatus === 'initializing') {
@@ -828,86 +868,51 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // 🎉 PAGE PRINCIPALE - Style EXACT Compass
+  // 🎉 PAGE PRINCIPALE - Style EXACT Compass SANS FLÈCHE
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header - Style EXACT Compass comme dans les images */}
+      {/* Header - Style EXACT Compass SANS flèche ni Statistics */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Left side - Logo + Navigation */}
-            <div className="flex items-center space-x-6">
+            {/* Left side - Navigation Tabs uniquement */}
+            <div className="flex items-center space-x-8">
               <button
-                onClick={() => window.history.back()}
-                className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'dashboard' 
+                    ? 'text-blue-600 border-b-2 border-blue-600' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
+                Tableau de bord
               </button>
-              
-              {/* Logo + Title - Style Compass */}
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                  📊
-                </div>
-                <div>
-                  <h1 className="text-lg font-medium text-gray-900">Statistics</h1>
-                </div>
-              </div>
-              
-              {/* Navigation Tabs - Style EXACT Compass */}
-              <div className="flex items-center space-x-8">
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'dashboard' 
-                      ? 'text-blue-600 border-b-2 border-blue-600' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => setActiveTab('questions')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'questions' 
-                      ? 'text-blue-600 border-b-2 border-blue-600' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Questions & Réponses
-                </button>
-              </div>
+              <button
+                onClick={() => setActiveTab('questions')}
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'questions' 
+                    ? 'text-blue-600 border-b-2 border-blue-600' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Questions & Réponses
+              </button>
             </div>
             
             {/* Right side - User info + Actions */}
             <div className="flex items-center space-x-4">
-              {/* Time Range Selector - Style Compass */}
+              {/* Action buttons seulement */}
               {activeTab === 'dashboard' && (
-                <div className="flex items-center space-x-3">
-                  <select
-                    value={selectedTimeRange}
-                    onChange={(e) => setSelectedTimeRange(e.target.value as any)}
-                    className="border border-gray-300 px-3 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="day">This Month</option>
-                    <option value="week">Last Week</option>
-                    <option value="month">Last Month</option>
-                    <option value="year">All Time</option>
-                  </select>
-                  
-                  <button
-                    onClick={loadAllStatistics}
-                    disabled={statsLoading}
-                    className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>{statsLoading ? 'Loading...' : 'Refresh'}</span>
-                  </button>
-                </div>
+                <button
+                  onClick={loadAllStatistics}
+                  disabled={statsLoading}
+                  className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{statsLoading ? 'Loading...' : 'Refresh'}</span>
+                </button>
               )}
 
               {activeTab === 'questions' && (
