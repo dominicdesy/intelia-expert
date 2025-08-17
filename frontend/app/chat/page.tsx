@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useRouter } from 'next/navigation' // ✅ AJOUTÉ pour router.push
 import { Message } from './types'
