@@ -119,57 +119,41 @@ export const HistoryMenu = () => {
     setIsOpen(false)
   }
 
-  // ✅ VERSION INTELLIGENTE: S'adapte automatiquement au fuseau horaire utilisateur
+  // ✅ SOLUTION FINALE: Correction du problème de timezone
   const formatConversationTime = (timestamp: string): string => {
     try {
-      const date = new Date(timestamp)
+      let processedTimestamp = timestamp
+      
+      // 🔧 CORRECTION: Si le timestamp n'a pas de timezone, on assume qu'il est UTC
+      if (timestamp && !timestamp.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(timestamp)) {
+        processedTimestamp = timestamp + 'Z'
+        console.log('🔧 [HistoryMenu] Timestamp corrigé pour UTC:', processedTimestamp)
+      }
+      
+      const date = new Date(processedTimestamp)
       
       if (isNaN(date.getTime())) {
         console.warn('⚠️ Timestamp invalide:', timestamp)
         return 'Date invalide'
       }
       
-      // 🌍 DÉTECTION AUTOMATIQUE du fuseau horaire utilisateur
-      const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const locale = navigator.language || 'fr-CA'
-      
-      // 📅 FORMATAGE INTELLIGENT selon la région
-      return date.toLocaleString(locale, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: userTimeZone // Utilise le fuseau horaire détecté automatiquement
-      })
-      
-    } catch (error) {
-      console.warn('⚠️ Erreur formatage intelligent, fallback simple:', error)
-      
-      // 🔧 FALLBACK SIMPLE mais fiable
-      const date = new Date(timestamp)
-      const day = date.getDate().toString().padStart(2, '0')
-      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      // 📅 Formatage simple et efficace en heure locale
       const year = date.getFullYear()
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const day = date.getDate().toString().padStart(2, '0')
       const hours = date.getHours().toString().padStart(2, '0')
       const minutes = date.getMinutes().toString().padStart(2, '0')
       
       return `${year}-${month}-${day} ${hours}:${minutes}`
-    }
-  }
-
-  // 🆕 BONUS: Fonction pour afficher le fuseau horaire détecté (pour débogage)
-  const getUserTimeZoneInfo = (): string => {
-    try {
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const locale = navigator.language
-      const offset = new Date().getTimezoneOffset() / -60
-      const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`
       
-      return `${timeZone} (UTC${offsetStr}) - Locale: ${locale}`
     } catch (error) {
-      return 'Fuseau horaire non détectable'
+      console.warn('⚠️ Erreur formatage heure:', error)
+      // Fallback vers l'ancienne méthode si erreur
+      try {
+        return simpleLocalTime(timestamp)
+      } catch (fallbackError) {
+        return 'Erreur affichage'
+      }
     }
   }
 
