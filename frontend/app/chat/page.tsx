@@ -1288,8 +1288,8 @@ export default function ChatInterface() {
             </div>
 
             <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
-              <div className="w-8 h-8 grid place-items-center">
-                <InteliaLogo className="h-7 w-auto" />
+              <div className="w-10 h-10 grid place-items-center">
+                <InteliaLogo className="h-8 w-auto" />
               </div>
               <div className="text-center">
                 <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>

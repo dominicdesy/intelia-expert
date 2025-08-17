@@ -195,24 +195,7 @@ export const HistoryMenu = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleRefresh}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    title="Actualiser"
-                    disabled={isLoadingHistory}
-                  >
-                    <RefreshIcon />
-                  </button>
-                  
-                  <button
-                    onClick={handleNewConversation}
-                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                    title="Nouvelle conversation"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                  </button>
-                </div>
+                {/* ❌ SUPPRIMÉ: Boutons refresh et nouvelle conversation */}
               </div>
 
               {/* Bouton supprimer tout */}

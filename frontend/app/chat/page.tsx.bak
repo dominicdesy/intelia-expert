@@ -1350,8 +1350,8 @@ export default function ChatInterface() {
                   <div key={`${message.id}-${index}`}>
                     <div className={`flex items-start space-x-3 min-w-0 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
                       {!message.isUser && (
-                        <div className="flex-shrink-0 w-8 h-8 grid place-items-center">
-                          <InteliaLogo className="h-7 w-auto" />
+						<div className="flex-shrink-0 w-10 h-10 grid place-items-center">
+                          <InteliaLogo className="h-8 w-auto" />
                         </div>
                       )}
 
@@ -1454,8 +1454,8 @@ export default function ChatInterface() {
 
               {isLoadingChat && (
                 <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 grid place-items-center flex-shrink-0">
-                    <InteliaLogo className="h-7 w-auto" />
+                  <div className="w-10 h-10 grid place-items-center flex-shrink-0">
+                    <InteliaLogo className="h-8 w-auto" />
                   </div>
                   <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
                     <div className="flex space-x-1">
