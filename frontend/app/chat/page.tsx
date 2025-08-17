@@ -1295,7 +1295,7 @@ export default function ChatInterface() {
 				<button
 				  onClick={() => {
 					const btn = document.querySelector('.history-hidden button');
-					if (btn) btn.click();
+					if (btn) (btn as HTMLElement).click();
 				  }}
 				  className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
 				>
@@ -1328,7 +1328,7 @@ export default function ChatInterface() {
 				<button
 				  onClick={() => {
 					const btn = document.querySelector('.user-hidden button');
-					if (btn) btn.click();
+					if (btn) (btn as HTMLElement).click();
 				  }}
 				  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors"
 				>
