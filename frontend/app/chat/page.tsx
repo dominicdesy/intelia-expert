@@ -1282,7 +1282,7 @@ export default function ChatInterface() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
-                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center"
+                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
                 title={t('nav.newConversation')}
                 aria-label={t('nav.newConversation')}
               >
@@ -1292,12 +1292,12 @@ export default function ChatInterface() {
               <HistoryMenu />
             </div>
         
-            {/* Centre — Titre + Logo Intelia */}
+            {/* Centre — Logo Intelia + Titre */}
             <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
-              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
+              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
             {/* Droite — Bouton menu utilisateur (affiché comme "DD" carré arrondi bleu) */}
@@ -1329,6 +1329,7 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
+
 
 
 
