@@ -75,7 +75,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 }) => {
   return (
     <>
-      {/* KPIs Row - EXACT Compass Style */}
+      {/* KPIs Row - EXACT Compass Style - Sans icônes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Utilisateurs Actifs - Sans icône */}
         <div className="bg-white border border-gray-200 p-4">
