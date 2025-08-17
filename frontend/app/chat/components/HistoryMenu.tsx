@@ -304,17 +304,12 @@ export const HistoryMenu = () => {
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0 pr-3">
                               
-                              {/* Titre de la conversation - DEBUG */}
+                              {/* Titre de la conversation */}
                               <h4 className="text-sm font-medium text-gray-900 truncate mb-2">
-                                [TITRE] {conv.title}
+                                {conv.title}
                               </h4>
                               
-                              {/* DEBUG: Affichage temporaire du preview pour identifier la source */}
-                              {conv.preview && conv.preview !== conv.title && (
-                                <p className="text-xs text-red-600 mb-1 line-clamp-1 leading-relaxed">
-                                  [PREVIEW] {conv.preview}
-                                </p>
-                              )}
+                              {/* ❌ COMPLÈTEMENT SUPPRIMÉ: Preview qui duplique le titre */}
                               
                               {/* Métadonnées avec HEURE LOCALE CORRIGÉE */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
