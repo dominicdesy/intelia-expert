@@ -119,46 +119,57 @@ export const HistoryMenu = () => {
     setIsOpen(false)
   }
 
-  // ✅ CORRECTION: Nouvelle fonction pour formater la date en heure locale
+  // ✅ VERSION INTELLIGENTE: S'adapte automatiquement au fuseau horaire utilisateur
   const formatConversationTime = (timestamp: string): string => {
     try {
-      // Créer un objet Date à partir du timestamp
       const date = new Date(timestamp)
       
-      // Vérifier si la date est valide
       if (isNaN(date.getTime())) {
         console.warn('⚠️ Timestamp invalide:', timestamp)
         return 'Date invalide'
       }
       
-      // Utiliser toLocaleString() pour obtenir l'heure locale automatiquement
-      return date.toLocaleString('fr-CA', {
+      // 🌍 DÉTECTION AUTOMATIQUE du fuseau horaire utilisateur
+      const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const locale = navigator.language || 'fr-CA'
+      
+      // 📅 FORMATAGE INTELLIGENT selon la région
+      return date.toLocaleString(locale, {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: false, // Format 24h
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Heure locale automatique
+        hour12: false,
+        timeZone: userTimeZone // Utilise le fuseau horaire détecté automatiquement
       })
       
     } catch (error) {
-      console.warn('⚠️ Erreur formatage heure locale:', error)
-      // Fallback vers l'ancienne méthode si erreur
-      try {
-        return simpleLocalTime(timestamp)
-      } catch (fallbackError) {
-        console.warn('⚠️ Erreur fallback simpleLocalTime:', fallbackError)
-        // Dernier fallback
-        return new Date(timestamp).toLocaleDateString('fr-CA', { 
-          year: 'numeric',
-          month: '2-digit', 
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        })
-      }
+      console.warn('⚠️ Erreur formatage intelligent, fallback simple:', error)
+      
+      // 🔧 FALLBACK SIMPLE mais fiable
+      const date = new Date(timestamp)
+      const day = date.getDate().toString().padStart(2, '0')
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const year = date.getFullYear()
+      const hours = date.getHours().toString().padStart(2, '0')
+      const minutes = date.getMinutes().toString().padStart(2, '0')
+      
+      return `${year}-${month}-${day} ${hours}:${minutes}`
+    }
+  }
+
+  // 🆕 BONUS: Fonction pour afficher le fuseau horaire détecté (pour débogage)
+  const getUserTimeZoneInfo = (): string => {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const locale = navigator.language
+      const offset = new Date().getTimezoneOffset() / -60
+      const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`
+      
+      return `${timeZone} (UTC${offsetStr}) - Locale: ${locale}`
+    } catch (error) {
+      return 'Fuseau horaire non détectable'
     }
   }
 

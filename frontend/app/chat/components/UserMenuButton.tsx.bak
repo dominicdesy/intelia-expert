@@ -84,15 +84,12 @@ export const UserMenuButton = () => {
                 <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
                 <div className="mt-2">
-                  {/* 🎯 MASQUER LE PLAN POUR SUPER_ADMIN */}
-                  {!isSuperAdmin && (
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
-                      {plan.name}
-                    </span>
-                  )}
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
+                    {plan.name}
+                  </span>
                   {/* 🎯 AFFICHAGE DU RÔLE POUR DEBUG */}
                   {isSuperAdmin && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                       Super Admin
                     </span>
                   )}

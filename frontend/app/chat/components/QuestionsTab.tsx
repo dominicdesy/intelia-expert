@@ -148,18 +148,51 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return conversations
   }
 
-  // 🚀 EXPORT CSV CONVERSATIONS (format Excel-like en CSV)
-  const exportConversationsToCSV = (questions: QuestionLog[]) => {
+  // 🚀 EXPORT CSV CONVERSATIONS avec choix de scope
+  const exportConversationsToCSV = () => {
     try {
-      if (questions.length === 0) {
-        alert('❌ Aucune question à exporter')
+      // 🤔 DEMANDER À L'UTILISATEUR LE SCOPE D'EXPORT
+      const shouldExportAll = window.confirm(
+        `🤔 Choix de l'export :\n\n` +
+        `• OUI = Exporter TOUTES les ${totalQuestions} questions de la base\n` +
+        `• NON = Exporter seulement les ${filteredQuestions.length} questions affichées\n\n` +
+        `Voulez-vous exporter TOUTES les questions ?`
+      )
+
+      let questionsToExport: QuestionLog[]
+      let exportScope: string
+
+      if (shouldExportAll) {
+        // Exporter toutes les questions
+        questionsToExport = questionLogs // Toutes les questions chargées
+        exportScope = 'TOUTES'
+        
+        // ⚠️ Vérifier si on a bien toutes les données
+        if (questionLogs.length < totalQuestions) {
+          const proceed = window.confirm(
+            `⚠️ Attention :\n\n` +
+            `• Total questions dans la base : ${totalQuestions}\n` +
+            `• Questions actuellement chargées : ${questionLogs.length}\n\n` +
+            `L'export contiendra seulement les ${questionLogs.length} questions chargées.\n\n` +
+            `Continuer l'export ?`
+          )
+          if (!proceed) return
+        }
+      } else {
+        // Exporter seulement les questions filtrées
+        questionsToExport = filteredQuestions
+        exportScope = 'FILTRÉES'
+      }
+
+      if (questionsToExport.length === 0) {
+        alert('❌ Aucune question à exporter dans la sélection')
         return
       }
 
-      const conversations = groupQuestionsByConversation(questions)
+      const conversations = groupQuestionsByConversation(questionsToExport)
       const maxQuestions = Math.max(...conversations.map(c => c.total_questions))
       
-      console.log(`📊 Export CSV de ${conversations.length} conversations, max ${maxQuestions} questions`)
+      console.log(`📊 Export CSV ${exportScope} de ${conversations.length} conversations, max ${maxQuestions} questions`)
 
       // Créer les en-têtes
       const headers = [
@@ -216,7 +249,8 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       })
 
       // Télécharger le fichier
-      const fileName = `conversations_export_${new Date().toISOString().split('T')[0]}_${Date.now()}.csv`
+      const scopeSuffix = shouldExportAll ? 'TOUTES' : 'FILTREES'
+      const fileName = `conversations_${scopeSuffix}_${new Date().toISOString().split('T')[0]}_${Date.now()}.csv`
       
       // Ajouter BOM pour Excel français
       const bom = '\uFEFF'
@@ -231,14 +265,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
       
-      console.log(`✅ Export CSV conversations réussi: ${fileName}`)
+      console.log(`✅ Export CSV conversations ${exportScope} réussi: ${fileName}`)
       
-      const uniqueUsers = new Set(questions.map(q => q.user_email)).size
-      const summary = `✅ Export CSV réussi !
+      const uniqueUsers = new Set(questionsToExport.map(q => q.user_email)).size
+      const summary = `✅ Export CSV ${exportScope} réussi !
 
-📊 Format "Excel-like" en CSV :
+📊 Scope: ${exportScope} les questions
 • ${conversations.length} conversations (lignes)
-• ${questions.length} questions au total
+• ${questionsToExport.length} questions au total
 • ${uniqueUsers} utilisateurs uniques
 • ${maxQuestions} questions max par conversation
 
@@ -615,28 +649,41 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">💾 Export des Données</h3>
         
-        {/* 🚀 BOUTON CSV CONVERSATIONS (format Excel-like) */}
+        {/* 🚀 BOUTON CSV CONVERSATIONS (format Excel-like) avec choix de scope */}
         <div className="mb-4">
           <button
-            onClick={() => exportConversationsToCSV(filteredQuestions)}
-            disabled={filteredQuestions.length === 0}
+            onClick={() => exportConversationsToCSV()}
+            disabled={questionLogs.length === 0}
             className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
-            📊 Exporter Conversations (CSV Excel-like) - {filteredQuestions.length} questions
+            📊 Exporter Conversations (CSV Excel-like)
           </button>
           
-          {/* Description détaillée du format CSV */}
+          {/* Description détaillée du format CSV avec choix */}
           <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <h4 className="text-sm font-medium text-emerald-800 mb-2">📊 Format CSV "Excel-like" - Une ligne par conversation :</h4>
+            <h4 className="text-sm font-medium text-emerald-800 mb-2">📊 Export CSV avec choix de portée :</h4>
             <ul className="text-xs text-emerald-700 space-y-1">
-              <li><strong>• Colonnes fixes :</strong> N°, Session, Utilisateur, Email, Début, Fin, Durée</li>
-              <li><strong>• Colonnes dynamiques :</strong> Q1, R1, Source1, Q2, R2, Source2...</li>
+              <li><strong>🤔 Choix automatique :</strong> Questions filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</li>
+              <li><strong>• Format ligne par conversation :</strong> Q1, R1, Source1, Q2, R2, Source2...</li>
               <li><strong>• Compatible Excel :</strong> Encodage UTF-8 avec BOM</li>
               <li><strong>🚀 Aucune dépendance :</strong> Code natif, déploiement garanti</li>
             </ul>
-            {filteredQuestions.length === 0 && (
-              <p className="text-xs text-emerald-600 mt-2 italic">⚠️ Aucune question à exporter avec les filtres actuels</p>
-            )}
+            
+            {/* Indicateurs visuels du scope */}
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-4">
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                  📋 Filtrées: {filteredQuestions.length}
+                </span>
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                  🗃️ Total base: {totalQuestions}
+                </span>
+              </div>
+              
+              {questionLogs.length === 0 && (
+                <p className="text-emerald-600 italic">⚠️ Aucune question chargée</p>
+              )}
+            </div>
           </div>
         </div>
 
