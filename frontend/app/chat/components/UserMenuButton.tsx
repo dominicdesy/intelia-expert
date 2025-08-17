@@ -30,6 +30,11 @@ export const UserMenuButton = () => {
   // 🎯 NOUVEAU: Vérifier si l'utilisateur est super_admin
   const isSuperAdmin = user?.user_type === 'super_admin'
 
+  // 🔍 DEBUG: Afficher les valeurs pour vérifier
+  console.log('🔍 DEBUG - User type:', user?.user_type)
+  console.log('🔍 DEBUG - Is Super Admin:', isSuperAdmin)
+  console.log('🔍 DEBUG - Plan should show:', !isSuperAdmin)
+
   const handleContactClick = () => {
     setIsOpen(false)
     setShowContactModal(true)
@@ -83,15 +88,18 @@ export const UserMenuButton = () => {
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
+                {/* 🔍 DEBUG TEMPORAIRE - À SUPPRIMER APRÈS */}
+                <p className="text-xs text-red-500">DEBUG: user_type = "{user?.user_type}"</p>
+                {/* 🎯 AFFICHAGE CONDITIONNEL DU PLAN ET DU RÔLE */}
                 <div className="mt-2">
-                  {/* 🎯 MASQUER LE PLAN POUR SUPER_ADMIN */}
-                  {!isSuperAdmin && (
+                  {/* 🎯 AFFICHAGE DU PLAN POUR LES UTILISATEURS NORMAUX SEULEMENT */}
+                  {user?.user_type && user?.user_type !== 'super_admin' && (
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
                       {plan.name}
                     </span>
                   )}
-                  {/* 🎯 AFFICHAGE DU RÔLE POUR DEBUG */}
-                  {isSuperAdmin && (
+                  {/* 🎯 AFFICHAGE DU RÔLE SUPER ADMIN */}
+                  {user?.user_type === 'super_admin' && (
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                       Super Admin
                     </span>

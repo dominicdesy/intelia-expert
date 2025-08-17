@@ -309,10 +309,10 @@ export const HistoryMenu = () => {
                                 {conv.title}
                               </h4>
                               
-                              {/* Aperçu de la conversation */}
-                              <p className="text-xs text-gray-600 mb-2 line-clamp-2 leading-relaxed">
+                              {/* ❌ SUPPRIMÉ: Aperçu de la conversation (ligne dupliquée) */}
+                              {/* <p className="text-xs text-gray-600 mb-2 line-clamp-2 leading-relaxed">
                                 {conv.preview}
-                              </p>
+                              </p> */}
                               
                               {/* Métadonnées avec HEURE LOCALE CORRIGÉE */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
