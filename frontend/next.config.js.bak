@@ -6,15 +6,11 @@ const nextConfig = {
 
   // 🔧 Configuration pour DigitalOcean
   trailingSlash: true,
-  
-  // 🆕 Configuration pour améliorer les performances sur DO
-  compress: true,
-  
-  // 🆕 Output standalone pour Digital Ocean (optionnel, améliore les performances)
-  output: 'standalone',
 
   // ✅ CONFIGURATION SIMPLIFIÉE - Suppression des options obsolètes
   experimental: {
+    // ❌ Supprimé: appDir, isrMemoryCacheSize (obsolètes dans Next.js 14+)
+    
     // ✅ Configuration minimale pour Supabase
     serverComponentsExternalPackages: [
       '@supabase/supabase-js'
@@ -75,14 +71,14 @@ const nextConfig = {
     ]
   },
 
-  // ✅ CONFIGURATION WEBPACK OPTIMISÉE pour Digital Ocean + XLSX
+  // ✅ CONFIGURATION WEBPACK SIMPLIFIÉE - Résout juste les incompatibilités critiques
   webpack: (config, { isServer }) => {
     // Désactiver la minification pour debug
     if (!isServer && process.env.NODE_ENV === 'production') {
       config.optimization.minimize = false
     }
     
-    // ✅ CORRECTION pour Supabase + XLSX sur Digital Ocean
+    // ✅ CORRECTION MINIMALE pour Supabase - Seulement les polyfills nécessaires
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -91,28 +87,12 @@ const nextConfig = {
         tls: false,
         crypto: false,
         stream: false,
-        process: false,
-        // 🆕 Fallbacks spécifiques pour XLSX
-        buffer: require.resolve('buffer'),
-        util: require.resolve('util'),
+        process: false, // ✅ Résout process.versions dans Supabase Realtime
       }
-      
-      // 🆕 Polyfills pour XLSX
-      config.plugins.push(
-        new config.webpack.ProvidePlugin({
-          Buffer: ['buffer', 'Buffer'],
-          process: 'process/browser',
-        })
-      )
     }
     
-    // 🆕 Optimisation spécifique pour XLSX
-    config.module.rules.push({
-      test: /\.m?js$/,
-      resolve: {
-        fullySpecified: false
-      }
-    })
+    // ❌ SUPPRIMÉ: config.externals qui causait l'erreur
+    // ❌ SUPPRIMÉ: config.resolve.alias qui causait des conflits
     
     return config
   }

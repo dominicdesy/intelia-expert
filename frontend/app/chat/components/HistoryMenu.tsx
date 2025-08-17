@@ -119,22 +119,46 @@ export const HistoryMenu = () => {
     setIsOpen(false)
   }
 
-  // ✅ NOUVEAU: Fonction utilitaire pour formater la date en heure locale
+  // ✅ CORRECTION: Nouvelle fonction pour formater la date en heure locale
   const formatConversationTime = (timestamp: string): string => {
     try {
-      // Utiliser la nouvelle fonction de formatage heure locale
-      return simpleLocalTime(timestamp)
-    } catch (error) {
-      console.warn('⚠️ Erreur formatage heure:', error)
-      // Fallback si erreur
-      return new Date(timestamp).toLocaleDateString('fr-CA', { 
+      // Créer un objet Date à partir du timestamp
+      const date = new Date(timestamp)
+      
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        console.warn('⚠️ Timestamp invalide:', timestamp)
+        return 'Date invalide'
+      }
+      
+      // Utiliser toLocaleString() pour obtenir l'heure locale automatiquement
+      return date.toLocaleString('fr-CA', {
         year: 'numeric',
-        month: '2-digit', 
+        month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: false
+        hour12: false, // Format 24h
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Heure locale automatique
       })
+      
+    } catch (error) {
+      console.warn('⚠️ Erreur formatage heure locale:', error)
+      // Fallback vers l'ancienne méthode si erreur
+      try {
+        return simpleLocalTime(timestamp)
+      } catch (fallbackError) {
+        console.warn('⚠️ Erreur fallback simpleLocalTime:', fallbackError)
+        // Dernier fallback
+        return new Date(timestamp).toLocaleDateString('fr-CA', { 
+          year: 'numeric',
+          month: '2-digit', 
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
+      }
     }
   }
 
@@ -285,10 +309,10 @@ export const HistoryMenu = () => {
                                 {conv.preview}
                               </p>
                               
-                              {/* Métadonnées avec HEURE LOCALE */}
+                              {/* Métadonnées avec HEURE LOCALE CORRIGÉE */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
                                 <span>
-                                  {/* ✅ CORRECTION: Utilisation formatage heure locale */}
+                                  {/* ✅ CORRECTION: Utilisation du nouveau formatage heure locale */}
                                   {formatConversationTime(conv.updated_at)}
                                 </span>
                                 
