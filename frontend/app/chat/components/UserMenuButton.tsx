@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useAuthStore } from '@/lib/stores/auth' 
+import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -7,12 +7,25 @@ import { AccountModal } from './modals/AccountModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
-import { PLAN_CONFIGS } from '../types'
 
-// ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
+/** Mappe l’utilisateur d’auth (Supabase) vers le format attendu par UserInfoModal */
+function mapAuthUserToUserInfo(authUser: any) {
+  const meta = authUser?.user_metadata ?? {}
+  return {
+    id: authUser?.id ?? '',
+    email: authUser?.email ?? '',
+    firstName: meta.given_name ?? meta.firstName ?? meta.firstname ?? '',
+    lastName: meta.family_name ?? meta.lastName ?? meta.lastname ?? '',
+    phone: meta.phone_number ?? meta.phone ?? '',
+    country: meta.country ?? '',
+    company: meta.company ?? '',
+    role: meta.role ?? meta.job_title ?? '',
+    language: meta.language ?? meta.lang ?? 'en'
+  } as any // on “asserte” pour satisfaire le type exact attendu par le modal
+}
+
 export const UserMenuButton = () => {
-  const { user } = useAuthStore() 
-  const { logout } = useAuthStore() // ✅ CHANGÉ: useAuth pour les actions
+  const { user, logout } = useAuthStore()
   const { t } = useTranslation()
 
   const [isOpen, setIsOpen] = useState(false)
@@ -22,7 +35,7 @@ export const UserMenuButton = () => {
   const [showContactModal, setShowContactModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  const userInitials = (user?.email || user?.id || 'DD').slice(0,2).toUpperCase()
+  const userInitials = (user?.email || user?.id || 'DD').slice(0, 2).toUpperCase()
 
   const handleUserInfoClick = () => {
     setIsOpen(false)
@@ -60,21 +73,20 @@ export const UserMenuButton = () => {
   return (
     <>
       <div className="relative">
-        {/* ✅ carré 40×40 (plus de cercle par-dessus) */}
+        {/* Bouton carré 40×40 (plus de rond superposé) */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors force-square"
+          className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
+          title={t('nav.account')}
+          aria-label={t('nav.account')}
         >
           <span className="text-white text-xs font-medium">{userInitials}</span>
         </button>
 
         {isOpen && (
           <>
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setIsOpen(false)}
-            />
-            
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               {/* En-tête compte */}
               <div className="px-3 pb-2 border-b border-gray-100">
@@ -92,7 +104,6 @@ export const UserMenuButton = () => {
                   onClick={handleAccountClick}
                   className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  {/* Icône */}
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0" />
                   </svg>
@@ -119,7 +130,6 @@ export const UserMenuButton = () => {
                   <span>{t('nav.language')}</span>
                 </button>
 
-                {/* ✅ Inviter un ami */}
                 <button
                   onClick={handleInviteFriendClick}
                   className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -165,14 +175,11 @@ export const UserMenuButton = () => {
         title={t('nav.profile')}
       >
         {user ? (
-          <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+          <UserInfoModal user={mapAuthUserToUserInfo(user)} onClose={() => setShowUserInfoModal(false)} />
         ) : (
           <div className="text-sm text-gray-500 p-2">Chargement du profil…</div>
         )}
       </Modal>
-
-
-
 
       <Modal isOpen={showAccountModal} onClose={() => setShowAccountModal(false)} title={t('subscription.title')}>
         <AccountModal onClose={() => setShowAccountModal(false)} />
@@ -189,7 +196,7 @@ export const UserMenuButton = () => {
       <Modal
         isOpen={showInviteFriendModal}
         onClose={() => setShowInviteFriendModal(false)}
-        title="Inviter des amis"
+        title={t('nav.inviteFriend') || 'Invite a friend'}
       >
         <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />
       </Modal>
