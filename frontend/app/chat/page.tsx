@@ -1277,6 +1277,7 @@ export default function ChatInterface() {
       >
 
 
+
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
@@ -1380,7 +1381,8 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
-		
+
+
 
 
 
