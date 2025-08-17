@@ -1277,7 +1277,6 @@ export default function ChatInterface() {
       >
 
 
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
 		  <div className="flex items-center justify-between">
 			{/* Gauche — + puis Historique */}
@@ -1291,39 +1290,31 @@ export default function ChatInterface() {
 				<PlusIcon className="w-5 h-5" />
 			  </button>
 
-			  {/* Bouton Historique - Version finale avec icône d'horloge */}
-			  <div className="relative w-10 h-10">
-				{/* Bouton personnalisé qui déclenche HistoryMenu */}
+			  {/* Bouton Historique avec icône d'horloge */}
+			  <div className="relative">
 				<button
 				  onClick={() => {
-					// Trouver et cliquer sur le vrai bouton HistoryMenu
-					const historyButton = document.querySelector('[data-history-menu] button');
-					if (historyButton) {
-					  (historyButton as HTMLElement).click();
-					}
+					const btn = document.querySelector('.history-hidden button');
+					if (btn) btn.click();
 				  }}
 				  className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
-				  title="Historique des conversations"
 				>
-				  {/* Icône d'horloge */}
 				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				  </svg>
 				</button>
 				
-				{/* HistoryMenu caché mais fonctionnel */}
-				<div className="absolute opacity-0 pointer-events-none" data-history-menu>
+				<div className="absolute opacity-0 pointer-events-none history-hidden">
 				  <HistoryMenu />
 				</div>
 				
-				{/* Badge avec nombre de conversations */}
 				<span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
 				  {conversationsCount}
 				</span>
 			  </div>
 			</div>
 
-			{/* Centre — Logo Intelia + Titre */}
+			{/* Centre — Logo + Titre */}
 			<div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
 			  <div className="w-10 h-10 grid place-items-center">
 				<InteliaLogo className="h-8 w-auto" />
@@ -1331,57 +1322,26 @@ export default function ChatInterface() {
 			  <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
 			</div>
 
-			{/* Droite — Bouton menu utilisateur - Version finale carré bleu */}
+			{/* Droite — Bouton DD */}
 			<div className="flex items-center space-x-2">
-			  <div className="relative w-10 h-10">
-				{/* Bouton personnalisé qui déclenche UserMenuButton */}
+			  <div className="relative">
 				<button
 				  onClick={() => {
-					// Trouver et cliquer sur le vrai bouton UserMenuButton
-					const userButton = document.querySelector('[data-user-menu] button');
-					if (userButton) {
-					  (userButton as HTMLElement).click();
-					}
+					const btn = document.querySelector('.user-hidden button');
+					if (btn) btn.click();
 				  }}
 				  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors"
-				  title="Menu utilisateur"
 				>
 				  {getUserInitials(user)}
 				</button>
 				
-				{/* UserMenuButton caché mais fonctionnel */}
-				<div className="absolute opacity-0 pointer-events-none" data-user-menu>
+				<div className="absolute opacity-0 pointer-events-none user-hidden">
 				  <UserMenuButton />
 				</div>
 			  </div>
 			</div>
 		  </div>
-
-		  {showConcisionSettings && (
-			<div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-			  <div className="flex items-center justify-between mb-3">
-				<h3 className="font-medium text-gray-700">Paramètres de concision</h3>
-				<button
-				  onClick={() => setShowConcisionSettings(false)}
-				  className="text-gray-400 hover:text-gray-600"
-				>
-				  ×
-				</button>
-			  </div>
-
-			  {hasMessages && (
-				<button
-				  onClick={reprocessAllMessages}
-				  className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm transition-colors"
-				>
-				  Appliquer à toutes les réponses
-				</button>
-			  )}
-			</div>
-		  )}
 		</header>
-
-
 
 
 
