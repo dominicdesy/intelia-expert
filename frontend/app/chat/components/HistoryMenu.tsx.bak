@@ -138,7 +138,7 @@ export const HistoryMenu = () => {
     }
   }
 
-  // ✅ CONSERVÉ: Fonction pour formater la dernière activité (utilisée mais pas affichée)
+  // ✅ NOUVEAU: Fonction pour formater la dernière activité
   const formatLastActivity = (): string => {
     try {
       if (conversationGroups.length === 0) return ''
@@ -351,9 +351,33 @@ export const HistoryMenu = () => {
               )}
             </div>
 
-            {/* ❌ SUPPRIMÉ: Footer avec statistiques */}
-            {/* Le footer avec "2 conversations • 2 groupes" et "Conversation active" a été retiré */}
-            
+            {/* Footer avec statistiques - HEURE LOCALE */}
+            {totalConversations > 0 && (
+              <div className="p-3 border-t border-gray-100 bg-gray-50">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    {totalConversations} conversation{totalConversations > 1 ? 's' : ''} • 
+                    <span className="ml-1">
+                      {conversationGroups.length} groupe{conversationGroups.length > 1 ? 's' : ''}
+                    </span>
+                  </span>
+                  
+                  {conversationGroups.length > 0 && (
+                    <span>
+                      {/* ✅ CORRECTION: Utilisation formatage heure locale pour dernière activité */}
+                      Dernière : {formatLastActivity()}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Indicateur conversation courante */}
+                {currentConversation && (
+                  <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                    📖 Conversation active : {currentConversation.title}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
