@@ -21,7 +21,7 @@ function mapAuthUserToUserInfo(authUser: any) {
     company: meta.company ?? '',
     role: meta.role ?? meta.job_title ?? '',
     language: meta.language ?? meta.lang ?? 'en'
-  } as any // on “asserte” pour satisfaire le type exact attendu par le modal
+  } as any
 }
 
 export const UserMenuButton = () => {
@@ -73,7 +73,7 @@ export const UserMenuButton = () => {
   return (
     <>
       <div className="relative">
-        {/* Bouton carré 40×40 (plus de rond superposé) */}
+        {/* Bouton carré 40×40 */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
@@ -181,8 +181,16 @@ export const UserMenuButton = () => {
         )}
       </Modal>
 
-      <Modal isOpen={showAccountModal} onClose={() => setShowAccountModal(false)} title={t('subscription.title')}>
-        <AccountModal onClose={() => setShowAccountModal(false)} />
+      <Modal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        title={t('subscription.title')}
+      >
+        {user ? (
+          <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
+        ) : (
+          <div className="text-sm text-gray-500 p-2">Chargement du compte…</div>
+        )}
       </Modal>
 
       <Modal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} title={t('nav.language')}>
