@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useAuthStore } from '@/lib/stores/auth'
+import { useAuthStore } from '@/lib/stores/auth' 
 import { useTranslation } from '../hooks/useTranslation'
 import { Modal } from './Modal'
 import { UserInfoModal } from './modals/UserInfoModal'
@@ -7,35 +7,32 @@ import { AccountModal } from './modals/AccountModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
+import { PLAN_CONFIGS } from '../types'
 
-/** Mappe l’utilisateur d’auth (Supabase) vers le format attendu par UserInfoModal */
-function mapAuthUserToUserInfo(authUser: any) {
-  const meta = authUser?.user_metadata ?? {}
-  return {
-    id: authUser?.id ?? '',
-    email: authUser?.email ?? '',
-    firstName: meta.given_name ?? meta.firstName ?? meta.firstname ?? '',
-    lastName: meta.family_name ?? meta.lastName ?? meta.lastname ?? '',
-    phone: meta.phone_number ?? meta.phone ?? '',
-    country: meta.country ?? '',
-    company: meta.company ?? '',
-    role: meta.role ?? meta.job_title ?? '',
-    language: meta.language ?? meta.lang ?? 'en'
-  } as any
-}
-
+// ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
 export const UserMenuButton = () => {
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore() 
+  const { logout } = useAuthStore() // ✅ CHANGÉ: useAuth pour les actions
   const { t } = useTranslation()
-
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [showLanguageModal, setShowLanguageModal] = useState(false)
-  const [showContactModal, setShowContactModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  const userInitials = (user?.email || user?.id || 'DD').slice(0, 2).toUpperCase()
+  const getUserInitials = (user: any) => {
+    const email = user?.email || ''
+    const namePart = email.split('@')[0]
+    return namePart ? namePart.slice(0, 2).toUpperCase() : 'DD'
+  }
+
+  const userInitials = getUserInitials(user)
+
+  const handleContactClick = () => {
+    setIsOpen(false)
+    setShowContactModal(true)
+  }
 
   const handleUserInfoClick = () => {
     setIsOpen(false)
@@ -52,11 +49,6 @@ export const UserMenuButton = () => {
     setShowLanguageModal(true)
   }
 
-  const handleContactClick = () => {
-    setIsOpen(false)
-    setShowContactModal(true)
-  }
-
   const handleInviteFriendClick = () => {
     setIsOpen(false)
     setShowInviteFriendModal(true)
@@ -65,28 +57,28 @@ export const UserMenuButton = () => {
   const handleLogout = async () => {
     try {
       await logout()
-    } catch (e) {
-      console.error('Logout error', e)
+    } catch (error) {
+      console.error('Error during logout:', error)
     }
   }
 
   return (
     <>
       <div className="relative">
-        {/* Bouton carré 40×40 */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
-          title={t('nav.account')}
-          aria-label={t('nav.account')}
         >
           <span className="text-white text-xs font-medium">{userInitials}</span>
         </button>
 
         {isOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setIsOpen(false)}
+            />
+            
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               {/* En-tête compte */}
               <div className="px-3 pb-2 border-b border-gray-100">
@@ -104,6 +96,7 @@ export const UserMenuButton = () => {
                   onClick={handleAccountClick}
                   className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
+                  {/* Icône */}
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0" />
                   </svg>
@@ -130,6 +123,7 @@ export const UserMenuButton = () => {
                   <span>{t('nav.language')}</span>
                 </button>
 
+                {/* ✅ Inviter un ami */}
                 <button
                   onClick={handleInviteFriendClick}
                   className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -170,41 +164,42 @@ export const UserMenuButton = () => {
 
       {/* Modales */}
       <Modal
-        isOpen={showUserInfoModal}
-        onClose={() => setShowUserInfoModal(false)}
-        title={t('nav.profile')}
-      >
-        {user ? (
-          <UserInfoModal user={mapAuthUserToUserInfo(user)} onClose={() => setShowUserInfoModal(false)} />
-        ) : (
-          <div className="text-sm text-gray-500 p-2">Chargement du profil…</div>
-        )}
-      </Modal>
-
-      <Modal
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
         title={t('subscription.title')}
       >
-        {user ? (
-          <AccountModal user={user} onClose={() => setShowAccountModal(false)} />
-        ) : (
-          <div className="text-sm text-gray-500 p-2">Chargement du compte…</div>
-        )}
-      </Modal>
-
-      <Modal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} title={t('nav.language')}>
-        <LanguageModal onClose={() => setShowLanguageModal(false)} />
-      </Modal>
-
-      <Modal isOpen={showContactModal} onClose={() => setShowContactModal(false)} title={t('nav.contact')}>
-        <ContactModal onClose={() => setShowContactModal(false)} />
+        <AccountModal user={user as any} onClose={() => setShowAccountModal(false)} />
       </Modal>
 
       <Modal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title={t('profile.title')}
+      >
+        <UserInfoModal user={user as any} onClose={() => setShowUserInfoModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showLanguageModal}
+        onClose={() => setShowLanguageModal(false)}
+        title={t('nav.language')}
+      >
+        <LanguageModal onClose={() => setShowLanguageModal(false)} />
+      </Modal>
+
+      <Modal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        title={t('nav.contact')}
+      >
+        <ContactModal onClose={() => setShowContactModal(false)} />
+      </Modal>
+
+      {/* ✅ NOUVELLE MODAL INVITER UN AMI */}
+      <Modal
         isOpen={showInviteFriendModal}
         onClose={() => setShowInviteFriendModal(false)}
-        title={t('nav.inviteFriend') || 'Invite a friend'}
+        title="Inviter des amis"
       >
         <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />
       </Modal>
