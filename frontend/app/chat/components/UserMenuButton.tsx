@@ -159,9 +159,20 @@ export const UserMenuButton = () => {
       </div>
 
       {/* Modales */}
-      <Modal isOpen={showUserInfoModal} onClose={() => setShowUserInfoModal(false)} title={t('nav.profile')}>
-        <UserInfoModal onClose={() => setShowUserInfoModal(false)} />
+      <Modal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        title={t('nav.profile')}
+      >
+        {user ? (
+          <UserInfoModal user={user} onClose={() => setShowUserInfoModal(false)} />
+        ) : (
+          <div className="text-sm text-gray-500 p-2">Chargement du profil…</div>
+        )}
       </Modal>
+
+
+
 
       <Modal isOpen={showAccountModal} onClose={() => setShowAccountModal(false)} title={t('subscription.title')}>
         <AccountModal onClose={() => setShowAccountModal(false)} />
