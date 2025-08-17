@@ -1278,7 +1278,6 @@ export default function ChatInterface() {
 
 
 
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
@@ -1322,13 +1321,23 @@ export default function ChatInterface() {
         
             {/* Droite — Bouton menu utilisateur (carré arrondi bleu avec initiales) */}
             <div className="flex items-center space-x-2">
-              <button 
-                className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-medium hover:bg-blue-700 transition-colors"
-                title="Menu utilisateur"
-                aria-label="Menu utilisateur"
-              >
-                {getUserInitials(user)}
-              </button>
+              <div className="relative w-10 h-10">
+                {/* Composant original masqué mais fonctionnel */}
+                <div className="absolute inset-0 opacity-0">
+                  <UserMenuButton />
+                </div>
+                
+                {/* Bouton visible avec le bon style */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <button 
+                    className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors"
+                    title="Menu utilisateur"
+                    aria-label="Menu utilisateur"
+                  >
+                    {getUserInitials(user)}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1355,6 +1364,11 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
+
+
+
+
+
 
 
 
