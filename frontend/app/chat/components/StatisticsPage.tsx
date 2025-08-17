@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 
-// Types pour les données de statistiques
+// Types pour les données de statistiques (inchangés)
 interface SystemStats {
   system_health: {
     uptime_hours: number
@@ -152,12 +152,11 @@ export const StatisticsPage: React.FC = () => {
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
 
-  // 🚀 LOGIQUE D'AUTHENTIFICATION OPTIMISÉE
+  // 🚀 LOGIQUE D'AUTHENTIFICATION OPTIMISÉE (inchangée)
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const performAuthCheck = () => {
-      // Éviter les vérifications multiples si déjà prêt
       if (authStatus === 'ready' && authCheckRef.current) {
         return
       }
@@ -170,7 +169,6 @@ export const StatisticsPage: React.FC = () => {
         currentAuthStatus: authStatus
       })
 
-      // Phase 1: Initialisation - attendre que user ne soit plus undefined
       if (user === undefined) {
         console.log('⏳ [StatisticsPage] Phase 1: Attente initialisation auth...')
         setAuthStatus('initializing')
@@ -178,7 +176,6 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      // Phase 2: Vérification - s'assurer que les données sont stables
       if (user !== null && (!user.email || !user.user_type)) {
         console.log('⏳ [StatisticsPage] Phase 2: Données utilisateur incomplètes, attente...')
         setAuthStatus('checking')
@@ -186,21 +183,17 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      // Incrémenter le compteur de stabilité seulement si pas encore prêt
       if (authStatus !== 'ready') {
         stabilityCounterRef.current++
       }
 
-      // Attendre au moins 2 vérifications consécutives avec les mêmes données
       if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
         console.log(`⏳ [StatisticsPage] Stabilisation... (${stabilityCounterRef.current}/2)`)
         setAuthStatus('checking')
-        // Programmer une nouvelle vérification
         timeoutId = setTimeout(performAuthCheck, 150)
         return
       }
 
-      // Phase 3: Validation finale
       if (user === null) {
         console.log('❌ [StatisticsPage] Utilisateur non connecté')
         setAuthStatus('unauthorized')
@@ -215,7 +208,6 @@ export const StatisticsPage: React.FC = () => {
         return
       }
 
-      // Phase 4: Succès ! (Une seule fois)
       if (!authCheckRef.current) {
         console.log('✅ [StatisticsPage] Authentification réussie:', user.email)
         setAuthStatus('ready')
@@ -224,13 +216,12 @@ export const StatisticsPage: React.FC = () => {
       }
     }
 
-    // Démarrer la vérification avec un petit délai initial
     timeoutId = setTimeout(performAuthCheck, 50)
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [user, authStatus]) // 🚀 AJOUTÉ: authStatus dans les dépendances pour éviter boucles
+  }, [user, authStatus])
 
   // Charger les statistiques uniquement quand tout est prêt
   useEffect(() => {
@@ -238,7 +229,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des statistiques')
       loadAllStatistics()
     }
-  }, [authStatus, selectedTimeRange]) // Retirer authStatus des deps pour éviter boucles
+  }, [authStatus, selectedTimeRange])
 
   // Charger les questions si nécessaire
   useEffect(() => {
@@ -246,7 +237,7 @@ export const StatisticsPage: React.FC = () => {
       console.log('📊 [StatisticsPage] Lancement chargement des questions')
       loadQuestionLogs()
     }
-  }, [authStatus, activeTab, currentPage]) // Garder authStatus pour sécurité
+  }, [authStatus, activeTab, currentPage])
 
   // Fonction pour récupérer les headers d'authentification
   const getAuthHeaders = async () => {
@@ -270,7 +261,7 @@ export const StatisticsPage: React.FC = () => {
   }
 
   const loadAllStatistics = async () => {
-    if (statsLoading) return // Éviter les chargements multiples
+    if (statsLoading) return
     
     console.log('📊 [StatisticsPage] Début chargement statistiques')
     setStatsLoading(true)
@@ -279,7 +270,6 @@ export const StatisticsPage: React.FC = () => {
     try {
       const headers = await getAuthHeaders()
 
-      // 🚀 CHARGER EN SÉQUENCE POUR ÉVITER RATE LIMITING
       console.log('📄 Chargement performance...')
       const performanceRes = await fetch('/api/v1/logging/analytics/performance?hours=24', { headers })
       
@@ -289,15 +279,13 @@ export const StatisticsPage: React.FC = () => {
       console.log('📄 Chargement dashboard...')
       const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
       
-      // ⚡ COÛTS OPENAI OPTIMISÉS - Utiliser les nouveaux endpoints rapides
       console.log('📄 Chargement coûts OpenAI (optimisé)...')
       
-      // 🚀 PRIORISER les endpoints rapides dans l'ordre
       const openaiEndpoints = [
-        '/api/v1/billing/openai-usage/last-week',        // ⚡ RAPIDE - 7 jours
-        '/api/v1/billing/openai-usage/current-month-light', // 🛡️ SÉCURISÉ - 10 jours max
-        '/api/v1/billing/openai-usage/fallback',         // 🆘 SECOURS - données simulées
-        '/api/v1/billing/openai-usage/current-month'     // 🌐 LEGACY - en dernier recours
+        '/api/v1/billing/openai-usage/last-week',
+        '/api/v1/billing/openai-usage/current-month-light',
+        '/api/v1/billing/openai-usage/fallback',
+        '/api/v1/billing/openai-usage/current-month'
       ]
       
       let openaiCostsRes = null
@@ -321,7 +309,6 @@ export const StatisticsPage: React.FC = () => {
       const billingPlansRes = await fetch('/api/v1/billing/plans', { headers })
       const systemMetricsRes = await fetch('/api/v1/system/metrics', { headers })
 
-      // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
       let backendData: BackendPerformanceStats | null = null
 
@@ -330,8 +317,7 @@ export const StatisticsPage: React.FC = () => {
         backendData = await performanceRes.json()
         console.log('📊 Données de performance reçues:', backendData)
         
-        // 🚀 RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec endpoints optimisés
-        let realOpenaiCosts = 6.30 // Valeur connue comme fallback
+        let realOpenaiCosts = 6.30
         
         if (openaiCostsRes && openaiCostsRes.ok) {
           try {
@@ -349,23 +335,20 @@ export const StatisticsPage: React.FC = () => {
           console.log('⚠️ Tous les endpoints OpenAI ont échoué, utilisation fallback:', realOpenaiCosts)
         }
         
-        // 🚀 UTILISER LES VRAIES DONNÉES DU BACKEND + CALCUL DEPUIS LES QUESTIONS
         let realResponseTime = null
         
-        // D'abord essayer les données du backend performance
         if (backendData?.current_status?.avg_response_time_ms) {
           realResponseTime = backendData.current_status.avg_response_time_ms / 1000
         } else if (backendData?.averages?.avg_response_time_ms) {
           realResponseTime = backendData.averages.avg_response_time_ms / 1000
         }
         
-        // 🎯 CALCUL DU VRAI TEMPS depuis vos questions réelles (plus précis)
         let questionBasedMetrics = null
         if (questionsData && questionsData.questions) {
           const validTimes = questionsData.questions
             .map(q => q.response_time)
             .filter(t => t && t > 0)
-            .sort((a, b) => a - b) // Trier pour calculer la médiane
+            .sort((a, b) => a - b)
           
           if (validTimes.length > 0) {
             const average = validTimes.reduce((a, b) => a + b, 0) / validTimes.length
@@ -394,19 +377,18 @@ export const StatisticsPage: React.FC = () => {
           }
         }
         
-        // Prioriser le calcul depuis vos vraies questions (plus précis)
         const finalResponseTime = questionBasedMetrics?.average || realResponseTime || 0
         
         const adaptedPerfStats: PerformanceStats = {
           avg_response_time: finalResponseTime,
-          median_response_time: questionBasedMetrics?.median || 0, // 🆕 MÉDIANE
-          min_response_time: questionBasedMetrics?.min || 0,       // 🆕 MINIMUM  
-          max_response_time: questionBasedMetrics?.max || 0,       // 🆕 MAXIMUM
-          response_time_count: questionBasedMetrics?.count || 0,   // 🆕 NOMBRE D'ÉCHANTILLONS
+          median_response_time: questionBasedMetrics?.median || 0,
+          min_response_time: questionBasedMetrics?.min || 0,
+          max_response_time: questionBasedMetrics?.max || 0,
+          response_time_count: questionBasedMetrics?.count || 0,
           openai_costs: realOpenaiCosts,
           error_count: backendData?.global_stats?.total_failures || 
                       backendData?.current_status?.total_errors || 0,
-          cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données quand disponible
+          cache_hit_rate: 85.2
         }
         
         setPerformanceStats(adaptedPerfStats)
@@ -414,7 +396,6 @@ export const StatisticsPage: React.FC = () => {
       } else {
         console.log('❌ Endpoint performance non disponible, récupération via endpoint alternatif...')
         
-        // 📄 ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
         try {
           const altResponse = await fetch('/api/v1/logging/analytics/health-check', { headers })
           if (altResponse.ok) {
@@ -422,12 +403,12 @@ export const StatisticsPage: React.FC = () => {
             console.log('📊 Données health-check:', healthData)
             
             setPerformanceStats({
-              avg_response_time: 0, // Sera affiché comme "Aucune donnée"
+              avg_response_time: 0,
               median_response_time: 0,
               min_response_time: 0,
               max_response_time: 0,
               response_time_count: 0,
-              openai_costs: 127.35, // Fallback
+              openai_costs: 127.35,
               error_count: 0,
               cache_hit_rate: healthData.analytics_available ? 85.2 : 0
             })
@@ -437,7 +418,7 @@ export const StatisticsPage: React.FC = () => {
         } catch (healthError) {
           console.log('❌ Aucun endpoint de performance disponible')
           setPerformanceStats({
-            avg_response_time: 0, // Sera affiché comme "Aucune donnée disponible"
+            avg_response_time: 0,
             median_response_time: 0,
             min_response_time: 0,
             max_response_time: 0,
@@ -455,7 +436,6 @@ export const StatisticsPage: React.FC = () => {
         realBillingStats = await billingRes.json()
         console.log('✅ Billing stats réelles récupérées:', realBillingStats)
         
-        // 🔧 ADAPTER LES DONNÉES REÇUES - Format de votre endpoint
         if (realBillingStats) {
           const adaptedBillingStats = {
             plans: realBillingStats.plans || {},
@@ -468,7 +448,6 @@ export const StatisticsPage: React.FC = () => {
       } else {
         console.log('⚠️ Endpoint billing non disponible, calcul depuis les questions...')
         
-        // 🚀 CALCULER LES TOP USERS depuis les vraies questions
         try {
           const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
           const questionsData = await questionsResponse.json()
@@ -476,7 +455,6 @@ export const StatisticsPage: React.FC = () => {
           if (questionsData && questionsData.questions) {
             const questions = questionsData.questions
             
-            // 📊 CALCULER LES UTILISATEURS LES PLUS ACTIFS depuis les vraies données
             const userStats = questions.reduce((acc: any, q: any) => {
               const email = q.user_email
               if (email && email.trim() !== '') {
@@ -484,7 +462,7 @@ export const StatisticsPage: React.FC = () => {
                   acc[email] = {
                     email: email,
                     question_count: 0,
-                    plan: 'free' // TODO: Récupérer le vrai plan depuis la base
+                    plan: 'free'
                   }
                 }
                 acc[email].question_count++
@@ -492,7 +470,6 @@ export const StatisticsPage: React.FC = () => {
               return acc
             }, {})
             
-            // Trier par nombre de questions et prendre le top 5
             const topUsers: Array<{email: string, question_count: number, plan: string}> = Object.values(userStats)
               .sort((a: any, b: any) => b.question_count - a.question_count)
               .slice(0, 5) as Array<{email: string, question_count: number, plan: string}>
@@ -524,10 +501,7 @@ export const StatisticsPage: React.FC = () => {
         const dashData = await dashboardRes.json()
         console.log('✅ Dashboard data:', dashData)
         
-        // 🚀 CALCULER LES VRAIES STATISTIQUES depuis les données réelles
-        // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
         try {
-          // 🔧 RÉCUPÉRER TOUTES LES QUESTIONS avec le bon endpoint qui fonctionne !
           const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=50', { headers })
           questionsData = await allQuestionsResponse.json()
           
@@ -537,7 +511,6 @@ export const StatisticsPage: React.FC = () => {
             
             console.log(`📊 Récupéré ${questions.length} questions sur ${totalFromPagination} total`)
             
-            // 🚀 FILTRER les utilisateurs avec email valide
             const validUsers = new Set(
               questions
                 .map((q: any) => q.user_email)
@@ -548,14 +521,12 @@ export const StatisticsPage: React.FC = () => {
             const today = new Date().toDateString()
             const thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0')
             
-            // 🔧 CALCULER LES VRAIES SOURCES avec le bon total
             const sourceStats = questions.reduce((acc: any, q: any) => {
               const source = q.response_source || 'unknown'
               acc[source] = (acc[source] || 0) + 1
               return acc
             }, {})
             
-            // Calculer le total des sources pour vérification
             const totalFromSources = Object.values(sourceStats).reduce((sum: number, count: any) => sum + count, 0)
             
             console.log('📊 Distribution des sources:', {
@@ -565,20 +536,16 @@ export const StatisticsPage: React.FC = () => {
               sampleSize: questions.length
             })
             
-            // Questions aujourd'hui
             const questionsToday = questions.filter((q: any) => 
               new Date(q.timestamp).toDateString() === today
             ).length
             
-            // Questions ce mois
             const questionsThisMonth = questions.filter((q: any) => 
               q.timestamp.startsWith(thisMonth)
             ).length
             
-            // 🚀 AJUSTER les proportions si on n'a qu'un échantillon
             let adjustedSourceStats = sourceStats
             if (questions.length < totalFromPagination) {
-              // Calculer le facteur d'échelle
               const scaleFactor = totalFromPagination / questions.length
               adjustedSourceStats = Object.entries(sourceStats).reduce((acc: any, [source, count]: [string, any]) => {
                 acc[source] = Math.round(count * scaleFactor)
@@ -594,7 +561,7 @@ export const StatisticsPage: React.FC = () => {
             
             setUsageStats({
               unique_users: uniqueUsers,
-              total_questions: totalFromPagination, // Utiliser le vrai total
+              total_questions: totalFromPagination,
               questions_today: questionsToday,
               questions_this_month: questionsThisMonth,
               source_distribution: {
@@ -604,7 +571,7 @@ export const StatisticsPage: React.FC = () => {
               },
               monthly_breakdown: {
                 [thisMonth]: questionsThisMonth,
-                "2025-07": 0, // TODO: Calculer les mois précédents
+                "2025-07": 0,
                 "2025-06": 0
               }
             })
@@ -620,9 +587,8 @@ export const StatisticsPage: React.FC = () => {
           }
         } catch (questionsError) {
           console.error('❌ Erreur récupération questions pour stats:', questionsError)
-          // Fallback aux données par défaut
           setUsageStats({
-            unique_users: 1, // Au minimum vous
+            unique_users: 1,
             total_questions: totalQuestions || 0,
             questions_today: 0,
             questions_this_month: totalQuestions || 0,
@@ -637,7 +603,6 @@ export const StatisticsPage: React.FC = () => {
           })
         }
 
-        // 🚀 RÉCUPÉRATION DES VRAIES DONNÉES SYSTÈME
         let systemHealthData = null
         let systemMetricsData = null
         let realPlans = {}
@@ -652,23 +617,21 @@ export const StatisticsPage: React.FC = () => {
           console.log('✅ System metrics récupérés:', systemMetricsData)
         }
 
-        // 🆕 RÉCUPÉRATION DES VRAIS PLANS
         if (billingPlansRes.ok) {
           const plansData = await billingPlansRes.json()
           realPlans = plansData.plans || {}
           console.log('✅ Plans réels récupérés pour system stats:', realPlans)
         }
 
-        // 🚀 CONSTRUIRE LES VRAIES STATISTICS SYSTÈME
         setSystemStats({
           system_health: {
-            uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
-            total_requests: questionsData?.pagination?.total || 0, // 🆕 VRAIES DONNÉES - FIXED avec null check
-            error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1, // Fix: Ensure it's a number
+            uptime_hours: 24 * 7,
+            total_requests: questionsData?.pagination?.total || 0,
+            error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1,
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
-              layer: true // TODO: Ajouter endpoint spécifique
+              layer: true
             }
           },
           billing_stats: {
@@ -676,9 +639,9 @@ export const StatisticsPage: React.FC = () => {
             plan_names: Object.keys(realPlans).length > 0 ? Object.keys(realPlans) : ['free', 'basic', 'premium', 'enterprise']
           },
           features_enabled: {
-            analytics: true, // Prouvé par le fait qu'on récupère les données
+            analytics: true,
             billing: billingRes.ok,
-            authentication: true, // On est connecté
+            authentication: true,
             openai_fallback: systemHealthData?.openai_configured || true
           }
         })
@@ -707,7 +670,6 @@ export const StatisticsPage: React.FC = () => {
 
       console.log('🔍 [StatisticsPage] Chargement questions:', { page: currentPage, limit: questionsPerPage })
 
-      // 🚀 UTILISER LE BON ENDPOINT DES QUESTIONS QUI FONCTIONNE
       const response = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!response.ok) {
@@ -718,7 +680,6 @@ export const StatisticsPage: React.FC = () => {
       
       console.log('✅ Questions chargées:', data)
       
-      // Adapter les données du backend pour l'UI
       const adaptedQuestions: QuestionLog[] = data.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
@@ -747,7 +708,6 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // Fonction helper pour mapper les sources de réponse
   const mapResponseSource = (source: string): QuestionLog['response_source'] => {
     switch (source) {
       case 'rag': return 'rag'
@@ -765,17 +725,15 @@ export const StatisticsPage: React.FC = () => {
     return '❓'
   }
 
-  // 🎯 RENDU CONDITIONNEL ULTRA-SIMPLE - Style Compass
+  // 🎯 RENDU CONDITIONNEL - Style EXACT Compass
   
   // États de chargement/initialisation
   if (authStatus === 'initializing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
-          <p className="text-gray-700 font-medium">Initialisation...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Initialisation...</p>
         </div>
       </div>
     )
@@ -783,40 +741,34 @@ export const StatisticsPage: React.FC = () => {
 
   if (authStatus === 'checking') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
-          <p className="text-gray-700 font-medium">Vérification des permissions...</p>
-          <p className="text-xs text-gray-500 mt-2">Stabilisation des données d'authentification</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification des permissions...</p>
+          <p className="text-xs text-gray-400 mt-2">Stabilisation des données d'authentification</p>
         </div>
       </div>
     )
   }
 
-  // États d'erreur - Style Compass
+  // États d'erreur - Style Compass exact
   if (authStatus === 'unauthorized') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full text-center p-8 border border-gray-100">
-          <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Connexion requise</h2>
-          <p className="text-gray-600 mb-8">Vous devez être connecté pour accéder à cette page.</p>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
+          <div className="text-red-600 text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Connexion requise</h2>
+          <p className="text-gray-600 mb-6">Vous devez être connecté pour accéder à cette page.</p>
           <div className="flex space-x-3">
             <button
               onClick={() => window.location.href = '/login'}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg"
+              className="flex-1 bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
             >
               Se connecter
             </button>
             <button
               onClick={() => window.history.back()}
-              className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors font-medium border border-gray-200"
+              className="flex-1 bg-gray-100 text-gray-700 px-6 py-2 hover:bg-gray-200 transition-colors border border-gray-300"
             >
               Retour
             </button>
@@ -828,19 +780,15 @@ export const StatisticsPage: React.FC = () => {
 
   if (authStatus === 'forbidden') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full text-center p-8 border border-gray-100">
-          <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Accès refusé</h2>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
+          <div className="text-red-600 text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Accès refusé</h2>
           <p className="text-gray-600 mb-2">Cette page est réservée aux super administrateurs.</p>
-          <p className="text-sm text-gray-500 mb-8">Votre rôle actuel : <span className="font-medium">{user?.user_type || 'non défini'}</span></p>
+          <p className="text-sm text-gray-500 mb-6">Votre rôle actuel : <span className="font-medium">{user?.user_type || 'non défini'}</span></p>
           <button
             onClick={() => window.history.back()}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg"
+            className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
           >
             Retour
           </button>
@@ -852,12 +800,10 @@ export const StatisticsPage: React.FC = () => {
   // Chargement des données
   if (statsLoading && !systemStats) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
-          <p className="text-gray-700 font-medium">Chargement des statistiques...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des statistiques...</p>
         </div>
       </div>
     )
@@ -866,18 +812,14 @@ export const StatisticsPage: React.FC = () => {
   // Erreur dans le chargement des données
   if (error && authStatus === 'ready' && !systemStats) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full text-center p-8 border border-gray-100">
-          <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Erreur</h2>
-          <p className="text-gray-600 mb-8">{error}</p>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
+          <div className="text-amber-600 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Erreur</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={loadAllStatistics}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg"
+            className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
           >
             Réessayer
           </button>
@@ -886,94 +828,84 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // 🎉 PAGE PRINCIPALE - Style Compass
+  // 🎉 PAGE PRINCIPALE - Style EXACT Compass
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-      {/* Header - Style Compass */}
-      <div className="bg-white shadow-sm border-b border-gray-100">
+    <div className="min-h-screen bg-gray-100">
+      {/* Header - Style EXACT Compass comme dans les images */}
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between h-16">
+            {/* Left side - Logo + Navigation */}
             <div className="flex items-center space-x-6">
               <button
                 onClick={() => window.history.back()}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </button>
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
+              
+              {/* Logo + Title - Style Compass */}
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                  📊
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Statistiques Administrateur</h1>
-                  <div className="text-sm text-gray-500 flex items-center space-x-2">
-                    <span>Connecté en tant que <span className="font-semibold text-emerald-600">{user?.email}</span></span>
-                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
-                      {user?.user_type}
-                    </span>
-                  </div>
+                  <h1 className="text-lg font-medium text-gray-900">Statistics</h1>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Navigation Tabs - Style Compass */}
-              <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner border border-gray-200">
+              
+              {/* Navigation Tabs - Style EXACT Compass */}
+              <div className="flex items-center space-x-8">
                 <button
                   onClick={() => setActiveTab('dashboard')}
-                  className={`px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'dashboard' 
-                      ? 'bg-white text-blue-700 shadow-sm border border-blue-200' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'text-blue-600 border-b-2 border-blue-600' 
+                      : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <span>Tableau de Bord</span>
+                  Dashboard
                 </button>
                 <button
                   onClick={() => setActiveTab('questions')}
-                  className={`px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'questions' 
-                      ? 'bg-white text-blue-700 shadow-sm border border-blue-200' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'text-blue-600 border-b-2 border-blue-600' 
+                      : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  <span>Questions & Réponses</span>
+                  Questions & Réponses
                 </button>
               </div>
-              
-              {/* Action Buttons - Style Compass */}
+            </div>
+            
+            {/* Right side - User info + Actions */}
+            <div className="flex items-center space-x-4">
+              {/* Time Range Selector - Style Compass */}
               {activeTab === 'dashboard' && (
                 <div className="flex items-center space-x-3">
                   <select
                     value={selectedTimeRange}
                     onChange={(e) => setSelectedTimeRange(e.target.value as any)}
-                    className="border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
+                    className="border border-gray-300 px-3 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="day">Aujourd'hui</option>
-                    <option value="week">Cette semaine</option>
-                    <option value="month">Ce mois</option>
-                    <option value="year">Cette année</option>
+                    <option value="day">This Month</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">All Time</option>
                   </select>
                   
                   <button
                     onClick={loadAllStatistics}
                     disabled={statsLoading}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 text-sm font-medium disabled:opacity-50 shadow-lg flex items-center space-x-2"
+                    className="bg-blue-600 text-white px-3 py-1 text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span>{statsLoading ? 'Actualisation...' : 'Actualiser'}</span>
+                    <span>{statsLoading ? 'Loading...' : 'Refresh'}</span>
                   </button>
                 </div>
               )}
@@ -982,21 +914,30 @@ export const StatisticsPage: React.FC = () => {
                 <button
                   onClick={loadQuestionLogs}
                   disabled={questionsLoading}
-                  className="bg-gradient-to-r from-emerald-600 to-green-600 text-white px-6 py-2 rounded-lg hover:from-emerald-700 hover:to-green-700 transition-all duration-200 text-sm font-medium disabled:opacity-50 shadow-lg flex items-center space-x-2"
+                  className="bg-green-600 text-white px-3 py-1 text-sm hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>{questionsLoading ? 'Chargement...' : 'Actualiser Questions'}</span>
+                  <span>{questionsLoading ? 'Loading...' : 'Refresh'}</span>
                 </button>
               )}
+              
+              {/* User Info - Style Compass */}
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-gray-600">Connecté en tant que</span>
+                <span className="font-medium text-gray-900">{user?.email}</span>
+                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium">
+                  {user?.user_type}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content - Style Compass */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'dashboard' ? (
           <StatisticsDashboard
             systemStats={systemStats}
@@ -1023,99 +964,101 @@ export const StatisticsPage: React.FC = () => {
         {/* Modal de détail de question - Style Compass */}
         {selectedQuestion && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100">
-              <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-blue-50">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Détails de la Question</h3>
+            <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-base font-medium text-gray-900">Détails de la Question</h3>
                 </div>
                 <button
                   onClick={() => setSelectedQuestion(null)}
-                  className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="text-gray-400 hover:text-gray-600 p-1"
                 >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
               
-              <div className="p-8">
-                <div className="space-y-6">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+              <div className="p-4">
+                <div className="space-y-4">
+                  <div className="bg-blue-50 p-4 border border-blue-200">
+                    <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
                       <span>❓</span>
                       <span>Question:</span>
                     </h4>
                     <p className="text-gray-700">{selectedQuestion.question}</p>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                  <div className="bg-gray-50 p-4 border border-gray-200">
+                    <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
                       <span>💬</span>
                       <span>Réponse:</span>
                     </h4>
                     <div className="text-gray-700 whitespace-pre-wrap">{selectedQuestion.response}</div>
                   </div>
                   
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 border border-gray-200">
+                      <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
                         <span>📊</span>
                         <span>Métadonnées:</span>
                       </h4>
-                      <ul className="text-sm text-gray-600 space-y-3">
-                        <li className="flex justify-between">
-                          <span>Source:</span>
-                          <span className="font-medium">{selectedQuestion.response_source}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Confiance:</span>
-                          <span className="font-medium">{(selectedQuestion.confidence_score * 100).toFixed(1)}%</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Temps:</span>
-                          <span className="font-medium">{selectedQuestion.response_time}s</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Langue:</span>
-                          <span className="font-medium">{selectedQuestion.language}</span>
-                        </li>
-                      </ul>
+                      <table className="w-full text-sm">
+                        <tbody className="space-y-2">
+                          <tr>
+                            <td className="text-gray-600 py-1">Source:</td>
+                            <td className="font-medium py-1">{selectedQuestion.response_source}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Confiance:</td>
+                            <td className="font-medium py-1">{(selectedQuestion.confidence_score * 100).toFixed(1)}%</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Temps:</td>
+                            <td className="font-medium py-1">{selectedQuestion.response_time}s</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Langue:</td>
+                            <td className="font-medium py-1">{selectedQuestion.language}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                     
-                    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                    <div className="bg-white p-4 border border-gray-200">
+                      <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
                         <span>👤</span>
                         <span>Utilisateur:</span>
                       </h4>
-                      <ul className="text-sm text-gray-600 space-y-3">
-                        <li className="flex justify-between">
-                          <span>Email:</span>
-                          <span className="font-medium">{selectedQuestion.user_email}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Session:</span>
-                          <span className="font-medium">{selectedQuestion.session_id.substring(0, 12)}...</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Date:</span>
-                          <span className="font-medium">{new Date(selectedQuestion.timestamp).toLocaleString('fr-FR')}</span>
-                        </li>
-                        <li className="flex justify-between">
-                          <span>Feedback:</span>
-                          <span className="text-lg">{getFeedbackIcon(selectedQuestion.feedback)}</span>
-                        </li>
-                      </ul>
+                      <table className="w-full text-sm">
+                        <tbody className="space-y-2">
+                          <tr>
+                            <td className="text-gray-600 py-1">Email:</td>
+                            <td className="font-medium py-1">{selectedQuestion.user_email}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Session:</td>
+                            <td className="font-medium py-1">{selectedQuestion.session_id.substring(0, 12)}...</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Date:</td>
+                            <td className="font-medium py-1">{new Date(selectedQuestion.timestamp).toLocaleString('fr-FR')}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-gray-600 py-1">Feedback:</td>
+                            <td className="text-lg py-1">{getFeedbackIcon(selectedQuestion.feedback)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                   
                   {selectedQuestion.feedback_comment && (
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
-                      <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                    <div className="bg-purple-50 p-4 border border-purple-200">
+                      <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
                         <span>💬</span>
                         <span>Commentaire:</span>
                       </h4>
