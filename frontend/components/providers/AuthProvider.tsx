@@ -101,7 +101,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // ✅ NOUVELLE GESTION : Période de grâce pour éviter redirections prématurées
   useEffect(() => {
-    if (!hasHydrated) return
+    // 🔥 PROTECTION CRITIQUE : Éviter la boucle infinie
+    if (!hasHydrated || isInGracePeriod === false) return
+
+    // 🔥 PROTECTION : Ne démarrer qu'une seule fois
+    if (gracePeriodCount > 0) {
+      console.log('⚠️ [AuthProvider] Période de grâce déjà démarrée, skip')
+      return
+    }
 
     const gracePeriodDuration = isPublicPage ? 1000 : 3000 // Plus court pour pages publiques
     
@@ -109,22 +116,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       clearTimeout(gracePeriodTimeoutRef.current)
     }
     
-    setGracePeriodCount(prev => prev + 1)
-    console.log(`🔄 [AuthProvider] Période de grâce démarrée (${gracePeriodDuration}ms) - tentative ${gracePeriodCount + 1}`)
+    setGracePeriodCount(1) // Marquer comme démarré
+    console.log(`🔄 [AuthProvider] Période de grâce démarrée UNIQUE (${gracePeriodDuration}ms)`)
     
     gracePeriodTimeoutRef.current = setTimeout(() => {
-      if (!isInitialized) return
-      
+      console.log('✅ [AuthProvider] Période de grâce terminée')
       setIsInGracePeriod(false)
       setIsAuthReady(true)
-      console.log('✅ [AuthProvider] Période de grâce terminée, auth prête')
       
       // Si on est sur page protégée et pas authentifié après grâce, vérifier une dernière fois
       if (isProtectedPage && !isAuthenticated && !isLoading) {
         console.log('🔍 [AuthProvider] Vérification finale après période de grâce')
         
         authCheckTimeoutRef.current = setTimeout(() => {
-          if (!isAuthenticated && isProtectedPage && !isLoading) {
+          const currentState = useAuthStore.getState()
+          if (!currentState.isAuthenticated && isProtectedPage && !currentState.isLoading) {
             handleAuthRedirect('Non authentifié après période de grâce')
           }
         }, 1000)
@@ -136,7 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         clearTimeout(gracePeriodTimeoutRef.current)
       }
     }
-  }, [hasHydrated, isInitialized, isPublicPage, isProtectedPage, isAuthenticated, isLoading, gracePeriodCount])
+  }, [hasHydrated]) // 🔥 DÉPENDANCES RÉDUITES - seulement hasHydrated
 
   // 🔥 INITIALISATION UNE SEULE FOIS
   useEffect(() => {
