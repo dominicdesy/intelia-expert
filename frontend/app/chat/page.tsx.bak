@@ -1276,6 +1276,7 @@ export default function ChatInterface() {
       >
 
 
+
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
@@ -1289,7 +1290,20 @@ export default function ChatInterface() {
                 <PlusIcon className="w-5 h-5" />
               </button>
         
-              <HistoryMenu />
+              {/* Bouton Historique avec badge */}
+              <div className="relative">
+                <button className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200">
+                  {/* Icône d'horloge/historique */}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                
+                {/* Badge de notification */}
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                  3
+                </span>
+              </div>
             </div>
         
             {/* Centre — Logo Intelia + Titre */}
@@ -1300,9 +1314,11 @@ export default function ChatInterface() {
               <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
-            {/* Droite — Bouton menu utilisateur (affiché comme "DD" carré arrondi bleu) */}
+            {/* Droite — Bouton menu utilisateur (carré arrondi bleu avec initiales) */}
             <div className="flex items-center space-x-2">
-              <UserMenuButton />
+              <button className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-medium hover:bg-blue-700 transition-colors">
+                {getUserInitials(user)}
+              </button>
             </div>
           </div>
 
@@ -1329,7 +1345,6 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
-
 
 
 
