@@ -1355,7 +1355,7 @@ export default function ChatInterface() {
                         </div>
                       )}
 
-                      <div className={`px-3 sm:px-4 py-3 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
+					  <div className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-gray-200 text-gray-900'}`}>
                         {message.isUser ? (
                           <p className="whitespace-pre-wrap leading-relaxed text-sm">
                             {message.content}
