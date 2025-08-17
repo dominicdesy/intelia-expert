@@ -2,63 +2,31 @@
 
 import React from 'react'
 
-// === Types (compatible with original) ===
-interface SystemStats {
+// === Types (compatibles) ===
+export interface SystemStats {
   system_health: {
     uptime_hours: number
     total_requests: number
     error_rate: number
-    rag_status: {
-      global: boolean
-      broiler: boolean
-      layer: boolean
-    }
-  }
-  billing_stats: {
-    plans_available: number
-    plan_names: string[]
-  }
-  features_enabled?: {
-    analytics: boolean
-    billing: boolean
-    authentication: boolean
-    openai_fallback: boolean
+    rag_status: { global: boolean; broiler: boolean; layer: boolean }
   }
 }
-
-interface UsageStats {
+export interface UsageStats {
   unique_users: number
   total_questions: number
   questions_today: number
   questions_this_month: number
-  source_distribution: {
-    rag_retriever: number
-    openai_fallback: number
-    perfstore: number
-  }
-  monthly_breakdown: { [month: string]: number }
+  source_distribution: { rag_retriever: number; openai_fallback: number; perfstore: number }
+  monthly_breakdown: Record<string, number>
 }
-
-interface BillingStats {
-  plans?: {
-    [planName: string]: {
-      user_count: number
-      revenue: number
-    }
-  }
+export interface BillingStats {
   total_revenue: number
-  top_users?: Array<{
-    email: string
-    question_count: number
-    plan: string
-  }>
 }
-
-interface PerformanceStats {
+export interface PerformanceStats {
   avg_response_time: number
+  cache_hit_rate: number
   openai_costs?: number
   error_count?: number
-  cache_hit_rate: number
 }
 
 interface StatisticsDashboardProps {
@@ -66,7 +34,7 @@ interface StatisticsDashboardProps {
   usageStats: UsageStats | null
   billingStats: BillingStats | null
   performanceStats: PerformanceStats | null
-  /** Nouvel attribut optionnel : utilisateurs actifs du mois précédent (calculé dans StatisticsPage) */
+  /** Utilisateurs actifs du mois précédent (calculé côté StatisticsPage) */
   activePrevMonth?: number
 }
 
@@ -77,82 +45,50 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
   performanceStats,
   activePrevMonth
 }) => {
-  // --- Ajouts: série 12 mois + export CSV ---
-  const monthlyEntries = usageStats?.monthly_breakdown
-    ? Object.entries(usageStats.monthly_breakdown).sort(([a],[b])=>a.localeCompare(b)).slice(-12)
-    : []
-  const monthlySeries = monthlyEntries.map(([ym, v]) => {
-    const [yy, mm] = ym.split('-')
-    const label = new Date(Number(yy), Number(mm)-1, 1).toLocaleDateString('fr-FR', { month: 'short' })
-    return { label, value: Number(v) || 0 }
-  })
-  const monthlyMax = Math.max(1, ...monthlySeries.map(d=>d.value))
-
-  const sourceDist = usageStats?.source_distribution || { rag_retriever:0, openai_fallback:0, perfstore:0 }
-  const sources = [
-    { name:'RAG', value: sourceDist.rag_retriever },
-    { name:'OpenAI', value: sourceDist.openai_fallback },
-    { name:'Perfstore', value: sourceDist.perfstore },
-  ]
-  const sourceMax = Math.max(1, ...sources.map(s=>s.value))
-  const sourceTotal = sources.reduce((s,x)=>s+x.value,0)
-
-  function exportStatsCSV(){
-    const lines:string[] = []
-    lines.push('Section,Clé,Valeur')
-    lines.push(`KPI,Utilisateurs actifs,${usageStats?.unique_users ?? 0}`)
-    if (typeof activePrevMonth === 'number') lines.push(`KPI,Utilisateurs actifs (mois précédent),${activePrevMonth}`)
-    lines.push(`KPI,Questions total,${usageStats?.total_questions ?? 0}`)
-    lines.push(`KPI,Questions ce mois,${usageStats?.questions_this_month ?? 0}`)
-    lines.push(`KPI,Questions aujourd\'hui,${usageStats?.questions_today ?? 0}`)
-    lines.push(`KPI,Revenus totaux,$${billingStats?.total_revenue ?? 0}`)
-    lines.push(`KPI,Temps moyen de réponse,${performanceStats?.avg_response_time ?? 0}s`)
-    lines.push(`KPI,Cache hit,${performanceStats?.cache_hit_rate ?? 0}%`)
-    const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'))
-    const a = document.createElement('a'); a.href = csv; a.download = 'stats_export.csv'; document.body.appendChild(a); a.click(); a.remove()
-  }
-
-  // Sécurité sur données nulles
+  // Aliases sûrs
   const sys = systemStats
   const use = usageStats
   const bill = billingStats
   const perf = performanceStats
 
-  // 12 derniers mois (étiquettes FR) — hauteur réduite (~40%) via h-24
-  const monthlyEntries = use?.monthly_breakdown
-    ? Object.entries(use.monthly_breakdown).sort(([a],[b])=>a.localeCompare(b)).slice(-12)
-    : []
+  // ---- Activité 12 mois (déclarée UNE SEULE fois) ----
+  const monthlyEntries =
+    use?.monthly_breakdown
+      ? Object.entries(use.monthly_breakdown)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .slice(-12)
+      : []
   const monthlySeries = monthlyEntries.map(([ym, v]) => {
     const [yy, mm] = ym.split('-')
-    const label = new Date(Number(yy), Number(mm)-1, 1).toLocaleDateString('fr-FR', { month: 'short' })
+    const label = new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString('fr-FR', { month: 'short' })
     return { label, value: Number(v) || 0 }
   })
-  const monthlyMax = Math.max(1, ...monthlySeries.map(d=>d.value))
+  const monthlyMax = Math.max(1, ...monthlySeries.map(d => d.value))
 
-  const sourceDist = use?.source_distribution || { rag_retriever:0, openai_fallback:0, perfstore:0 }
+  // ---- Sources (déclarée UNE SEULE fois) ----
+  const sourceDist = use?.source_distribution || { rag_retriever: 0, openai_fallback: 0, perfstore: 0 }
   const sources = [
-    { name:'RAG', value: sourceDist.rag_retriever },
-    { name:'OpenAI', value: sourceDist.openai_fallback },
-    { name:'Perfstore', value: sourceDist.perfstore },
+    { name: 'RAG', value: sourceDist.rag_retriever },
+    { name: 'OpenAI', value: sourceDist.openai_fallback },
+    { name: 'Perfstore', value: sourceDist.perfstore }
   ]
-  const sourceMax = Math.max(1, ...sources.map(s=>s.value))
-  const sourceTotal = sources.reduce((s,x)=>s+x.value,0)
+  const sourceMax = Math.max(1, ...sources.map(s => s.value))
+  const sourceTotal = sources.reduce((s, x) => s + x.value, 0)
 
-  // Export CSV (statistiques)
-  function exportStatsCSV(){
-    const lines:string[] = []
+  // ---- Export CSV (une fois) ----
+  function exportStatsCSV() {
+    const lines: string[] = []
     lines.push('Section,Clé,Valeur')
     lines.push(`KPI,Utilisateurs actifs,${use?.unique_users ?? 0}`)
-    if (typeof activePrevMonth === 'number') lines.push(`KPI,Utilisateurs actifs (mois précédent),${activePrevMonth}`)
+    if (typeof activePrevMonth === 'number') {
+      lines.push(`KPI,Utilisateurs actifs (mois précédent),${activePrevMonth}`)
+    }
     lines.push(`KPI,Questions total,${use?.total_questions ?? 0}`)
     lines.push(`KPI,Questions ce mois,${use?.questions_this_month ?? 0}`)
-    lines.push(`KPI,Questions aujourd'hui,${use?.questions_today ?? 0}`)
+    lines.push(`KPI,Questions aujourd’hui,${use?.questions_today ?? 0}`)
     lines.push(`KPI,Revenus totaux,$${bill?.total_revenue ?? 0}`)
     lines.push(`KPI,Temps moyen de réponse,${perf?.avg_response_time ?? 0}s`)
     lines.push(`KPI,Cache hit,${perf?.cache_hit_rate ?? 0}%`)
-    if (typeof perf?.openai_costs === 'number') lines.push(`Coûts,OpenAI,$${perf.openai_costs}`)
-    if (typeof perf?.error_count === 'number') lines.push(`Système,Erreurs,${perf.error_count}`)
-    if (typeof sys?.system_health?.total_requests === 'number') lines.push(`Système,Requêtes totales,${sys.system_health.total_requests}`)
 
     lines.push('Mensuel,Mois,Questions')
     monthlyEntries.forEach(([m, v]) => lines.push(`Mensuel,${m},${v}`))
@@ -162,8 +98,11 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
     const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'))
     const a = document.createElement('a')
-    a.href = csv; a.download = 'stats_export.csv'
-    document.body.appendChild(a); a.click(); a.remove()
+    a.href = csv
+    a.download = 'stats_export.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
   }
 
   return (
@@ -207,7 +146,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Questions ce mois</p>
               <p className="text-2xl font-bold text-gray-900">{use?.questions_this_month ?? 0}</p>
-              <p className="text-xs text-gray-500 mt-1">Aujourd'hui: {use?.questions_today ?? 0}</p>
+              <p className="text-xs text-gray-500 mt-1">Aujourd’hui: {use?.questions_today ?? 0}</p>
             </div>
           </div>
         </div>
@@ -235,22 +174,23 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Temps de Réponse</p>
-              <p className="text-2xl font-bold text-gray-900">{perf?.avg_response_time ?? 0}s</p>
-              <p className="text-xs text-gray-500 mt-1">Cache hit: {perf?.cache_hit_rate ?? 0}%</p>
+              <p className="text-2xl font-bold text-gray-900">{Number(perf?.avg_response_time ?? 0).toFixed(2)}s</p>
+              <p className="text-xs text-gray-500 mt-1">Cache hit: {Number(perf?.cache_hit_rate ?? 0).toFixed(1)}%</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Activité — 12 derniers mois */}
+      {/* Activité — 12 derniers mois (hauteur compacte) */}
       <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
         <div className="mb-2">
           <h3 className="text-lg font-semibold text-gray-900">Activité — 12 derniers mois</h3>
           <p className="text-xs text-gray-500">Questions / mois</p>
         </div>
         <div className="h-24 flex items-end gap-2">
+          {monthlySeries.length === 0 && <div className="text-sm text-gray-500">Aucune donnée mensuelle</div>}
           {monthlySeries.map((d, i) => {
-            const h = Math.max(4, Math.round((d.value / monthlyMax) * 88)) // hauteur compacte
+            const h = Math.max(4, Math.round((d.value / monthlyMax) * 88))
             return (
               <div key={i} className="flex flex-col items-center gap-1">
                 <div className="w-6 rounded-md bg-blue-500" style={{ height: h }} />
@@ -258,9 +198,6 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               </div>
             )
           })}
-          {monthlySeries.length === 0 && (
-            <div className="text-sm text-gray-500">Aucune donnée mensuelle</div>
-          )}
         </div>
       </div>
 
@@ -280,7 +217,9 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                 <div className="flex-1 h-2 rounded-full bg-gray-200">
                   <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${w}%` }} />
                 </div>
-                <div className="w-24 text-right text-sm text-gray-700">{s.value} ({pct}%)</div>
+                <div className="w-24 text-right text-sm text-gray-700">
+                  {s.value} ({pct}%)
+                </div>
               </div>
             )
           })}
@@ -289,10 +228,30 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
 
       {/* Santé système / mini cartes */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border p-4"><p className="text-xs text-gray-500">Uptime</p><p className="mt-1 text-lg font-semibold">{sys?.system_health?.uptime_hours?.toFixed?.(1) ?? '0.0'}h</p></div>
-        <div className="rounded-xl border p-4"><p className="text-xs text-gray-500">Taux d’erreur</p><p className="mt-1 text-lg font-semibold">{sys?.system_health?.error_rate?.toFixed?.(1) ?? '0.0'}%</p></div>
-        <div className="rounded-xl border p-4"><p className="text-xs text-gray-500">Requêtes</p><p className="mt-1 text-lg font-semibold">{(sys?.system_health?.total_requests ?? 0).toLocaleString()}</p></div>
-        <div className="rounded-xl border p-4"><p className="text-xs text-gray-500">RAG Global</p><p className="mt-1 text-lg font-semibold">{sys?.system_health?.rag_status?.global ? 'Actif' : 'Inactif'}</p></div>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-gray-500">Uptime</p>
+          <p className="mt-1 text-lg font-semibold">
+            {Number(sys?.system_health?.uptime_hours ?? 0).toFixed(1)}h
+          </p>
+        </div>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-gray-500">Taux d’erreur</p>
+          <p className="mt-1 text-lg font-semibold">
+            {Number(sys?.system_health?.error_rate ?? 0).toFixed(1)}%
+          </p>
+        </div>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-gray-500">Requêtes</p>
+          <p className="mt-1 text-lg font-semibold">
+            {(sys?.system_health?.total_requests ?? 0).toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-gray-500">RAG Global</p>
+          <p className="mt-1 text-lg font-semibold">
+            {sys?.system_health?.rag_status?.global ? 'Actif' : 'Inactif'}
+          </p>
+        </div>
       </div>
     </>
   )
