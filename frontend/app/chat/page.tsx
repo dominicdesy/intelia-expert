@@ -1276,6 +1276,7 @@ export default function ChatInterface() {
       >
 
 
+
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
@@ -1304,7 +1305,7 @@ export default function ChatInterface() {
                 
                 {/* Badge de notification */}
                 <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-                  {useChatStore(state => state.conversations.length)}
+                  {conversationsCount}
                 </span>
               </div>
             </div>
@@ -1352,7 +1353,6 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
-
 
 
 
