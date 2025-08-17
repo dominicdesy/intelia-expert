@@ -7,22 +7,16 @@ import {
 } from '../hooks/useChatStore'
 import { useAuthStore } from '@/lib/stores/auth'
 import { ClockIcon, TrashIcon, PlusIcon, MessageCircleIcon } from '../utils/icons'
-import { Conversation, ConversationGroup } from '../types'
+import type { Conversation, ConversationGroup } from '../types'
 
-// ==================== MENU HISTORIQUE CONVERSATIONS ====================
 export const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const { user } = useAuthStore()
 
-  // Hooks pour conversations
   const { conversationGroups, isLoadingHistory, loadConversations } = useConversationGroups()
-  const {
-    deleteConversation,
-    clearAllConversations,
-    refreshConversations,
-    createNewConversation
-  } = useConversationActions()
+  const { deleteConversation, clearAllConversations, refreshConversations, createNewConversation } =
+    useConversationActions()
   const { currentConversation, loadConversation } = useCurrentConversation()
 
   const handleToggle = async () => {
@@ -57,7 +51,7 @@ export const HistoryMenu = () => {
   const handleConversationClick = async (conv: Conversation, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    // ✅ Corrigé: on charge la conversation complète (avec messages) pour mettre à jour le store
+    // Charge la conversation complète (avec messages) et met à jour le store
     await loadConversation(conv.id)
     setIsOpen(false)
   }
@@ -69,7 +63,7 @@ export const HistoryMenu = () => {
     setIsOpen(false)
   }
 
-  // Affichage hh:mm local simple avec fallback
+  // hh:mm local (fallback robuste)
   const formatConversationTime = (timestamp: string): string => {
     try {
       let ts = timestamp
@@ -91,7 +85,7 @@ export const HistoryMenu = () => {
 
   return (
     <div className="relative header-icon-container">
-      {/* Bouton : icône horloge + badge externe (pas de pastille interne) */}
+      {/* Bouton 40×40 : horloge + badge externe */}
       <button
         onClick={handleToggle}
         className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
@@ -108,7 +102,7 @@ export const HistoryMenu = () => {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
-          {/* Fenêtre historique */}
+          {/* Panneau historique */}
           <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="p-3 border-b border-gray-100 flex items-center justify-between">
@@ -118,11 +112,11 @@ export const HistoryMenu = () => {
                 <span className="text-xs text-gray-400">({totalConversations})</span>
               </div>
               <div className="flex items-center space-x-2">
-                {/* actions header optionnelles */}
+                {/* Actions d’en-tête (optionnelles) */}
               </div>
             </div>
 
-            {/* Liste/groupes */}
+            {/* Liste */}
             <div className="flex-1 overflow-y-auto">
               {isLoadingHistory ? (
                 <div className="p-6 text-center text-gray-500">
@@ -182,19 +176,16 @@ export const HistoryMenu = () => {
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0 pr-3">
-                              {/* Titre */}
                               <h4 className="text-sm font-medium text-gray-900 truncate mb-2">
                                 {conv.title}
                               </h4>
 
-                              {/* Métadonnées */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
                                 <span>{formatConversationTime(conv.updated_at)}</span>
-				{conv.message_count != null && <span>{conv.message_count} msg</span>}
+                                {conv.message_count != null && <span>{conv.message_count} msg</span>}
                               </div>
                             </div>
 
-                            {/* Actions à droite */}
                             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => handleDeleteSingle(conv.id, e)}
@@ -212,8 +203,6 @@ export const HistoryMenu = () => {
                 ))
               )}
             </div>
-
-            {/* Footer (optionnel) */}
           </div>
         </>
       )}
