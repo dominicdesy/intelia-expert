@@ -1,7 +1,5 @@
-// QuestionsTab
-
 import React from 'react'
-import ExcelJS from 'exceljs' // 🔒 SÉCURISÉ - Remplace xlsx
+// 🚀 AUCUNE DÉPENDANCE EXTERNE - Utilise uniquement les APIs natives du navigateur
 
 interface QuestionLog {
   id: string
@@ -110,7 +108,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return '❓'
   }
 
-  // 🔒 NOUVELLE FONCTION D'EXPORT SÉCURISÉE AVEC EXCELJS
+  // 🚀 FONCTION CSV AVANCÉE - CONVERSATIONS EN LIGNES (format demandé)
   const groupQuestionsByConversation = (questions: QuestionLog[]): ConversationExport[] => {
     const conversationMap = new Map<string, QuestionLog[]>()
     
@@ -150,7 +148,8 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return conversations
   }
 
-  const exportConversationsToExcel = async (questions: QuestionLog[]) => {
+  // 🚀 EXPORT CSV CONVERSATIONS (format Excel-like en CSV)
+  const exportConversationsToCSV = (questions: QuestionLog[]) => {
     try {
       if (questions.length === 0) {
         alert('❌ Aucune question à exporter')
@@ -160,37 +159,34 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       const conversations = groupQuestionsByConversation(questions)
       const maxQuestions = Math.max(...conversations.map(c => c.total_questions))
       
-      console.log(`📊 Export de ${conversations.length} conversations avec ExcelJS`)
+      console.log(`📊 Export CSV de ${conversations.length} conversations, max ${maxQuestions} questions`)
 
-      // 🔒 CRÉER LE WORKBOOK AVEC EXCELJS (SÉCURISÉ)
-      const workbook = new ExcelJS.Workbook()
-      workbook.creator = 'Intelia Expert'
-      workbook.created = new Date()
-
-      // === FEUILLE 1: CONVERSATIONS ===
-      const conversationSheet = workbook.addWorksheet('Conversations')
-      
-      // En-têtes de base
+      // Créer les en-têtes
       const headers = [
         'N°', 'Session ID', 'Utilisateur', 'Email', 'Début', 'Fin', 'Nb Questions', 'Durée (min)'
       ]
       
-      // Ajouter les en-têtes dynamiques pour Q&R
+      // Ajouter les colonnes dynamiques Q1, R1, Q2, R2...
       for (let i = 0; i < maxQuestions; i++) {
         headers.push(
           `Q${i + 1}`, `R${i + 1}`, `Source${i + 1}`, 
           `Confiance${i + 1}`, `Temps${i + 1}`, `Feedback${i + 1}`, `Commentaire${i + 1}`
         )
       }
+
+      // Fonction pour échapper les chaînes CSV
+      const escapeCSV = (value: any): string => {
+        if (value === null || value === undefined) return ''
+        const str = String(value)
+        if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`
+        }
+        return str
+      }
+
+      // Construire les données
+      let csvContent = headers.map(escapeCSV).join(',') + '\n'
       
-      conversationSheet.addRow(headers)
-      
-      // Styliser l'en-tête
-      const headerRow = conversationSheet.getRow(1)
-      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } }
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '366092' } }
-      
-      // Ajouter les données
       conversations.forEach((conv, index) => {
         const rowData: any[] = [
           index + 1,
@@ -216,125 +212,15 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           )
         }
         
-        conversationSheet.addRow(rowData)
+        csvContent += rowData.map(escapeCSV).join(',') + '\n'
       })
-      
-      // Ajuster les largeurs des colonnes
-      conversationSheet.columns = [
-        { width: 5 },   // N°
-        { width: 15 },  // Session ID
-        { width: 20 },  // Utilisateur
-        { width: 35 },  // Email
-        { width: 18 },  // Début
-        { width: 18 },  // Fin
-        { width: 12 },  // Nb Questions
-        { width: 12 },  // Durée
-        // Colonnes Q&R
-        ...Array(maxQuestions).fill(null).flatMap(() => [
-          { width: 60 },  // Question
-          { width: 100 }, // Réponse
-          { width: 12 },  // Source
-          { width: 12 },  // Confiance
-          { width: 10 },  // Temps
-          { width: 12 },  // Feedback
-          { width: 50 }   // Commentaire
-        ])
-      ]
 
-      // === FEUILLE 2: QUESTIONS DÉTAILLÉES ===
-      const detailSheet = workbook.addWorksheet('Questions Détaillées')
+      // Télécharger le fichier
+      const fileName = `conversations_export_${new Date().toISOString().split('T')[0]}_${Date.now()}.csv`
       
-      const detailHeaders = [
-        'N°', 'Date', 'Heure', 'Utilisateur', 'Email', 'Session', 
-        'Question', 'Réponse', 'Source', 'Confiance', 'Temps (s)', 'Langue', 'Feedback', 'Commentaire'
-      ]
-      
-      detailSheet.addRow(detailHeaders)
-      
-      // Styliser l'en-tête
-      const detailHeaderRow = detailSheet.getRow(1)
-      detailHeaderRow.font = { bold: true, color: { argb: 'FFFFFF' } }
-      detailHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '366092' } }
-      
-      questions.forEach((q, index) => {
-        detailSheet.addRow([
-          index + 1,
-          new Date(q.timestamp).toLocaleDateString('fr-FR'),
-          new Date(q.timestamp).toLocaleTimeString('fr-FR'),
-          q.user_name,
-          q.user_email,
-          q.session_id.substring(0, 12) + '...',
-          q.question,
-          q.response.length > 1000 ? q.response.substring(0, 1000) + '...' : q.response,
-          getSourceLabel(q.response_source),
-          `${(q.confidence_score * 100).toFixed(1)}%`,
-          q.response_time,
-          q.language.toUpperCase(),
-          q.feedback === 1 ? 'Positif' : q.feedback === -1 ? 'Négatif' : 'Aucun',
-          q.feedback_comment || ''
-        ])
-      })
-      
-      detailSheet.columns = [
-        { width: 5 }, { width: 12 }, { width: 10 }, { width: 20 }, { width: 35 }, 
-        { width: 15 }, { width: 60 }, { width: 100 }, { width: 15 }, { width: 12 }, 
-        { width: 10 }, { width: 8 }, { width: 12 }, { width: 50 }
-      ]
-
-      // === FEUILLE 3: STATISTIQUES ===
-      const statsSheet = workbook.addWorksheet('Statistiques')
-      
-      const uniqueUsers = new Set(questions.map(q => q.user_email)).size
-      const avgResponseTime = questions.length > 0 ? 
-        (questions.reduce((sum, q) => sum + q.response_time, 0) / questions.length) : 0
-      const avgConfidence = questions.length > 0 ? 
-        (questions.reduce((sum, q) => sum + q.confidence_score, 0) / questions.length) : 0
-      const feedbackQuestions = questions.filter(q => q.feedback !== null)
-      const satisfactionRate = feedbackQuestions.length > 0 ? 
-        (questions.filter(q => q.feedback === 1).length / feedbackQuestions.length) : 0
-      
-      statsSheet.addRow(['Métrique', 'Valeur'])
-      const statsHeaderRow = statsSheet.getRow(1)
-      statsHeaderRow.font = { bold: true }
-      
-      const statsData = [
-        ['Total Conversations', conversations.length],
-        ['Total Questions', questions.length],
-        ['Utilisateurs Uniques', uniqueUsers],
-        ['Questions par Conversation (Moyenne)', conversations.length > 0 ? (questions.length / conversations.length).toFixed(1) : '0'],
-        ['Temps de Réponse Moyen', `${avgResponseTime.toFixed(1)}s`],
-        ['Confiance Moyenne', `${(avgConfidence * 100).toFixed(1)}%`],
-        ['Feedback Positifs', questions.filter(q => q.feedback === 1).length],
-        ['Feedback Négatifs', questions.filter(q => q.feedback === -1).length],
-        ['Taux de Satisfaction', `${(satisfactionRate * 100).toFixed(1)}%`],
-        ['', ''],
-        ['=== DISTRIBUTION DES SOURCES ===', '']
-      ]
-      
-      // Distribution des sources
-      const sourceStats = questions.reduce((acc: any, q) => {
-        const source = getSourceLabel(q.response_source)
-        acc[source] = (acc[source] || 0) + 1
-        return acc
-      }, {})
-      
-      Object.entries(sourceStats)
-        .sort(([,a], [,b]) => (b as number) - (a as number))
-        .forEach(([source, count]) => {
-          statsData.push([
-            `Source: ${source}`,
-            `${count} (${((count as number) / questions.length * 100).toFixed(1)}%)`
-          ])
-        })
-      
-      statsData.forEach(row => statsSheet.addRow(row))
-      statsSheet.columns = [{ width: 40 }, { width: 25 }]
-
-      // 💾 TÉLÉCHARGER LE FICHIER
-      const fileName = `conversations_export_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`
-      
-      const buffer = await workbook.xlsx.writeBuffer()
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      // Ajouter BOM pour Excel français
+      const bom = '\uFEFF'
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' })
       const url = window.URL.createObjectURL(blob)
       
       const link = document.createElement('a')
@@ -345,30 +231,30 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
       
-      console.log(`✅ Export Excel sécurisé réussi: ${fileName}`)
+      console.log(`✅ Export CSV conversations réussi: ${fileName}`)
       
-      const summary = `✅ Export Excel sécurisé réussi !
+      const uniqueUsers = new Set(questions.map(q => q.user_email)).size
+      const summary = `✅ Export CSV réussi !
 
-📊 Résumé de l'export :
-• ${conversations.length} conversations
+📊 Format "Excel-like" en CSV :
+• ${conversations.length} conversations (lignes)
 • ${questions.length} questions au total
 • ${uniqueUsers} utilisateurs uniques
 • ${maxQuestions} questions max par conversation
 
-📁 Fichier généré : ${fileName}
+📁 Fichier: ${fileName}
 
-🔒 Utilise ExcelJS (sécurisé, pas de vulnérabilités)
+📋 Format: Une ligne par conversation
+• Colonnes fixes: Session, Utilisateur, Dates...
+• Colonnes dynamiques: Q1, R1, Q2, R2, Q3, R3...
 
-📋 3 feuilles créées :
-1. Conversations (format ligne par conversation)
-2. Questions Détaillées (format classique)
-3. Statistiques (métriques générales)`
+💡 Ouvrir avec Excel pour format tabulaire !`
 
       alert(summary)
       
     } catch (error) {
-      console.error('❌ Erreur lors de l\'export Excel:', error)
-      alert(`❌ Erreur lors de l'export Excel: ${error}\n\nVérifiez la console pour plus de détails.`)
+      console.error('❌ Erreur export CSV conversations:', error)
+      alert(`❌ Erreur export CSV: ${error}`)
     }
   }
 
@@ -725,28 +611,28 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 💾 Boutons d'Export - SECTION MISE À JOUR AVEC EXCELJS SÉCURISÉ */}
+      {/* 💾 Boutons d'Export - VERSION FINALE CSV UNIQUEMENT */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">💾 Export des Données</h3>
         
-        {/* 🔒 BOUTON EXCEL SÉCURISÉ */}
+        {/* 🚀 BOUTON CSV CONVERSATIONS (format Excel-like) */}
         <div className="mb-4">
           <button
-            onClick={() => exportConversationsToExcel(filteredQuestions)}
+            onClick={() => exportConversationsToCSV(filteredQuestions)}
             disabled={filteredQuestions.length === 0}
             className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
-            🔒 Exporter Conversations (Excel Sécurisé) - {filteredQuestions.length} questions
+            📊 Exporter Conversations (CSV Excel-like) - {filteredQuestions.length} questions
           </button>
           
-          {/* Description détaillée du format Excel sécurisé */}
+          {/* Description détaillée du format CSV */}
           <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <h4 className="text-sm font-medium text-emerald-800 mb-2">🔒 Format Excel Sécurisé - 3 feuilles incluses :</h4>
+            <h4 className="text-sm font-medium text-emerald-800 mb-2">📊 Format CSV "Excel-like" - Une ligne par conversation :</h4>
             <ul className="text-xs text-emerald-700 space-y-1">
-              <li><strong>• Conversations :</strong> Une ligne par conversation avec colonnes Q1, R1, Q2, R2, etc.</li>
-              <li><strong>• Questions Détaillées :</strong> Vue classique avec une ligne par question</li>
-              <li><strong>• Statistiques :</strong> Métriques générales et distribution des sources</li>
-              <li><strong>🔒 ExcelJS :</strong> Librairie sécurisée, sans vulnérabilités connues</li>
+              <li><strong>• Colonnes fixes :</strong> N°, Session, Utilisateur, Email, Début, Fin, Durée</li>
+              <li><strong>• Colonnes dynamiques :</strong> Q1, R1, Source1, Q2, R2, Source2...</li>
+              <li><strong>• Compatible Excel :</strong> Encodage UTF-8 avec BOM</li>
+              <li><strong>🚀 Aucune dépendance :</strong> Code natif, déploiement garanti</li>
             </ul>
             {filteredQuestions.length === 0 && (
               <p className="text-xs text-emerald-600 mt-2 italic">⚠️ Aucune question à exporter avec les filtres actuels</p>
@@ -754,7 +640,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           </div>
         </div>
 
-        {/* Boutons d'export existants (CSV et JSON) - INCHANGÉS */}
+        {/* Boutons d'export existants (CSV classiques) - INCHANGÉS */}
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => {
