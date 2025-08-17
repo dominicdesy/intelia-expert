@@ -1283,19 +1283,17 @@ export default function ChatInterface() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
-                className="header-button-default"
+                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
                 title={t('nav.newConversation')}
                 aria-label={t('nav.newConversation')}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
         
-              {/* Bouton Historique avec styles CSS */}
-              <div className="header-icon-container">
-                <div className="history-menu-container">
-                  <HistoryMenu />
-                </div>
-                <span className="notification-badge badge-isolated">
+              {/* Bouton Historique - Version simple qui fonctionne */}
+              <div className="relative">
+                <HistoryMenu />
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
                   {conversationsCount}
                 </span>
               </div>
@@ -1309,10 +1307,30 @@ export default function ChatInterface() {
               <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
-            {/* Droite — Bouton menu utilisateur avec styles CSS */}
+            {/* Droite — Bouton menu utilisateur - Clic garanti */}
             <div className="flex items-center space-x-2">
-              <div className="user-menu-container force-square">
-                <UserMenuButton />
+              <div className="relative w-10 h-10">
+                {/* Composant original invisible mais cliquable */}
+                <div className="absolute inset-0 opacity-0">
+                  <UserMenuButton />
+                </div>
+                
+                {/* Bouton visuel qui délègue le clic */}
+                <button
+                  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors relative z-10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Trouver et cliquer sur le bouton UserMenuButton caché
+                    const hiddenButton = e.currentTarget.parentElement?.querySelector('button[class*="opacity-0"] button, div[class*="opacity-0"] button');
+                    if (hiddenButton) {
+                      (hiddenButton as HTMLElement).click();
+                    }
+                  }}
+                  title="Menu utilisateur"
+                  aria-label="Menu utilisateur"
+                >
+                  {getUserInitials(user)}
+                </button>
               </div>
             </div>
           </div>
