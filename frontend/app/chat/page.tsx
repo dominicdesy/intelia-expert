@@ -1277,36 +1277,25 @@ export default function ChatInterface() {
       >
 
 
-
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
-                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
+                className="header-button-default"
                 title={t('nav.newConversation')}
                 aria-label={t('nav.newConversation')}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
         
-              {/* Wrapper pour HistoryMenu avec style forcé */}
-              <div className="relative">
-                <div className="[&>*]:w-10 [&>*]:h-10 [&>*]:border [&>*]:border-gray-200 [&>*]:rounded-lg [&>*]:flex [&>*]:items-center [&>*]:justify-center [&>*]:text-transparent [&>*]:relative [&>*]:overflow-hidden">
+              {/* Bouton Historique avec styles CSS */}
+              <div className="header-icon-container">
+                <div className="history-menu-container">
                   <HistoryMenu />
                 </div>
-                
-                {/* Icône d'horloge par-dessus */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                
-                {/* Badge de notification */}
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium z-20 border-2 border-white shadow-sm">
+                <span className="notification-badge badge-isolated">
                   {conversationsCount}
                 </span>
               </div>
@@ -1320,18 +1309,10 @@ export default function ChatInterface() {
               <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
-            {/* Droite — Bouton menu utilisateur (carré arrondi bleu avec initiales) */}
+            {/* Droite — Bouton menu utilisateur avec styles CSS */}
             <div className="flex items-center space-x-2">
-              <div className="relative w-10 h-10">
-                {/* Wrapper pour forcer le style sur UserMenuButton */}
-                <div className="[&>*]:w-10 [&>*]:h-10 [&>*]:!bg-blue-600 [&>*]:!text-white [&>*]:!rounded-lg [&>*]:!border-radius-[8px] [&>*]:flex [&>*]:items-center [&>*]:justify-center [&>*]:text-sm [&>*]:hover:!bg-blue-700 [&>*]:transition-colors" style={{borderRadius: '8px !important'}}>
-                  <UserMenuButton />
-                </div>
-                
-                {/* Overlay pour masquer le contenu original et afficher les initiales */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-white text-sm">
-                  {getUserInitials(user)}
-                </div>
+              <div className="user-menu-container force-square">
+                <UserMenuButton />
               </div>
             </div>
           </div>
@@ -1359,6 +1340,9 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
+
+
+
 
 
 
