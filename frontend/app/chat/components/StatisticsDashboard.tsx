@@ -77,63 +77,35 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
     <>
       {/* KPIs Row - EXACT Compass Style */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Utilisateurs Actifs - Style exact Compass */}
+        {/* Utilisateurs Actifs - Sans icône */}
         <div className="bg-white border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Utilisateurs Actifs</p>
-              <p className="text-2xl font-semibold text-gray-900">{usageStats?.unique_users || 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM9 3a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
+          <div>
+            <p className="text-sm text-gray-600 mb-1">Utilisateurs Actifs</p>
+            <p className="text-2xl font-semibold text-gray-900">{usageStats?.unique_users || 0}</p>
           </div>
         </div>
 
-        {/* Questions ce mois - Style exact Compass */}
+        {/* Questions ce mois - Sans icône */}
         <div className="bg-white border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Questions ce mois</p>
-              <p className="text-2xl font-semibold text-gray-900">{usageStats?.questions_this_month || 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
+          <div>
+            <p className="text-sm text-gray-600 mb-1">Questions ce mois</p>
+            <p className="text-2xl font-semibold text-gray-900">{usageStats?.questions_this_month || 0}</p>
           </div>
         </div>
 
-        {/* Revenus Totaux - Style exact Compass */}
+        {/* Revenus Totaux - Sans icône */}
         <div className="bg-white border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Revenus Totaux</p>
-              <p className="text-2xl font-semibold text-gray-900">${billingStats?.total_revenue || 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-yellow-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
+          <div>
+            <p className="text-sm text-gray-600 mb-1">Revenus Totaux</p>
+            <p className="text-2xl font-semibold text-gray-900">${billingStats?.total_revenue || 0}</p>
           </div>
         </div>
 
-        {/* Temps de Réponse - Style exact Compass */}
+        {/* Temps de Réponse - Sans icône */}
         <div className="bg-white border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Temps de Réponse</p>
-              <p className="text-2xl font-semibold text-gray-900">{performanceStats?.avg_response_time || 0}s</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
+          <div>
+            <p className="text-sm text-gray-600 mb-1">Temps de Réponse</p>
+            <p className="text-2xl font-semibold text-gray-900">{performanceStats?.avg_response_time || 0}s</p>
           </div>
         </div>
       </div>
@@ -298,28 +270,28 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Costs Section - Style Compass exact */}
+      {/* Costs Section - Style Compass exact avec fond blanc */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">Coûts et Performance</h3>
         </div>
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-red-50 border border-red-200">
+            <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-red-600">${performanceStats?.openai_costs?.toFixed(2) || '0.00'}</p>
-              <p className="text-xs text-red-600">Coûts OpenAI</p>
+              <p className="text-xs text-gray-600">Coûts OpenAI</p>
             </div>
-            <div className="text-center p-3 bg-yellow-50 border border-yellow-200">
+            <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-yellow-600">{performanceStats?.error_count || 0}</p>
-              <p className="text-xs text-yellow-600">Erreurs</p>
+              <p className="text-xs text-gray-600">Erreurs</p>
             </div>
-            <div className="text-center p-3 bg-green-50 border border-green-200">
+            <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-green-600">{systemStats?.system_health?.total_requests || 0}</p>
-              <p className="text-xs text-green-600">Requêtes Totales</p>
+              <p className="text-xs text-gray-600">Requêtes Totales</p>
             </div>
-            <div className="text-center p-3 bg-blue-50 border border-blue-200">
+            <div className="text-center p-3 bg-white border border-gray-200">
               <p className="text-lg font-semibold text-blue-600">{usageStats?.questions_today || 0}</p>
-              <p className="text-xs text-blue-600">Questions Aujourd'hui</p>
+              <p className="text-xs text-gray-600">Questions Aujourd'hui</p>
             </div>
           </div>
         </div>
