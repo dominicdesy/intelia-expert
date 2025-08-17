@@ -13,7 +13,7 @@ interface QuestionLog {
   confidence_score: number
   response_time: number
   language: string
-  session_id?: string
+  session_id: string
   feedback: number | null
   feedback_comment: string | null
 }
