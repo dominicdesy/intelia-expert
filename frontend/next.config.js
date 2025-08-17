@@ -1,32 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 🔧 Configuration de base
   poweredByHeader: false,
   reactStrictMode: true,
   swcMinify: true,
-
-  // 🔧 Configuration pour DigitalOcean
   trailingSlash: true,
-  
-  // 🆕 Configuration pour améliorer les performances sur DO
+
+  // 🚀 Optimisations pour Digital Ocean
   compress: true,
   
-  // 🆕 Output standalone pour Digital Ocean (optionnel, améliore les performances)
-  output: 'standalone',
-
-  // ✅ CONFIGURATION SIMPLIFIÉE - Suppression des options obsolètes
+  // ⚡ Configuration expérimentale minimale
   experimental: {
-    // ✅ Configuration minimale pour Supabase
     serverComponentsExternalPackages: [
       '@supabase/supabase-js'
     ]
   },
   
-  // ✅ Générer un build ID simple
+  // 🏷️ Build ID simple et prévisible
   generateBuildId: async () => {
-    return 'intelia-expert-build'
+    return `intelia-expert-${Date.now()}`
   },
 
-  // Configuration images
+  // 🖼️ Configuration des images
   images: {
     domains: [
       'cdrmjshmkdfwwtsfdvbl.supabase.co',
@@ -36,23 +31,23 @@ const nextConfig = {
     unoptimized: process.env.NODE_ENV === 'production',
   },
 
-  // Variables d'environnement
+  // 🌍 Variables d'environnement
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
   },
 
-  // Configuration TypeScript
+  // 📝 Configuration TypeScript
   typescript: {
     ignoreBuildErrors: false,
   },
 
-  // Configuration ESLint
+  // 🔍 Configuration ESLint
   eslint: {
     ignoreDuringBuilds: false,
   },
 
-  // Headers de sécurité
+  // 🔒 Headers de sécurité
   async headers() {
     return [
       {
@@ -60,7 +55,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate'
+            value: 'public, max-age=31536000, immutable'
           },
           {
             key: 'X-Frame-Options',
@@ -69,20 +64,57 @@ const nextConfig = {
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin'
+          },
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          }
+        ]
+      },
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate'
           }
         ]
       }
     ]
   },
 
-  // ✅ CONFIGURATION WEBPACK OPTIMISÉE pour Digital Ocean + XLSX
-  webpack: (config, { isServer }) => {
-    // Désactiver la minification pour debug
-    if (!isServer && process.env.NODE_ENV === 'production') {
-      config.optimization.minimize = false
+  // ⚙️ Configuration Webpack MINIMALISTE et SÉCURISÉE
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    
+    // 🐛 Mode développement - configurations de debug
+    if (dev) {
+      config.devtool = 'cheap-module-source-map'
     }
     
-    // ✅ CORRECTION pour Supabase + XLSX sur Digital Ocean
+    // 🏭 Mode production - optimisations
+    if (!dev && !isServer) {
+      // Optimisations légères pour la production
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+            },
+          },
+        },
+      }
+    }
+    
+    // 🌐 Fallbacks pour le navigateur (Supabase uniquement)
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -92,30 +124,87 @@ const nextConfig = {
         crypto: false,
         stream: false,
         process: false,
-        // 🆕 Fallbacks spécifiques pour XLSX
-        buffer: require.resolve('buffer'),
-        util: require.resolve('util'),
+        path: false,
+        os: false,
+        url: false,
+        util: false,
+        querystring: false,
+        punycode: false,
+        http: false,
+        https: false,
+        zlib: false,
+        assert: false,
+        buffer: false,
+        constants: false,
       }
-      
-      // 🆕 Polyfills pour XLSX
+    }
+
+    // 📦 Alias pour optimiser les imports
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, './'),
+    }
+
+    // 🔧 Règles de modules pour la compatibilité
+    config.module.rules.push({
+      test: /\.m?js$/,
+      type: 'javascript/auto',
+      resolve: {
+        fullySpecified: false,
+      },
+    })
+
+    // 🚫 Ignorer les warnings spécifiques
+    config.ignoreWarnings = [
+      {
+        module: /node_modules/,
+        message: /Critical dependency/,
+      },
+      {
+        module: /node_modules/,
+        message: /Can't resolve/,
+      }
+    ]
+
+    // 📊 Analyse du bundle en développement
+    if (dev && process.env.ANALYZE === 'true') {
+      const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
       config.plugins.push(
-        new config.webpack.ProvidePlugin({
-          Buffer: ['buffer', 'Buffer'],
-          process: 'process/browser',
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'server',
+          openAnalyzer: true,
         })
       )
     }
-    
-    // 🆕 Optimisation spécifique pour XLSX
-    config.module.rules.push({
-      test: /\.m?js$/,
-      resolve: {
-        fullySpecified: false
-      }
-    })
-    
+
     return config
-  }
+  },
+
+  // 🔄 Redirections pour compatibilité
+  async redirects() {
+    return [
+      // Exemple de redirection si nécessaire
+      // {
+      //   source: '/old-path',
+      //   destination: '/new-path',
+      //   permanent: true,
+      // },
+    ]
+  },
+
+  // ✨ Rewrites pour l'API si nécessaire
+  async rewrites() {
+    return [
+      // Exemple de rewrite si nécessaire
+      // {
+      //   source: '/api/external/:path*',
+      //   destination: 'https://external-api.com/:path*',
+      // },
+    ]
+  },
 }
+
+// 🔍 Validation de la configuration
+console.log('🚀 Next.js config loaded for environment:', process.env.NODE_ENV)
 
 module.exports = nextConfig
