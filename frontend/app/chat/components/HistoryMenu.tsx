@@ -1,26 +1,33 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
-import { useConversationGroups, useConversationActions, useCurrentConversation } from '../hooks/useChatStore'
-import { useAuthStore } from '@/lib/stores/auth' // ✅ CHANGÉ: Utiliser useUser helper
-import { EllipsisVerticalIcon, TrashIcon, RefreshIcon, PlusIcon, ClockIcon, MessageCircleIcon } from '../utils/icons'
+import {
+  useConversationGroups,
+  useConversationActions,
+  useCurrentConversation
+} from '../hooks/useChatStore'
+import { useAuthStore } from '@/lib/stores/auth'
+import { ClockIcon, TrashIcon, PlusIcon, MessageCircleIcon } from '../utils/icons'
 import { Conversation, ConversationGroup } from '../types'
-import { formatToLocalTime, simpleLocalTime } from '../services/apiService' // ✅ NOUVEAU: Import formatage heure
 
-// ==================== MENU HISTORIQUE CONVERSATIONS STYLE CLAUDE.AI ====================
+// ==================== MENU HISTORIQUE CONVERSATIONS ====================
 export const HistoryMenu = () => {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
-  const { user } = useAuthStore() 
-  
+  const { user } = useAuthStore()
+
   // Hooks pour conversations
   const { conversationGroups, isLoadingHistory, loadConversations } = useConversationGroups()
-  const { deleteConversation, clearAllConversations, refreshConversations, createNewConversation } = useConversationActions()
-  const { currentConversation, setCurrentConversation, loadConversation } = useCurrentConversation()
+  const {
+    deleteConversation,
+    clearAllConversations,
+    refreshConversations,
+    createNewConversation
+  } = useConversationActions()
+  const { currentConversation, loadConversation } = useCurrentConversation()
 
   const handleToggle = async () => {
     if (!isOpen && user) {
-      console.log('📂 [HistoryMenu] Ouverture menu - chargement conversations pour:', user.email || user.id)
-	  await loadConversations(user.email || user.id)
+      await loadConversations(user.email || user.id)
     }
     setIsOpen(!isOpen)
   }
@@ -28,115 +35,63 @@ export const HistoryMenu = () => {
   const handleRefresh = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
     if (!user) return
-    try {
-      console.log('🔄 [HistoryMenu] Refresh conversations pour:', user.email || user.id)
-      await refreshConversations(user.email || user.id)
-    } catch (error) {
-      console.error('❌ [HistoryMenu] Erreur refresh:', error)
-      alert('Erreur lors de l’actualisation des conversations')
-    }
+    await refreshConversations(user.email || user.id)
   }
 
   const handleClearAll = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
     if (!user) return
-    try {
-      if (!confirm('Supprimer toutes les conversations ?')) return
-      console.log('🗑️ [HistoryMenu] Suppression de toutes les conversations')
-      await clearAllConversations(user.email || user.id)
-      console.log('✅ [HistoryMenu] Conversations supprimées')
-    } catch (error) {
-      console.error('❌ [HistoryMenu] Erreur suppression conversations:', error)
-      alert('Erreur lors de la suppression des conversations')
-    }
+    if (!confirm('Supprimer toutes les conversations ?')) return
+    await clearAllConversations(user.email || user.id)
   }
 
   const handleDeleteSingle = async (conversationId: string, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    try {
-      console.log('🗑️ [HistoryMenu] Suppression conversation:', conversationId)
-      await deleteConversation(conversationId)
-      console.log('✅ [HistoryMenu] Conversation supprimée:', conversationId)
-      
-      // ✅ NOUVEAU: Refresh automatique après suppression d'une conversation
-      if (user) {
-        await refreshConversations(user.email || user.id)
-      }
-    } catch (error) {
-      console.error('❌ [HistoryMenu] Erreur suppression conversation:', error)
-      alert('Erreur lors de la suppression de la conversation')
-    }
+    await deleteConversation(conversationId)
+    if (user) await refreshConversations(user.email || user.id)
   }
 
   const handleConversationClick = async (conv: Conversation, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
-    try {
-      console.log('🗂️ [HistoryMenu] Ouverture conversation:', conv.id)
-      setCurrentConversation(conv)
-      await loadConversation(conv.id)
-      setIsOpen(false)
-    } catch (error) {
-      console.error('❌ [HistoryMenu] Erreur ouverture conversation:', error)
-      alert('Erreur lors de l\'ouverture de la conversation')
-    }
+    // ✅ Corrigé: on charge la conversation complète (avec messages) pour mettre à jour le store
+    await loadConversation(conv.id)
+    setIsOpen(false)
   }
 
   const handleNewConversation = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    console.log('✨ [HistoryMenu] Nouvelle conversation')
     createNewConversation()
     setIsOpen(false)
   }
 
-  // ✅ SOLUTION FORCÉE: Bypasser simpleLocalTime complètement
+  // Affichage hh:mm local simple avec fallback
   const formatConversationTime = (timestamp: string): string => {
-    // 🔍 DEBUG: Afficher le timestamp reçu
-    console.log('🔍 [formatConversationTime] Timestamp reçu:', timestamp, typeof timestamp)
-    
     try {
-      let processedTimestamp = timestamp
-      
-      // 🔧 CORRECTION: Si le timestamp n'a pas de timezone, on assume qu'il est UTC
-      if (timestamp && !timestamp.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(timestamp)) {
-        processedTimestamp = timestamp + 'Z'
-        console.log('🔧 [formatConversationTime] Timestamp corrigé pour UTC:', processedTimestamp)
-      }
-      
-      const date = new Date(processedTimestamp)
-      if (isNaN(date.getTime())) {
-        console.warn('⚠️ [formatConversationTime] Date invalide pour:', processedTimestamp)
-        // Fallback très simple
-        return '—'
-      }
-      
-      const h = date.getHours().toString().padStart(2, '0')
-      const m = date.getMinutes().toString().padStart(2, '0')
-      const result = `${h}:${m}`
-      console.log('🎯 [formatConversationTime] Résultat:', result)
-      return result
-      
-    } catch (err) {
-      console.error('❌ [formatConversationTime] Exception:', err)
+      let ts = timestamp
+      if (ts && !ts.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(ts)) ts = ts + 'Z'
+      const d = new Date(ts)
+      if (isNaN(d.getTime())) return '—'
+      const h = d.getHours().toString().padStart(2, '0')
+      const m = d.getMinutes().toString().padStart(2, '0')
+      return `${h}:${m}`
+    } catch {
       return '—'
     }
   }
 
-  // Compteur total (toutes conversations)
-  const totalConversations = conversationGroups.reduce((acc: number, g: ConversationGroup) => acc + g.conversations.length, 0)
+  const totalConversations = conversationGroups.reduce(
+    (acc: number, g: ConversationGroup) => acc + g.conversations.length,
+    0
+  )
 
   return (
     <div className="relative header-icon-container">
-      {/* ✅ BOUTON : icône horloge + badge externe (pas de pastille à l’intérieur) */}
+      {/* Bouton : icône horloge + badge externe (pas de pastille interne) */}
       <button
         onClick={handleToggle}
         className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
@@ -151,40 +106,23 @@ export const HistoryMenu = () => {
 
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* ✅ NOUVEAU: Fenêtre plus grande pour afficher plusieurs conversations */}
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+
+          {/* Fenêtre historique */}
           <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
-            {/* Header avec actions */}
+            {/* Header */}
             <div className="p-3 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <ClockIcon className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Historique</span>
                 <span className="text-xs text-gray-400">({totalConversations})</span>
               </div>
-
               <div className="flex items-center space-x-2">
-                {/* ❌ SUPPRIMÉ: Boutons refresh et nouvelle conversation */}
+                {/* actions header optionnelles */}
               </div>
-
-              {/* Bouton supprimer tout */}
-              {totalConversations > 0 && (
-                <button
-                  onClick={handleClearAll}
-                  className="w-full text-red-600 hover:text-red-700 transition-colors flex items-center justify-center space-x-2"
-                  title="Supprimer toutes les conversations"
-                  disabled={isLoadingHistory}
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  <span>Supprimer tout ({totalConversations})</span>
-                </button>
-              )}
             </div>
 
-            {/* Liste des conversations groupées */}
+            {/* Liste/groupes */}
             <div className="flex-1 overflow-y-auto">
               {isLoadingHistory ? (
                 <div className="p-6 text-center text-gray-500">
@@ -201,7 +139,7 @@ export const HistoryMenu = () => {
                   </div>
                   <div className="text-sm font-medium text-gray-600 mb-1">Aucune conversation</div>
                   <div className="text-xs text-gray-400 mb-4">Commencez par poser une question</div>
-                  
+
                   <button
                     onClick={handleNewConversation}
                     className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
@@ -209,7 +147,7 @@ export const HistoryMenu = () => {
                     <PlusIcon className="w-4 h-4" />
                     <span>Nouvelle conversation</span>
                   </button>
-                  
+
                   {user && (
                     <button
                       onClick={handleRefresh}
@@ -221,10 +159,8 @@ export const HistoryMenu = () => {
                   )}
                 </div>
               ) : (
-                // ✅ NOUVEAU: Affichage groupé par date comme Claude.ai
                 conversationGroups.map((group: ConversationGroup, groupIndex: number) => (
                   <div key={groupIndex} className="border-b border-gray-100 last:border-b-0">
-                    
                     {/* En-tête de groupe */}
                     <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                       <div className="flex items-center space-x-2">
@@ -233,12 +169,12 @@ export const HistoryMenu = () => {
                         <span className="text-xs text-gray-400">({group.conversations.length})</span>
                       </div>
                     </div>
-                    
-                    {/* Conversations du groupe */}
+
+                    {/* Conversations */}
                     <div className="divide-y divide-gray-50">
                       {group.conversations.map((conv: Conversation) => (
-                        <div 
-                          key={conv.id} 
+                        <div
+                          key={conv.id}
                           className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors group ${
                             currentConversation?.id === conv.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                           }`}
@@ -246,45 +182,19 @@ export const HistoryMenu = () => {
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0 pr-3">
-                              
-                              {/* Titre de la conversation */}
+                              {/* Titre */}
                               <h4 className="text-sm font-medium text-gray-900 truncate mb-2">
                                 {conv.title}
                               </h4>
-                              
-                              {/* ❌ COMPLÈTEMENT SUPPRIMÉ: Preview qui duplique le titre */}
-                              
-                              {/* Métadonnées avec HEURE LOCALE CORRIGÉE */}
+
+                              {/* Métadonnées */}
                               <div className="flex items-center space-x-3 text-xs text-gray-400">
-                                <span>
-                                  {/* ✅ FORCE: Appel direct de notre fonction avec debug */}
-                                  {(() => {
-                                    const timestamp = conv.updated_at
-                                    console.log('🔍 [FORCE] Timestamp brut:', timestamp)
-                                    
-                                    let processedTimestamp = timestamp
-                                    if (timestamp && !timestamp.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(timestamp)) {
-                                      processedTimestamp = timestamp + 'Z'
-                                      console.log('🔧 [FORCE] Timestamp corrigé:', processedTimestamp)
-                                    }
-                                    
-                                    const date = new Date(processedTimestamp)
-                                    console.log('📅 [FORCE] Date parsée:', date.toString())
-                                    
-                                    const result = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`
-                                    console.log('🎯 [FORCE] Résultat:', result)
-                                    
-                                    return result
-                                  })()}
-                                </span>
-                                
-                                {conv.messages_count != null && (
-                                  <span>{conv.messages_count} msg</span>
-                                )}
+                                <span>{formatConversationTime(conv.updated_at)}</span>
+                                {conv.messages_count != null && <span>{conv.messages_count} msg</span>}
                               </div>
                             </div>
 
-                            {/* Actions à droite (supprimer) */}
+                            {/* Actions à droite */}
                             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => handleDeleteSingle(conv.id, e)}
@@ -303,9 +213,7 @@ export const HistoryMenu = () => {
               )}
             </div>
 
-            {/* ❌ SUPPRIMÉ: Footer avec statistiques */}
-            {/* Le footer avec "2 conversations • 2 groupes" et "Conversation active" a été retiré */}
-            
+            {/* Footer (optionnel) */}
           </div>
         </>
       )}
