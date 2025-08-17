@@ -1,5 +1,5 @@
 import React from 'react'
-import * as XLSX from 'xlsx' // 🆕 AJOUT pour export XLSX
+import ExcelJS from 'exceljs' // 🔒 SÉCURISÉ - Remplace xlsx
 
 interface QuestionLog {
   id: string
@@ -39,12 +39,10 @@ interface QuestionsTabProps {
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>
   questionsPerPage: number
   setSelectedQuestion: React.Dispatch<React.SetStateAction<QuestionLog | null>>
-  // 🆕 NOUVELLES PROPS pour les vraies données
   isLoading?: boolean
   totalQuestions?: number
 }
 
-// 🆕 Interface pour une conversation groupée
 interface ConversationExport {
   session_id: string
   user_email: string
@@ -75,7 +73,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
   totalQuestions = 0
 }) => {
   
-  // 🎨 Fonctions utilitaires pour le styling
+  // 🎨 Fonctions utilitaires pour le styling (inchangées)
   const getConfidenceColor = (score: number) => {
     if (score >= 0.9) return 'text-green-600 bg-green-100'
     if (score >= 0.7) return 'text-yellow-600 bg-yellow-100'
@@ -110,11 +108,10 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return '❓'
   }
 
-  // 🆕 NOUVELLES FONCTIONS D'EXPORT XLSX
+  // 🔒 NOUVELLE FONCTION D'EXPORT SÉCURISÉE AVEC EXCELJS
   const groupQuestionsByConversation = (questions: QuestionLog[]): ConversationExport[] => {
     const conversationMap = new Map<string, QuestionLog[]>()
     
-    // Grouper par session_id
     questions.forEach(question => {
       const sessionId = question.session_id
       if (!conversationMap.has(sessionId)) {
@@ -123,11 +120,9 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       conversationMap.get(sessionId)!.push(question)
     })
     
-    // Convertir en format d'export
     const conversations: ConversationExport[] = []
     
     conversationMap.forEach((sessionQuestions, sessionId) => {
-      // Trier par timestamp pour avoir l'ordre chronologique
       sessionQuestions.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       
       const firstQuestion = sessionQuestions[0]
@@ -153,129 +148,140 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return conversations
   }
 
-  const exportConversationsToXLSX = (questions: QuestionLog[]) => {
+  const exportConversationsToExcel = async (questions: QuestionLog[]) => {
     try {
-      const conversations = groupQuestionsByConversation(questions)
-      
-      if (conversations.length === 0) {
-        alert('❌ Aucune conversation à exporter')
+      if (questions.length === 0) {
+        alert('❌ Aucune question à exporter')
         return
       }
-      
-      // Créer un nouveau workbook
-      const workbook = XLSX.utils.book_new()
-      
-      // === FEUILLE 1: CONVERSATIONS (format demandé - une ligne par conversation) ===
-      const conversationData: any[] = []
-      
-      // Calculer le nombre maximum de questions dans une conversation
+
+      const conversations = groupQuestionsByConversation(questions)
       const maxQuestions = Math.max(...conversations.map(c => c.total_questions))
-      console.log(`📊 Export de ${conversations.length} conversations, max ${maxQuestions} questions par conversation`)
       
-      conversations.forEach((conv, index) => {
-        const row: any = {
-          'N°': index + 1,
-          'Session ID': conv.session_id.substring(0, 12) + '...',
-          'Utilisateur': conv.user_name,
-          'Email': conv.user_email,
-          'Début': new Date(conv.start_time).toLocaleString('fr-FR'),
-          'Fin': new Date(conv.end_time).toLocaleString('fr-FR'),
-          'Nb Questions': conv.total_questions,
-          'Durée (min)': Math.max(1, Math.round((new Date(conv.end_time).getTime() - new Date(conv.start_time).getTime()) / 60000))
-        }
-        
-        // Ajouter les questions et réponses en colonnes (Q1, R1, Q2, R2, etc.)
-        for (let i = 0; i < maxQuestions; i++) {
-          row[`Q${i + 1}`] = conv.questions[i] || ''
-          row[`R${i + 1}`] = conv.responses[i] || ''
-          row[`Source${i + 1}`] = conv.sources[i] || ''
-          row[`Confiance${i + 1}`] = conv.confidence_scores[i] ? `${(conv.confidence_scores[i] * 100).toFixed(1)}%` : ''
-          row[`Temps${i + 1}`] = conv.response_times[i] ? `${conv.response_times[i]}s` : ''
-          
-          if (conv.feedback_scores[i] !== null && conv.feedback_scores[i] !== undefined) {
-            row[`Feedback${i + 1}`] = conv.feedback_scores[i] === 1 ? 'Positif' : 'Négatif'
-          } else {
-            row[`Feedback${i + 1}`] = ''
-          }
-          
-          row[`Commentaire${i + 1}`] = conv.feedback_comments[i] || ''
-        }
-        
-        conversationData.push(row)
-      })
+      console.log(`📊 Export de ${conversations.length} conversations avec ExcelJS`)
+
+      // 🔒 CRÉER LE WORKBOOK AVEC EXCELJS (SÉCURISÉ)
+      const workbook = new ExcelJS.Workbook()
+      workbook.creator = 'Intelia Expert'
+      workbook.created = new Date()
+
+      // === FEUILLE 1: CONVERSATIONS ===
+      const conversationSheet = workbook.addWorksheet('Conversations')
       
-      const conversationSheet = XLSX.utils.json_to_sheet(conversationData)
-      
-      // Ajuster la largeur des colonnes pour les conversations
-      const conversationCols: XLSX.ColInfo[] = [
-        { wch: 5 },   // N°
-        { wch: 15 },  // Session ID
-        { wch: 20 },  // Utilisateur
-        { wch: 35 },  // Email
-        { wch: 18 },  // Début
-        { wch: 18 },  // Fin
-        { wch: 12 },  // Nb Questions
-        { wch: 12 },  // Durée
+      // En-têtes de base
+      const headers = [
+        'N°', 'Session ID', 'Utilisateur', 'Email', 'Début', 'Fin', 'Nb Questions', 'Durée (min)'
       ]
       
-      // Ajouter les colonnes pour Q&R
+      // Ajouter les en-têtes dynamiques pour Q&R
       for (let i = 0; i < maxQuestions; i++) {
-        conversationCols.push(
-          { wch: 60 },  // Question
-          { wch: 100 }, // Réponse
-          { wch: 12 },  // Source
-          { wch: 12 },  // Confiance
-          { wch: 10 },  // Temps
-          { wch: 12 },  // Feedback
-          { wch: 50 }   // Commentaire
+        headers.push(
+          `Q${i + 1}`, `R${i + 1}`, `Source${i + 1}`, 
+          `Confiance${i + 1}`, `Temps${i + 1}`, `Feedback${i + 1}`, `Commentaire${i + 1}`
         )
       }
       
-      conversationSheet['!cols'] = conversationCols
+      conversationSheet.addRow(headers)
       
-      XLSX.utils.book_append_sheet(workbook, conversationSheet, 'Conversations')
+      // Styliser l'en-tête
+      const headerRow = conversationSheet.getRow(1)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } }
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '366092' } }
       
-      // === FEUILLE 2: QUESTIONS DÉTAILLÉES (format classique) ===
-      const detailData = questions.map((q, index) => ({
-        'N°': index + 1,
-        'Date': new Date(q.timestamp).toLocaleDateString('fr-FR'),
-        'Heure': new Date(q.timestamp).toLocaleTimeString('fr-FR'),
-        'Utilisateur': q.user_name,
-        'Email': q.user_email,
-        'Session': q.session_id.substring(0, 12) + '...',
-        'Question': q.question,
-        'Réponse': q.response.length > 1000 ? q.response.substring(0, 1000) + '...' : q.response,
-        'Source': getSourceLabel(q.response_source),
-        'Confiance': `${(q.confidence_score * 100).toFixed(1)}%`,
-        'Temps (s)': q.response_time,
-        'Langue': q.language.toUpperCase(),
-        'Feedback': q.feedback === 1 ? 'Positif' : q.feedback === -1 ? 'Négatif' : 'Aucun',
-        'Commentaire': q.feedback_comment || ''
-      }))
+      // Ajouter les données
+      conversations.forEach((conv, index) => {
+        const rowData: any[] = [
+          index + 1,
+          conv.session_id.substring(0, 12) + '...',
+          conv.user_name,
+          conv.user_email,
+          new Date(conv.start_time).toLocaleString('fr-FR'),
+          new Date(conv.end_time).toLocaleString('fr-FR'),
+          conv.total_questions,
+          Math.max(1, Math.round((new Date(conv.end_time).getTime() - new Date(conv.start_time).getTime()) / 60000))
+        ]
+        
+        // Ajouter les Q&R
+        for (let i = 0; i < maxQuestions; i++) {
+          rowData.push(
+            conv.questions[i] || '',
+            conv.responses[i] || '',
+            conv.sources[i] || '',
+            conv.confidence_scores[i] ? `${(conv.confidence_scores[i] * 100).toFixed(1)}%` : '',
+            conv.response_times[i] ? `${conv.response_times[i]}s` : '',
+            conv.feedback_scores[i] !== null ? (conv.feedback_scores[i] === 1 ? 'Positif' : 'Négatif') : '',
+            conv.feedback_comments[i] || ''
+          )
+        }
+        
+        conversationSheet.addRow(rowData)
+      })
       
-      const detailSheet = XLSX.utils.json_to_sheet(detailData)
+      // Ajuster les largeurs des colonnes
+      conversationSheet.columns = [
+        { width: 5 },   // N°
+        { width: 15 },  // Session ID
+        { width: 20 },  // Utilisateur
+        { width: 35 },  // Email
+        { width: 18 },  // Début
+        { width: 18 },  // Fin
+        { width: 12 },  // Nb Questions
+        { width: 12 },  // Durée
+        // Colonnes Q&R
+        ...Array(maxQuestions).fill(null).flatMap(() => [
+          { width: 60 },  // Question
+          { width: 100 }, // Réponse
+          { width: 12 },  // Source
+          { width: 12 },  // Confiance
+          { width: 10 },  // Temps
+          { width: 12 },  // Feedback
+          { width: 50 }   // Commentaire
+        ])
+      ]
+
+      // === FEUILLE 2: QUESTIONS DÉTAILLÉES ===
+      const detailSheet = workbook.addWorksheet('Questions Détaillées')
       
-      // Ajuster la largeur des colonnes pour les détails
-      detailSheet['!cols'] = [
-        { wch: 5 },   // N°
-        { wch: 12 },  // Date
-        { wch: 10 },  // Heure
-        { wch: 20 },  // Utilisateur
-        { wch: 35 },  // Email
-        { wch: 15 },  // Session
-        { wch: 60 },  // Question
-        { wch: 100 }, // Réponse
-        { wch: 15 },  // Source
-        { wch: 12 },  // Confiance
-        { wch: 10 },  // Temps
-        { wch: 8 },   // Langue
-        { wch: 12 },  // Feedback
-        { wch: 50 }   // Commentaire
+      const detailHeaders = [
+        'N°', 'Date', 'Heure', 'Utilisateur', 'Email', 'Session', 
+        'Question', 'Réponse', 'Source', 'Confiance', 'Temps (s)', 'Langue', 'Feedback', 'Commentaire'
       ]
       
-      XLSX.utils.book_append_sheet(workbook, detailSheet, 'Questions Détaillées')
+      detailSheet.addRow(detailHeaders)
       
+      // Styliser l'en-tête
+      const detailHeaderRow = detailSheet.getRow(1)
+      detailHeaderRow.font = { bold: true, color: { argb: 'FFFFFF' } }
+      detailHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '366092' } }
+      
+      questions.forEach((q, index) => {
+        detailSheet.addRow([
+          index + 1,
+          new Date(q.timestamp).toLocaleDateString('fr-FR'),
+          new Date(q.timestamp).toLocaleTimeString('fr-FR'),
+          q.user_name,
+          q.user_email,
+          q.session_id.substring(0, 12) + '...',
+          q.question,
+          q.response.length > 1000 ? q.response.substring(0, 1000) + '...' : q.response,
+          getSourceLabel(q.response_source),
+          `${(q.confidence_score * 100).toFixed(1)}%`,
+          q.response_time,
+          q.language.toUpperCase(),
+          q.feedback === 1 ? 'Positif' : q.feedback === -1 ? 'Négatif' : 'Aucun',
+          q.feedback_comment || ''
+        ])
+      })
+      
+      detailSheet.columns = [
+        { width: 5 }, { width: 12 }, { width: 10 }, { width: 20 }, { width: 35 }, 
+        { width: 15 }, { width: 60 }, { width: 100 }, { width: 15 }, { width: 12 }, 
+        { width: 10 }, { width: 8 }, { width: 12 }, { width: 50 }
+      ]
+
       // === FEUILLE 3: STATISTIQUES ===
+      const statsSheet = workbook.addWorksheet('Statistiques')
+      
       const uniqueUsers = new Set(questions.map(q => q.user_email)).size
       const avgResponseTime = questions.length > 0 ? 
         (questions.reduce((sum, q) => sum + q.response_time, 0) / questions.length) : 0
@@ -285,18 +291,22 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       const satisfactionRate = feedbackQuestions.length > 0 ? 
         (questions.filter(q => q.feedback === 1).length / feedbackQuestions.length) : 0
       
+      statsSheet.addRow(['Métrique', 'Valeur'])
+      const statsHeaderRow = statsSheet.getRow(1)
+      statsHeaderRow.font = { bold: true }
+      
       const statsData = [
-        { 'Métrique': 'Total Conversations', 'Valeur': conversations.length },
-        { 'Métrique': 'Total Questions', 'Valeur': questions.length },
-        { 'Métrique': 'Utilisateurs Uniques', 'Valeur': uniqueUsers },
-        { 'Métrique': 'Questions par Conversation (Moyenne)', 'Valeur': conversations.length > 0 ? (questions.length / conversations.length).toFixed(1) : '0' },
-        { 'Métrique': 'Temps de Réponse Moyen', 'Valeur': `${avgResponseTime.toFixed(1)}s` },
-        { 'Métrique': 'Confiance Moyenne', 'Valeur': `${(avgConfidence * 100).toFixed(1)}%` },
-        { 'Métrique': 'Feedback Positifs', 'Valeur': questions.filter(q => q.feedback === 1).length },
-        { 'Métrique': 'Feedback Négatifs', 'Valeur': questions.filter(q => q.feedback === -1).length },
-        { 'Métrique': 'Taux de Satisfaction', 'Valeur': `${(satisfactionRate * 100).toFixed(1)}%` },
-        { 'Métrique': '', 'Valeur': '' }, // Ligne vide
-        { 'Métrique': '=== DISTRIBUTION DES SOURCES ===', 'Valeur': '' }
+        ['Total Conversations', conversations.length],
+        ['Total Questions', questions.length],
+        ['Utilisateurs Uniques', uniqueUsers],
+        ['Questions par Conversation (Moyenne)', conversations.length > 0 ? (questions.length / conversations.length).toFixed(1) : '0'],
+        ['Temps de Réponse Moyen', `${avgResponseTime.toFixed(1)}s`],
+        ['Confiance Moyenne', `${(avgConfidence * 100).toFixed(1)}%`],
+        ['Feedback Positifs', questions.filter(q => q.feedback === 1).length],
+        ['Feedback Négatifs', questions.filter(q => q.feedback === -1).length],
+        ['Taux de Satisfaction', `${(satisfactionRate * 100).toFixed(1)}%`],
+        ['', ''],
+        ['=== DISTRIBUTION DES SOURCES ===', '']
       ]
       
       // Distribution des sources
@@ -309,25 +319,33 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       Object.entries(sourceStats)
         .sort(([,a], [,b]) => (b as number) - (a as number))
         .forEach(([source, count]) => {
-          statsData.push({
-            'Métrique': `Source: ${source}`,
-            'Valeur': `${count} (${((count as number) / questions.length * 100).toFixed(1)}%)`
-          })
+          statsData.push([
+            `Source: ${source}`,
+            `${count} (${((count as number) / questions.length * 100).toFixed(1)}%)`
+          ])
         })
       
-      const statsSheet = XLSX.utils.json_to_sheet(statsData)
-      statsSheet['!cols'] = [{ wch: 40 }, { wch: 25 }]
-      
-      XLSX.utils.book_append_sheet(workbook, statsSheet, 'Statistiques')
-      
-      // Générer et télécharger le fichier
+      statsData.forEach(row => statsSheet.addRow(row))
+      statsSheet.columns = [{ width: 40 }, { width: 25 }]
+
+      // 💾 TÉLÉCHARGER LE FICHIER
       const fileName = `conversations_export_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`
-      XLSX.writeFile(workbook, fileName)
       
-      console.log(`✅ Export XLSX réussi: ${fileName}`)
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = window.URL.createObjectURL(blob)
       
-      // Afficher un message de succès détaillé
-      const summary = `✅ Export Excel réussi !
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      console.log(`✅ Export Excel sécurisé réussi: ${fileName}`)
+      
+      const summary = `✅ Export Excel sécurisé réussi !
 
 📊 Résumé de l'export :
 • ${conversations.length} conversations
@@ -337,6 +355,8 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
 📁 Fichier généré : ${fileName}
 
+🔒 Utilise ExcelJS (sécurisé, pas de vulnérabilités)
+
 📋 3 feuilles créées :
 1. Conversations (format ligne par conversation)
 2. Questions Détaillées (format classique)
@@ -345,12 +365,12 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       alert(summary)
       
     } catch (error) {
-      console.error('❌ Erreur lors de l\'export XLSX:', error)
-      alert(`❌ Erreur lors de l'export XLSX: ${error}\n\nVérifiez la console pour plus de détails.`)
+      console.error('❌ Erreur lors de l\'export Excel:', error)
+      alert(`❌ Erreur lors de l'export Excel: ${error}\n\nVérifiez la console pour plus de détails.`)
     }
   }
 
-  // 🔍 Filtrage côté client (pour l'expérience utilisateur)
+  // 🔍 Filtrage côté client (inchangé)
   const filteredQuestions = questionLogs.filter(q => {
     if (questionFilters.search && !q.question.toLowerCase().includes(questionFilters.search.toLowerCase()) && 
         !q.response.toLowerCase().includes(questionFilters.search.toLowerCase()) &&
@@ -375,7 +395,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return true
   })
 
-  // 📊 Calculs statistiques
+  // 📊 Calculs statistiques (inchangés)
   const uniqueUsers = Array.from(new Set(questionLogs.map(q => q.user_email)))
   const feedbackStats = {
     total: questionLogs.filter(q => q.feedback !== null).length,
@@ -392,7 +412,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     return acc
   }, {} as Record<string, number>)
 
-  // 🔄 État de chargement
   if (isLoading && questionLogs.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -407,7 +426,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 📊 Statistiques en en-tête */}
+      {/* 📊 Statistiques en en-tête (inchangées) */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="text-center">
@@ -429,7 +448,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 🔧 Filtres et Recherche */}
+      {/* 🔧 Filtres et Recherche (inchangés) */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">🔍 Filtres et Recherche</h3>
@@ -564,7 +583,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 📈 Section Analyse des Feedback et Sources */}
+      {/* 📈 Section Analyse des Feedback et Sources (inchangées) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Analyse des Commentaires */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -704,27 +723,28 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 💾 Boutons d'Export - SECTION MISE À JOUR AVEC XLSX */}
+      {/* 💾 Boutons d'Export - SECTION MISE À JOUR AVEC EXCELJS SÉCURISÉ */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">💾 Export des Données</h3>
         
-        {/* 🆕 Bouton XLSX en premier (mis en évidence) */}
+        {/* 🔒 BOUTON EXCEL SÉCURISÉ */}
         <div className="mb-4">
           <button
-            onClick={() => exportConversationsToXLSX(filteredQuestions)}
+            onClick={() => exportConversationsToExcel(filteredQuestions)}
             disabled={filteredQuestions.length === 0}
             className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
-            📊 Exporter Conversations (XLSX) - {filteredQuestions.length} questions
+            🔒 Exporter Conversations (Excel Sécurisé) - {filteredQuestions.length} questions
           </button>
           
-          {/* Description détaillée du format XLSX */}
+          {/* Description détaillée du format Excel sécurisé */}
           <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <h4 className="text-sm font-medium text-emerald-800 mb-2">📊 Format Excel - 3 feuilles incluses :</h4>
+            <h4 className="text-sm font-medium text-emerald-800 mb-2">🔒 Format Excel Sécurisé - 3 feuilles incluses :</h4>
             <ul className="text-xs text-emerald-700 space-y-1">
               <li><strong>• Conversations :</strong> Une ligne par conversation avec colonnes Q1, R1, Q2, R2, etc.</li>
               <li><strong>• Questions Détaillées :</strong> Vue classique avec une ligne par question</li>
               <li><strong>• Statistiques :</strong> Métriques générales et distribution des sources</li>
+              <li><strong>🔒 ExcelJS :</strong> Librairie sécurisée, sans vulnérabilités connues</li>
             </ul>
             {filteredQuestions.length === 0 && (
               <p className="text-xs text-emerald-600 mt-2 italic">⚠️ Aucune question à exporter avec les filtres actuels</p>
@@ -732,7 +752,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           </div>
         </div>
 
-        {/* Boutons d'export existants (CSV et JSON) */}
+        {/* Boutons d'export existants (CSV et JSON) - INCHANGÉS */}
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => {
@@ -827,7 +847,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 📋 Liste des Questions */}
+      {/* 📋 Liste des Questions (inchangée) */}
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -989,7 +1009,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           </div>
         )}
         
-        {/* Pagination */}
+        {/* Pagination (inchangée) */}
         {filteredQuestions.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
