@@ -1276,7 +1276,6 @@ export default function ChatInterface() {
         style={containerStyle}
       >
 
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
 		  <div className="flex items-center justify-between">
 			{/* Gauche — + puis Historique */}
@@ -1290,27 +1289,9 @@ export default function ChatInterface() {
 				<PlusIcon className="w-5 h-5" />
 			  </button>
 
-			  {/* Bouton Historique avec icône d'horloge */}
-			  <div className="relative">
-				<button
-				  onClick={() => {
-					const btn = document.querySelector('.history-hidden button');
-					if (btn) (btn as HTMLElement).click();
-				  }}
-				  className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
-				>
-				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-				  </svg>
-				</button>
-				
-				<div className="absolute opacity-0 pointer-events-none history-hidden">
-				  <HistoryMenu />
-				</div>
-				
-				<span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-				  {conversationsCount}
-				</span>
+			  {/* History rendu directement (plus de proxy/hidden) */}
+			  <div className="header-icon-container history-menu-container">
+				<HistoryMenu />
 			  </div>
 			</div>
 
@@ -1324,24 +1305,16 @@ export default function ChatInterface() {
 
 			{/* Droite — Bouton DD */}
 			<div className="flex items-center space-x-2">
-			  <div className="relative">
-				<button
-				  onClick={() => {
-					const btn = document.querySelector('.user-hidden button');
-					if (btn) (btn as HTMLElement).click();
-				  }}
-				  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors"
-				>
-				  {getUserInitials(user)}
-				</button>
-				
-				<div className="absolute opacity-0 pointer-events-none user-hidden">
-				  <UserMenuButton />
-				</div>
+			  {/* UserMenu rendu directement (plus de proxy/hidden) */}
+			  <div className="header-icon-container user-menu-container">
+				<UserMenuButton />
 			  </div>
 			</div>
 		  </div>
 		</header>
+
+
+
 
 
 
