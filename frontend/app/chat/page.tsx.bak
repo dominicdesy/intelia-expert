@@ -1276,24 +1276,36 @@ export default function ChatInterface() {
         style={containerStyle}
       >
 
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
-                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
+                className="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
                 title={t('nav.newConversation')}
                 aria-label={t('nav.newConversation')}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
         
-              {/* Bouton Historique - Version simple qui fonctionne */}
-              <div className="relative">
-                <HistoryMenu />
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+              {/* Bouton Historique - Icône d'horloge avec badge dynamique */}
+              <div className="relative w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px]">
+                {/* Composant original invisible mais cliquable */}
+                <div className="absolute inset-0 opacity-0 pointer-events-auto z-10">
+                  <HistoryMenu />
+                </div>
+                
+                {/* Overlay visuel avec icône d'horloge */}
+                <div className="absolute inset-0 w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center pointer-events-none transition-colors">
+                  {/* Icône d'horloge */}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                
+                {/* Badge dynamique */}
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium z-20">
                   {conversationsCount}
                 </span>
               </div>
@@ -1307,30 +1319,18 @@ export default function ChatInterface() {
               <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
-            {/* Droite — Bouton menu utilisateur - Clic garanti */}
+            {/* Droite — Bouton menu utilisateur - Clic direct */}
             <div className="flex items-center space-x-2">
-              <div className="relative w-10 h-10">
+              <div className="relative w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px]">
                 {/* Composant original invisible mais cliquable */}
-                <div className="absolute inset-0 opacity-0">
+                <div className="absolute inset-0 opacity-0 pointer-events-auto z-10">
                   <UserMenuButton />
                 </div>
                 
-                {/* Bouton visuel qui délègue le clic */}
-                <button
-                  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors relative z-10"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Trouver et cliquer sur le bouton UserMenuButton caché
-                    const hiddenButton = e.currentTarget.parentElement?.querySelector('button[class*="opacity-0"] button, div[class*="opacity-0"] button');
-                    if (hiddenButton) {
-                      (hiddenButton as HTMLElement).click();
-                    }
-                  }}
-                  title="Menu utilisateur"
-                  aria-label="Menu utilisateur"
-                >
+                {/* Overlay visuel sans interaction */}
+                <div className="absolute inset-0 w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm pointer-events-none z-5">
                   {getUserInitials(user)}
-                </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1358,6 +1358,7 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
+
 
 
 
