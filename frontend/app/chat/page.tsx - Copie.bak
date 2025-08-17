@@ -1274,34 +1274,29 @@ export default function ChatInterface() {
         className={`bg-gray-50 flex flex-col ${isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
         style={containerStyle}
       >
-
-
-		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
+        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
-            {/* Gauche — + puis Historique */}
             <div className="flex items-center space-x-2">
+              <HistoryMenu />
               <button
                 onClick={handleNewConversation}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                 title={t('nav.newConversation')}
-                aria-label={t('nav.newConversation')}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
-        
-              <HistoryMenu />
             </div>
-        
-            {/* Centre — Logo Intelia + Titre */}
+
             <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
-              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
+              <div className="text-center">
+                <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
+              </div>
             </div>
-        
-            {/* Droite — Bouton menu utilisateur (affiché comme "DD" carré arrondi bleu) */}
-            <div className="flex items-center space-x-2">
+
+            <div className="flex items-center">
               <UserMenuButton />
             </div>
           </div>
@@ -1329,9 +1324,6 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
-
-
-
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {/* ✅ ZONE CHAT avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
