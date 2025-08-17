@@ -1292,12 +1292,12 @@ export default function ChatInterface() {
               <HistoryMenu />
             </div>
         
-            {/* Centre — Titre + Logo Intelia */}
+            {/* Centre — Logo Intelia + Titre */}
             <div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
-              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
+              <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
             </div>
         
             {/* Droite — Bouton menu utilisateur (affiché comme "DD" carré arrondi bleu) */}
