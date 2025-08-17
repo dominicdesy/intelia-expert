@@ -1276,7 +1276,6 @@ export default function ChatInterface() {
       >
 
 
-
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Gauche — + puis Historique */}
@@ -1305,7 +1304,7 @@ export default function ChatInterface() {
                 
                 {/* Badge de notification */}
                 <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-                  3
+                  {useChatStore(state => state.conversations.length)}
                 </span>
               </div>
             </div>
@@ -1320,9 +1319,13 @@ export default function ChatInterface() {
         
             {/* Droite — Bouton menu utilisateur (carré arrondi bleu avec initiales) */}
             <div className="flex items-center space-x-2">
-              <div className="[&>*]:!w-10 [&>*]:!h-10 [&>*]:!min-w-[40px] [&>*]:!min-h-[40px] [&>*]:!max-w-[40px] [&>*]:!max-h-[40px] [&>*]:bg-blue-600 [&>*]:text-white [&>*]:!rounded-lg [&>*]:flex [&>*]:items-center [&>*]:justify-center [&>*]:font-medium [&>*]:hover:bg-blue-700">
-                <UserMenuButton />
-              </div>
+              <button 
+                className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-medium hover:bg-blue-700 transition-colors"
+                title="Menu utilisateur"
+                aria-label="Menu utilisateur"
+              >
+                {getUserInitials(user)}
+              </button>
             </div>
           </div>
 
@@ -1349,6 +1352,8 @@ export default function ChatInterface() {
             </div>
           )}
         </header>
+
+
 
 
 
