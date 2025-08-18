@@ -205,7 +205,15 @@ export const useAuthStore = create<AuthState>()(
           // 504/timeout/réseau ?
           const status: any = (error as any)?.status || 0
           const msg = (error?.message || '').toLowerCase()
-          const maybeTimeout = status === 504 || msg.includes('timeout') || msg.includes('gateway') || msg.includes('network') || msg.includes('fetch failed')
+          const name = (error as any)?.name || ''
+          const causeMsg = String((error as any)?.cause?.message || (error as any)?.cause || '').toLowerCase()
+          const maybeTimeout =
+            status === 504 ||
+            name === 'AbortError' ||
+            msg.includes('timeout') || causeMsg.includes('timeout') ||
+            msg.includes('aborted') || msg.includes('abort') ||
+            msg.includes('gateway') || msg.includes('network') ||
+            msg.includes('fetch failed')
           alog('register → first error', { status, msg, maybeTimeout })
 
           if (maybeTimeout) {
