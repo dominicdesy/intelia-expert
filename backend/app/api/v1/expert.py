@@ -413,7 +413,7 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                     return {
                         "type": "quota_exceeded",
                         "message": f"Line not specified. Available: {', '.join(available)}"
-                },
+                }
             })
 
         # [STEP 7] Chargement DataFrame
