@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useAuthStore } from '@/lib/stores/useAuthStore' // ← Nouveau store backend
+import { useAuthStore } from '@/app/chat/hooks/useAuthStore' // ← Store backend (chemin corrigé)
 import type { User } from '@/types'
 
 // ==================== VALIDATION MOT DE PASSE ====================
