@@ -315,7 +315,7 @@ def perf_probe(payload: AskPayload):
             "entities": (payload.entities or {}) if payload else {},
             "debug": {"step": "unknown", "error_type": type(e).__name__},
             "confidence": get_perfstore_confidence(False)
-        })confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
+                    "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
             "unified_confidence_module": CONFIDENCE_SYSTEM_AVAILABLE,
             "dialogue_manager_confidence_integration": dialogue_status.get("unified_confidence_system") == "integrated",
             "components": {
