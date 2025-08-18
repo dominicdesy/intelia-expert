@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useAuthStore } from '@/app/chat/hooks/useAuthStore' // ← Store backend (chemin corrigé)
+import type { User } from '@/types'
 
 // ==================== VALIDATION MOT DE PASSE ====================
 const validatePassword = (password: string): string[] => {
@@ -186,6 +188,9 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
 
 // ==================== PAGE CRÉATION DE COMPTE ====================
 export default function SignupPage() {
+  // 🔄 NOUVEAU : Utiliser le store backend
+  const { register, isLoading, error, clearError } = useAuthStore()
+  
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -194,41 +199,37 @@ export default function SignupPage() {
     confirmPassword: '',
     acceptTerms: false
   })
-  const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
+  const [localErrors, setLocalErrors] = useState<string[]>([])
 
   // 🔍 DEBUG : Log au chargement de la page
   useEffect(() => {
-    console.log('🚨 FICHIER UTILISÉ: Page signup SIMPLE (pas de AuthStore)')
-    console.log('=== DEBUG: Page Signup chargée ===')
-    console.log('URL actuelle:', window.location.href)
+    console.log('🚨 FICHIER UTILISÉ: Page signup AVEC Backend Store')
+    console.log('=== DEBUG: Page Signup Backend ===')
+    console.log('Backend URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+    console.log('Store utilisé: Backend API (useAuthStore)')
     console.log('Variables d\'environnement:', {
-      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Configuré' : 'MANQUANT',
-      SUPABASE_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Configuré' : 'MANQUANT',
-      url_value: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      key_length: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length
+      API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NODE_ENV: process.env.NODE_ENV
     })
-    console.log('Type de page: Page signup SIMPLE (sans AuthStore)')
-    
-    // Test si on a accès aux stores
-    try {
-      const hasAuthStore = typeof window !== 'undefined' && 'useAuthStore' in window
-      console.log('AuthStore disponible?', hasAuthStore)
-    } catch (e) {
-      console.log('Erreur test AuthStore:', e)
-    }
   }, [])
+
+  // Nettoyer les erreurs quand on change les données
+  useEffect(() => {
+    if (error) {
+      clearError()
+    }
+  }, [formData, error, clearError])
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors.length > 0) {
-      setErrors([])
+    if (localErrors.length > 0) {
+      setLocalErrors([])
     }
   }
 
   const handleSubmit = async () => {
-    console.log('🚨 DEBUG: handleSubmit SIMPLE appelé (PAS AuthStore)')
-    console.log('=== DEBUG: handleSubmit appelé ===')
+    console.log('🚨 DEBUG: handleSubmit BACKEND appelé')
+    console.log('=== DEBUG: handleSubmit Backend ===')
     console.log('Données du formulaire:', {
       email: formData.email,
       firstName: formData.firstName,
@@ -266,63 +267,48 @@ export default function SignupPage() {
     console.log('Erreurs de validation:', validationErrors)
     
     if (validationErrors.length > 0) {
-      setErrors(validationErrors)
+      setLocalErrors(validationErrors)
       return
     }
     
-    setIsLoading(true)
-    setErrors([])
+    setLocalErrors([])
     
     try {
-      console.log('🔍 DÉBUT: Simulation création compte (AUCUN APPEL SUPABASE)')
+      console.log('🔍 DÉBUT: Création compte via Backend API')
       
-      // 🔍 TEST: Vérifier si Supabase est réellement importé quelque part
-      try {
-        // @ts-ignore - Test de l'existence de Supabase
-        if (typeof window !== 'undefined' && window.supabase) {
-          console.log('⚠️ Supabase client détecté dans window')
-        }
-      } catch (e) {
-        console.log('Pas de Supabase global:', e)
+      // Préparer les données utilisateur pour le backend
+      const userData: Partial<User> = {
+        name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+        user_type: 'producer',
+        language: 'fr'
       }
-
-      // TODO: Intégrer avec Supabase
-      // const { data, error } = await supabase.auth.signUp({
-      //   email: formData.email,
-      //   password: formData.password,
-      //   options: {
-      //     data: {
-      //       first_name: formData.firstName,
-      //       last_name: formData.lastName
-      //     }
-      //   }
-      // })
       
-      console.log('🔍 Création compte avec standards sécurisés:', {
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        passwordStrength: 4 - validatePassword(formData.password).length
+      console.log('🔍 Appel register() du store backend...')
+      await register(formData.email.trim(), formData.password, userData)
+      
+      console.log('✅ Inscription réussie via backend!')
+      
+      // Réinitialiser le formulaire en cas de succès
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        acceptTerms: false
       })
       
-      console.log('🔍 Simulation en cours... (2 secondes)')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      console.log('✅ Simulation terminée - Redirection vers verify-email')
-      
-      // Redirection vers la page de vérification email ou directement vers le chat
-      window.location.href = '/auth/verify-email'
+      // Redirection sera gérée par le store ou AuthProvider
       
     } catch (error: any) {
-      console.error('❌ Erreur lors de la création du compte:', error)
-      console.error('Type d\'erreur:', typeof error, error.constructor.name)
-      console.error('Message:', error.message)
-      console.error('Stack:', error.stack)
+      console.error('❌ Erreur inscription backend:', error)
       
-      setErrors([error.message || 'Erreur lors de la création du compte'])
-    } finally {
-      setIsLoading(false)
-      console.log('🔍 handleSubmit terminé')
+      // L'erreur est déjà gérée par le store, mais on peut ajouter des logs
+      const errorMessage = error.message || 'Erreur lors de la création du compte'
+      console.error('Type d\'erreur:', typeof error, error.constructor.name)
+      console.error('Message final:', errorMessage)
+      
+      // Les erreurs sont maintenant gérées par le store
     }
   }
 
@@ -340,6 +326,12 @@ export default function SignupPage() {
     )
     
     return valid
+  }
+
+  // Combiner les erreurs locales et du store
+  const allErrors = [...localErrors]
+  if (error) {
+    allErrors.push(error)
   }
 
   return (
@@ -362,21 +354,21 @@ export default function SignupPage() {
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
           
           {/* 🔍 PANNEAU DE DEBUG */}
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
-            <div className="font-bold text-blue-800 mb-1">🔍 DEBUG - Page Signup Simple</div>
-            <div className="text-blue-700">
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-xs">
+            <div className="font-bold text-green-800 mb-1">🔍 DEBUG - Page Signup Backend</div>
+            <div className="text-green-700">
               • Page: {typeof window !== 'undefined' ? window.location.pathname : 'N/A'}<br/>
-              • Supabase: {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓' : '❌'}<br/>
-              • Type: Formulaire simple sans AuthStore<br/>
-              • Appel API: Commenté (ligne 206-215)
+              • Backend: {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}<br/>
+              • Store: Backend API (useAuthStore)<br/>
+              • Architecture: Frontend → Backend → Supabase
             </div>
           </div>
           
           {/* Affichage des erreurs */}
-          {errors.length > 0 && (
+          {allErrors.length > 0 && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
               <div className="text-sm text-red-800">
-                {errors.map((error, index) => (
+                {allErrors.map((error, index) => (
                   <div key={index} className="flex items-start space-x-2">
                     <span className="text-red-500 font-bold">•</span>
                     <span>{error}</span>
