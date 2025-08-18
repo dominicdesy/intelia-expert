@@ -113,25 +113,8 @@ export const HistoryMenu = () => {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {/* petit picto rappel */}
-                <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                        d="M8 7H5m0 0v3m0-3l2.2 2.2" />
-                  <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                        d="M21 12a9 9 0 10-9 9" />
-                  <path strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                        d="M12 7v5l3 3" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">Historique</span>
-                <span className="text-xs text-gray-400">({totalConversations})</span>
-              </div>
-              <div className="flex items-center space-x-2">{/* actions optionnelles */}</div>
-            </div>
-
-            {/* Liste */}
+            
+            {/* Liste directement sans header */}
             <div className="flex-1 overflow-y-auto">
               {isLoadingHistory ? (
                 <div className="p-6 text-center text-gray-500">
