@@ -1,24 +1,19 @@
-// lib/supabase/client.ts - CLIENT SUPABASE SÉCURISÉ (avec client auth à timeout étendu)
+// lib/supabase/client.ts - CLIENT SUPABASE SÉCURISÉ (ajout supabaseAuth + timeout 25s)
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/types/supabase' // Types à créer/ajuster au besoin
+import { Database } from '@/types/supabase' // adapte si besoin
 
-// Client Supabase pour composants React (conserve le comportement d’origine)
+// Client Supabase pour composants React (inchangé)
 export const supabase = createClientComponentClient<Database>()
 
-// Configuration sécurisée (déjà utilisée dans le projet)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Configuration
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Vérifications de sécurité
-if (!supabaseUrl) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL')
-}
-if (!supabaseAnonKey) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
-}
+if (!SUPABASE_URL) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL')
+if (!SUPABASE_ANON_KEY) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
-// ⏳ Fetch avec timeout global (25s) — utilisé par le client d’auth pour éviter les faux timeouts
+// ⏳ Fetch avec timeout (25s) pour éviter les faux timeouts sur /auth
 export const fetchWithTimeout = (ms: number = 25000) => {
   return (input: RequestInfo | URL, init: RequestInit = {}) => {
     const controller = new AbortController()
@@ -28,36 +23,41 @@ export const fetchWithTimeout = (ms: number = 25000) => {
   }
 }
 
-// Client Supabase dédié aux opérations d’auth (signup/signin) avec fetch temporisé
-export const supabaseAuth = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+// Client dédié aux opérations d’auth (signup/signin) avec timeout étendu
+export const supabaseAuth = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: { fetch: fetchWithTimeout(25000) }
 })
 
-// —— API d’assistance auth (conservée) ——
+// Helpers de sécurité (conservent l’API existante)
 export const auth = {
-  // Récupère la session courante
-  async getSession() {
-    const { data } = await supabase.auth.getSession()
-    return data?.session || null
+  // Vérifier si l'utilisateur est connecté
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      return !!session
+    } catch (error) {
+      console.error('❌ isAuthenticated error:', error)
+      return false
+    }
   },
 
-  // Retourne le token d’accès si disponible
-  async getAccessToken() {
-    const session = await this.getSession()
-    return session?.access_token || null
+  // Récupérer le token d’accès courant
+  async getAccessToken(): Promise<string | null> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      return session?.access_token || null
+    } catch (error) {
+      console.error('❌ getAccessToken error:', error)
+      return null
+    }
   },
 
-  // Déconnexion + nettoyage localStorage
+  // Déconnexion
   async logout() {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-
-      // Nettoyage éventuel de vos stores persistés
-      try {
-        localStorage.removeItem('intelia-chat-storage')
-      } catch {}
-
+      try { localStorage.removeItem('intelia-chat-storage') } catch {}
       return { success: true }
     } catch (error) {
       console.error('❌ Erreur déconnexion:', error)
@@ -66,9 +66,8 @@ export const auth = {
   }
 }
 
-// —— Helpers pour les requêtes sécurisées (conservés) ——
+// Requêtes sécurisées (conserve l’API)
 export const secureRequest = {
-  // GET avec authentification
   async get(url: string, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
     if (!token) throw new Error('Non authentifié')
@@ -83,7 +82,6 @@ export const secureRequest = {
     })
   },
 
-  // POST JSON avec authentification
   async post(url: string, data: any, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
     if (!token) throw new Error('Non authentifié')
@@ -101,5 +99,5 @@ export const secureRequest = {
   }
 }
 
-// Export par défaut (conserve la compatibilité existante)
+// Export par défaut (compat)
 export default supabase
