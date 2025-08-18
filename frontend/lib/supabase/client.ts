@@ -39,9 +39,17 @@ export const fetchWithTimeout = (ms: number = 25000) => {
     const idNum = ++__fetchSeq
     const start = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
     const controller = new AbortController()
+    try {
+      controller.signal.addEventListener('abort', () => {
+        try { slog(`#${idNum} ⚠️ signal aborted`, (controller as any)?.signal?.reason || '(no reason)') } catch {}
+      })
+    } catch {}
     const to = setTimeout(() => {
-      controller.abort()
-      try { slog(`#${idNum} ⏱️ ABORT after ${ms}ms`, (input as any)?.toString?.() ?? String(input)) } catch {}
+      const reason = new Error(`timeout:${ms}ms`)
+      try { (controller as any).abort(reason) } catch { controller.abort() }
+      try {
+        slog(`#${idNum} ⏱️ ABORT after ${ms}ms`, { reason: reason.message, url: (input as any)?.toString?.() ?? String(input) })
+      } catch {}
     }, ms)
 
     try {
