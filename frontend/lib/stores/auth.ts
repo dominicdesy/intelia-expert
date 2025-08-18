@@ -1,4 +1,4 @@
-// lib/stores/auth.ts — Store d'auth robuste (timeouts/504 gérés) + exports nommés & défaut
+// lib/stores/auth.ts — Store d'auth robuste (timeouts/504 gérés) + DEBUG + exports nommés & défaut
 'use client'
 
 import { create } from 'zustand'
@@ -6,6 +6,23 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import toast from 'react-hot-toast'
 import { supabase, supabaseAuth } from '@/lib/supabase/client'
 import type { User as AppUser, RGPDConsent } from '@/types' // Ajustez si nécessaire
+
+// ---- DEBUG ----
+const AUTH_DEBUG = (
+  (typeof window !== 'undefined' && (
+    localStorage.getItem('AUTH_DEBUG') === '1' ||
+    localStorage.getItem('SUPABASE_DEBUG') === '1'
+  )) || process.env.NEXT_PUBLIC_AUTH_DEBUG === '1'
+)
+const alog = (...args: any[]) => {
+  if (AUTH_DEBUG) {
+    if (typeof window !== 'undefined') console.debug('[AuthStore]', ...args)
+    else console.debug('[AuthStore/SSR]', ...args)
+  }
+}
+const maskEmail = (e: string) => e?.replace(/(^.).*(@.*$)/, '$1***$2')
+
+alog('✅ Loaded from /lib/stores/auth.ts')
 
 // ---- Types d'état du store ----
 interface AuthState {
@@ -58,13 +75,19 @@ function mapSessionToAppUser(sess: any): AppUser | null {
 }
 
 async function trySignInCheck(email: string, password: string): Promise<SignInCheck> {
+  alog('trySignInCheck()', maskEmail(email))
   const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password })
-  if (data?.session) return { created: true, pendingEmailConfirm: false }
+  if (data?.session) {
+    alog('trySignInCheck → session present')
+    return { created: true, pendingEmailConfirm: false }
+  }
 
   const msg = (error?.message || '').toLowerCase()
   const code = (error as any)?.status || (error as any)?.code
+  alog('trySignInCheck → no session', { code, msg })
 
   if (msg.includes('confirm') || msg.includes('not confirmed') || msg.includes('email not confirmed')) {
+    alog('trySignInCheck → created but pending email confirmation')
     return { created: true, pendingEmailConfirm: true }
   }
   if (msg.includes('invalid') || msg.includes('invalid login credentials') || code === 400) {
@@ -100,12 +123,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const appUser = mapSessionToAppUser(session)
-          set({
-            user: appUser,
-            isAuthenticated: !!session,
-            lastAuthCheck: Date.now(),
-            isRecovering: false,
-          })
+          set({ user: appUser, isAuthenticated: !!session, lastAuthCheck: Date.now(), isRecovering: false })
+          alog('initializeSession →', { isAuth: !!session, email: appUser?.email && maskEmail(appUser.email) })
           return !!session
         } catch (e) {
           get().handleAuthError(e, 'initializeSession')
@@ -125,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
             sessionCheckCount: get().sessionCheckCount + 1,
             isRecovering: false,
           })
+          alog('checkAuth →', { isAuth: !!session, checks: get().sessionCheckCount })
         } catch (e) {
           get().handleAuthError(e, 'checkAuth')
           set({ isAuthenticated: false, user: null })
@@ -133,13 +153,16 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         set({ isLoading: true })
+        alog('login()', maskEmail(email))
         try {
           const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password })
           if (error) throw error
           const appUser = mapSessionToAppUser(data?.session)
           set({ user: appUser, isAuthenticated: !!data?.session })
+          alog('login → success', appUser?.email && maskEmail(appUser.email))
         } catch (e: any) {
           get().handleAuthError(e, 'login')
+          alog('login → error', e?.message)
           throw new Error(e?.message || 'Erreur de connexion')
         } finally {
           set({ isLoading: false })
@@ -148,6 +171,7 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
         set({ isLoading: true, authErrors: [] })
+        alog('register()', maskEmail(email))
         try {
           const fullName = (userData?.name || '').toString().trim()
           if (!fullName || fullName.length < 2) {
@@ -155,6 +179,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const signUpOnce = async () => {
+            alog('signUpOnce → calling supabaseAuth.auth.signUp')
             return await supabaseAuth.auth.signUp({
               email,
               password,
@@ -164,9 +189,7 @@ export const useAuthStore = create<AuthState>()(
                   user_type: (userData as any)?.user_type || 'producer',
                   language: (userData as any)?.language || 'fr',
                 },
-                emailRedirectTo: typeof window !== 'undefined'
-                  ? `${window.location.origin}/auth/callback`
-                  : undefined,
+                emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
               },
             })
           }
@@ -174,6 +197,7 @@ export const useAuthStore = create<AuthState>()(
           // Essai #1
           const { error } = await signUpOnce()
           if (!error) {
+            alog('register → success (first attempt)')
             toast.success('Compte créé. Vérifiez vos e‑mails si une confirmation est requise.', { icon: '📧' })
             return
           }
@@ -181,47 +205,43 @@ export const useAuthStore = create<AuthState>()(
           // 504/timeout/réseau ?
           const status: any = (error as any)?.status || 0
           const msg = (error?.message || '').toLowerCase()
-          const maybeTimeout =
-            status === 504 ||
-            msg.includes('timeout') ||
-            msg.includes('gateway') ||
-            msg.includes('network') ||
-            msg.includes('fetch failed')
+          const maybeTimeout = status === 504 || msg.includes('timeout') || msg.includes('gateway') || msg.includes('network') || msg.includes('fetch failed')
+          alog('register → first error', { status, msg, maybeTimeout })
 
           if (maybeTimeout) {
             const check = await trySignInCheck(email, password)
             if (check.created === true) {
               if (check.pendingEmailConfirm) {
-                throw Object.assign(new Error(
-                  'Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'
-                ), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
+                alog('register → account created, pending email confirmation')
+                throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
+              alog('register → account created & session active')
               return
             }
 
             await sleep(1500)
             const { error: again } = await signUpOnce()
-            if (!again) return
+            if (!again) { alog('register → success (second attempt)'); return }
 
             const recheck = await trySignInCheck(email, password)
             if (recheck.created === true) {
               if (recheck.pendingEmailConfirm) {
-                throw Object.assign(new Error(
-                  'Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'
-                ), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
+                alog('register → created on retry, pending email confirmation')
+                throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
+              alog('register → created on retry, session active')
               return
             }
 
-            throw Object.assign(new Error(
-              'Le service d’inscription est temporairement indisponible (504). Réessayez plus tard.'
-            ), { code: 'SIGNUP_TEMPORARY_DOWN' })
+            alog('register → temporary down (504) after retry')
+            throw Object.assign(new Error('Le service d’inscription est temporairement indisponible (504). Réessayez plus tard.'), { code: 'SIGNUP_TEMPORARY_DOWN' })
           }
 
           // Erreur fonctionnelle (e‑mail déjà utilisé, mot de passe invalide, …)
           throw new Error(error?.message || 'Erreur lors de la création du compte')
         } catch (e: any) {
           get().handleAuthError(e, 'register')
+          alog('register → error', e?.message)
           toast.error(e?.message || 'Erreur lors de la création du compte', { icon: '⚠️' })
           throw e
         } finally {
@@ -231,13 +251,16 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         set({ isLoading: true })
+        alog('logout()')
         try {
           const { error } = await supabase.auth.signOut()
           if (error) throw error
           set({ user: null, isAuthenticated: false })
           try { localStorage.removeItem('intelia-chat-storage') } catch {}
+          alog('logout → success')
         } catch (e: any) {
           get().handleAuthError(e, 'logout')
+          alog('logout → error', e?.message)
           throw new Error(e?.message || 'Erreur lors de la déconnexion')
         } finally {
           set({ isLoading: false })
@@ -246,13 +269,16 @@ export const useAuthStore = create<AuthState>()(
 
       updateProfile: async (data: Partial<AppUser>) => {
         set({ isLoading: true })
+        alog('updateProfile()', Object.keys(data || {}))
         try {
           const { data: upd, error } = await supabase.auth.updateUser({ data })
           if (error) throw error
           const appUser = mapSessionToAppUser({ user: upd?.user })
           set({ user: appUser || get().user })
+          alog('updateProfile → success')
         } catch (e: any) {
           get().handleAuthError(e, 'updateProfile')
+          alog('updateProfile → error', e?.message)
           throw new Error(e?.message || 'Erreur de mise à jour du profil')
         } finally {
           set({ isLoading: false })
@@ -260,6 +286,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateConsent: async (consent: RGPDConsent) => {
+        alog('updateConsent()', consent)
         await get().updateProfile({ rgpd_consent: consent } as any)
       },
 
@@ -294,6 +321,7 @@ export const useAuthStore = create<AuthState>()(
       onRehydrateStorage: () => (state, error) => {
         if (error) console.error('❌ Persist rehydrate error', error)
         state?.setHasHydrated(true)
+        alog('rehydrated')
       },
     }
   )
@@ -305,16 +333,20 @@ export function attachAuthStateChangeListener() {
   if (authListenerAttached) return
   authListenerAttached = true
 
+  alog('attachAuthStateChangeListener()')
   supabase.auth.onAuthStateChange(async (event, session) => {
+    alog('onAuthStateChange →', event)
     if (event === 'SIGNED_IN' && session) {
       const appUser = mapSessionToAppUser(session)
       useAuthStore.setState({ user: appUser, isAuthenticated: true, isRecovering: false })
+      alog('state: SIGNED_IN', appUser?.email && maskEmail(appUser.email))
     } else if (event === 'SIGNED_OUT') {
       useAuthStore.setState({ user: null, isAuthenticated: false })
+      alog('state: SIGNED_OUT')
     } else if (event === 'TOKEN_REFRESHED') {
-      // no-op
+      alog('state: TOKEN_REFRESHED')
     } else if (event === 'INITIAL_SESSION') {
-      // handled by initializeSession
+      alog('state: INITIAL_SESSION')
     }
   })
 }
