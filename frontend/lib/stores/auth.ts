@@ -315,7 +315,7 @@ export const useAuthStore = create<AuthState>()(
               // Timeout de 10 secondes
               const timeoutId = setTimeout(() => {
                 reject(new Error('Timeout: La création du compte a pris trop de temps. Réessayez dans quelques minutes.'))
-              }, 10000)
+              }, 30000)
 
               // Appel Supabase
               supabase.auth.signUp({
