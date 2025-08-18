@@ -1,22 +1,21 @@
-// lib/supabase/client.ts - CLIENT SUPABASE SÉCURISÉ (ajout supabaseAuth + timeout 25s)
-
+// lib/supabase/client.ts — CLIENT SUPABASE SÉCURISÉ (timeout 25s pour l'auth)
 'use client'
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/supabase' // adaptez si besoin
+import type { Database } from '@/types/supabase' // Ajustez le chemin si besoin
 
 // Client Supabase pour composants React (inchangé)
 export const supabase = createClientComponentClient<Database>()
 
-// Configuration
+// Configuration env
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 if (!SUPABASE_URL) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL')
 if (!SUPABASE_ANON_KEY) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
-// ⏳ Fetch avec timeout (25s) pour éviter les faux timeouts sur /auth
+// ⏳ fetch avec timeout (par défaut 25s) — idéal pour signup/signin qui peuvent être lents
 export const fetchWithTimeout = (ms: number = 25000) => {
   return (input: RequestInfo | URL, init: RequestInit = {}) => {
     const controller = new AbortController()
@@ -26,31 +25,21 @@ export const fetchWithTimeout = (ms: number = 25000) => {
   }
 }
 
-// Client dédié aux opérations d’auth (signup/signin) avec timeout étendu
+// Client dédié aux opérations d’auth avec fetch temporisé (évite les faux timeouts 504)
 export const supabaseAuth = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: { fetch: fetchWithTimeout(25000) }
+  global: { fetch: fetchWithTimeout(25000) },
 })
 
-// Helpers de sécurité
+// —— Helpers d’auth (conservent l’API existante) ——
 export const auth = {
-  async isAuthenticated(): Promise<boolean> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      return !!session
-    } catch (error) {
-      console.error('❌ isAuthenticated error:', error)
-      return false
-    }
+  async getSession() {
+    const { data } = await supabase.auth.getSession()
+    return data?.session || null
   },
 
-  async getAccessToken(): Promise<string | null> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      return session?.access_token || null
-    } catch (error) {
-      console.error('❌ getAccessToken error:', error)
-      return null
-    }
+  async getAccessToken() {
+    const session = await this.getSession()
+    return session?.access_token || null
   },
 
   async logout() {
@@ -63,40 +52,30 @@ export const auth = {
       console.error('❌ Erreur déconnexion:', error)
       return { success: false, error }
     }
-  }
+  },
 }
 
-// Requêtes sécurisées
+// —— Requêtes sécurisées (compat) ——
 export const secureRequest = {
   async get(url: string, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
     if (!token) throw new Error('Non authentifié')
-
     return fetch(url, {
       ...options,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        ...(options.headers || {}),
-      },
-      method: 'GET'
+      headers: { 'Authorization': `Bearer ${token}`, ...(options.headers || {}) },
+      method: 'GET',
     })
   },
-
   async post(url: string, data: any, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
     if (!token) throw new Error('Non authentifié')
-
     return fetch(url, {
       ...options,
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
       body: JSON.stringify(data),
     })
-  }
+  },
 }
 
 // Export par défaut (compat)
