@@ -633,18 +633,18 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
           <h3 className="text-base font-medium text-gray-900">Export des Données</h3>
         </div>
         <div className="p-4">
-          {/* Grille de 4 cartes uniformes sur UNE ligne - Style Compass */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Grille de 4 cartes uniformes sur UNE ligne avec hauteurs égales - Style Compass */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
             
             {/* Carte 1: Conversations */}
-            <div className="bg-white border border-gray-200 p-4">
-              <div className="mb-3">
+            <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
+              <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Conversations</h4>
-                <p className="text-sm text-gray-600">Format ligne par conversation, compatible Excel</p>
-              </div>
-              <div className="mb-3 text-xs text-gray-500">
-                <p>• Choix automatique: Filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</p>
-                <p>• Colonnes: Q1, R1, Source1, Q2, R2, Source2...</p>
+                <p className="text-sm text-gray-600 mb-3">Format ligne par conversation, compatible Excel</p>
+                <div className="text-xs text-gray-500 mb-4">
+                  <p>• Choix automatique: Filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</p>
+                  <p>• Colonnes: Q1, R1, Source1, Q2, R2, Source2...</p>
+                </div>
               </div>
               <button
                 onClick={() => exportConversationsToCSV()}
@@ -656,14 +656,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             </div>
 
             {/* Carte 2: Commentaires */}
-            <div className="bg-white border border-gray-200 p-4">
-              <div className="mb-3">
+            <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
+              <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Commentaires</h4>
-                <p className="text-sm text-gray-600">Feedback et commentaires utilisateurs</p>
-              </div>
-              <div className="mb-3 text-xs text-gray-500">
-                <p>• Feedback positifs et négatifs</p>
-                <p>• Commentaires avec contexte question</p>
+                <p className="text-sm text-gray-600 mb-3">Feedback et commentaires utilisateurs</p>
+                <div className="text-xs text-gray-500 mb-4">
+                  <p>• Feedback positifs et négatifs</p>
+                  <p>• Commentaires avec contexte question</p>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -700,14 +700,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             </div>
 
             {/* Carte 3: Questions Filtrées */}
-            <div className="bg-white border border-gray-200 p-4">
-              <div className="mb-3">
+            <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
+              <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Questions Filtrées</h4>
-                <p className="text-sm text-gray-600">Questions actuellement affichées</p>
-              </div>
-              <div className="mb-3 text-xs text-gray-500">
-                <p>• {filteredQuestions.length} questions sélectionnées</p>
-                <p>• Données complètes avec réponses</p>
+                <p className="text-sm text-gray-600 mb-3">Questions actuellement affichées</p>
+                <div className="text-xs text-gray-500 mb-4">
+                  <p>• {filteredQuestions.length} questions sélectionnées</p>
+                  <p>• Données complètes avec réponses</p>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -743,14 +743,14 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             </div>
 
             {/* Carte 4: Statistiques */}
-            <div className="bg-white border border-gray-200 p-4">
-              <div className="mb-3">
+            <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
+              <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">Statistiques</h4>
-                <p className="text-sm text-gray-600">Données d'analyse et métriques</p>
-              </div>
-              <div className="mb-3 text-xs text-gray-500">
-                <p>• Métriques de satisfaction et performance</p>
-                <p>• Format JSON pour analyse avancée</p>
+                <p className="text-sm text-gray-600 mb-3">Données d'analyse et métriques</p>
+                <div className="text-xs text-gray-500 mb-4">
+                  <p>• Métriques de satisfaction et performance</p>
+                  <p>• Format JSON pour analyse avancée</p>
+                </div>
               </div>
               <button
                 onClick={() => {
