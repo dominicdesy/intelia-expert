@@ -1,4 +1,4 @@
-/* app/globals.css - VERSION FINALE SANS ERREURS */
+/* app/globals.css - VERSION FINALE AVEC CORRECTIONS HEADER */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -101,6 +101,30 @@
   .focus-visible {
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
   }
+  
+  .animate-slide-in-bottom {
+    animation: slideInBottom 0.3s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
+  }
+  
+  /* Force le carré pour les boutons utilisateur qui veulent être ronds */
+  .force-square {
+    border-radius: 8px !important;
+    border-radius: 0.5rem !important;
+  }
+  
+  /* Isolation pour les badges */
+  .badge-isolated {
+    isolation: isolate;
+    z-index: 20;
+  }
 }
 
 /* Components personnalisés - SÉPARÉS POUR ÉVITER LES ERREURS */
@@ -145,23 +169,66 @@
   .spinner {
     @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
   }
+  
+  /* === NOUVEAUX STYLES POUR LE HEADER === */
+  
+  /* Boutons header uniformes */
+  .header-button {
+    @apply w-10 h-10 flex items-center justify-center rounded-lg transition-colors;
+  }
+  
+  .header-button-default {
+    @apply header-button text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200;
+  }
+  
+  .header-button-primary {
+    @apply header-button bg-blue-600 text-white hover:bg-blue-700 text-sm;
+  }
+  
+  /* Style forcé pour HistoryMenu */
+  .history-menu-container > * {
+    width: 40px !important;
+    height: 40px !important;
+    border: 1px solid rgb(229 231 235) !important;
+    border-radius: 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
+  /* Style forcé pour UserMenuButton - Carré arrondi bleu */
+  .user-menu-container > * {
+    width: 40px !important;
+    height: 40px !important;
+    background-color: rgb(37 99 235) !important;
+    color: white !important;
+    border-radius: 0.5rem !important;
+    border-radius: 8px !important; /* Force explicite */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.875rem !important;
+    transition: background-color 0.2s !important;
+  }
+  
+  .user-menu-container > *:hover {
+    background-color: rgb(29 78 216) !important;
+  }
+  
+  /* Badge de notification */
+  .notification-badge {
+    @apply absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium;
+    z-index: 10;
+  }
+  
+  /* Container pour éviter les lignes parasites */
+  .header-icon-container {
+    @apply relative;
+    isolation: isolate;
+  }
 }
 
 /* Animations personnalisées */
-@layer utilities {
-  .animate-slide-in-bottom {
-    animation: slideInBottom 0.3s ease-out;
-  }
-  
-  .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out;
-  }
-  
-  .animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out;
-  }
-}
-
 @keyframes slideInBottom {
   from {
     transform: translateY(100%);
