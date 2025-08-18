@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useAuthStore } from '@/lib/stores/auth'
+// import { useAuthStore } from '@/lib/stores/auth'
+import useAuthStore from '@/lib/stores/auth'
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {

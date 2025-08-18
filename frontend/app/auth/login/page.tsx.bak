@@ -9,7 +9,8 @@ import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isLoading, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore() // Données d'état
+  const { login, isLoading } = useAuthStore() // Actions
   
   const [formData, setFormData] = useState({
     email: '',
