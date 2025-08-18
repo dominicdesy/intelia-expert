@@ -299,3 +299,26 @@
 }
 
 
+/* === Zoho SalesIQ — centrer l'icône dans le carré/badge === */
+#zsiqwidget .zsiq_floatmain,
+#zsiqwidget .zsiq_floatmain .zsiq_flt_rel {
+  display: flex !important;
+  align-items: center !important;   /* centrage vertical */
+  justify-content: center !important;/* centrage horizontal */
+  padding: 0 !important;
+}
+
+/* Assure un vrai carré (avec coins arrondis si voulu) */
+#zsiqwidget .zsiq_floatmain {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 12px !important;   /* garde un carré arrondi (optionnel) */
+}
+
+/* Supprime marges internes de l’icône si Zoho en injecte */
+#zsiqwidget .zsiq_floatmain [class*="siqico"] {
+  margin: 0 !important;
+  line-height: 1 !important;
+  transform: translate(0,0) !important;
+}
+
