@@ -206,11 +206,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔑 CONNEXION ORIGINALE (Supabase direct) - AMÉLIORÉE
+      // 🔐 CONNEXION ORIGINALE (Supabase direct) - AMÉLIORÉE
       login: async (email: string, password: string) => {
         try {
           set({ isLoading: true, authErrors: [] }) // Nettoyer les erreurs précédentes
-          console.log('🔑 Connexion pour:', email)
+          console.log('🔐 Connexion pour:', email)
 
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -286,7 +286,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 📝 INSCRIPTION - AMÉLIORÉE
+      // 📝 INSCRIPTION - AMÉLIORÉE AVEC TIMEOUT
       register: async (email: string, password: string, userData: Partial<User>) => {
         try {
           set({ isLoading: true, authErrors: [] })
@@ -309,17 +309,37 @@ export const useAuthStore = create<AuthState>()(
 
           console.log('✅ Validations passées, création compte...')
 
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                name: fullName,
-                user_type: userData.user_type || 'producer',
-                language: userData.language || 'fr'
-              }
-            }
-          })
+          // 🔍 AJOUT TIMEOUT : Créer une promesse avec timeout
+          const signUpWithTimeout = () => {
+            return new Promise((resolve, reject) => {
+              // Timeout de 10 secondes
+              const timeoutId = setTimeout(() => {
+                reject(new Error('Timeout: La création du compte a pris trop de temps. Réessayez dans quelques minutes.'))
+              }, 10000)
+
+              // Appel Supabase
+              supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                  data: {
+                    name: fullName,
+                    user_type: userData.user_type || 'producer',
+                    language: userData.language || 'fr'
+                  }
+                }
+              }).then((result) => {
+                clearTimeout(timeoutId)
+                resolve(result)
+              }).catch((error) => {
+                clearTimeout(timeoutId)
+                reject(error)
+              })
+            })
+          }
+
+          console.log('🔍 Appel Supabase avec timeout de 10s...')
+          const { data, error } = await signUpWithTimeout() as any
 
           if (error) {
             console.error('❌ Erreur création compte:', error)
@@ -332,7 +352,10 @@ export const useAuthStore = create<AuthState>()(
               'Password should be at least': 'Le mot de passe doit contenir au moins 8 caractères',
               'Invalid email': 'Format d\'email invalide',
               'Signup is disabled': 'Les inscriptions sont temporairement désactivées',
-              'Weak password': 'Mot de passe trop faible'
+              'Weak password': 'Mot de passe trop faible',
+              'email rate limit exceeded': 'Trop de tentatives d\'inscription. Attendez quelques minutes.',
+              'Gateway timeout': 'Serveur indisponible. Réessayez dans quelques minutes.',
+              'Timeout': 'Délai d\'attente dépassé. Réessayez plus tard.'
             }
             
             const userMessage = errorMessages[error.message] || error.message
@@ -746,7 +769,7 @@ if (typeof window !== 'undefined') {
       return
     }
 
-    console.log('🔔 [Auth] État changé:', event)
+    console.log('📢 [Auth] État changé:', event)
     
     // 🔥 VERROUILLER LE LISTENER
     isListenerActive = true
@@ -757,7 +780,7 @@ if (typeof window !== 'undefined') {
       console.log('🚪 [Auth] Événement SIGNED_OUT détecté')
       store.clearAuth()
     } else if (event === 'SIGNED_IN' && session) {
-      console.log('🔑 [Auth] Événement SIGNED_IN détecté')
+      console.log('🔐 [Auth] Événement SIGNED_IN détecté')
       
       // 🔥 CORRECTION: Seulement mettre à jour si pas déjà authentifié
       if (!store.isAuthenticated) {
