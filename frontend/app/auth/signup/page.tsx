@@ -199,6 +199,7 @@ export default function SignupPage() {
 
   // 🔍 DEBUG : Log au chargement de la page
   useEffect(() => {
+    console.log('🚨 FICHIER UTILISÉ: Page signup SIMPLE (pas de AuthStore)')
     console.log('=== DEBUG: Page Signup chargée ===')
     console.log('URL actuelle:', window.location.href)
     console.log('Variables d\'environnement:', {
@@ -226,6 +227,7 @@ export default function SignupPage() {
   }
 
   const handleSubmit = async () => {
+    console.log('🚨 DEBUG: handleSubmit SIMPLE appelé (PAS AuthStore)')
     console.log('=== DEBUG: handleSubmit appelé ===')
     console.log('Données du formulaire:', {
       email: formData.email,
@@ -272,7 +274,7 @@ export default function SignupPage() {
     setErrors([])
     
     try {
-      console.log('🔍 DÉBUT: Simulation création compte')
+      console.log('🔍 DÉBUT: Simulation création compte (AUCUN APPEL SUPABASE)')
       
       // 🔍 TEST: Vérifier si Supabase est réellement importé quelque part
       try {
@@ -337,17 +339,8 @@ export default function SignupPage() {
       validatePassword(formData.password).length === 0
     )
     
-    // Log périodique de la validité (seulement si changement)
-    const validityChanged = valid !== isFormValid.lastResult
-    if (validityChanged) {
-      console.log('🔍 Validité formulaire:', valid)
-      isFormValid.lastResult = valid
-    }
-    
     return valid
   }
-  // Stockage du dernier résultat pour éviter les logs répétitifs
-  isFormValid.lastResult = false
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
