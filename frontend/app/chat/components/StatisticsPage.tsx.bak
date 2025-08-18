@@ -280,17 +280,17 @@ export const StatisticsPage: React.FC = () => {
       const headers = await getAuthHeaders()
 
       // 🚀 CHARGER EN SÉQUENCE POUR ÉVITER RATE LIMITING
-      console.log('📄 Chargement performance...')
+      console.log('🔄 Chargement performance...')
       const performanceRes = await fetch('/api/v1/logging/analytics/performance?hours=24', { headers })
       
-      console.log('📄 Chargement billing (peut être lent)...')
+      console.log('🔄 Chargement billing (peut être lent)...')
       const billingRes = await fetch('/api/v1/logging/admin/stats', { headers })
       
-      console.log('📄 Chargement dashboard...')
+      console.log('🔄 Chargement dashboard...')
       const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
       
       // ⚡ COÛTS OPENAI OPTIMISÉS - Utiliser les nouveaux endpoints rapides
-      console.log('📄 Chargement coûts OpenAI (optimisé)...')
+      console.log('🔄 Chargement coûts OpenAI (optimisé)...')
       
       // 🚀 PRIORISER les endpoints rapides dans l'ordre
       const openaiEndpoints = [
@@ -316,7 +316,7 @@ export const StatisticsPage: React.FC = () => {
         }
       }
       
-      console.log('📄 Chargement health et métriques...')
+      console.log('🔄 Chargement health et métriques...')
       const systemHealthRes = await fetch('/api/v1/health/detailed', { headers })
       const billingPlansRes = await fetch('/api/v1/billing/plans', { headers })
       const systemMetricsRes = await fetch('/api/v1/system/metrics', { headers })
@@ -414,7 +414,7 @@ export const StatisticsPage: React.FC = () => {
       } else {
         console.log('❌ Endpoint performance non disponible, récupération via endpoint alternatif...')
         
-        // 📄 ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
+        // 🔄 ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
         try {
           const altResponse = await fetch('/api/v1/logging/analytics/health-check', { headers })
           if (altResponse.ok) {
@@ -868,10 +868,10 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // 🎉 PAGE PRINCIPALE - Style EXACT Compass SANS FLÈCHE
+  // 🎉 PAGE PRINCIPALE - Header sans info utilisateur
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header - Style EXACT Compass SANS flèche ni Statistics */}
+      {/* Header - Navigation et boutons seulement */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -899,9 +899,8 @@ export const StatisticsPage: React.FC = () => {
               </button>
             </div>
             
-            {/* Right side - User info + Actions */}
+            {/* Right side - Action buttons seulement */}
             <div className="flex items-center space-x-4">
-              {/* Action buttons seulement */}
               {activeTab === 'dashboard' && (
                 <button
                   onClick={loadAllStatistics}
@@ -927,15 +926,6 @@ export const StatisticsPage: React.FC = () => {
                   <span>{questionsLoading ? 'Loading...' : 'Refresh'}</span>
                 </button>
               )}
-              
-              {/* User Info - Style Compass */}
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="text-gray-600">Connecté en tant que</span>
-                <span className="font-medium text-gray-900">{user?.email}</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium">
-                  {user?.user_type}
-                </span>
-              </div>
             </div>
           </div>
         </div>
