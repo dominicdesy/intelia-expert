@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 // ==================== VALIDATION MOT DE PASSE ====================
@@ -197,6 +197,27 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
+  // 🔍 DEBUG : Log au chargement de la page
+  useEffect(() => {
+    console.log('=== DEBUG: Page Signup chargée ===')
+    console.log('URL actuelle:', window.location.href)
+    console.log('Variables d\'environnement:', {
+      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Configuré' : 'MANQUANT',
+      SUPABASE_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Configuré' : 'MANQUANT',
+      url_value: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      key_length: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length
+    })
+    console.log('Type de page: Page signup SIMPLE (sans AuthStore)')
+    
+    // Test si on a accès aux stores
+    try {
+      const hasAuthStore = typeof window !== 'undefined' && 'useAuthStore' in window
+      console.log('AuthStore disponible?', hasAuthStore)
+    } catch (e) {
+      console.log('Erreur test AuthStore:', e)
+    }
+  }, [])
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors.length > 0) {
@@ -205,6 +226,15 @@ export default function SignupPage() {
   }
 
   const handleSubmit = async () => {
+    console.log('=== DEBUG: handleSubmit appelé ===')
+    console.log('Données du formulaire:', {
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      passwordLength: formData.password.length,
+      acceptTerms: formData.acceptTerms
+    })
+
     const validationErrors: string[] = []
     
     // Validations
@@ -231,6 +261,8 @@ export default function SignupPage() {
     const passwordValidationErrors = validatePassword(formData.password)
     validationErrors.push(...passwordValidationErrors)
     
+    console.log('Erreurs de validation:', validationErrors)
+    
     if (validationErrors.length > 0) {
       setErrors(validationErrors)
       return
@@ -240,6 +272,18 @@ export default function SignupPage() {
     setErrors([])
     
     try {
+      console.log('🔍 DÉBUT: Simulation création compte')
+      
+      // 🔍 TEST: Vérifier si Supabase est réellement importé quelque part
+      try {
+        // @ts-ignore - Test de l'existence de Supabase
+        if (typeof window !== 'undefined' && window.supabase) {
+          console.log('⚠️ Supabase client détecté dans window')
+        }
+      } catch (e) {
+        console.log('Pas de Supabase global:', e)
+      }
+
       // TODO: Intégrer avec Supabase
       // const { data, error } = await supabase.auth.signUp({
       //   email: formData.email,
@@ -252,28 +296,36 @@ export default function SignupPage() {
       //   }
       // })
       
-      console.log('🔐 Création compte avec standards sécurisés:', {
+      console.log('🔍 Création compte avec standards sécurisés:', {
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         passwordStrength: 4 - validatePassword(formData.password).length
       })
       
+      console.log('🔍 Simulation en cours... (2 secondes)')
       await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      console.log('✅ Simulation terminée - Redirection vers verify-email')
       
       // Redirection vers la page de vérification email ou directement vers le chat
       window.location.href = '/auth/verify-email'
       
     } catch (error: any) {
       console.error('❌ Erreur lors de la création du compte:', error)
+      console.error('Type d\'erreur:', typeof error, error.constructor.name)
+      console.error('Message:', error.message)
+      console.error('Stack:', error.stack)
+      
       setErrors([error.message || 'Erreur lors de la création du compte'])
     } finally {
       setIsLoading(false)
+      console.log('🔍 handleSubmit terminé')
     }
   }
 
   const isFormValid = () => {
-    return (
+    const valid = (
       formData.firstName.trim() &&
       formData.lastName.trim() &&
       formData.email.trim() &&
@@ -284,7 +336,18 @@ export default function SignupPage() {
       formData.acceptTerms &&
       validatePassword(formData.password).length === 0
     )
+    
+    // Log périodique de la validité (seulement si changement)
+    const validityChanged = valid !== isFormValid.lastResult
+    if (validityChanged) {
+      console.log('🔍 Validité formulaire:', valid)
+      isFormValid.lastResult = valid
+    }
+    
+    return valid
   }
+  // Stockage du dernier résultat pour éviter les logs répétitifs
+  isFormValid.lastResult = false
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -304,6 +367,17 @@ export default function SignupPage() {
       {/* Formulaire */}
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+          
+          {/* 🔍 PANNEAU DE DEBUG */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+            <div className="font-bold text-blue-800 mb-1">🔍 DEBUG - Page Signup Simple</div>
+            <div className="text-blue-700">
+              • Page: {typeof window !== 'undefined' ? window.location.pathname : 'N/A'}<br/>
+              • Supabase: {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓' : '❌'}<br/>
+              • Type: Formulaire simple sans AuthStore<br/>
+              • Appel API: Commenté (ligne 206-215)
+            </div>
+          </div>
           
           {/* Affichage des erreurs */}
           {errors.length > 0 && (
