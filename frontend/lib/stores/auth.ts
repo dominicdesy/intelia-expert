@@ -1,13 +1,11 @@
-// lib/stores/auth.ts — Store d'authentification stable (compat + correctifs timeouts/504)
-// NOTE: Conserve l'API existante: useAuthStore (export nommé) + export default useAuthStore
-
+// lib/stores/auth.ts — Store d'auth robuste (timeouts/504 gérés) + exports nommés & défaut
 'use client'
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import toast from 'react-hot-toast'
 import { supabase, supabaseAuth } from '@/lib/supabase/client'
-import type { User as AppUser, RGPDConsent } from '@/types'
+import type { User as AppUser, RGPDConsent } from '@/types' // Ajustez si nécessaire
 
 // ---- Types d'état du store ----
 interface AuthState {
@@ -18,13 +16,13 @@ interface AuthState {
   hasHydrated: boolean
   lastAuthCheck: number
   authErrors: string[]
-  clearAuthErrors: () => void
   isRecovering: boolean
   sessionCheckCount: number
 
   // Actions
   setHasHydrated: (v: boolean) => void
   handleAuthError: (error: any, ctx?: string) => void
+  clearAuthErrors: () => void
   initializeSession: () => Promise<boolean>
   checkAuth: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
@@ -39,10 +37,14 @@ interface AuthState {
 // ---- Helpers ----
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 
+type SignInCheck =
+  | { created: true; pendingEmailConfirm: boolean }
+  | { created: false; pendingEmailConfirm: false }
+  | { created: null; pendingEmailConfirm: false; raw?: any }
+
 function mapSessionToAppUser(sess: any): AppUser | null {
   const u = sess?.user
   if (!u) return null
-  // On mape minimalement pour compat; adaptez si vos types sont différents
   const meta = u.user_metadata || {}
   const appUser: any = {
     id: u.id,
@@ -50,27 +52,25 @@ function mapSessionToAppUser(sess: any): AppUser | null {
     name: meta.name || meta.full_name || '',
     user_type: meta.user_type || 'producer',
     language: meta.language || 'fr',
-    // conservez d'autres champs si nécessaires...
     ...meta,
   }
   return appUser as AppUser
 }
 
-async function trySignInCheck(email: string, password: string) {
+async function trySignInCheck(email: string, password: string): Promise<SignInCheck> {
   const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password })
-
-  if (data?.session) return { created: true as const, pendingEmailConfirm: false }
+  if (data?.session) return { created: true, pendingEmailConfirm: false }
 
   const msg = (error?.message || '').toLowerCase()
   const code = (error as any)?.status || (error as any)?.code
 
   if (msg.includes('confirm') || msg.includes('not confirmed') || msg.includes('email not confirmed')) {
-    return { created: true as const, pendingEmailConfirm: true }
+    return { created: true, pendingEmailConfirm: true }
   }
   if (msg.includes('invalid') || msg.includes('invalid login credentials') || code === 400) {
-    return { created: false as const, pendingEmailConfirm: false }
+    return { created: false, pendingEmailConfirm: false }
   }
-  return { created: null as const, pendingEmailConfirm: false, raw: error }
+  return { created: null, pendingEmailConfirm: false, raw: error }
 }
 
 // ---- Store ----
@@ -83,7 +83,6 @@ export const useAuthStore = create<AuthState>()(
       hasHydrated: false,
       lastAuthCheck: 0,
       authErrors: [],
-	  clearAuthErrors: () => set({ authErrors: [] }),
       isRecovering: false,
       sessionCheckCount: 0,
 
@@ -94,6 +93,8 @@ export const useAuthStore = create<AuthState>()(
         console.error('⚠️ [Auth]', ctx || '', error)
         set((s) => ({ authErrors: [...s.authErrors, msg] }))
       },
+
+      clearAuthErrors: () => set({ authErrors: [] }),
 
       initializeSession: async () => {
         try {
@@ -116,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         try {
           const { data: { session } } = await supabase.auth.getSession()
-        const appUser = mapSessionToAppUser(session)
+          const appUser = mapSessionToAppUser(session)
           set({
             user: appUser,
             isAuthenticated: !!session,
@@ -146,7 +147,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
-        set({ isLoading: true })
+        set({ isLoading: true, authErrors: [] })
         try {
           const fullName = (userData?.name || '').toString().trim()
           if (!fullName || fullName.length < 2) {
@@ -173,7 +174,7 @@ export const useAuthStore = create<AuthState>()(
           // Essai #1
           const { error } = await signUpOnce()
           if (!error) {
-            toast.success('Compte créé. Vérifiez vos e-mails si une confirmation est requise.', { icon: '📧' })
+            toast.success('Compte créé. Vérifiez vos e‑mails si une confirmation est requise.', { icon: '📧' })
             return
           }
 
@@ -192,7 +193,7 @@ export const useAuthStore = create<AuthState>()(
             if (check.created === true) {
               if (check.pendingEmailConfirm) {
                 throw Object.assign(new Error(
-                  'Votre compte a été créé, mais vous devez confirmer votre adresse e-mail. Vérifiez votre boîte de réception.'
+                  'Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'
                 ), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
               return
@@ -206,7 +207,7 @@ export const useAuthStore = create<AuthState>()(
             if (recheck.created === true) {
               if (recheck.pendingEmailConfirm) {
                 throw Object.assign(new Error(
-                  'Votre compte a été créé, mais vous devez confirmer votre adresse e-mail. Vérifiez votre boîte de réception.'
+                  'Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'
                 ), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
               return
@@ -217,7 +218,7 @@ export const useAuthStore = create<AuthState>()(
             ), { code: 'SIGNUP_TEMPORARY_DOWN' })
           }
 
-          // Erreur fonctionnelle
+          // Erreur fonctionnelle (e‑mail déjà utilisé, mot de passe invalide, …)
           throw new Error(error?.message || 'Erreur lors de la création du compte')
         } catch (e: any) {
           get().handleAuthError(e, 'register')
@@ -259,17 +260,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateConsent: async (consent: RGPDConsent) => {
-        // Stocke le consentement dans le profil (métadonnées)
         await get().updateProfile({ rgpd_consent: consent } as any)
       },
 
       deleteUserData: async () => {
-        // Placeholder : implémentez votre effacement backend si nécessaire
         console.warn('deleteUserData: non implémenté côté client')
       },
 
       exportUserData: async () => {
-        // Placeholder : implémentez votre export backend si nécessaire
         console.warn('exportUserData: non implémenté côté client')
         return null
       },
@@ -278,7 +276,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-store',
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
-          // No-op storage for SSR safety
           const noop = {
             getItem: async (_key: string) => null,
             setItem: async (_key: string, _value: string) => {},
@@ -295,36 +292,32 @@ export const useAuthStore = create<AuthState>()(
         hasHydrated: state.hasHydrated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          console.error('❌ Persist rehydrate error', error)
-        }
+        if (error) console.error('❌ Persist rehydrate error', error)
         state?.setHasHydrated(true)
       },
     }
   )
 )
 
-// ---- Abonnement aux changements d’auth pour garder le store à jour ----
+// ---- Abonnement aux changements d’auth ----
 let authListenerAttached = false
 export function attachAuthStateChangeListener() {
   if (authListenerAttached) return
   authListenerAttached = true
 
   supabase.auth.onAuthStateChange(async (event, session) => {
-    const store = useAuthStore.getState()
-
     if (event === 'SIGNED_IN' && session) {
       const appUser = mapSessionToAppUser(session)
       useAuthStore.setState({ user: appUser, isAuthenticated: true, isRecovering: false })
     } else if (event === 'SIGNED_OUT') {
       useAuthStore.setState({ user: null, isAuthenticated: false })
     } else if (event === 'TOKEN_REFRESHED') {
-      // rien à faire; l'utilisateur reste connecté
+      // no-op
     } else if (event === 'INITIAL_SESSION') {
-      // Laisse initializeSession gérer
+      // handled by initializeSession
     }
   })
 }
 
-// Export par défaut pour compat
+// Export par défaut (compat imports par défaut)
 export default useAuthStore
