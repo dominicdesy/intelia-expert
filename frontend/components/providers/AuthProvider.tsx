@@ -78,6 +78,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     pathname === route || pathname.startsWith(route + '/')
   )
 
+  // 🔍 FONCTION DE DEBUG AJOUTÉE
+  const debugAuthCheck = () => {
+    console.log('=== DEBUG: AuthProvider checkAuth ===')
+    console.log('Supabase config:', {
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'OK' : 'MANQUANT',
+      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'OK' : 'MANQUANT',
+      url_value: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      key_length: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length
+    })
+    console.log('Contexte:', {
+      pathname,
+      isPublicPage,
+      isProtectedPage,
+      isAuthenticated,
+      isLoading,
+      hasHydrated,
+      isInGracePeriod
+    })
+  }
+
   // ✅ NOUVELLE FONCTION : Gestion intelligente de la redirection
   const handleAuthRedirect = (reason: string) => {
     console.log('🔄 [AuthProvider] Redirection vers login:', reason)
@@ -213,6 +233,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     console.log('🔍 [AuthProvider] Vérification auth pour page protégée:', pathname)
+    
+    // 🔍 APPEL DU DEBUG ICI
+    debugAuthCheck()
     
     // Marquer comme en cours de vérification
     authCheckLock.current = true
