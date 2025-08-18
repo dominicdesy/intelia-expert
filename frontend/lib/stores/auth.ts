@@ -96,6 +96,17 @@ async function trySignInCheck(email: string, password: string): Promise<SignInCh
   return { created: null, pendingEmailConfirm: false, raw: error }
 }
 
+async function maybeResendConfirmation(email: string) {
+  try {
+    alog('resend(signup) → attempting')
+    const { error } = await (supabaseAuth.auth as any).resend({ type: 'signup', email })
+    if (error) alog('resend(signup) → error', error.message || error)
+    else alog('resend(signup) → success (email re-sent)')
+  } catch (e: any) {
+    alog('resend(signup) → exception', e?.message)
+  }
+}
+
 // ---- Store ----
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -221,7 +232,8 @@ export const useAuthStore = create<AuthState>()(
             if (check.created === true) {
               if (check.pendingEmailConfirm) {
                 alog('register → account created, pending email confirmation')
-                throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
+              await maybeResendConfirmation(email)
+              throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
               alog('register → account created & session active')
               return
@@ -235,6 +247,7 @@ export const useAuthStore = create<AuthState>()(
             if (recheck.created === true) {
               if (recheck.pendingEmailConfirm) {
                 alog('register → created on retry, pending email confirmation')
+                await maybeResendConfirmation(email)
                 throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
               }
               alog('register → created on retry, session active')
