@@ -627,133 +627,158 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         </div>
       </div>
 
-      {/* 💾 Export Section - Style Compass */}
+      {/* 💾 Export Section - Style Compass avec cartes uniformes en ligne */}
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">Export des Données</h3>
         </div>
         <div className="p-4">
-          {/* Bouton principal CSV */}
-          <div className="mb-3">
-            <button
-              onClick={() => exportConversationsToCSV()}
-              disabled={questionLogs.length === 0}
-              className="bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Exporter Conversations (CSV Excel-like)
-            </button>
+          {/* Grille de 4 cartes uniformes sur UNE ligne - Style Compass */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 text-xs">
-              <p className="font-medium text-blue-800 mb-1">Export CSV avec choix de portée :</p>
-              <ul className="text-blue-700 space-y-1">
-                <li>• Choix automatique : Questions filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</li>
-                <li>• Format ligne par conversation : Q1, R1, Source1, Q2, R2, Source2...</li>
-                <li>• Compatible Excel : Encodage UTF-8 avec BOM</li>
-              </ul>
-              
-              <div className="mt-2 flex items-center space-x-3 text-xs">
-                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800">
-                  Filtrées: {filteredQuestions.length}
-                </span>
-                <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800">
-                  Total base: {totalQuestions}
-                </span>
+            {/* Carte 1: Conversations */}
+            <div className="bg-white border border-gray-200 p-4">
+              <div className="mb-3">
+                <h4 className="text-base font-medium text-gray-900 mb-1">Conversations</h4>
+                <p className="text-sm text-gray-600">Format ligne par conversation, compatible Excel</p>
               </div>
+              <div className="mb-3 text-xs text-gray-500">
+                <p>• Choix automatique: Filtrées ({filteredQuestions.length}) ou toutes ({totalQuestions})</p>
+                <p>• Colonnes: Q1, R1, Source1, Q2, R2, Source2...</p>
+              </div>
+              <button
+                onClick={() => exportConversationsToCSV()}
+                disabled={questionLogs.length === 0}
+                className="w-full bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Exporter CSV
+              </button>
             </div>
-          </div>
 
-          {/* Autres exports */}
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                const commentsData = questionLogs
-                  .filter(q => q.feedback_comment)
-                  .map(q => ({
+            {/* Carte 2: Commentaires */}
+            <div className="bg-white border border-gray-200 p-4">
+              <div className="mb-3">
+                <h4 className="text-base font-medium text-gray-900 mb-1">Commentaires</h4>
+                <p className="text-sm text-gray-600">Feedback et commentaires utilisateurs</p>
+              </div>
+              <div className="mb-3 text-xs text-gray-500">
+                <p>• Feedback positifs et négatifs</p>
+                <p>• Commentaires avec contexte question</p>
+              </div>
+              <button
+                onClick={() => {
+                  const commentsData = questionLogs
+                    .filter(q => q.feedback_comment)
+                    .map(q => ({
+                      date: new Date(q.timestamp).toLocaleDateString('fr-FR'),
+                      user: q.user_email,
+                      question: q.question.substring(0, 100) + '...',
+                      feedback: q.feedback === 1 ? 'Positif' : 'Négatif',
+                      comment: q.feedback_comment,
+                      source: getSourceLabel(q.response_source),
+                      confidence: (q.confidence_score * 100).toFixed(1) + '%'
+                    }))
+                  
+                  const csvContent = "data:text/csv;charset=utf-8," + 
+                    "Date,Utilisateur,Question,Feedback,Commentaire,Source,Confiance\n" +
+                    commentsData.map(row => 
+                      Object.values(row).map(field => `"${field}"`).join(',')
+                    ).join('\n')
+                  
+                  const encodedUri = encodeURI(csvContent)
+                  const link = document.createElement("a")
+                  link.setAttribute("href", encodedUri)
+                  link.setAttribute("download", `commentaires_feedback_${new Date().toISOString().split('T')[0]}.csv`)
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Exporter CSV
+              </button>
+            </div>
+
+            {/* Carte 3: Questions Filtrées */}
+            <div className="bg-white border border-gray-200 p-4">
+              <div className="mb-3">
+                <h4 className="text-base font-medium text-gray-900 mb-1">Questions Filtrées</h4>
+                <p className="text-sm text-gray-600">Questions actuellement affichées</p>
+              </div>
+              <div className="mb-3 text-xs text-gray-500">
+                <p>• {filteredQuestions.length} questions sélectionnées</p>
+                <p>• Données complètes avec réponses</p>
+              </div>
+              <button
+                onClick={() => {
+                  const questionsData = filteredQuestions.map(q => ({
                     date: new Date(q.timestamp).toLocaleDateString('fr-FR'),
                     user: q.user_email,
-                    question: q.question.substring(0, 100) + '...',
-                    feedback: q.feedback === 1 ? 'Positif' : 'Négatif',
-                    comment: q.feedback_comment,
+                    question: q.question,
+                    response: q.response.substring(0, 200) + '...',
                     source: getSourceLabel(q.response_source),
-                    confidence: (q.confidence_score * 100).toFixed(1) + '%'
+                    confidence: (q.confidence_score * 100).toFixed(1) + '%',
+                    response_time: q.response_time + 's',
+                    feedback: q.feedback === 1 ? 'Positif' : q.feedback === -1 ? 'Négatif' : 'Aucun'
                   }))
-                
-                const csvContent = "data:text/csv;charset=utf-8," + 
-                  "Date,Utilisateur,Question,Feedback,Commentaire,Source,Confiance\n" +
-                  commentsData.map(row => 
-                    Object.values(row).map(field => `"${field}"`).join(',')
-                  ).join('\n')
-                
-                const encodedUri = encodeURI(csvContent)
-                const link = document.createElement("a")
-                link.setAttribute("href", encodedUri)
-                link.setAttribute("download", `commentaires_feedback_${new Date().toISOString().split('T')[0]}.csv`)
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}
-              className="bg-green-600 text-white px-3 py-2 text-sm hover:bg-green-700 transition-colors"
-            >
-              Exporter Commentaires (CSV)
-            </button>
-            
-            <button
-              onClick={() => {
-                const questionsData = filteredQuestions.map(q => ({
-                  date: new Date(q.timestamp).toLocaleDateString('fr-FR'),
-                  user: q.user_email,
-                  question: q.question,
-                  response: q.response.substring(0, 200) + '...',
-                  source: getSourceLabel(q.response_source),
-                  confidence: (q.confidence_score * 100).toFixed(1) + '%',
-                  response_time: q.response_time + 's',
-                  feedback: q.feedback === 1 ? 'Positif' : q.feedback === -1 ? 'Négatif' : 'Aucun'
-                }))
-                
-                const csvContent = "data:text/csv;charset=utf-8," + 
-                  "Date,Utilisateur,Question,Réponse,Source,Confiance,Temps,Feedback\n" +
-                  questionsData.map(row => 
-                    Object.values(row).map(field => `"${field}"`).join(',')
-                  ).join('\n')
-                
-                const encodedUri = encodeURI(csvContent)
-                const link = document.createElement("a")
-                link.setAttribute("href", encodedUri)
-                link.setAttribute("download", `questions_export_${new Date().toISOString().split('T')[0]}.csv`)
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}
-              className="bg-blue-600 text-white px-3 py-2 text-sm hover:bg-blue-700 transition-colors"
-            >
-              Exporter Questions Filtrées (CSV)
-            </button>
+                  
+                  const csvContent = "data:text/csv;charset=utf-8," + 
+                    "Date,Utilisateur,Question,Réponse,Source,Confiance,Temps,Feedback\n" +
+                    questionsData.map(row => 
+                      Object.values(row).map(field => `"${field}"`).join(',')
+                    ).join('\n')
+                  
+                  const encodedUri = encodeURI(csvContent)
+                  const link = document.createElement("a")
+                  link.setAttribute("href", encodedUri)
+                  link.setAttribute("download", `questions_export_${new Date().toISOString().split('T')[0]}.csv`)
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Exporter CSV
+              </button>
+            </div>
 
-            <button
-              onClick={() => {
-                const statsData = {
-                  export_date: new Date().toISOString(),
-                  total_questions: totalQuestions,
-                  displayed_questions: questionLogs.length,
-                  filtered_questions: filteredQuestions.length,
-                  unique_users: uniqueUsers.length,
-                  feedback_stats: feedbackStats,
-                  source_distribution: sourceStats,
-                  filters_applied: questionFilters
-                }
-                
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(statsData, null, 2))
-                const link = document.createElement("a")
-                link.setAttribute("href", dataStr)
-                link.setAttribute("download", `stats_export_${new Date().toISOString().split('T')[0]}.json`)
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}
-              className="bg-purple-600 text-white px-3 py-2 text-sm hover:bg-purple-700 transition-colors"
-            >
-              Exporter Statistiques (JSON)
-            </button>
+            {/* Carte 4: Statistiques */}
+            <div className="bg-white border border-gray-200 p-4">
+              <div className="mb-3">
+                <h4 className="text-base font-medium text-gray-900 mb-1">Statistiques</h4>
+                <p className="text-sm text-gray-600">Données d'analyse et métriques</p>
+              </div>
+              <div className="mb-3 text-xs text-gray-500">
+                <p>• Métriques de satisfaction et performance</p>
+                <p>• Format JSON pour analyse avancée</p>
+              </div>
+              <button
+                onClick={() => {
+                  const statsData = {
+                    export_date: new Date().toISOString(),
+                    total_questions: totalQuestions,
+                    displayed_questions: questionLogs.length,
+                    filtered_questions: filteredQuestions.length,
+                    unique_users: uniqueUsers.length,
+                    feedback_stats: feedbackStats,
+                    source_distribution: sourceStats,
+                    filters_applied: questionFilters
+                  }
+                  
+                  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(statsData, null, 2))
+                  const link = document.createElement("a")
+                  link.setAttribute("href", dataStr)
+                  link.setAttribute("download", `stats_export_${new Date().toISOString().split('T')[0]}.json`)
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Exporter JSON
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
