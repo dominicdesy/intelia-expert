@@ -34,7 +34,7 @@ slog('✅ Loaded client.ts (supabase client ready)', { url: SUPABASE_URL })
 
 // ⏳ fetch avec timeout (par défaut 25s) — idéal pour signup/signin qui peuvent être lents
 let __fetchSeq = 0
-export const fetchWithTimeout = (ms: number = 25000) => {
+export const fetchWithTimeout = (ms: number = 45000) => {
   return async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const idNum = ++__fetchSeq
     const start = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
@@ -70,10 +70,11 @@ export const fetchWithTimeout = (ms: number = 25000) => {
 
 // Client dédié aux opérations d’auth avec fetch temporisé (évite les faux timeouts 504)
 export const supabaseAuth = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: { fetch: fetchWithTimeout(25000) },
+  global: { fetch: fetchWithTimeout(45000) },
+  auth: { persistSession: false, autoRefreshToken: false, storageKey: 'sb-auth-timeout' },
 })
 
-slog('🔐 supabaseAuth created with 25s timeout')
+slog('🔐 supabaseAuth created with 45s timeout')
 
 // —— Helpers d’auth (conservent l’API existante) ——
 export const auth = {
