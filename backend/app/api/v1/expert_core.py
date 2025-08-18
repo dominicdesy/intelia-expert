@@ -41,7 +41,7 @@ try:
     logger.info("✅ Agricultural domain validator imported successfully")
 except ImportError as e:
     AGRICULTURAL_VALIDATOR_AVAILABLE = False
-    logger.error(f"❌ Failed to import agricultural validator: {e}")
+    logger.error(f"⚠ Failed to import agricultural validator: {e}")
 
 # ===== Import Dialogue Manager =====
 try:
@@ -49,7 +49,7 @@ try:
     DIALOGUE_AVAILABLE = True
     logger.info("✅ DialogueManager handle function imported successfully")
 except Exception as e:
-    logger.error(f"❌ Failed to import dialogue_manager.handle: {e}")
+    logger.error(f"⚠ Failed to import dialogue_manager.handle: {e}")
     DIALOGUE_AVAILABLE = False
 
     # Fallback minimal, signature d'origine conservée
@@ -65,7 +65,7 @@ try:
     from app.api.v1.billing import check_quota_middleware, increment_quota_usage
     BILLING_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"⚠️ Billing system unavailable: {e}")
+    logger.warning(f"⚠ Billing system unavailable: {e}")
     BILLING_AVAILABLE = False
     
     def check_quota_middleware(email):
@@ -75,13 +75,13 @@ except ImportError as e:
 def validate_agricultural_question_safe(question: str, lang: str = "fr", user_id: str = "unknown", request_ip: str = "unknown") -> ValidationResult:
     """Valide qu'une question concerne le domaine agricole"""
     if not AGRICULTURAL_VALIDATOR_AVAILABLE:
-        logger.warning("⚠️ Agricultural validator not available, allowing all questions")
+        logger.warning("⚠ Agricultural validator not available, allowing all questions")
         return ValidationResult(is_valid=True, confidence=100.0, reason="Validator unavailable")
     
     try:
         return validate_agricultural_question(question, lang, user_id, request_ip)
     except Exception as e:
-        logger.error(f"❌ Error in agricultural validation: {e}")
+        logger.error(f"⚠ Error in agricultural validation: {e}")
         # En cas d'erreur, permettre la question avec un avertissement
         return ValidationResult(is_valid=True, confidence=50.0, reason=f"Validation error: {str(e)}")
 
@@ -144,7 +144,7 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
                 else:
                     logger.info(f"✅ Quota OK pour {user_email}: {quota_details.get('usage', 0)}/{quota_details.get('limit', 'unlimited')}")
             except Exception as e:
-                logger.error(f"❌ Erreur vérification quota pour {user_email}: {e}")
+                logger.error(f"⚠ Erreur vérification quota pour {user_email}: {e}")
                 # En cas d'erreur quota, on continue le traitement
                 pass
 
@@ -153,7 +153,7 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
             user_email_display = current_user.get('email', 'unknown')
             logger.info(f"🔒 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
-            logger.info(f"🌍 Question publique: {payload.question[:120]}")
+            logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
         # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
         validation_bypassed = False
@@ -177,7 +177,7 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
                         from .expert_utils import increment_quota_async
                         await increment_quota_async(user_email)
                     except Exception as e:
-                        logger.error(f"❌ Erreur incrémentation quota (validation failed): {e}")
+                        logger.error(f"⚠ Erreur incrémentation quota (validation failed): {e}")
                 
                 validation_rejected_response = {
                     "type": "validation_rejected",
@@ -211,14 +211,14 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
                     logger.info("📊 Validation échouée loggée dans analytics")
                     
                 except Exception as log_e:
-                    logger.error(f"❌ Erreur logging analytics (validation): {log_e}")
+                    logger.error(f"⚠ Erreur logging analytics (validation): {log_e}")
                 
                 return validation_rejected_response
             else:
                 logger.info(f"✅ Question validée (confiance: {validation_result.confidence:.1f}%)")
         else:
             validation_bypassed = True
-            logger.info("⚠️ Validation agricole bypassée par l'utilisateur")
+            logger.info("⚠ Validation agricole bypassée par l'utilisateur")
             # Validation result par défaut pour bypass
             validation_result_dict = {
                 "is_valid": True,
@@ -245,7 +245,7 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
                 validation_result=validation_result_dict
             )
         else:
-            logger.warning("⚠️ Dialogue manager not available, using fallback")
+            logger.warning("⚠ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
             
             # Ajouter confidence par défaut si dialogue manager indisponible
@@ -300,7 +300,7 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
                 await increment_quota_async(user_email)
                 logger.info(f"📊 Usage incrémenté pour {user_email} (erreur)")
             except Exception as quota_e:
-                logger.error(f"❌ Erreur incrémentation quota (error): {quota_e}")
+                logger.error(f"⚠ Erreur incrémentation quota (error): {quota_e}")
         
         # Logging des erreurs dans analytics
         error_result = {
@@ -326,9 +326,9 @@ async def ask_internal_async(payload, request: Request, current_user: Optional[D
             logger.info("📊 Erreur loggée dans analytics")
             
         except Exception as log_e:
-            logger.error(f"❌ Erreur logging analytics (error): {log_e}")
+            logger.error(f"⚠ Erreur logging analytics (error): {log_e}")
         
-        logger.exception("❌ Erreur dans le traitement de la question")
+        logger.exception("⚠ Erreur dans le traitement de la question")
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
 

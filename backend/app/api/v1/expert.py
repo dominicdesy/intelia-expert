@@ -13,8 +13,9 @@ from typing import Optional, Any, Dict, List
 import logging
 import time
 import asyncio
+import os
 
-# 🔒 Import authentification
+# 🔐 Import authentification
 from app.api.v1.auth import get_current_user
 
 # Import des modules refactorisés
@@ -31,8 +32,7 @@ from .expert_utils import (
     get_cached_store,
     normalize_entities_soft_local,
     extract_age_from_text,
-    clean_dict_for_json,
-    jsonable_encoder
+    clean_dict_for_json
 )
 
 from .expert_confidence import (
@@ -94,14 +94,30 @@ def confidence_status() -> Dict[str, Any]:
         dialogue_status = get_fallback_status()
         
         return {
-            "ok": True,
-            "root": str(root) if root is not None else None,
-            "species": species,
-            "tables_dir": tables_dir,
-            "lines": lines,
+            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
+            "unified_confidence_module": CONFIDENCE_SYSTEM_AVAILABLE,
+            "dialogue_manager_confidence_integration": dialogue_status.get("unified_confidence_system") == "integrated",
+            "components": {
+                "agricultural_validator": AGRICULTURAL_VALIDATOR_AVAILABLE,
+                "intent_confidence": dialogue_status.get("modules", {}).get("cot_fallback_processor", {}).get("openai_fallback_available", False),
+                "completeness_scoring": True,
+                "source_reliability": True
+            },
+            "confidence_levels": ["very_high", "high", "medium", "low", "very_low"],
+            "score_range": {"min": 0.0, "max": 100.0},
+            "features": {
+                "adaptive_weighting": True,
+                "contextual_adjustments": True,
+                "debug_mode_available": True,
+                "explanation_generation": True
+            }
         }
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {
+            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
+            "error": f"Could not get detailed status: {str(e)}",
+            "basic_status": "partial" if CONFIDENCE_SYSTEM_AVAILABLE else "unavailable"
+        }
 
 @router.get("/test-basic")
 def test_basic():
@@ -315,30 +331,7 @@ def perf_probe(payload: AskPayload):
             "entities": (payload.entities or {}) if payload else {},
             "debug": {"step": "unknown", "error_type": type(e).__name__},
             "confidence": get_perfstore_confidence(False)
-                    "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
-            "unified_confidence_module": CONFIDENCE_SYSTEM_AVAILABLE,
-            "dialogue_manager_confidence_integration": dialogue_status.get("unified_confidence_system") == "integrated",
-            "components": {
-                "agricultural_validator": AGRICULTURAL_VALIDATOR_AVAILABLE,
-                "intent_confidence": dialogue_status.get("modules", {}).get("cot_fallback_processor", {}).get("openai_fallback_available", False),
-                "completeness_scoring": True,
-                "source_reliability": True
-            },
-            "confidence_levels": ["very_high", "high", "medium", "low", "very_low"],
-            "score_range": {"min": 0.0, "max": 100.0},
-            "features": {
-                "adaptive_weighting": True,
-                "contextual_adjustments": True,
-                "debug_mode_available": True,
-                "explanation_generation": True
-            }
-        }
-    except Exception as e:
-        return {
-            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
-            "error": f"Could not get detailed status: {str(e)}",
-            "basic_status": "partial" if CONFIDENCE_SYSTEM_AVAILABLE else "unavailable"
-        }
+        })
 
 @router.post("/test-confidence-system")
 async def test_confidence_system(
@@ -616,7 +609,7 @@ async def quota_status(
             "timestamp": time.time()
         }
     except Exception as e:
-        logger.error(f"❌ Erreur récupération quota pour {user_email}: {e}")
+        logger.error(f"⚠ Erreur récupération quota pour {user_email}: {e}")
         return {
             "error": f"Failed to get quota status: {str(e)}",
             "user_email": user_email
@@ -702,7 +695,7 @@ def debug_imports() -> Dict[str, Any]:
             __import__(import_path)
             debug_info["imports_tested"].append({"path": import_path, "status": "✅ OK"})
         except Exception as e:
-            debug_info["imports_tested"].append({"path": import_path, "status": f"❌ Error: {e}"})
+            debug_info["imports_tested"].append({"path": import_path, "status": f"⚠ Error: {e}"})
     
     return debug_info
 
@@ -730,7 +723,7 @@ async def force_import_test():
         }
     except Exception as e:
         return {
-            "status": "❌ FAILED",
+            "status": "⚠ FAILED",
             "error": str(e),
             "traceback": traceback.format_exc(),
             "import_successful": False,
@@ -757,4 +750,11 @@ def perfstore_status():
                 lines.append({"line": ln, "error": str(e)})
 
         return {
-            "
+            "ok": True,
+            "root": str(root) if root is not None else None,
+            "species": species,
+            "tables_dir": tables_dir,
+            "lines": lines,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
