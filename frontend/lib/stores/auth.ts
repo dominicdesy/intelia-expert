@@ -18,6 +18,7 @@ interface AuthState {
   hasHydrated: boolean
   lastAuthCheck: number
   authErrors: string[]
+  clearAuthErrors: () => void
   isRecovering: boolean
   sessionCheckCount: number
 
@@ -82,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
       hasHydrated: false,
       lastAuthCheck: 0,
       authErrors: [],
+	  clearAuthErrors: () => set({ authErrors: [] }),
       isRecovering: false,
       sessionCheckCount: 0,
 
