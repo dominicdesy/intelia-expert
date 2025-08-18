@@ -1,28 +1,31 @@
-// lib/stores/auth.ts — Store d'auth robuste (timeouts/504 gérés) + DEBUG + exports nommés & défaut
+// lib/stores/auth.ts — Store d'auth BACKEND API (robuste + timeout gérés)
 'use client'
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import toast from 'react-hot-toast'
-import { supabase, supabaseAuth } from '@/lib/supabase/client'
-import type { User as AppUser, RGPDConsent } from '@/types' // Ajustez si nécessaire
+import type { User as AppUser, RGPDConsent } from '@/types'
 
 // ---- DEBUG ----
 const AUTH_DEBUG = (
   (typeof window !== 'undefined' && (
     localStorage.getItem('AUTH_DEBUG') === '1' ||
-    localStorage.getItem('SUPABASE_DEBUG') === '1'
+    localStorage.getItem('BACKEND_DEBUG') === '1'
   )) || process.env.NEXT_PUBLIC_AUTH_DEBUG === '1'
 )
 const alog = (...args: any[]) => {
   if (AUTH_DEBUG) {
-    if (typeof window !== 'undefined') console.debug('[AuthStore]', ...args)
-    else console.debug('[AuthStore/SSR]', ...args)
+    if (typeof window !== 'undefined') console.debug('[BackendAuthStore]', ...args)
+    else console.debug('[BackendAuthStore/SSR]', ...args)
   }
 }
 const maskEmail = (e: string) => e?.replace(/(^.).*(@.*$)/, '$1***$2')
 
-alog('✅ Loaded from /lib/stores/auth.ts')
+alog('✅ Loaded Backend Auth Store from /lib/stores/auth.ts')
+
+// ---- Configuration API ----
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+const API_TIMEOUT = 30000 // 30 secondes (plus court que Supabase direct)
 
 // ---- Types d'état du store ----
 interface AuthState {
@@ -51,59 +54,56 @@ interface AuthState {
   exportUserData: () => Promise<any>
 }
 
-// ---- Helpers ----
+// ---- Helpers API ----
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 
-type SignInCheck =
-  | { created: true; pendingEmailConfirm: boolean }
-  | { created: false; pendingEmailConfirm: false }
-  | { created: null; pendingEmailConfirm: false; raw?: any }
-
-function mapSessionToAppUser(sess: any): AppUser | null {
-  const u = sess?.user
-  if (!u) return null
-  const meta = u.user_metadata || {}
-  const appUser: any = {
-    id: u.id,
-    email: u.email,
-    name: meta.name || meta.full_name || '',
-    user_type: meta.user_type || 'producer',
-    language: meta.language || 'fr',
-    ...meta,
-  }
-  return appUser as AppUser
-}
-
-async function trySignInCheck(email: string, password: string): Promise<SignInCheck> {
-  alog('trySignInCheck()', maskEmail(email))
-  const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password })
-  if (data?.session) {
-    alog('trySignInCheck → session present')
-    return { created: true, pendingEmailConfirm: false }
-  }
-
-  const msg = (error?.message || '').toLowerCase()
-  const code = (error as any)?.status || (error as any)?.code
-  alog('trySignInCheck → no session', { code, msg })
-
-  if (msg.includes('confirm') || msg.includes('not confirmed') || msg.includes('email not confirmed')) {
-    alog('trySignInCheck → created but pending email confirmation')
-    return { created: true, pendingEmailConfirm: true }
-  }
-  if (msg.includes('invalid') || msg.includes('invalid login credentials') || code === 400) {
-    return { created: false, pendingEmailConfirm: false }
-  }
-  return { created: null, pendingEmailConfirm: false, raw: error }
-}
-
-async function maybeResendConfirmation(email: string) {
+// Fetch avec timeout pour appels backend
+async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const url = `${API_BASE_URL}${endpoint}`
+  alog('🌐 API Call:', url)
+  
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+  
   try {
-    alog('resend(signup) → attempting')
-    const { error } = await (supabaseAuth.auth as any).resend({ type: 'signup', email })
-    if (error) alog('resend(signup) → error', error.message || error)
-    else alog('resend(signup) → success (email re-sent)')
-  } catch (e: any) {
-    alog('resend(signup) → exception', e?.message)
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+    
+    clearTimeout(timeoutId)
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Erreur réseau' }))
+      throw new Error(errorData.message || `Erreur ${response.status}`)
+    }
+    
+    return await response.json()
+    
+  } catch (error: any) {
+    clearTimeout(timeoutId)
+    
+    if (error.name === 'AbortError') {
+      throw new Error('La requête a pris trop de temps. Vérifiez votre connexion.')
+    }
+    
+    throw error
+  }
+}
+
+// Fonction pour obtenir le token depuis localStorage/session
+function getStoredToken(): string | null {
+  try {
+    // Vérifier dans localStorage, sessionStorage, ou cookie
+    return localStorage.getItem('auth_token') || 
+           sessionStorage.getItem('auth_token') ||
+           null
+  } catch {
+    return null
   }
 }
 
@@ -124,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
 
       handleAuthError: (error: any, ctx?: string) => {
         const msg = (error?.message || 'Authentication error').toString()
-        console.error('⚠️ [Auth]', ctx || '', error)
+        console.error('⚠️ [BackendAuth]', ctx || '', error)
         set((s) => ({ authErrors: [...s.authErrors, msg] }))
       },
 
@@ -132,13 +132,41 @@ export const useAuthStore = create<AuthState>()(
 
       initializeSession: async () => {
         try {
-          const { data: { session } } = await supabase.auth.getSession()
-          const appUser = mapSessionToAppUser(session)
-          set({ user: appUser, isAuthenticated: !!session, lastAuthCheck: Date.now(), isRecovering: false })
-          alog('initializeSession →', { isAuth: !!session, email: appUser?.email && maskEmail(appUser.email) })
-          return !!session
+          alog('🔄 initializeSession via backend')
+          
+          const token = getStoredToken()
+          if (!token) {
+            alog('❌ No stored token found')
+            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            return false
+          }
+
+          // Vérifier le token avec le backend
+          const userData = await apiCall('/api/auth/verify', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          const appUser = userData.user
+          set({ 
+            user: appUser, 
+            isAuthenticated: !!appUser, 
+            lastAuthCheck: Date.now(), 
+            isRecovering: false 
+          })
+          
+          alog('✅ initializeSession success', appUser?.email && maskEmail(appUser.email))
+          return !!appUser
+          
         } catch (e) {
           get().handleAuthError(e, 'initializeSession')
+          // Token invalide, nettoyer
+          try { 
+            localStorage.removeItem('auth_token')
+            sessionStorage.removeItem('auth_token')
+          } catch {}
           set({ isAuthenticated: false, user: null })
           return false
         }
@@ -146,16 +174,27 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         try {
-          const { data: { session } } = await supabase.auth.getSession()
-          const appUser = mapSessionToAppUser(session)
+          const token = getStoredToken()
+          if (!token) {
+            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            return
+          }
+
+          const userData = await apiCall('/api/auth/verify', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+
           set({
-            user: appUser,
-            isAuthenticated: !!session,
+            user: userData.user,
+            isAuthenticated: !!userData.user,
             lastAuthCheck: Date.now(),
             sessionCheckCount: get().sessionCheckCount + 1,
             isRecovering: false,
           })
-          alog('checkAuth →', { isAuth: !!session, checks: get().sessionCheckCount })
+          
+          alog('✅ checkAuth success', { checks: get().sessionCheckCount })
+          
         } catch (e) {
           get().handleAuthError(e, 'checkAuth')
           set({ isAuthenticated: false, user: null })
@@ -164,16 +203,30 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         set({ isLoading: true })
-        alog('login()', maskEmail(email))
+        alog('🔄 login via backend', maskEmail(email))
+        
         try {
-          const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password })
-          if (error) throw error
-          const appUser = mapSessionToAppUser(data?.session)
-          set({ user: appUser, isAuthenticated: !!data?.session })
-          alog('login → success', appUser?.email && maskEmail(appUser.email))
+          const result = await apiCall('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+          })
+
+          // Stocker le token
+          if (result.token) {
+            localStorage.setItem('auth_token', result.token)
+          }
+
+          set({ 
+            user: result.user, 
+            isAuthenticated: !!result.user,
+            isLoading: false 
+          })
+          
+          alog('✅ login success', result.user?.email && maskEmail(result.user.email))
+          
         } catch (e: any) {
           get().handleAuthError(e, 'login')
-          alog('login → error', e?.message)
+          alog('❌ login error', e?.message)
           throw new Error(e?.message || 'Erreur de connexion')
         } finally {
           set({ isLoading: false })
@@ -182,89 +235,61 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
         set({ isLoading: true, authErrors: [] })
-        alog('register()', maskEmail(email))
+        alog('🔄 register via backend', maskEmail(email))
+        
         try {
           const fullName = (userData?.name || '').toString().trim()
           if (!fullName || fullName.length < 2) {
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          const signUpOnce = async () => {
-            alog('signUpOnce → calling supabaseAuth.auth.signUp')
-            return await supabaseAuth.auth.signUp({
-              email,
+          // 🚀 APPEL BACKEND (robuste)
+          const result = await apiCall('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: email.trim(),
               password,
-              options: {
-                data: {
-                  name: fullName,
-                  user_type: (userData as any)?.user_type || 'producer',
-                  language: (userData as any)?.language || 'fr',
-                },
-                emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
-              },
+              userData: {
+                name: fullName,
+                user_type: userData.user_type || 'producer',
+                language: userData.language || 'fr',
+                ...userData
+              }
             })
+          })
+
+          // Stocker le token si fourni
+          if (result.token) {
+            localStorage.setItem('auth_token', result.token)
           }
 
-          // Essai #1
-          const { error } = await signUpOnce()
-          if (!error) {
-            alog('register → success (first attempt)')
-            toast.success('Compte créé. Vérifiez vos e‑mails si une confirmation est requise.', { icon: '📧' })
-            return
-          }
+          set({ 
+            user: result.user, 
+            isAuthenticated: !!result.user,
+            isLoading: false 
+          })
 
-          // 504/timeout/réseau ?
-          const status: any = (error as any)?.status || 0
-          const msg = (error?.message || '').toLowerCase()
-          const name = (error as any)?.name || ''
-          const causeMsg = String((error as any)?.cause?.message || (error as any)?.cause || '').toLowerCase()
-          const maybeTimeout =
-            status === 504 ||
-            name === 'AbortError' ||
-            msg.includes('timeout') || causeMsg.includes('timeout') ||
-            msg.includes('aborted') || msg.includes('abort') ||
-            msg.includes('gateway') || msg.includes('network') ||
-            msg.includes('fetch failed')
-          alog('register → first error', { status, msg, maybeTimeout })
-
-          if (maybeTimeout) {
-            const check = await trySignInCheck(email, password)
-            if (check.created === true) {
-              if (check.pendingEmailConfirm) {
-                alog('register → account created, pending email confirmation')
-              await maybeResendConfirmation(email)
-              throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
-              }
-              alog('register → account created & session active')
-              return
-            }
-
-            await sleep(1500)
-            const { error: again } = await signUpOnce()
-            if (!again) { alog('register → success (second attempt)'); return }
-
-            const recheck = await trySignInCheck(email, password)
-            if (recheck.created === true) {
-              if (recheck.pendingEmailConfirm) {
-                alog('register → created on retry, pending email confirmation')
-                await maybeResendConfirmation(email)
-                throw Object.assign(new Error('Votre compte a été créé, mais vous devez confirmer votre adresse e‑mail. Vérifiez votre boîte de réception.'), { code: 'SIGNUP_CREATED_NEEDS_CONFIRM' })
-              }
-              alog('register → created on retry, session active')
-              return
-            }
-
-            alog('register → temporary down (504) after retry')
-            throw Object.assign(new Error('Le service d’inscription est temporairement indisponible (504). Réessayez plus tard.'), { code: 'SIGNUP_TEMPORARY_DOWN' })
-          }
-
-          // Erreur fonctionnelle (e‑mail déjà utilisé, mot de passe invalide, …)
-          throw new Error(error?.message || 'Erreur lors de la création du compte')
+          alog('✅ register success via backend')
+          toast.success('Compte créé avec succès ! Vérifiez vos emails si nécessaire.', { icon: '🎉' })
+          
         } catch (e: any) {
           get().handleAuthError(e, 'register')
-          alog('register → error', e?.message)
-          toast.error(e?.message || 'Erreur lors de la création du compte', { icon: '⚠️' })
-          throw e
+          alog('❌ register error', e?.message)
+          
+          // Messages d'erreur plus clairs
+          let userMessage = e?.message || 'Erreur lors de la création du compte'
+          
+          if (userMessage.includes('already exists') || userMessage.includes('déjà utilisé')) {
+            userMessage = 'Cette adresse email est déjà utilisée.'
+          } else if (userMessage.includes('weak') || userMessage.includes('password')) {
+            userMessage = 'Le mot de passe ne respecte pas les critères de sécurité.'
+          } else if (userMessage.includes('timeout') || userMessage.includes('temps')) {
+            userMessage = 'Le service met du temps à répondre. Réessayez dans quelques instants.'
+          }
+          
+          toast.error(userMessage, { icon: '⚠️' })
+          throw new Error(userMessage)
+          
         } finally {
           set({ isLoading: false })
         }
@@ -272,16 +297,36 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         set({ isLoading: true })
-        alog('logout()')
+        alog('🔄 logout via backend')
+        
         try {
-          const { error } = await supabase.auth.signOut()
-          if (error) throw error
+          const token = getStoredToken()
+          
+          // Appeler le backend pour logout (optionnel)
+          if (token) {
+            try {
+              await apiCall('/api/auth/logout', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+              })
+            } catch {
+              // Ignorer les erreurs de logout backend
+            }
+          }
+
+          // Nettoyer côté client
+          try {
+            localStorage.removeItem('auth_token')
+            sessionStorage.removeItem('auth_token')
+            localStorage.removeItem('intelia-chat-storage')
+          } catch {}
+
           set({ user: null, isAuthenticated: false })
-          try { localStorage.removeItem('intelia-chat-storage') } catch {}
-          alog('logout → success')
+          alog('✅ logout success')
+          
         } catch (e: any) {
           get().handleAuthError(e, 'logout')
-          alog('logout → error', e?.message)
+          alog('❌ logout error', e?.message)
           throw new Error(e?.message || 'Erreur lors de la déconnexion')
         } finally {
           set({ isLoading: false })
@@ -290,16 +335,24 @@ export const useAuthStore = create<AuthState>()(
 
       updateProfile: async (data: Partial<AppUser>) => {
         set({ isLoading: true })
-        alog('updateProfile()', Object.keys(data || {}))
+        alog('🔄 updateProfile via backend', Object.keys(data || {}))
+        
         try {
-          const { data: upd, error } = await supabase.auth.updateUser({ data })
-          if (error) throw error
-          const appUser = mapSessionToAppUser({ user: upd?.user })
-          set({ user: appUser || get().user })
-          alog('updateProfile → success')
+          const token = getStoredToken()
+          if (!token) throw new Error('Non authentifié')
+
+          const result = await apiCall('/api/auth/update-profile', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+          })
+
+          set({ user: result.user || get().user })
+          alog('✅ updateProfile success')
+          
         } catch (e: any) {
           get().handleAuthError(e, 'updateProfile')
-          alog('updateProfile → error', e?.message)
+          alog('❌ updateProfile error', e?.message)
           throw new Error(e?.message || 'Erreur de mise à jour du profil')
         } finally {
           set({ isLoading: false })
@@ -307,21 +360,35 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateConsent: async (consent: RGPDConsent) => {
-        alog('updateConsent()', consent)
+        alog('🔄 updateConsent via backend', consent)
         await get().updateProfile({ rgpd_consent: consent } as any)
       },
 
       deleteUserData: async () => {
-        console.warn('deleteUserData: non implémenté côté client')
+        const token = getStoredToken()
+        if (!token) throw new Error('Non authentifié')
+
+        await apiCall('/api/auth/delete-user', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        
+        // Nettoyer après suppression
+        get().logout()
       },
 
       exportUserData: async () => {
-        console.warn('exportUserData: non implémenté côté client')
-        return null
+        const token = getStoredToken()
+        if (!token) throw new Error('Non authentifié')
+
+        return await apiCall('/api/auth/export-user', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       },
     }),
     {
-      name: 'auth-store',
+      name: 'backend-auth-store',
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
           const noop = {
@@ -340,37 +407,13 @@ export const useAuthStore = create<AuthState>()(
         hasHydrated: state.hasHydrated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) console.error('❌ Persist rehydrate error', error)
+        if (error) console.error('❌ Backend auth rehydrate error', error)
         state?.setHasHydrated(true)
-        alog('rehydrated')
+        alog('✅ Backend auth rehydrated')
       },
     }
   )
 )
 
-// ---- Abonnement aux changements d’auth ----
-let authListenerAttached = false
-export function attachAuthStateChangeListener() {
-  if (authListenerAttached) return
-  authListenerAttached = true
-
-  alog('attachAuthStateChangeListener()')
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    alog('onAuthStateChange →', event)
-    if (event === 'SIGNED_IN' && session) {
-      const appUser = mapSessionToAppUser(session)
-      useAuthStore.setState({ user: appUser, isAuthenticated: true, isRecovering: false })
-      alog('state: SIGNED_IN', appUser?.email && maskEmail(appUser.email))
-    } else if (event === 'SIGNED_OUT') {
-      useAuthStore.setState({ user: null, isAuthenticated: false })
-      alog('state: SIGNED_OUT')
-    } else if (event === 'TOKEN_REFRESHED') {
-      alog('state: TOKEN_REFRESHED')
-    } else if (event === 'INITIAL_SESSION') {
-      alog('state: INITIAL_SESSION')
-    }
-  })
-}
-
-// Export par défaut (compat imports par défaut)
+// Export par défaut (compat)
 export default useAuthStore

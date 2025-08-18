@@ -296,3 +296,295 @@ async def debug_jwt_config():
             ] if value
         ]
     }
+    
+    
+    
+# 🆕 AJOUTS À app/api/v1/auth.py
+# Ajoutez ces endpoints à la fin de votre fichier auth.py existant
+
+# Nouveaux modèles Pydantic
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    userData: Optional[Dict[str, Any]] = {}
+
+class RegisterResponse(BaseModel):
+    user: Dict[str, Any]
+    token: Optional[str] = None
+    message: str
+
+class VerifyRequest(BaseModel):
+    pass  # Le token est dans l'Authorization header
+
+class VerifyResponse(BaseModel):
+    user: Dict[str, Any]
+    valid: bool = True
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    user_type: Optional[str] = None
+    language: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
+
+# 🆕 ENDPOINT REGISTER
+@router.post("/register", response_model=RegisterResponse)
+async def register(request: RegisterRequest):
+    """
+    Créer un nouveau compte utilisateur via Supabase
+    """
+    if not SUPABASE_AVAILABLE:
+        logger.error("Supabase client not available for registration")
+        raise HTTPException(status_code=500, detail="Registration service unavailable")
+
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("Supabase configuration missing")
+        raise HTTPException(status_code=500, detail="Registration service misconfigured")
+
+    supabase: Client = create_client(supabase_url, supabase_key)
+    
+    try:
+        logger.info(f"🔄 Attempting registration for: {request.email}")
+        
+        # Données utilisateur à inclure
+        user_metadata = {
+            "name": request.userData.get("name", ""),
+            "user_type": request.userData.get("user_type", "producer"),
+            "language": request.userData.get("language", "fr"),
+        }
+        
+        # Créer le compte via Supabase
+        result = supabase.auth.sign_up({
+            "email": request.email,
+            "password": request.password,
+            "options": {
+                "data": user_metadata
+            }
+        })
+        
+        if result.user is None:
+            logger.error(f"❌ Registration failed - no user returned for {request.email}")
+            raise HTTPException(status_code=400, detail="Registration failed")
+        
+        # Construire la réponse utilisateur
+        user_data = {
+            "id": result.user.id,
+            "email": result.user.email,
+            "name": user_metadata.get("name", ""),
+            "user_type": user_metadata.get("user_type", "producer"),
+            "language": user_metadata.get("language", "fr"),
+            "email_confirmed": result.user.email_confirmed_at is not None,
+            "created_at": result.user.created_at
+        }
+        
+        # Générer un token JWT pour l'authentification immédiate (optionnel)
+        token = None
+        if result.session and result.session.access_token:
+            # Utiliser le token Supabase directement
+            token = result.session.access_token
+        elif result.user.id:
+            # Ou créer notre propre token JWT
+            expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            token = create_access_token(
+                {"user_id": result.user.id, "email": request.email}, 
+                expires
+            )
+        
+        logger.info(f"✅ Registration successful for: {request.email}")
+        
+        return {
+            "user": user_data,
+            "token": token,
+            "message": "Compte créé avec succès. Vérifiez vos emails si une confirmation est requise."
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Registration error for {request.email}: {str(e)}")
+        
+        # Gestion des erreurs spécifiques Supabase
+        error_msg = str(e).lower()
+        if "already registered" in error_msg or "already exists" in error_msg:
+            raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée.")
+        elif "weak password" in error_msg or "password" in error_msg:
+            raise HTTPException(status_code=400, detail="Le mot de passe ne respecte pas les critères de sécurité.")
+        elif "rate limit" in error_msg or "too many" in error_msg:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans quelques minutes.")
+        else:
+            raise HTTPException(status_code=500, detail="Erreur lors de la création du compte. Réessayez plus tard.")
+
+# 🆕 ENDPOINT VERIFY
+@router.post("/verify", response_model=VerifyResponse)
+async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Vérifier la validité d'un token JWT
+    """
+    try:
+        # Si get_current_user réussit, le token est valide
+        user_data = {
+            "id": current_user.get("user_id"),
+            "email": current_user.get("email"),
+            "user_type": current_user.get("user_type", "user"),
+            "full_name": current_user.get("full_name"),
+            "is_admin": current_user.get("is_admin", False),
+            "preferences": current_user.get("preferences", {}),
+        }
+        
+        return {
+            "user": user_data,
+            "valid": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Token verification error: {e}")
+        raise HTTPException(status_code=401, detail="Token verification failed")
+
+# 🆕 ENDPOINT LOGOUT
+@router.post("/logout")
+async def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Déconnexion utilisateur
+    """
+    try:
+        user_email = current_user.get("email")
+        logger.info(f"🔄 Logout requested for: {user_email}")
+        
+        # Avec JWT, le logout côté serveur est optionnel
+        # Le token sera invalidé côté client
+        
+        # Optionnel : invalider le token côté Supabase
+        try:
+            if SUPABASE_AVAILABLE:
+                supabase_url = os.getenv("SUPABASE_URL")
+                supabase_key = os.getenv("SUPABASE_ANON_KEY")
+                supabase: Client = create_client(supabase_url, supabase_key)
+                supabase.auth.sign_out()
+        except Exception as e:
+            logger.warning(f"Supabase logout warning: {e}")
+            # Ne pas faire échouer le logout pour ça
+        
+        logger.info(f"✅ Logout successful for: {user_email}")
+        
+        return {
+            "success": True,
+            "message": "Déconnexion réussie"
+        }
+        
+    except Exception as e:
+        logger.error(f"Logout error: {e}")
+        # Même en cas d'erreur, on confirme le logout côté client
+        return {
+            "success": True,
+            "message": "Déconnexion effectuée"
+        }
+
+# 🆕 ENDPOINT UPDATE PROFILE
+@router.put("/update-profile")
+async def update_profile(
+    request: UpdateProfileRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Mettre à jour le profil utilisateur
+    """
+    try:
+        user_id = current_user.get("user_id")
+        user_email = current_user.get("email")
+        
+        logger.info(f"🔄 Profile update requested for: {user_email}")
+        
+        if not SUPABASE_AVAILABLE:
+            logger.error("Supabase not available for profile update")
+            raise HTTPException(status_code=500, detail="Profile update service unavailable")
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        # Préparer les données à mettre à jour
+        update_data = {}
+        if request.name is not None:
+            update_data["name"] = request.name
+        if request.user_type is not None:
+            update_data["user_type"] = request.user_type
+        if request.language is not None:
+            update_data["language"] = request.language
+        if request.preferences is not None:
+            update_data["preferences"] = request.preferences
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+        
+        # Mettre à jour dans Supabase Auth metadata
+        result = supabase.auth.update_user({
+            "data": update_data
+        })
+        
+        if result.user is None:
+            raise HTTPException(status_code=500, detail="Échec de la mise à jour")
+        
+        # Construire la réponse
+        updated_user = {
+            "id": result.user.id,
+            "email": result.user.email,
+            **update_data,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"✅ Profile updated for: {user_email}")
+        
+        return {
+            "user": updated_user,
+            "message": "Profil mis à jour avec succès"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Profile update error for {current_user.get('email')}: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour du profil")
+
+# 🆕 ENDPOINT EXPORT USER DATA (RGPD)
+@router.get("/export-user")
+async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Exporter toutes les données utilisateur (conformité RGPD)
+    """
+    try:
+        user_id = current_user.get("user_id")
+        user_email = current_user.get("email")
+        
+        logger.info(f"🔄 Data export requested for: {user_email}")
+        
+        # Collecter toutes les données utilisateur
+        export_data = {
+            "user_profile": {
+                "user_id": user_id,
+                "email": user_email,
+                "user_type": current_user.get("user_type"),
+                "full_name": current_user.get("full_name"),
+                "preferences": current_user.get("preferences", {}),
+                "created_at": current_user.get("created_at"),
+            },
+            "export_metadata": {
+                "exported_at": datetime.utcnow().isoformat(),
+                "export_version": "1.0",
+                "data_types": ["profile", "preferences"]
+            }
+        }
+        
+        # TODO: Ajouter d'autres données si nécessaire
+        # - Conversations
+        # - Historique des requêtes
+        # - Logs d'activité
+        
+        logger.info(f"✅ Data export completed for: {user_email}")
+        
+        return export_data
+        
+    except Exception as e:
+        logger.error(f"Data export error for {current_user.get('email')}: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de l'export des données")

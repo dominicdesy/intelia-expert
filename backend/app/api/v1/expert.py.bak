@@ -55,26 +55,6 @@ except Exception as e:
             "session_id": session_id,
         }
 
-# 🎯 NOUVEAU: Import système de confidence unifié
-try:
-    from .pipeline.unified_confidence import (
-        calculate_unified_confidence,
-        get_confidence_summary,
-        get_detailed_confidence,
-        test_unified_confidence,
-        UNIFIED_CONFIDENCE_AVAILABLE
-    )
-    CONFIDENCE_SYSTEM_AVAILABLE = True
-    logger.info("🎯 Système de confidence unifié importé avec succès")
-except ImportError as e:
-    CONFIDENCE_SYSTEM_AVAILABLE = False
-    logger.warning(f"⚠️ Système de confidence unifié indisponible: {e}")
-    
-    # Fallback pour éviter les erreurs
-    def test_unified_confidence():
-        return {"status": "unavailable", "reason": "Module not imported"}
-    UNIFIED_CONFIDENCE_AVAILABLE = False
-
 # ===== Import numpy sécurisé =====
 try:
     import numpy as np
@@ -190,20 +170,6 @@ def _extract_user_id_for_persistence(current_user: Optional[Dict[str, Any]] = No
     
     return "authenticated_unknown"
 
-# 🎯 NOUVELLE FONCTION: Préparation validation result pour confidence
-def _prepare_validation_result_for_confidence(validation_result: ValidationResult) -> Dict[str, Any]:
-    """
-    Convertit ValidationResult en format compatible avec unified_confidence
-    """
-    return {
-        "is_valid": validation_result.is_valid,
-        "confidence": validation_result.confidence,
-        "reason": validation_result.reason,
-        "suggested_topics": getattr(validation_result, 'suggested_topics', []),
-        "detected_keywords": getattr(validation_result, 'detected_keywords', []),
-        "rejected_keywords": getattr(validation_result, 'rejected_keywords', [])
-    }
-
 # 🚀 NOUVELLES FONCTIONS ASYNC POUR OPTIMISATION PERFORMANCE
 async def _increment_quota_async(user_email: str) -> bool:
     """Version async pour l'incrémentation du quota"""
@@ -239,10 +205,6 @@ async def _log_analytics_async(
         else:
             response_text = str(result.get("message", ""))
         
-        # 🎯 NOUVEAU: Inclure le score de confidence dans les analytics
-        confidence_score = result.get("confidence", {}).get("score")
-        confidence_level = result.get("confidence", {}).get("level")
-        
         # Pour l'instant, wrapper la fonction sync en thread
         # TODO: Remplacer par vrai async quand logging.py sera optimisé
         await asyncio.to_thread(
@@ -251,12 +213,9 @@ async def _log_analytics_async(
             payload=payload,
             result=result,
             response_text=response_text[:500],  # Limiter la taille pour analytics
-            processing_time_ms=processing_time,
-            # 🎯 NOUVEAU: Paramètres de confidence pour analytics
-            confidence_score=confidence_score,
-            confidence_level=confidence_level
+            processing_time_ms=processing_time
         )
-        logger.info("📊 Question loggée dans analytics avec confidence")
+        logger.info("📊 Question loggée dans analytics")
         return True
         
     except Exception as e:
@@ -373,24 +332,19 @@ class AskPayload(BaseModel):
     bypass_validation: Optional[bool] = False  # 🌾 NOUVEAU: pour bypass administrateur
     model_config = {"extra": "allow"}
 
-# ===== Fonction interne partagée avec validation ET quota ET persistance ET CONFIDENCE =====
+# ===== Fonction interne partagée avec validation ET quota ET persistance =====
 async def _ask_internal_async(payload: AskPayload, request: Request, current_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    🚀 VERSION ASYNC OPTIMISÉE + CONFIDENCE UNIFIÉ - Logique interne pour traiter les questions
+    🚀 VERSION ASYNC OPTIMISÉE - Logique interne pour traiter les questions
     
     OPTIMISATIONS:
     - Parallélisation des opérations DB finales
     - Gain estimé: 1-1.5 secondes par requête
     
-    NOUVEAU:
-    - Intégration automatique du confidence score unifié
-    - Transmission du validation_result au dialogue_manager
-    
     CONSERVE: Toute la logique métier originale
     """
     user_email = None
     start_time = time.time()  # 📊 NOUVEAU: Mesure du temps de traitement
-    validation_result_dict = None  # 🎯 NOUVEAU: Pour le confidence unifié
     
     try:
         # Extraction des infos utilisateur pour la validation
@@ -412,115 +366,7 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                     logger.warning(f"🚫 Quota dépassé pour {user_email}: {quota_details.get('message', 'Quota exceeded')}")
                     return {
                         "type": "quota_exceeded",
-                        "message": f"Line not specified. Available: {', '.join(available)}"
-                },
-            })
-
-        # [STEP 7] Chargement DataFrame
-        try:
-            df = store._load_df(norm["line"])
-        except Exception as e:
-            return jsonable_encoder({
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "load_df_failed",
-                    "message": str(e),
-                    "line": norm.get("line"),
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                },
-            })
-
-        if df is None:
-            return jsonable_encoder({
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "rec": None,
-                "debug": {
-                    "error": "table_missing",
-                    "line": norm.get("line"),
-                    "available_lines": available,
-                    "tables_dir": str(getattr(store, "dir_tables", "")),
-                    "message": f"No data table found for line {norm.get('line')}"
-                },
-            })
-
-        # [STEP 8] Récupération des données avec nettoyage JSON
-        try:
-            rec = store.get(
-                line=norm["line"],
-                sex=norm["sex"],
-                unit=norm["unit"],
-                age_days=int(norm.get("age_days") or 21),
-            )
-            
-            # Nettoyage JSON des valeurs
-            rec_clean = clean_dict_for_json(rec) if rec else None
-            
-        except Exception as e:
-            return jsonable_encoder({
-                "error": "store_get_failed",
-                "message": str(e),
-                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-                "norm": norm,
-                "debug": {
-                    "rows": int(len(df)),
-                    "columns": [str(c) for c in df.columns],
-                    "available_lines": available,
-                }
-            })
-
-        # [SUCCESS] Résultat final avec message informatif + 🎯 CONFIDENCE
-        success_message = "Performance data found"
-        confidence_score = 95.0  # 🎯 NOUVEAU: Haute confiance pour données exactes
-        confidence_level = "very_high"
-        
-        if not rec_clean:
-            line_name = norm.get("line", "unknown")
-            sex_name = norm.get("sex", "unknown") 
-            age_val = norm.get("age_days", "unknown")
-            success_message = f"No data found for {line_name}, {sex_name}, {age_val} days. Try: male/female/as_hatched, ages 1-49"
-            confidence_score = 90.0  # 🎯 NOUVEAU: Toujours haute confiance (réponse système claire)
-            confidence_level = "high"
-
-        result = {
-            "success": bool(rec_clean),
-            "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
-            "norm": norm,
-            "rec": rec_clean,
-            "debug": {
-                "rows": int(len(df)),
-                "columns": [str(c) for c in df.columns],
-                "available_lines": available,
-                "tables_dir": str(getattr(store, "dir_tables", "")),
-            },
-            "message": success_message,
-            # 🎯 NOUVEAU: Confidence pour perf-probe
-            "confidence": {
-                "score": confidence_score,
-                "level": confidence_level,
-                "explanation": "Données PerfStore directes - très fiable" if rec_clean else "Paramètres manquants clarifiés"
-            }
-        }
-        
-        return jsonable_encoder(result)
-
-    except Exception as e:
-        # Catch-all final avec informations de debug + 🎯 CONFIDENCE
-        return jsonable_encoder({
-            "error": "internal_error",
-            "message": str(e),
-            "entities": (payload.entities or {}) if payload else {},
-            "debug": {"step": "unknown", "has_numpy": HAS_NUMPY},
-            # 🎯 NOUVEAU: Confidence pour erreurs
-            "confidence": {
-                "score": 10.0,
-                "level": "very_low",
-                "explanation": f"Erreur interne PerfStore: {type(e).__name__}"
-            }
-        }) quota_details.get("message", "Quota mensuel dépassé"),
+                        "message": quota_details.get("message", "Quota mensuel dépassé"),
                         "quota_details": quota_details,
                         "upgrade_suggestions": [
                             {"plan": "basic", "price": "29.99€", "quota": "1000 questions"},
@@ -530,12 +376,6 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                         "user": {
                             "email": user_email,
                             "user_id": current_user.get('user_id')
-                        },
-                        # 🎯 NOUVEAU: Confidence même pour quota exceeded
-                        "confidence": {
-                            "score": 100.0,
-                            "level": "very_high",
-                            "explanation": "Quota dépassé - information système fiable"
                         }
                     }
                 else:
@@ -550,7 +390,7 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
             user_email_display = current_user.get('email', 'unknown')
             logger.info(f"🔒 Question authentifiée de {user_email_display}: {payload.question[:120]}")
         else:
-            logger.info(f"🌍 Question publique: {payload.question[:120]}")
+            logger.info(f"🌐 Question publique: {payload.question[:120]}")
 
         # 🌾 VALIDATION AGRICOLE (sauf si bypass autorisé)
         validation_bypassed = False
@@ -562,9 +402,6 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                 request_ip=request_ip
             )
             
-            # 🎯 NOUVEAU: Préparer validation_result pour confidence unifié
-            validation_result_dict = _prepare_validation_result_for_confidence(validation_result)
-            
             if not validation_result.is_valid:
                 logger.warning(f"🚫 Question rejetée par validation agricole: {validation_result.reason}")
                 # ❌ INCRÉMENT USAGE MÊME POUR VALIDATION ÉCHOUÉE
@@ -575,7 +412,19 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                         logger.error(f"❌ Erreur incrémentation quota (validation failed): {e}")
                 
                 # 📊 NOUVEAU: LOGGING VALIDATION ÉCHOUÉE
-                validation_rejected_response = {
+                try:
+                    await _log_analytics_async(  # 🚀 ASYNC
+                        current_user=current_user,
+                        payload=payload,
+                        result={"type": "validation_rejected"},
+                        start_time=start_time
+                    )
+                    logger.info("📊 Validation échouée loggée dans analytics")
+                    
+                except Exception as log_e:
+                    logger.error(f"❌ Erreur logging analytics (validation): {log_e}")
+                
+                return {
                     "type": "validation_rejected",
                     "message": validation_result.reason,
                     "session_id": payload.session_id or "default",
@@ -589,39 +438,13 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                     "user": {
                         "email": current_user.get('email') if current_user else None,
                         "user_id": current_user.get('user_id') if current_user else None
-                    } if current_user else None,
-                    # 🎯 NOUVEAU: Confidence pour validation échouée
-                    "confidence": {
-                        "score": validation_result.confidence,
-                        "level": "medium" if validation_result.confidence > 70 else "low",
-                        "explanation": f"Question hors domaine agricole (confiance validation: {validation_result.confidence}%)"
-                    }
+                    } if current_user else None
                 }
-                
-                try:
-                    await _log_analytics_async(  # 🚀 ASYNC
-                        current_user=current_user,
-                        payload=payload,
-                        result=validation_rejected_response,
-                        start_time=start_time
-                    )
-                    logger.info("📊 Validation échouée loggée dans analytics")
-                    
-                except Exception as log_e:
-                    logger.error(f"❌ Erreur logging analytics (validation): {log_e}")
-                
-                return validation_rejected_response
             else:
                 logger.info(f"✅ Question validée (confiance: {validation_result.confidence:.1f}%)")
         else:
             validation_bypassed = True
             logger.info("⚠️ Validation agricole bypassée par l'utilisateur")
-            # 🎯 NOUVEAU: Validation result par défaut pour bypass
-            validation_result_dict = {
-                "is_valid": True,
-                "confidence": 100.0,
-                "reason": "Validation bypassée par utilisateur"
-            }
 
         # Traitement normal de la question
         fp_qs = request.query_params.get("force_perfstore")
@@ -629,7 +452,6 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
 
         if DIALOGUE_AVAILABLE:
             # 💾 NOUVEAU: Passer user_id au dialogue manager pour persistance
-            # 🎯 NOUVEAU: Passer validation_result pour confidence unifié
             result = handle(
                 session_id=payload.session_id or "default",
                 question=payload.question,
@@ -638,20 +460,11 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                 force_perfstore=force_perf,
                 intent_hint=(payload.intent_hint or None),
                 entities=(payload.entities or {}),
-                user_id=persistence_user_id,  # NOUVEAU: Paramètre pour persistance
-                validation_result=validation_result_dict  # 🎯 NOUVEAU: Pour confidence unifié
+                user_id=persistence_user_id  # NOUVEAU: Paramètre pour persistance
             )
         else:
             logger.warning("⚠️ Dialogue manager not available, using fallback")
             result = handle(payload.session_id or "default", payload.question, payload.lang or "fr")
-            
-            # 🎯 NOUVEAU: Ajouter confidence par défaut si dialogue manager indisponible
-            if "confidence" not in result:
-                result["confidence"] = {
-                    "score": 30.0,
-                    "level": "low", 
-                    "explanation": "Service de dialogue temporairement indisponible"
-                }
 
         # 🚀 OPTIMISATION PERFORMANCE: Tâches de fond en parallèle
         # AVANT: 3 opérations séquentielles = 1.2s
@@ -684,15 +497,8 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
             "user_id_for_persistence": persistence_user_id,
             "is_authenticated": bool(current_user)
         }
-        
-        # 🎯 NOUVEAU: Métadonnées de confidence unifié
-        result["confidence_metadata"] = {
-            "unified_confidence_enabled": CONFIDENCE_SYSTEM_AVAILABLE,
-            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
-            "validation_confidence_included": bool(validation_result_dict)
-        }
 
-        logger.info(f"✅ Réponse générée: type={result.get('type')}, confidence={result.get('confidence', {}).get('score', 'N/A')}%")
+        logger.info(f"✅ Réponse générée: type={result.get('type')}")
         return result
         
     except Exception as e:
@@ -705,22 +511,16 @@ async def _ask_internal_async(payload: AskPayload, request: Request, current_use
                 logger.error(f"❌ Erreur incrémentation quota (error): {quota_e}")
         
         # 📊 NOUVEAU: LOGGING DES ERREURS DANS ANALYTICS
-        error_result = {
-            "type": "system_error",
-            "error": {
-                "type": type(e).__name__,
-                "message": str(e),
-                "category": "system_error"
-            },
-            # 🎯 NOUVEAU: Confidence pour erreurs système
-            "confidence": {
-                "score": 5.0,
-                "level": "very_low",
-                "explanation": f"Erreur système: {type(e).__name__}"
-            }
-        }
-        
         try:
+            error_result = {
+                "type": "system_error",
+                "error": {
+                    "type": type(e).__name__,
+                    "message": str(e),
+                    "category": "system_error"
+                }
+            }
+            
             await _log_analytics_async(  # 🚀 ASYNC
                 current_user=current_user,
                 payload=payload,
@@ -752,29 +552,24 @@ async def ask(  # 🚀 ASYNC
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
     """
-    🚀 ENDPOINT OPTIMISÉ + CONFIDENCE UNIFIÉ - Poser des questions avec validation agricole, quota, persistance et confidence score.
+    🚀 ENDPOINT OPTIMISÉ - Poser des questions avec validation agricole, quota et persistance.
     
     OPTIMISATIONS:
     - Opérations DB parallélisées
     - Gain estimé: 1-1.5 secondes par requête
-    
-    NOUVEAU:
-    - Score de confidence unifié dans chaque réponse
-    - Niveau de confiance explicite (very_high/high/medium/low/very_low)
-    - Explication humaine de la fiabilité
     """
     return await _ask_internal_async(payload, request, current_user)
 
 @router.post("/ask-public")
 async def ask_public(payload: AskPayload, request: Request) -> Dict[str, Any]:  # 🚀 ASYNC
     """
-    🚀 ENDPOINT PUBLIC OPTIMISÉ + CONFIDENCE UNIFIÉ - Pas d'authentification requise
+    🚀 ENDPOINT PUBLIC OPTIMISÉ - Pas d'authentification requise
     """
     return await _ask_internal_async(payload, request, None)
 
 @router.get("/system-status")
 def system_status() -> Dict[str, Any]:
-    """État synthétique du service avec info persistance et confidence."""
+    """État synthétique du service avec info persistance."""
     # Vérifier la disponibilité de la persistance
     persistence_available = False
     try:
@@ -792,203 +587,15 @@ def system_status() -> Dict[str, Any]:
         "analytics_system_available": True,  # 📊 NOUVEAU
         "conversation_persistence_available": persistence_available,  # 💾 NOUVEAU
         "performance_optimizations_enabled": True,  # 🚀 NOUVEAU
-        "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,  # 🎯 NOUVEAU
-        "unified_confidence_enabled": CONFIDENCE_SYSTEM_AVAILABLE,  # 🎯 NOUVEAU
         "service": "expert_api",
     }
 
-# ===== 🎯 NOUVEAUX ENDPOINTS: Confidence System =====
-
-@router.get("/confidence-status")
-def confidence_status() -> Dict[str, Any]:
-    """
-    Status détaillé du système de confidence unifié.
-    """
-    try:
-        from .pipeline.dialogue_manager import get_fallback_status
-        dialogue_status = get_fallback_status()
-        
-        return {
-            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
-            "unified_confidence_module": UNIFIED_CONFIDENCE_AVAILABLE if CONFIDENCE_SYSTEM_AVAILABLE else False,
-            "dialogue_manager_confidence_integration": dialogue_status.get("unified_confidence_system") == "integrated",
-            "components": {
-                "agricultural_validator": AGRICULTURAL_VALIDATOR_AVAILABLE,
-                "intent_confidence": dialogue_status.get("modules", {}).get("cot_fallback_processor", {}).get("openai_fallback_available", False),
-                "completeness_scoring": True,  # Toujours disponible via clarification_manager
-                "source_reliability": True   # Calculé automatiquement
-            },
-            "confidence_levels": ["very_high", "high", "medium", "low", "very_low"],
-            "score_range": {"min": 0.0, "max": 100.0},
-            "features": {
-                "adaptive_weighting": True,
-                "contextual_adjustments": True,
-                "debug_mode_available": True,
-                "explanation_generation": True
-            }
-        }
-    except Exception as e:
-        return {
-            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,
-            "error": f"Could not get detailed status: {str(e)}",
-            "basic_status": "partial" if CONFIDENCE_SYSTEM_AVAILABLE else "unavailable"
-        }
-
-@router.post("/test-confidence-system")
-async def test_confidence_system(  # 🚀 ASYNC
-    current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
-) -> Dict[str, Any]:
-    """
-    Teste le système de confidence unifié avec différents scénarios.
-    """
-    if not CONFIDENCE_SYSTEM_AVAILABLE:
-        return {
-            "error": "Confidence system not available",
-            "status": "unavailable"
-        }
-    
-    try:
-        # Test du module unified_confidence directement
-        confidence_test = await asyncio.to_thread(test_unified_confidence)
-        
-        # Test d'intégration via dialogue_manager
-        try:
-            from .pipeline.dialogue_manager import test_confidence_integration
-            integration_test = await asyncio.to_thread(test_confidence_integration)
-        except ImportError:
-            integration_test = {"status": "unavailable", "reason": "dialogue_manager not available"}
-        
-        # Test via endpoint réel
-        test_payload = AskPayload(
-            session_id="test_confidence",
-            question="Quel est le poids cible pour un Ross 308 mâle de 35 jours ?",
-            lang="fr",
-            entities={"species": "broiler", "line": "ross308", "sex": "male", "age_days": 35}
-        )
-        
-        # Simulation d'une request basique
-        class MockRequest:
-            def __init__(self):
-                self.query_params = {}
-                self.client = type('obj', (object,), {'host': 'localhost'})
-                self.headers = {}
-        
-        mock_request = MockRequest()
-        
-        # Test endpoint complet
-        try:
-            endpoint_result = await _ask_internal_async(test_payload, mock_request, current_user)
-            endpoint_confidence = endpoint_result.get("confidence", {})
-            
-            endpoint_test = {
-                "status": "success",
-                "confidence_included": "confidence" in endpoint_result,
-                "confidence_score": endpoint_confidence.get("score"),
-                "confidence_level": endpoint_confidence.get("level"),
-                "confidence_explanation": endpoint_confidence.get("explanation"),
-                "response_type": endpoint_result.get("type"),
-                "route_taken": endpoint_result.get("route_taken")
-            }
-        except Exception as e:
-            endpoint_test = {
-                "status": "error",
-                "error": str(e)
-            }
-        
-        return {
-            "status": "completed",
-            "confidence_system_available": True,
-            "tests": {
-                "unified_confidence_module": confidence_test,
-                "dialogue_manager_integration": integration_test,
-                "full_endpoint_integration": endpoint_test
-            },
-            "tester": current_user.get('email', 'unknown'),
-            "timestamp": time.time()
-        }
-        
-    except Exception as e:
-        return {
-            "error": f"Confidence system test failed: {str(e)}",
-            "status": "error",
-            "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE
-        }
-
-@router.get("/confidence-examples")
-def confidence_examples() -> Dict[str, Any]:
-    """
-    Exemples de scores de confidence selon différents scénarios.
-    """
-    return {
-        "confidence_levels": {
-            "very_high": {
-                "score_range": "90-100%",
-                "description": "Réponse très fiable avec données précises et contexte complet",
-                "examples": [
-                    "Lookup exact dans table de performance avec lignée, sexe et âge précis",
-                    "Calcul mathématique avec paramètres complets",
-                    "Réponse basée sur données techniques officielles"
-                ]
-            },
-            "high": {
-                "score_range": "70-89%",
-                "description": "Réponse fiable basée sur des sources techniques solides",
-                "examples": [
-                    "RAG avec sources multiples et contexte riche",
-                    "Analyse CoT structurée avec données partielles",
-                    "Réponse technique avec validation agricole forte"
-                ]
-            },
-            "medium": {
-                "score_range": "50-69%",
-                "description": "Réponse correcte mais avec certaines limitations contextuelles",
-                "examples": [
-                    "RAG avec sources limitées",
-                    "Fallback OpenAI avec bon contexte",
-                    "Réponse de clarification avec informations partielles"
-                ]
-            },
-            "low": {
-                "score_range": "30-49%",
-                "description": "Réponse approximative, précisions recommandées",
-                "examples": [
-                    "Fallback OpenAI avec contexte limité",
-                    "Question partiellement hors domaine agricole",
-                    "Entités manquantes pour une réponse précise"
-                ]
-            },
-            "very_low": {
-                "score_range": "0-29%",
-                "description": "Réponse incertaine, vérification nécessaire",
-                "examples": [
-                    "Erreur système",
-                    "Question hors domaine agricole",
-                    "Échec de tous les systèmes de réponse"
-                ]
-            }
-        },
-        "factors_affecting_confidence": [
-            "Type de source (table > CoT > RAG > fallback IA)",
-            "Complétude du contexte (espèce, lignée, âge, sexe)",
-            "Validation du domaine agricole",
-            "Qualité de classification de l'intention",
-            "Nombre et qualité des sources RAG",
-            "Précision des entités extraites"
-        ],
-        "confidence_components": {
-            "source_reliability": "Fiabilité de la source de données (40% pour lookup, 30% pour CoT, etc.)",
-            "intent_confidence": "Confiance dans la classification de l'intention",
-            "completeness_score": "Complétude des informations contextuelles",
-            "validation_confidence": "Confiance de la validation du domaine agricole"
-        }
-    }
-
-# ===== NOUVEAUX ENDPOINTS: Fallback OpenAI (code original conservé) =====
+# ===== NOUVEAUX ENDPOINTS: Fallback OpenAI =====
 
 @router.get("/fallback-status")
 def fallback_status() -> Dict[str, Any]:
     """
-    Status détaillé du système de fallback OpenAI + persistance + confidence.
+    Status détaillé du système de fallback OpenAI + persistance.
     """
     try:
         from .pipeline.dialogue_manager import get_fallback_status
@@ -1006,7 +613,7 @@ async def test_openai_fallback(  # 🚀 ASYNC
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise
 ) -> Dict[str, Any]:
     """
-    Teste le fallback OpenAI directement (bypass RAG) avec confidence.
+    Teste le fallback OpenAI directement (bypass RAG).
     """
     try:
         # Import correct de la fonction et de l'Intention
@@ -1030,18 +637,9 @@ async def test_openai_fallback(  # 🚀 ASYNC
             rag_context="Contexte RAG non disponible (test)"
         )
         
-        # 🎯 NOUVEAU: Extraire info de confidence si disponible
-        confidence_info = {}
-        if result and isinstance(result, dict):
-            confidence_info = {
-                "source_confidence": result.get("confidence", "N/A"),
-                "source_type": result.get("source", "unknown")
-            }
-        
         return {
             "test_question": test_question,
             "openai_response": result,
-            "confidence_info": confidence_info,  # 🎯 NOUVEAU
             "tester": current_user.get('email', 'unknown'),
             "timestamp": time.time()
         }
@@ -1058,7 +656,7 @@ async def test_fallback_integration(  # 🚀 ASYNC
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Teste l'intégration complète RAG → Fallback OpenAI + persistance + confidence
+    Teste l'intégration complète RAG → Fallback OpenAI + persistance
     """
     try:
         # Test avec une question qui devrait déclencher le fallback
@@ -1087,9 +685,6 @@ async def test_fallback_integration(  # 🚀 ASYNC
         source = answer.get("source", "unknown")
         meta = answer.get("meta", {})
         
-        # 🎯 NOUVEAU: Extraire info de confidence unifié
-        confidence = result.get("confidence", {})
-        
         return {
             "test_question": test_question,
             "result_source": source,
@@ -1097,8 +692,6 @@ async def test_fallback_integration(  # 🚀 ASYNC
             "rag_attempted": meta.get("rag_attempted", False),
             "result_preview": answer.get("text", "")[:200] + "..." if answer.get("text") else None,
             "persistence_metadata": result.get("persistence_metadata", {}),
-            "confidence_metadata": result.get("confidence_metadata", {}),  # 🎯 NOUVEAU
-            "unified_confidence": confidence,  # 🎯 NOUVEAU
             "full_result": result,
             "tester": current_user.get('email', 'unknown'),
             "timestamp": time.time()
@@ -1114,17 +707,17 @@ async def test_fallback_integration(  # 🚀 ASYNC
 
 @router.post("/test-conversation-persistence")
 async def test_conversation_persistence(  # 🚀 ASYNC
-    test_question: str = "Test de persistance des conversations avec confidence",
+    test_question: str = "Test de persistance des conversations",
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Teste la persistance des conversations directement avec tracking confidence.
+    Teste la persistance des conversations directement.
     """
     try:
         from .pipeline.dialogue_manager import _persist_conversation
         
         test_session_id = f"test_persistence_{int(time.time())}"
-        test_answer = "Réponse de test pour vérifier la persistance avec confidence"
+        test_answer = "Réponse de test pour vérifier la persistance"
         user_id = _extract_user_id_for_persistence(current_user)
         
         # Test de la fonction de persistance en thread
@@ -1138,9 +731,7 @@ async def test_conversation_persistence(  # 🚀 ASYNC
             additional_context={
                 "test": True,
                 "intent": "test_persistence",
-                "route": "test_endpoint",
-                "confidence_score": 85.0,  # 🎯 NOUVEAU: Test avec confidence
-                "confidence_level": "high"  # 🎯 NOUVEAU
+                "route": "test_endpoint"
             }
         )
         
@@ -1151,7 +742,6 @@ async def test_conversation_persistence(  # 🚀 ASYNC
             "test_answer": test_answer,
             "user_id": user_id,
             "persistence_success": persistence_success,
-            "confidence_tracking": True,  # 🎯 NOUVEAU
             "tester": current_user.get('email', 'unknown'),
             "timestamp": time.time()
         }
@@ -1165,7 +755,7 @@ async def test_conversation_persistence(  # 🚀 ASYNC
 @router.get("/conversation-persistence-status")
 def conversation_persistence_status() -> Dict[str, Any]:
     """
-    Status détaillé de la persistance des conversations avec confidence tracking.
+    Status détaillé de la persistance des conversations.
     """
     try:
         from .pipeline.dialogue_manager import (
@@ -1181,7 +771,6 @@ def conversation_persistence_status() -> Dict[str, Any]:
             "clear_context_after_ask": CLEAR_CONTEXT_AFTER_ASK,
             "postgres_memory_initialized": _POSTGRES_MEMORY is not None,
             "database_url_configured": bool(os.getenv("DATABASE_URL")),
-            "confidence_tracking_enabled": CONFIDENCE_SYSTEM_AVAILABLE,  # 🎯 NOUVEAU
             "status": "operational" if (POSTGRES_AVAILABLE and PERSIST_CONVERSATIONS) else "limited"
         }
         
@@ -1221,7 +810,7 @@ async def test_agricultural_validation(  # 🚀 ASYNC
     lang: str = "fr",
     current_user: dict = Depends(get_current_user)  # 🔒 Auth requise pour les tests
 ) -> Dict[str, Any]:
-    """Teste la validation agricole sur une question donnée avec confidence."""
+    """Teste la validation agricole sur une question donnée."""
     if not AGRICULTURAL_VALIDATOR_AVAILABLE:
         return {
             "error": "Agricultural validator not available"
@@ -1239,22 +828,10 @@ async def test_agricultural_validation(  # 🚀 ASYNC
             request_ip="test_ip"
         )
         
-        # 🎯 NOUVEAU: Calculer confidence basé sur validation
-        validation_confidence = {
-            "score": validation_result.confidence,
-            "level": "high" if validation_result.confidence > 80 else "medium" if validation_result.confidence > 50 else "low",
-            "explanation": f"Validation agricole: {validation_result.confidence}% de confiance"
-        }
-        
         return {
             "question": test_question,
             "lang": lang,
-            "validation": validation_result.to_dict() if hasattr(validation_result, 'to_dict') else {
-                "is_valid": validation_result.is_valid,
-                "confidence": validation_result.confidence,
-                "reason": validation_result.reason
-            },
-            "validation_confidence": validation_confidence,  # 🎯 NOUVEAU
+            "validation": validation_result.to_dict(),
             "tester": user_id
         }
     except Exception as e:
@@ -1335,7 +912,6 @@ def debug_imports() -> Dict[str, Any]:
         "billing_system_available": True,  # 🦆 NOUVEAU
         "analytics_system_available": True,  # 📊 NOUVEAU
         "performance_optimizations_enabled": True,  # 🚀 NOUVEAU
-        "confidence_system_available": CONFIDENCE_SYSTEM_AVAILABLE,  # 🎯 NOUVEAU
         "imports_tested": []
     }
     
@@ -1357,7 +933,6 @@ def debug_imports() -> Dict[str, Any]:
         "app.api.v1.billing",  # 🦆 NOUVEAU
         "app.api.v1.logging",  # 📊 NOUVEAU
         "app.api.v1.pipeline.postgres_memory",  # 💾 NOUVEAU
-        "app.api.v1.pipeline.unified_confidence",  # 🎯 NOUVEAU
     ]
     
     for import_path in imports_to_test:
@@ -1379,19 +954,7 @@ async def force_import_test():  # 🚀 ASYNC
         test_result = await asyncio.to_thread(
             _handle, "test", "test question", "fr", debug=True, user_id="test_user"
         )
-        
-        # 🎯 NOUVEAU: Vérifier presence confidence dans résultat
-        has_confidence = "confidence" in test_result
-        confidence_info = test_result.get("confidence", {}) if has_confidence else {}
-        
-        return {
-            "status": "✅ SUCCESS", 
-            "result": test_result, 
-            "import_successful": True,
-            "confidence_included": has_confidence,  # 🎯 NOUVEAU
-            "confidence_score": confidence_info.get("score"),  # 🎯 NOUVEAU
-            "confidence_level": confidence_info.get("level")  # 🎯 NOUVEAU
-        }
+        return {"status": "✅ SUCCESS", "result": test_result, "import_successful": True}
     except Exception as e:
         return {
             "status": "❌ FAILED",
@@ -1539,4 +1102,95 @@ def perf_probe(payload: AskPayload):
                     "error": "missing_line",
                     "available_lines": available,
                     "tables_dir": str(getattr(store, "dir_tables", "")),
-                    "message":
+                    "message": f"Line not specified. Available: {', '.join(available)}"
+                },
+            })
+
+        # [STEP 7] Chargement DataFrame
+        try:
+            df = store._load_df(norm["line"])
+        except Exception as e:
+            return jsonable_encoder({
+                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+                "norm": norm,
+                "rec": None,
+                "debug": {
+                    "error": "load_df_failed",
+                    "message": str(e),
+                    "line": norm.get("line"),
+                    "available_lines": available,
+                    "tables_dir": str(getattr(store, "dir_tables", "")),
+                },
+            })
+
+        if df is None:
+            return jsonable_encoder({
+                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+                "norm": norm,
+                "rec": None,
+                "debug": {
+                    "error": "table_missing",
+                    "line": norm.get("line"),
+                    "available_lines": available,
+                    "tables_dir": str(getattr(store, "dir_tables", "")),
+                    "message": f"No data table found for line {norm.get('line')}"
+                },
+            })
+
+        # [STEP 8] Récupération des données avec nettoyage JSON
+        try:
+            rec = store.get(
+                line=norm["line"],
+                sex=norm["sex"],
+                unit=norm["unit"],
+                age_days=int(norm.get("age_days") or 21),
+            )
+            
+            # Nettoyage JSON des valeurs
+            rec_clean = clean_dict_for_json(rec) if rec else None
+            
+        except Exception as e:
+            return jsonable_encoder({
+                "error": "store_get_failed",
+                "message": str(e),
+                "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+                "norm": norm,
+                "debug": {
+                    "rows": int(len(df)),
+                    "columns": [str(c) for c in df.columns],
+                    "available_lines": available,
+                }
+            })
+
+        # [SUCCESS] Résultat final avec message informatif
+        success_message = "Performance data found"
+        if not rec_clean:
+            line_name = norm.get("line", "unknown")
+            sex_name = norm.get("sex", "unknown") 
+            age_val = norm.get("age_days", "unknown")
+            success_message = f"No data found for {line_name}, {sex_name}, {age_val} days. Try: male/female/as_hatched, ages 1-49"
+
+        result = {
+            "success": bool(rec_clean),
+            "entities": {"species": species, "line": line, "sex": sex, "age_days": age_days, "unit": unit},
+            "norm": norm,
+            "rec": rec_clean,
+            "debug": {
+                "rows": int(len(df)),
+                "columns": [str(c) for c in df.columns],
+                "available_lines": available,
+                "tables_dir": str(getattr(store, "dir_tables", "")),
+            },
+            "message": success_message
+        }
+        
+        return jsonable_encoder(result)
+
+    except Exception as e:
+        # Catch-all final avec informations de debug
+        return jsonable_encoder({
+            "error": "internal_error",
+            "message": str(e),
+            "entities": (payload.entities or {}) if payload else {},
+            "debug": {"step": "unknown", "has_numpy": HAS_NUMPY}
+        })

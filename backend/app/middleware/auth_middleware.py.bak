@@ -1,4 +1,5 @@
 # app/middleware/auth_middleware.py
+# app/middleware/auth_middleware.py
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
