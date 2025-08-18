@@ -1,7 +1,10 @@
 // lib/supabase/client.ts - CLIENT SUPABASE SÉCURISÉ (ajout supabaseAuth + timeout 25s)
+
+'use client'
+
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/types/supabase' // adapte si besoin
+import type { Database } from '@/types/supabase' // adaptez si besoin
 
 // Client Supabase pour composants React (inchangé)
 export const supabase = createClientComponentClient<Database>()
@@ -28,9 +31,8 @@ export const supabaseAuth = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_K
   global: { fetch: fetchWithTimeout(25000) }
 })
 
-// Helpers de sécurité (conservent l’API existante)
+// Helpers de sécurité
 export const auth = {
-  // Vérifier si l'utilisateur est connecté
   async isAuthenticated(): Promise<boolean> {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -41,7 +43,6 @@ export const auth = {
     }
   },
 
-  // Récupérer le token d’accès courant
   async getAccessToken(): Promise<string | null> {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -52,7 +53,6 @@ export const auth = {
     }
   },
 
-  // Déconnexion
   async logout() {
     try {
       const { error } = await supabase.auth.signOut()
@@ -66,7 +66,7 @@ export const auth = {
   }
 }
 
-// Requêtes sécurisées (conserve l’API)
+// Requêtes sécurisées
 export const secureRequest = {
   async get(url: string, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
