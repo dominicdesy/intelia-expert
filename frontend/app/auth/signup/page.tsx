@@ -298,12 +298,6 @@ export default function SignupPage() {
     return valid
   }
 
-  // Combiner les erreurs locales et du store
-  const allErrors = [...localErrors]
-  if (error) {
-    allErrors.push(error)
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       {/* Header */}
@@ -335,10 +329,10 @@ export default function SignupPage() {
           </div>
           
           {/* Affichage des erreurs */}
-          {allErrors.length > 0 && (
+          {localErrors.length > 0 && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
               <div className="text-sm text-red-800">
-                {allErrors.map((error, index) => (
+                {localErrors.map((error, index) => (
                   <div key={index} className="flex items-start space-x-2">
                     <span className="text-red-500 font-bold">•</span>
                     <span>{error}</span>
