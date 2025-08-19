@@ -1,4 +1,4 @@
-import { ModalProps } from '@/types'
+import { ModalProps } from '../types'
 
 // ==================== COMPOSANTS MODAL - CORRIGÉ POUR MICROSOFT EDGE ====================
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {

@@ -7,7 +7,7 @@ import { AccountModal } from './modals/AccountModal'
 import { LanguageModal } from './modals/LanguageModal'
 import { ContactModal } from './modals/ContactModal'
 import { InviteFriendModal } from './modals/InviteFriendModal'
-import { PLAN_CONFIGS } from '@/types'
+import { PLAN_CONFIGS } from '../types'
 
 // ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
 export const UserMenuButton = () => {
