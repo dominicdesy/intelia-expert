@@ -2,33 +2,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { secureRequest } from '@/lib/supabase/client'
-
-interface Message {
-  id: string
-  content: string
-  role: 'user' | 'assistant'
-  timestamp: string
-  feedback?: 'positive' | 'negative' | null
-  sources?: Array<{ title: string; url?: string }>
-  metadata?: { response_time?: number; model_used?: string }
-}
-
-interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-  created_at: string
-  updated_at: string
-}
-
-interface TopicSuggestion {
-  id: string
-  title: string
-  description: string
-  category: string
-  icon: string
-  popular: boolean
-}
+import type { Message, Conversation, TopicSuggestion } from '@/types'
 
 interface ChatState {
   // État
@@ -97,6 +71,8 @@ export const useChatStore = create<ChatState>()(
         const newConversation: Conversation = {
           id: `conv-${Date.now()}`,
           title: 'Nouvelle conversation',
+          preview: '',
+          message_count: 0,
           messages: [],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -219,12 +195,13 @@ export const useChatStore = create<ChatState>()(
         try {
           console.log('💬 Envoi message sécurisé:', content.substring(0, 50) + '...')
 
-          // Créer le message utilisateur
+          // Créer le message utilisateur avec interface correcte
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             content,
-            role: 'user',
-            timestamp: new Date().toISOString()
+            isUser: true, // ✅ Utilise isUser au lieu de role
+            timestamp: new Date(), // ✅ Utilise Date au lieu de string
+            conversation_id: get().currentConversation?.id
           }
 
           // Ajouter à la conversation courante
@@ -237,8 +214,10 @@ export const useChatStore = create<ChatState>()(
           // Mettre à jour avec message utilisateur
           const updatedConv = {
             ...currentConv,
-            messages: [...currentConv.messages, userMessage],
-            title: currentConv.messages.length === 0 ? content.substring(0, 50) : currentConv.title,
+            messages: [...(currentConv.messages || []), userMessage],
+            title: currentConv.message_count === 0 ? content.substring(0, 50) : currentConv.title,
+            preview: currentConv.message_count === 0 ? content.substring(0, 150) : currentConv.preview,
+            message_count: (currentConv.message_count || 0) + 1,
             updated_at: new Date().toISOString()
           }
 
@@ -266,16 +245,16 @@ export const useChatStore = create<ChatState>()(
               throw new Error(data.message || `Erreur API: ${response.status}`)
             }
 
-            // Créer le message de réponse
+            // Créer le message de réponse avec interface correcte
             const assistantMessage: Message = {
               id: `ai-${Date.now()}`,
               content: data.answer || data.response || 'Réponse reçue avec succès.',
-              role: 'assistant',
-              timestamp: new Date().toISOString(),
+              isUser: false, // ✅ Utilise isUser au lieu de role
+              timestamp: new Date(), // ✅ Utilise Date au lieu de string
+              conversation_id: currentConv.id,
               sources: data.sources || [],
               metadata: { 
                 response_time: responseTime,
-                // ✅ MODIFICATION: Utiliser DEFAULT_MODEL depuis les variables d'environnement
                 model_used: data.model_used || process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'gpt-5'
               }
             }
@@ -283,7 +262,8 @@ export const useChatStore = create<ChatState>()(
             // Mettre à jour avec la réponse
             const finalConv = {
               ...updatedConv,
-              messages: [...updatedConv.messages, assistantMessage],
+              messages: [...updatedConv.messages!, assistantMessage],
+              message_count: updatedConv.message_count + 1,
               updated_at: new Date().toISOString()
             }
 
@@ -317,8 +297,9 @@ En tant qu'expert en santé et nutrition animale, cette question est importante 
 *Note : Le système fonctionne en mode dégradé. L'API sera bientôt disponible.*
 
 Avez-vous d'autres questions spécifiques sur ce sujet ?`,
-              role: 'assistant',
-              timestamp: new Date().toISOString(),
+              isUser: false,
+              timestamp: new Date(),
+              conversation_id: currentConv.id,
               sources: [],
               metadata: { 
                 response_time: Date.now() - startTime,
@@ -328,7 +309,8 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
 
             const finalConv = {
               ...updatedConv,
-              messages: [...updatedConv.messages, fallbackMessage],
+              messages: [...updatedConv.messages!, fallbackMessage],
+              message_count: updatedConv.message_count + 1,
               updated_at: new Date().toISOString()
             }
 
@@ -349,8 +331,9 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
           const errorMessage: Message = {
             id: `error-${Date.now()}`,
             content: 'Désolé, le système est temporairement indisponible. Veuillez réessayer dans quelques instants.',
-            role: 'assistant',
-            timestamp: new Date().toISOString(),
+            isUser: false,
+            timestamp: new Date(),
+            conversation_id: get().currentConversation?.id,
             metadata: { 
               response_time: Date.now() - startTime,
               model_used: 'error'
@@ -361,7 +344,8 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
           if (currentConv) {
             const updatedConv = {
               ...currentConv,
-              messages: [...currentConv.messages, errorMessage],
+              messages: [...(currentConv.messages || []), errorMessage],
+              message_count: (currentConv.message_count || 0) + 1,
               updated_at: new Date().toISOString()
             }
 
@@ -387,7 +371,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
 
           // Mettre à jour localement
           const currentConv = get().currentConversation
-          if (currentConv) {
+          if (currentConv && currentConv.messages) {
             const updatedMessages = currentConv.messages.map(msg =>
               msg.id === messageId
                 ? { ...msg, feedback: feedback.rating }
@@ -446,7 +430,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
               id: '2',
               title: 'Conditions environnementales optimales',
               description: 'Température, ventilation et humidité',
-              category: 'environnement',
+              category: 'environment',
               icon: '🌡️',
               popular: true
             },
@@ -454,7 +438,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
               id: '3',
               title: 'Protocoles de vaccination',
               description: 'Calendriers et bonnes pratiques',
-              category: 'sante',
+              category: 'health',
               icon: '💉',
               popular: false
             },
@@ -462,7 +446,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
               id: '4',
               title: 'Diagnostic des maladies',
               description: 'Symptômes et identification précoce',
-              category: 'sante',
+              category: 'health',
               icon: '🔬',
               popular: true
             },
@@ -478,7 +462,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
               id: '6',
               title: 'Gestion de la mortalité',
               description: 'Prévention et causes fréquentes',
-              category: 'sante',
+              category: 'health',
               icon: '⚠️',
               popular: true
             }

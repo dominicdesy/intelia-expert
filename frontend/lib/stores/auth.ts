@@ -1,4 +1,4 @@
-// lib/stores/auth.ts — Store d'auth SUPABASE NATIF (VERSION FINALE)
+// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE)
 'use client'
 
 import { create } from 'zustand'
@@ -41,14 +41,50 @@ interface AuthState {
   exportUserData: () => Promise<any>
 }
 
-// Adapter utilisateur Supabase vers AppUser
+// ✅ CORRECTION: Adapter utilisateur Supabase vers AppUser COMPLET
 function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
+  // Construire le nom complet
+  const fullName = additionalData?.full_name || 
+                   supabaseUser.user_metadata?.full_name || 
+                   supabaseUser.email?.split('@')[0] || 
+                   'Utilisateur'
+  
+  // Séparer firstName et lastName
+  const nameParts = fullName.trim().split(' ')
+  const firstName = nameParts[0] || ''
+  const lastName = nameParts.slice(1).join(' ') || ''
+
   return {
+    // ✅ Champs obligatoires de l'interface User
     id: supabaseUser.id,
     email: supabaseUser.email,
+    name: fullName,
+    firstName: firstName,
+    lastName: lastName,
+    phone: additionalData?.phone || '', // Champ obligatoire, défaut vide
+    country: additionalData?.country || '',
+    linkedinProfile: additionalData?.linkedinProfile || '',
+    companyName: additionalData?.companyName || '',
+    companyWebsite: additionalData?.companyWebsite || '',
+    linkedinCorporate: additionalData?.linkedinCorporate || '',
     user_type: additionalData?.user_type || 'producer',
-    name: additionalData?.full_name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'Utilisateur',
     language: additionalData?.language || 'fr',
+    created_at: additionalData?.created_at || new Date().toISOString(),
+    plan: additionalData?.plan || 'essential',
+
+    // ✅ Champs optionnels
+    country_code: additionalData?.country_code,
+    area_code: additionalData?.area_code,
+    phone_number: additionalData?.phone_number,
+    full_name: fullName,
+    avatar_url: additionalData?.avatar_url,
+    consent_given: additionalData?.consent_given ?? true,
+    consent_date: additionalData?.consent_date,
+    updated_at: additionalData?.updated_at,
+    user_id: supabaseUser.id, // Alias pour compatibilité
+    profile_id: additionalData?.profile_id,
+    preferences: additionalData?.preferences,
+    is_admin: additionalData?.is_admin || false
   }
 }
 
