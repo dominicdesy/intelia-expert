@@ -97,7 +97,7 @@ export class ConversationService {
     
     // 🔧 CORRECTION: URL construite proprement
     this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`
-    console.log('ConversationService configuré: ✅', `NEXT_PUBLIC_API_BASE_URL=${apiBaseUrl}`)
+    console.log('ConversationService configuré:', apiBaseUrl)
   }
 
   private getAuthToken(): string {
