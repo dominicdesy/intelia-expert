@@ -2,7 +2,23 @@
 
 import { useState, useEffect } from 'react'
 import { useChatStore } from '@/lib/stores/chat'
-import type { Conversation, Message } from '@/types'
+
+// SOLUTION: Utiliser les types du store directement
+type StoreConversation = {
+  id: string
+  title: string
+  messages: Array<{
+    id: string
+    content: string
+    role: 'user' | 'assistant'
+    timestamp: string
+    feedback?: 'positive' | 'negative' | null
+    sources?: Array<{ title: string; url?: string }>
+    metadata?: { response_time?: number; model_used?: string }
+  }>
+  created_at: string
+  updated_at: string
+}
 
 // Icônes SVG
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
@@ -133,17 +149,17 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
     }
   }
 
-  // ✅ CORRECTION: Générer un aperçu en utilisant les vrais types
-  const getConversationPreview = (conversation: Conversation): string => {
+  // Générer un aperçu de la conversation - TYPES ALIGNÉS
+  const getConversationPreview = (conversation: StoreConversation): string => {
     try {
       // Vérifier si la conversation a des messages
       if (!conversation.messages || conversation.messages.length === 0) {
-        return conversation.preview || "Nouvelle conversation"
+        return "Nouvelle conversation"
       }
       
-      // Chercher le premier message utilisateur avec la structure correcte
+      // Chercher le premier message utilisateur
       const firstUserMessage = conversation.messages.find(message => 
-        message && message.isUser === true && message.content
+        message && message.role === 'user' && message.content
       )
       
       if (firstUserMessage && firstUserMessage.content) {
@@ -154,20 +170,16 @@ export default function ConversationSidebar({ isOpen, onClose }: ConversationSid
         return content
       }
       
-      return conversation.title || conversation.preview || "Conversation sans titre"
+      return conversation.title || "Conversation sans titre"
     } catch (error) {
       console.error('Erreur lors de la génération de l\'aperçu:', error)
       return "Conversation"
     }
   }
 
-  // ✅ CORRECTION: Compter les messages avec les vrais types
-  const getMessageCount = (conversation: Conversation): number => {
+  // Compter les messages de manière sécurisée - TYPES ALIGNÉS
+  const getMessageCount = (conversation: StoreConversation): number => {
     try {
-      // Utiliser message_count si disponible, sinon compter les messages
-      if (typeof conversation.message_count === 'number') {
-        return conversation.message_count
-      }
       return conversation.messages?.length || 0
     } catch (error) {
       console.error('Erreur lors du comptage des messages:', error)

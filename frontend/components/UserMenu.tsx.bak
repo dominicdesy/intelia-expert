@@ -1,12 +1,11 @@
-// components/UserMenu.tsx - VERSION CORRIGÉE AVEC TYPES FIXES
+// components/UserMenu.tsx - VERSION CORRIGÉE STRUCTURE
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
-import type { User } from '@/types' // ✅ Import du bon type
 
-// Icônes (inchangées)
+// Icônes
 const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -223,9 +222,9 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       )}
 
       {/* Modal Mon Profil */}
-      {activeModal === 'profile' && user && (
+      {activeModal === 'profile' && (
         <ProfileModal 
-          user={user}
+          user={user!}
           onClose={() => setActiveModal(null)}
           onSave={updateProfile}
         />
@@ -284,11 +283,11 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   )
 }
 
-// ✅ CORRECTION: Modal Mon Profil avec type User correct
+// Modal Mon Profil
 interface ProfileModalProps {
-  user: User  // ✅ Utilise le type User correct
+  user: any
   onClose: () => void
-  onSave: (data: Partial<User>) => Promise<void>  // ✅ Type correct
+  onSave: (data: any) => Promise<void>
 }
 
 function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
@@ -441,7 +440,7 @@ function ProfileModal({ user, onClose, onSave }: ProfileModalProps) {
   )
 }
 
-// Modal Paramètres (inchangée)
+// Modal Paramètres
 interface SettingsModalProps {
   onClose: () => void
 }
@@ -557,7 +556,7 @@ function SettingsModal({ onClose }: SettingsModalProps) {
   )
 }
 
-// Modal Legal (inchangée)
+// Modal Legal
 interface LegalModalProps {
   onClose: () => void
 }
