@@ -19,6 +19,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Initialiser la session au démarrage
       initializeSession().then((success) => {
         console.log('🔄 [AuthProvider] Session initialisée:', success ? 'succès' : 'échec')
+      }).catch((error) => {
+        // ✅ AMÉLIORATION: Gestion d'erreur
+        console.error('❌ [AuthProvider] Erreur initialisation session:', error)
       })
     }
   }, [hasHydrated, setHasHydrated, initializeSession])
@@ -29,33 +32,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event, session) => {
         console.log('🔄 [AuthProvider] Changement état Supabase:', event, !!session)
         
-        switch (event) {
-          case 'SIGNED_IN':
-            console.log('✅ [AuthProvider] Utilisateur connecté')
-            await checkAuth()
-            break
-            
-          case 'SIGNED_OUT':
-            console.log('🚪 [AuthProvider] Utilisateur déconnecté')
-            useAuthStore.setState({ 
-              user: null, 
-              isAuthenticated: false,
-              lastAuthCheck: Date.now()
-            })
-            break
-            
-          case 'TOKEN_REFRESHED':
-            console.log('🔄 [AuthProvider] Token rafraîchi')
-            await checkAuth()
-            break
-            
-          case 'USER_UPDATED':
-            console.log('👤 [AuthProvider] Utilisateur mis à jour')
-            await checkAuth()
-            break
-            
-          default:
-            console.log('ℹ️ [AuthProvider] Événement Supabase non géré:', event)
+        try {
+          switch (event) {
+            case 'SIGNED_IN':
+              console.log('✅ [AuthProvider] Utilisateur connecté')
+              await checkAuth()
+              break
+              
+            case 'SIGNED_OUT':
+              console.log('🚪 [AuthProvider] Utilisateur déconnecté')
+              useAuthStore.setState({ 
+                user: null, 
+                isAuthenticated: false,
+                lastAuthCheck: Date.now()
+              })
+              break
+              
+            case 'TOKEN_REFRESHED':
+              console.log('🔄 [AuthProvider] Token rafraîchi')
+              await checkAuth()
+              break
+              
+            case 'USER_UPDATED':
+              console.log('👤 [AuthProvider] Utilisateur mis à jour')
+              await checkAuth()
+              break
+              
+            default:
+              console.log('ℹ️ [AuthProvider] Événement Supabase non géré:', event)
+          }
+        } catch (error) {
+          // ✅ AMÉLIORATION: Gestion d'erreur dans les événements
+          console.error('❌ [AuthProvider] Erreur traitement événement:', event, error)
         }
       }
     )
@@ -87,6 +95,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.unsubscribe()
       clearInterval(intervalId)
+      console.log('🧹 [AuthProvider] Nettoyage subscription et interval')
     }
   }, [checkAuth])
 

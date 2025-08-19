@@ -5,6 +5,15 @@ import { useEffect } from 'react'
 import { useLanguageStore } from '@/lib/stores/language'
 import { useAuthStore } from '@/lib/stores/auth'
 
+// ✅ Importer le type Language depuis types
+type Language = 'fr' | 'en' | 'es' | 'pt' | 'de' | 'nl' | 'pl'
+
+// ✅ Helper function pour valider le type Language
+function isValidLanguage(lang: string): lang is Language {
+  const supportedLangs: Language[] = ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl']
+  return supportedLangs.includes(lang as Language)
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { setLanguage } = useLanguageStore()
   const { user } = useAuthStore()
@@ -12,12 +21,18 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Définir la langue basée sur l'utilisateur ou le navigateur
     if (user?.language) {
-      setLanguage(user.language)
+      // ✅ CORRECTION: Valider le type avant de passer à setLanguage
+      if (isValidLanguage(user.language)) {
+        setLanguage(user.language)
+      } else {
+        console.warn(`Langue utilisateur invalide: ${user.language}, fallback vers 'fr'`)
+        setLanguage('fr')
+      }
     } else if (typeof window !== 'undefined') {
-      const browserLang = navigator.language.split('-')[0] as any
-      const supportedLangs = ['fr', 'en', 'es', 'pt', 'de', 'nl', 'pl']
+      const browserLang = navigator.language.split('-')[0]
       
-      if (supportedLangs.includes(browserLang)) {
+      // ✅ CORRECTION: Validation propre du type
+      if (isValidLanguage(browserLang)) {
         setLanguage(browserLang)
       } else {
         setLanguage('fr') // Français par défaut
