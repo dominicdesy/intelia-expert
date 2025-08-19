@@ -1,4 +1,4 @@
-// types/index.ts - Mise à jour COMPLÈTE avec support de concision ET response_versions
+// types/index.ts - VERSION UNIFIÉE COMPLÈTE (37K+ caractères)
 
 // ==================== INTERFACE MESSAGE ÉTENDUE AVEC CONCISION ET RESPONSE_VERSIONS ====================
 
@@ -31,6 +31,11 @@ export interface Message {
   originalResponse?: string  // Réponse originale avant concision
   processedResponse?: string // Réponse après traitement de concision
   concisionLevel?: ConcisionLevel // Niveau de concision appliqué
+  
+  // ✅ COMPATIBILITY: Champs du petit fichier
+  role?: 'user' | 'assistant'
+  sources?: DocumentSource[]
+  metadata?: MessageMetadata
 }
 
 // ==================== TYPES POUR CONCISION BACKEND ====================
@@ -73,7 +78,7 @@ export interface ResponseProcessingResult {
 export interface ExpertApiResponse {
   question: string
   response: string
-  full_text?: string  // ✅ plein texte non tronqué (si fourni par l’API)
+  full_text?: string  // ✅ plein texte non tronqué (si fourni par l'API)
   conversation_id: string
   rag_used: boolean
   rag_score?: number
@@ -102,7 +107,7 @@ export interface ConversationData {
   user_id: string
   question: string
   response: string
-  full_text?: string  // ✅ plein texte non tronqué (si fourni par l’API)
+  full_text?: string  // ✅ plein texte non tronqué (si fourni par l'API)
   conversation_id: string
   confidence_score?: number
   response_time_ms?: number
@@ -140,6 +145,9 @@ export interface Conversation {
   language?: string
   last_message_preview?: string
   status?: 'active' | 'archived'
+  // ✅ COMPATIBILITY: Champs du petit fichier
+  user_id?: string
+  messages?: Message[]
 }
 
 // ✅ CONSERVÉ: Conversation complète avec tous ses messages
@@ -247,6 +255,17 @@ export interface User {
   country_code?: string    // Code pays (ex: +1, +33, +32)
   area_code?: string       // Code régional (ex: 514, 04, 2)
   phone_number?: string    // Numéro principal (ex: 1234567, 12345678)
+  
+  // ✅ COMPATIBILITY: Champs du petit fichier
+  full_name?: string
+  avatar_url?: string
+  consent_given?: boolean
+  consent_date?: string
+  updated_at?: string
+  user_id?: string
+  profile_id?: string
+  preferences?: Record<string, any>
+  is_admin?: boolean
 }
 
 export interface ProfileUpdateData {
@@ -292,6 +311,10 @@ export interface FeedbackData {
   comment?: string
   timestamp: string
   user_id?: string
+  // ✅ COMPATIBILITY: Champs du petit fichier
+  message_id?: string
+  rating?: 'positive' | 'negative'
+  category?: 'accuracy' | 'relevance' | 'completeness' | 'other'
 }
 
 // ✅ CONSERVÉ: Props pour la modal feedback
@@ -446,6 +469,124 @@ export interface IconProps {
   className?: string
 }
 
+// ============================================================================
+// LANGUAGE & INTERNATIONALIZATION - UNIFIÉ
+// ============================================================================
+
+export type Language = 'fr' | 'en' | 'es' | 'pt' | 'de' | 'nl' | 'pl'
+
+export interface LanguageOption {
+  code: Language
+  name: string
+  flag: string
+}
+
+// ============================================================================
+// PETIT FICHIER - TYPES EXPERT SYSTEM
+// ============================================================================
+
+export interface ExpertQuestion {
+  content: string
+  language: Language
+  context?: string
+  conversation_id?: string
+}
+
+export interface ExpertResponse {
+  id: string
+  content: string
+  sources: DocumentSource[]
+  confidence_score: number
+  response_time: number
+  model_used: string
+  suggestions?: string[]
+  clarification_needed?: boolean
+}
+
+export interface TopicSuggestion {
+  id: string
+  title: string
+  description: string
+  category: 'health' | 'nutrition' | 'environment' | 'general'
+  icon: string
+  popular: boolean
+}
+
+export interface DocumentSource {
+  id: string
+  title: string
+  excerpt: string
+  relevance_score: number
+  document_type: string
+  url?: string
+}
+
+export interface MessageMetadata {
+  response_time?: number
+  model_used?: string
+  confidence_score?: number
+  language_detected?: Language
+}
+
+export interface UsageAnalytics {
+  daily_questions: number
+  satisfaction_rate: number
+  avg_response_time: number
+  popular_topics: string[]
+  user_retention: number
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: {
+    code: string
+    message: string
+    details?: any
+  }
+  metadata?: {
+    pagination?: {
+      page: number
+      per_page: number
+      total: number
+      total_pages: number
+    }
+    timestamp: string
+  }
+}
+
+export interface RGPDConsent {
+  analytics: boolean
+  marketing: boolean
+  functional: boolean
+  given_at: string
+  ip_address?: string
+}
+
+export interface DataExportRequest {
+  user_id: string
+  request_date: string
+  status: 'pending' | 'processing' | 'ready' | 'expired'
+  download_url?: string
+  expires_at?: string
+}
+
+export interface DataDeletionRequest {
+  user_id: string
+  request_date: string
+  scheduled_deletion: string
+  status: 'pending' | 'confirmed' | 'completed'
+}
+
+export interface AppError {
+  code: string
+  message: string
+  details?: any
+  timestamp: string
+  user_id?: string
+  context?: string
+}
+
 // ==================== CONSERVÉS: TYPES API ====================
 
 export interface ApiError extends Error {
@@ -463,6 +604,91 @@ export class TimeoutError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'TimeoutError'
+  }
+}
+
+// ==================== TYPES MANQUANTS POUR useAuthStore ====================
+
+export interface AuthState {
+  user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  hasHydrated: boolean
+}
+
+export interface BackendUserData {
+  id?: string                    // Version gros fichier
+  user_id?: string              // Version petit fichier
+  email: string
+  name?: string
+  full_name?: string
+  firstName?: string
+  lastName?: string
+  user_type?: string
+  created_at?: string
+  updated_at?: string
+  language?: string
+  plan?: string
+  country_code?: string
+  area_code?: string
+  phone_number?: string
+  country?: string
+  linkedinProfile?: string
+  companyName?: string
+  companyWebsite?: string
+  linkedinCorporate?: string
+  avatar_url?: string
+  consent_given?: boolean
+  consent_date?: string
+  profile_id?: string
+  preferences?: Record<string, any>
+  is_admin?: boolean
+  iss?: string
+  aud?: string
+  exp?: number
+  jwt_secret_used?: string
+}
+
+export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
+  // Récupérer l'ID (priorité user_id puis id)
+  const userId = backendUser.user_id || backendUser.id || ''
+  
+  // Récupérer le nom (priorité name, puis full_name, puis construction firstName+lastName)
+  const userName = backendUser.name || 
+                   backendUser.full_name || 
+                   `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || 
+                   backendUser.email || ''
+
+  return {
+    id: userId,
+    email: backendUser.email || '',
+    name: userName,
+    firstName: backendUser.firstName || '',
+    lastName: backendUser.lastName || '',
+    phone: `${backendUser.country_code || ''}${backendUser.area_code || ''}${backendUser.phone_number || ''}`,
+    country: backendUser.country || '',
+    linkedinProfile: backendUser.linkedinProfile || '',
+    companyName: backendUser.companyName || '',
+    companyWebsite: backendUser.companyWebsite || '',
+    linkedinCorporate: backendUser.linkedinCorporate || '',
+    user_type: backendUser.user_type || 'producer',
+    language: (backendUser.language as Language) || 'fr',
+    created_at: backendUser.created_at || new Date().toISOString(),
+    plan: backendUser.plan || 'essential',
+    
+    // Champs optionnels
+    country_code: backendUser.country_code,
+    area_code: backendUser.area_code,
+    phone_number: backendUser.phone_number,
+    full_name: backendUser.full_name,
+    avatar_url: backendUser.avatar_url,
+    consent_given: backendUser.consent_given ?? true,
+    consent_date: backendUser.consent_date,
+    updated_at: backendUser.updated_at,
+    user_id: backendUser.user_id,
+    profile_id: backendUser.profile_id,
+    preferences: backendUser.preferences,
+    is_admin: backendUser.is_admin || false
   }
 }
 
@@ -492,8 +718,6 @@ const getApiConfig = () => {
 }
 
 export const API_CONFIG = getApiConfig()
-
-
 
 // ✅ CONSERVÉS: ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {
@@ -638,7 +862,7 @@ export const CONCISION_CONFIG = {
     STANDARD: {
       value: 'standard' as const,
       label: 'Standard',
-      icon: '📝', 
+      icon: '📄', 
       description: 'Réponse équilibrée avec conseils',
       example: 'Réponse complète sans détails techniques'
     },
@@ -1154,7 +1378,7 @@ export const CONVERSATION_UTILS = {
     return [...conversations].sort((a, b) => {
       switch (sortBy) {
         case 'message_count':
-          return b.message_count - a.message_count
+          return b.message_count! - a.message_count!
         case 'created_at':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'updated_at':
@@ -1164,55 +1388,3 @@ export const CONVERSATION_UTILS = {
     })
   }
 } as const
-// ==================== TYPES MANQUANTS POUR useAuthStore ====================
-
-export interface AuthState {
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  hasHydrated: boolean
-}
-
-export interface BackendUserData {
-  id: string
-  email: string
-  name?: string
-  firstName?: string
-  lastName?: string
-  user_type?: string
-  created_at: string
-  updated_at: string
-  language?: string
-  plan?: string
-  country_code?: string
-  area_code?: string
-  phone_number?: string
-  country?: string
-  linkedinProfile?: string
-  companyName?: string
-  companyWebsite?: string
-  linkedinCorporate?: string
-}
-
-export const mapBackendUserToUser = (backendUser: BackendUserData): User => {
-  return {
-    id: backendUser.id,
-    email: backendUser.email,
-    name: backendUser.name || `${backendUser.firstName || ""} ${backendUser.lastName || ""}`.trim() || backendUser.email,
-    firstName: backendUser.firstName || '',
-    lastName: backendUser.lastName || '',
-    phone: `${backendUser.country_code || ""}${backendUser.area_code || ""}${backendUser.phone_number || ""}`,
-    country: backendUser.country || '',
-    linkedinProfile: backendUser.linkedinProfile || '',
-    companyName: backendUser.companyName || '',
-    companyWebsite: backendUser.companyWebsite || '',
-    linkedinCorporate: backendUser.linkedinCorporate || '',
-    user_type: backendUser.user_type || 'producer',
-    language: backendUser.language || 'fr',
-    created_at: backendUser.created_at,
-    plan: backendUser.plan || 'essential',
-    country_code: backendUser.country_code,
-    area_code: backendUser.area_code,
-    phone_number: backendUser.phone_number
-  }
-}
