@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ConversationItem, Conversation, ConversationWithMessages, ConversationGroup, Message } from '../../../types'
+import { ConversationItem, Conversation, ConversationWithMessages, ConversationGroup, Message } from '../types'
 import { conversationService } from '../services/conversationService'
 import { loadUserConversations } from '../services/apiService' // ✅ AJOUT: Import de la nouvelle fonction
 
@@ -90,7 +90,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       const conversationsData = await loadUserConversations(userId)
       
       if (!conversationsData || !conversationsData.conversations || conversationsData.conversations.length === 0) {
-        console.log('🔭 [ChatStore] Aucune conversation trouvée')
+        console.log('📭 [ChatStore] Aucune conversation trouvée')
         set({ 
           conversations: [], 
           conversationGroups: [],
@@ -402,7 +402,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   setCurrentConversation: (conversation: ConversationWithMessages | null) => {
-    console.log('🔄 [ChatStore] setCurrentConversation appelée:', conversation?.id, 'Messages:', conversation?.messages?.length || 0)
+    console.log('🔄 [ChatStore] setCurrentConversation appelé:', conversation?.id, 'Messages:', conversation?.messages?.length || 0)
     set({ currentConversation: conversation })
   }
 }))
