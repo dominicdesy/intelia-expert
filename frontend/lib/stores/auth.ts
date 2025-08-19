@@ -141,8 +141,8 @@ export const useAuthStore = create<AuthState>()(
             return false
           }
 
-          // Vérifier le token avec le backend
-          const userData = await apiCall('/api/auth/verify', {
+          // ✅ CORRIGÉ: Vérifier le token avec le backend
+          const userData = await apiCall('/v1/auth/verify', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -180,7 +180,8 @@ export const useAuthStore = create<AuthState>()(
             return
           }
 
-          const userData = await apiCall('/api/auth/verify', {
+          // ✅ CORRIGÉ: Endpoint correct
+          const userData = await apiCall('/v1/auth/verify', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           })
@@ -206,7 +207,8 @@ export const useAuthStore = create<AuthState>()(
         alog('🔄 login via backend', maskEmail(email))
         
         try {
-          const result = await apiCall('/api/auth/login', {
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password })
           })
@@ -243,8 +245,8 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          // 🚀 APPEL BACKEND (robuste)
-          const result = await apiCall('/api/auth/register', {
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/register', {
             method: 'POST',
             body: JSON.stringify({
               email: email.trim(),
@@ -305,7 +307,8 @@ export const useAuthStore = create<AuthState>()(
           // Appeler le backend pour logout (optionnel)
           if (token) {
             try {
-              await apiCall('/api/auth/logout', {
+              // ✅ CORRIGÉ: Endpoint correct
+              await apiCall('/v1/auth/logout', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
               })
@@ -341,7 +344,8 @@ export const useAuthStore = create<AuthState>()(
           const token = getStoredToken()
           if (!token) throw new Error('Non authentifié')
 
-          const result = await apiCall('/api/auth/update-profile', {
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/update-profile', {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(data)
@@ -368,7 +372,8 @@ export const useAuthStore = create<AuthState>()(
         const token = getStoredToken()
         if (!token) throw new Error('Non authentifié')
 
-        await apiCall('/api/auth/delete-user', {
+        // ✅ CORRIGÉ: Endpoint correct
+        await apiCall('/v1/auth/delete-user', {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -381,7 +386,8 @@ export const useAuthStore = create<AuthState>()(
         const token = getStoredToken()
         if (!token) throw new Error('Non authentifié')
 
-        return await apiCall('/api/auth/export-user', {
+        // ✅ CORRIGÉ: Endpoint correct
+        return await apiCall('/v1/auth/export-user', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -414,5 +420,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
-
-// 🔥 SUPPRIMÉ: export default useAuthStore
