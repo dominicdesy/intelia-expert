@@ -7,10 +7,11 @@ import {
   ConversationGroupingOptions,
   Message,
   ConversationData
-} from '../types'
+} from '../../../types'
 
 // 🔧 IMPORT CRITIQUE: Utiliser loadUserConversations d'apiService au lieu de dupliquer la logique
 import { loadUserConversations, sendFeedback, deleteConversation } from './apiService'
+
 
 // Circuit breaker pour éviter les boucles infinies
 class ConversationLoadingCircuitBreaker {
