@@ -9,9 +9,6 @@ import {
   ConversationData
 } from '../types'
 
-// 🔧 IMPORT CRITIQUE: Utiliser loadUserConversations d'apiService au lieu de dupliquer la logique
-import { loadUserConversations, sendFeedback, deleteConversation } from './apiService'
-
 // Circuit breaker pour éviter les boucles infinies
 class ConversationLoadingCircuitBreaker {
   private attempts = 0
@@ -76,15 +73,14 @@ function createConversation(data: {
   }
 }
 
-// 🔧 SERVICE CONVERSATIONS CORRIGÉ - UTILISE apiService.ts POUR ÉVITER DUPLICATION
+// SERVICE CONVERSATIONS CORRIGÉ - HEADERS GET NETTOYÉS POUR ÉVITER CORS PREFLIGHT
 export class ConversationService {
   private baseUrl: string
   private loggingEnabled = true
   private circuitBreaker = new ConversationLoadingCircuitBreaker()
 
   constructor() {
-    // 🔧 CORRECTION: Construction URL plus propre
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') // Enlever trailing slashes
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
     const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
     
     if (!apiBaseUrl) {
@@ -94,9 +90,8 @@ export class ConversationService {
       return
     }
     
-    // 🔧 CORRECTION: URL construite proprement
     this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`
-    console.log('ConversationService configuré: ✅', `NEXT_PUBLIC_API_BASE_URL=${apiBaseUrl}`)
+    console.log('ConversationService configuré:', this.baseUrl)
   }
 
   private getAuthToken(): string {
@@ -161,7 +156,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
         method: 'GET',
-        headers: this.getHeaders('GET')
+        headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
       })
       
       if (response.ok) {
@@ -216,7 +211,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/history/${userId}?${params}`,
         {
           method: 'GET',
-          headers: this.getHeaders('GET')
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         }
       )
 
@@ -243,7 +238,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/${conversationId}`,
         {
           method: 'GET',
-          headers: this.getHeaders('GET')
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         }
       )
 
@@ -296,7 +291,7 @@ export class ConversationService {
     return groups.filter(group => group.conversations.length > 0)
   }
 
-  // 🔧 MÉTHODE CRITIQUE CORRIGÉE - Utilise apiService.ts au lieu de dupliquer
+  // ✅ MÉTHODE CORRIGÉE AVEC HEADERS GET NETTOYÉS + CIRCUIT BREAKER
   async getUserConversations(userId: string, limit = 50): Promise<Conversation[]> {
     if (!this.circuitBreaker.canAttempt()) {
       console.warn('[ConversationService] Circuit breaker actif - tentatives bloquées temporairement')
@@ -311,14 +306,70 @@ export class ConversationService {
     console.log('[ConversationService] Récupération conversations pour:', userId)
     this.circuitBreaker.recordAttempt()
 
+    // 1️⃣ ESSAYER L'ENDPOINT BACKEND D'ABORD
     try {
-      // 🔧 CORRECTION CRITIQUE: Utiliser loadUserConversations d'apiService
-      console.log('[ConversationService] 🔄 Délégation vers apiService.loadUserConversations...')
+      console.log('Test endpoint backend principal...')
       
-      const conversationsData = await loadUserConversations(userId)
+      const response = await fetch(`${this.baseUrl}/conversations/user/${userId}?limit=${limit}`, {
+        method: 'GET',
+        headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
+      })
       
-      if (!conversationsData || !conversationsData.conversations) {
-        console.log('[ConversationService] 📭 Aucune conversation via apiService, essai fallback localStorage...')
+      console.log(`Backend endpoint: ${response.status} ${response.statusText}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`Backend data:`, data)
+        
+        let conversations = []
+        
+        if (Array.isArray(data)) {
+          conversations = data
+        } else if (data.conversations && Array.isArray(data.conversations)) {
+          conversations = data.conversations
+        } else if (data.data && Array.isArray(data.data)) {
+          conversations = data.data
+        }
+        
+        if (conversations.length > 0) {
+          console.log(`${conversations.length} conversations backend récupérées`)
+          
+          // Transformer en format Conversation[] avec fonction utilitaire
+          const formattedConversations: Conversation[] = conversations.map((conv: any) => {
+            const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
+            const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
+            
+            const responses = conv.response?.split('\n--- Réponse suivante ---\n') || [conv.response]
+            const lastResponse = responses[responses.length - 1] || 'Aucune réponse'
+            const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
+
+            return createConversation({
+              id: conv.conversation_id || conv.id || conv.session_id,
+              title: title,
+              preview: firstQuestion,
+              message_count: conv.message_count || 2,
+              created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
+              updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
+              feedback: conv.feedback,
+              language: conv.language || 'fr',
+              last_message_preview: lastMessagePreview
+            })
+          })
+          
+          this.circuitBreaker.recordSuccess()
+          return formattedConversations
+        } else {
+          console.log('Backend retourne 0 conversations, essai fallback localStorage...')
+          const fallbackResult = await this.getConversationsFromLocalStorage(limit)
+          if (fallbackResult.length > 0) {
+            this.circuitBreaker.recordSuccess()
+          } else {
+            this.circuitBreaker.recordFailure()
+          }
+          return fallbackResult
+        }
+      } else {
+        console.log(`Backend endpoint failed: ${response.status}, essai fallback localStorage...`)
         const fallbackResult = await this.getConversationsFromLocalStorage(limit)
         if (fallbackResult.length > 0) {
           this.circuitBreaker.recordSuccess()
@@ -327,43 +378,8 @@ export class ConversationService {
         }
         return fallbackResult
       }
-
-      const conversations = conversationsData.conversations
-      console.log(`[ConversationService] ✅ ${conversations.length} conversations récupérées via apiService`)
-      
-      // 🔧 Transformer les données si nécessaire pour compatibilité
-      const formattedConversations: Conversation[] = conversations.map((conv: any) => {
-        // Si c'est déjà au bon format, l'utiliser directement
-        if (conv.title && conv.preview && conv.message_count !== undefined) {
-          return conv as Conversation
-        }
-        
-        // Sinon transformer depuis format ancien
-        const firstQuestion = conv.question?.split('\n--- Question suivante ---\n')?.[0] || conv.question || 'Conversation sans titre'
-        const title = firstQuestion.length > 100 ? firstQuestion.substring(0, 100) + '...' : firstQuestion
-        
-        const responses = conv.response?.split('\n--- Réponse suivante ---\n') || [conv.response]
-        const lastResponse = responses[responses.length - 1] || 'Aucune réponse'
-        const lastMessagePreview = lastResponse.length > 300 ? lastResponse.substring(0, 300) + '...' : lastResponse
-
-        return createConversation({
-          id: conv.conversation_id || conv.id || conv.session_id,
-          title: title,
-          preview: firstQuestion,
-          message_count: conv.message_count || 2,
-          created_at: conv.timestamp || conv.created_at || new Date().toISOString(),
-          updated_at: conv.updated_at || conv.timestamp || new Date().toISOString(),
-          feedback: conv.feedback,
-          language: conv.language || 'fr',
-          last_message_preview: lastMessagePreview
-        })
-      })
-      
-      this.circuitBreaker.recordSuccess()
-      return formattedConversations
-      
     } catch (error) {
-      console.error('[ConversationService] ❌ Erreur apiService, fallback localStorage...', error)
+      console.log(`Backend endpoint error: ${error.message}, essai fallback localStorage...`)
       
       try {
         const fallbackResult = await this.getConversationsFromLocalStorage(limit)
@@ -400,7 +416,7 @@ export class ConversationService {
           
           const response = await fetch(`${this.baseUrl}/conversations/${sessionId}`, {
             method: 'GET',
-            headers: this.getHeaders('GET')
+            headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
           })
           
           if (response.ok) {
@@ -554,7 +570,7 @@ export class ConversationService {
       try {
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method: 'GET',
-          headers: this.getHeaders('GET')
+          headers: this.getHeaders('GET') // ✅ CORRECTION: Headers GET nettoyés
         })
         
         console.log(`${endpoint}: ${response.status} ${response.statusText}`)
@@ -629,7 +645,7 @@ export class ConversationService {
     }
   }
 
-  // 🔧 MÉTHODES DÉLÉGUÉES VERS apiService.ts POUR ÉVITER DUPLICATION
+  // ✅ MÉTHODES AVEC HEADERS APPROPRIÉS SELON LE TYPE DE REQUÊTE
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non sauvegardée:', data.conversation_id)
@@ -642,7 +658,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversation`, {
         method: 'POST',
-        headers: this.getHeaders('POST'),
+        headers: this.getHeaders('POST'), // ✅ Headers POST complets
         body: JSON.stringify({
           user_id: data.user_id,
           question: data.question,
@@ -669,15 +685,34 @@ export class ConversationService {
     }
   }
 
-  // 🔧 DÉLÉGATION VERS apiService.ts
   async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - feedback non envoyé:', conversationId)
       return
     }
 
-    console.log('[ConversationService] 🔄 Délégation feedback vers apiService...')
-    return await sendFeedback(conversationId, feedback)
+    try {
+      console.log('Envoi feedback:', conversationId, feedback)
+      console.log('URL feedback:', `${this.baseUrl}/conversations/${conversationId}/feedback`)
+      
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback`, {
+        method: 'PATCH',
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
+        body: JSON.stringify({ feedback })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('Feedback enregistré:', result.message)
+      
+    } catch (error) {
+      console.error('Erreur envoi feedback:', error)
+      throw error
+    }
   }
 
   async sendFeedbackComment(conversationId: string, comment: string): Promise<void> {
@@ -692,7 +727,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/comment`, {
         method: 'PATCH',
-        headers: this.getHeaders('PATCH'),
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
         body: JSON.stringify({ 
           comment: comment,
           timestamp: new Date().toISOString()
@@ -732,7 +767,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`, {
         method: 'PATCH',
-        headers: this.getHeaders('PATCH'),
+        headers: this.getHeaders('PATCH'), // ✅ Headers PATCH complets
         body: JSON.stringify({ 
           feedback,
           comment: comment || null,
@@ -762,15 +797,37 @@ export class ConversationService {
     }
   }
 
-  // 🔧 DÉLÉGATION VERS apiService.ts
   async deleteConversation(conversationId: string): Promise<void> {
     if (!this.loggingEnabled) {
       console.log('Logging désactivé - conversation non supprimée:', conversationId)
       return
     }
 
-    console.log('[ConversationService] 🔄 Délégation suppression vers apiService...')
-    return await deleteConversation(conversationId)
+    try {
+      console.log('Suppression conversation serveur:', conversationId)
+      console.log('URL suppression:', `${this.baseUrl}/conversations/${conversationId}`)
+      
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders('DELETE') // ✅ Headers DELETE appropriés
+      })
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn('Endpoint de suppression non disponible sur le serveur')
+          return
+        }
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('Conversation supprimée du serveur:', result.message)
+      
+    } catch (error) {
+      console.error('Erreur suppression conversation serveur:', error)
+      throw error
+    }
   }
 
   async clearAllUserConversations(userId: string): Promise<void> {
@@ -785,7 +842,7 @@ export class ConversationService {
       
       const response = await fetch(`${this.baseUrl}/conversations/user/${userId}`, {
         method: 'DELETE',
-        headers: this.getHeaders('DELETE')
+        headers: this.getHeaders('DELETE') // ✅ Headers DELETE appropriés
       })
       
       if (!response.ok) {
@@ -817,7 +874,7 @@ export class ConversationService {
       console.log('Récupération stats feedback:', url)
       
       const response = await fetch(url, {
-        headers: this.getHeaders('GET')
+        headers: this.getHeaders('GET') // ✅ Headers GET nettoyés
       })
       
       if (!response.ok) {
@@ -843,7 +900,7 @@ export class ConversationService {
       console.log('Test connectivité service logging...')
       
       const response = await fetch(`${this.baseUrl}/test-comments`, {
-        headers: this.getHeaders('GET')
+        headers: this.getHeaders('GET') // ✅ Headers GET nettoyés
       })
       
       if (response.ok) {
