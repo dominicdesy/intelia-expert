@@ -445,7 +445,7 @@ except ImportError as e:
     
     try:
         from app.api.v1.auth import router as auth_router
-        temp_v1_router.include_router(auth_router, prefix="/auth", tags=["auth"])
+        temp_v1_router.include_router(auth_router, tags=["auth"])
         logger.info("✅ Auth router ajouté")
     except ImportError as e:
         logger.error(f"❌ Impossible de charger auth router: {e}")
