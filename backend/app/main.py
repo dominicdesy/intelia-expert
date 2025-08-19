@@ -922,7 +922,7 @@ async def admin_statistics():
 # ===============================================================================
 
 # ✅ ENDPOINTS AUTH DIRECTS - Évite le problème de montage du router
-@app.post("/api/v1/auth/login")
+@app.post("/v1/auth/login")
 async def auth_login_direct(request: Request):
     """Endpoint login direct - contournement du problème de router"""
     try:
@@ -946,7 +946,13 @@ async def auth_login_direct(request: Request):
         try:
             from supabase import create_client
             supabase = create_client(supabase_url, supabase_key)
-            result = supabase.auth.sign_in(email=login_data.email, password=login_data.password)
+            
+            # 🔧 CORRECTION API SUPABASE - Nouvelle méthode
+            result = supabase.auth.sign_in_with_password({
+                "email": login_data.email,
+                "password": login_data.password
+            })
+            
         except Exception as e:
             return JSONResponse(
                 status_code=401,
@@ -971,7 +977,12 @@ async def auth_login_direct(request: Request):
         return {
             "access_token": token,
             "token_type": "bearer",
-            "expires_at": (datetime.utcnow() + expires).isoformat()
+            "expires_at": (datetime.utcnow() + expires).isoformat(),
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "user_metadata": user.user_metadata
+            }
         }
         
     except Exception as e:
@@ -981,7 +992,7 @@ async def auth_login_direct(request: Request):
             content={"detail": "Login failed", "error": str(e)}
         )
 
-@app.get("/api/v1/auth/debug/jwt-config")
+@app.get("/v1/auth/debug/jwt-config")
 async def auth_debug_direct():
     """Endpoint debug JWT direct - contournement du problème de router"""
     return {
@@ -991,6 +1002,8 @@ async def auth_debug_direct():
         "jwt_algorithm": "HS256",
         "direct_endpoint": True,
         "bypassed_router_issue": True,
+        "api_corrected": True,  # 🔧 NOUVEAU FLAG
+        "routing_fixed": True,   # 🔧 NOUVEAU FLAG
         "secrets_available": [
             name for name, value in [
                 ("SUPABASE_JWT_SECRET", os.getenv("SUPABASE_JWT_SECRET")),
@@ -1000,7 +1013,7 @@ async def auth_debug_direct():
         ]
     }
 
-@app.get("/api/v1/auth/me")
+@app.get("/v1/auth/me")
 async def auth_me_direct(request: Request):
     """Endpoint me direct - contournement du problème de router"""
     try:
@@ -1032,7 +1045,8 @@ async def auth_me_direct(request: Request):
             "is_admin": user_info.get("is_admin"),
             "preferences": user_info.get("preferences", {}),
             "profile_id": user_info.get("profile_id"),
-            "direct_endpoint": True
+            "direct_endpoint": True,
+            "routing_corrected": True  # 🔧 NOUVEAU FLAG
         }
         
     except Exception as e:
@@ -1042,7 +1056,7 @@ async def auth_me_direct(request: Request):
             content={"detail": "Authentication failed", "error": str(e)}
         )
 
-@app.post("/api/v1/auth/delete-data")
+@app.post("/v1/auth/delete-data")
 async def auth_delete_data_direct(request: Request):
     """Endpoint delete data direct - contournement du problème de router"""
     try:
@@ -1075,7 +1089,8 @@ async def auth_delete_data_direct(request: Request):
             "message": "Demande de suppression enregistrée",
             "note": "Vos données seront supprimées sous 30 jours",
             "timestamp": datetime.utcnow().isoformat(),
-            "direct_endpoint": True
+            "direct_endpoint": True,
+            "routing_corrected": True  # 🔧 NOUVEAU FLAG
         }
         
     except Exception as e:
@@ -1085,20 +1100,21 @@ async def auth_delete_data_direct(request: Request):
             content={"detail": "Authentication failed", "error": str(e)}
         )
 
-@app.get("/api/v1/auth/test-direct")
+@app.get("/v1/auth/test-direct")
 async def auth_test_direct():
     """Test pour confirmer que les endpoints directs fonctionnent"""
     return {
         "message": "Auth endpoints directs fonctionnent",
         "status": "success",
         "available_endpoints": [
-            "POST /api/v1/auth/login",
+            "POST /api/v1/auth/login",  # Maintenant /api/v1/ au lieu de /api/api/v1/
             "GET /api/v1/auth/debug/jwt-config", 
             "GET /api/v1/auth/me",
             "POST /api/v1/auth/delete-data",
             "GET /api/v1/auth/test-direct"
         ],
         "catch_22_resolved": True,
+        "routing_fixed": True,  # 🔧 NOUVEAU FLAG
         "solution": "direct_endpoints_bypass",
         "timestamp": datetime.utcnow().isoformat()
     }
