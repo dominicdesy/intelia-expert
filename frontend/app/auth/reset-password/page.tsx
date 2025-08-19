@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
@@ -274,8 +274,8 @@ const InvalidTokenPage = () => (
   </div>
 )
 
-// ==================== PAGE RÉINITIALISATION ====================
-export default function ResetPasswordPage() {
+// ==================== PAGE RÉINITIALISATION CONTENT ====================
+function ResetPasswordPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isAuthenticated, user } = useAuthStore()
@@ -598,5 +598,26 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// ==================== EXPORT PRINCIPAL AVEC SUSPENSE ====================
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <img 
+            src="/images/favicon.png" 
+            alt="Intelia Logo" 
+            className="w-16 h-16 mx-auto mb-4"
+          />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement de la réinitialisation...</p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordPageContent />
+    </Suspense>
   )
 }
