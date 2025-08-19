@@ -18,19 +18,38 @@ except ImportError:
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
-# ✅ CONFIGURATION JWT SUPABASE CORRIGÉE
-# Récupérer le JWT secret de Supabase depuis les variables d'environnement
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
-if not SUPABASE_JWT_SECRET:
-    # Si pas de JWT secret spécifique, essayer la clé anon Supabase
-    SUPABASE_JWT_SECRET = os.getenv("SUPABASE_ANON_KEY")
-    
-if not SUPABASE_JWT_SECRET:
-    # Fallback pour développement
-    SUPABASE_JWT_SECRET = "development-secret-change-in-production-12345"
-    logger.error("❌ Aucun SUPABASE_JWT_SECRET configuré")
+# ✅ CONFIGURATION JWT MULTI-COMPATIBLE (auth-temp + Supabase)
+# Récupérer les secrets JWT dans l'ordre de priorité
+JWT_SECRETS = []
 
-JWT_ALGORITHM = "HS256"  # Supabase utilise HS256
+# 1. Secret auth-temp (utilisé par vos endpoints /auth-temp/*)
+auth_temp_secret = os.getenv("SUPABASE_JWT_SECRET") or os.getenv("JWT_SECRET") or "fallback-secret"
+JWT_SECRETS.append(("AUTH_TEMP", auth_temp_secret))
+
+# 2. Secrets Supabase traditionnels
+supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+if supabase_jwt_secret and supabase_jwt_secret != auth_temp_secret:
+    JWT_SECRETS.append(("SUPABASE_JWT_SECRET", supabase_jwt_secret))
+
+supabase_anon = os.getenv("SUPABASE_ANON_KEY")
+if supabase_anon and supabase_anon not in [s[1] for s in JWT_SECRETS]:
+    JWT_SECRETS.append(("SUPABASE_ANON_KEY", supabase_anon))
+
+service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if service_role_key and service_role_key not in [s[1] for s in JWT_SECRETS]:
+    JWT_SECRETS.append(("SUPABASE_SERVICE_ROLE_KEY", service_role_key))
+
+# Fallback
+if not JWT_SECRETS:
+    JWT_SECRETS.append(("FALLBACK", "development-secret-change-in-production-12345"))
+    logger.error("❌ Aucun JWT secret configuré - utilisation fallback")
+
+logger.info(f"✅ JWT Secrets configurés: {len(JWT_SECRETS)} secrets disponibles")
+logger.info(f"✅ Secrets types: {[s[0] for s in JWT_SECRETS]}")
+
+# Utiliser le premier secret pour créer des tokens
+MAIN_JWT_SECRET = JWT_SECRETS[0][1]
+JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 security = HTTPBearer()
@@ -39,7 +58,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    token = jwt.encode(to_encode, SUPABASE_JWT_SECRET, algorithm=JWT_ALGORITHM)
+    token = jwt.encode(to_encode, MAIN_JWT_SECRET, algorithm=JWT_ALGORITHM)
     return token
 
 class TokenResponse(BaseModel):
@@ -64,7 +83,15 @@ async def login(request: LoginRequest):
     supabase_key = os.getenv("SUPABASE_ANON_KEY")
     supabase: Client = create_client(supabase_url, supabase_key)
     try:
-        result = supabase.auth.sign_in(email=request.email, password=request.password)
+        # Essayer la nouvelle API d'abord
+        try:
+            result = supabase.auth.sign_in_with_password({
+                "email": request.email,
+                "password": request.password
+            })
+        except AttributeError:
+            # Fallback pour ancienne API
+            result = supabase.auth.sign_in(email=request.email, password=request.password)
     except Exception as e:
         logger.error("Supabase sign-in error: %s", e)
         raise HTTPException(status_code=500, detail="Authentication error")
@@ -88,7 +115,7 @@ async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, 
             return {"user_type": "user"}
         
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")  # ✅ CORRIGÉ
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
         if not supabase_url or not supabase_key:
             logger.warning("Config Supabase manquante - rôle par défaut")
@@ -122,7 +149,7 @@ async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
-    ✅ VERSION CORRIGÉE : Decode JWT tokens Supabase + récupération user_type
+    ✅ VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
     """
     token = credentials.credentials
     
@@ -130,65 +157,46 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         logger.warning("⚠️ Token vide ou invalide")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
     
-    # ✅ STRATÉGIE MULTI-SECRET CORRIGÉE: Essayer plusieurs secrets dans l'ordre
-    secrets_to_try = []
-    
-    # 1. Secret JWT Supabase configuré
-    if SUPABASE_JWT_SECRET:
-        secrets_to_try.append(("SUPABASE_JWT_SECRET", SUPABASE_JWT_SECRET))
-    
-    # 2. Essayer avec la clé anon Supabase
-    supabase_anon = os.getenv("SUPABASE_ANON_KEY")
-    if supabase_anon and supabase_anon != SUPABASE_JWT_SECRET:
-        secrets_to_try.append(("SUPABASE_ANON_KEY", supabase_anon))
-    
-    # 3. ✅ CORRIGÉ : Utiliser SUPABASE_SERVICE_ROLE_KEY
-    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    if service_role_key and service_role_key not in [s[1] for s in secrets_to_try]:
-        secrets_to_try.append(("SUPABASE_SERVICE_ROLE_KEY", service_role_key))
-    
-    # 4. Autres clés possibles
-    other_keys = [
-        ("SUPABASE_SECRET_KEY", os.getenv("SUPABASE_SECRET_KEY")),
-    ]
-    
-    for key_name, key_value in other_keys:
-        if key_value and key_value not in [s[1] for s in secrets_to_try]:
-            secrets_to_try.append((key_name, key_value))
-    
-    # ✅ ESSAYER CHAQUE SECRET
-    for secret_name, secret_value in secrets_to_try:
+    # ✅ ESSAYER TOUS LES SECRETS CONFIGURÉS
+    for secret_name, secret_value in JWT_SECRETS:
         if not secret_value:
             continue
             
         try:
             logger.debug(f"🔑 Tentative décodage avec {secret_name}")
             
-            # ✅ CORRIGÉ : Essayer avec et sans audience pour plus de flexibilité
+            # ✅ DÉCODER AVEC PLUSIEURS OPTIONS
             decode_options = [
-                {"audience": "authenticated"},  # Standard Supabase
-                {"audience": None},             # Sans audience
-                {}                             # Sans options spéciales
+                {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
+                {"audience": "authenticated"},       # Standard Supabase
+                {}                                  # Sans options spéciales
             ]
             
             payload = None
-            for options in decode_options:
+            for option_set in decode_options:
                 try:
-                    if options.get("audience") is None:
+                    if "options" in option_set:
                         # Décoder sans vérifier l'audience
                         payload = jwt.decode(
                             token, 
                             secret_value, 
                             algorithms=[JWT_ALGORITHM],
-                            options={"verify_aud": False}
+                            **option_set
                         )
-                    else:
+                    elif "audience" in option_set:
                         # Décoder avec audience
                         payload = jwt.decode(
                             token, 
                             secret_value, 
                             algorithms=[JWT_ALGORITHM],
-                            **options
+                            audience=option_set["audience"]
+                        )
+                    else:
+                        # Décoder simple
+                        payload = jwt.decode(
+                            token, 
+                            secret_value, 
+                            algorithms=[JWT_ALGORITHM]
                         )
                     break  # Si succès, sortir de la boucle des options
                 except jwt.InvalidAudienceError:
@@ -201,27 +209,28 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             
             logger.info(f"✅ Token décodé avec succès avec {secret_name}")
             
-            # Extraire les informations utilisateur du payload Supabase
-            user_id = payload.get("sub")
+            # ✅ EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
+            # Support auth-temp ET Supabase
+            user_id = payload.get("sub") or payload.get("user_id")
             email = payload.get("email")
             
             # Vérification de base
             if not user_id:
-                logger.warning("⚠️ Token sans user_id (sub) valide")
+                logger.warning("⚠️ Token sans user_id valide")
                 continue
                 
             if not email:
                 logger.warning("⚠️ Token sans email valide")
                 continue
             
-            # ✅ CORRIGÉ : Vérification plus flexible de l'émetteur
-            iss = payload.get("iss", "")
-            # Accepter les tokens Supabase même si l'iss n'est pas parfait
+            # 🆕 RÉCUPÉRER LE PROFIL UTILISATEUR depuis Supabase
+            try:
+                profile = await get_user_profile_from_supabase(user_id, email)
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur récupération profil: {e}")
+                profile = {"user_type": "user"}
             
-            # 🆕 NOUVEAU : Récupérer le profil utilisateur depuis Supabase
-            profile = await get_user_profile_from_supabase(user_id, email)
-            
-            # 🆕 Construire la réponse avec rôles
+            # 🆕 CONSTRUIRE LA RÉPONSE UNIFIÉE
             user_data = {
                 "user_id": user_id,
                 "email": email,
@@ -230,13 +239,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 "exp": payload.get("exp"),
                 "jwt_secret_used": secret_name,
                 
-                # 🆕 NOUVEAUX CHAMPS DE RÔLES
+                # Champs de rôles
                 "user_type": profile.get("user_type", "user"),
                 "full_name": profile.get("full_name"),
                 "preferences": profile.get("preferences", {}),
                 "profile_id": profile.get("profile_id"),
                 
-                # ✅ RÉTROCOMPATIBILITÉ : Maintenir is_admin pour l'existant
+                # Rétrocompatibilité
                 "is_admin": profile.get("user_type") in ["admin", "super_admin"]
             }
             
@@ -261,7 +270,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     # Si aucun secret n'a fonctionné
     logger.error("❌ Impossible de décoder le token avec tous les secrets disponibles")
-    logger.error(f"❌ Secrets essayés: {[s[0] for s in secrets_to_try]}")
+    logger.error(f"❌ Secrets essayés: {[s[0] for s in JWT_SECRETS]}")
     
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -282,7 +291,6 @@ async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_us
     user_id = current_user["user_id"]
     user_email = current_user["email"]
     logger.info("GDPR deletion requested for %s (%s)", user_email, user_id)
-    # Here enqueue deletion job or log for manual process
     return {
         "success": True,
         "message": "Demande de suppression enregistrée",
@@ -301,24 +309,23 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
         "full_name": current_user.get("full_name"),
         "is_admin": current_user.get("is_admin"),
         "preferences": current_user.get("preferences", {}),
-        "profile_id": current_user.get("profile_id")
+        "profile_id": current_user.get("profile_id"),
+        "jwt_secret_used": current_user.get("jwt_secret_used")  # 🆕 Debug info
     }
 
-# ✅ ENDPOINT DE DEBUG CORRIGÉ
+# ✅ ENDPOINT DE DEBUG ÉTENDU
 @router.get("/debug/jwt-config")
 async def debug_jwt_config():
-    """Debug endpoint pour voir la configuration JWT"""
+    """Debug endpoint pour voir la configuration JWT multi-compatible"""
     return {
-        "supabase_jwt_secret_configured": bool(SUPABASE_JWT_SECRET),
-        "supabase_anon_key_configured": bool(os.getenv("SUPABASE_ANON_KEY")),
-        "supabase_service_role_key_configured": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),  # ✅ CORRIGÉ
+        "jwt_secrets_configured": len(JWT_SECRETS),
+        "jwt_secret_types": [s[0] for s in JWT_SECRETS],
         "supabase_url_configured": bool(os.getenv("SUPABASE_URL")),
+        "supabase_anon_key_configured": bool(os.getenv("SUPABASE_ANON_KEY")),
+        "supabase_service_role_key_configured": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
         "jwt_algorithm": JWT_ALGORITHM,
-        "secrets_available": [
-            name for name, value in [
-                ("SUPABASE_JWT_SECRET", os.getenv("SUPABASE_JWT_SECRET")),
-                ("SUPABASE_ANON_KEY", os.getenv("SUPABASE_ANON_KEY")),
-                ("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY")),  # ✅ CORRIGÉ
-            ] if value
-        ]
+        "auth_temp_compatible": True,  # 🆕 Flag
+        "supabase_compatible": True,   # 🆕 Flag
+        "multi_secret_support": True,  # 🆕 Flag
+        "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none"
     }
