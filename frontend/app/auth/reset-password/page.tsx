@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuthStore } from '@/lib/stores/auth'
 
 // ==================== VALIDATION MOT DE PASSE ====================
 const validatePassword = (password: string): string[] => {
@@ -76,7 +78,7 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
   const [showPassword, setShowPassword] = useState(false)
   
   const passwordErrors = validatePassword(value)
-  const strength = value ? 4 - passwordErrors.length : 0
+  const strength = value ? 5 - passwordErrors.length : 0
   
   return (
     <div>
@@ -91,6 +93,7 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
           className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 transition-colors"
           placeholder={placeholder}
           disabled={disabled}
+          autoComplete={isConfirmField ? "new-password" : "new-password"}
         />
         <button
           type="button"
@@ -111,7 +114,7 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
         <div className="mt-2">
           <div className="text-xs text-gray-600 mb-1">Force du mot de passe :</div>
           <div className="flex space-x-1">
-            {[1, 2, 3, 4].map((level) => (
+            {[1, 2, 3, 4, 5].map((level) => (
               <div
                 key={level}
                 className={`h-1 flex-1 rounded ${
@@ -119,14 +122,23 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
                     ? strength <= 1
                       ? 'bg-red-500'
                       : strength <= 2
-                      ? 'bg-yellow-500'
+                      ? 'bg-orange-500'
                       : strength <= 3
+                      ? 'bg-yellow-500'
+                      : strength <= 4
                       ? 'bg-blue-500'
                       : 'bg-green-500'
                     : 'bg-gray-200'
                 }`}
               />
             ))}
+          </div>
+          <div className="text-xs mt-1 text-gray-600">
+            {strength <= 1 && 'Très faible'}
+            {strength === 2 && 'Faible'}
+            {strength === 3 && 'Moyen'}
+            {strength === 4 && 'Fort'}
+            {strength === 5 && 'Très fort'}
           </div>
         </div>
       )}
@@ -135,9 +147,19 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
       {isConfirmField && value && confirmValue && (
         <div className="mt-1 text-xs">
           {confirmValue === value ? (
-            <span className="text-green-600">✓ Les mots de passe correspondent</span>
+            <span className="text-green-600 flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Les mots de passe correspondent
+            </span>
           ) : (
-            <span className="text-red-600">✗ Les mots de passe ne correspondent pas</span>
+            <span className="text-red-600 flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Les mots de passe ne correspondent pas
+            </span>
           )}
         </div>
       )}
@@ -170,231 +192,3 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
                 {/\d/.test(value) ? '✓' : '○'}
               </span>
               <span>Au moins un chiffre</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className={/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[!@#$%^&*(),.?":{}|<>]/.test(value) ? '✓' : '○'}
-              </span>
-              <span>Au moins un caractère spécial</span>
-            </li>
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ==================== PAGE SUCCÈS ====================
-const SuccessPage = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
-    <div className="w-full max-w-md text-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
-        <div className="text-6xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          Mot de passe modifié !
-        </h1>
-        <p className="text-gray-600 mb-6 leading-relaxed">
-          Votre mot de passe a été mis à jour avec succès. Vous allez être redirigé vers la page de connexion dans quelques secondes.
-        </p>
-        <div className="flex justify-center">
-          <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-)
-
-// ==================== PAGE RÉINITIALISATION ====================
-export default function ResetPasswordPage() {
-  const [formData, setFormData] = useState({
-    newPassword: '',
-    confirmPassword: ''
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
-  const [success, setSuccess] = useState(false)
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors.length > 0) {
-      setErrors([])
-    }
-  }
-
-  const handleSubmit = async () => {
-    const validationErrors: string[] = []
-    
-    // Validations
-    if (!formData.newPassword) {
-      validationErrors.push('Le nouveau mot de passe est requis')
-    }
-    if (!formData.confirmPassword) {
-      validationErrors.push('La confirmation du mot de passe est requise')
-    }
-    if (formData.newPassword !== formData.confirmPassword) {
-      validationErrors.push('Les mots de passe ne correspondent pas')
-    }
-    
-    // Validation de la force du mot de passe
-    const passwordValidationErrors = validatePassword(formData.newPassword)
-    validationErrors.push(...passwordValidationErrors)
-    
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors)
-      return
-    }
-    
-    setIsLoading(true)
-    setErrors([])
-    
-    try {
-      // TODO: Intégrer avec Supabase
-      // const { error } = await supabase.auth.updateUser({
-      //   password: formData.newPassword
-      // })
-      
-      console.log('🔐 Réinitialisation mot de passe avec standards sécurisés')
-      
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      setSuccess(true)
-      
-      // Redirection après 3 secondes
-      setTimeout(() => {
-        window.location.href = '/auth/login'
-      }, 3000)
-      
-    } catch (error: any) {
-      console.error('❌ Erreur lors de la réinitialisation:', error)
-      setErrors([error.message || 'Erreur lors de la réinitialisation du mot de passe'])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const isFormValid = () => {
-    return (
-      formData.newPassword &&
-      formData.confirmPassword &&
-      formData.newPassword === formData.confirmPassword &&
-      validatePassword(formData.newPassword).length === 0
-    )
-  }
-
-  // Affichage de la page de succès
-  if (success) {
-    return <SuccessPage />
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <InteliaLogo className="w-12 h-12" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Nouveau mot de passe
-          </h1>
-          <p className="text-gray-600 leading-relaxed">
-            Choisissez un nouveau mot de passe sécurisé pour votre compte Intelia Expert
-          </p>
-        </div>
-
-        {/* Messages d'erreur */}
-        {errors.length > 0 && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="text-sm text-red-800">
-              {errors.map((error, index) => (
-                <div key={index} className="flex items-start space-x-2">
-                  <span className="text-red-500 font-bold">•</span>
-                  <span>{error}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Formulaire */}
-        <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
-          <div className="space-y-6">
-            {/* Nouveau mot de passe */}
-            <PasswordField
-              value={formData.newPassword}
-              onChange={(value) => handleInputChange('newPassword', value)}
-              label="Nouveau mot de passe"
-              placeholder="Créez un mot de passe sécurisé"
-              showStrength={true}
-              showRequirements={true}
-              disabled={isLoading}
-            />
-
-            {/* Confirmation */}
-            <PasswordField
-              value={formData.confirmPassword}
-              onChange={(value) => handleInputChange('confirmPassword', value)}
-              label="Confirmer le nouveau mot de passe"
-              placeholder="Confirmez votre nouveau mot de passe"
-              confirmValue={formData.newPassword}
-              isConfirmField={true}
-              disabled={isLoading}
-            />
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isLoading || !isFormValid()}
-              className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Mise à jour...</span>
-                </div>
-              ) : (
-                'Mettre à jour le mot de passe'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="mt-6 text-center">
-          <Link
-            href="/auth/login"
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Retour à la connexion
-          </Link>
-        </div>
-
-        {/* Information sécurité */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500 leading-relaxed">
-            🔒 Votre nouveau mot de passe respecte les plus hauts standards de sécurité.
-            <br />
-            Il sera automatiquement chiffré et stocké de manière sécurisée.
-          </p>
-        </div>
-
-        {/* Support */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center">
-          <p className="text-xs text-gray-600">
-            Problème avec la réinitialisation ?{' '}
-            <button
-              type="button"
-              onClick={() => window.open('mailto:support@intelia.com', '_blank')}
-              className="text-blue-600 hover:underline font-medium transition-colors"
-            >
-              Contactez le support
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
