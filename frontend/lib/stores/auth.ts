@@ -1,4 +1,4 @@
-// lib/stores/auth.ts — Store d'auth BACKEND API (robuste + timeout gérés)
+// lib/stores/auth.ts – Store d'auth BACKEND API (robuste + timeout gérés)
 'use client'
 
 import { create } from 'zustand'
@@ -415,5 +415,4 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-// Export par défaut (compat)
-export default useAuthStore
+// 🔥 SUPPRIMÉ: export default useAuthStore
