@@ -379,8 +379,7 @@ app.add_middleware(
         "https://expert.intelia.com",
         "https://expert-app-cngws.ondigitalocean.app",
         "http://localhost:3000",
-        "http://localhost:8080",
-        "*"
+        "http://localhost:8080"
     ],
     allow_credentials=True,
     allow_methods=["*"],
