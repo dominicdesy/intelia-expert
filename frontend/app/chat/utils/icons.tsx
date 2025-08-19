@@ -1,5 +1,5 @@
 // utils/icons.tsx - Mise à jour avec les nouvelles icônes
-import { IconProps } from '../types'
+import { IconProps } from '../../../types'
 
 // ==================== ICÔNES SVG EXISTANTES ====================
 
