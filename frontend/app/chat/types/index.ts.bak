@@ -467,7 +467,8 @@ export class TimeoutError extends Error {
 }
 
 // ==================== CONSERVÉES: CONSTANTES API SÉCURISÉES ====================
-// 🔧 CONFIGURATION API CORRIGÉE - Configuration API dynamique depuis environnement
+
+// ✅ CONSERVÉ: Configuration API dynamique depuis environnement
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
@@ -481,19 +482,14 @@ const getApiConfig = () => {
     }
   }
   
-  // 🔧 CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
-  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
-  
   return {
-    BASE_URL: cleanBaseUrl, // 🔧 URL de base nettoyée
+    BASE_URL: baseUrl,
     TIMEOUT: 30000,
-    LOGGING_BASE_URL: `${cleanBaseUrl}/api/${version}` // 🔧 Construction correcte
+    LOGGING_BASE_URL: `${baseUrl}/api/${version}`
   }
 }
 
 export const API_CONFIG = getApiConfig()
-
-
 
 // ✅ CONSERVÉS: ENDPOINTS FEEDBACK
 export const FEEDBACK_ENDPOINTS = {

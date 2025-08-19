@@ -60,10 +60,14 @@ interface ChatState {
 const getAPIConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  const fullUrl = `${baseUrl}/api/${version}`
+  
+  // 🔧 CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
+  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
+  const fullUrl = `${cleanBaseUrl}/api/${version}`
   
   console.log('🔧 [ChatStore] Configuration API:', {
-    baseUrl,
+    originalBaseUrl: baseUrl,
+    cleanBaseUrl,
     version,
     fullUrl
   })

@@ -3,19 +3,22 @@
 import { conversationService } from './conversationService'
 import { supabase } from '@/lib/supabase/client'
 
-// Configuration API
+// 🔧 CONFIGURATION API CORRIGÉE
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
+  
+  // 🔧 CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
+  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
+  const finalUrl = `${cleanBaseUrl}/api/${version}`
   
   // 🔍 DEBUG: Log des variables d'environnement
   console.log('🔍 [DEBUG] Variables d\'environnement:')
   console.log('  - NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
   console.log('  - NEXT_PUBLIC_API_VERSION:', process.env.NEXT_PUBLIC_API_VERSION)
-  console.log('  - baseUrl (après fallback):', baseUrl)
+  console.log('  - baseUrl (original):', baseUrl)
+  console.log('  - cleanBaseUrl (après nettoyage):', cleanBaseUrl)
   console.log('  - version (après fallback):', version)
-  
-  const finalUrl = `${baseUrl}/api/${version}`
   console.log('  - URL finale construite:', finalUrl)
   
   return finalUrl
