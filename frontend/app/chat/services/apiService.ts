@@ -1,9 +1,9 @@
-// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLÈTE
+// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLÈTE - CORRIGÉE
 
 import { conversationService } from './conversationService'
 import { supabase } from '@/lib/supabase/client'
 
-// 🔧 CONFIGURATION API CORRIGÉE
+// 🔧 CONFIGURATION API CORRIGÉE - SANS DEBUG PROBLÉMATIQUE
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
@@ -11,15 +11,6 @@ const getApiConfig = () => {
   // 🔧 CORRECTION: Enlever /api s'il est déjà présent pour éviter /api/api/
   const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
   const finalUrl = `${cleanBaseUrl}/api/${version}`
-  
-  // 🔍 DEBUG: Log des variables d'environnement
-  console.log('🔍 [DEBUG] Variables d\'environnement:')
-  console.log('  - NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
-  console.log('  - NEXT_PUBLIC_API_VERSION:', process.env.NEXT_PUBLIC_API_VERSION)
-  console.log('  - baseUrl (original):', baseUrl)
-  console.log('  - cleanBaseUrl (après nettoyage):', cleanBaseUrl)
-  console.log('  - version (après fallback):', version)
-  console.log('  - URL finale construite:', finalUrl)
   
   return finalUrl
 }
@@ -589,12 +580,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 
   try {
     const headers = await getAuthHeaders()
-    
-    // 🔍 DEBUG: Log de l'URL exacte construite
     const url = `${API_BASE_URL}/conversations/user/${userId}`
-    console.log('🔍 [DEBUG] URL exacte construite:', url)
-    console.log('🔍 [DEBUG] API_BASE_URL:', API_BASE_URL)
-    console.log('🔍 [DEBUG] process.env.NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
 
     const response = await fetch(url, {
       method: 'GET',
