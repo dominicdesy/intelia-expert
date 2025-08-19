@@ -1,40 +1,34 @@
-// ==================== API SERVICE UNIFIÉ - MIGRÉ VERS SUPABASE ====================
+// app/chat/services/apiService.ts - VERSION SUPABASE NATIVE FINALE
 
-// 🔧 AJOUT : Import du conversationService pour stocker les session IDs
 import { conversationService } from './conversationService'
 import { supabase } from '@/lib/supabase/client'
 
-// ✅ CONFIGURATION CORRIGÉE POUR SUPABASE
+// Configuration API
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  
-  if (!baseUrl) {
-    console.error('❌ NEXT_PUBLIC_API_BASE_URL environment variable is required')
-    throw new Error('API configuration missing - check environment variables')
-  }
-  
   return `${baseUrl}/api/${version}`
 }
 
 const API_BASE_URL = getApiConfig()
 
-// ✅ FONCTIONS AUTH CORRIGÉES POUR SUPABASE
+// ✅ FONCTION AUTH SUPABASE NATIVE
 const getAuthToken = async (): Promise<string | null> => {
   try {
-    // 🔧 PRIORITÉ 1: Récupérer le token Supabase
+    console.log('[apiService] Récupération token Supabase natif...')
+    
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     
     if (token && token !== 'null' && token !== 'undefined') {
-      console.log('[getAuthToken] Token Supabase trouvé')
+      console.log('[apiService] ✅ Token Supabase natif récupéré')
       return token
     }
 
-    console.warn('[getAuthToken] Aucun token Supabase trouvé')
+    console.warn('[apiService] ❌ Aucun token Supabase trouvé')
     return null
   } catch (error) {
-    console.error('[getAuthToken] Error getting Supabase token:', error)
+    console.error('[apiService] ❌ Erreur récupération token Supabase:', error)
     return null
   }
 }
@@ -48,15 +42,15 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const authToken = await getAuthToken()
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('🔑 [apiService] Token Supabase ajouté aux headers')
+    console.log('[apiService] 🔑 Token Supabase natif ajouté aux headers')
   } else {
-    console.warn('⚠️ [apiService] Aucun token Supabase - requête sans auth')
+    console.warn('[apiService] ⚠️ Requête sans authentification - pas de token Supabase')
   }
 
   return headers
 }
 
-// ✅ GÉNÉRATION UUID INCHANGÉE
+// UUID Generation
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID()
@@ -69,12 +63,10 @@ const generateUUID = (): string => {
   })
 }
 
-// 🆕 NOUVEAU : FONCTIONS FORMATAGE HEURE LOCALE (PRÉSERVÉES)
+// Formatage heure locale
 export const formatToLocalTime = (utcTimestamp: string): string => {
   try {
     const date = new Date(utcTimestamp);
-    
-    // Options pour l'affichage en français canadien
     const options: Intl.DateTimeFormatOptions = {
       year: 'numeric',
       month: '2-digit', 
@@ -82,18 +74,16 @@ export const formatToLocalTime = (utcTimestamp: string): string => {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Heure locale auto
-      hour12: false // Format 24h
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      hour12: false
     };
-    
     return date.toLocaleString('fr-CA', options);
   } catch (error) {
     console.warn('Erreur formatage date:', error);
-    return utcTimestamp; // Fallback
+    return utcTimestamp;
   }
 }
 
-// Version plus simple si préférée
 export const simpleLocalTime = (utcTimestamp: string): string => {
   try {
     return new Date(utcTimestamp).toLocaleString('fr-CA', {
@@ -110,7 +100,7 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
   }
 }
 
-// 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité (PRÉSERVÉE INTÉGRALEMENT)
+// Interface pour les réponses IA
 interface EnhancedAIResponse {
   response?: string
   conversation_id: string
@@ -125,7 +115,6 @@ interface EnhancedAIResponse {
   timestamp?: string
   processing_time?: number
   
-  // 🚀 NOUVEAU : Toutes les versions de réponse (généré côté frontend si absent)
   response_versions?: {
     ultra_concise?: string
     concise?: string
@@ -133,7 +122,6 @@ interface EnhancedAIResponse {
     detailed?: string
   }
   
-  // ✅ CLARIFICATIONS INCHANGÉES
   clarification_result?: {
     clarification_requested: boolean
     clarification_type: string
@@ -146,14 +134,12 @@ interface EnhancedAIResponse {
   clarification_type?: string
   vague_entities?: string[]
   
-  // 🚀 NOUVEAU : Support format DialogueManager
   type?: 'answer' | 'clarification' | 'partial_answer' | 'validation_rejected'
   questions?: string[]
   source?: string
   documents_used?: number
   warning?: string
   
-  // 🔧 AJOUT CRITIQUE : Support format partial_answer
   general_answer?: {
     text: string
     source?: string
@@ -164,7 +150,6 @@ interface EnhancedAIResponse {
     options?: string[]
   }>
   
-  // 🌾 NOUVEAU : Support validation_rejected
   message?: string
   validation?: {
     is_valid: boolean
@@ -174,11 +159,9 @@ interface EnhancedAIResponse {
     rejected_keywords?: string[]
   }
   
-  // 🚀 AJOUT : Champ pour compatibilité
   full_text?: string
 }
 
-// ✅ INTERFACE ERROR INCHANGÉE
 interface APIError {
   detail: string
   timestamp: string
@@ -187,7 +170,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE AVEC STOCKAGE SESSION ID (PRÉSERVÉE + CORRIGÉE SUPABASE)
+ * FONCTION PRINCIPALE - Expert API avec Supabase natif
  */
 export const generateAIResponse = async (
   question: string,
@@ -207,20 +190,18 @@ export const generateAIResponse = async (
     throw new Error('Utilisateur requis')
   }
 
-  // 🔧 ADAPTÉ : Session ID pour DialogueManager
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🎯 [apiService] Nouveau système DialogueManager (Supabase compatible):', {
+  console.log('🎯 [apiService] Expert API avec Supabase natif:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
-    system: 'expert.py + DialogueManager + Supabase'
+    system: 'Supabase → Expert API'
   })
 
   try {
-    // 🔧 ADAPTÉ : Endpoint simplifié du nouveau système
     const endpoint = `${API_BASE_URL}/expert/ask`
     
-    // ✅ ENRICHISSEMENT CLARIFICATION CONSERVÉ (au cas où)
+    // Enrichissement clarification conservé
     let finalQuestion = question.trim()
     
     if (isClarificationResponse && originalQuestion) {
@@ -238,17 +219,14 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🔧 CORRECTION CRITIQUE : session_id dans le body, pas dans les headers !
     const requestBody = {
-      session_id: finalConversationId,  // ✅ CORRIGÉ !
+      session_id: finalConversationId,
       question: finalQuestion
     }
 
-    // 🔧 CORRECTION : Headers avec CORS et Supabase
-    const headers = await getAuthHeaders()  // ✅ CORRIGÉ !
+    const headers = await getAuthHeaders()
 
-    console.log('📤 [apiService] Body DialogueManager (Supabase):', requestBody)
-    console.log('📤 [apiService] Session ID:', finalConversationId.substring(0, 8) + '...')
+    console.log('📤 [apiService] Requête Expert API (Supabase natif):', requestBody)
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -256,11 +234,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut DialogueManager (Supabase):', response.status)
+    console.log('📡 [apiService] Expert API status (Supabase):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur DialogueManager (Supabase):', errorText)
+      console.error('❌ [apiService] Erreur Expert API (Supabase):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -283,7 +261,7 @@ export const generateAIResponse = async (
 
     const data = await response.json()
     
-    console.log('✅ [apiService] Réponse DialogueManager reçue (Supabase):', {
+    console.log('✅ [apiService] Réponse Expert API reçue (Supabase):', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -294,29 +272,28 @@ export const generateAIResponse = async (
       documents_used: data.documents_used
     })
 
-    // 🚨 CORRECTION CRITIQUE : Extraction du texte selon le type + validation_rejected (PRÉSERVÉE)
+    // Extraction du texte selon le type
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
-      console.log('🎯 [apiService] Texte extrait de data.answer.text:', responseText.substring(0, 100))
+      console.log('🎯 [apiService] Texte extrait de data.answer.text')
     } else if (data.type === 'partial_answer' && data.general_answer?.text) {
       responseText = data.general_answer.text
-      console.log('🎯 [apiService] Texte extrait de data.general_answer.text:', responseText.substring(0, 100))
+      console.log('🎯 [apiService] Texte extrait de data.general_answer.text')
     } else if (data.type === 'validation_rejected') {
-      // 🌾 NOUVEAU : Gestion validation_rejected
       responseText = data.message || "Cette question ne concerne pas le domaine agricole."
-      console.log('🚫 [apiService] Question rejetée par validation agricole:', responseText.substring(0, 100))
+      console.log('🚫 [apiService] Question rejetée par validation agricole')
     } else {
       console.warn('⚠️ [apiService] Aucun texte trouvé dans la réponse!')
     }
 
-    // 🔧 CORRECTION FINALE : Construction processedData simplifiée + validation_rejected (PRÉSERVÉE)
+    // Construction des données de réponse
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 🚨 CORRECTION TYPE ANSWER
+      // Type answer
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: responseText,
@@ -329,7 +306,7 @@ export const generateAIResponse = async (
         confidence_score: data.answer?.confidence || 0.9
       } : {}),
       
-      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER
+      // Type partial_answer
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
@@ -343,7 +320,7 @@ export const generateAIResponse = async (
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
       } : {}),
       
-      // 🔧 GESTION CLARIFICATION : Format DialogueManager
+      // Type clarification
       ...(data.type === 'clarification' ? {
         type: 'clarification',
         requires_clarification: true,
@@ -362,7 +339,7 @@ export const generateAIResponse = async (
         note: 'Clarification requise'
       } : {}),
 
-      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type
+      // Type validation_rejected
       ...(data.type === 'validation_rejected' ? {
         type: 'validation_rejected',
         message: data.message,
@@ -378,7 +355,7 @@ export const generateAIResponse = async (
       } : {})
     }
 
-    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions SEULEMENT si response existe (PRÉSERVÉE)
+    // Génération automatique des versions de réponse
     if (processedData.response && !processedData.response_versions) {
       console.log('✅ [apiService] Génération automatique response_versions')
       
@@ -395,7 +372,7 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (PRÉSERVÉ)
+    // Stocker le session ID pour l'historique
     try {
       conversationService.storeRecentSessionId(finalConversationId)
       console.log('✅ [apiService] Session ID stocké pour historique')
@@ -403,16 +380,7 @@ export const generateAIResponse = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID:', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation - DÉSACTIVÉ car endpoint manquant (PRÉSERVÉ)
-    try {
-      await saveConversationExplicitly(processedData, user.id, finalQuestion)
-      console.log('✅ [apiService] Conversation sauvegardée explicitement')
-    } catch (saveError) {
-      console.warn('⚠️ [apiService] Erreur sauvegarde conversation:', saveError)
-      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
-    }
-
-    console.log('🎯 [apiService] Données traitées DialogueManager (Supabase):', {
+    console.log('🎯 [apiService] Réponse traitée (Supabase natif):', {
       type: processedData.type,
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
@@ -426,7 +394,7 @@ export const generateAIResponse = async (
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur DialogueManager (Supabase):', error)
+    console.error('❌ [apiService] Erreur Expert API (Supabase):', error)
     
     if (error instanceof Error) {
       throw error
@@ -437,7 +405,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE AVEC STOCKAGE SESSION ID (PRÉSERVÉE + CORRIGÉE SUPABASE)
+ * VERSION PUBLIQUE avec Supabase
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -451,7 +419,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌍 [apiService] DialogueManager public (Supabase):', {
+  console.log('🌍 [apiService] Expert API public (Supabase):', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
@@ -477,13 +445,13 @@ export const generateAIResponsePublic = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur DialogueManager public (Supabase):', errorText)
+      console.error('❌ [apiService] Erreur Expert API public (Supabase):', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
     const data = await response.json()
     
-    console.log('✅ [apiService] Réponse DialogueManager public (Supabase):', {
+    console.log('✅ [apiService] Réponse Expert API public (Supabase):', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -492,16 +460,14 @@ export const generateAIResponsePublic = async (
       has_message: !!data.message
     })
 
-    // 🚨 MÊME EXTRACTION que la version auth + validation_rejected (PRÉSERVÉE)
+    // Même extraction que la version auth
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
     } else if (data.type === 'partial_answer' && data.general_answer?.text) {
       responseText = data.general_answer.text
     } else if (data.type === 'validation_rejected') {
-      // 🌾 NOUVEAU : Gestion validation_rejected
       responseText = data.message || "Cette question ne concerne pas le domaine agricole."
-      console.log('🚫 [apiService] Question rejetée par validation agricole (public):', responseText.substring(0, 100))
     }
 
     const processedData: EnhancedAIResponse = {
@@ -509,7 +475,6 @@ export const generateAIResponsePublic = async (
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 🚨 CORRECTION TYPE ANSWER (PRÉSERVÉE)
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: responseText,
@@ -522,7 +487,6 @@ export const generateAIResponsePublic = async (
         confidence_score: data.answer?.confidence || 0.9
       } : {}),
       
-      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER (PRÉSERVÉE)
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
@@ -536,7 +500,6 @@ export const generateAIResponsePublic = async (
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
       } : {}),
       
-      // 🔧 GESTION CLARIFICATION (PRÉSERVÉE)
       ...(data.type === 'clarification' ? {
         type: 'clarification',
         requires_clarification: true,
@@ -555,7 +518,6 @@ export const generateAIResponsePublic = async (
         note: 'Clarification requise'
       } : {}),
 
-      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type (public) (PRÉSERVÉE)
       ...(data.type === 'validation_rejected' ? {
         type: 'validation_rejected',
         message: data.message,
@@ -571,7 +533,7 @@ export const generateAIResponsePublic = async (
       } : {})
     }
 
-    // 🚀 GÉNÉRATION response_versions SEULEMENT si response existe (PRÉSERVÉE)
+    // Génération response_versions
     if (processedData.response && !processedData.response_versions) {
       const mainResponse = processedData.response
       
@@ -585,7 +547,7 @@ export const generateAIResponsePublic = async (
       }
     }
 
-    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (version publique aussi) (PRÉSERVÉ)
+    // Stocker le session ID
     try {
       conversationService.storeRecentSessionId(finalConversationId)
       console.log('✅ [apiService] Session ID stocké pour historique (public)')
@@ -593,146 +555,15 @@ export const generateAIResponsePublic = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID (public):', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique) - DÉSACTIVÉ car endpoint manquant (PRÉSERVÉ)
-    try {
-      await saveConversationPublic(processedData, question.trim())
-      console.log('✅ [apiService] Conversation publique sauvegardée explicitement')
-    } catch (saveError) {
-      console.warn('⚠️ [apiService] Erreur sauvegarde conversation publique:', saveError)
-      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
-    }
-
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur DialogueManager public (Supabase):', error)
+    console.error('❌ [apiService] Erreur Expert API public (Supabase):', error)
     throw error
   }
 }
 
-/**
- * 🚀 FONCTIONS DE SAUVEGARDE EXPLICITE - CORRIGÉES POUR ÉVITER ERREUR 405 (PRÉSERVÉES)
- */
-const saveConversationExplicitly = async (
-  processedData: EnhancedAIResponse,
-  userId: string,
-  question: string
-): Promise<void> => {
-  // ✅ CORRECTION : Désactiver car l'endpoint POST /v1/conversation n'existe pas
-  console.log('ℹ️ [saveConversationExplicitly] Sauvegarde automatique via /expert/ask - endpoint POST manquant, skipping explicit save')
-  console.log('📊 [saveConversationExplicitly] Conversation déjà créée avec ID:', processedData.conversation_id)
-  
-  // Les conversations sont automatiquement créées par /v1/expert/ask
-  // Pas besoin de sauvegarde explicite supplémentaire
-  return
-}
-
-const saveConversationPublic = async (
-  processedData: EnhancedAIResponse,
-  question: string
-): Promise<void> => {
-  // ✅ CORRECTION : Désactiver car l'endpoint POST /v1/conversation n'existe pas
-  console.log('ℹ️ [saveConversationPublic] Sauvegarde automatique via /expert/ask - endpoint POST manquant, skipping explicit save')
-  console.log('📊 [saveConversationPublic] Conversation publique déjà créée avec ID:', processedData.conversation_id)
-  
-  // Les conversations sont automatiquement créées par /v1/expert/ask
-  // Pas besoin de sauvegarde explicite supplémentaire
-  return
-}
-
-/**
- * 🆕 NOUVEAU : FONCTION DELETE CONVERSATION CORRIGÉE (PRÉSERVÉE + CORRIGÉE SUPABASE)
- */
-export const deleteConversation = async (conversationId: string): Promise<void> => {
-  if (!conversationId) {
-    throw new Error('ID de conversation requis')
-  }
-
-  console.log('🗑️ [apiService] Suppression conversation (Supabase):', conversationId)
-
-  try {
-    const headers = await getAuthHeaders() // 🔧 CORRECTION: Utilise Supabase headers
-
-    // ✅ CORRECTION : URL corrigée avec conversations (au pluriel)
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
-      method: 'DELETE',
-      headers
-    })
-
-    console.log('📡 [apiService] Delete statut (Supabase):', response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ [apiService] Erreur delete conversation (Supabase):', errorText)
-      
-      if (response.status === 401) {
-        throw new Error('Session expirée. Veuillez vous reconnecter.')
-      }
-      
-      if (response.status === 404) {
-        console.warn('⚠️ [apiService] Conversation déjà supprimée ou inexistante')
-        return // Ne pas lever d'erreur pour un 404
-      }
-      
-      throw new Error(`Erreur suppression conversation: ${response.status}`)
-    }
-
-    const result = await response.json()
-    console.log('✅ [apiService] Conversation supprimée (Supabase):', result.message || 'Succès')
-
-  } catch (error) {
-    console.error('❌ [apiService] Erreur suppression conversation (Supabase):', error)
-    throw error
-  }
-}
-
-/**
- * 🆕 NOUVEAU : FONCTION CLEAR ALL CONVERSATIONS CORRIGÉE (PRÉSERVÉE + CORRIGÉE SUPABASE)
- */
-export const clearAllUserConversations = async (userId: string): Promise<void> => {
-  if (!userId) {
-    throw new Error('User ID requis')
-  }
-
-  console.log('🗑️ [apiService] Suppression toutes conversations pour (Supabase):', userId)
-
-  try {
-    const headers = await getAuthHeaders() // 🔧 CORRECTION: Utilise Supabase headers
-
-    // ✅ CORRECTION : URL corrigée
-    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
-      method: 'DELETE',
-      headers
-    })
-
-    console.log('📡 [apiService] Clear all statut (Supabase):', response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ [apiService] Erreur clear all conversations (Supabase):', errorText)
-      
-      if (response.status === 401) {
-        throw new Error('Session expirée. Veuillez vous reconnecter.')
-      }
-      
-      throw new Error(`Erreur suppression conversations: ${response.status}`)
-    }
-
-    const result = await response.json()
-    console.log('✅ [apiService] Toutes conversations supprimées (Supabase):', {
-      message: result.message,
-      deleted_count: result.deleted_count || 0
-    })
-
-  } catch (error) {
-    console.error('❌ [apiService] Erreur suppression toutes conversations (Supabase):', error)
-    throw error
-  }
-}
-
-/**
- * ✅ TOUTES LES AUTRES FONCTIONS RESTENT IDENTIQUES MAIS AVEC SUPABASE HEADERS
- */
+// Toutes les autres fonctions utilitaires restent identiques...
 export const sendFeedback = async (
   conversationId: string,
   feedback: 1 | -1,
@@ -742,7 +573,7 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('👍👎 [apiService] Envoi feedback (Supabase):', feedback, 'pour conversation:', conversationId)
+  console.log('👍👎 [apiService] Envoi feedback (Supabase):', feedback)
 
   try {
     const requestBody = {
@@ -751,15 +582,13 @@ export const sendFeedback = async (
       ...(comment && { comment: comment.trim() })
     }
 
-    const headers = await getAuthHeaders() // 🔧 CORRECTION: Utilise Supabase headers
+    const headers = await getAuthHeaders()
 
     const response = await fetch(`${API_BASE_URL}/expert/feedback`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody)
     })
-
-    console.log('📡 [apiService] Feedback statut (Supabase):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -780,115 +609,50 @@ export const sendFeedback = async (
   }
 }
 
-export const loadUserConversations = async (userId: string): Promise<any> => {
-  if (!userId) {
-    throw new Error('User ID requis')
+// Export des autres fonctions...
+export const deleteConversation = async (conversationId: string): Promise<void> => {
+  if (!conversationId) {
+    throw new Error('ID de conversation requis')
   }
 
-  console.log('📂 [apiService] Chargement conversations pour (Supabase):', userId)
+  console.log('🗑️ [apiService] Suppression conversation (Supabase):', conversationId)
 
   try {
-    const headers = await getAuthHeaders() // 🔧 CORRECTION: Utilise Supabase headers
+    const headers = await getAuthHeaders()
 
-    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
-      method: 'GET',
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+      method: 'DELETE',
       headers
     })
 
-    console.log('📡 [apiService] Conversations statut (Supabase):', response.status)
+    console.log('📡 [apiService] Delete statut (Supabase):', response.status)
 
     if (!response.ok) {
+      if (response.status === 404) {
+        console.warn('⚠️ [apiService] Conversation déjà supprimée ou inexistante')
+        return
+      }
+      
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur conversations (Supabase):', errorText)
+      console.error('❌ [apiService] Erreur delete conversation (Supabase):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
       }
       
-      throw new Error(`Erreur chargement conversations: ${response.status}`)
+      throw new Error(`Erreur suppression conversation: ${response.status}`)
     }
 
-    const data = await response.json()
-    console.log('✅ [apiService] Conversations chargées (Supabase):', {
-      count: data.count,
-      conversations: data.conversations?.length || 0
-    })
-
-    return data
+    const result = await response.json()
+    console.log('✅ [apiService] Conversation supprimée (Supabase):', result.message || 'Succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur chargement conversations (Supabase):', error)
+    console.error('❌ [apiService] Erreur suppression conversation (Supabase):', error)
     throw error
   }
 }
 
-export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
-  console.log('💡 [apiService] Récupération suggestions sujets (Supabase):', language)
-
-  try {
-    const headers = await getAuthHeaders() // 🔧 CORRECTION: Utilise Supabase headers
-
-    const response = await fetch(`${API_BASE_URL}/expert/topics?language=${language}`, {
-      method: 'GET',
-      headers
-    })
-
-    if (!response.ok) {
-      console.warn('⚠️ [apiService] Erreur récupération sujets (Supabase):', response.status)
-      
-      return [
-        "Problèmes de croissance poulets",
-        "Conditions environnementales optimales",
-        "Protocoles de vaccination",
-        "Diagnostic problèmes de santé",
-        "Nutrition et alimentation",
-        "Gestion de la mortalité"
-      ]
-    }
-
-    const data = await response.json()
-    console.log('✅ [apiService] Sujets récupérés (Supabase):', data.topics?.length || 0)
-
-    return Array.isArray(data.topics) ? data.topics : []
-
-  } catch (error) {
-    console.error('❌ [apiService] Erreur sujets (Supabase):', error)
-    
-    return [
-      "Problèmes de croissance poulets",
-      "Conditions environnementales optimales", 
-      "Protocoles de vaccination",
-      "Diagnostic problèmes de santé",
-      "Nutrition et alimentation",
-      "Gestion de la mortalité"
-    ]
-  }
-}
-
-export const checkAPIHealth = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/system/health`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com'
-      }
-    })
-
-    const isHealthy = response.ok
-    console.log('🏥 [apiService] API Health (Supabase):', isHealthy ? 'OK' : 'KO')
-    
-    return isHealthy
-
-  } catch (error) {
-    console.error('❌ [apiService] Erreur health check (Supabase):', error)
-    return false
-  }
-}
-
-/**
- * ✅ TOUTES LES AUTRES FONCTIONS UTILITAIRES INCHANGÉES (PRÉSERVÉES INTÉGRALEMENT)
- */
+// Utilitaires clarification inchangés
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
   clarificationQuestions: string[]
@@ -941,177 +705,8 @@ export const handleEnhancedNetworkError = (error: any): string => {
     return 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.'
   }
   
-  if (error?.message?.includes('DialogueManager') || error?.message?.includes('ask')) {
-    return 'Erreur du système expert. Veuillez réessayer.'
-  }
-  
   return error?.message || 'Une erreur inattendue s\'est produite.'
 }
 
-export const debugEnhancedConversationFlow = (
-  step: string,
-  conversationId: string | undefined,
-  additionalInfo?: any
-) => {
-  console.log(`🔍 [DialogueManager Debug] ${step}:`, {
-    session_id: conversationId || 'GÉNÉRÉ_AUTO',
-    endpoint: 'ask (DialogueManager)',
-    auth_system: 'Supabase',
-    timestamp: new Date().toISOString(),
-    ...additionalInfo
-  })
-}
-
-export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py + SUPABASE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
-  console.log('API_BASE_URL:', API_BASE_URL)
-  console.log('Système backend: DialogueManager + expert.py')
-  console.log('Système auth: Supabase')
-  console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
-  console.log('🔧 CORRECTIONS EFFECTUÉES:')
-  console.log('  ✅ Body avec session_id: { session_id, question }')
-  console.log('  ✅ Headers avec CORS Origin obligatoire')
-  console.log('  ✅ Supabase: Token dans Authorization header')
-  console.log('  ✅ Extraction correcte du texte selon type')
-  console.log('  ✅ Support type: "answer" avec data.answer.text')
-  console.log('  ✅ Support type: "partial_answer"')
-  console.log('  ✅ Support type: "clarification"')
-  console.log('  🌾 Support type: "validation_rejected" (NOUVEAU !)')
-  console.log('  ✅ Génération automatique response_versions')
-  console.log('  🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
-  console.log('  ✅ Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
-  console.log('  🆕 DELETE conversation corrigé (/conversations au pluriel)')
-  console.log('  🆕 CLEAR ALL conversations ajouté')
-  console.log('  🆕 Formatage heure locale (formatToLocalTime, simpleLocalTime)')
-  console.log('  🔧 SUPABASE: Headers avec Origin + Authorization')
-  console.log('FONCTIONNALITÉS PRÉSERVÉES:')
-  console.log('  ✅ Authentification JWT (Supabase)')
-  console.log('  ✅ Feedback, conversations, topics')
-  console.log('  ✅ Gestion erreurs')
-  console.log('  ✅ Health check')
-  console.log('  ✅ Utilitaires clarification')
-  console.log('  ✅ Intégration ConversationService')
-  console.groupEnd()
-}
-
-export const testEnhancedConversationContinuity = async (
-  user: any,
-  language: string = 'fr'
-): Promise<{
-  first_conversation_id: string,
-  second_conversation_id: string,
-  same_id: boolean,
-  success: boolean,
-  enhancements_used: string[]
-}> => {
-  try {
-    console.log('🧪 [apiService] Test continuité DialogueManager (Supabase)...')
-    
-    const firstResponse = await generateAIResponse(
-      "Test question 1: Qu'est-ce que les poulets de chair ?",
-      user,
-      language
-    )
-    
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const secondResponse = await generateAIResponse(
-      "Test question 2: Quel est leur poids optimal à 12 jours ?",
-      user,
-      language,
-      firstResponse.conversation_id
-    )
-    
-    const sameId = firstResponse.conversation_id === secondResponse.conversation_id
-    
-    console.log('🧪 [apiService] Test DialogueManager résultat (Supabase):', {
-      first_id: firstResponse.conversation_id,
-      second_id: secondResponse.conversation_id,
-      same_id: sameId,
-      first_type: firstResponse.type,
-      second_type: secondResponse.type
-    })
-    
-    return {
-      first_conversation_id: firstResponse.conversation_id,
-      second_conversation_id: secondResponse.conversation_id,
-      same_id: sameId,
-      success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase']
-    }
-    
-  } catch (error) {
-    console.error('❌ [apiService] Erreur test DialogueManager (Supabase):', error)
-    return {
-      first_conversation_id: '',
-      second_conversation_id: '',
-      same_id: false,
-      success: false,
-      enhancements_used: []
-    }
-  }
-}
-
-export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' | 'error'> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/expert/ask`, {
-      method: 'OPTIONS',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com'
-      }
-    })
-    
-    if (response.ok || response.status === 405) {
-      console.log('✅ [detectAPIVersion] DialogueManager /ask disponible (Supabase)')
-      return 'dialoguemanager'
-    }
-    
-    return 'error'
-    
-  } catch (error) {
-    console.error('❌ [detectAPIVersion] Erreur détection (Supabase):', error)
-    return 'error'
-  }
-}
-
-export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration + SUPABASE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
-  console.log('Version:', 'DialogueManager v1.0 - SUPABASE + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE FIXED')
-  console.log('Base URL:', API_BASE_URL)
-  console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
-  console.log('Auth System: Supabase')
-  console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
-  console.log('  - 🚀 Utilisation endpoint /ask simplifié')
-  console.log('  - 🔧 Session ID dans le BODY (corrigé !)')
-  console.log('  - 🔧 Headers avec CORS Origin obligatoire')
-  console.log('  - 🔧 Supabase: Token JWT dans Authorization header')
-  console.log('  - 🚨 Extraction type: "answer" de data.answer.text (CORRIGÉ !)')
-  console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
-  console.log('  - 🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
-  console.log('  - 🚀 Sauvegarde conversation désactivée (endpoint manquant - CORRIGÉ !)')
-  console.log('  - 🆕 DELETE conversation corrigé (/conversations au pluriel)')
-  console.log('  - 🆕 CLEAR ALL conversations ajouté')
-  console.log('  - 🆕 Formatage heure locale (formatToLocalTime, simpleLocalTime)')
-  console.log('  - 🚀 Body: { session_id, question }')
-  console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
-  console.log('  - 🚀 PRÉSERVATION format partial_answer')
-  console.log('  - 🚀 Conversion automatique format')
-  console.log('  - 🔧 SUPABASE: JWT token authentique + profil utilisateur')
-  console.log('FONCTIONNALITÉS:')
-  console.log('  - ✅ Clarification intelligente automatique')
-  console.log('  - ✅ Gestion mémoire conversation Postgres')
-  console.log('  - ✅ Pipeline RAG modulaire')
-  console.log('  - 🌾 Validation agricole intégrée (NOUVEAU !)')
-  console.log('  - ✅ Toutes fonctions frontend préservées')
-  console.log('  - ✅ Support PerfStore avec type: "answer"')
-  console.log('  - 🔧 Intégration ConversationService pour historique (NOUVEAU !)')
-  console.log('  - ✅ Sauvegarde automatique via /expert/ask (CORRIGÉ !)')
-  console.log('  - 🆕 Gestion DELETE conversations (NOUVEAU !)')
-  console.log('  - 🆕 Formatage heure locale automatique (NOUVEAU !)')
-  console.log('  - 🔧 Supabase: Auth moderne + profils utilisateur (NOUVEAU !)')
-  console.groupEnd()
-}
-
-// Export par défaut de la fonction principale
+// Export par défaut
 export default generateAIResponse
