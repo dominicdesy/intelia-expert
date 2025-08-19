@@ -883,7 +883,7 @@ async def system_metrics():
             "synthesis_enabled": synthesis_enabled,
             "auth_routing_fixed": True,  # ✅ Flag pour confirmer la correction
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
-            "direct_auth_endpoints": True   # ✅ NOUVEAU FLAG AUTH DIRECT
+            "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
         }
     except Exception as e:
         return {"error": str(e)}
@@ -925,7 +925,7 @@ async def admin_statistics():
                 "openai_billing_api": bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_ORG_ID")),
                 "auth_routing_fixed": True,  # ✅ NOUVEAU
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
-            "direct_auth_endpoints": True   # ✅ NOUVEAU FLAG AUTH DIRECT
+            "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
             }
         }
         
@@ -1160,7 +1160,7 @@ async def root():
         "auth_routing_fix": "applied",  # ✅ NOUVEAU FLAG
         "catch_22_resolved": True,      # ✅ NOUVEAU FLAG
         "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
-        "direct_auth_endpoints": True   # ✅ NOUVEAU FLAG AUTH DIRECT
+        "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
         "new_features": {
             "billing_system": True,
             "analytics_tracking": True,
@@ -1176,7 +1176,7 @@ async def root():
             "openai_billing_integration": True,
             "auth_routing_fixed": True,  # ✅ NOUVEAU
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
-            "direct_auth_endpoints": True   # ✅ NOUVEAU FLAG AUTH DIRECT
+            "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
         },
         "uptime_hours": round(uptime_hours, 2),
         "requests_processed": request_counter
