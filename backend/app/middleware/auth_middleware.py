@@ -2,6 +2,7 @@
 """
 Middleware d'authentification globale pour l'API Intelia Expert
 Version corrigée - Endpoints auth alignés avec la configuration réelle
+🔧 FIX: Support des endpoints /api/v1/auth/ (vrais endpoints du backend)
 """
 
 from fastapi import HTTPException, Request
@@ -31,10 +32,21 @@ PUBLIC_ENDPOINTS = {
     "/api/openapi.json",
     "/api/v1/health",
     
-    # === ✅ ENDPOINTS AUTH PUBLICS CORRIGES ===
-    "/api/auth/login",              # ✅ Correspond au router réel
-    "/api/auth/register",           # ✅ Correspond au router réel
-    "/api/auth/debug/jwt-config",   # ✅ Correspond au router réel
+    # === ✅ ENDPOINTS AUTH PUBLICS CORRIGES - VRAIS ENDPOINTS ===
+    "/api/v1/auth/login",              # ✅ VRAI endpoint backend
+    "/api/v1/auth/debug/jwt-config",   # ✅ VRAI endpoint backend
+    "/api/v1/auth/test-direct",        # ✅ VRAI endpoint backend
+    
+    # === AUTH TEMPORAIRE (auth-temp) ===
+    "/api/auth-temp/login",            # ✅ Auth temp
+    "/api/auth-temp/me",               # ✅ Auth temp
+    "/api/auth-temp/test",             # ✅ Auth temp
+    
+    # === SYSTEM ENDPOINTS ===
+    "/api/v1/system/health",           # ✅ System health
+    "/api/v1/system/metrics",          # ✅ System metrics
+    "/api/v1/system/status",           # ✅ System status
+    "/api/deployment-debug",           # ✅ Deployment debug
     
     # === CONVERSATIONS PUBLIQUES ===
     "/api/v1/conversations/test-public",
@@ -53,14 +65,18 @@ PUBLIC_ENDPOINTS = {
     "/redoc",
     "/openapi.json",
     "/health",
-    "/metrics",                     # Monitoring
-    "/admin/stats",                 # Stats admin publiques
-    "/health/complete",             # Health check complet
+    "/metrics",                        # Monitoring
+    "/admin/stats",                    # Stats admin publiques
+    "/health/complete",                # Health check complet
+    "/deployment-debug",               # Debug deployment
     
-    # === ✅ AUTH ENDPOINTS SANS PREFIX (compatibilité) ===
-    "/auth/login",                  # ✅ Version directe
-    "/auth/register",               # ✅ Version directe
-    "/auth/debug/jwt-config",       # ✅ Version directe
+    # === AUTH ENDPOINTS SANS PREFIX (compatibilité) ===
+    "/v1/auth/login",                  # ✅ Version directe
+    "/v1/auth/debug/jwt-config",       # ✅ Version directe
+    "/v1/auth/test-direct",            # ✅ Version directe
+    "/auth-temp/login",                # ✅ Auth temp sans /api
+    "/auth-temp/me",                   # ✅ Auth temp sans /api
+    "/auth-temp/test",                 # ✅ Auth temp sans /api
     
     # === CONVERSATIONS SANS PREFIX ===
     "/v1/conversations/test-public",
@@ -70,20 +86,19 @@ PUBLIC_ENDPOINTS = {
 # 🔒 PATTERNS D'ENDPOINTS PROTÉGÉS (authentification requise)
 PROTECTED_PATTERNS = [
     # === ENDPOINTS BUSINESS CORE ===
-    "/api/v1/billing/",             # Facturation
-    "/api/v1/logging/analytics/",   # Analytics
-    "/api/v1/conversations/",       # Conversations (sauf test-public)
-    "/api/v1/expert/ask",           # Questions expert
-    "/api/v1/admin/",               # Administration
-    "/api/v1/invitations/",         # Invitations
+    "/api/v1/billing/",                # Facturation
+    "/api/v1/logging/analytics/",      # Analytics
+    "/api/v1/conversations/",          # Conversations (sauf test-public)
+    "/api/v1/expert/ask",              # Questions expert
+    "/api/v1/admin/",                  # Administration
+    "/api/v1/invitations/",            # Invitations
     
-    # === ✅ ENDPOINTS AUTH PROTÉGÉS CORRIGES ===
-    "/api/auth/verify",             # ✅ Vérification token
-    "/api/auth/logout",             # ✅ Déconnexion
-    "/api/auth/update-profile",     # ✅ Mise à jour profil
-    "/api/auth/me",                 # ✅ Profil utilisateur
-    "/api/auth/delete-data",        # ✅ Suppression données RGPD
-    "/api/auth/export-user",        # ✅ Export données RGPD
+    # === ✅ ENDPOINTS AUTH PROTÉGÉS CORRIGES - VRAIS ENDPOINTS ===
+    "/api/v1/auth/me",                 # ✅ Profil utilisateur (VRAI endpoint)
+    "/api/v1/auth/delete-data",        # ✅ Suppression données RGPD (VRAI endpoint)
+    
+    # === AUTH TEMPORAIRE PROTÉGÉ ===
+    "/api/auth-temp/me",               # ✅ Auth temp - profil
     
     # === PATTERNS SANS PREFIX (compatibilité) ===
     "/v1/billing/",
@@ -92,25 +107,25 @@ PROTECTED_PATTERNS = [
     "/v1/expert/ask",
     "/v1/admin/",
     "/v1/invitations/",
-    "/auth/verify",                 # ✅ Sans /api
-    "/auth/logout",                 # ✅ Sans /api
-    "/auth/update-profile",         # ✅ Sans /api
-    "/auth/me",                     # ✅ Sans /api
-    "/auth/delete-data",            # ✅ Sans /api
-    "/auth/export-user",            # ✅ Sans /api
+    "/v1/auth/me",                     # ✅ Sans /api
+    "/v1/auth/delete-data",            # ✅ Sans /api
+    "/auth-temp/me",                   # ✅ Auth temp sans /api
 ]
 
 # ❌ PATTERNS D'ENDPOINTS INEXISTANTS (retourner 404 au lieu de 405)
 NONEXISTENT_PATTERNS = [
-    "/api/v1/analytics/",           # N'existe pas
-    "/api/v1/user/",                # N'existe pas
-    "/api/v1/stats/",               # N'existe pas
-    "/api/v1/profile/",             # N'existe pas (utiliser /auth/)
-    "/api/v1/account/",             # N'existe pas (utiliser /auth/)
-    "/api/v1/users/",               # N'existe pas (utiliser /auth/)
+    "/api/v1/analytics/",              # N'existe pas
+    "/api/v1/user/",                   # N'existe pas
+    "/api/v1/stats/",                  # N'existe pas
+    "/api/v1/profile/",                # N'existe pas (utiliser /v1/auth/)
+    "/api/v1/account/",                # N'existe pas (utiliser /v1/auth/)
+    "/api/v1/users/",                  # N'existe pas (utiliser /v1/auth/)
     
-    # ❌ ANCIENS ENDPOINTS AUTH INCORRECTS (n'existent pas)
-    "/api/v1/auth/",                # ❌ Le router est sur /auth, pas /v1/auth
+    # ❌ ANCIENS ENDPOINTS AUTH INCORRECTS (n'existent plus)
+    "/api/auth/login",                 # ❌ Ancien - maintenant /v1/auth/login
+    "/api/auth/register",              # ❌ Ancien - n'existe pas
+    "/api/auth/me",                    # ❌ Ancien - maintenant /v1/auth/me
+    "/api/auth/debug/jwt-config",      # ❌ Ancien - maintenant /v1/auth/debug/jwt-config
     
     # Patterns sans prefix
     "/v1/analytics/",
@@ -119,7 +134,10 @@ NONEXISTENT_PATTERNS = [
     "/v1/profile/",
     "/v1/account/",
     "/v1/users/",
-    "/v1/auth/",                    # ❌ Incorrect aussi
+    "/auth/login",                     # ❌ Ancien sans /api
+    "/auth/register",                  # ❌ Ancien sans /api
+    "/auth/me",                        # ❌ Ancien sans /api
+    "/auth/debug/jwt-config",          # ❌ Ancien sans /api
 ]
 
 # 🆕 PATTERNS PUBLICS ÉTENDUS (pour la fonction is_public_endpoint)
@@ -132,10 +150,11 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/metrics",
     "/static/",
     
-    # === ✅ AUTH PUBLICS CORRIGES ===
-    "/auth/login",                  # ✅ Chemin réel
-    "/auth/register",               # ✅ Chemin réel
-    "/auth/debug",                  # ✅ Chemin réel
+    # === ✅ AUTH PUBLICS CORRIGES - PATTERNS ===
+    "/v1/auth/login",                  # ✅ Pattern login
+    "/v1/auth/debug",                  # ✅ Pattern debug
+    "/v1/auth/test-direct",            # ✅ Pattern test
+    "/auth-temp/",                     # ✅ Pattern auth temporaire
     
     # === RAG ET TESTS ===
     "/rag/",
@@ -145,21 +164,24 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json", 
-    "/api/auth/login",              # ✅ Avec prefix /api
-    "/api/auth/register",           # ✅ Avec prefix /api
-    "/api/auth/debug",              # ✅ Avec prefix /api
+    "/api/v1/auth/login",              # ✅ Pattern login avec /api
+    "/api/v1/auth/debug",              # ✅ Pattern debug avec /api
+    "/api/v1/auth/test-direct",        # ✅ Pattern test avec /api
+    "/api/auth-temp/",                 # ✅ Pattern auth temp avec /api
     "/api/rag/",
     "/api/cors-test",
-    "/api/v1/system-status",
+    "/api/v1/system",                  # ✅ Pattern system
     "/api/v1/debug",
     "/api/v1/ask-public",
     "/api/v1/conversations/test-public",
     "/api/ask-public",
+    "/api/deployment-debug",
     
     # === PATTERNS SANS VERSION ===
     "/v1/conversations/test-public",
     "/v1/ask-public",
     "/ask-public",
+    "/deployment-debug",
 ]
 
 async def verify_supabase_token(request: Request) -> Dict[str, Any]:
@@ -320,7 +342,8 @@ async def auth_middleware(request: Request, call_next):
                 "detail": "Not Found", 
                 "error": "endpoint_not_found",
                 "path": request.url.path,
-                "suggestion": "Vérifiez l'URL ou consultez /docs pour les endpoints disponibles"
+                "suggestion": "Vérifiez l'URL ou consultez /docs pour les endpoints disponibles",
+                "note": "Les endpoints auth sont maintenant sur /v1/auth/ et non /auth/"
             },
             headers=create_cors_headers()
         )
@@ -473,15 +496,23 @@ def debug_middleware_config() -> Dict[str, Any]:
         "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:10],
         "sample_protected_patterns": PROTECTED_PATTERNS[:10],
         "auth_endpoints_corrected": [
-            "/api/auth/login",
-            "/api/auth/register", 
-            "/api/auth/debug/jwt-config"
+            "/api/v1/auth/login",                    # ✅ NOUVEAU - VRAI endpoint
+            "/api/v1/auth/debug/jwt-config",         # ✅ NOUVEAU - VRAI endpoint
+            "/api/v1/auth/me",                       # ✅ NOUVEAU - VRAI endpoint
+            "/api/v1/auth/delete-data",              # ✅ NOUVEAU - VRAI endpoint
         ],
-        "middleware_version": "2.1-auth-paths-fixed",
+        "auth_endpoints_removed": [
+            "/api/auth/login",                       # ❌ SUPPRIMÉ - ancien
+            "/api/auth/register",                    # ❌ SUPPRIMÉ - ancien
+            "/api/auth/debug/jwt-config",            # ❌ SUPPRIMÉ - ancien
+        ],
+        "middleware_version": "3.0-v1-auth-fixed",
         "key_changes": [
-            "Fixed auth endpoints paths from /v1/auth to /auth",
-            "Added /api/v1/auth to nonexistent patterns", 
-            "Improved CORS handling",
-            "Enhanced error messages"
+            "✅ Fixed: Added /api/v1/auth/* as public endpoints",
+            "❌ Removed: Old /api/auth/* endpoints marked as nonexistent",
+            "✅ Added: Support for auth-temp endpoints",
+            "✅ Fixed: CORS handling for all endpoint types",
+            "✅ Fixed: System endpoints support",
+            "🔧 Updated: All patterns align with Swagger docs"
         ]
     }
