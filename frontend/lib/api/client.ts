@@ -7,8 +7,10 @@ class ApiClient {
   private defaultHeaders: HeadersInit
 
   constructor() {
-    // 🔧 CORRECTION: URL corrigée pour utiliser l'API déployée
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
+    // 🔧 CORRECTION CRITIQUE: 
+    // 1. Utiliser NEXT_PUBLIC_API_BASE_URL (avec _BASE)
+    // 2. Fallback SANS /api pour éviter le double /api/api/
+    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       'Origin': 'https://expert.intelia.com', // 🔧 AJOUT: Header CORS obligatoire
@@ -29,11 +31,30 @@ class ApiClient {
     }
   }
 
+  // 🔧 NOUVELLE MÉTHODE: Construction URL correcte avec /api/v1
+  private buildFullUrl(endpoint: string): string {
+    const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
+    // Nettoyer l'endpoint (enlever / en début si présent)
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
+    // Construire l'URL complète
+    const fullUrl = `${this.baseURL}/api/${version}/${cleanEndpoint}`
+    
+    console.log('🔍 [ApiClient] URL construite:', {
+      baseURL: this.baseURL,
+      version,
+      endpoint: cleanEndpoint,
+      fullUrl
+    })
+    
+    return fullUrl
+  }
+
   private async request<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const fullUrl = `${this.baseURL}${endpoint}`
+    // 🔧 CORRECTION: Utiliser la nouvelle méthode de construction URL
+    const fullUrl = this.buildFullUrl(endpoint)
     
     // 🔧 CORRECTION: Récupérer automatiquement le token Supabase si pas fourni
     let headers = { ...this.defaultHeaders, ...options.headers }

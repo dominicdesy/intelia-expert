@@ -7,7 +7,18 @@ import { supabase } from '@/lib/supabase/client'
 const getApiConfig = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  return `${baseUrl}/api/${version}`
+  
+  // 🔍 DEBUG: Log des variables d'environnement
+  console.log('🔍 [DEBUG] Variables d\'environnement:')
+  console.log('  - NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
+  console.log('  - NEXT_PUBLIC_API_VERSION:', process.env.NEXT_PUBLIC_API_VERSION)
+  console.log('  - baseUrl (après fallback):', baseUrl)
+  console.log('  - version (après fallback):', version)
+  
+  const finalUrl = `${baseUrl}/api/${version}`
+  console.log('  - URL finale construite:', finalUrl)
+  
+  return finalUrl
 }
 
 const API_BASE_URL = getApiConfig()
@@ -575,8 +586,14 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 
   try {
     const headers = await getAuthHeaders()
+    
+    // 🔍 DEBUG: Log de l'URL exacte construite
+    const url = `${API_BASE_URL}/conversations/user/${userId}`
+    console.log('🔍 [DEBUG] URL exacte construite:', url)
+    console.log('🔍 [DEBUG] API_BASE_URL:', API_BASE_URL)
+    console.log('🔍 [DEBUG] process.env.NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
 
-    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
+    const response = await fetch(url, {
       method: 'GET',
       headers
     })
