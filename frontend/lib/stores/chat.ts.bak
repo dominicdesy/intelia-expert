@@ -1,4 +1,4 @@
-// lib/stores/chat.ts - VERSION FINALE AVEC API SÉCURISÉE + HYDRATATION - CORRIGÉE
+// lib/stores/chat.ts - VERSION FINALE AVEC API SÉCURISÉE + HYDRATATION
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { secureRequest } from '@/lib/supabase/client'
@@ -56,23 +56,6 @@ interface ChatState {
   loadTopicSuggestions: () => Promise<TopicSuggestion[]>
 }
 
-// 🔧 CONFIGURATION API CORRIGÉE - Une seule fois, en haut du fichier
-const getAPIConfig = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
-  const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-  const fullUrl = `${baseUrl}/api/${version}`
-  
-  console.log('🔧 [ChatStore] Configuration API:', {
-    baseUrl,
-    version,
-    fullUrl
-  })
-  
-  return fullUrl
-}
-
-const API_URL = getAPIConfig()
-
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -113,7 +96,7 @@ export const useChatStore = create<ChatState>()(
           
           // API sécurisée (quand elle sera prête)
           /*
-          const response = await secureRequest.get(`${API_URL}/conversations`)
+          const response = await secureRequest.get('/api/v1/conversations')
           const data = await response.json()
           
           if (response.ok) {
@@ -160,7 +143,7 @@ export const useChatStore = create<ChatState>()(
           
           // API sécurisée (quand elle sera prête)
           /*
-          const response = await secureRequest.delete(`${API_URL}/conversations/${id}`)
+          const response = await secureRequest.delete(`/api/v1/conversations/${id}`)
           if (!response.ok) {
             throw new Error('Erreur suppression serveur')
           }
@@ -187,7 +170,7 @@ export const useChatStore = create<ChatState>()(
           
           // API sécurisée (quand elle sera prête)
           /*
-          const response = await secureRequest.delete(`${API_URL}/conversations`)
+          const response = await secureRequest.delete('/api/v1/conversations')
           if (!response.ok) {
             throw new Error('Erreur suppression serveur')
           }
@@ -207,7 +190,7 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // Envoyer un message - Version sécurisée avec URL corrigée
+      // Envoyer un message - Version sécurisée
       sendMessage: async (content: string) => {
         const startTime = Date.now()
         set({ isLoading: true, error: null })
@@ -245,11 +228,10 @@ export const useChatStore = create<ChatState>()(
             )
           }))
 
-          // Appel API sécurisé avec URL corrigée
+          // Appel API sécurisé
           try {
-            console.log('🔧 [ChatStore] Appel API URL:', `${API_URL}/expert/ask`)
-            
-            const response = await secureRequest.post(`${API_URL}/expert/ask`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api'
+            const response = await secureRequest.post(`${apiUrl}/v1/expert/ask`, {
               question: content,
               conversation_id: currentConv.id,
               language: 'fr'
@@ -407,7 +389,7 @@ Avez-vous d'autres questions spécifiques sur ce sujet ?`,
           // Envoyer au serveur (quand l'API sera prête)
           /*
           try {
-            const response = await secureRequest.post(`${API_URL}/expert/feedback`, feedback)
+            const response = await secureRequest.post('/api/v1/expert/feedback', feedback)
             if (!response.ok) {
               console.warn('⚠️ Erreur envoi feedback serveur, conservé localement')
             }
