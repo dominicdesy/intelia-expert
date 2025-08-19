@@ -1,29 +1,30 @@
-// lib/stores/auth.ts — Store d'auth BACKEND API (corrigé pour auth-temp)
+// lib/stores/auth.ts — Store d'auth SUPABASE (migré depuis auth-temp)
 'use client'
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import toast from 'react-hot-toast'
 import type { User as AppUser, RGPDConsent } from '@/types'
+import { supabase } from '@/lib/supabase/client'
 
 // ---- DEBUG ----
 const AUTH_DEBUG = (
   (typeof window !== 'undefined' && (
     localStorage.getItem('AUTH_DEBUG') === '1' ||
-    localStorage.getItem('BACKEND_DEBUG') === '1'
+    localStorage.getItem('SUPABASE_DEBUG') === '1'
   )) || process.env.NEXT_PUBLIC_AUTH_DEBUG === '1'
 )
 const alog = (...args: any[]) => {
   if (AUTH_DEBUG) {
-    if (typeof window !== 'undefined') console.debug('[BackendAuthStore]', ...args)
-    else console.debug('[BackendAuthStore/SSR]', ...args)
+    if (typeof window !== 'undefined') console.debug('[SupabaseAuthStore]', ...args)
+    else console.debug('[SupabaseAuthStore/SSR]', ...args)
   }
 }
 const maskEmail = (e: string) => e?.replace(/(^.).*(@.*$)/, '$1***$2')
 
-alog('✅ Loaded Backend Auth Store from /lib/stores/auth.ts')
+alog('✅ Loaded Supabase Auth Store from /lib/stores/auth.ts')
 
-// ---- Configuration API CORRIGÉE ----
+// ---- Configuration API ----
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
 const API_TIMEOUT = 30000 // 30 secondes
 
@@ -54,13 +55,13 @@ interface AuthState {
   exportUserData: () => Promise<any>
 }
 
-// ---- Helpers API CORRIGÉS ----
+// ---- Helpers API ----
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 
 // Fetch avec timeout pour appels backend
 async function apiCall(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`
-  alog('🌍 API Call:', url)
+  alog('🌐 API Call:', url)
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
@@ -71,7 +72,7 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com', // 🔧 AJOUT CORS
+        'Origin': 'https://expert.intelia.com',
         ...options.headers,
       },
     })
@@ -96,19 +97,35 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
   }
 }
 
-// Fonction pour obtenir le token depuis localStorage/session
-function getStoredToken(): string | null {
+// Fonction pour obtenir le token Supabase
+async function getSupabaseToken(): Promise<string | null> {
   try {
-    // Vérifier dans localStorage, sessionStorage, ou cookie
-    return localStorage.getItem('auth_token') || 
-           sessionStorage.getItem('auth_token') ||
-           null
-  } catch {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || null
+    alog('🔑 Token Supabase:', token ? 'présent' : 'absent')
+    return token
+  } catch (error) {
+    alog('❌ Erreur récupération token Supabase:', error)
     return null
   }
 }
 
-// ---- Store CORRIGÉ ----
+// Adapter les données utilisateur Supabase vers AppUser
+function adaptSupabaseUser(supabaseUser: any, additionalData?: any): AppUser {
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email,
+    user_type: additionalData?.user_type || 'producer',
+    name: additionalData?.full_name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'Utilisateur',
+    language: additionalData?.language || 'fr',
+    // Autres champs requis par votre interface
+    phone: additionalData?.phone,
+    company: additionalData?.company,
+    rgpd_consent: additionalData?.rgpd_consent,
+  }
+}
+
+// ---- Store Supabase ----
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -125,7 +142,7 @@ export const useAuthStore = create<AuthState>()(
 
       handleAuthError: (error: any, ctx?: string) => {
         const msg = (error?.message || 'Authentication error').toString()
-        console.error('⚠️ [BackendAuth]', ctx || '', error)
+        console.error('⚠️ [SupabaseAuth]', ctx || '', error)
         set((s) => ({ authErrors: [...s.authErrors, msg] }))
       },
 
@@ -133,50 +150,53 @@ export const useAuthStore = create<AuthState>()(
 
       initializeSession: async () => {
         try {
-          alog('🔄 initializeSession via backend')
+          alog('🔄 initializeSession via Supabase')
           
-          const token = getStoredToken()
-          if (!token) {
-            alog('❌ No stored token found')
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            alog('❌ Erreur session Supabase:', error)
             set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
             return false
           }
 
-          // 🔧 CORRIGÉ: Vérifier le token avec le backend auth-temp
-          const userData = await apiCall('/auth-temp/me', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-
-          // Adapter la réponse auth-temp au format AppUser
-          const appUser: AppUser = {
-            id: userData.user_id,
-            email: userData.email,
-            user_type: 'producer', // Valeur par défaut
-            name: userData.email.split('@')[0], // Nom par défaut
-            language: 'fr',
-            // Autres champs requis par votre interface
+          if (!session || !session.user) {
+            alog('❌ Pas de session Supabase')
+            set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
+            return false
           }
+
+          // 🆕 Récupérer le profil utilisateur depuis Supabase
+          let profileData = {}
+          try {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('auth_user_id', session.user.id)
+              .single()
+            
+            if (profile) {
+              profileData = profile
+              alog('✅ Profil utilisateur trouvé:', profile.user_type)
+            }
+          } catch (profileError) {
+            alog('⚠️ Pas de profil utilisateur trouvé, utilisation des valeurs par défaut')
+          }
+
+          const appUser = adaptSupabaseUser(session.user, profileData)
 
           set({ 
             user: appUser, 
-            isAuthenticated: !!appUser, 
+            isAuthenticated: true, 
             lastAuthCheck: Date.now(), 
             isRecovering: false 
           })
           
           alog('✅ initializeSession success', appUser?.email && maskEmail(appUser.email))
-          return !!appUser
+          return true
           
         } catch (e) {
           get().handleAuthError(e, 'initializeSession')
-          // Token invalide, nettoyer
-          try { 
-            localStorage.removeItem('auth_token')
-            sessionStorage.removeItem('auth_token')
-          } catch {}
           set({ isAuthenticated: false, user: null })
           return false
         }
@@ -184,30 +204,34 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         try {
-          const token = getStoredToken()
-          if (!token) {
+          const { data: { session } } = await supabase.auth.getSession()
+          
+          if (!session || !session.user) {
             set({ user: null, isAuthenticated: false, lastAuthCheck: Date.now() })
             return
           }
 
-          // 🔧 CORRIGÉ: Endpoint auth-temp
-          const userData = await apiCall('/auth-temp/me', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-
-          // Adapter la réponse
-          const appUser: AppUser = {
-            id: userData.user_id,
-            email: userData.email,
-            user_type: 'producer',
-            name: userData.email.split('@')[0],
-            language: 'fr',
+          // 🆕 Récupérer le profil utilisateur mis à jour
+          let profileData = {}
+          try {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('auth_user_id', session.user.id)
+              .single()
+            
+            if (profile) {
+              profileData = profile
+            }
+          } catch (profileError) {
+            alog('⚠️ Erreur récupération profil lors du checkAuth')
           }
+
+          const appUser = adaptSupabaseUser(session.user, profileData)
 
           set({
             user: appUser,
-            isAuthenticated: !!appUser,
+            isAuthenticated: true,
             lastAuthCheck: Date.now(),
             sessionCheckCount: get().sessionCheckCount + 1,
             isRecovering: false,
@@ -223,32 +247,43 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         set({ isLoading: true })
-        alog('🔄 login via backend', maskEmail(email))
+        alog('🔄 login via Supabase', maskEmail(email))
         
         try {
-          // 🔧 CORRIGÉ: Endpoint auth-temp
-          const result = await apiCall('/auth-temp/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password })
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
           })
 
-          // Stocker le token
-          if (result.access_token) {
-            localStorage.setItem('auth_token', result.access_token)
+          if (error) {
+            throw new Error(error.message)
           }
 
-          // Adapter la réponse au format AppUser
-          const appUser: AppUser = {
-            id: result.user?.id || result.user_id,
-            email: result.user?.email || email,
-            user_type: result.user?.user_type || 'producer',
-            name: result.user?.name || result.user?.email?.split('@')[0] || email.split('@')[0],
-            language: result.user?.language || 'fr',
+          if (!data.user) {
+            throw new Error('Aucun utilisateur retourné')
           }
+
+          // 🆕 Récupérer le profil utilisateur
+          let profileData = {}
+          try {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('auth_user_id', data.user.id)
+              .single()
+            
+            if (profile) {
+              profileData = profile
+            }
+          } catch (profileError) {
+            alog('⚠️ Pas de profil utilisateur trouvé lors du login')
+          }
+
+          const appUser = adaptSupabaseUser(data.user, profileData)
 
           set({ 
             user: appUser, 
-            isAuthenticated: !!appUser,
+            isAuthenticated: true,
             isLoading: false 
           })
           
@@ -265,7 +300,7 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (email: string, password: string, userData: Partial<AppUser>) => {
         set({ isLoading: true, authErrors: [] })
-        alog('🔄 register via backend', maskEmail(email))
+        alog('🔄 register via Supabase', maskEmail(email))
         
         try {
           const fullName = (userData?.name || '').toString().trim()
@@ -273,15 +308,85 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          // 🔧 NOTE: Pour l'instant, auth-temp ne supporte que login/me
-          // Vous devrez implémenter /auth-temp/register ou utiliser Supabase pour register
-          throw new Error('Inscription non disponible avec auth-temp. Utilisez Supabase ou implémentez /auth-temp/register')
+          // 🔑 Inscription Supabase
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName,
+                user_type: userData.user_type || 'producer',
+                language: userData.language || 'fr'
+              }
+            }
+          })
+
+          if (error) {
+            throw new Error(error.message)
+          }
+
+          if (!data.user) {
+            throw new Error('Erreur lors de la création du compte')
+          }
+
+          // 🆕 Créer le profil utilisateur dans la table users
+          if (data.user.id) {
+            try {
+              const { error: profileError } = await supabase
+                .from('users')
+                .insert({
+                  auth_user_id: data.user.id,
+                  email: email,
+                  full_name: fullName,
+                  user_type: userData.user_type || 'producer',
+                  language: userData.language || 'fr',
+                  phone: userData.phone,
+                  company: userData.company,
+                })
+
+              if (profileError) {
+                alog('⚠️ Erreur création profil:', profileError)
+              } else {
+                alog('✅ Profil utilisateur créé')
+              }
+            } catch (profileError) {
+              alog('⚠️ Erreur création profil:', profileError)
+            }
+          }
+
+          const appUser = adaptSupabaseUser(data.user, {
+            full_name: fullName,
+            user_type: userData.user_type || 'producer',
+            language: userData.language || 'fr',
+            ...userData
+          })
+
+          set({ 
+            user: appUser, 
+            isAuthenticated: !!data.session,
+            isLoading: false 
+          })
+          
+          alog('✅ register success', appUser?.email && maskEmail(appUser.email))
+          
+          if (!data.session) {
+            toast.success('Compte créé ! Vérifiez votre email pour confirmer votre inscription.')
+          }
           
         } catch (e: any) {
           get().handleAuthError(e, 'register')
           alog('❌ register error', e?.message)
           
           let userMessage = e?.message || 'Erreur lors de la création du compte'
+          
+          // Messages d'erreur spécifiques Supabase
+          if (userMessage.includes('already registered')) {
+            userMessage = 'Cette adresse email est déjà utilisée'
+          } else if (userMessage.includes('Password should be at least')) {
+            userMessage = 'Le mot de passe doit contenir au moins 6 caractères'
+          } else if (userMessage.includes('Invalid email')) {
+            userMessage = 'Adresse email invalide'
+          }
           
           toast.error(userMessage, { icon: '⚠️' })
           throw new Error(userMessage)
@@ -293,13 +398,17 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         set({ isLoading: true })
-        alog('🔄 logout via backend')
+        alog('🔄 logout via Supabase')
         
         try {
-          // Nettoyer côté client (auth-temp n'a pas d'endpoint logout)
+          const { error } = await supabase.auth.signOut()
+          
+          if (error) {
+            throw new Error(error.message)
+          }
+
+          // Nettoyer le localStorage
           try {
-            localStorage.removeItem('auth_token')
-            sessionStorage.removeItem('auth_token')
             localStorage.removeItem('intelia-chat-storage')
           } catch {}
 
@@ -317,18 +426,35 @@ export const useAuthStore = create<AuthState>()(
 
       updateProfile: async (data: Partial<AppUser>) => {
         set({ isLoading: true })
-        alog('🔄 updateProfile via backend', Object.keys(data || {}))
+        alog('🔄 updateProfile via Supabase', Object.keys(data || {}))
         
         try {
-          // 🔧 NOTE: auth-temp ne supporte pas updateProfile
-          // Pour l'instant, juste mettre à jour localement
           const currentUser = get().user
-          if (currentUser) {
-            const updatedUser = { ...currentUser, ...data }
-            set({ user: updatedUser })
+          if (!currentUser) {
+            throw new Error('Utilisateur non connecté')
           }
+
+          // 🆕 Mettre à jour le profil dans Supabase
+          const { error } = await supabase
+            .from('users')
+            .update({
+              full_name: data.name,
+              user_type: data.user_type,
+              language: data.language,
+              phone: data.phone,
+              company: data.company,
+            })
+            .eq('auth_user_id', currentUser.id)
+
+          if (error) {
+            throw new Error(error.message)
+          }
+
+          // Mettre à jour localement
+          const updatedUser = { ...currentUser, ...data }
+          set({ user: updatedUser })
           
-          alog('✅ updateProfile success (local only)')
+          alog('✅ updateProfile success')
           
         } catch (e: any) {
           get().handleAuthError(e, 'updateProfile')
@@ -340,29 +466,64 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateConsent: async (consent: RGPDConsent) => {
-        alog('🔄 updateConsent via backend', consent)
+        alog('🔄 updateConsent via Supabase', consent)
         await get().updateProfile({ rgpd_consent: consent } as any)
       },
 
       deleteUserData: async () => {
-        const token = getStoredToken()
-        if (!token) throw new Error('Non authentifié')
+        const currentUser = get().user
+        if (!currentUser) throw new Error('Non authentifié')
 
-        // 🔧 NOTE: auth-temp ne supporte pas delete user
-        // Pour l'instant, juste logout
-        await get().logout()
+        try {
+          // 🆕 Supprimer le profil utilisateur
+          const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('auth_user_id', currentUser.id)
+
+          if (error) {
+            alog('⚠️ Erreur suppression profil:', error)
+          }
+
+          // Supprimer le compte Supabase (nécessite des permissions spéciales)
+          // Note: Cette fonctionnalité nécessite généralement un endpoint backend
+          alog('⚠️ Suppression compte Supabase nécessite un endpoint backend')
+
+          // Pour l'instant, juste déconnecter
+          await get().logout()
+          
+        } catch (e: any) {
+          alog('❌ deleteUserData error', e?.message)
+          throw new Error(e?.message || 'Erreur de suppression des données')
+        }
       },
 
       exportUserData: async () => {
-        const token = getStoredToken()
-        if (!token) throw new Error('Non authentifié')
+        const currentUser = get().user
+        if (!currentUser) throw new Error('Non authentifié')
 
-        // 🔧 NOTE: auth-temp ne supporte pas export
-        return { message: 'Export non disponible avec auth-temp' }
+        try {
+          // 🆕 Récupérer toutes les données utilisateur
+          const { data: profile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('auth_user_id', currentUser.id)
+            .single()
+
+          return {
+            user_profile: profile,
+            export_date: new Date().toISOString(),
+            message: 'Données utilisateur exportées'
+          }
+          
+        } catch (e: any) {
+          alog('❌ exportUserData error', e?.message)
+          throw new Error(e?.message || 'Erreur d\'exportation des données')
+        }
       },
     }),
     {
-      name: 'backend-auth-store',
+      name: 'supabase-auth-store',
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
           const noop = {
@@ -381,9 +542,9 @@ export const useAuthStore = create<AuthState>()(
         hasHydrated: state.hasHydrated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) console.error('❌ Backend auth rehydrate error', error)
+        if (error) console.error('❌ Supabase auth rehydrate error', error)
         state?.setHasHydrated(true)
-        alog('✅ Backend auth rehydrated')
+        alog('✅ Supabase auth rehydrated')
       },
     }
   )
