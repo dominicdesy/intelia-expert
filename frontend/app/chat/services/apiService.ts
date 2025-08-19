@@ -1,7 +1,8 @@
 // app/chat/services/apiService.ts - VERSION SUPABASE NATIVE COMPLETE
 
 import { conversationService } from './conversationService'
-import { supabase } from '@/lib/supabase/client'
+// ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu d'importer directement
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // Configuration API propre
 const getApiConfig = () => {
@@ -17,23 +18,25 @@ const getApiConfig = () => {
 
 const API_BASE_URL = getApiConfig()
 
-// Fonction auth Supabase native
+// ✅ Fonction auth Supabase native MISE À JOUR avec singleton
 const getAuthToken = async (): Promise<string | null> => {
   try {
-    console.log('[apiService] Recuperation token Supabase natif...')
+    console.log('[apiService] Recuperation token Supabase natif (singleton)...')
     
+    // 🎯 CHANGEMENT: Utiliser getSupabaseClient() au lieu de supabase direct
+    const supabase = getSupabaseClient()
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     
     if (token && token !== 'null' && token !== 'undefined') {
-      console.log('[apiService] Token Supabase natif recupere')
+      console.log('[apiService] Token Supabase natif recupere (singleton)')
       return token
     }
 
-    console.warn('[apiService] Aucun token Supabase trouve')
+    console.warn('[apiService] Aucun token Supabase trouve (singleton)')
     return null
   } catch (error) {
-    console.error('[apiService] Erreur recuperation token Supabase:', error)
+    console.error('[apiService] Erreur recuperation token Supabase (singleton):', error)
     return null
   }
 }
@@ -47,9 +50,9 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const authToken = await getAuthToken()
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('[apiService] Token Supabase natif ajoute aux headers')
+    console.log('[apiService] Token Supabase natif ajoute aux headers (singleton)')
   } else {
-    console.warn('[apiService] Requete sans authentification - pas de token Supabase')
+    console.warn('[apiService] Requete sans authentification - pas de token Supabase (singleton)')
   }
 
   return headers
@@ -175,7 +178,7 @@ interface APIError {
 }
 
 /**
- * FONCTION PRINCIPALE - Expert API avec Supabase natif
+ * FONCTION PRINCIPALE - Expert API avec Supabase natif (singleton)
  */
 export const generateAIResponse = async (
   question: string,
@@ -197,10 +200,10 @@ export const generateAIResponse = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] Expert API avec Supabase natif:', {
+  console.log('[apiService] Expert API avec Supabase natif (singleton):', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
-    system: 'Supabase -> Expert API'
+    system: 'Supabase singleton -> Expert API'
   })
 
   try {
@@ -231,7 +234,7 @@ export const generateAIResponse = async (
 
     const headers = await getAuthHeaders()
 
-    console.log('[apiService] Requete Expert API (Supabase natif):', requestBody)
+    console.log('[apiService] Requete Expert API (Supabase singleton):', requestBody)
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -239,11 +242,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('[apiService] Expert API status (Supabase):', response.status)
+    console.log('[apiService] Expert API status (Supabase singleton):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur Expert API (Supabase):', errorText)
+      console.error('[apiService] Erreur Expert API (Supabase singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -266,7 +269,7 @@ export const generateAIResponse = async (
 
     const data = await response.json()
     
-    console.log('[apiService] Reponse Expert API recue (Supabase):', {
+    console.log('[apiService] Reponse Expert API recue (Supabase singleton):', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -380,12 +383,12 @@ export const generateAIResponse = async (
     // Stocker le session ID pour l'historique
     try {
       conversationService.storeRecentSessionId(finalConversationId)
-      console.log('[apiService] Session ID stocke pour historique')
+      console.log('[apiService] Session ID stocke pour historique (singleton)')
     } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID:', error)
+      console.warn('[apiService] Erreur stockage session ID (singleton):', error)
     }
 
-    console.log('[apiService] Reponse traitee (Supabase natif):', {
+    console.log('[apiService] Reponse traitee (Supabase singleton):', {
       type: processedData.type,
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
@@ -399,7 +402,7 @@ export const generateAIResponse = async (
     return processedData
 
   } catch (error) {
-    console.error('[apiService] Erreur Expert API (Supabase):', error)
+    console.error('[apiService] Erreur Expert API (Supabase singleton):', error)
     
     if (error instanceof Error) {
       throw error
@@ -410,7 +413,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * VERSION PUBLIQUE avec Supabase
+ * VERSION PUBLIQUE avec Supabase (singleton)
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -424,7 +427,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('[apiService] Expert API public (Supabase):', {
+  console.log('[apiService] Expert API public (Supabase singleton):', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
@@ -450,13 +453,13 @@ export const generateAIResponsePublic = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur Expert API public (Supabase):', errorText)
+      console.error('[apiService] Erreur Expert API public (Supabase singleton):', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
     const data = await response.json()
     
-    console.log('[apiService] Reponse Expert API public (Supabase):', {
+    console.log('[apiService] Reponse Expert API public (Supabase singleton):', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -555,28 +558,28 @@ export const generateAIResponsePublic = async (
     // Stocker le session ID
     try {
       conversationService.storeRecentSessionId(finalConversationId)
-      console.log('[apiService] Session ID stocke pour historique (public)')
+      console.log('[apiService] Session ID stocke pour historique (public singleton)')
     } catch (error) {
-      console.warn('[apiService] Erreur stockage session ID (public):', error)
+      console.warn('[apiService] Erreur stockage session ID (public singleton):', error)
     }
 
     return processedData
 
   } catch (error) {
-    console.error('[apiService] Erreur Expert API public (Supabase):', error)
+    console.error('[apiService] Erreur Expert API public (Supabase singleton):', error)
     throw error
   }
 }
 
 /**
- * Chargement des conversations utilisateur
+ * Chargement des conversations utilisateur (singleton)
  */
 export const loadUserConversations = async (userId: string): Promise<any> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Chargement conversations pour:', userId)
+  console.log('[apiService] Chargement conversations pour (singleton):', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -587,11 +590,11 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
       headers
     })
 
-    console.log('[apiService] Conversations statut:', response.status)
+    console.log('[apiService] Conversations statut (singleton):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur conversations:', errorText)
+      console.error('[apiService] Erreur conversations (singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -599,7 +602,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
       
       if (response.status === 405 || response.status === 404) {
         // Si l'endpoint n'existe pas encore, retourner des donnees vides
-        console.warn('[apiService] Endpoint conversations non disponible - retour donnees vides')
+        console.warn('[apiService] Endpoint conversations non disponible - retour donnees vides (singleton)')
         return {
           count: 0,
           conversations: [],
@@ -612,7 +615,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     }
 
     const data = await response.json()
-    console.log('[apiService] Conversations chargees:', {
+    console.log('[apiService] Conversations chargees (singleton):', {
       count: data.count,
       conversations: data.conversations?.length || 0
     })
@@ -620,11 +623,11 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     return data
 
   } catch (error) {
-    console.error('[apiService] Erreur chargement conversations:', error)
+    console.error('[apiService] Erreur chargement conversations (singleton):', error)
     
     // En cas d'erreur reseau, retourner des donnees vides plutot que de faire planter l'app
     if (error instanceof Error && error.message.includes('Failed to fetch')) {
-      console.warn('[apiService] Erreur reseau - retour donnees vides')
+      console.warn('[apiService] Erreur reseau - retour donnees vides (singleton)')
       return {
         count: 0,
         conversations: [],
@@ -638,7 +641,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
 }
 
 /**
- * ENVOI DE FEEDBACK
+ * ENVOI DE FEEDBACK (singleton)
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -649,7 +652,7 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Envoi feedback (Supabase):', feedback)
+  console.log('[apiService] Envoi feedback (Supabase singleton):', feedback)
 
   try {
     const requestBody = {
@@ -668,7 +671,7 @@ export const sendFeedback = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur feedback (Supabase):', errorText)
+      console.error('[apiService] Erreur feedback (Supabase singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -677,23 +680,23 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('[apiService] Feedback envoye avec succes (Supabase)')
+    console.log('[apiService] Feedback envoye avec succes (Supabase singleton)')
 
   } catch (error) {
-    console.error('[apiService] Erreur feedback (Supabase):', error)
+    console.error('[apiService] Erreur feedback (Supabase singleton):', error)
     throw error
   }
 }
 
 /**
- * SUPPRESSION DE CONVERSATION
+ * SUPPRESSION DE CONVERSATION (singleton)
  */
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
     throw new Error('ID de conversation requis')
   }
 
-  console.log('[apiService] Suppression conversation (Supabase):', conversationId)
+  console.log('[apiService] Suppression conversation (Supabase singleton):', conversationId)
 
   try {
     const headers = await getAuthHeaders()
@@ -703,16 +706,16 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
       headers
     })
 
-    console.log('[apiService] Delete statut (Supabase):', response.status)
+    console.log('[apiService] Delete statut (Supabase singleton):', response.status)
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.warn('[apiService] Conversation deja supprimee ou inexistante')
+        console.warn('[apiService] Conversation deja supprimee ou inexistante (singleton)')
         return
       }
       
       const errorText = await response.text()
-      console.error('[apiService] Erreur delete conversation (Supabase):', errorText)
+      console.error('[apiService] Erreur delete conversation (Supabase singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -722,23 +725,23 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
     }
 
     const result = await response.json()
-    console.log('[apiService] Conversation supprimee (Supabase):', result.message || 'Succes')
+    console.log('[apiService] Conversation supprimee (Supabase singleton):', result.message || 'Succes')
 
   } catch (error) {
-    console.error('[apiService] Erreur suppression conversation (Supabase):', error)
+    console.error('[apiService] Erreur suppression conversation (Supabase singleton):', error)
     throw error
   }
 }
 
 /**
- * SUPPRESSION DE TOUTES LES CONVERSATIONS
+ * SUPPRESSION DE TOUTES LES CONVERSATIONS (singleton)
  */
 export const clearAllUserConversations = async (userId: string): Promise<void> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('[apiService] Suppression toutes conversations pour (Supabase):', userId)
+  console.log('[apiService] Suppression toutes conversations pour (Supabase singleton):', userId)
 
   try {
     const headers = await getAuthHeaders()
@@ -748,11 +751,11 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
       headers
     })
 
-    console.log('[apiService] Clear all statut (Supabase):', response.status)
+    console.log('[apiService] Clear all statut (Supabase singleton):', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[apiService] Erreur clear all conversations (Supabase):', errorText)
+      console.error('[apiService] Erreur clear all conversations (Supabase singleton):', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expiree. Veuillez vous reconnecter.')
@@ -762,22 +765,22 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
     }
 
     const result = await response.json()
-    console.log('[apiService] Toutes conversations supprimees (Supabase):', {
+    console.log('[apiService] Toutes conversations supprimees (Supabase singleton):', {
       message: result.message,
       deleted_count: result.deleted_count || 0
     })
 
   } catch (error) {
-    console.error('[apiService] Erreur suppression toutes conversations (Supabase):', error)
+    console.error('[apiService] Erreur suppression toutes conversations (Supabase singleton):', error)
     throw error
   }
 }
 
 /**
- * SUGGESTIONS DE SUJETS
+ * SUGGESTIONS DE SUJETS (singleton)
  */
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
-  console.log('[apiService] Recuperation suggestions sujets (Supabase):', language)
+  console.log('[apiService] Recuperation suggestions sujets (Supabase singleton):', language)
 
   try {
     const headers = await getAuthHeaders()
@@ -788,7 +791,7 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     })
 
     if (!response.ok) {
-      console.warn('[apiService] Erreur recuperation sujets (Supabase):', response.status)
+      console.warn('[apiService] Erreur recuperation sujets (Supabase singleton):', response.status)
       
       return [
         "Problemes de croissance poulets",
@@ -801,12 +804,12 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     }
 
     const data = await response.json()
-    console.log('[apiService] Sujets recuperes (Supabase):', data.topics?.length || 0)
+    console.log('[apiService] Sujets recuperes (Supabase singleton):', data.topics?.length || 0)
 
     return Array.isArray(data.topics) ? data.topics : []
 
   } catch (error) {
-    console.error('[apiService] Erreur sujets (Supabase):', error)
+    console.error('[apiService] Erreur sujets (Supabase singleton):', error)
     
     return [
       "Problemes de croissance poulets",
@@ -820,7 +823,7 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
 }
 
 /**
- * HEALTH CHECK
+ * HEALTH CHECK (singleton)
  */
 export const checkAPIHealth = async (): Promise<boolean> => {
   try {
@@ -833,12 +836,12 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     })
 
     const isHealthy = response.ok
-    console.log('[apiService] API Health (Supabase):', isHealthy ? 'OK' : 'KO')
+    console.log('[apiService] API Health (Supabase singleton):', isHealthy ? 'OK' : 'KO')
     
     return isHealthy
 
   } catch (error) {
-    console.error('[apiService] Erreur health check (Supabase):', error)
+    console.error('[apiService] Erreur health check (Supabase singleton):', error)
     return false
   }
 }
@@ -881,7 +884,7 @@ export const buildClarificationEntities = (
     }
   })
   
-  console.log('[apiService] Entites construites:', entities)
+  console.log('[apiService] Entites construites (singleton):', entities)
   return entities
 }
 
@@ -902,18 +905,18 @@ export const handleEnhancedNetworkError = (error: any): string => {
 }
 
 /**
- * FONCTIONS DE DEBUG ET TEST
+ * FONCTIONS DE DEBUG ET TEST (singleton)
  */
 export const debugEnhancedAPI = () => {
-  console.group('[apiService] Configuration DialogueManager + expert.py + SUPABASE')
+  console.group('[apiService] Configuration DialogueManager + expert.py + SUPABASE SINGLETON')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Systeme backend: DialogueManager + expert.py')
-  console.log('Systeme auth: Supabase')
+  console.log('Systeme auth: Supabase SINGLETON')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
   console.log('CORRECTIONS EFFECTUEES:')
   console.log('  - Body avec session_id: { session_id, question }')
   console.log('  - Headers avec CORS Origin obligatoire')
-  console.log('  - Supabase: Token dans Authorization header')
+  console.log('  - Supabase SINGLETON: Token dans Authorization header')
   console.log('  - Extraction correcte du texte selon type')
   console.log('  - Support type: "answer" avec data.answer.text')
   console.log('  - Support type: "partial_answer"')
@@ -924,9 +927,10 @@ export const debugEnhancedAPI = () => {
   console.log('  - DELETE conversation corrige (/conversations au pluriel)')
   console.log('  - CLEAR ALL conversations ajoute')
   console.log('  - Formatage heure locale')
-  console.log('  - SUPABASE: Headers avec Origin + Authorization')
+  console.log('  - SUPABASE SINGLETON: Headers avec Origin + Authorization')
+  console.log('  - ✅ SINGLETON: Une seule instance GoTrueClient')
   console.log('FONCTIONNALITES PRESERVEES:')
-  console.log('  - Authentification JWT (Supabase)')
+  console.log('  - Authentification JWT (Supabase SINGLETON)')
   console.log('  - Feedback, conversations, topics')
   console.log('  - Gestion erreurs')
   console.log('  - Health check')
@@ -946,7 +950,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('[apiService] Test continuite DialogueManager (Supabase)...')
+    console.log('[apiService] Test continuite DialogueManager (Supabase singleton)...')
     
     const firstResponse = await generateAIResponse(
       "Test question 1: Qu'est-ce que les poulets de chair ?",
@@ -965,7 +969,7 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('[apiService] Test DialogueManager resultat (Supabase):', {
+    console.log('[apiService] Test DialogueManager resultat (Supabase singleton):', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
@@ -978,11 +982,11 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'Supabase', 'SINGLETON']
     }
     
   } catch (error) {
-    console.error('[apiService] Erreur test DialogueManager (Supabase):', error)
+    console.error('[apiService] Erreur test DialogueManager (Supabase singleton):', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
@@ -1004,29 +1008,29 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
     })
     
     if (response.ok || response.status === 405) {
-      console.log('[detectAPIVersion] DialogueManager /ask disponible (Supabase)')
+      console.log('[detectAPIVersion] DialogueManager /ask disponible (Supabase singleton)')
       return 'dialoguemanager'
     }
     
     return 'error'
     
   } catch (error) {
-    console.error('[detectAPIVersion] Erreur detection (Supabase):', error)
+    console.error('[detectAPIVersion] Erreur detection (Supabase singleton):', error)
     return 'error'
   }
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE')
-  console.log('Version:', 'DialogueManager v1.0 - SUPABASE FIXED')
+  console.group('[apiService] DialogueManager + expert.py Integration + SUPABASE SINGLETON')
+  console.log('Version:', 'DialogueManager v1.0 - SUPABASE SINGLETON FIXED')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
-  console.log('Auth System: Supabase')
+  console.log('Auth System: Supabase SINGLETON')
   console.log('CHANGEMENTS MAJEURS CORRIGES:')
   console.log('  - Utilisation endpoint /ask simplifie')
   console.log('  - Session ID dans le BODY (corrige !)')
   console.log('  - Headers avec CORS Origin obligatoire')
-  console.log('  - Supabase: Token JWT dans Authorization header')
+  console.log('  - Supabase SINGLETON: Token JWT dans Authorization header')
   console.log('  - Extraction type: "answer" de data.answer.text (CORRIGE !)')
   console.log('  - Support type: "validation_rejected"')
   console.log('  - Stockage automatique session ID pour historique')
@@ -1037,7 +1041,8 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - PRESERVATION format partial_answer')
   console.log('  - Conversion automatique format')
-  console.log('  - SUPABASE: JWT token authentique + profil utilisateur')
+  console.log('  - SUPABASE SINGLETON: JWT token authentique + profil utilisateur')
+  console.log('  - ✅ SINGLETON: Elimination Multiple GoTrueClient instances')
   console.log('FONCTIONNALITES:')
   console.log('  - Clarification intelligente automatique')
   console.log('  - Gestion memoire conversation Postgres')
@@ -1049,7 +1054,8 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - Sauvegarde automatique via /expert/ask')
   console.log('  - Gestion DELETE conversations')
   console.log('  - Formatage heure locale automatique')
-  console.log('  - Supabase: Auth moderne + profils utilisateur')
+  console.log('  - Supabase SINGLETON: Auth moderne + profils utilisateur')
+  console.log('  - ✅ Une seule instance GoTrueClient dans toute l\'application')
   console.groupEnd()
 }
 
