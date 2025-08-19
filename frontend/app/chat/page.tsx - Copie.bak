@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation' // ✅ AJOUTÉ pour router.push
 import { Message } from './types'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from './hooks/useTranslation'
@@ -73,8 +73,8 @@ class PageLoadingCircuitBreaker {
 const pageLoadingBreaker = new PageLoadingCircuitBreaker()
 
 export default function ChatInterface() {
-  const router = useRouter()
-  const { user, isAuthenticated, isLoading, hasHydrated, initializeSession } = useAuthStore()
+  const router = useRouter() // ✅ AJOUTÉ pour navigation propre
+  const { user, isAuthenticated, isLoading } = useAuthStore()
   const { t, currentLanguage } = useTranslation()
 
   const currentConversation = useChatStore(state => state.currentConversation)
@@ -92,10 +92,16 @@ export default function ChatInterface() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [showConcisionSettings, setShowConcisionSettings] = useState(false)
 
-  // NOUVEAUX ÉTATS pour gestion clavier mobile - CODE ORIGINAL CONSERVÉ
+  // ✅ NOUVEAUX ÉTATS pour gestion clavier mobile - CODE ORIGINAL CONSERVÉ
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(0)
+
+  // ✅ NOUVEAUX ÉTATS pour gestion authentification améliorée
+  const [authGracePeriod, setAuthGracePeriod] = useState(true)
+  const [authCheckCount, setAuthCheckCount] = useState(0)
+  const [lastAuthCheck, setLastAuthCheck] = useState(0)
+  const [showAuthMessage, setShowAuthMessage] = useState(false)
 
   // États existants inchangés - CODE ORIGINAL CONSERVÉ
   const [clarificationState, setClarificationState] = useState<{
@@ -124,16 +130,23 @@ export default function ChatInterface() {
   const lastMessageCountRef = useRef(0)
   const isMountedRef = useRef(true)
   
-  // Nouveaux refs pour contrôler la redirection avec délai - CODE ORIGINAL CONSERVÉ
+  // 🔥 SUPPRIMÉ: hasRedirectedRef - plus de redirection brutale dans cette page
+  // const hasRedirectedRef = useRef(false)
+  
+  // Nouveaux refs pour contrôler la redirection avec délai - CODE ORIGINAL CONSERVÉ (mais logique modifiée)
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // ✅ NOUVEAUX REFS pour gestion auth améliorée
+  const gracePeriodTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const authMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Refs pour éviter les re-chargements multiples et contrôler les tentatives - CODE ORIGINAL CONSERVÉ
   const hasLoadedConversationsRef = useRef(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const conversationLoadingAttemptsRef = useRef(0)
 
-  // NOUVEAU REF pour l'input mobile - CODE ORIGINAL CONSERVÉ
+  // ✅ NOUVEAU REF pour l'input mobile - CODE ORIGINAL CONSERVÉ
   const inputRef = useRef<HTMLInputElement>(null)
 
   const messages: Message[] = currentConversation?.messages || []
@@ -141,7 +154,7 @@ export default function ChatInterface() {
 
   console.log('[Render] Messages:', messages.length, 'Clarification:', !!clarificationState, 'Concision:', config.level)
 
-  // NOUVELLE FONCTION : Gestion intelligente des erreurs auth
+  // ✅ NOUVELLE FONCTION : Gestion intelligente des erreurs auth
   const handleAuthError = (error: any) => {
     console.log('🔧 [Auth] Gestion erreur auth:', error)
     
@@ -149,18 +162,30 @@ export default function ChatInterface() {
         error?.message?.includes('Auth session missing') ||
         error?.message?.includes('Forbidden')) {
       
-      console.log('🔄 [Auth] Session expirée détectée, redirection')
-      handleRedirectToLogin('Session expirée')
+      console.log('🔄 [Auth] Session expirée détectée, mise à jour état')
+      setShowAuthMessage(true)
+      
+      // Nettoyer le message après 5 secondes
+      if (authMessageTimeoutRef.current) {
+        clearTimeout(authMessageTimeoutRef.current)
+      }
+      
+      authMessageTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setShowAuthMessage(false)
+        }
+      }, 5000)
     }
   }
 
-  // NOUVELLE FONCTION : Redirection intelligente vers login
+  // ✅ NOUVELLE FONCTION : Redirection intelligente vers login
   const handleRedirectToLogin = useCallback((reason: string = 'Session expirée') => {
     console.log('🔄 [Auth] Redirection vers login:', reason)
     
     // Nettoyer tous les timeouts
     if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current)
     if (authCheckTimeoutRef.current) clearTimeout(authCheckTimeoutRef.current)
+    if (gracePeriodTimeoutRef.current) clearTimeout(gracePeriodTimeoutRef.current)
     
     // Utiliser router au lieu de window.location pour éviter les boucles
     try {
@@ -345,7 +370,7 @@ export default function ChatInterface() {
     // Retirer les phrases qui se terminent abruptement par ---
     cleaned = cleaned.replace(/[^.!?]+---\s*/g, '')
 
-    // Retirer les numérotations orphelines
+    // Nettoyer les numérotations orphelines
     cleaned = cleaned.replace(/^\d+\.\s+[A-Z][^:]+:\s*$/gm, '')
     cleaned = cleaned.replace(/^\w\.\s+[A-Z][^:]+:\s*$/gm, '')
 
@@ -424,7 +449,7 @@ export default function ChatInterface() {
       pageLoadingBreaker.recordFailure()
       console.error(`[loadConversationsWithBreaker] Tentative ${conversationLoadingAttemptsRef.current} échouée:`, error)
       
-      // Nouvelle logique : Gestion des erreurs auth
+      // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
       handleAuthError(error)
       
       // Reset le flag pour permettre une nouvelle tentative
@@ -440,33 +465,74 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVEAU useEffect simplifié pour auth backend
+  // ✅ NOUVEAU useEffect pour période de grâce authentification
   useEffect(() => {
-    // Initialiser la session une seule fois au montage
-    const initAuth = async () => {
-      if (!hasHydrated) return // Attendre l'hydratation
-      
-      console.log('🔍 [Auth] Initialisation auth backend')
-      
-      try {
-        const sessionValid = await initializeSession()
-        
-        if (!sessionValid) {
-          console.log('❌ [Auth] Session invalide, redirection')
-          handleRedirectToLogin('Session expirée')
-        } else {
-          console.log('✅ [Auth] Session valide')
-        }
-      } catch (error) {
-        console.error('❌ [Auth] Erreur initialisation:', error)
-        handleAuthError(error)
-      }
+    // Période de grâce de 3 secondes pour éviter les redirections prématurées
+    if (gracePeriodTimeoutRef.current) {
+      clearTimeout(gracePeriodTimeoutRef.current)
     }
     
-    initAuth()
-  }, [hasHydrated, initializeSession, handleRedirectToLogin])
+    gracePeriodTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setAuthGracePeriod(false)
+        console.log('🔄 [Auth] Période de grâce terminée')
+      }
+    }, 3000)
 
-  // NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
+    return () => {
+      if (gracePeriodTimeoutRef.current) {
+        clearTimeout(gracePeriodTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // ✅ NOUVEAU useEffect pour gestion intelligente auth
+  useEffect(() => {
+    const now = Date.now()
+    
+    // Éviter les vérifications trop fréquentes
+    if (now - lastAuthCheck < 2000) {
+      return
+    }
+    
+    setLastAuthCheck(now)
+    setAuthCheckCount(prev => prev + 1)
+    
+    console.log('🔍 [Auth] Vérification état:', {
+      isLoading,
+      isAuthenticated,
+      hasUser: !!user,
+      authGracePeriod,
+      checkCount: authCheckCount
+    })
+    
+    // Pas d'action pendant la période de grâce ou le chargement
+    if (authGracePeriod || isLoading) {
+      return
+    }
+    
+    // Si pas authentifié après la période de grâce, gérer selon le contexte
+    if (!isAuthenticated || !user) {
+      // Si c'est la première vérification, attendre un peu plus
+      if (authCheckCount === 1) {
+        console.log('🔄 [Auth] Première vérification non-auth, attente supplémentaire')
+        const extraWaitTimeout = setTimeout(() => {
+          if (isMountedRef.current && (!isAuthenticated || !user)) {
+            console.log('🔄 [Auth] Toujours non-auth après attente, redirection')
+            handleRedirectToLogin('Utilisateur non authentifié')
+          }
+        }, 2000)
+        
+        return () => clearTimeout(extraWaitTimeout)
+      } else {
+        // Redirection après plusieurs vérifications
+        console.log('🔄 [Auth] Redirection après vérifications multiples')
+        handleRedirectToLogin('Session expirée après vérifications')
+      }
+    }
+  }, [isLoading, isAuthenticated, user, authGracePeriod, authCheckCount, handleRedirectToLogin])
+
+  // ✅ NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
     if (!isMobileDevice) return
 
@@ -591,6 +657,12 @@ export default function ChatInterface() {
       }
       if (authCheckTimeoutRef.current) {
         clearTimeout(authCheckTimeoutRef.current)
+      }
+      if (gracePeriodTimeoutRef.current) {
+        clearTimeout(gracePeriodTimeoutRef.current)
+      }
+      if (authMessageTimeoutRef.current) {
+        clearTimeout(authMessageTimeoutRef.current)
       }
     }
   }, [])
@@ -752,7 +824,7 @@ export default function ChatInterface() {
         }
       }
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, user?.id]) // loadConversations RETIRÉ des dépendances !
 
   // useEffect pour reset le circuit breaker quand l'utilisateur change - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
@@ -765,8 +837,8 @@ export default function ChatInterface() {
     }
   }, [user?.id])
 
-  // ✅ ÉTATS DE CHARGEMENT SIMPLIFIÉS
-  if (isLoading || !hasHydrated) {
+  // ✅ ÉTATS DE CHARGEMENT AMÉLIORÉS
+  if (isLoading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -777,12 +849,36 @@ export default function ChatInterface() {
     )
   }
 
+  // ✅ NOUVELLE GESTION INTELLIGENTE AUTH - Période de grâce
+  if (authGracePeriod) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-pulse h-8 w-8 bg-blue-300 rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification de l'authentification...</p>
+          <div className="mt-2 text-xs text-gray-500">
+            Patientez quelques instants
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ NOUVELLE GESTION INTELLIGENTE AUTH - Pas d'authentification
   if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection vers la connexion...</p>
+          <p className="text-gray-600">Session expirée, redirection...</p>
+          
+          {showAuthMessage && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                Votre session a expiré. Redirection en cours...
+              </p>
+            </div>
+          )}
           
           <button 
             onClick={() => handleRedirectToLogin('Bouton utilisateur')}
@@ -1014,7 +1110,7 @@ export default function ChatInterface() {
     } catch (error) {
       console.error('[handleSendMessage] Erreur:', error)
 
-      // NOUVELLE LOGIQUE : Gestion des erreurs auth
+      // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
       handleAuthError(error)
 
       if (isMountedRef.current) {
@@ -1076,7 +1172,7 @@ export default function ChatInterface() {
       } catch (feedbackError) {
         console.error('Erreur envoi feedback:', feedbackError)
         
-        // NOUVELLE LOGIQUE : Gestion des erreurs auth
+        // ✅ NOUVELLE LOGIQUE : Gestion des erreurs auth
         handleAuthError(feedbackError)
         
         if (isMountedRef.current) {
@@ -1150,7 +1246,7 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // CALCUL des styles dynamiques pour mobile - CODE ORIGINAL CONSERVÉ
+  // ✅ CALCUL des styles dynamiques pour mobile - CODE ORIGINAL CONSERVÉ
   const containerStyle = isMobileDevice ? {
     height: '100vh',
     minHeight: '100vh',
@@ -1174,15 +1270,16 @@ export default function ChatInterface() {
     <>
       <ZohoSalesIQ user={user} language={currentLanguage} />
 
-      {/* CONTAINER PRINCIPAL avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
+      {/* ✅ CONTAINER PRINCIPAL avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
       <div 
         className={`bg-gray-50 flex flex-col ${isMobileDevice ? 'chat-main-container' : 'min-h-dvh h-screen'}`}
         style={containerStyle}
       >
 
+
 		<header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
 		  <div className="flex items-center justify-between">
-			{/* Gauche – + puis Historique */}
+			{/* Gauche — + puis Historique */}
 			<div className="flex items-center space-x-2">
 			  <button
 				onClick={handleNewConversation}
@@ -1193,13 +1290,31 @@ export default function ChatInterface() {
 				<PlusIcon className="w-5 h-5" />
 			  </button>
 
-			  {/* History rendu directement (plus de proxy/hidden) */}
-			  <div className="header-icon-container history-menu-container">
-				<HistoryMenu />
+			  {/* Bouton Historique avec icône d'horloge */}
+			  <div className="relative">
+				<button
+				  onClick={() => {
+					const btn = document.querySelector('.history-hidden button');
+					if (btn) (btn as HTMLElement).click();
+				  }}
+				  className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
+				>
+				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				  </svg>
+				</button>
+				
+				<div className="absolute opacity-0 pointer-events-none history-hidden">
+				  <HistoryMenu />
+				</div>
+				
+				<span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+				  {conversationsCount}
+				</span>
 			  </div>
 			</div>
 
-			{/* Centre – Logo + Titre */}
+			{/* Centre — Logo + Titre */}
 			<div className="flex-1 min-w-0 flex justify-center items-center space-x-3">
 			  <div className="w-10 h-10 grid place-items-center">
 				<InteliaLogo className="h-8 w-auto" />
@@ -1207,18 +1322,39 @@ export default function ChatInterface() {
 			  <h1 className="text-lg font-medium text-gray-900 truncate">Intelia Expert</h1>
 			</div>
 
-			{/* Droite – Bouton DD */}
+			{/* Droite — Bouton DD */}
 			<div className="flex items-center space-x-2">
-			  {/* UserMenu rendu directement (plus de proxy/hidden) */}
-			  <div className="header-icon-container user-menu-container">
-				<UserMenuButton />
+			  <div className="relative">
+				<button
+				  onClick={() => {
+					const btn = document.querySelector('.user-hidden button');
+					if (btn) (btn as HTMLElement).click();
+				  }}
+				  className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm hover:bg-blue-700 transition-colors"
+				>
+				  {getUserInitials(user)}
+				</button>
+				
+				<div className="absolute opacity-0 pointer-events-none user-hidden">
+				  <UserMenuButton />
+				</div>
 			  </div>
 			</div>
 		  </div>
 		</header>
 
+
+
+
+
+
+
+
+
+
+
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-          {/* ZONE CHAT avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
+          {/* ✅ ZONE CHAT avec styles dynamiques mobile - CODE ORIGINAL CONSERVÉ */}
           <div
             ref={chatContainerRef}
             className={`flex-1 overflow-y-auto px-2 sm:px-4 py-6 pb-28 overscroll-contain ${isMobileDevice ? 'chat-scroll-area' : ''}`}
@@ -1376,7 +1512,7 @@ export default function ChatInterface() {
             </div>
           )}
 
-          {/* BARRE DE SAISIE avec correction mobile complète - CODE ORIGINAL CONSERVÉ */}
+          {/* ✅ BARRE DE SAISIE avec correction mobile complète - CODE ORIGINAL CONSERVÉ */}
           <div 
             className={`px-2 sm:px-4 py-2 bg-white border-t border-gray-100 z-20 ${isMobileDevice ? 'chat-input-fixed' : 'sticky bottom-0'}`}
             style={{
@@ -1420,7 +1556,7 @@ export default function ChatInterface() {
                 </div>
               )}
 
-			  {/* CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
+			  {/* ✅ CONTAINER INPUT MOBILE CORRIGÉ avec largeur élargie - CODE ORIGINAL CONSERVÉ */}
 			  <div className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? 'mobile-input-container' : 'space-x-3'}`}>
 			  
                 <div className={`flex-1 ${isMobileDevice ? 'mobile-input-wrapper' : ''}`}>
