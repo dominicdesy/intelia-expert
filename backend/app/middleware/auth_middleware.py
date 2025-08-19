@@ -1,7 +1,7 @@
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert
-Version mise à jour avec support des nouveaux endpoints auth
+Version corrigée - Endpoints auth alignés avec la configuration réelle
 """
 
 from fastapi import HTTPException, Request
@@ -15,7 +15,7 @@ from app.api.v1.auth import get_current_user, security
 
 logger = logging.getLogger(__name__)
 
-# 🆕 ENDPOINTS PUBLICS COMPLETS (pas d'auth requise)
+# 🆕 ENDPOINTS PUBLICS CORRIGES (pas d'auth requise)
 PUBLIC_ENDPOINTS = {
     # === API ENDPOINTS PUBLICS ===
     "/api/ask-public",
@@ -31,10 +31,10 @@ PUBLIC_ENDPOINTS = {
     "/api/openapi.json",
     "/api/v1/health",
     
-    # === NOUVEAUX ENDPOINTS AUTH PUBLICS ===
-    "/api/v1/auth/login",           # ✅ Login public
-    "/api/v1/auth/register",        # ✅ Registration publique
-    "/api/v1/auth/debug/jwt-config", # ✅ Debug public
+    # === ✅ ENDPOINTS AUTH PUBLICS CORRIGES ===
+    "/api/auth/login",              # ✅ Correspond au router réel
+    "/api/auth/register",           # ✅ Correspond au router réel
+    "/api/auth/debug/jwt-config",   # ✅ Correspond au router réel
     
     # === CONVERSATIONS PUBLIQUES ===
     "/api/v1/conversations/test-public",
@@ -57,10 +57,10 @@ PUBLIC_ENDPOINTS = {
     "/admin/stats",                 # Stats admin publiques
     "/health/complete",             # Health check complet
     
-    # === AUTH ENDPOINTS SANS PREFIX (compatibilité) ===
-    "/auth/login",
-    "/auth/register",
-    "/auth/debug/jwt-config",
+    # === ✅ AUTH ENDPOINTS SANS PREFIX (compatibilité) ===
+    "/auth/login",                  # ✅ Version directe
+    "/auth/register",               # ✅ Version directe
+    "/auth/debug/jwt-config",       # ✅ Version directe
     
     # === CONVERSATIONS SANS PREFIX ===
     "/v1/conversations/test-public",
@@ -77,13 +77,13 @@ PROTECTED_PATTERNS = [
     "/api/v1/admin/",               # Administration
     "/api/v1/invitations/",         # Invitations
     
-    # === NOUVEAUX ENDPOINTS AUTH PROTÉGÉS ===
-    "/api/v1/auth/verify",          # Vérification token
-    "/api/v1/auth/logout",          # Déconnexion
-    "/api/v1/auth/update-profile",  # Mise à jour profil
-    "/api/v1/auth/me",              # Profil utilisateur
-    "/api/v1/auth/delete-data",     # Suppression données RGPD
-    "/api/v1/auth/export-user",     # Export données RGPD
+    # === ✅ ENDPOINTS AUTH PROTÉGÉS CORRIGES ===
+    "/api/auth/verify",             # ✅ Vérification token
+    "/api/auth/logout",             # ✅ Déconnexion
+    "/api/auth/update-profile",     # ✅ Mise à jour profil
+    "/api/auth/me",                 # ✅ Profil utilisateur
+    "/api/auth/delete-data",        # ✅ Suppression données RGPD
+    "/api/auth/export-user",        # ✅ Export données RGPD
     
     # === PATTERNS SANS PREFIX (compatibilité) ===
     "/v1/billing/",
@@ -92,12 +92,12 @@ PROTECTED_PATTERNS = [
     "/v1/expert/ask",
     "/v1/admin/",
     "/v1/invitations/",
-    "/auth/verify",
-    "/auth/logout",
-    "/auth/update-profile",
-    "/auth/me",
-    "/auth/delete-data",
-    "/auth/export-user",
+    "/auth/verify",                 # ✅ Sans /api
+    "/auth/logout",                 # ✅ Sans /api
+    "/auth/update-profile",         # ✅ Sans /api
+    "/auth/me",                     # ✅ Sans /api
+    "/auth/delete-data",            # ✅ Sans /api
+    "/auth/export-user",            # ✅ Sans /api
 ]
 
 # ❌ PATTERNS D'ENDPOINTS INEXISTANTS (retourner 404 au lieu de 405)
@@ -109,6 +109,9 @@ NONEXISTENT_PATTERNS = [
     "/api/v1/account/",             # N'existe pas (utiliser /auth/)
     "/api/v1/users/",               # N'existe pas (utiliser /auth/)
     
+    # ❌ ANCIENS ENDPOINTS AUTH INCORRECTS (n'existent pas)
+    "/api/v1/auth/",                # ❌ Le router est sur /auth, pas /v1/auth
+    
     # Patterns sans prefix
     "/v1/analytics/",
     "/v1/user/",
@@ -116,6 +119,7 @@ NONEXISTENT_PATTERNS = [
     "/v1/profile/",
     "/v1/account/",
     "/v1/users/",
+    "/v1/auth/",                    # ❌ Incorrect aussi
 ]
 
 # 🆕 PATTERNS PUBLICS ÉTENDUS (pour la fonction is_public_endpoint)
@@ -128,10 +132,10 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/metrics",
     "/static/",
     
-    # === AUTH PUBLICS ===
-    "/auth/login",
-    "/auth/register",
-    "/auth/debug",
+    # === ✅ AUTH PUBLICS CORRIGES ===
+    "/auth/login",                  # ✅ Chemin réel
+    "/auth/register",               # ✅ Chemin réel
+    "/auth/debug",                  # ✅ Chemin réel
     
     # === RAG ET TESTS ===
     "/rag/",
@@ -141,9 +145,9 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json", 
-    "/api/v1/auth/login",
-    "/api/v1/auth/register",
-    "/api/v1/auth/debug",
+    "/api/auth/login",              # ✅ Avec prefix /api
+    "/api/auth/register",           # ✅ Avec prefix /api
+    "/api/auth/debug",              # ✅ Avec prefix /api
     "/api/rag/",
     "/api/cors-test",
     "/api/v1/system-status",
@@ -304,7 +308,7 @@ async def auth_middleware(request: Request, call_next):
     logger.debug(
         f"🔍 Auth middleware - Method: {request.method}, "
         f"Path: {request.url.path}, "
-        f"Headers: {dict(request.headers)}"
+        f"Auth Header: {'Present' if request.headers.get('Authorization') else 'Missing'}"
     )
     
     # 🚨 ÉTAPE 1: Gérer les endpoints inexistants AVANT toute autre logique
@@ -315,7 +319,8 @@ async def auth_middleware(request: Request, call_next):
             content={
                 "detail": "Not Found", 
                 "error": "endpoint_not_found",
-                "path": request.url.path
+                "path": request.url.path,
+                "suggestion": "Vérifiez l'URL ou consultez /docs pour les endpoints disponibles"
             },
             headers=create_cors_headers()
         )
@@ -333,7 +338,13 @@ async def auth_middleware(request: Request, call_next):
             )
         
         # Pour les endpoints publics, continuer sans auth
-        return await call_next(request)
+        response = await call_next(request)
+        
+        # Ajouter les headers CORS aux réponses publiques
+        for key, value in create_cors_headers().items():
+            response.headers[key] = value
+            
+        return response
     
     # 🔒 ÉTAPE 3: Vérifier l'auth pour les endpoints protégés
     if is_protected_endpoint(request.url.path):
@@ -353,7 +364,13 @@ async def auth_middleware(request: Request, call_next):
             )
             
             # Continuer vers l'endpoint
-            return await call_next(request)
+            response = await call_next(request)
+            
+            # Ajouter les headers CORS aux réponses protégées
+            for key, value in create_cors_headers().items():
+                response.headers[key] = value
+                
+            return response
             
         except HTTPException as e:
             logger.warning(
@@ -396,7 +413,13 @@ async def auth_middleware(request: Request, call_next):
         # Ignorer les erreurs d'auth optionnelle
         pass
     
-    return await call_next(request)
+    response = await call_next(request)
+    
+    # Ajouter les headers CORS à toutes les réponses
+    for key, value in create_cors_headers().items():
+        response.headers[key] = value
+        
+    return response
 
 # 🆕 FONCTION UTILITAIRE POUR LES ENDPOINTS
 def get_authenticated_user(request: Request) -> Dict[str, Any]:
@@ -447,7 +470,18 @@ def debug_middleware_config() -> Dict[str, Any]:
         "protected_patterns_count": len(PROTECTED_PATTERNS),
         "nonexistent_patterns_count": len(NONEXISTENT_PATTERNS),
         "extended_public_patterns_count": len(EXTENDED_PUBLIC_PATTERNS),
-        "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:5],
-        "sample_protected_patterns": PROTECTED_PATTERNS[:5],
-        "middleware_version": "2.0-auth-enhanced"
+        "sample_public_endpoints": list(PUBLIC_ENDPOINTS)[:10],
+        "sample_protected_patterns": PROTECTED_PATTERNS[:10],
+        "auth_endpoints_corrected": [
+            "/api/auth/login",
+            "/api/auth/register", 
+            "/api/auth/debug/jwt-config"
+        ],
+        "middleware_version": "2.1-auth-paths-fixed",
+        "key_changes": [
+            "Fixed auth endpoints paths from /v1/auth to /auth",
+            "Added /api/v1/auth to nonexistent patterns", 
+            "Improved CORS handling",
+            "Enhanced error messages"
+        ]
     }
