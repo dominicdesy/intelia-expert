@@ -1,12 +1,11 @@
-// ==================== API SERVICE UNIFIÉ - CORRIGÉ AUTH-TEMP + PRÉSERVATION COMPLÈTE ====================
+// ==================== API SERVICE UNIFIÉ - CORRIGÉ SESSION_ID + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION INTEGRATION + DELETE FIX + HEURE LOCALE ====================
 
 // 🔧 AJOUT : Import du conversationService pour stocker les session IDs
 import { conversationService } from './conversationService'
 
-// ✅ CONFIGURATION CORRIGÉE POUR AUTH-TEMP
+// ✅ CONFIGURATION INCHANGÉE
 const getApiConfig = () => {
-  // 🔧 CORRECTION: URL de base corrigée pour auth-temp
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
   const version = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
   
   if (!baseUrl) {
@@ -19,30 +18,21 @@ const getApiConfig = () => {
 
 const API_BASE_URL = getApiConfig()
 
-// ✅ FONCTIONS AUTH CORRIGÉES POUR AUTH-TEMP
+// ✅ FONCTIONS AUTH INCHANGÉES
 const getAuthToken = (): string | null => {
   try {
-    // 🔧 PRIORITÉ 1: Chercher dans le localStorage standard (auth-temp)
-    const authToken = localStorage.getItem('auth_token')
-    if (authToken && authToken !== 'null' && authToken !== 'undefined') {
-      console.log('[getAuthToken] Token trouvé dans localStorage (auth-temp)')
-      return authToken
-    }
-
-    // PRIORITÉ 2: Chercher dans les cookies
     const cookieToken = getCookieToken()
     if (cookieToken) {
       console.log('[getAuthToken] Token trouvé dans cookies')
       return cookieToken
     }
 
-    // PRIORITÉ 3: Fallback Supabase localStorage
     const sbToken = localStorage.getItem('sb-cdrmjshmkdfwwtsfdvbl-auth-token')
     if (sbToken) {
       try {
         const parsed = JSON.parse(sbToken)
         if (Array.isArray(parsed) && parsed[0] && parsed[0] !== 'mock-jwt-token-for-development') {
-          console.log('[getAuthToken] Token trouvé dans localStorage Supabase (fallback)')
+          console.log('[getAuthToken] Token trouvé dans localStorage')
           return parsed[0]
         }
       } catch (e) {
@@ -86,13 +76,12 @@ const getCookieToken = (): string | null => {
 const getAuthHeaders = (): Record<string, string> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Origin': 'https://expert.intelia.com', // 🔧 AJOUT: Header CORS obligatoire
   }
 
   const authToken = getAuthToken()
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('🔑 [apiService] Token ajouté aux headers (auth-temp compatible)')
+    console.log('🔑 [apiService] Token ajouté aux headers')
   } else {
     console.warn('⚠️ [apiService] Aucun token trouvé - requête sans auth')
   }
@@ -113,7 +102,7 @@ const generateUUID = (): string => {
   })
 }
 
-// 🆕 NOUVEAU : FONCTIONS FORMATAGE HEURE LOCALE (PRÉSERVÉES)
+// 🆕 NOUVEAU : FONCTIONS FORMATAGE HEURE LOCALE
 export const formatToLocalTime = (utcTimestamp: string): string => {
   try {
     const date = new Date(utcTimestamp);
@@ -154,7 +143,7 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
   }
 }
 
-// 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité (PRÉSERVÉE INTÉGRALEMENT)
+// 🔧 INTERFACE ADAPTÉE : Compatible nouveau backend + garder compatibilité
 interface EnhancedAIResponse {
   response?: string
   conversation_id: string
@@ -231,7 +220,7 @@ interface APIError {
 }
 
 /**
- * 🔧 FONCTION PRINCIPALE AVEC STOCKAGE SESSION ID (PRÉSERVÉE + CORRIGÉE AUTH-TEMP)
+ * 🔧 FONCTION PRINCIPALE AVEC STOCKAGE SESSION ID
  */
 export const generateAIResponse = async (
   question: string,
@@ -254,10 +243,10 @@ export const generateAIResponse = async (
   // 🔧 ADAPTÉ : Session ID pour DialogueManager
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🎯 [apiService] Nouveau système DialogueManager (auth-temp compatible):', {
+  console.log('🎯 [apiService] Nouveau système DialogueManager:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...',
-    system: 'expert.py + DialogueManager + auth-temp'
+    system: 'expert.py + DialogueManager'
   })
 
   try {
@@ -288,10 +277,10 @@ export const generateAIResponse = async (
       question: finalQuestion
     }
 
-    // 🔧 CORRECTION : Headers avec CORS et auth-temp
+    // 🔧 CORRECTION : Headers sans X-Session-ID
     const headers = getAuthHeaders()  // ✅ CORRIGÉ !
 
-    console.log('📤 [apiService] Body DialogueManager (auth-temp):', requestBody)
+    console.log('📤 [apiService] Body DialogueManager:', requestBody)
     console.log('📤 [apiService] Session ID:', finalConversationId.substring(0, 8) + '...')
 
     const response = await fetch(endpoint, {
@@ -300,11 +289,11 @@ export const generateAIResponse = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Statut DialogueManager (auth-temp):', response.status)
+    console.log('📡 [apiService] Statut DialogueManager:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur DialogueManager (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur DialogueManager:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -327,7 +316,7 @@ export const generateAIResponse = async (
 
     const data = await response.json()
     
-    console.log('✅ [apiService] Réponse DialogueManager reçue (auth-temp):', {
+    console.log('✅ [apiService] Réponse DialogueManager reçue:', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -338,7 +327,7 @@ export const generateAIResponse = async (
       documents_used: data.documents_used
     })
 
-    // 🚨 CORRECTION CRITIQUE : Extraction du texte selon le type + validation_rejected (PRÉSERVÉE)
+    // 🚨 CORRECTION CRITIQUE : Extraction du texte selon le type + validation_rejected
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
@@ -354,7 +343,7 @@ export const generateAIResponse = async (
       console.warn('⚠️ [apiService] Aucun texte trouvé dans la réponse!')
     }
 
-    // 🔧 CORRECTION FINALE : Construction processedData simplifiée + validation_rejected (PRÉSERVÉE)
+    // 🔧 CORRECTION FINALE : Construction processedData simplifiée + validation_rejected
     const processedData: EnhancedAIResponse = {
       conversation_id: finalConversationId,
       language: language,
@@ -422,7 +411,7 @@ export const generateAIResponse = async (
       } : {})
     }
 
-    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions SEULEMENT si response existe (PRÉSERVÉE)
+    // 🚀 GÉNÉRATION AUTOMATIQUE response_versions SEULEMENT si response existe
     if (processedData.response && !processedData.response_versions) {
       console.log('✅ [apiService] Génération automatique response_versions')
       
@@ -439,7 +428,7 @@ export const generateAIResponse = async (
       }
     }
 
-    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (PRÉSERVÉ)
+    // 🔧 NOUVEAU : Stocker le session ID pour l'historique
     try {
       conversationService.storeRecentSessionId(finalConversationId)
       console.log('✅ [apiService] Session ID stocké pour historique')
@@ -447,7 +436,7 @@ export const generateAIResponse = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID:', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation - DÉSACTIVÉ car endpoint manquant (PRÉSERVÉ)
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation - DÉSACTIVÉ car endpoint manquant
     try {
       await saveConversationExplicitly(processedData, user.id, finalQuestion)
       console.log('✅ [apiService] Conversation sauvegardée explicitement')
@@ -456,7 +445,7 @@ export const generateAIResponse = async (
       // Ne pas faire échouer la réponse pour une erreur de sauvegarde
     }
 
-    console.log('🎯 [apiService] Données traitées DialogueManager (auth-temp):', {
+    console.log('🎯 [apiService] Données traitées DialogueManager:', {
       type: processedData.type,
       requires_clarification: processedData.requires_clarification,
       clarification_questions_count: processedData.clarification_questions?.length || 0,
@@ -470,7 +459,7 @@ export const generateAIResponse = async (
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur DialogueManager (auth-temp):', error)
+    console.error('❌ [apiService] Erreur DialogueManager:', error)
     
     if (error instanceof Error) {
       throw error
@@ -481,7 +470,7 @@ export const generateAIResponse = async (
 }
 
 /**
- * 🔧 VERSION PUBLIQUE AVEC STOCKAGE SESSION ID (PRÉSERVÉE + CORRIGÉE AUTH-TEMP)
+ * 🔧 VERSION PUBLIQUE AVEC STOCKAGE SESSION ID
  */
 export const generateAIResponsePublic = async (
   question: string,
@@ -495,7 +484,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌍 [apiService] DialogueManager public (auth-temp):', {
+  console.log('🌍 [apiService] DialogueManager public:', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
@@ -509,8 +498,7 @@ export const generateAIResponsePublic = async (
     }
 
     const headers = {
-      'Content-Type': 'application/json',
-      'Origin': 'https://expert.intelia.com' // 🔧 AJOUT: Header CORS
+      'Content-Type': 'application/json'
     }
 
     const response = await fetch(endpoint, {
@@ -521,13 +509,13 @@ export const generateAIResponsePublic = async (
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur DialogueManager public (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur DialogueManager public:', errorText)
       throw new Error(`Erreur API: ${response.status}`)
     }
 
     const data = await response.json()
     
-    console.log('✅ [apiService] Réponse DialogueManager public (auth-temp):', {
+    console.log('✅ [apiService] Réponse DialogueManager public:', {
       type: data.type,
       has_answer: !!data.answer,
       answer_text_exists: !!(data.answer?.text),
@@ -536,7 +524,7 @@ export const generateAIResponsePublic = async (
       has_message: !!data.message
     })
 
-    // 🚨 MÊME EXTRACTION que la version auth + validation_rejected (PRÉSERVÉE)
+    // 🚨 MÊME EXTRACTION que la version auth + validation_rejected
     let responseText = ''
     if (data.type === 'answer' && data.answer?.text) {
       responseText = data.answer.text
@@ -553,7 +541,7 @@ export const generateAIResponsePublic = async (
       language: language,
       timestamp: new Date().toISOString(),
       
-      // 🚨 CORRECTION TYPE ANSWER (PRÉSERVÉE)
+      // 🚨 CORRECTION TYPE ANSWER
       ...(data.type === 'answer' ? {
         type: 'answer',
         response: responseText,
@@ -566,7 +554,7 @@ export const generateAIResponsePublic = async (
         confidence_score: data.answer?.confidence || 0.9
       } : {}),
       
-      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER (PRÉSERVÉE)
+      // 🔧 PRÉSERVATION FORMAT PARTIAL_ANSWER
       ...(data.type === 'partial_answer' ? {
         type: 'partial_answer',
         general_answer: data.general_answer,
@@ -580,7 +568,7 @@ export const generateAIResponsePublic = async (
         confidence_score: data.documents_used ? Math.min(0.9, 0.5 + (data.documents_used * 0.1)) : 0.5
       } : {}),
       
-      // 🔧 GESTION CLARIFICATION (PRÉSERVÉE)
+      // 🔧 GESTION CLARIFICATION
       ...(data.type === 'clarification' ? {
         type: 'clarification',
         requires_clarification: true,
@@ -599,7 +587,7 @@ export const generateAIResponsePublic = async (
         note: 'Clarification requise'
       } : {}),
 
-      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type (public) (PRÉSERVÉE)
+      // 🌾 GESTION VALIDATION_REJECTED : Nouveau type (public)
       ...(data.type === 'validation_rejected' ? {
         type: 'validation_rejected',
         message: data.message,
@@ -615,7 +603,7 @@ export const generateAIResponsePublic = async (
       } : {})
     }
 
-    // 🚀 GÉNÉRATION response_versions SEULEMENT si response existe (PRÉSERVÉE)
+    // 🚀 GÉNÉRATION response_versions SEULEMENT si response existe
     if (processedData.response && !processedData.response_versions) {
       const mainResponse = processedData.response
       
@@ -629,7 +617,7 @@ export const generateAIResponsePublic = async (
       }
     }
 
-    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (version publique aussi) (PRÉSERVÉ)
+    // 🔧 NOUVEAU : Stocker le session ID pour l'historique (version publique aussi)
     try {
       conversationService.storeRecentSessionId(finalConversationId)
       console.log('✅ [apiService] Session ID stocké pour historique (public)')
@@ -637,7 +625,7 @@ export const generateAIResponsePublic = async (
       console.warn('⚠️ [apiService] Erreur stockage session ID (public):', error)
     }
 
-    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique) - DÉSACTIVÉ car endpoint manquant (PRÉSERVÉ)
+    // 🚀 NOUVEAU: Sauvegarder explicitement la conversation (version publique) - DÉSACTIVÉ car endpoint manquant
     try {
       await saveConversationPublic(processedData, question.trim())
       console.log('✅ [apiService] Conversation publique sauvegardée explicitement')
@@ -649,13 +637,13 @@ export const generateAIResponsePublic = async (
     return processedData
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur DialogueManager public (auth-temp):', error)
+    console.error('❌ [apiService] Erreur DialogueManager public:', error)
     throw error
   }
 }
 
 /**
- * 🚀 FONCTIONS DE SAUVEGARDE EXPLICITE - CORRIGÉES POUR ÉVITER ERREUR 405 (PRÉSERVÉES)
+ * 🚀 FONCTIONS DE SAUVEGARDE EXPLICITE - CORRIGÉES POUR ÉVITER ERREUR 405
  */
 const saveConversationExplicitly = async (
   processedData: EnhancedAIResponse,
@@ -685,17 +673,17 @@ const saveConversationPublic = async (
 }
 
 /**
- * 🆕 NOUVEAU : FONCTION DELETE CONVERSATION CORRIGÉE (PRÉSERVÉE + CORRIGÉE AUTH-TEMP)
+ * 🆕 NOUVEAU : FONCTION DELETE CONVERSATION CORRIGÉE
  */
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
     throw new Error('ID de conversation requis')
   }
 
-  console.log('🗑️ [apiService] Suppression conversation (auth-temp):', conversationId)
+  console.log('🗑️ [apiService] Suppression conversation:', conversationId)
 
   try {
-    const headers = getAuthHeaders() // 🔧 CORRECTION: Utilise auth-temp headers
+    const headers = getAuthHeaders()
 
     // ✅ CORRECTION : URL corrigée avec conversations (au pluriel)
     const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
@@ -703,11 +691,11 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
       headers
     })
 
-    console.log('📡 [apiService] Delete statut (auth-temp):', response.status)
+    console.log('📡 [apiService] Delete statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur delete conversation (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur delete conversation:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -722,26 +710,26 @@ export const deleteConversation = async (conversationId: string): Promise<void> 
     }
 
     const result = await response.json()
-    console.log('✅ [apiService] Conversation supprimée (auth-temp):', result.message || 'Succès')
+    console.log('✅ [apiService] Conversation supprimée:', result.message || 'Succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur suppression conversation (auth-temp):', error)
+    console.error('❌ [apiService] Erreur suppression conversation:', error)
     throw error
   }
 }
 
 /**
- * 🆕 NOUVEAU : FONCTION CLEAR ALL CONVERSATIONS CORRIGÉE (PRÉSERVÉE + CORRIGÉE AUTH-TEMP)
+ * 🆕 NOUVEAU : FONCTION CLEAR ALL CONVERSATIONS CORRIGÉE
  */
 export const clearAllUserConversations = async (userId: string): Promise<void> => {
   if (!userId) {
     throw new Error('User ID requis')
   }
 
-  console.log('🗑️ [apiService] Suppression toutes conversations pour (auth-temp):', userId)
+  console.log('🗑️ [apiService] Suppression toutes conversations pour:', userId)
 
   try {
-    const headers = getAuthHeaders() // 🔧 CORRECTION: Utilise auth-temp headers
+    const headers = getAuthHeaders()
 
     // ✅ CORRECTION : URL corrigée
     const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
@@ -749,11 +737,11 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
       headers
     })
 
-    console.log('📡 [apiService] Clear all statut (auth-temp):', response.status)
+    console.log('📡 [apiService] Clear all statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur clear all conversations (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur clear all conversations:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -763,19 +751,19 @@ export const clearAllUserConversations = async (userId: string): Promise<void> =
     }
 
     const result = await response.json()
-    console.log('✅ [apiService] Toutes conversations supprimées (auth-temp):', {
+    console.log('✅ [apiService] Toutes conversations supprimées:', {
       message: result.message,
       deleted_count: result.deleted_count || 0
     })
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur suppression toutes conversations (auth-temp):', error)
+    console.error('❌ [apiService] Erreur suppression toutes conversations:', error)
     throw error
   }
 }
 
 /**
- * ✅ TOUTES LES AUTRES FONCTIONS RESTENT IDENTIQUES MAIS AVEC AUTH-TEMP HEADERS
+ * ✅ TOUTES LES AUTRES FONCTIONS RESTENT IDENTIQUES
  */
 export const sendFeedback = async (
   conversationId: string,
@@ -786,7 +774,7 @@ export const sendFeedback = async (
     throw new Error('ID de conversation requis')
   }
 
-  console.log('👍👎 [apiService] Envoi feedback (auth-temp):', feedback, 'pour conversation:', conversationId)
+  console.log('👍👎 [apiService] Envoi feedback:', feedback, 'pour conversation:', conversationId)
 
   try {
     const requestBody = {
@@ -795,7 +783,7 @@ export const sendFeedback = async (
       ...(comment && { comment: comment.trim() })
     }
 
-    const headers = getAuthHeaders() // 🔧 CORRECTION: Utilise auth-temp headers
+    const headers = getAuthHeaders()
 
     const response = await fetch(`${API_BASE_URL}/expert/feedback`, {
       method: 'POST',
@@ -803,11 +791,11 @@ export const sendFeedback = async (
       body: JSON.stringify(requestBody)
     })
 
-    console.log('📡 [apiService] Feedback statut (auth-temp):', response.status)
+    console.log('📡 [apiService] Feedback statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur feedback (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur feedback:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -816,10 +804,10 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`)
     }
 
-    console.log('✅ [apiService] Feedback envoyé avec succès (auth-temp)')
+    console.log('✅ [apiService] Feedback envoyé avec succès')
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur feedback (auth-temp):', error)
+    console.error('❌ [apiService] Erreur feedback:', error)
     throw error
   }
 }
@@ -829,21 +817,21 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     throw new Error('User ID requis')
   }
 
-  console.log('📂 [apiService] Chargement conversations pour (auth-temp):', userId)
+  console.log('📂 [apiService] Chargement conversations pour:', userId)
 
   try {
-    const headers = getAuthHeaders() // 🔧 CORRECTION: Utilise auth-temp headers
+    const headers = getAuthHeaders()
 
     const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
       method: 'GET',
       headers
     })
 
-    console.log('📡 [apiService] Conversations statut (auth-temp):', response.status)
+    console.log('📡 [apiService] Conversations statut:', response.status)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ [apiService] Erreur conversations (auth-temp):', errorText)
+      console.error('❌ [apiService] Erreur conversations:', errorText)
       
       if (response.status === 401) {
         throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -853,7 +841,7 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     }
 
     const data = await response.json()
-    console.log('✅ [apiService] Conversations chargées (auth-temp):', {
+    console.log('✅ [apiService] Conversations chargées:', {
       count: data.count,
       conversations: data.conversations?.length || 0
     })
@@ -861,16 +849,16 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
     return data
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur chargement conversations (auth-temp):', error)
+    console.error('❌ [apiService] Erreur chargement conversations:', error)
     throw error
   }
 }
 
 export const getTopicSuggestions = async (language: string = 'fr'): Promise<string[]> => {
-  console.log('💡 [apiService] Récupération suggestions sujets (auth-temp):', language)
+  console.log('💡 [apiService] Récupération suggestions sujets:', language)
 
   try {
-    const headers = getAuthHeaders() // 🔧 CORRECTION: Utilise auth-temp headers
+    const headers = getAuthHeaders()
 
     const response = await fetch(`${API_BASE_URL}/expert/topics?language=${language}`, {
       method: 'GET',
@@ -878,7 +866,7 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     })
 
     if (!response.ok) {
-      console.warn('⚠️ [apiService] Erreur récupération sujets (auth-temp):', response.status)
+      console.warn('⚠️ [apiService] Erreur récupération sujets:', response.status)
       
       return [
         "Problèmes de croissance poulets",
@@ -891,12 +879,12 @@ export const getTopicSuggestions = async (language: string = 'fr'): Promise<stri
     }
 
     const data = await response.json()
-    console.log('✅ [apiService] Sujets récupérés (auth-temp):', data.topics?.length || 0)
+    console.log('✅ [apiService] Sujets récupérés:', data.topics?.length || 0)
 
     return Array.isArray(data.topics) ? data.topics : []
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur sujets (auth-temp):', error)
+    console.error('❌ [apiService] Erreur sujets:', error)
     
     return [
       "Problèmes de croissance poulets",
@@ -914,24 +902,23 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     const response = await fetch(`${API_BASE_URL}/system/health`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com' // 🔧 AJOUT: Header CORS
+        'Content-Type': 'application/json'
       }
     })
 
     const isHealthy = response.ok
-    console.log('🏥 [apiService] API Health (auth-temp):', isHealthy ? 'OK' : 'KO')
+    console.log('🏥 [apiService] API Health:', isHealthy ? 'OK' : 'KO')
     
     return isHealthy
 
   } catch (error) {
-    console.error('❌ [apiService] Erreur health check (auth-temp):', error)
+    console.error('❌ [apiService] Erreur health check:', error)
     return false
   }
 }
 
 /**
- * ✅ UTILITAIRES CLARIFICATION - INCHANGÉS (PRÉSERVÉS INTÉGRALEMENT)
+ * ✅ UTILITAIRES CLARIFICATION - INCHANGÉS
  */
 export const buildClarificationEntities = (
   clarificationAnswers: Record<string, string>,
@@ -973,7 +960,7 @@ export const buildClarificationEntities = (
 }
 
 /**
- * ✅ TOUTES LES AUTRES FONCTIONS UTILITAIRES INCHANGÉES (PRÉSERVÉES INTÉGRALEMENT)
+ * ✅ TOUTES LES AUTRES FONCTIONS UTILITAIRES INCHANGÉES
  */
 export const handleEnhancedNetworkError = (error: any): string => {
   if (error?.message?.includes('Failed to fetch')) {
@@ -1003,22 +990,19 @@ export const debugEnhancedConversationFlow = (
   console.log(`🔍 [DialogueManager Debug] ${step}:`, {
     session_id: conversationId || 'GÉNÉRÉ_AUTO',
     endpoint: 'ask (DialogueManager)',
-    auth_system: 'auth-temp',
     timestamp: new Date().toISOString(),
     ...additionalInfo
   })
 }
 
 export const debugEnhancedAPI = () => {
-  console.group('🔧 [apiService] Configuration DialogueManager + expert.py + AUTH-TEMP CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
+  console.group('🔧 [apiService] Configuration DialogueManager + expert.py CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
   console.log('API_BASE_URL:', API_BASE_URL)
   console.log('Système backend: DialogueManager + expert.py')
-  console.log('Système auth: auth-temp endpoints')
   console.log('Endpoint principal:', `${API_BASE_URL}/expert/ask`)
   console.log('🔧 CORRECTIONS EFFECTUÉES:')
   console.log('  ✅ Body avec session_id: { session_id, question }')
-  console.log('  ✅ Headers avec CORS Origin obligatoire')
-  console.log('  ✅ Auth-temp token dans Authorization header')
+  console.log('  ✅ Headers sans X-Session-ID (corrigé !)')
   console.log('  ✅ Extraction correcte du texte selon type')
   console.log('  ✅ Support type: "answer" avec data.answer.text')
   console.log('  ✅ Support type: "partial_answer"')
@@ -1030,9 +1014,8 @@ export const debugEnhancedAPI = () => {
   console.log('  🆕 DELETE conversation corrigé (/conversations au pluriel)')
   console.log('  🆕 CLEAR ALL conversations ajouté')
   console.log('  🆕 Formatage heure locale (formatToLocalTime, simpleLocalTime)')
-  console.log('  🔧 AUTH-TEMP: Headers avec Origin + Authorization')
   console.log('FONCTIONNALITÉS PRÉSERVÉES:')
-  console.log('  ✅ Authentification JWT (auth-temp)')
+  console.log('  ✅ Authentification JWT')
   console.log('  ✅ Feedback, conversations, topics')
   console.log('  ✅ Gestion erreurs')
   console.log('  ✅ Health check')
@@ -1052,7 +1035,7 @@ export const testEnhancedConversationContinuity = async (
   enhancements_used: string[]
 }> => {
   try {
-    console.log('🧪 [apiService] Test continuité DialogueManager (auth-temp)...')
+    console.log('🧪 [apiService] Test continuité DialogueManager...')
     
     const firstResponse = await generateAIResponse(
       "Test question 1: Qu'est-ce que les poulets de chair ?",
@@ -1071,7 +1054,7 @@ export const testEnhancedConversationContinuity = async (
     
     const sameId = firstResponse.conversation_id === secondResponse.conversation_id
     
-    console.log('🧪 [apiService] Test DialogueManager résultat (auth-temp):', {
+    console.log('🧪 [apiService] Test DialogueManager résultat:', {
       first_id: firstResponse.conversation_id,
       second_id: secondResponse.conversation_id,
       same_id: sameId,
@@ -1084,11 +1067,11 @@ export const testEnhancedConversationContinuity = async (
       second_conversation_id: secondResponse.conversation_id,
       same_id: sameId,
       success: true,
-      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale', 'AuthTemp']
+      enhancements_used: ['DialogueManager', 'expert.py', 'ConversationService', 'DeleteFix', 'HeureLocale']
     }
     
   } catch (error) {
-    console.error('❌ [apiService] Erreur test DialogueManager (auth-temp):', error)
+    console.error('❌ [apiService] Erreur test DialogueManager:', error)
     return {
       first_conversation_id: '',
       second_conversation_id: '',
@@ -1103,36 +1086,31 @@ export const detectAPIVersion = async (): Promise<'dialoguemanager' | 'legacy' |
   try {
     const response = await fetch(`${API_BASE_URL}/expert/ask`, {
       method: 'OPTIONS',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com' // 🔧 AJOUT: Header CORS
-      }
+      headers: { 'Content-Type': 'application/json' }
     })
     
     if (response.ok || response.status === 405) {
-      console.log('✅ [detectAPIVersion] DialogueManager /ask disponible (auth-temp)')
+      console.log('✅ [detectAPIVersion] DialogueManager /ask disponible')
       return 'dialoguemanager'
     }
     
     return 'error'
     
   } catch (error) {
-    console.error('❌ [detectAPIVersion] Erreur détection (auth-temp):', error)
+    console.error('❌ [detectAPIVersion] Erreur détection:', error)
     return 'error'
   }
 }
 
 export const logEnhancedAPIInfo = () => {
-  console.group('🚀 [apiService] DialogueManager + expert.py Integration + AUTH-TEMP CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
-  console.log('Version:', 'DialogueManager v1.0 - AUTH-TEMP + TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE FIXED')
+  console.group('🚀 [apiService] DialogueManager + expert.py Integration CORRIGÉE + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE')
+  console.log('Version:', 'DialogueManager v1.0 - TYPE ANSWER + VALIDATION_REJECTED + CONVERSATION_SERVICE + DELETE_FIX + HEURE_LOCALE FIXED')
   console.log('Base URL:', API_BASE_URL)
   console.log('Backend: expert.py + DialogueManager + Agricultural Validator')
-  console.log('Auth System: auth-temp endpoints')
   console.log('🔧 CHANGEMENTS MAJEURS CORRIGÉS:')
   console.log('  - 🚀 Utilisation endpoint /ask simplifié')
   console.log('  - 🔧 Session ID dans le BODY (corrigé !)')
-  console.log('  - 🔧 Headers avec CORS Origin obligatoire')
-  console.log('  - 🔧 Auth-temp: localStorage auth_token + Authorization header')
+  console.log('  - 🔧 Headers sans X-Session-ID (corrigé !)')
   console.log('  - 🚨 Extraction type: "answer" de data.answer.text (CORRIGÉ !)')
   console.log('  - 🌾 Support type: "validation_rejected" (NOUVEAU !)')
   console.log('  - 🔧 Stockage automatique session ID pour historique (NOUVEAU !)')
@@ -1144,7 +1122,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - 🚀 Support type: clarification/answer/partial_answer/validation_rejected')
   console.log('  - 🚀 PRÉSERVATION format partial_answer')
   console.log('  - 🚀 Conversion automatique format')
-  console.log('  - 🔧 AUTH-TEMP: Fallback Supabase + priorité auth_token')
   console.log('FONCTIONNALITÉS:')
   console.log('  - ✅ Clarification intelligente automatique')
   console.log('  - ✅ Gestion mémoire conversation Postgres')
@@ -1156,7 +1133,6 @@ export const logEnhancedAPIInfo = () => {
   console.log('  - ✅ Sauvegarde automatique via /expert/ask (CORRIGÉ !)')
   console.log('  - 🆕 Gestion DELETE conversations (NOUVEAU !)')
   console.log('  - 🆕 Formatage heure locale automatique (NOUVEAU !)')
-  console.log('  - 🔧 Auth-temp: Compatible avec système actuel (NOUVEAU !)')
   console.groupEnd()
 }
 
