@@ -9,6 +9,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth' // ← Maintenant c'est le store backend
 import type { Language, User } from '@/types'
 
+
 // 🆕 BANNIÈRE TEMPORAIRE pour informer du changement
 const BackendMigrationBanner = () => (
   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
