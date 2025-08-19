@@ -349,12 +349,13 @@ export const useAuthStore = create<AuthState>()(
                 language: userData.language || 'fr',
               }
 
-              // Ajouter les champs optionnels seulement s'ils sont fournis
-              if (userData.phone && 'phone' in userData) {
-                profileData.phone = userData.phone
+              // Ajouter les champs optionnels seulement s'ils sont fournis et existent
+              const userDataAny = userData as any
+              if (userDataAny.phone) {
+                profileData.phone = userDataAny.phone
               }
-              if (userData.company && 'company' in userData) {
-                profileData.company = userData.company
+              if (userDataAny.company) {
+                profileData.company = userDataAny.company
               }
 
               const { error: profileError } = await supabase
@@ -375,8 +376,8 @@ export const useAuthStore = create<AuthState>()(
             full_name: fullName,
             user_type: userData.user_type || 'producer',
             language: userData.language || 'fr',
-            phone: userData.phone,
-            company: userData.company,
+            phone: (userData as any).phone,
+            company: (userData as any).company,
           })
 
           set({ 
@@ -460,8 +461,9 @@ export const useAuthStore = create<AuthState>()(
           if (data.language !== undefined) updateData.language = data.language
           
           // Ajouter les champs optionnels seulement s'ils sont fournis
-          if ('phone' in data && data.phone !== undefined) updateData.phone = data.phone
-          if ('company' in data && data.company !== undefined) updateData.company = data.company
+          const dataAny = data as any
+          if (dataAny.phone !== undefined) updateData.phone = dataAny.phone
+          if (dataAny.company !== undefined) updateData.company = dataAny.company
 
           const { error } = await supabase
             .from('users')
@@ -492,22 +494,25 @@ export const useAuthStore = create<AuthState>()(
         
         // Mettre à jour seulement si le champ rgpd_consent existe dans AppUser
         const currentUser = get().user
-        if (currentUser && 'rgpd_consent' in currentUser) {
-          await get().updateProfile({ rgpd_consent: consent } as any)
-        } else {
-          // Sinon, juste mettre à jour dans Supabase
-          try {
-            const { error } = await supabase
-              .from('users')
-              .update({ rgpd_consent: consent })
-              .eq('auth_user_id', currentUser?.id)
+        if (currentUser) {
+          const currentUserAny = currentUser as any
+          if ('rgpd_consent' in currentUserAny) {
+            await get().updateProfile({ rgpd_consent: consent } as any)
+          } else {
+            // Sinon, juste mettre à jour dans Supabase
+            try {
+              const { error } = await supabase
+                .from('users')
+                .update({ rgpd_consent: consent })
+                .eq('auth_user_id', currentUser?.id)
 
-            if (error) {
-              throw new Error(error.message)
+              if (error) {
+                throw new Error(error.message)
+              }
+            } catch (e: any) {
+              alog('❌ updateConsent error', e?.message)
+              throw new Error(e?.message || 'Erreur de mise à jour du consentement')
             }
-          } catch (e: any) {
-            alog('❌ updateConsent error', e?.message)
-            throw new Error(e?.message || 'Erreur de mise à jour du consentement')
           }
         }
       },
