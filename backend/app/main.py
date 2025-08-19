@@ -446,9 +446,17 @@ except ImportError as e:
     try:
         from app.api.v1.auth import router as auth_router
         temp_v1_router.include_router(auth_router, tags=["auth"])
-        logger.info("✅ Auth router ajouté")
+        logger.info("✅ Auth router ajouté avec %d routes", len(auth_router.routes))
+        logger.info("✅ Auth router prefix: %s", getattr(auth_router, 'prefix', 'None'))
+        logger.info("✅ Auth routes disponibles: %s", [route.path for route in auth_router.routes[:3]])
     except ImportError as e:
-        logger.error(f"❌ Impossible de charger auth router: {e}")
+        logger.error(f"❌ Import Error auth router: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+    except Exception as e:
+        logger.error(f"❌ Erreur inattendue auth router: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
     
     try:
         from app.api.v1.health import router as health_router
