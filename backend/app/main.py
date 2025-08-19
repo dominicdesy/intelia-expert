@@ -92,7 +92,7 @@ async def periodic_monitoring():
                        f"santé: {health_status}")
             
         except Exception as e:
-            logger.error(f"❌ Erreur monitoring périodique: {e}")
+            logger.error(f"⌛ Erreur monitoring périodique: {e}")
             await asyncio.sleep(60)  # Retry dans 1 minute en cas d'erreur
 
 # -------------------------------------------------------------------
@@ -153,7 +153,7 @@ async def lifespan(app: FastAPI):
             logger.warning("⚠️ DATABASE_URL manquante - services analytics désactivés")
             
     except Exception as e:
-        logger.error(f"❌ Erreur initialisation services: {e}")
+        logger.error(f"⌛ Erreur initialisation services: {e}")
         # Ne pas empêcher le démarrage
     
     # Initialisation Supabase (CONSERVÉ)
@@ -220,9 +220,9 @@ async def lifespan(app: FastAPI):
                 app.state.rag = global_embedder
                 _log_loaded("global", global_path, global_embedder)
             else:
-                logger.error(f"❌ RAG Global: Échec chargement depuis {global_path}")
+                logger.error(f"⌛ RAG Global: Échec chargement depuis {global_path}")
         else:
-            logger.error(f"❌ RAG Global: Chemin inexistant {global_path}")
+            logger.error(f"⌛ RAG Global: Chemin inexistant {global_path}")
 
         # 🚀 BROILER
         broiler_path = rag_paths["broiler"]
@@ -260,9 +260,9 @@ async def lifespan(app: FastAPI):
         total_rags = sum(1 for rag in [app.state.rag, app.state.rag_broiler, app.state.rag_layer] if rag)
 
         rag_summary = {
-            "global": "✅ Actif" if app.state.rag else "❌ CRITIQUE",
-            "broiler": "✅ Actif" if app.state.rag_broiler else "❌ Absent",
-            "layer": "✅ Actif" if app.state.rag_layer else "❌ Absent",
+            "global": "✅ Actif" if app.state.rag else "⌛ CRITIQUE",
+            "broiler": "✅ Actif" if app.state.rag_broiler else "⌛ Absent",
+            "layer": "✅ Actif" if app.state.rag_layer else "⌛ Absent",
             "total_loaded": total_rags
         }
         logger.info(f"📊 Status final des RAG: {rag_summary}")
@@ -275,7 +275,7 @@ async def lifespan(app: FastAPI):
             logger.warning(f"⚠️ Seulement {total_rags}/3 RAG chargés")
 
     except Exception as e:
-        logger.error("❌ Erreur critique initialisation RAG: %s", e)
+        logger.error("⌛ Erreur critique initialisation RAG: %s", e)
 
     # ========== DÉMARRAGE DU MONITORING PÉRIODIQUE ==========
     monitoring_task = None
@@ -283,7 +283,7 @@ async def lifespan(app: FastAPI):
         monitoring_task = asyncio.create_task(periodic_monitoring())
         logger.info("📊 Monitoring périodique démarré")
     except Exception as e:
-        logger.error(f"❌ Erreur démarrage monitoring: {e}")
+        logger.error(f"⌛ Erreur démarrage monitoring: {e}")
 
     # ========== L'APPLICATION DÉMARRE ==========
     logger.info("🎯 Application Expert API prête avec système complet")
@@ -298,7 +298,7 @@ async def lifespan(app: FastAPI):
             monitoring_task.cancel()
             logger.info("📊 Monitoring périodique arrêté")
         except Exception as e:
-            logger.error(f"❌ Erreur arrêt monitoring: {e}")
+            logger.error(f"⌛ Erreur arrêt monitoring: {e}")
     
     # Statistiques finales
     uptime_hours = (time.time() - start_time) / 3600
@@ -316,6 +316,40 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+)
+
+# =============================================================================
+# 🔥 CORRECTION CORS CRITIQUE - MIDDLEWARE EN PREMIER POUR TOUT FIXER
+# =============================================================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "*"  # Temporaire pour debug
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+        "X-Session-ID"
+    ],
+    expose_headers=[
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
+    ]
 )
 
 # =============================================================================
@@ -341,7 +375,7 @@ async def monitoring_middleware(request: Request, call_next):
         
     except Exception as e:
         error_counter += 1
-        logger.error(f"❌ Erreur dans middleware monitoring: {e}")
+        logger.error(f"⌛ Erreur dans middleware monitoring: {e}")
         raise
         
     finally:
@@ -350,41 +384,7 @@ async def monitoring_middleware(request: Request, call_next):
         
         # Log des requêtes lentes
         if processing_time > 5000:  # Plus de 5 secondes
-            logger.warning(f"🐌 Requête lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
-
-# =============================================================================
-# CORS MIDDLEWARE CORRIGÉ - VERSION SIMPLIFIÉE ET FONCTIONNELLE
-# =============================================================================
-@app.middleware("http")
-async def cors_middleware_fixed(request: Request, call_next):
-    """Middleware CORS corrigé - Applique CORS à TOUTES les réponses"""
-    
-    # Traiter la requête
-    if request.method == "OPTIONS":
-        # Réponse directe pour OPTIONS
-        return JSONResponse(
-            status_code=200,
-            content={"message": "OK"},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Max-Age": "3600",
-            }
-        )
-    
-    # Pour toutes les autres requêtes
-    response = await call_next(request)
-    
-    # Ajouter les headers CORS à TOUTES les réponses
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Max-Age"] = "3600"
-    
-    return response
+            logger.warning(f"🌀 Requête lente: {request.method} {request.url.path} - {processing_time:.0f}ms")
 
 # 🔒 AJOUT DU MIDDLEWARE D'AUTHENTIFICATION (CONSERVÉ)
 try:
@@ -394,22 +394,7 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ Middleware d'authentification non disponible: {e}")
 except Exception as e:
-    logger.error(f"❌ Erreur lors de l'activation du middleware d'auth: {e}")
-
-@app.options("/{full_path:path}")
-async def options_handler_fixed(request: Request, full_path: str):
-    """Handler OPTIONS global corrigé"""
-    return JSONResponse(
-        status_code=200,
-        content={"message": "OK"},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH", 
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Max-Age": "3600",
-        }
-    )
+    logger.error(f"⌛ Erreur lors de l'activation du middleware d'auth: {e}")
 
 # -------------------------------------------------------------------
 # 🔧 CORRECTION MAJEURE : Montage des routers avec AUTH ROUTING FIXÉ
@@ -433,7 +418,7 @@ except ImportError as e:
         temp_v1_router.include_router(expert_router, tags=["expert"])
         logger.info("✅ Expert router ajouté")
     except ImportError as e:
-        logger.error(f"❌ Impossible de charger expert router: {e}")
+        logger.error(f"⌛ Impossible de charger expert router: {e}")
     
     # ✅ CORRECTION CRITIQUE DU ROUTING AUTH - Résout le catch-22
     try:
@@ -460,13 +445,13 @@ except ImportError as e:
         logger.info("✅ Auth routes maintenant disponibles sur /v1/auth/*")
         
     except ImportError as e:
-        logger.error(f"❌ Import Error auth router: {e}")
+        logger.error(f"⌛ Import Error auth router: {e}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"⌛ Traceback: {traceback.format_exc()}")
     except Exception as e:
-        logger.error(f"❌ Erreur inattendue auth router: {e}")
+        logger.error(f"⌛ Erreur inattendue auth router: {e}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"⌛ Traceback: {traceback.format_exc()}")
     
     # ✅ ENDPOINTS DE TEST TEMPORAIRES pour vérifier le fix
     @temp_v1_router.get("/auth/test-routing")
@@ -728,7 +713,7 @@ async def test_rag_access():
     elif available_rags == 3 and loaded_rags < 3:
         results["summary"]["recommendations"].append(f"⚠️ 3 RAG disponibles mais seulement {loaded_rags} chargé(s)")
     elif available_rags < 3:
-        results["summary"]["recommendations"].append(f"❌ Seulement {available_rags}/3 RAG trouvés sur le disque")
+        results["summary"]["recommendations"].append(f"⌛ Seulement {available_rags}/3 RAG trouvés sur le disque")
 
     return results
 
@@ -855,7 +840,7 @@ async def complete_health_check():
         return health_status
         
     except Exception as e:
-        logger.error(f"❌ Erreur health check: {e}")
+        logger.error(f"⌛ Erreur health check: {e}")
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "status": "error",
@@ -924,8 +909,8 @@ async def admin_statistics():
                 "openai_fallback": bool(os.getenv("OPENAI_API_KEY")),
                 "openai_billing_api": bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_ORG_ID")),
                 "auth_routing_fixed": True,  # ✅ NOUVEAU
-            "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
-            "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
+                "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
+                "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
             }
         }
         
@@ -990,7 +975,7 @@ async def auth_login_direct(request: Request):
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur login direct: {e}")
+        logger.error(f"⌛ Erreur login direct: {e}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Login failed", "error": str(e)}
@@ -1051,7 +1036,7 @@ async def auth_me_direct(request: Request):
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur me direct: {e}")
+        logger.error(f"⌛ Erreur me direct: {e}")
         return JSONResponse(
             status_code=401,
             content={"detail": "Authentication failed", "error": str(e)}
@@ -1094,7 +1079,7 @@ async def auth_delete_data_direct(request: Request):
         }
         
     except Exception as e:
-        logger.error(f"❌ Erreur delete data direct: {e}")
+        logger.error(f"⌛ Erreur delete data direct: {e}")
         return JSONResponse(
             status_code=401,
             content={"detail": "Authentication failed", "error": str(e)}
