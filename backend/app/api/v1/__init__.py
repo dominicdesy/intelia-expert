@@ -1,41 +1,197 @@
-# app/api/v1/__init__.py - VERSION CORRIGÉE AVEC BILLING
+# app/api/v1/__init__.py - VERSION AVEC DEBUG COMPLET
 from fastapi import APIRouter
+import logging
 
-from .system import router as system_router
-from .auth import router as auth_router
-from .admin import router as admin_router
-from .health import router as health_router
-from .invitations import router as invitations_router
-from .logging import router as logging_router
-from .billing import router as billing_router  # 🆕 AJOUTÉ - SYSTÈME DE FACTURATION
-from .billing_openai import router as billing_openai_router  # 🔥 NOUVEAU - BILLING OPENAI
-from .expert import router as expert_router
+logger = logging.getLogger(__name__)
 
-# Import conditionnel pour conversations (au cas où le fichier n'existe pas encore)
+# Import avec debug détaillé pour chaque router
+logger.info("🔄 Début import des routers...")
+
+# System router
+try:
+    from .system import router as system_router
+    logger.info("✅ System router importé avec %d routes", len(system_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import system router: %s", e)
+    import traceback
+    logger.error("❌ Traceback system: %s", traceback.format_exc())
+    system_router = None
+
+# Auth router - AVEC DEBUG COMPLET
+try:
+    logger.info("🔄 Tentative import auth router...")
+    from .auth import router as auth_router
+    logger.info("✅ Auth router importé avec succès!")
+    logger.info("✅ Auth router a %d routes", len(auth_router.routes))
+    logger.info("✅ Auth router prefix: %s", getattr(auth_router, 'prefix', 'None'))
+    auth_routes = [f"{route.path} ({', '.join(route.methods)})" for route in auth_router.routes[:5]]
+    logger.info("✅ Auth routes échantillon: %s", auth_routes)
+except ImportError as ie:
+    logger.error("❌ IMPORT ERROR auth router: %s", ie)
+    logger.error("❌ Le module auth.py n'a pas pu être importé")
+    import traceback
+    logger.error("❌ Traceback import auth: %s", traceback.format_exc())
+    auth_router = None
+except AttributeError as ae:
+    logger.error("❌ ATTRIBUTE ERROR auth router: %s", ae)
+    logger.error("❌ Le module auth.py n'exporte pas 'router'")
+    auth_router = None
+except Exception as e:
+    logger.error("❌ ERREUR GÉNÉRALE auth router: %s", e)
+    logger.error("❌ Type d'erreur: %s", type(e).__name__)
+    import traceback
+    logger.error("❌ Traceback complet auth: %s", traceback.format_exc())
+    auth_router = None
+
+# Admin router
+try:
+    from .admin import router as admin_router
+    logger.info("✅ Admin router importé avec %d routes", len(admin_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import admin router: %s", e)
+    admin_router = None
+
+# Health router
+try:
+    from .health import router as health_router
+    logger.info("✅ Health router importé avec %d routes", len(health_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import health router: %s", e)
+    health_router = None
+
+# Invitations router
+try:
+    from .invitations import router as invitations_router
+    logger.info("✅ Invitations router importé avec %d routes", len(invitations_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import invitations router: %s", e)
+    invitations_router = None
+
+# Logging router
+try:
+    from .logging import router as logging_router
+    logger.info("✅ Logging router importé avec %d routes", len(logging_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import logging router: %s", e)
+    logging_router = None
+
+# Billing router
+try:
+    from .billing import router as billing_router
+    logger.info("✅ Billing router importé avec %d routes", len(billing_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import billing router: %s", e)
+    billing_router = None
+
+# Billing OpenAI router
+try:
+    from .billing_openai import router as billing_openai_router
+    logger.info("✅ Billing OpenAI router importé avec %d routes", len(billing_openai_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import billing_openai router: %s", e)
+    billing_openai_router = None
+
+# Expert router
+try:
+    from .expert import router as expert_router
+    logger.info("✅ Expert router importé avec %d routes", len(expert_router.routes))
+except Exception as e:
+    logger.error("❌ ERREUR import expert router: %s", e)
+    expert_router = None
+
+# Conversations router (conditionnel)
 try:
     from .conversations import router as conversations_router
     CONVERSATIONS_AVAILABLE = True
+    logger.info("✅ Conversations router importé avec %d routes", len(conversations_router.routes))
 except ImportError:
     CONVERSATIONS_AVAILABLE = False
     conversations_router = None
+    logger.warning("⚠️ Conversations router non disponible (normal si pas encore créé)")
+except Exception as e:
+    CONVERSATIONS_AVAILABLE = False
+    conversations_router = None
+    logger.error("❌ ERREUR import conversations router: %s", e)
 
+# Création du router principal
+logger.info("🔄 Création du router principal v1...")
 router = APIRouter(prefix="/v1")
 
-# Ordre logique par domaine
-router.include_router(system_router, tags=["System"])
-router.include_router(auth_router, tags=["Auth"])  # 🔧 PAS DE PRÉFIXE (déjà dans auth.py)
-router.include_router(admin_router, tags=["Admin"])
-router.include_router(health_router, tags=["Health"])
-router.include_router(invitations_router, tags=["Invitations"])
-router.include_router(logging_router, tags=["Logging"])  # /v1/logging/*
-router.include_router(billing_router, tags=["Billing"])  # 🆕 /v1/billing/*
-router.include_router(billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"])  # 🔥 NOUVEAU - /v1/billing/openai-*
+# Montage des routers avec debug
+logger.info("🔄 Montage des routers...")
+
+# System
+if system_router:
+    router.include_router(system_router, tags=["System"])
+    logger.info("✅ System router monté")
+else:
+    logger.error("❌ System router non monté (échec import)")
+
+# Auth - AVEC DEBUG COMPLET
+if auth_router:
+    try:
+        router.include_router(auth_router, tags=["Auth"])
+        logger.info("✅ Auth router monté avec succès!")
+        logger.info("✅ Auth router maintenant disponible sur /v1/auth/*")
+    except Exception as e:
+        logger.error("❌ ERREUR montage auth router: %s", e)
+        import traceback
+        logger.error("❌ Traceback montage auth: %s", traceback.format_exc())
+else:
+    logger.error("❌ Auth router NON MONTÉ - import a échoué")
+
+# Admin
+if admin_router:
+    router.include_router(admin_router, tags=["Admin"])
+    logger.info("✅ Admin router monté")
+
+# Health
+if health_router:
+    router.include_router(health_router, tags=["Health"])
+    logger.info("✅ Health router monté")
+
+# Invitations
+if invitations_router:
+    router.include_router(invitations_router, tags=["Invitations"])
+    logger.info("✅ Invitations router monté")
+
+# Logging
+if logging_router:
+    router.include_router(logging_router, tags=["Logging"])
+    logger.info("✅ Logging router monté")
+
+# Billing
+if billing_router:
+    router.include_router(billing_router, tags=["Billing"])
+    logger.info("✅ Billing router monté")
+
+# Billing OpenAI
+if billing_openai_router:
+    router.include_router(billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"])
+    logger.info("✅ Billing OpenAI router monté")
 
 # Conversations (conditionnel)
-if CONVERSATIONS_AVAILABLE:
+if CONVERSATIONS_AVAILABLE and conversations_router:
     router.include_router(conversations_router, prefix="/conversations", tags=["Conversations"])
+    logger.info("✅ Conversations router monté")
 
-# Expert vit sous /v1/expert/* (pas de prefix dans expert.py)
-router.include_router(expert_router, prefix="/expert", tags=["Expert"])
+# Expert
+if expert_router:
+    router.include_router(expert_router, prefix="/expert", tags=["Expert"])
+    logger.info("✅ Expert router monté")
+
+# Résumé final
+total_routes = len(router.routes)
+logger.info("🎯 Router v1 créé avec %d routes au total", total_routes)
+
+# Debug des routes auth spécifiquement
+auth_route_count = len([r for r in router.routes if '/auth' in r.path])
+logger.info("🔍 Routes auth détectées: %d", auth_route_count)
+
+if auth_route_count > 0:
+    auth_routes_debug = [f"{r.path} ({', '.join(r.methods)})" for r in router.routes if '/auth' in r.path]
+    logger.info("🔍 Routes auth disponibles: %s", auth_routes_debug[:5])
+else:
+    logger.error("❌ AUCUNE route auth détectée dans le router final!")
 
 __all__ = ["router"]
