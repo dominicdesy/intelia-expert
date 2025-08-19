@@ -25,7 +25,7 @@ const getAuthToken = async (): Promise<string | null> => {
       return token
     }
 
-    console.warn('[apiService] ❌ Aucun token Supabase trouvé')
+    console.warn('[apiService] ⚠ Aucun token Supabase trouvé')
     return null
   } catch (error) {
     console.error('[apiService] ❌ Erreur récupération token Supabase:', error)
@@ -419,7 +419,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID()
 
-  console.log('🌍 [apiService] Expert API public (Supabase):', {
+  console.log('🌐 [apiService] Expert API public (Supabase):', {
     question: question.substring(0, 50) + '...',
     session_id: finalConversationId.substring(0, 8) + '...'
   })
@@ -559,6 +559,74 @@ export const generateAIResponsePublic = async (
 
   } catch (error) {
     console.error('❌ [apiService] Erreur Expert API public (Supabase):', error)
+    throw error
+  }
+}
+
+/**
+ * 🔧 NOUVELLE FONCTION - Chargement des conversations utilisateur
+ */
+export const loadUserConversations = async (userId: string): Promise<any> => {
+  if (!userId) {
+    throw new Error('User ID requis')
+  }
+
+  console.log('📂 [apiService] Chargement conversations pour:', userId)
+
+  try {
+    const headers = await getAuthHeaders()
+
+    const response = await fetch(`${API_BASE_URL}/conversations/user/${userId}`, {
+      method: 'GET',
+      headers
+    })
+
+    console.log('📡 [apiService] Conversations statut:', response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [apiService] Erreur conversations:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.')
+      }
+      
+      if (response.status === 405 || response.status === 404) {
+        // 🚑 HOTFIX: Si l'endpoint n'existe pas encore, retourner des données vides
+        console.warn('⚠️ [apiService] Endpoint conversations non disponible - retour données vides')
+        return {
+          count: 0,
+          conversations: [],
+          user_id: userId,
+          note: "Fonctionnalité en cours de développement"
+        }
+      }
+      
+      throw new Error(`Erreur chargement conversations: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ [apiService] Conversations chargées:', {
+      count: data.count,
+      conversations: data.conversations?.length || 0
+    })
+
+    return data
+
+  } catch (error) {
+    console.error('❌ [apiService] Erreur chargement conversations:', error)
+    
+    // En cas d'erreur réseau, retourner des données vides plutôt que de faire planter l'app
+    if (error instanceof Error && error.message.includes('Failed to fetch')) {
+      console.warn('⚠️ [apiService] Erreur réseau - retour données vides')
+      return {
+        count: 0,
+        conversations: [],
+        user_id: userId,
+        note: "Erreur de connexion - réessayez plus tard"
+      }
+    }
+    
     throw error
   }
 }
