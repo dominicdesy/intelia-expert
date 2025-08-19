@@ -1,4 +1,4 @@
-// middleware.ts - Version Supabase mise à jour
+// middleware.ts - Version corrigée utilisant votre approche existante + corrections pour déconnexion
 
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
@@ -11,20 +11,17 @@ export async function middleware(req: NextRequest) {
     const supabase = createMiddlewareClient({ req, res })
     const { data: { session } } = await supabase.auth.getSession()
 
-    console.log('🔄 [Middleware] Vérification Supabase:', {
+    console.log('🔄 [Middleware] Vérification:', {
       path: req.nextUrl.pathname,
       hasSession: !!session,
-      userEmail: session?.user?.email
+      userAgent: req.headers.get('user-agent')?.substring(0, 50)
     })
 
     const { pathname } = req.nextUrl
 
-    // 🚨 GESTION SPÉCIALE POUR DÉCONNEXION - CONSERVÉE
+    // 🚨 GESTION SPÉCIALE POUR DÉCONNEXION - NOUVELLE CORRECTION
     if (pathname === '/auth/logout') {
       console.log('🚪 [Middleware] Route logout détectée - nettoyage forcé')
-      
-      // Déconnecter via Supabase
-      await supabase.auth.signOut()
       
       // Créer une réponse de redirection vers login
       const loginUrl = new URL('/auth/login', req.url)
@@ -37,7 +34,8 @@ export async function middleware(req: NextRequest) {
         'supabase.auth.token', 
         'sb-access-token',
         'sb-refresh-token',
-        // Cookies Supabase spécifiques au projet
+        // Cookies de votre ancienne approche
+        'sb-localhost-auth-token',
         'sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token'
       ]
       
@@ -51,7 +49,7 @@ export async function middleware(req: NextRequest) {
         })
       })
       
-      console.log('✅ [Middleware] Redirection logout avec nettoyage cookies Supabase')
+      console.log('✅ [Middleware] Redirection logout avec nettoyage cookies')
       return logoutResponse
     }
 
@@ -62,7 +60,6 @@ export async function middleware(req: NextRequest) {
       '/auth/forgot-password',
       '/auth/reset-password',
       '/auth/confirm',
-      '/auth/callback', // 🆕 AJOUT: Route callback Supabase
       '/privacy',
       '/terms',
       '/',  // Page d'accueil publique
@@ -104,18 +101,12 @@ export async function middleware(req: NextRequest) {
       // Laisser l'utilisateur sur la page d'accueil, ne pas forcer vers /chat
     }
 
-    // 🆕 NOUVEAU: Redirection des pages d'auth vers chat si connecté
-    if (pathname.startsWith('/auth/') && session && pathname !== '/auth/callback') {
-      console.log('🔄 [Middleware] Utilisateur connecté sur page auth, redirection vers chat')
-      return NextResponse.redirect(new URL('/chat', req.url))
-    }
-
     // Headers de sécurité conservés pour Zoho SalesIQ
     const secureResponse = applySecurityHeaders(res)
     return secureResponse
 
   } catch (error) {
-    console.error('❌ [Middleware] Erreur Supabase:', error)
+    console.error('❌ [Middleware] Erreur:', error)
     return NextResponse.next()
   }
 }
@@ -131,7 +122,7 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
     // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-    // ✅ CONNECT-SRC CORRIGÉ - URL WEBSOCKET CONSERVÉE + Supabase
+    // ✅ CONNECT-SRC CORRIGÉ - URL WEBSOCKET CONSERVÉE
     "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com",
     // ✅ FRAME-SRC CONSERVÉ pour autoriser les iframes Zoho
     "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",

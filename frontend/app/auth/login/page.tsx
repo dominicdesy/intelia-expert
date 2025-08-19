@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuthStore } from '@/lib/stores/auth'
+import { supabase } from '@/lib/supabase/client'
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
@@ -50,6 +51,53 @@ export default function LoginPage() {
       [name]: value
     }))
     setError('')
+  }
+
+  // 🆕 NOUVEAU: Gestion de la connexion Google
+  const handleGoogleLogin = async () => {
+    try {
+      setError('')
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (error) {
+        setError(error.message)
+      }
+    } catch (error: any) {
+      setError('Erreur lors de la connexion avec Google')
+    }
+  }
+
+  // 🆕 NOUVEAU: Gestion de la connexion avec un lien magique
+  const handleMagicLink = async () => {
+    if (!formData.email) {
+      setError('Veuillez entrer votre adresse email')
+      return
+    }
+
+    try {
+      setError('')
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        setError('') // Pas d'erreur
+        // Afficher un message de succès
+        alert(`Un lien de connexion a été envoyé à ${formData.email}`)
+      }
+    } catch (error: any) {
+      setError('Erreur lors de l\'envoi du lien magique')
+    }
   }
 
   return (
@@ -113,7 +161,7 @@ export default function LoginPage() {
               Se connecter
             </button>
             <Link 
-              href="/auth/register" 
+              href="/auth/signup" 
               className="flex-1 py-3 text-center text-gray-500 hover:text-gray-700 transition-colors"
             >
               S'inscrire
@@ -198,7 +246,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Actions sociales (placeholder pour plus tard) */}
+          {/* 🆕 NOUVEAU: Actions sociales et lien magique */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -210,14 +258,19 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              <button className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+              <button 
+                onClick={handleGoogleLogin}
+                className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              >
                 Continuer avec Google
               </button>
-              <button className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                Continuer avec Facebook
-              </button>
-              <button className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                Continuer avec LinkedIn
+              
+              <button 
+                onClick={handleMagicLink}
+                disabled={!formData.email}
+                className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Recevoir un lien de connexion
               </button>
             </div>
           </div>
@@ -236,7 +289,7 @@ export default function LoginPage() {
           <div className="lg:hidden mt-8 text-center">
             <span className="text-sm text-gray-600">Pas encore de compte ? </span>
             <Link 
-              href="/auth/register" 
+              href="/auth/signup" 
               className="text-sm text-blue-600 hover:text-blue-500 font-medium transition-colors"
             >
               S'inscrire

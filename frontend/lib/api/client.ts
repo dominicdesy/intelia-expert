@@ -1,5 +1,6 @@
-// lib/api/client.ts - VERSION CORRIGÉE AVEC AUTH-TEMP
+// lib/api/client.ts - VERSION CORRIGÉE AVEC SUPABASE
 import { ApiResponse } from '@/types'
+import { supabase } from '@/lib/supabase/client'
 
 class ApiClient {
   private baseURL: string
@@ -15,25 +16,48 @@ class ApiClient {
     console.log('🔧 API Client initialisé avec baseURL:', this.baseURL)
   }
 
+  // 🆕 NOUVELLE MÉTHODE: Récupérer le token Supabase
+  private async getSupabaseToken(): Promise<string | null> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || null
+      console.log('🔑 Token Supabase:', token ? 'présent' : 'absent')
+      return token
+    } catch (error) {
+      console.error('❌ Erreur récupération token Supabase:', error)
+      return null
+    }
+  }
+
   private async request<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const fullUrl = `${this.baseURL}${endpoint}`
+    
+    // 🔧 CORRECTION: Récupérer automatiquement le token Supabase si pas fourni
+    let headers = { ...this.defaultHeaders, ...options.headers }
+    
+    // Si pas d'Authorization header fourni, essayer de récupérer le token Supabase
+    if (!headers['Authorization'] && !headers['authorization']) {
+      const token = await this.getSupabaseToken()
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+        console.log('🔑 Token Supabase ajouté automatiquement')
+      }
+    }
+    
     console.log('📤 Requête API:', {
       url: fullUrl,
       method: options.method || 'GET',
-      headers: { ...this.defaultHeaders, ...options.headers },
+      headers: headers,
       body: options.body
     })
 
     try {
       const response = await fetch(fullUrl, {
         ...options,
-        headers: {
-          ...this.defaultHeaders,
-          ...options.headers,
-        },
+        headers,
       })
 
       console.log('📥 Réponse API Status:', response.status, response.statusText)
@@ -46,6 +70,12 @@ class ApiClient {
           statusText: response.statusText,
           errorText: errorText
         })
+        
+        // Gestion spécifique des erreurs d'authentification
+        if (response.status === 401) {
+          console.error('🚫 Erreur d\'authentification - token Supabase invalide ou expiré')
+          throw new Error('Session expirée. Veuillez vous reconnecter.')
+        }
         
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
@@ -134,6 +164,33 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${authToken}`
     }
     return this.request<T>(endpoint, { method: 'DELETE', headers })
+  }
+
+  // 🆕 NOUVELLES MÉTHODES: Versions avec auth automatique Supabase
+  async getSecure<T>(endpoint: string): Promise<ApiResponse<T>> {
+    console.log('🔒 GET Secure Request (Supabase):', endpoint)
+    return this.request<T>(endpoint, { method: 'GET' })
+  }
+
+  async postSecure<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    console.log('🔒 POST Secure Request (Supabase):', endpoint, 'avec data:', data)
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async putSecure<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    console.log('🔒 PUT Secure Request (Supabase):', endpoint)
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async deleteSecure<T>(endpoint: string): Promise<ApiResponse<T>> {
+    console.log('🔒 DELETE Secure Request (Supabase):', endpoint)
+    return this.request<T>(endpoint, { method: 'DELETE' })
   }
 }
 
