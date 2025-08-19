@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useRouter } from 'next/navigation'
-import { Message } from '../../types'
+import { Message } from './types'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from './hooks/useTranslation'
 import { useChatStore } from './hooks/useChatStore'
