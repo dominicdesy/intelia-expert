@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
-import { PLAN_CONFIGS } from '@/types'
+import { PLAN_CONFIGS } from '../../types'
 
 // ==================== MODAL ABONNEMENT ====================
 export const AccountModal = ({ user, onClose }: { user: any, onClose: () => void }) => {

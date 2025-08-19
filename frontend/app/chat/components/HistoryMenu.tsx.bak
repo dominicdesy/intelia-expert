@@ -7,7 +7,7 @@ import {
 } from '../hooks/useChatStore'
 import { useAuthStore } from '@/lib/stores/auth'
 import { TrashIcon, PlusIcon, MessageCircleIcon } from '../utils/icons'
-import type { Conversation, ConversationGroup } from '@/types'
+import type { Conversation, ConversationGroup } from '../types'
 
 export const HistoryMenu = () => {
   const { t } = useTranslation()
