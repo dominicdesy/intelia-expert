@@ -1,4 +1,4 @@
-// lib/stores/auth.ts — Store d'auth BACKEND API (corrigé pour auth-temp)
+// lib/stores/auth.ts – Store d'auth BACKEND API (robuste + timeout gérés)
 'use client'
 
 import { create } from 'zustand'
@@ -23,9 +23,9 @@ const maskEmail = (e: string) => e?.replace(/(^.).*(@.*$)/, '$1***$2')
 
 alog('✅ Loaded Backend Auth Store from /lib/stores/auth.ts')
 
-// ---- Configuration API CORRIGÉE ----
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
-const API_TIMEOUT = 30000 // 30 secondes
+// ---- Configuration API ----
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app'
+const API_TIMEOUT = 30000 // 30 secondes (plus court que Supabase direct)
 
 // ---- Types d'état du store ----
 interface AuthState {
@@ -54,13 +54,13 @@ interface AuthState {
   exportUserData: () => Promise<any>
 }
 
-// ---- Helpers API CORRIGÉS ----
+// ---- Helpers API ----
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 
 // Fetch avec timeout pour appels backend
 async function apiCall(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`
-  alog('🌍 API Call:', url)
+  alog('🌐 API Call:', url)
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
@@ -71,7 +71,6 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'Origin': 'https://expert.intelia.com', // 🔧 AJOUT CORS
         ...options.headers,
       },
     })
@@ -80,7 +79,7 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Erreur réseau' }))
-      throw new Error(errorData.detail || errorData.message || `Erreur ${response.status}`)
+      throw new Error(errorData.message || `Erreur ${response.status}`)
     }
     
     return await response.json()
@@ -108,7 +107,7 @@ function getStoredToken(): string | null {
   }
 }
 
-// ---- Store CORRIGÉ ----
+// ---- Store ----
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -142,24 +141,15 @@ export const useAuthStore = create<AuthState>()(
             return false
           }
 
-          // 🔧 CORRIGÉ: Vérifier le token avec le backend auth-temp
-          const userData = await apiCall('/auth-temp/me', {
-            method: 'GET',
+          // ✅ CORRIGÉ: Vérifier le token avec le backend
+          const userData = await apiCall('/v1/auth/verify', {
+            method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
             }
           })
 
-          // Adapter la réponse auth-temp au format AppUser
-          const appUser: AppUser = {
-            id: userData.user_id,
-            email: userData.email,
-            user_type: 'producer', // Valeur par défaut
-            name: userData.email.split('@')[0], // Nom par défaut
-            language: 'fr',
-            // Autres champs requis par votre interface
-          }
-
+          const appUser = userData.user
           set({ 
             user: appUser, 
             isAuthenticated: !!appUser, 
@@ -190,24 +180,15 @@ export const useAuthStore = create<AuthState>()(
             return
           }
 
-          // 🔧 CORRIGÉ: Endpoint auth-temp
-          const userData = await apiCall('/auth-temp/me', {
-            method: 'GET',
+          // ✅ CORRIGÉ: Endpoint correct
+          const userData = await apiCall('/v1/auth/verify', {
+            method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           })
 
-          // Adapter la réponse
-          const appUser: AppUser = {
-            id: userData.user_id,
-            email: userData.email,
-            user_type: 'producer',
-            name: userData.email.split('@')[0],
-            language: 'fr',
-          }
-
           set({
-            user: appUser,
-            isAuthenticated: !!appUser,
+            user: userData.user,
+            isAuthenticated: !!userData.user,
             lastAuthCheck: Date.now(),
             sessionCheckCount: get().sessionCheckCount + 1,
             isRecovering: false,
@@ -226,33 +207,24 @@ export const useAuthStore = create<AuthState>()(
         alog('🔄 login via backend', maskEmail(email))
         
         try {
-          // 🔧 CORRIGÉ: Endpoint auth-temp
-          const result = await apiCall('/auth-temp/login', {
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password })
           })
 
           // Stocker le token
-          if (result.access_token) {
-            localStorage.setItem('auth_token', result.access_token)
-          }
-
-          // Adapter la réponse au format AppUser
-          const appUser: AppUser = {
-            id: result.user?.id || result.user_id,
-            email: result.user?.email || email,
-            user_type: result.user?.user_type || 'producer',
-            name: result.user?.name || result.user?.email?.split('@')[0] || email.split('@')[0],
-            language: result.user?.language || 'fr',
+          if (result.token) {
+            localStorage.setItem('auth_token', result.token)
           }
 
           set({ 
-            user: appUser, 
-            isAuthenticated: !!appUser,
+            user: result.user, 
+            isAuthenticated: !!result.user,
             isLoading: false 
           })
           
-          alog('✅ login success', appUser?.email && maskEmail(appUser.email))
+          alog('✅ login success', result.user?.email && maskEmail(result.user.email))
           
         } catch (e: any) {
           get().handleAuthError(e, 'login')
@@ -273,15 +245,49 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Le nom doit contenir au moins 2 caractères')
           }
 
-          // 🔧 NOTE: Pour l'instant, auth-temp ne supporte que login/me
-          // Vous devrez implémenter /auth-temp/register ou utiliser Supabase pour register
-          throw new Error('Inscription non disponible avec auth-temp. Utilisez Supabase ou implémentez /auth-temp/register')
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: email.trim(),
+              password,
+              userData: {
+                name: fullName,
+                user_type: userData.user_type || 'producer',
+                language: userData.language || 'fr',
+                ...userData
+              }
+            })
+          })
+
+          // Stocker le token si fourni
+          if (result.token) {
+            localStorage.setItem('auth_token', result.token)
+          }
+
+          set({ 
+            user: result.user, 
+            isAuthenticated: !!result.user,
+            isLoading: false 
+          })
+
+          alog('✅ register success via backend')
+          toast.success('Compte créé avec succès ! Vérifiez vos emails si nécessaire.', { icon: '🎉' })
           
         } catch (e: any) {
           get().handleAuthError(e, 'register')
           alog('❌ register error', e?.message)
           
+          // Messages d'erreur plus clairs
           let userMessage = e?.message || 'Erreur lors de la création du compte'
+          
+          if (userMessage.includes('already exists') || userMessage.includes('déjà utilisé')) {
+            userMessage = 'Cette adresse email est déjà utilisée.'
+          } else if (userMessage.includes('weak') || userMessage.includes('password')) {
+            userMessage = 'Le mot de passe ne respecte pas les critères de sécurité.'
+          } else if (userMessage.includes('timeout') || userMessage.includes('temps')) {
+            userMessage = 'Le service met du temps à répondre. Réessayez dans quelques instants.'
+          }
           
           toast.error(userMessage, { icon: '⚠️' })
           throw new Error(userMessage)
@@ -296,7 +302,22 @@ export const useAuthStore = create<AuthState>()(
         alog('🔄 logout via backend')
         
         try {
-          // Nettoyer côté client (auth-temp n'a pas d'endpoint logout)
+          const token = getStoredToken()
+          
+          // Appeler le backend pour logout (optionnel)
+          if (token) {
+            try {
+              // ✅ CORRIGÉ: Endpoint correct
+              await apiCall('/v1/auth/logout', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+              })
+            } catch {
+              // Ignorer les erreurs de logout backend
+            }
+          }
+
+          // Nettoyer côté client
           try {
             localStorage.removeItem('auth_token')
             sessionStorage.removeItem('auth_token')
@@ -320,15 +341,18 @@ export const useAuthStore = create<AuthState>()(
         alog('🔄 updateProfile via backend', Object.keys(data || {}))
         
         try {
-          // 🔧 NOTE: auth-temp ne supporte pas updateProfile
-          // Pour l'instant, juste mettre à jour localement
-          const currentUser = get().user
-          if (currentUser) {
-            const updatedUser = { ...currentUser, ...data }
-            set({ user: updatedUser })
-          }
-          
-          alog('✅ updateProfile success (local only)')
+          const token = getStoredToken()
+          if (!token) throw new Error('Non authentifié')
+
+          // ✅ CORRIGÉ: Endpoint correct
+          const result = await apiCall('/v1/auth/update-profile', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+          })
+
+          set({ user: result.user || get().user })
+          alog('✅ updateProfile success')
           
         } catch (e: any) {
           get().handleAuthError(e, 'updateProfile')
@@ -348,17 +372,25 @@ export const useAuthStore = create<AuthState>()(
         const token = getStoredToken()
         if (!token) throw new Error('Non authentifié')
 
-        // 🔧 NOTE: auth-temp ne supporte pas delete user
-        // Pour l'instant, juste logout
-        await get().logout()
+        // ✅ CORRIGÉ: Endpoint correct
+        await apiCall('/v1/auth/delete-user', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        
+        // Nettoyer après suppression
+        get().logout()
       },
 
       exportUserData: async () => {
         const token = getStoredToken()
         if (!token) throw new Error('Non authentifié')
 
-        // 🔧 NOTE: auth-temp ne supporte pas export
-        return { message: 'Export non disponible avec auth-temp' }
+        // ✅ CORRIGÉ: Endpoint correct
+        return await apiCall('/v1/auth/export-user', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       },
     }),
     {

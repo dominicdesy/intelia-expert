@@ -1,4 +1,4 @@
-// lib/api/client.ts - VERSION CORRIGÉE AVEC AUTH-TEMP
+// lib/api/client.ts - VERSION DEBUG COMPLÈTE
 import { ApiResponse } from '@/types'
 
 class ApiClient {
@@ -6,11 +6,9 @@ class ApiClient {
   private defaultHeaders: HeadersInit
 
   constructor() {
-    // 🔧 CORRECTION: URL corrigée pour utiliser l'API déployée
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'https://expert-app-cngws.ondigitalocean.app/api'
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     this.defaultHeaders = {
       'Content-Type': 'application/json',
-      'Origin': 'https://expert.intelia.com', // 🔧 AJOUT: Header CORS obligatoire
     }
     console.log('🔧 API Client initialisé avec baseURL:', this.baseURL)
   }
@@ -23,7 +21,7 @@ class ApiClient {
     console.log('📤 Requête API:', {
       url: fullUrl,
       method: options.method || 'GET',
-      headers: { ...this.defaultHeaders, ...options.headers },
+      headers: this.defaultHeaders,
       body: options.body
     })
 
@@ -94,46 +92,28 @@ class ApiClient {
     }
   }
 
-  async get<T>(endpoint: string, authToken?: string): Promise<ApiResponse<T>> {
+  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
     console.log('🔍 GET Request:', endpoint)
-    const headers: HeadersInit = {}
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`
-    }
-    return this.request<T>(endpoint, { method: 'GET', headers })
+    return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  async post<T>(endpoint: string, data?: any, authToken?: string): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     console.log('📮 POST Request:', endpoint, 'avec data:', data)
-    const headers: HeadersInit = {}
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`
-    }
     return this.request<T>(endpoint, {
       method: 'POST',
-      headers,
       body: data ? JSON.stringify(data) : undefined,
     })
   }
 
-  async put<T>(endpoint: string, data?: any, authToken?: string): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {}
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`
-    }
+  async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
-      headers,
       body: data ? JSON.stringify(data) : undefined,
     })
   }
 
-  async delete<T>(endpoint: string, authToken?: string): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {}
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`
-    }
-    return this.request<T>(endpoint, { method: 'DELETE', headers })
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'DELETE' })
   }
 }
 
