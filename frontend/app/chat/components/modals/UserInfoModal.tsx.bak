@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { UserInfoModalProps } from '../../types'
+import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 
 const supabase = createClientComponentClient()

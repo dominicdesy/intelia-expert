@@ -1,11 +1,9 @@
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
 
 import { useState, useEffect } from 'react'
-// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
-import { getSupabaseClient } from '@/lib/supabase/singleton'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
-const supabase = getSupabaseClient()
+const supabase = createClientComponentClient()
 
 // Types pour le système de traduction
 interface TranslationKeys {
@@ -503,21 +501,20 @@ const translations: Record<string, TranslationKeys> = {
   }
 }
 
-// Hook de traduction (avec singleton)
+// Hook de traduction
 export const useTranslation = () => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('fr')
 
-  // ✅ Initialiser avec la langue de l'utilisateur (utilise le singleton)
+  // Initialiser avec la langue de l'utilisateur
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // ✅ Le client singleton est déjà initialisé plus haut
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user?.user_metadata?.language) {
           setCurrentLanguage(session.user.user_metadata.language)
         }
       } catch (error) {
-        console.log('Utilisation de la langue par défaut (fr) - singleton')
+        console.log('Utilisation de la langue par défaut (fr)')
       }
     }
     getUserLanguage()
