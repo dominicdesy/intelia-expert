@@ -289,8 +289,8 @@ async def request_password_reset(request: ForgotPasswordRequest):
     supabase: Client = create_client(supabase_url, supabase_key)
     
     try:
-        # Configurer l'URL de redirection pour votre frontend
-        redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://votre-domain.com/reset-password")
+        # 🔧 CORRECTION : Configurer l'URL de redirection avec fallback intelligent
+        redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert-app-cngws.ondigitalocean.app/auth/reset-password")
         
         # Essayer la nouvelle API Supabase d'abord
         try:

@@ -400,13 +400,15 @@ async def validate_reset_token(request: ValidateResetTokenRequest):
             detail="Erreur lors de la validation du token"
         )
 
-# === 🆕 ENDPOINT CONFIRM RESET PASSWORD ===
+# === 🆕 ENDPOINT CONFIRM RESET PASSWORD - VERSION CORRIGÉE ===
 @router.post("/confirm-reset-password", response_model=ForgotPasswordResponse)
 async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     """
     🆕 Confirme la réinitialisation du mot de passe avec le nouveau mot de passe
+    VERSION CORRIGÉE avec debug et multiples méthodes
     """
     logger.info(f"🔐 [ConfirmReset] Confirmation réinitialisation...")
+    logger.info(f"🔐 [ConfirmReset] Token reçu (premiers 50 char): {request.token[:50]}...")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -420,74 +422,126 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
         logger.error("❌ Configuration Supabase manquante")
         raise HTTPException(status_code=500, detail="Configuration service manquante")
     
+    logger.info(f"🔧 [ConfirmReset] Supabase URL: {supabase_url}")
+    logger.info(f"🔧 [ConfirmReset] Supabase Key configurée: {bool(supabase_key)}")
+    
     supabase: Client = create_client(supabase_url, supabase_key)
     
     try:
-        # Essayer la nouvelle API Supabase d'abord
+        # 🔧 MÉTHODES MULTIPLES POUR MAXIMUM DE COMPATIBILITÉ
+        
+        # Méthode 1 : Nouvelle API avec verify_otp
+        logger.info("🔄 [ConfirmReset] Méthode 1: verify_otp...")
         try:
-            # Avec la nouvelle API, on utilise verify_otp puis update
             result = supabase.auth.verify_otp({
                 "token": request.token,
                 "type": "recovery"
             })
             
+            logger.info(f"🔍 [ConfirmReset] Résultat verify_otp: user={bool(result.user)}")
+            
             if result.user:
+                logger.info("✅ [ConfirmReset] OTP vérifié, mise à jour mot de passe...")
+                
                 # Maintenant mettre à jour le mot de passe
                 update_result = supabase.auth.update_user({
                     "password": request.new_password
                 })
                 
+                logger.info(f"🔍 [ConfirmReset] Résultat update_user: user={bool(update_result.user)}")
+                
                 if update_result.user:
-                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès")
+                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 1)")
                     return ForgotPasswordResponse(
                         success=True,
                         message="Mot de passe mis à jour avec succès"
                     )
                 else:
+                    logger.error("❌ [ConfirmReset] Échec mise à jour mot de passe (méthode 1)")
                     raise Exception("Échec de la mise à jour du mot de passe")
             else:
-                raise Exception("Token invalide ou expiré")
+                logger.warning("⚠️ [ConfirmReset] verify_otp n'a pas retourné d'utilisateur")
+                raise Exception("Token invalide ou expiré (verify_otp)")
                 
-        except AttributeError:
-            # Fallback pour ancienne API Supabase
+        except Exception as method1_error:
+            logger.warning(f"⚠️ [ConfirmReset] Méthode 1 échouée: {method1_error}")
+            
+            # Méthode 2 : API legacy avec auth.api
+            logger.info("🔄 [ConfirmReset] Méthode 2: API legacy...")
             try:
                 result = supabase.auth.api.update_user(
                     jwt=request.token,
                     attributes={"password": request.new_password}
                 )
                 
+                logger.info(f"🔍 [ConfirmReset] Résultat API legacy: user={bool(result.user)}")
+                
                 if result.user:
-                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (ancienne API)")
+                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 2)")
                     return ForgotPasswordResponse(
                         success=True,
                         message="Mot de passe mis à jour avec succès"
                     )
                 else:
+                    logger.error("❌ [ConfirmReset] Échec mise à jour mot de passe (méthode 2)")
                     raise Exception("Échec de la mise à jour du mot de passe")
                     
-            except Exception as fallback_error:
-                logger.error(f"❌ [ConfirmReset] Échec fallback API: {fallback_error}")
-                raise fallback_error
+            except Exception as method2_error:
+                logger.warning(f"⚠️ [ConfirmReset] Méthode 2 échouée: {method2_error}")
+                
+                # Méthode 3 : Essayer de créer un client avec le token directement
+                logger.info("🔄 [ConfirmReset] Méthode 3: Client avec token...")
+                try:
+                    # Créer un client Supabase avec le token comme JWT
+                    supabase_with_token: Client = create_client(supabase_url, request.token)
+                    
+                    # Essayer de mettre à jour directement
+                    update_result = supabase_with_token.auth.update_user({
+                        "password": request.new_password
+                    })
+                    
+                    logger.info(f"🔍 [ConfirmReset] Résultat avec token client: user={bool(update_result.user)}")
+                    
+                    if update_result.user:
+                        logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 3)")
+                        return ForgotPasswordResponse(
+                            success=True,
+                            message="Mot de passe mis à jour avec succès"
+                        )
+                    else:
+                        raise Exception("Échec de la mise à jour du mot de passe")
+                        
+                except Exception as method3_error:
+                    logger.error(f"❌ [ConfirmReset] Toutes les méthodes ont échoué")
+                    logger.error(f"❌ [ConfirmReset] Méthode 1 (verify_otp): {method1_error}")
+                    logger.error(f"❌ [ConfirmReset] Méthode 2 (API legacy): {method2_error}")
+                    logger.error(f"❌ [ConfirmReset] Méthode 3 (token client): {method3_error}")
+                    
+                    # Lever l'erreur la plus informative
+                    if "invalid" in str(method1_error).lower() or "expired" in str(method1_error).lower():
+                        raise Exception("Token invalide ou expiré")
+                    else:
+                        raise Exception(f"Impossible de réinitialiser le mot de passe: {method1_error}")
         
     except Exception as e:
-        logger.error(f"❌ [ConfirmReset] Erreur: {str(e)}")
+        logger.error(f"❌ [ConfirmReset] Erreur globale: {str(e)}")
         
-        # Gestion d'erreurs spécifiques
+        # Gestion d'erreurs spécifiques avec plus de détails
         error_message = str(e).lower()
         if "expired" in error_message or "invalid" in error_message:
             raise HTTPException(
                 status_code=400, 
-                detail="Token expiré ou invalide"
+                detail="Token expiré ou invalide. Demandez un nouveau lien de réinitialisation."
             )
         elif "password" in error_message:
             raise HTTPException(
                 status_code=400, 
-                detail="Erreur lors de la mise à jour du mot de passe"
+                detail="Erreur lors de la mise à jour du mot de passe. Vérifiez que le mot de passe respecte les critères de sécurité."
             )
         else:
             raise HTTPException(
                 status_code=500, 
-                detail="Erreur lors de la confirmation de réinitialisation"
+                detail=f"Erreur lors de la confirmation de réinitialisation: {str(e)}"
             )
 
 # 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
@@ -710,4 +764,24 @@ async def debug_jwt_config():
         "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
         "register_endpoint_available": True,  # 🆕 Confirmation que register est disponible
         "reset_password_endpoints_available": True  # 🆕 Confirmation que reset password est disponible
+    }
+
+# === 🆕 ENDPOINT DEBUG POUR RESET PASSWORD ===
+@router.get("/debug/reset-config")
+async def debug_reset_config():
+    """Debug temporaire pour voir la configuration de reset password"""
+    
+    # Récupérer exactement comme dans la fonction reset-password
+    redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://expert-app-cngws.ondigitalocean.app/auth/reset-password")
+    
+    return {
+        "redirect_url_configured": redirect_url,
+        "env_var_exists": bool(os.getenv("RESET_PASSWORD_REDIRECT_URL")),
+        "env_var_value": os.getenv("RESET_PASSWORD_REDIRECT_URL"),
+        "fallback_used": not bool(os.getenv("RESET_PASSWORD_REDIRECT_URL")),
+        "all_env_vars": {
+            "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+            "SUPABASE_ANON_KEY": bool(os.getenv("SUPABASE_ANON_KEY")),
+            "RESET_PASSWORD_REDIRECT_URL": bool(os.getenv("RESET_PASSWORD_REDIRECT_URL"))
+        }
     }
