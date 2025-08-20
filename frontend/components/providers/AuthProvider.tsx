@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
-import { supabase } from '@/lib/supabase/client'
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 interface AuthProviderProps {
   children: React.ReactNode
@@ -27,7 +27,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [hasHydrated, setHasHydrated, initializeSession])
 
   useEffect(() => {
-    // 🆕 NOUVEAU: Écouter les changements d'état d'authentification Supabase
+    // 🔧 SINGLETON: Récupérer l'instance unique au moment de l'utilisation
+    const supabase = getSupabaseClient()
+    
+    // Écouter les changements d'état d'authentification Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 [AuthProvider] Changement état Supabase:', event, !!session)
@@ -68,9 +71,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     )
 
-    // 🆕 NOUVEAU: Vérification périodique de la session
+    // Vérification périodique de la session avec singleton
     const intervalId = setInterval(async () => {
       try {
+        const supabase = getSupabaseClient() // Singleton à chaque vérification
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
