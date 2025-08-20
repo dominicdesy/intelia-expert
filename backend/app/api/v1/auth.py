@@ -297,14 +297,14 @@ async def request_password_reset(request: ForgotPasswordRequest):
             result = supabase.auth.reset_password_email(
                 email=request.email,
                 options={
-                    "redirect_to": redirect_url
+                    "redirect_to": redirect_url + "?redirect=true"  # Force query params au lieu du hash
                 }
             )
         except AttributeError:
             # Fallback pour ancienne API Supabase
             result = supabase.auth.api.reset_password_email(
                 email=request.email,
-                redirect_to=redirect_url
+                redirect_to=redirect_url + "?redirect=true"  # Force query params aussi pour l'ancienne API
             )
         
         # Supabase ne retourne pas d'erreur même si l'email n'existe pas (pour des raisons de sécurité)
