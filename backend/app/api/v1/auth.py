@@ -430,61 +430,75 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     try:
         # 🔧 MÉTHODES MULTIPLES POUR MAXIMUM DE COMPATIBILITÉ
         
-        # Méthode 1 : Nouvelle API avec set_session
-        logger.info("🔄 [ConfirmReset] Méthode 1: set_session...")
+        # Méthode 1 : Approche directe avec le token
+        logger.info("🔄 [ConfirmReset] Méthode 1: Utilisation directe du token...")
         try:
-            # 🔧 CORRECTION : Le token reçu peut contenir plusieurs paramètres
-            # Il faut extraire l'access_token et le refresh_token
+            # 🔧 CORRECTION : Utiliser directement le token comme JWT pour update_user
+            logger.info("🔄 [ConfirmReset] Tentative update directe avec token JWT...")
             
-            access_token = request.token
-            refresh_token = None
+            # Créer un client temporaire avec le token
+            supabase_with_token: Client = create_client(supabase_url, request.token)
             
-            # Si le token contient des paramètres URL, les extraire
-            if '&' in request.token:
-                logger.info("🔍 [ConfirmReset] Token contient plusieurs paramètres, extraction...")
-                from urllib.parse import parse_qs, urlparse
-                
-                # Traiter comme des paramètres URL
-                params = parse_qs(request.token.replace('&', '&'))
-                access_token = params.get('access_token', [request.token])[0]
-                refresh_token = params.get('refresh_token', [None])[0]
-                
-                logger.info(f"🔍 [ConfirmReset] access_token extrait: {access_token[:50] if access_token else 'None'}...")
-                logger.info(f"🔍 [ConfirmReset] refresh_token extrait: {refresh_token[:20] if refresh_token else 'None'}...")
+            # Essayer de mettre à jour directement le mot de passe
+            update_result = supabase_with_token.auth.update_user({
+                "password": request.new_password
+            })
             
-            # Si pas de refresh_token, essayer avec juste l'access_token
-            if not refresh_token:
-                logger.info("🔄 [ConfirmReset] Pas de refresh_token, tentative avec access_token seul...")
-                # Utiliser une chaîne vide au lieu de None
-                refresh_token = ""
+            logger.info(f"🔍 [ConfirmReset] Résultat update direct: user={bool(update_result.user)}")
             
-            # Établir une session avec les tokens
-            session_result = supabase.auth.set_session(access_token, refresh_token)
-            
-            logger.info(f"🔍 [ConfirmReset] Résultat set_session: user={bool(session_result.user)}")
-            
-            if session_result.user:
-                logger.info("✅ [ConfirmReset] Session établie, mise à jour mot de passe...")
-                
-                # Maintenant mettre à jour le mot de passe
-                update_result = supabase.auth.update_user({
-                    "password": request.new_password
-                })
-                
-                logger.info(f"🔍 [ConfirmReset] Résultat update_user: user={bool(update_result.user)}")
-                
-                if update_result.user:
-                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 1)")
-                    return ForgotPasswordResponse(
-                        success=True,
-                        message="Mot de passe mis à jour avec succès"
-                    )
-                else:
-                    logger.error("❌ [ConfirmReset] Échec mise à jour mot de passe (méthode 1)")
-                    raise Exception("Échec de la mise à jour du mot de passe")
+            if update_result.user:
+                logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 1)")
+                return ForgotPasswordResponse(
+                    success=True,
+                    message="Mot de passe mis à jour avec succès"
+                )
             else:
-                logger.warning("⚠️ [ConfirmReset] set_session n'a pas retourné d'utilisateur")
-                raise Exception("Token invalide ou expiré (set_session)")
+                logger.error("❌ [ConfirmReset] Échec mise à jour mot de passe (méthode 1)")
+                raise Exception("Échec de la mise à jour du mot de passe")
+                
+        except Exception as method1_error:
+            logger.warning(f"⚠️ [ConfirmReset] Méthode 1 échouée: {method1_error}")
+            
+            # Méthode 2 : Essayer verify_otp avec email
+            logger.info("🔄 [ConfirmReset] Méthode 2: verify_otp avec email...")
+            try:
+                # Décoder le JWT pour obtenir l'email
+                import jwt as pyjwt
+                token_payload = pyjwt.decode(request.token, options={"verify_signature": False})
+                user_email = token_payload.get("email")
+                
+                if user_email:
+                    logger.info(f"🔍 [ConfirmReset] Email extrait du token: {user_email}")
+                    
+                    # Utiliser verify_otp avec l'email
+                    result = supabase.auth.verify_otp({
+                        "email": user_email,
+                        "token": request.token,
+                        "type": "recovery"
+                    })
+                    
+                    if result.user:
+                        logger.info("✅ [ConfirmReset] OTP vérifié avec email, mise à jour mot de passe...")
+                        
+                        update_result = supabase.auth.update_user({
+                            "password": request.new_password
+                        })
+                        
+                        if update_result.user:
+                            logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (méthode 2)")
+                            return ForgotPasswordResponse(
+                                success=True,
+                                message="Mot de passe mis à jour avec succès"
+                            )
+                        else:
+                            raise Exception("Échec de la mise à jour du mot de passe")
+                    else:
+                        raise Exception("Token ou email invalide")
+                else:
+                    raise Exception("Impossible d'extraire l'email du token")
+                    
+            except Exception as method2_error:
+                logger.warning(f"⚠️ [ConfirmReset] Méthode 2 échouée: {method2_error}")
                 
         except Exception as method1_error:
             logger.warning(f"⚠️ [ConfirmReset] Méthode 1 échouée: {method1_error}")
