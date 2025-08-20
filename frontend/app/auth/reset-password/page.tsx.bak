@@ -290,30 +290,13 @@ function ResetPasswordPageContent() {
   const [tokenValid, setTokenValid] = useState<boolean | null>(null)
   const [token, setToken] = useState<string | null>(null)
 
-  // 🔄 Extraction et validation du token - VERSION MISE À JOUR
+  // 🔄 Extraction et validation du token
   useEffect(() => {
-    // 🔧 NOUVELLE LOGIQUE : Lire depuis query params ET hash
-    const extractTokenFromUrl = () => {
-      // 1. Essayer d'abord les query parameters (?token=...)
-      const resetToken = searchParams.get('token')
-      const accessTokenQuery = searchParams.get('access_token')
-      
-      // 2. Si pas trouvé, essayer le hash (#access_token=...)
-      let accessTokenHash = null
-      if (typeof window !== 'undefined') {
-        const hash = window.location.hash.substring(1) // Enlever le #
-        const hashParams = new URLSearchParams(hash)
-        accessTokenHash = hashParams.get('access_token')
-      }
-      
-      // 3. Retourner le premier token trouvé
-      return resetToken || accessTokenQuery || accessTokenHash
-    }
-
-    const finalToken = extractTokenFromUrl()
+    const resetToken = searchParams.get('token')
+    const accessToken = searchParams.get('access_token') // Supabase style
+    const finalToken = resetToken || accessToken
 
     console.log('🔍 [ResetPassword] Token détecté:', finalToken ? 'Présent' : 'Absent')
-    console.log('🔍 [ResetPassword] URL complète:', typeof window !== 'undefined' ? window.location.href : 'N/A')
     
     if (!finalToken) {
       console.log('❌ [ResetPassword] Aucun token trouvé')
@@ -325,6 +308,13 @@ function ResetPasswordPageContent() {
     validateToken(finalToken)
   }, [searchParams])
 
+  // 🔄 Redirection si déjà connecté
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('✅ [ResetPassword] Utilisateur déjà connecté, redirection...')
+      router.push('/chat')
+    }
+  }, [isAuthenticated, user, router])
 
   // 🔧 Validation du token avec le backend
   const validateToken = async (resetToken: string) => {
