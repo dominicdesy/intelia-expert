@@ -181,14 +181,22 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       }
       
       console.log('✅ [Password] Mot de passe changé avec succès')
-      alert('Mot de passe changé avec succès!')
+      
+      // Réinitialiser les champs et fermer
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       })
       setPasswordErrors([])
+      
+      // Fermer d'abord la modal
       onClose()
+      
+      // Puis afficher le message de succès
+      setTimeout(() => {
+        alert('Mot de passe changé avec succès!')
+      }, 100)
       
     } catch (error: any) {
       console.error('❌ [Password] Erreur technique:', error)
