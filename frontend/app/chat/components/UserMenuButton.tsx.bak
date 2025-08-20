@@ -11,7 +11,8 @@ import { PLAN_CONFIGS } from '@/types'
 
 // ==================== MENU UTILISATEUR AVEC INVITATIONS ====================
 export const UserMenuButton = () => {
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore() 
+  const { logout } = useAuthStore()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
@@ -61,26 +62,6 @@ export const UserMenuButton = () => {
     setIsOpen(false)
     // Rediriger vers la page des statistiques
     window.open('/admin/statistics', '_blank')
-  }
-
-  // ✅ NOUVELLE FONCTION DE DÉCONNEXION CORRIGÉE
-  const handleLogout = async () => {
-    try {
-      console.log('🔄 [UserMenu] Démarrage déconnexion')
-      setIsOpen(false)
-      
-      // Appel de déconnexion
-      await logout()
-      
-      // Redirection forcée après déconnexion
-      console.log('✅ [UserMenu] Déconnexion terminée, redirection')
-      window.location.href = '/'
-      
-    } catch (error) {
-      console.error('❌ [UserMenu] Erreur déconnexion:', error)
-      // En cas d'erreur, forcer quand même la redirection
-      window.location.href = '/'
-    }
   }
 
   return (
@@ -211,9 +192,12 @@ export const UserMenuButton = () => {
 
               {/* Footer */}
               <div className="border-t border-gray-100 pt-1">
-                {/* ✅ GESTION DE DÉCONNEXION CORRIGÉE */}
+                {/* ✅ RESTAURÉ: Gestion de déconnexion simplifiée */}
                 <button
-                  onClick={handleLogout}
+                  onClick={() => {
+                    logout()
+                    setIsOpen(false)
+                  }}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
