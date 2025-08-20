@@ -433,15 +433,16 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
         # Méthode 1 : Nouvelle API avec verify_otp
         logger.info("🔄 [ConfirmReset] Méthode 1: verify_otp...")
         try:
-            result = supabase.auth.verify_otp({
-                "token": request.token,
-                "type": "recovery"
-            })
+            # 🔧 CORRECTION : Pour reset password, il faut utiliser set_session au lieu de verify_otp
+            logger.info("🔄 [ConfirmReset] Tentative set_session avec access_token...")
             
-            logger.info(f"🔍 [ConfirmReset] Résultat verify_otp: user={bool(result.user)}")
+            # Établir une session avec le token
+            session_result = supabase.auth.set_session(request.token, None)
             
-            if result.user:
-                logger.info("✅ [ConfirmReset] OTP vérifié, mise à jour mot de passe...")
+            logger.info(f"🔍 [ConfirmReset] Résultat set_session: user={bool(session_result.user)}")
+            
+            if session_result.user:
+                logger.info("✅ [ConfirmReset] Session établie, mise à jour mot de passe...")
                 
                 # Maintenant mettre à jour le mot de passe
                 update_result = supabase.auth.update_user({
@@ -460,8 +461,8 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
                     logger.error("❌ [ConfirmReset] Échec mise à jour mot de passe (méthode 1)")
                     raise Exception("Échec de la mise à jour du mot de passe")
             else:
-                logger.warning("⚠️ [ConfirmReset] verify_otp n'a pas retourné d'utilisateur")
-                raise Exception("Token invalide ou expiré (verify_otp)")
+                logger.warning("⚠️ [ConfirmReset] set_session n'a pas retourné d'utilisateur")
+                raise Exception("Token invalide ou expiré (set_session)")
                 
         except Exception as method1_error:
             logger.warning(f"⚠️ [ConfirmReset] Méthode 1 échouée: {method1_error}")
