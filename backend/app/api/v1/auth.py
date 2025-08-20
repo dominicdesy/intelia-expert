@@ -462,7 +462,7 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
             # Méthode 2 : Essayer verify_otp avec email
             logger.info("🔄 [ConfirmReset] Méthode 2: verify_otp avec email...")
             try:
-                # Décoder le JWT pour obtenir l'email
+                # Décoder le JWT pour obtenir l'email (sans vérification de signature)
                 import jwt as pyjwt
                 token_payload = pyjwt.decode(request.token, options={"verify_signature": False})
                 user_email = token_payload.get("email")
