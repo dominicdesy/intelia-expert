@@ -1,5 +1,3 @@
-// page.tsx
-
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
@@ -12,7 +10,7 @@ const validatePassword = (password: string): string[] => {
   const errors: string[] = []
   
   if (password.length < 8) {
-    errors.push('Le mot de passe doit contenir au moins 8 caractÃ¨res')
+    errors.push('Le mot de passe doit contenir au moins 8 caracteres')
   }
   if (!/[A-Z]/.test(password)) {
     errors.push('Le mot de passe doit contenir au moins une majuscule')
@@ -24,7 +22,7 @@ const validatePassword = (password: string): string[] => {
     errors.push('Le mot de passe doit contenir au moins un chiffre')
   }
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Le mot de passe doit contenir au moins un caractÃ¨re spÃ©cial')
+    errors.push('Le mot de passe doit contenir au moins un caractere special')
   }
   
   return errors
@@ -39,7 +37,7 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
-// ==================== ICÃ"NES ====================
+// ==================== ICONES ====================
 const EyeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -136,11 +134,11 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
             ))}
           </div>
           <div className="text-xs mt-1 text-gray-600">
-            {strength <= 1 && 'TrÃ¨s faible'}
+            {strength <= 1 && 'Tres faible'}
             {strength === 2 && 'Faible'}
             {strength === 3 && 'Moyen'}
             {strength === 4 && 'Fort'}
-            {strength === 5 && 'TrÃ¨s fort'}
+            {strength === 5 && 'Tres fort'}
           </div>
         </div>
       )}
@@ -173,33 +171,33 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
           <ul className="text-xs text-gray-600 space-y-1">
             <li className="flex items-center space-x-2">
               <span className={value.length >= 8 ? 'text-green-600' : 'text-gray-400'}>
-                {value.length >= 8 ? 'âœ"' : 'â—‹'}
+                {value.length >= 8 ? '✓' : '○'}
               </span>
-              <span>Au moins 8 caractÃ¨res</span>
+              <span>Au moins 8 caracteres</span>
             </li>
             <li className="flex items-center space-x-2">
               <span className={/[A-Z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[A-Z]/.test(value) ? 'âœ"' : 'â—‹'}
+                {/[A-Z]/.test(value) ? '✓' : '○'}
               </span>
               <span>Au moins une majuscule</span>
             </li>
             <li className="flex items-center space-x-2">
               <span className={/[a-z]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[a-z]/.test(value) ? 'âœ"' : 'â—‹'}
+                {/[a-z]/.test(value) ? '✓' : '○'}
               </span>
               <span>Au moins une minuscule</span>
             </li>
             <li className="flex items-center space-x-2">
               <span className={/\d/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/\d/.test(value) ? 'âœ"' : 'â—‹'}
+                {/\d/.test(value) ? '✓' : '○'}
               </span>
               <span>Au moins un chiffre</span>
             </li>
             <li className="flex items-center space-x-2">
               <span className={/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-green-600' : 'text-gray-400'}>
-                {/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'âœ"' : 'â—‹'}
+                {/[!@#$%^&*(),.?":{}|<>]/.test(value) ? '✓' : '○'}
               </span>
-              <span>Au moins un caractÃ¨re spÃ©cial</span>
+              <span>Au moins un caractere special</span>
             </li>
           </ul>
         </div>
@@ -208,10 +206,10 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
   )
 }
 
-// ==================== PAGE SUCCÃˆS ====================
+// ==================== PAGE SUCCES ====================
 const SuccessPage = () => {
   useEffect(() => {
-    // Redirection automatique aprÃ¨s 3 secondes
+    // Redirection automatique apres 3 secondes
     const timer = setTimeout(() => {
       window.location.href = 'https://expert.intelia.com/'
     }, 3000)
@@ -223,12 +221,12 @@ const SuccessPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md text-center">
         <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
-          <div className="text-6xl mb-4">âœ…</div>
+          <div className="text-6xl mb-4">✅</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Mot de passe modifiÃ© !
+            Mot de passe modifie !
           </h1>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            Votre mot de passe a Ã©tÃ© mis Ã  jour avec succÃ¨s. Vous allez Ãªtre redirigÃ© vers expert.intelia.com dans quelques secondes.
+            Votre mot de passe a ete mis a jour avec succes. Vous allez etre redirige vers expert.intelia.com dans quelques secondes.
           </p>
           <div className="flex justify-center mb-4">
             <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
@@ -237,7 +235,7 @@ const SuccessPage = () => {
             href="https://expert.intelia.com/"
             className="inline-block text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
           >
-            Aller à expert.intelia.com maintenant
+            Aller a expert.intelia.com maintenant
           </a>
         </div>
       </div>
@@ -246,37 +244,39 @@ const SuccessPage = () => {
 }
 
 // ==================== PAGE ERREUR TOKEN ====================
-const InvalidTokenPage = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
-    <div className="w-full max-w-md text-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
-        <div className="text-6xl mb-4">âš ï¸</div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          Lien expirÃ© ou invalide
-        </h1>
-        <p className="text-gray-600 mb-6 leading-relaxed">
-          Ce lien de rÃ©initialisation n'est plus valide. Il a peut-Ãªtre expirÃ© ou dÃ©jÃ  Ã©tÃ© utilisÃ©.
-        </p>
-        <div className="space-y-3">
-          <a
-            href="https://expert.intelia.com/forgot-password"
-            className="block w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Demander un nouveau lien
-          </a>
-          <a
-            href="https://expert.intelia.com/"
-            className="block text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-          >
-            Retour à expert.intelia.com
-          </a>
+const InvalidTokenPage = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-md text-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            Lien expire ou invalide
+          </h1>
+          <p className="text-gray-600 mb-6 leading-relaxed">
+            Ce lien de reinitialisation n'est plus valide. Il a peut-etre expire ou deja ete utilise.
+          </p>
+          <div className="space-y-3">
+            <a
+              href="https://expert.intelia.com/forgot-password"
+              className="block w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Demander un nouveau lien
+            </a>
+            <a
+              href="https://expert.intelia.com/"
+              className="block text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+            >
+              Retour a expert.intelia.com
+            </a>
+          </div>
         </div>
       </div>
     </div>
   )
-)
+}
 
-// ==================== PAGE RÃ‰INITIALISATION CONTENT ====================
+// ==================== PAGE REINITIALISATION CONTENT ====================
 function ResetPasswordPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -292,15 +292,15 @@ function ResetPasswordPageContent() {
   const [tokenValid, setTokenValid] = useState<boolean | null>(null)
   const [token, setToken] = useState<string | null>(null)
 
-  // ðŸ"„ Extraction et validation du token - VERSION CORRIGÃ‰E
+  // Extraction et validation du token - VERSION CORRIGEE
   useEffect(() => {
-    // ðŸ"§ LOGIQUE SIMPLIFIÃ‰E : Lire le token et l'accepter sans validation prÃ©alable
+    // LOGIQUE SIMPLIFIEE : Lire le token et l'accepter sans validation prealable
     const extractTokenFromUrl = () => {
       // 1. Essayer d'abord les query parameters (?token=...)
       const resetToken = searchParams.get('token')
       const accessTokenQuery = searchParams.get('access_token')
       
-      // 2. Si pas trouvÃ©, essayer le hash (#access_token=...)
+      // 2. Si pas trouve, essayer le hash (#access_token=...)
       let accessTokenHash = null
       if (typeof window !== 'undefined') {
         const hash = window.location.hash.substring(1) // Enlever le #
@@ -308,33 +308,33 @@ function ResetPasswordPageContent() {
         accessTokenHash = hashParams.get('access_token')
       }
       
-      // 3. Retourner le premier token trouvÃ©
+      // 3. Retourner le premier token trouve
       return resetToken || accessTokenQuery || accessTokenHash
     }
 
     const finalToken = extractTokenFromUrl()
 
-    console.log('ðŸ" [ResetPassword] Token dÃ©tectÃ©:', finalToken ? 'PrÃ©sent' : 'Absent')
-    console.log('ðŸ" [ResetPassword] URL complÃ¨te:', typeof window !== 'undefined' ? window.location.href : 'N/A')
+    console.log('[ResetPassword] Token detecte:', finalToken ? 'Present' : 'Absent')
+    console.log('[ResetPassword] URL complete:', typeof window !== 'undefined' ? window.location.href : 'N/A')
     
     if (!finalToken) {
-      console.log('âŒ [ResetPassword] Aucun token trouvÃ©')
+      console.log('[ResetPassword] Aucun token trouve')
       setTokenValid(false)
       return
     }
 
-    // ðŸ"§ CHANGEMENT MAJEUR : Pas de validation prÃ©alable !
-    // On considÃ¨re le token valide s'il existe et on affiche le formulaire
+    // CHANGEMENT MAJEUR : Pas de validation prealable !
+    // On considere le token valide s'il existe et on affiche le formulaire
     setToken(finalToken)
     setTokenValid(true)
-    console.log('âœ… [ResetPassword] Token acceptÃ© sans validation prÃ©alable')
+    console.log('[ResetPassword] Token accepte sans validation prealable')
     
   }, [searchParams])
 
-  // ðŸ"„ Redirection si dÃ©jÃ  connectÃ©
+  // Redirection si deja connecte
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log('âœ… [ResetPassword] Utilisateur dÃ©jÃ  connectÃ©, redirection...')
+      console.log('[ResetPassword] Utilisateur deja connecte, redirection...')
       router.push('/chat')
     }
   }, [isAuthenticated, user, router])
@@ -373,9 +373,9 @@ function ResetPasswordPageContent() {
     setErrors([])
     
     try {
-      console.log('ðŸ"„ [ResetPassword] RÃ©initialisation mot de passe...')
+      console.log('[ResetPassword] Reinitialisation mot de passe...')
       
-      // ðŸ"§ APPEL API pour la rÃ©initialisation
+      // APPEL API pour la reinitialisation
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/confirm-reset-password`, {
         method: 'POST',
         headers: {
@@ -393,22 +393,22 @@ function ResetPasswordPageContent() {
       }
 
       const data = await response.json()
-      console.log('âœ… [ResetPassword] Mot de passe mis Ã  jour avec succÃ¨s')
+      console.log('[ResetPassword] Mot de passe mis a jour avec succes')
       
       setSuccess(true)
       
     } catch (error: any) {
-      console.error('âŒ [ResetPassword] Erreur:', error)
+      console.error('[ResetPassword] Erreur:', error)
       
-      // Gestion d'erreurs spÃ©cifiques
+      // Gestion d'erreurs specifiques
       if (error.message.includes('400')) {
-        setErrors(['Token expirÃ© ou invalide. Demandez un nouveau lien de rÃ©initialisation.'])
+        setErrors(['Token expire ou invalide. Demandez un nouveau lien de reinitialisation.'])
       } else if (error.message.includes('429')) {
-        setErrors(['Trop de tentatives. Veuillez rÃ©essayer dans quelques minutes.'])
+        setErrors(['Trop de tentatives. Veuillez reessayer dans quelques minutes.'])
       } else if (error.message.includes('Failed to fetch')) {
-        setErrors(['ProblÃ¨me de connexion. VÃ©rifiez votre connexion internet.'])
+        setErrors(['Probleme de connexion. Verifiez votre connexion internet.'])
       } else {
-        setErrors([error.message || 'Erreur lors de la rÃ©initialisation du mot de passe'])
+        setErrors([error.message || 'Erreur lors de la reinitialisation du mot de passe'])
       }
     } finally {
       setIsLoading(false)
@@ -424,7 +424,7 @@ function ResetPasswordPageContent() {
     )
   }
 
-  // ðŸš€ Affichage conditionnel selon l'Ã©tat
+  // Affichage conditionnel selon l'etat
   if (isAuthenticated && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -437,17 +437,17 @@ function ResetPasswordPageContent() {
     )
   }
 
-  // Page de succÃ¨s
+  // Page de succes
   if (success) {
     return <SuccessPage />
   }
 
-  // Token invalide ou expirÃ©
+  // Token invalide ou expire
   if (tokenValid === false) {
     return <InvalidTokenPage />
   }
 
-  // Loading pendant validation du token (plus nÃ©cessaire mais gardÃ© pour compatibilitÃ©)
+  // Loading pendant validation du token (plus necessaire mais garde pour compatibilite)
   if (tokenValid === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -473,7 +473,7 @@ function ResetPasswordPageContent() {
             Nouveau mot de passe
           </h1>
           <p className="text-gray-600 leading-relaxed">
-            Choisissez un nouveau mot de passe sÃ©curisÃ© pour votre compte Intelia Expert
+            Choisissez un nouveau mot de passe securise pour votre compte Intelia Expert
           </p>
         </div>
 
@@ -483,7 +483,7 @@ function ResetPasswordPageContent() {
             <div className="text-sm text-red-800">
               {errors.map((error, index) => (
                 <div key={index} className="flex items-start space-x-2">
-                  <span className="text-red-500 font-bold">â€¢</span>
+                  <span className="text-red-500 font-bold">•</span>
                   <span>{error}</span>
                 </div>
               ))}
@@ -499,7 +499,7 @@ function ResetPasswordPageContent() {
               value={formData.newPassword}
               onChange={(value) => handleInputChange('newPassword', value)}
               label="Nouveau mot de passe"
-              placeholder="CrÃ©ez un mot de passe sÃ©curisÃ©"
+              placeholder="Creez un mot de passe securise"
               showStrength={true}
               showRequirements={true}
               disabled={isLoading}
@@ -525,10 +525,10 @@ function ResetPasswordPageContent() {
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Mise Ã  jour...</span>
+                  <span>Mise a jour...</span>
                 </div>
               ) : (
-                'Mettre Ã  jour le mot de passe'
+                'Mettre a jour le mot de passe'
               )}
             </button>
           </div>
@@ -543,26 +543,26 @@ function ResetPasswordPageContent() {
             <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Retour Ã  la connexion
+            Retour a la connexion
           </Link>
         </div>
 
-        {/* Information sÃ©curitÃ© */}
+        {/* Information securite */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            ðŸ"' Votre nouveau mot de passe respecte les plus hauts standards de sÃ©curitÃ©.
+            🔒 Votre nouveau mot de passe respecte les plus hauts standards de securite.
             <br />
-            Il sera automatiquement chiffrÃ© et stockÃ© de maniÃ¨re sÃ©curisÃ©e.
+            Il sera automatiquement chiffre et stocke de maniere securisee.
           </p>
         </div>
 
         {/* Support */}
         <div className="mt-4 p-3 bg-gray-50 rounded-lg text-center">
           <p className="text-xs text-gray-600">
-            ProblÃ¨me avec la rÃ©initialisation ?{' '}
+            Probleme avec la reinitialisation ?{' '}
             <button
               type="button"
-              onClick={() => window.open('mailto:support@intelia.com?subject=ProblÃ¨me rÃ©initialisation mot de passe', '_blank')}
+              onClick={() => window.open('mailto:support@intelia.com?subject=Probleme reinitialisation mot de passe', '_blank')}
               className="text-blue-600 hover:underline font-medium transition-colors"
             >
               Contactez le support
@@ -570,13 +570,13 @@ function ResetPasswordPageContent() {
           </p>
         </div>
 
-        {/* Debug en dÃ©veloppement */}
+        {/* Debug en developpement */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-            <strong>ðŸ"§ Dev Debug:</strong>
-            <br />â€¢ Token: {token ? 'PrÃ©sent' : 'Absent'}
-            <br />â€¢ Token Valid: {tokenValid?.toString()}
-            <br />â€¢ API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
+            <strong>🔧 Dev Debug:</strong>
+            <br />• Token: {token ? 'Present' : 'Absent'}
+            <br />• Token Valid: {tokenValid?.toString()}
+            <br />• API URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}
           </div>
         )}
       </div>
@@ -596,7 +596,7 @@ export default function ResetPasswordPage() {
             className="w-16 h-16 mx-auto mb-4"
           />
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de la rÃ©initialisation...</p>
+          <p className="text-gray-600">Chargement de la reinitialisation...</p>
         </div>
       </div>
     }>
