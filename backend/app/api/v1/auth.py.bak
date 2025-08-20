@@ -61,6 +61,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     token = jwt.encode(to_encode, MAIN_JWT_SECRET, algorithm=JWT_ALGORITHM)
     return token
 
+# === MODÈLES PYDANTIC EXISTANTS ===
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -70,6 +71,29 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class DeleteDataResponse(BaseModel):
+    success: bool
+    message: str
+    note: Optional[str]
+    timestamp: datetime
+
+# === 🆕 NOUVEAUX MODÈLES POUR REGISTER ===
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    full_name: Optional[str] = None
+    company: Optional[str] = None
+    phone: Optional[str] = None
+
+class AuthResponse(BaseModel):
+    success: bool
+    message: str
+    token: Optional[str] = None
+    user: Optional[Dict[str, Any]] = None
+
+# === ENDPOINT LOGIN EXISTANT (CONSERVÉ) ===
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
     """
@@ -104,7 +128,125 @@ async def login(request: LoginRequest):
     token = create_access_token({"user_id": user.id, "email": request.email}, expires)
     return {"access_token": token, "expires_at": datetime.utcnow() + expires}
 
-# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase
+# === 🆕 NOUVEL ENDPOINT REGISTER ===
+@router.post("/register", response_model=AuthResponse)
+async def register_user(user_data: UserRegister):
+    """
+    🆕 Inscription d'un nouvel utilisateur
+    Crée le compte dans Supabase et retourne un token JWT
+    """
+    logger.info(f"📝 [Register] Tentative inscription: {user_data.email}")
+    
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase client non disponible")
+        raise HTTPException(status_code=500, detail="Service d'inscription non disponible")
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+    
+    supabase: Client = create_client(supabase_url, supabase_key)
+    
+    try:
+        # Préparer le nom complet
+        full_name = user_data.full_name
+        if not full_name and (user_data.first_name or user_data.last_name):
+            parts = []
+            if user_data.first_name:
+                parts.append(user_data.first_name)
+            if user_data.last_name:
+                parts.append(user_data.last_name)
+            full_name = " ".join(parts)
+        
+        # Préparer les métadonnées utilisateur
+        user_metadata = {}
+        if full_name:
+            user_metadata["full_name"] = full_name
+        if user_data.first_name:
+            user_metadata["first_name"] = user_data.first_name
+        if user_data.last_name:
+            user_metadata["last_name"] = user_data.last_name
+        if user_data.company:
+            user_metadata["company"] = user_data.company
+        if user_data.phone:
+            user_metadata["phone"] = user_data.phone
+        
+        # Essayer la nouvelle API Supabase d'abord
+        try:
+            result = supabase.auth.sign_up({
+                "email": user_data.email,
+                "password": user_data.password,
+                "options": {
+                    "data": user_metadata
+                } if user_metadata else {}
+            })
+        except AttributeError:
+            # Fallback pour ancienne API Supabase
+            result = supabase.auth.sign_up(
+                email=user_data.email,
+                password=user_data.password,
+                user_metadata=user_metadata if user_metadata else {}
+            )
+        
+        # Vérifier le résultat
+        if result.user is None:
+            error_msg = "Impossible de créer le compte"
+            if hasattr(result, 'error') and result.error:
+                error_msg = str(result.error)
+            logger.error(f"❌ [Register] Échec Supabase: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        user = result.user
+        logger.info(f"✅ [Register] Compte créé dans Supabase: {user.id}")
+        
+        # Créer le token JWT pour l'authentification immédiate
+        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        token_data = {
+            "user_id": user.id,
+            "email": user_data.email,
+            "sub": user.id,  # Standard JWT claim
+            "iss": "intelia-expert",  # Issuer
+            "aud": "authenticated"  # Audience
+        }
+        
+        token = create_access_token(token_data, expires)
+        
+        # Construire la réponse utilisateur
+        user_response = {
+            "id": user.id,
+            "email": user_data.email,
+            "full_name": full_name,
+            "first_name": user_data.first_name,
+            "last_name": user_data.last_name,
+            "company": user_data.company,
+            "phone": user_data.phone,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"✅ [Register] Inscription réussie: {user_data.email}")
+        
+        return AuthResponse(
+            success=True,
+            message="Compte créé avec succès",
+            token=token,
+            user=user_response
+        )
+        
+    except HTTPException:
+        # Re-lever les HTTPException sans les modifier
+        raise
+    except Exception as e:
+        logger.error(f"❌ [Register] Erreur inattendue: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erreur lors de la création du compte"
+        )
+
+# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
 async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
     """
     Récupère le profil utilisateur depuis la table Supabase users
@@ -147,6 +289,7 @@ async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, 
         logger.error(f"❌ Erreur récupération profil Supabase: {e}")
         return {"user_type": "user"}
 
+# === FONCTION get_current_user EXISTANTE (CONSERVÉE) ===
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
     ✅ VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
@@ -277,12 +420,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         detail="Invalid token - unable to verify signature"
     )
 
-class DeleteDataResponse(BaseModel):
-    success: bool
-    message: str
-    note: Optional[str]
-    timestamp: datetime
-
+# === ENDPOINTS EXISTANTS (CONSERVÉS) ===
 @router.post("/delete-data", response_model=DeleteDataResponse)
 async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
@@ -298,7 +436,6 @@ async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_us
         "timestamp": datetime.utcnow()
     }
 
-# 🆕 NOUVEL ENDPOINT pour voir son profil
 @router.get("/me")
 async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Récupère le profil de l'utilisateur connecté"""
@@ -313,7 +450,6 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
         "jwt_secret_used": current_user.get("jwt_secret_used")  # 🆕 Debug info
     }
 
-# ✅ ENDPOINT DE DEBUG ÉTENDU
 @router.get("/debug/jwt-config")
 async def debug_jwt_config():
     """Debug endpoint pour voir la configuration JWT multi-compatible"""
@@ -327,5 +463,6 @@ async def debug_jwt_config():
         "auth_temp_compatible": True,  # 🆕 Flag
         "supabase_compatible": True,   # 🆕 Flag
         "multi_secret_support": True,  # 🆕 Flag
-        "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none"
+        "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
+        "register_endpoint_available": True  # 🆕 Confirmation que register est disponible
     }
