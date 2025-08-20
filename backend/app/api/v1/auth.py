@@ -297,14 +297,14 @@ async def request_password_reset(request: ForgotPasswordRequest):
             result = supabase.auth.reset_password_email(
                 email=request.email,
                 options={
-                    "redirect_to": redirect_url + "?redirect=true"  # Force query params au lieu du hash
+                    "redirect_to": redirect_url  # Retour à l'original sans modification
                 }
             )
         except AttributeError:
             # Fallback pour ancienne API Supabase
             result = supabase.auth.api.reset_password_email(
                 email=request.email,
-                redirect_to=redirect_url + "?redirect=true"  # Force query params aussi pour l'ancienne API
+                redirect_to=redirect_url  # Retour à l'original sans modification
             )
         
         # Supabase ne retourne pas d'erreur même si l'email n'existe pas (pour des raisons de sécurité)
@@ -430,14 +430,36 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     try:
         # 🔧 MÉTHODES MULTIPLES POUR MAXIMUM DE COMPATIBILITÉ
         
-        # Méthode 1 : Nouvelle API avec verify_otp
-        logger.info("🔄 [ConfirmReset] Méthode 1: verify_otp...")
+        # Méthode 1 : Nouvelle API avec set_session
+        logger.info("🔄 [ConfirmReset] Méthode 1: set_session...")
         try:
-            # 🔧 CORRECTION : Pour reset password, il faut utiliser set_session au lieu de verify_otp
-            logger.info("🔄 [ConfirmReset] Tentative set_session avec access_token...")
+            # 🔧 CORRECTION : Le token reçu peut contenir plusieurs paramètres
+            # Il faut extraire l'access_token et le refresh_token
             
-            # Établir une session avec le token
-            session_result = supabase.auth.set_session(request.token, None)
+            access_token = request.token
+            refresh_token = None
+            
+            # Si le token contient des paramètres URL, les extraire
+            if '&' in request.token:
+                logger.info("🔍 [ConfirmReset] Token contient plusieurs paramètres, extraction...")
+                from urllib.parse import parse_qs, urlparse
+                
+                # Traiter comme des paramètres URL
+                params = parse_qs(request.token.replace('&', '&'))
+                access_token = params.get('access_token', [request.token])[0]
+                refresh_token = params.get('refresh_token', [None])[0]
+                
+                logger.info(f"🔍 [ConfirmReset] access_token extrait: {access_token[:50] if access_token else 'None'}...")
+                logger.info(f"🔍 [ConfirmReset] refresh_token extrait: {refresh_token[:20] if refresh_token else 'None'}...")
+            
+            # Si pas de refresh_token, essayer avec juste l'access_token
+            if not refresh_token:
+                logger.info("🔄 [ConfirmReset] Pas de refresh_token, tentative avec access_token seul...")
+                # Utiliser une chaîne vide au lieu de None
+                refresh_token = ""
+            
+            # Établir une session avec les tokens
+            session_result = supabase.auth.set_session(access_token, refresh_token)
             
             logger.info(f"🔍 [ConfirmReset] Résultat set_session: user={bool(session_result.user)}")
             
