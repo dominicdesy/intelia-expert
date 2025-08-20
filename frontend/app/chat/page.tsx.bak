@@ -440,7 +440,7 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVEAU useEffect simplifiﾃｩ pour auth backend - CORRIGÉ POUR DÉCONNEXION
+  // ✅ NOUVEAU useEffect simplifié pour auth backend
   useEffect(() => {
     // Initialiser la session une seule fois au montage
     const initAuth = async () => {
@@ -463,20 +463,8 @@ export default function ChatInterface() {
       }
     }
     
-    // ✅ CORRECTION : Ne pas initialiser si l'utilisateur vient de se déconnecter
-    if (hasHydrated && isAuthenticated !== false) {
-      initAuth()
-    }
-  }, [hasHydrated, initializeSession, handleRedirectToLogin, isAuthenticated])
-
-  // ✅ NOUVEAU useEffect pour gérer la déconnexion
-  useEffect(() => {
-    // Si l'utilisateur n'est plus authentifié et que le store a été hydraté
-    if (hasHydrated && isAuthenticated === false && !isLoading) {
-      console.log('🔄 [Auth] Déconnexion détectée, redirection immédiate')
-      handleRedirectToLogin('Déconnexion')
-    }
-  }, [hasHydrated, isAuthenticated, isLoading, handleRedirectToLogin])
+    initAuth()
+  }, [hasHydrated, initializeSession, handleRedirectToLogin])
 
   // NOUVEAU useEffect pour gérer le clavier mobile - CODE ORIGINAL CONSERVÉ
   useEffect(() => {
@@ -777,7 +765,7 @@ export default function ChatInterface() {
     }
   }, [user?.id])
 
-  // ✅ ÉTATS DE CHARGEMENT CORRIGÉS
+  // ✅ ÉTATS DE CHARGEMENT SIMPLIFIÉS
   if (isLoading || !hasHydrated) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -789,31 +777,23 @@ export default function ChatInterface() {
     )
   }
 
-  // ✅ GESTION SIMPLIFIÉE DE L'ÉTAT NON-AUTHENTIFIÉ
-  if (!isAuthenticated) {
-    // Redirection immédiate sans affichage de chargement infini
-    handleRedirectToLogin('Non authentifié')
-    
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirection en cours...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // ✅ Vérification SUPPLÉMENTAIRE POUR L'UTILISATEUR
-  if (!user) {
-    console.log('❌ [Auth] Utilisateur manquant malgré authentification')
-    handleRedirectToLogin('Utilisateur manquant')
-    
+  if (!isAuthenticated || !user) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Redirection vers la connexion...</p>
+          
+          <button 
+            onClick={() => handleRedirectToLogin('Bouton utilisateur')}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retourner à la connexion
+          </button>
+          
+          <div className="mt-2 text-xs text-gray-500">
+            Redirection automatique dans quelques instants
+          </div>
         </div>
       </div>
     )
