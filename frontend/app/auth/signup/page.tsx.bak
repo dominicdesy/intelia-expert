@@ -24,7 +24,7 @@ const translations = {
     emailRequired: 'L\'adresse email est requise',
     emailInvalid: 'Veuillez entrer une adresse email valide',
     passwordRequired: 'Le mot de passe est requis',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre',
     passwordMismatch: 'Les mots de passe ne correspondent pas',
     firstNameRequired: 'Le prénom est requis',
     lastNameRequired: 'Le nom de famille est requis',
@@ -79,7 +79,7 @@ const translations = {
     emailRequired: 'Email address is required',
     emailInvalid: 'Please enter a valid email address',
     passwordRequired: 'Password is required',
-    passwordTooShort: 'Password must contain at least 8 characters, one uppercase, one lowercase, one number and one special character',
+    passwordTooShort: 'Password must contain at least 8 characters, one uppercase and one number',
     passwordMismatch: 'Passwords do not match',
     firstNameRequired: 'First name is required',
     lastNameRequired: 'Last name is required',
@@ -201,7 +201,6 @@ const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-// ✅ VALIDATION MOT DE PASSE CORRIGÉE - STANDARD FINAL
 const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
   
@@ -211,14 +210,8 @@ const validatePassword = (password: string): { isValid: boolean; errors: string[
   if (!/[A-Z]/.test(password)) {
     errors.push('Une majuscule')
   }
-  if (!/[a-z]/.test(password)) {
-    errors.push('Une minuscule')
-  }
   if (!/[0-9]/.test(password)) {
     errors.push('Un chiffre')
-  }
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Un caractère spécial')
   }
   
   return {

@@ -1,6 +1,4 @@
-// app/auth/callback/route.ts - Route de callback pour Supabase
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+// app/auth/callback/route.ts - Route de callback pour OAuth via backend
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -20,54 +18,42 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     try {
-      const supabase = createRouteHandlerClient({ cookies })
+      console.log('🔄 [Auth Callback] Échange du code via backend...')
       
-      // Échanger le code contre une session
-      const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
-      
-      if (sessionError) {
-        console.error('❌ [Auth Callback] Erreur échange code:', sessionError)
-        return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(sessionError.message)}`, request.url))
+      // ✅ NOUVEAU: Appel au backend au lieu de Supabase direct
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/oauth-callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          redirect_url: `${requestUrl.origin}/auth/callback`
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ [Auth Callback] Erreur échange code:', errorData)
+        return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(errorData.detail || 'Erreur d\'authentification')}`, request.url))
       }
 
-      if (data.session && data.user) {
-        console.log('✅ [Auth Callback] Session créée pour:', data.user.email)
+      const data = await response.json()
+      console.log('✅ [Auth Callback] Session créée via backend')
+
+      if (data.access_token) {
+        // Créer une réponse avec redirection vers le chat
+        const redirectResponse = NextResponse.redirect(new URL('/chat', request.url))
         
-        // 🆕 NOUVEAU: Créer/mettre à jour le profil utilisateur si nécessaire
-        try {
-          const { data: existingProfile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('auth_user_id', data.user.id)
-            .single()
+        // Optionnel: stocker le token dans un cookie sécurisé
+        redirectResponse.cookies.set('access_token', data.access_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7 // 7 jours
+        })
 
-          if (!existingProfile) {
-            console.log('🆕 [Auth Callback] Création profil utilisateur')
-            const { error: profileError } = await supabase
-              .from('users')
-              .insert({
-                auth_user_id: data.user.id,
-                email: data.user.email,
-                full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Utilisateur',
-                user_type: 'producer',
-                language: 'fr',
-              })
-
-            if (profileError) {
-              console.warn('⚠️ [Auth Callback] Erreur création profil:', profileError)
-            } else {
-              console.log('✅ [Auth Callback] Profil utilisateur créé')
-            }
-          } else {
-            console.log('✅ [Auth Callback] Profil utilisateur existe déjà')
-          }
-        } catch (profileError) {
-          console.warn('⚠️ [Auth Callback] Erreur gestion profil:', profileError)
-          // Ne pas faire échouer l'authentification pour une erreur de profil
-        }
-
-        // Rediriger vers le chat
-        return NextResponse.redirect(new URL('/chat', request.url))
+        return redirectResponse
       }
     } catch (error) {
       console.error('❌ [Auth Callback] Erreur inattendue:', error)
