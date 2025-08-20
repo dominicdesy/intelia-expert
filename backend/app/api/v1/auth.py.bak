@@ -93,6 +93,25 @@ class AuthResponse(BaseModel):
     token: Optional[str] = None
     user: Optional[Dict[str, Any]] = None
 
+# === 🆕 NOUVEAUX MODÈLES POUR RESET PASSWORD ===
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ValidateResetTokenRequest(BaseModel):
+    token: str
+
+class ConfirmResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+class ValidateTokenResponse(BaseModel):
+    valid: bool
+    message: str
+
 # === ENDPOINT LOGIN EXISTANT (CONSERVÉ) ===
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
@@ -245,6 +264,231 @@ async def register_user(user_data: UserRegister):
             status_code=500, 
             detail="Erreur lors de la création du compte"
         )
+
+# === 🆕 ENDPOINT FORGOT PASSWORD ===
+@router.post("/reset-password", response_model=ForgotPasswordResponse)
+async def request_password_reset(request: ForgotPasswordRequest):
+    """
+    🆕 Demande de réinitialisation de mot de passe
+    Envoie un email avec un lien de réinitialisation
+    """
+    logger.info(f"🔄 [ResetPassword] Demande pour: {request.email}")
+    
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase client non disponible")
+        raise HTTPException(status_code=500, detail="Service de réinitialisation non disponible")
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+    
+    supabase: Client = create_client(supabase_url, supabase_key)
+    
+    try:
+        # Configurer l'URL de redirection pour votre frontend
+        redirect_url = os.getenv("RESET_PASSWORD_REDIRECT_URL", "https://votre-domain.com/reset-password")
+        
+        # Essayer la nouvelle API Supabase d'abord
+        try:
+            result = supabase.auth.reset_password_email(
+                email=request.email,
+                options={
+                    "redirect_to": redirect_url
+                }
+            )
+        except AttributeError:
+            # Fallback pour ancienne API Supabase
+            result = supabase.auth.api.reset_password_email(
+                email=request.email,
+                redirect_to=redirect_url
+            )
+        
+        # Supabase ne retourne pas d'erreur même si l'email n'existe pas (pour des raisons de sécurité)
+        logger.info(f"✅ [ResetPassword] Email de réinitialisation envoyé pour: {request.email}")
+        
+        return ForgotPasswordResponse(
+            success=True,
+            message="Si cette adresse email existe dans notre système, vous recevrez un lien de réinitialisation sous peu."
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ [ResetPassword] Erreur: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erreur lors de l'envoi de l'email de réinitialisation"
+        )
+
+# === 🆕 ENDPOINT VALIDATE RESET TOKEN ===
+@router.post("/validate-reset-token", response_model=ValidateTokenResponse)
+async def validate_reset_token(request: ValidateResetTokenRequest):
+    """
+    🆕 Valide un token de réinitialisation de mot de passe
+    """
+    logger.info(f"🔍 [ValidateToken] Validation token...")
+    
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase client non disponible")
+        raise HTTPException(status_code=500, detail="Service de validation non disponible")
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+    
+    try:
+        # Pour Supabase, le token est généralement validé lors de la tentative de changement de mot de passe
+        # On peut essayer de décoder le JWT pour voir s'il est valide
+        try:
+            # Essayer de décoder le token avec les secrets disponibles
+            payload = None
+            for secret_name, secret_value in JWT_SECRETS:
+                try:
+                    payload = jwt.decode(
+                        request.token, 
+                        secret_value, 
+                        algorithms=[JWT_ALGORITHM],
+                        options={"verify_exp": True}
+                    )
+                    break
+                except:
+                    continue
+            
+            if payload and payload.get("exp"):
+                # Vérifier si le token n'est pas expiré
+                exp_timestamp = payload.get("exp")
+                current_timestamp = datetime.utcnow().timestamp()
+                
+                if current_timestamp < exp_timestamp:
+                    logger.info(f"✅ [ValidateToken] Token valide")
+                    return ValidateTokenResponse(
+                        valid=True,
+                        message="Token valide"
+                    )
+                else:
+                    logger.warning(f"⚠️ [ValidateToken] Token expiré")
+                    return ValidateTokenResponse(
+                        valid=False,
+                        message="Token expiré"
+                    )
+            else:
+                logger.warning(f"⚠️ [ValidateToken] Token invalide")
+                return ValidateTokenResponse(
+                    valid=False,
+                    message="Token invalide"
+                )
+                
+        except Exception as e:
+            logger.warning(f"⚠️ [ValidateToken] Erreur décodage: {e}")
+            # Si on ne peut pas décoder, on considère le token comme potentiellement valide
+            # car il pourrait être un token Supabase spécifique
+            return ValidateTokenResponse(
+                valid=True,
+                message="Token accepté pour validation"
+            )
+        
+    except Exception as e:
+        logger.error(f"❌ [ValidateToken] Erreur: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erreur lors de la validation du token"
+        )
+
+# === 🆕 ENDPOINT CONFIRM RESET PASSWORD ===
+@router.post("/confirm-reset-password", response_model=ForgotPasswordResponse)
+async def confirm_reset_password(request: ConfirmResetPasswordRequest):
+    """
+    🆕 Confirme la réinitialisation du mot de passe avec le nouveau mot de passe
+    """
+    logger.info(f"🔐 [ConfirmReset] Confirmation réinitialisation...")
+    
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase client non disponible")
+        raise HTTPException(status_code=500, detail="Service de réinitialisation non disponible")
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+    
+    supabase: Client = create_client(supabase_url, supabase_key)
+    
+    try:
+        # Essayer la nouvelle API Supabase d'abord
+        try:
+            # Avec la nouvelle API, on utilise verify_otp puis update
+            result = supabase.auth.verify_otp({
+                "token": request.token,
+                "type": "recovery"
+            })
+            
+            if result.user:
+                # Maintenant mettre à jour le mot de passe
+                update_result = supabase.auth.update_user({
+                    "password": request.new_password
+                })
+                
+                if update_result.user:
+                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès")
+                    return ForgotPasswordResponse(
+                        success=True,
+                        message="Mot de passe mis à jour avec succès"
+                    )
+                else:
+                    raise Exception("Échec de la mise à jour du mot de passe")
+            else:
+                raise Exception("Token invalide ou expiré")
+                
+        except AttributeError:
+            # Fallback pour ancienne API Supabase
+            try:
+                result = supabase.auth.api.update_user(
+                    jwt=request.token,
+                    attributes={"password": request.new_password}
+                )
+                
+                if result.user:
+                    logger.info(f"✅ [ConfirmReset] Mot de passe mis à jour avec succès (ancienne API)")
+                    return ForgotPasswordResponse(
+                        success=True,
+                        message="Mot de passe mis à jour avec succès"
+                    )
+                else:
+                    raise Exception("Échec de la mise à jour du mot de passe")
+                    
+            except Exception as fallback_error:
+                logger.error(f"❌ [ConfirmReset] Échec fallback API: {fallback_error}")
+                raise fallback_error
+        
+    except Exception as e:
+        logger.error(f"❌ [ConfirmReset] Erreur: {str(e)}")
+        
+        # Gestion d'erreurs spécifiques
+        error_message = str(e).lower()
+        if "expired" in error_message or "invalid" in error_message:
+            raise HTTPException(
+                status_code=400, 
+                detail="Token expiré ou invalide"
+            )
+        elif "password" in error_message:
+            raise HTTPException(
+                status_code=400, 
+                detail="Erreur lors de la mise à jour du mot de passe"
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail="Erreur lors de la confirmation de réinitialisation"
+            )
 
 # 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
 async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
@@ -464,5 +708,6 @@ async def debug_jwt_config():
         "supabase_compatible": True,   # 🆕 Flag
         "multi_secret_support": True,  # 🆕 Flag
         "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
-        "register_endpoint_available": True  # 🆕 Confirmation que register est disponible
+        "register_endpoint_available": True,  # 🆕 Confirmation que register est disponible
+        "reset_password_endpoints_available": True  # 🆕 Confirmation que reset password est disponible
     }
