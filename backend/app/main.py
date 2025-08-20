@@ -1,5 +1,6 @@
 # app/main.py - VERSION 3 RAG COMPLETS - CORRIGÉ AVEC AUTH + MONITORING COMPLET + ANALYTICS
 # ✅ CORRECTION DU ROUTING AUTH POUR RÉSOUDRE LE CATCH-22
+# 🔧 CORRECTION CORS POUR CREDENTIALS: 'INCLUDE' - VERSION FINALE
 from __future__ import annotations
 
 import os
@@ -178,7 +179,7 @@ async def lifespan(app: FastAPI):
         from rag.embedder import FastRAGEmbedder
 
         rag_paths = get_rag_paths()
-        logger.info(f"🔍 Chargement des 3 RAG: {list(rag_paths.keys())}")
+        logger.info(f"📁 Chargement des 3 RAG: {list(rag_paths.keys())}")
 
         # Variables d'environnement (override si définies)
         env_override = {
@@ -213,7 +214,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 GLOBAL
         global_path = rag_paths["global"]
-        logger.info(f"🔍 Chargement RAG Global: {global_path}")
+        logger.info(f"📁 Chargement RAG Global: {global_path}")
         if os.path.exists(global_path):
             global_embedder = FastRAGEmbedder(debug=True, cache_embeddings=True, max_workers=2)
             if global_embedder.load_index(global_path) and global_embedder.has_search_engine():
@@ -226,7 +227,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 BROILER
         broiler_path = rag_paths["broiler"]
-        logger.info(f"🔍 Chargement RAG Broiler: {broiler_path}")
+        logger.info(f"📁 Chargement RAG Broiler: {broiler_path}")
         if os.path.exists(broiler_path):
             try:
                 broiler_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -242,7 +243,7 @@ async def lifespan(app: FastAPI):
 
         # 🚀 LAYER
         layer_path = rag_paths["layer"]
-        logger.info(f"🔍 Chargement RAG Layer: {layer_path}")
+        logger.info(f"📁 Chargement RAG Layer: {layer_path}")
         if os.path.exists(layer_path):
             try:
                 layer_embedder = FastRAGEmbedder(debug=False, cache_embeddings=True, max_workers=2)
@@ -319,7 +320,7 @@ app = FastAPI(
 )
 
 # =============================================================================
-# 🔥 CORRECTION CORS CRITIQUE - MIDDLEWARE EN PREMIER POUR TOUT FIXER
+# 🔥 CORRECTION CORS CRITIQUE - FIXED POUR CREDENTIALS: 'INCLUDE'
 # =============================================================================
 app.add_middleware(
     CORSMiddleware,
@@ -328,7 +329,7 @@ app.add_middleware(
         "https://expert-app-cngws.ondigitalocean.app",
         "http://localhost:3000",
         "http://localhost:8080",
-        "*"  # Temporaire pour debug
+        # 🔧 SUPPRIMÉ: "*"  # ❌ Incompatible avec allow_credentials=True
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -424,15 +425,15 @@ except ImportError as e:
     try:
         from app.api.v1.auth import router as auth_router
         
-        # 🔍 Debug du router auth avant montage
-        logger.info(f"🔍 Auth router prefix avant montage: {getattr(auth_router, 'prefix', 'None')}")
-        logger.info(f"🔍 Auth router routes count: {len(auth_router.routes)}")
+        # 📁 Debug du router auth avant montage
+        logger.info(f"📁 Auth router prefix avant montage: {getattr(auth_router, 'prefix', 'None')}")
+        logger.info(f"📁 Auth router routes count: {len(auth_router.routes)}")
         
         # Debug détaillé des routes auth
         for route in auth_router.routes:
             if hasattr(route, 'path') and hasattr(route, 'methods'):
                 methods_list = list(route.methods) if hasattr(route, 'methods') else ['UNKNOWN']
-                logger.info(f"🔍 Route auth: {route.path} {methods_list}")
+                logger.info(f"📁 Route auth: {route.path} {methods_list}")
         
         # ✅ MONTAGE CORRIGÉ - Pas de prefix car auth.py a déjà /auth
         temp_v1_router.include_router(
@@ -546,7 +547,7 @@ except ImportError as e:
 # -------------------------------------------------------------------
 @app.get("/rag/debug", tags=["Debug"])
 async def rag_debug():
-    """🔍 Debug des 3 RAG (Global + Broiler + Layer)"""
+    """📁 Debug des 3 RAG (Global + Broiler + Layer)"""
     rag_paths = get_rag_paths()
     env_vars = {
         "RAG_INDEX_GLOBAL": os.getenv("RAG_INDEX_GLOBAL"),
@@ -720,7 +721,7 @@ async def test_rag_access():
 # ========== HEALTH CHECK COMPLET AMÉLIORÉ ==========
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
-    """🏥 Check de santé complet du système avec billing et analytics"""
+    """🥼 Check de santé complet du système avec billing et analytics"""
     try:
         health_status = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -869,6 +870,7 @@ async def system_metrics():
             "auth_routing_fixed": True,  # ✅ Flag pour confirmer la correction
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
             "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
+            "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         }
     except Exception as e:
         return {"error": str(e)}
@@ -911,6 +913,7 @@ async def admin_statistics():
                 "auth_routing_fixed": True,  # ✅ NOUVEAU
                 "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
                 "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
+                "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
             }
         }
         
@@ -1004,6 +1007,7 @@ async def auth_debug_direct():
         "bypassed_router_issue": True,
         "api_corrected": True,  # 🔧 NOUVEAU FLAG
         "routing_fixed": True,   # 🔧 NOUVEAU FLAG
+        "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         "secrets_available": [
             name for name, value in [
                 ("SUPABASE_JWT_SECRET", os.getenv("SUPABASE_JWT_SECRET")),
@@ -1115,6 +1119,7 @@ async def auth_test_direct():
         ],
         "catch_22_resolved": True,
         "routing_fixed": True,  # 🔧 NOUVEAU FLAG
+        "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         "solution": "direct_endpoints_bypass",
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -1126,7 +1131,8 @@ async def cors_test_fixed(request: Request):
         "message": "CORS test fixed successful",
         "origin": request.headers.get("Origin"),
         "timestamp": datetime.utcnow().isoformat(),
-        "cors_fixed": True
+        "cors_fixed": True,
+        "cors_credentials_fixed": True  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
     }
 
 @app.get("/", tags=["Root"])
@@ -1156,12 +1162,13 @@ async def root():
         "postgresql": bool(os.getenv("DATABASE_URL")),
         "rag": rag_status(),
         "synthesis_enabled": synthesis_enabled,
-        "cors_fix": "applied_v2",
+        "cors_fix": "applied_v3_credentials",  # 🔧 NOUVEAU
         "optimization": "three_rag_system_enabled",
         "auth_routing_fix": "applied",  # ✅ NOUVEAU FLAG
         "catch_22_resolved": True,      # ✅ NOUVEAU FLAG
         "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
         "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
+        "cors_credentials_fixed": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         "new_features": {
             "billing_system": True,
             "analytics_tracking": True,
@@ -1178,11 +1185,12 @@ async def root():
             "auth_routing_fixed": True,  # ✅ NOUVEAU
             "cors_middleware_fixed": True,  # ✅ NOUVEAU FLAG CORS
             "direct_auth_endpoints": True,  # ✅ NOUVEAU FLAG AUTH DIRECT
+            "cors_credentials_support": True,  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
         },
         "uptime_hours": round(uptime_hours, 2),
         "requests_processed": request_counter,
-        "last_update": "2025-08-19T13:45:00Z",  # 🔧 FLAG DE DEBUG
-        "deployment_version": "v3.5.5-fixed-final"  # 🔧 FLAG DE DEBUG
+        "last_update": "2025-08-20T01:30:00Z",  # 🔧 FLAG DE DEBUG UPDATED
+        "deployment_version": "v3.5.5-cors-credentials-fixed"  # 🔧 FLAG DE DEBUG UPDATED
     }
 
 # ===============================================================================
@@ -1335,7 +1343,8 @@ async def temp_auth_test():
         ],
         "deployment_confirmed": True,
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "temp-auth-v1"
+        "version": "temp-auth-v1",
+        "cors_credentials_fixed": True  # 🔧 NOUVEAU FLAG CORS CREDENTIALS
     }
 
 @app.get("/deployment-debug")
@@ -1343,20 +1352,25 @@ async def deployment_debug():
     """🔧 DEBUG - Confirmer que cette version est déployée"""
     return {
         "deployment_status": "SUCCESS",
-        "version": "3.5.5-fixed-final",
+        "version": "3.5.5-cors-credentials-fixed",  # 🔧 UPDATED
         "timestamp": datetime.utcnow().isoformat(),
-        "last_update": "2025-08-19T13:45:00Z",
-        "cors_status": "FIXED",
+        "last_update": "2025-08-20T01:30:00Z",  # 🔧 UPDATED
+        "cors_status": "FIXED_CREDENTIALS",  # 🔧 UPDATED
         "auth_endpoints": {
             "v1_direct": "UPDATED",
             "temp_endpoints": "ADDED",
             "routing_fixed": True
         },
-        "confirmation": "Cette version contient toutes les corrections",
-        "next_test": "Utilisez /api/auth-temp/* pour l'authentification"
+        "cors_fixes": {
+            "wildcard_removed": True,
+            "credentials_support": True,
+            "specific_origins_only": True
+        },
+        "confirmation": "Cette version contient TOUTES les corrections CORS + Auth",
+        "next_test": "Le frontend avec credentials: 'include' devrait maintenant fonctionner"
     }
 
-# Exception handlers (CONSERVÉS INTÉGRALEMENT)
+# Exception handlers (CONSERVÉS INTÉGRALEMENT MAIS AVEC CORS CORRIGÉ)
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     response = JSONResponse(
@@ -1367,11 +1381,23 @@ async def http_exc_handler(request: Request, exc: HTTPException):
 
     origin = request.headers.get("Origin")
     
-    # ✅ CORS simplifié - autoriser tous les origins
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    # 🔧 CORS CORRIGÉ - Pas de wildcard avec credentials
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ]
+    
+    if origin and origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "false"
+    
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
 
@@ -1387,11 +1413,23 @@ async def generic_exc_handler(request: Request, exc: Exception):
 
     origin = request.headers.get("Origin")
     
-    # ✅ CORS simplifié - autoriser tous les origins  
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    # 🔧 CORS CORRIGÉ - Pas de wildcard avec credentials
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app",
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ]
+    
+    if origin and origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "false"
+    
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Session-ID"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
 
