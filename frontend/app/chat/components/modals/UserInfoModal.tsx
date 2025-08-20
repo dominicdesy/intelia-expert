@@ -1,15 +1,8 @@
-// UserInfoModal.tsx
-
 import React, { useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
-// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
-import { getSupabaseClient } from '@/lib/supabase/singleton'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
-
-// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
-const supabase = getSupabaseClient()
 
 // ==================== MODAL PROFIL REDESIGNÉ COMPLÈTEMENT ====================
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
@@ -155,34 +148,30 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
     setIsLoading(true)
     try {
-      console.log('🔐 [Password] Vérification mot de passe actuel')
+      console.log('🔐 [Password] Appel à l\'API backend pour changement mot de passe')
       
-      // 🔧 CORRECTION: Vérifier d'abord le mot de passe actuel
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: passwordData.currentPassword
+      // ✅ CORRECTION: Utiliser l'API backend au lieu de Supabase direct
+      const response = await fetch('/api/v1/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          current_password: passwordData.currentPassword,
+          new_password: passwordData.newPassword
+        })
       })
+
+      const result = await response.json()
       
-      if (signInError) {
-        console.log('❌ [Password] Mot de passe actuel incorrect:', signInError.message)
-        setPasswordErrors(['Le mot de passe actuel est incorrect'])
+      if (!response.ok) {
+        console.log('❌ [Password] Erreur API:', result.detail || result.message)
+        setPasswordErrors([result.detail || result.message || 'Erreur lors du changement de mot de passe'])
         return
       }
       
-      console.log('✅ [Password] Mot de passe actuel vérifié, mise à jour...')
-      
-      // Maintenant changer le mot de passe
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
-      })
-      
-      if (updateError) {
-        console.log('❌ [Password] Erreur lors du changement:', updateError.message)
-        setPasswordErrors([updateError.message || 'Erreur lors du changement de mot de passe'])
-        return
-      }
-      
-      console.log('✅ [Password] Mot de passe changé avec succès')
+      console.log('✅ [Password] Mot de passe changé avec succès via backend')
       
       // Réinitialiser les champs et fermer
       setPasswordData({
@@ -202,7 +191,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       
     } catch (error: any) {
       console.error('❌ [Password] Erreur technique:', error)
-      setPasswordErrors([error.message || 'Erreur technique lors du changement de mot de passe'])
+      setPasswordErrors(['Erreur de connexion au serveur. Veuillez réessayer.'])
     } finally {
       setIsLoading(false)
     }
