@@ -1,28 +1,10 @@
-// page.tsx - Version Backend API complète et fonctionnelle
-
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-// 🔄 CHANGEMENT PRINCIPAL: Utiliser le store backend au lieu de Supabase
-import { useAuthStore } from '@/lib/stores/auth' // ← Maintenant c'est le store backend
+import { useAuthStore } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
-
-
-// 🆕 BANNIÈRE TEMPORAIRE pour informer du changement
-const BackendMigrationBanner = () => (
-  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-    <div className="flex items-center space-x-2">
-      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <span className="text-sm text-green-800 font-medium">
-        Service optimisé : Création de compte maintenant plus rapide et fiable
-      </span>
-    </div>
-  </div>
-)
 
 const translations = {
   fr: {
@@ -266,7 +248,6 @@ function PageContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
-  // 🔄 UTILISATION DU STORE BACKEND (API identique à Supabase)
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { login, register, initializeSession } = useAuthStore()
 
@@ -398,7 +379,7 @@ function PageContent() {
     return null
   }
 
-  // ✅ GESTION DE LA CONNEXION (fonctionne automatiquement avec le backend)
+  // ✅ GESTION DE LA CONNEXION
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError('')
@@ -420,16 +401,15 @@ function PageContent() {
     }
 
     try {
-      console.log('🔄 [Login] Tentative connexion backend...')
+      console.log('🔄 [Login] Tentative connexion...')
       
-      // 🔄 APPEL BACKEND VIA LE STORE (API identique)
       await login(loginData.email, loginData.password)
       
       // Sauvegarder remember me
       rememberMeUtils.save(loginData.email, loginData.rememberMe)
       
       setLocalSuccess(t.authSuccess)
-      console.log('✅ [Login] Connexion backend réussie')
+      console.log('✅ [Login] Connexion réussie')
       
       // Redirection automatique après succès
       setTimeout(() => {
@@ -437,12 +417,12 @@ function PageContent() {
       }, 1000)
       
     } catch (error: any) {
-      console.error('❌ [Login] Erreur connexion backend:', error)
+      console.error('❌ [Login] Erreur connexion:', error)
       setLocalError(error?.message || t.authError)
     }
   }
 
-  // ✅ GESTION DE L'INSCRIPTION (fonctionne automatiquement avec le backend)
+  // ✅ GESTION DE L'INSCRIPTION
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError('')
@@ -455,9 +435,8 @@ function PageContent() {
     }
 
     try {
-      console.log('🔄 [Signup] Tentative création compte backend...')
+      console.log('🔄 [Signup] Tentative création compte...')
       
-      // 🔄 APPEL BACKEND VIA LE STORE (API identique)
       const userData = {
         email: signupData.email,
         firstName: signupData.firstName,
@@ -475,7 +454,7 @@ function PageContent() {
       await register(signupData.email, signupData.password, userData)
       
       setLocalSuccess(t.accountCreated)
-      console.log('✅ [Signup] Création compte backend réussie')
+      console.log('✅ [Signup] Création compte réussie')
       
       // Retour au mode login après création
       setTimeout(() => {
@@ -484,7 +463,7 @@ function PageContent() {
       }, 2000)
       
     } catch (error: any) {
-      console.error('❌ [Signup] Erreur création compte backend:', error)
+      console.error('❌ [Signup] Erreur création compte:', error)
       setLocalError(error?.message || t.signupError)
     }
   }
@@ -584,9 +563,6 @@ function PageContent() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
-          
-          {/* 🆕 BANNIÈRE INFORMATION BACKEND */}
-          <BackendMigrationBanner />
           
           {/* Messages d'erreur et succès */}
           {localError && (
@@ -996,12 +972,6 @@ function PageContent() {
               <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
                 {t.privacy}
               </Link>
-            </p>
-          </div>
-
-          <div className="text-center mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-700">
-              💡 Nouveau : Service optimisé via notre backend sécurisé pour une meilleure fiabilité
             </p>
           </div>
         </div>

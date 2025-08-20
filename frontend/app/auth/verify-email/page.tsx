@@ -215,14 +215,14 @@ function VerifyEmailPageContent() {
         return
       }
 
-      // Vérification avec le backend
+      // Vérification
       const finalToken = token || confirmationUrl
       
       try {
-        console.log('🔄 [VerifyEmail] Vérification avec backend...')
+        console.log('🔄 [VerifyEmail] Vérification en cours...')
         setMessage('Vérification en cours...')
         
-        // 🔧 APPEL AU BACKEND pour vérifier l'email
+        // 🔧 APPEL API pour vérifier l'email
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/verify-email`, {
           method: 'POST',
           headers: {
@@ -295,18 +295,6 @@ function VerifyEmailPageContent() {
           <p className="mt-2 text-sm text-gray-600">
             Intelia Expert - Assistant IA spécialisé
           </p>
-        </div>
-
-        {/* 🆕 BANNIÈRE BACKEND */}
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs text-blue-800">
-              Vérification sécurisée : Validation via notre backend optimisé
-            </span>
-          </div>
         </div>
 
         {/* Contenu conditionnel selon le statut */}

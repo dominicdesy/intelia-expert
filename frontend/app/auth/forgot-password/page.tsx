@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
     try {
       console.log('🔄 [ForgotPassword] Demande réinitialisation pour:', email.trim())
       
-      // 🔧 APPEL AU BACKEND pour la réinitialisation
+      // 📧 APPEL API pour la réinitialisation
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app/api'}/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
@@ -209,18 +209,6 @@ export default function ForgotPasswordPage() {
             <Link href="/?signup=true" className="text-blue-600 hover:underline transition-colors">
               Créer un compte
             </Link>
-          </div>
-        </div>
-
-        {/* 🆕 BANNIÈRE BACKEND */}
-        <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs text-blue-800">
-              Service optimisé : Réinitialisation sécurisée via notre backend
-            </span>
           </div>
         </div>
 
