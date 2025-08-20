@@ -1,4 +1,4 @@
-// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON + API EXPERT)
+// lib/stores/auth.ts – Store d'auth SUPABASE NATIF (VERSION FINALE CORRIGÉE + SINGLETON)
 'use client'
 
 import { create } from 'zustand'
@@ -40,8 +40,6 @@ interface AuthState {
   updateConsent: (consent: RGPDConsent) => Promise<void>
   deleteUserData: () => Promise<void>
   exportUserData: () => Promise<any>
-  // 🆕 AJOUT: Méthode pour récupérer le token pour l'API Expert
-  getAuthToken: () => Promise<string | null>
 }
 
 // ✅ CORRECTION: Adapter utilisateur Supabase vers AppUser COMPLET
@@ -508,25 +506,6 @@ export const useAuthStore = create<AuthState>()(
           throw new Error(e?.message || 'Erreur d\'exportation des données')
         }
       },
-
-      // 🆕 NOUVELLE MÉTHODE: Récupérer le token Supabase pour l'API Expert
-      getAuthToken: async () => {
-        try {
-          const supabase = getSupabaseClient()
-          const { data: { session } } = await supabase.auth.getSession()
-          
-          if (session?.access_token) {
-            alog('🎫 Token Supabase récupéré pour API Expert')
-            return session.access_token
-          }
-          
-          alog('❌ Pas de token Supabase disponible')
-          return null
-        } catch (error) {
-          alog('❌ Erreur récupération token:', error)
-          return null
-        }
-      },
     }),
     {
       name: 'supabase-auth-store',
@@ -545,21 +524,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
-
-// 🆕 FONCTION UTILITAIRE EXPORTÉE: Pour utilisation dans d'autres fichiers
-export const getAuthToken = async (): Promise<string | null> => {
-  try {
-    const supabase = getSupabaseClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (session?.access_token) {
-      alog('🎫 Token Supabase récupéré (fonction utilitaire)')
-      return session.access_token
-    }
-    
-    return null
-  } catch (error) {
-    alog('❌ Erreur récupération token (fonction utilitaire):', error)
-    return null
-  }
-}
