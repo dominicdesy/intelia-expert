@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 import { UserInfoModalProps } from '@/types'
 import { PhoneInput, usePhoneValidation } from '../PhoneInput'
 
-const supabase = createClientComponentClient()
+// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
+const supabase = getSupabaseClient()
 
 // ==================== MODAL PROFIL REDESIGNÉ COMPLÈTEMENT ====================
 export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
@@ -110,7 +112,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
       }
     } catch (error) {
-      console.error('❌ Erreur mise à jour profil:', error)
+      console.error('❌ Erreur mise à jour profil (singleton):', error)
       alert('Erreur lors de la mise à jour du profil')
     }
     setIsLoading(false)
@@ -143,6 +145,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
     setIsLoading(true)
     try {
+      // ✅ Le client singleton est déjà initialisé plus haut
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       })

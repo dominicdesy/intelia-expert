@@ -45,7 +45,7 @@ const invitationService = {
         'Authorization': `Bearer ${session.access_token}` // ✅ MÊME TOKEN QUE LE CHAT
       }
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/invitations/send`, {
+      const response = await fetch(`${FULL_API_URL}/invitations/send`, {		  
         method: 'POST',
         headers,
         body: JSON.stringify({

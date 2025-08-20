@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from '../../hooks/useTranslation'
 import { useAuthStore } from '@/lib/stores/auth' 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+// ✅ CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
+import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 interface InviteFriendModalProps {
   onClose: () => void
@@ -11,19 +12,19 @@ interface InviteFriendModalProps {
 const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
     try {
-      console.log('📧 [InvitationService] Envoi invitation avec auth Supabase:', { 
+      console.log('📧 [InvitationService] Envoi invitation avec auth Supabase (singleton):', { 
         emails, 
         hasMessage: !!personalMessage,
         inviterEmail: inviterInfo.email 
       })
       
-      // SOLUTION: Utiliser exactement la même méthode que generateAIResponse
-      const supabase = createClientComponentClient()
+      // ✅ SOLUTION: Utiliser le singleton au lieu de createClientComponentClient
+      const supabase = getSupabaseClient()
       
       // Récupérer la session Supabase comme dans apiService
       const { data, error } = await supabase.auth.getSession()
       if (error) {
-        console.error('❌ [InvitationService] Erreur session Supabase:', error)
+        console.error('❌ [InvitationService] Erreur session Supabase (singleton):', error)
         throw new Error('Session expirée - reconnexion nécessaire')
       }
       
@@ -32,7 +33,7 @@ const invitationService = {
         throw new Error('Session expirée - reconnexion nécessaire')
       }
 
-      console.log('✅ [InvitationService] Token Supabase récupéré, longueur:', session.access_token.length)
+      console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
       
 	  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
  	  const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
@@ -59,7 +60,7 @@ const invitationService = {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorText)
+        console.error('❌ [InvitationService] Erreur HTTP (singleton):', response.status, errorText)
         
         if (response.status === 401) {
           // Même gestion d'erreur que apiService
@@ -80,11 +81,11 @@ const invitationService = {
       }
 
       const result = await response.json()
-      console.log('✅ [InvitationService] Invitations envoyées:', result)
+      console.log('✅ [InvitationService] Invitations envoyées (singleton):', result)
       return result
       
     } catch (error) {
-      console.error('❌ [InvitationService] Erreur envoi:', error)
+      console.error('❌ [InvitationService] Erreur envoi (singleton):', error)
       throw error
     }
   }
@@ -206,7 +207,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     setIsLoading(true)
     
     try {
-      console.log('🚀 [InviteFriendModal] Début envoi invitations:', {
+      console.log('🚀 [InviteFriendModal] Début envoi invitations (singleton):', {
         emails: valid,
         userEmail: currentUser.email,
         userName: currentUser.name,
@@ -246,7 +247,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
       }
       
     } catch (error) {
-      console.error('❌ [InviteFriendModal] Erreur envoi:', error)
+      console.error('❌ [InviteFriendModal] Erreur envoi (singleton):', error)
       
       let errorMessage = 'Erreur lors de l\'envoi des invitations'
       

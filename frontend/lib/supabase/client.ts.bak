@@ -1,21 +1,21 @@
-// lib/supabase/client.ts – CLIENT SUPABASE SÉCURISÉ (timeout 25s) + DEBUG + SINGLETON
+// lib/supabase/client.ts — CLIENT SUPABASE SÉCURISÉ (timeout 25s) + DEBUG
 'use client'
 
-// ✅ CHANGEMENT CRITIQUE: Utiliser le singleton au lieu de créer de nouvelles instances
-import { getSupabaseClient, resetSupabaseClient } from './singleton'
-import type { Database } from '@/types/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/supabase' // Ajustez si besoin
 
-// ✅ EXPORT DU CLIENT SINGLETON au lieu de createClientComponentClient
-export const supabase = getSupabaseClient()
+// Client Supabase pour composants React (inchangé)
+export const supabase = createClientComponentClient<Database>()
 
-// Configuration env (conservée pour compatibilité)
+// Configuration env
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 if (!SUPABASE_URL) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL')
 if (!SUPABASE_ANON_KEY) throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
-// ---- DEBUG (conservé tel quel) ----
+// ---- DEBUG ----
 const SUPABASE_DEBUG = (
   (typeof window !== 'undefined' && (
     localStorage.getItem('SUPABASE_DEBUG') === '1' ||
@@ -25,14 +25,14 @@ const SUPABASE_DEBUG = (
 
 const slog = (...args: any[]) => {
   if (SUPABASE_DEBUG) {
-    if (typeof window !== 'undefined') console.debug('[SupabaseClient/Singleton]', ...args)
-    else console.debug('[SupabaseClient/Singleton/SSR]', ...args)
+    if (typeof window !== 'undefined') console.debug('[SupabaseClient]', ...args)
+    else console.debug('[SupabaseClient/SSR]', ...args)
   }
 }
 
-slog('✅ Loaded client.ts (supabase singleton client ready)', { url: SUPABASE_URL })
+slog('✅ Loaded client.ts (supabase client ready)', { url: SUPABASE_URL })
 
-// ⏳ fetch avec timeout (conservé tel quel)
+// ⏳ fetch avec timeout (par défaut 25s) — idéal pour signup/signin qui peuvent être lents
 let __fetchSeq = 0
 export const fetchWithTimeout = (ms: number = 45000) => {
   return async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -53,10 +53,10 @@ export const fetchWithTimeout = (ms: number = 45000) => {
     }, ms)
 
     try {
-      slog(`#${idNum} ↗ fetch start`, (input as any)?.toString?.() ?? String(input), { timeout_ms: ms })
+      slog(`#${idNum} → fetch start`, (input as any)?.toString?.() ?? String(input), { timeout_ms: ms })
       const res = await fetch(input, { ...init, signal: controller.signal })
       const dur = Math.round(((typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()) - start))
-      slog(`#${idNum} ↙ fetch end`, { status: (res as any)?.status, duration_ms: dur })
+      slog(`#${idNum} ← fetch end`, { status: (res as any)?.status, duration_ms: dur })
       return res
     } catch (e) {
       const dur = Math.round(((typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()) - start))
@@ -68,38 +68,36 @@ export const fetchWithTimeout = (ms: number = 45000) => {
   }
 }
 
-// ✅ CHANGEMENT: supabaseAuth utilise maintenant le singleton avec fetch temporisé
-// Au lieu de créer une nouvelle instance, on utilise le singleton existant
-export const supabaseAuth = getSupabaseClient()
+// Client dédié aux opérations d’auth avec fetch temporisé (évite les faux timeouts 504)
+export const supabaseAuth = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: fetchWithTimeout(45000) },
+  auth: { persistSession: false, autoRefreshToken: false, storageKey: 'sb-auth-timeout' },
+})
 
-slog('🔐 supabaseAuth using singleton (no new instance created)')
+slog('🔐 supabaseAuth created with 45s timeout')
 
-// —— Helpers d'auth (conservés mais utilisent le singleton) ——
+// —— Helpers d’auth (conservent l’API existante) ——
 export const auth = {
   async getSession() {
-    // ✅ Utilise le singleton
-    const client = getSupabaseClient()
-    const { data } = await client.auth.getSession()
-    slog('getSession ↦', !!data?.session)
+    const { data } = await supabase.auth.getSession()
+    slog('getSession →', !!data?.session)
     return data?.session || null
   },
 
   async getAccessToken() {
     const session = await this.getSession()
     const token = session?.access_token || null
-    slog('getAccessToken ↦', token ? 'present' : 'null')
+    slog('getAccessToken →', token ? 'present' : 'null')
     return token
   },
 
   async logout() {
     try {
       slog('logout() called')
-      // ✅ Utilise le singleton
-      const client = getSupabaseClient()
-      const { error } = await client.auth.signOut()
+      const { error } = await supabase.auth.signOut()
       if (error) throw error
       try { localStorage.removeItem('intelia-chat-storage') } catch {}
-      slog('logout() ↦ success')
+      slog('logout() → success')
       return { success: true }
     } catch (error) {
       console.error('❌ Erreur déconnexion:', error)
@@ -108,7 +106,7 @@ export const auth = {
   },
 }
 
-// —— Requêtes sécurisées (conservées, utilisent auth.getAccessToken qui utilise le singleton) ——
+// —— Requêtes sécurisées (compat) ——
 export const secureRequest = {
   async get(url: string, options: RequestInit = {}) {
     const token = await auth.getAccessToken()
@@ -133,45 +131,5 @@ export const secureRequest = {
   },
 }
 
-// ✅ NOUVELLES FONCTIONS UTILITAIRES POUR LE SINGLETON
-export const getAuthHeaders = async () => {
-  try {
-    const client = getSupabaseClient()
-    const { data: { session }, error } = await client.auth.getSession()
-    
-    if (error) {
-      console.error('❌ [client] Erreur récupération session:', error.message)
-      return {
-        'Content-Type': 'application/json',
-      }
-    }
-
-    if (!session?.access_token) {
-      console.warn('⚠️ [client] Aucun token d\'accès disponible')
-      return {
-        'Content-Type': 'application/json',
-      }
-    }
-
-    console.log('✅ [client] Token Supabase récupéré avec succès (singleton)')
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
-      'X-Supabase-Auth': 'true',
-    }
-  } catch (error) {
-    console.error('❌ [client] Erreur getAuthHeaders (singleton):', error)
-    return {
-      'Content-Type': 'application/json',
-    }
-  }
-}
-
-// ✅ FONCTION POUR RÉINITIALISER LE SINGLETON (utile pour logout complet)
-export const resetClient = () => {
-  resetSupabaseClient()
-  slog('🔄 Client singleton réinitialisé')
-}
-
-// Export par défaut (utilise le singleton)
+// Export par défaut (compat)
 export default supabase
