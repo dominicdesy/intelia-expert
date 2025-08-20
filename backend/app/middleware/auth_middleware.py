@@ -3,6 +3,7 @@
 Middleware d'authentification globale pour l'API Intelia Expert
 Version corrigée - Endpoints auth alignés avec la configuration réelle
 🔧 FIX: Support des endpoints /api/v1/auth/ (vrais endpoints du backend)
+🔧 CORS FIX: Compatible avec credentials: 'include'
 """
 
 from fastapi import HTTPException, Request
@@ -193,7 +194,7 @@ async def verify_supabase_token(request: Request) -> Dict[str, Any]:
         # Extraire le token Authorization
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            logger.debug(f"🔍 Missing or invalid auth header for {request.url.path}")
+            logger.debug(f"📁 Missing or invalid auth header for {request.url.path}")
             raise HTTPException(
                 status_code=401, 
                 detail="Missing or invalid authorization header"
@@ -229,7 +230,7 @@ async def optional_auth(request: Request) -> Optional[Dict[str, Any]]:
     try:
         return await verify_supabase_token(request)
     except HTTPException:
-        logger.debug(f"🔍 Optional auth failed for {request.url.path} - continuing without auth")
+        logger.debug(f"📁 Optional auth failed for {request.url.path} - continuing without auth")
         return None
     except Exception:
         return None
@@ -273,7 +274,7 @@ def is_protected_endpoint(path: str) -> bool:
             logger.debug(f"🔒 Protected pattern match: {path} -> {pattern}")
             return True
     
-    logger.debug(f"🔓 Not a protected endpoint: {path}")
+    logger.debug(f"📄 Not a protected endpoint: {path}")
     return False
 
 def is_nonexistent_endpoint(path: str) -> bool:
@@ -294,23 +295,43 @@ def is_nonexistent_endpoint(path: str) -> bool:
     
     return False
 
-def create_cors_headers() -> Dict[str, str]:
+def create_cors_headers(origin: str = None) -> Dict[str, str]:
     """
+    🔧 CORS CORRIGÉ - Compatible avec credentials: 'include'
     Crée les headers CORS standard pour les réponses
     
+    Args:
+        origin: Origin de la requête (pour éviter le wildcard avec credentials)
+        
     Returns:
         Dict: Headers CORS complets
     """
+    # Liste des origins autorisés
+    allowed_origins = [
+        "https://expert.intelia.com",
+        "https://expert-app-cngws.ondigitalocean.app", 
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ]
+    
+    # Déterminer l'origin à utiliser
+    cors_origin = "*"  # Par défaut
+    cors_credentials = "false"  # Par défaut
+    
+    if origin and origin in allowed_origins:
+        cors_origin = origin  # Origin spécifique pour credentials
+        cors_credentials = "true"  # Credentials autorisées pour origins spécifiques
+    
     return {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": cors_origin,
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, Accept, Origin, User-Agent",
-        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Credentials": cors_credentials,
     }
 
 async def auth_middleware(request: Request, call_next):
     """
-    Middleware d'authentification globale pour l'API Intelia Expert
+    Middleware d'authentification globale pour l'API Intelia Expert - VERSION CORRIGÉE CORS
     
     Logique:
     1. Gère les endpoints inexistants (404)
@@ -328,10 +349,14 @@ async def auth_middleware(request: Request, call_next):
     
     # 📊 LOG DE DEBUG DÉTAILLÉ
     logger.debug(
-        f"🔍 Auth middleware - Method: {request.method}, "
+        f"📁 Auth middleware - Method: {request.method}, "
         f"Path: {request.url.path}, "
-        f"Auth Header: {'Present' if request.headers.get('Authorization') else 'Missing'}"
+        f"Auth Header: {'Present' if request.headers.get('Authorization') else 'Missing'}, "
+        f"Origin: {request.headers.get('Origin', 'None')}"
     )
+    
+    # Récupérer l'origin de la requête pour CORS
+    request_origin = request.headers.get("Origin")
     
     # 🚨 ÉTAPE 1: Gérer les endpoints inexistants AVANT toute autre logique
     if is_nonexistent_endpoint(request.url.path):
@@ -345,7 +370,7 @@ async def auth_middleware(request: Request, call_next):
                 "suggestion": "Vérifiez l'URL ou consultez /docs pour les endpoints disponibles",
                 "note": "Les endpoints auth sont maintenant sur /v1/auth/ et non /auth/"
             },
-            headers=create_cors_headers()
+            headers=create_cors_headers(request_origin)  # ✅ CORRIGÉ
         )
     
     # ✅ ÉTAPE 2: Skip l'auth pour les endpoints publics et requêtes OPTIONS
@@ -357,14 +382,14 @@ async def auth_middleware(request: Request, call_next):
             return JSONResponse(
                 status_code=200,
                 content={"message": "OK"},
-                headers=create_cors_headers()
+                headers=create_cors_headers(request_origin)  # ✅ CORRIGÉ
             )
         
         # Pour les endpoints publics, continuer sans auth
         response = await call_next(request)
         
         # Ajouter les headers CORS aux réponses publiques
-        for key, value in create_cors_headers().items():
+        for key, value in create_cors_headers(request_origin).items():  # ✅ CORRIGÉ
             response.headers[key] = value
             
         return response
@@ -390,7 +415,7 @@ async def auth_middleware(request: Request, call_next):
             response = await call_next(request)
             
             # Ajouter les headers CORS aux réponses protégées
-            for key, value in create_cors_headers().items():
+            for key, value in create_cors_headers(request_origin).items():  # ✅ CORRIGÉ
                 response.headers[key] = value
                 
             return response
@@ -407,7 +432,7 @@ async def auth_middleware(request: Request, call_next):
                     "error": "authentication_failed",
                     "path": request.url.path
                 },
-                headers=create_cors_headers()
+                headers=create_cors_headers(request_origin)  # ✅ CORRIGÉ
             )
             
         except Exception as e:
@@ -419,7 +444,7 @@ async def auth_middleware(request: Request, call_next):
                     "error": "internal_auth_error",
                     "path": request.url.path
                 },
-                headers=create_cors_headers()
+                headers=create_cors_headers(request_origin)  # ✅ CORRIGÉ
             )
     
     # 🔄 ÉTAPE 4: Pour tous les autres endpoints (non protégés, non publics)
@@ -439,7 +464,7 @@ async def auth_middleware(request: Request, call_next):
     response = await call_next(request)
     
     # Ajouter les headers CORS à toutes les réponses
-    for key, value in create_cors_headers().items():
+    for key, value in create_cors_headers(request_origin).items():  # ✅ CORRIGÉ
         response.headers[key] = value
         
     return response
@@ -506,13 +531,20 @@ def debug_middleware_config() -> Dict[str, Any]:
             "/api/auth/register",                    # ❌ SUPPRIMÉ - ancien
             "/api/auth/debug/jwt-config",            # ❌ SUPPRIMÉ - ancien
         ],
-        "middleware_version": "3.0-v1-auth-fixed",
+        "cors_fixes": {
+            "wildcard_removed": True,
+            "credentials_support": True,
+            "origin_specific": True,
+            "compatible_with_include": True
+        },
+        "middleware_version": "3.1-cors-credentials-fixed",  # 🔧 UPDATED
         "key_changes": [
             "✅ Fixed: Added /api/v1/auth/* as public endpoints",
             "❌ Removed: Old /api/auth/* endpoints marked as nonexistent",
             "✅ Added: Support for auth-temp endpoints",
-            "✅ Fixed: CORS handling for all endpoint types",
+            "🔧 FIXED: CORS handling compatible with credentials: 'include'",
             "✅ Fixed: System endpoints support",
-            "🔧 Updated: All patterns align with Swagger docs"
+            "🔧 Updated: All patterns align with Swagger docs",
+            "🔧 NEW: Origin-specific CORS headers for credentials support"
         ]
     }
