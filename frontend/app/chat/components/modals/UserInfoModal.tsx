@@ -151,7 +151,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
       console.log('🔐 [Password] Appel à l\'API backend pour changement mot de passe')
       
       // 🔍 DEBUG: Récupérer le token depuis les cookies Supabase (solution validée)
-      function getSupabaseToken() {
+      const getSupabaseToken = () => {
         // Chercher le cookie Supabase auth token
         const cookieMatch = document.cookie.match(/sb-[^-]+-auth-token=([^;]+)/);
         if (cookieMatch) {
