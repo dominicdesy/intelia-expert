@@ -458,7 +458,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           autoComplete="current-password"
                           value={passwordData.currentPassword}
                           onChange={(e) => {
-                            console.log('Current password change:', e.target.value);
                             setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))
                           }}
                           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
@@ -498,7 +497,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           autoComplete="new-password"
                           value={passwordData.newPassword}
                           onChange={(e) => {
-                            console.log('New password change:', e.target.value);
                             setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))
                           }}
                           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
@@ -563,7 +561,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           autoComplete="new-password"
                           value={passwordData.confirmPassword}
                           onChange={(e) => {
-                            console.log('Confirm password change:', e.target.value);
                             setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))
                           }}
                           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
