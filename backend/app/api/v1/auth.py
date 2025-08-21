@@ -160,7 +160,7 @@ async def login(request: LoginRequest):
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     request: ChangePasswordRequest,
-    current_user: Dict[str, Any] = Depends(lambda: None)  # Sera remplacé par get_current_user
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
     🆕 Changer le mot de passe de l'utilisateur connecté
