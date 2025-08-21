@@ -447,6 +447,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                     onChange={(e) => setEmails(e.target.value)}
                     placeholder="nom1@exemple.com, nom2@exemple.com, nom3@exemple.com"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    style={{
+                      fontSize: '16px',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      lineHeight: '1.5'
+                    }}
                     rows={3}
                     disabled={isLoading}
                   />
@@ -466,6 +472,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                     onChange={(e) => setPersonalMessage(e.target.value)}
                     placeholder="Expliquez à vos collègues pourquoi vous les invitez à découvrir Intelia Expert..."
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    style={{
+                      fontSize: '16px',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      lineHeight: '1.5'
+                    }}
                     rows={4}
                     maxLength={500}
                     disabled={isLoading}
