@@ -48,6 +48,20 @@ export const UserMenuButton = () => {
 
   const userInitials = getUserInitials(user)
   
+  // DEBUG - à supprimer après diagnostic
+  console.log('DEBUG UserMenu:', {
+    user_name: user?.name,
+    user_email: user?.email,
+    calculated_initials: userInitials,
+    user_object: user,
+    // Test de la logique étape par étape
+    has_name: !!user?.name,
+    name_split: user?.name ? user.name.trim().split(' ') : null,
+    name_length: user?.name ? user.name.trim().split(' ').length : 0,
+    first_char: user?.name ? user.name.trim().split(' ')[0][0] : null,
+    last_char: user?.name && user.name.trim().split(' ').length >= 2 ? user.name.trim().split(' ')[user.name.trim().split(' ').length - 1][0] : null
+  })
+  
   // ✅ RESTAURÉ: Variables de plan
   const currentPlan = user?.plan || 'essential'
   const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential
