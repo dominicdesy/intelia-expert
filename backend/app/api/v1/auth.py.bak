@@ -112,6 +112,15 @@ class ValidateTokenResponse(BaseModel):
     valid: bool
     message: str
 
+# === 🆕 NOUVEAU MODÈLE POUR CHANGE PASSWORD ===
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+class ChangePasswordResponse(BaseModel):
+    success: bool
+    message: str
+
 # === ENDPOINT LOGIN EXISTANT (CONSERVÉ) ===
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
@@ -146,6 +155,110 @@ async def login(request: LoginRequest):
     expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token({"user_id": user.id, "email": request.email}, expires)
     return {"access_token": token, "expires_at": datetime.utcnow() + expires}
+
+# === 🆕 NOUVEL ENDPOINT CHANGE PASSWORD ===
+@router.post("/change-password", response_model=ChangePasswordResponse)
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: Dict[str, Any] = Depends(lambda: None)  # Sera remplacé par get_current_user
+):
+    """
+    🆕 Changer le mot de passe de l'utilisateur connecté
+    Vérifie le mot de passe actuel puis met à jour avec le nouveau
+    """
+    # Pour l'instant, récupérer current_user sera fait plus tard
+    # Simulons un utilisateur pour tester
+    if not current_user:
+        # Sera remplacé par la vraie fonction get_current_user
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    logger.info(f"🔐 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
+    
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase client non disponible")
+        raise HTTPException(status_code=500, detail="Service de changement de mot de passe non disponible")
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    
+    if not supabase_url or not supabase_key:
+        logger.error("❌ Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+    
+    supabase: Client = create_client(supabase_url, supabase_key)
+    user_email = current_user.get("email")
+    
+    try:
+        # 1. Vérifier le mot de passe actuel
+        logger.info("🔐 [ChangePassword] Vérification mot de passe actuel")
+        
+        try:
+            verify_result = supabase.auth.sign_in_with_password({
+                "email": user_email,
+                "password": request.current_password
+            })
+        except AttributeError:
+            # Fallback pour ancienne API
+            verify_result = supabase.auth.sign_in(
+                email=user_email, 
+                password=request.current_password
+            )
+        
+        if not verify_result.user:
+            logger.warning(f"❌ [ChangePassword] Mot de passe actuel incorrect pour: {user_email}")
+            raise HTTPException(
+                status_code=400, 
+                detail="Le mot de passe actuel est incorrect"
+            )
+        
+        logger.info("✅ [ChangePassword] Mot de passe actuel vérifié")
+        
+        # 2. Mettre à jour le mot de passe
+        logger.info("🔄 [ChangePassword] Mise à jour du nouveau mot de passe")
+        
+        # Créer un nouveau client avec la session de vérification
+        supabase_auth: Client = create_client(supabase_url, supabase_key)
+        
+        # Définir la session pour pouvoir faire l'update
+        if verify_result.session:
+            try:
+                supabase_auth.auth.set_session(
+                    verify_result.session.access_token, 
+                    verify_result.session.refresh_token
+                )
+            except Exception:
+                # Essayer avec l'objet session complet
+                supabase_auth.auth.set_session(verify_result.session)
+        
+        # Mettre à jour le mot de passe
+        update_result = supabase_auth.auth.update_user({
+            "password": request.new_password
+        })
+        
+        if not update_result.user:
+            logger.error(f"❌ [ChangePassword] Échec mise à jour mot de passe pour: {user_email}")
+            raise HTTPException(
+                status_code=500, 
+                detail="Erreur lors de la mise à jour du mot de passe"
+            )
+        
+        logger.info(f"✅ [ChangePassword] Mot de passe mis à jour avec succès pour: {user_email}")
+        
+        return ChangePasswordResponse(
+            success=True,
+            message="Mot de passe changé avec succès"
+        )
+        
+    except HTTPException:
+        # Re-lever les HTTPException sans les modifier
+        raise
+    except Exception as e:
+        logger.error(f"❌ [ChangePassword] Erreur inattendue: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erreur technique lors du changement de mot de passe"
+        )
 
 # === 🆕 NOUVEL ENDPOINT REGISTER ===
 @router.post("/register", response_model=AuthResponse)
@@ -407,9 +520,9 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     🆕 Confirme la réinitialisation du mot de passe avec le nouveau mot de passe
     VERSION AVEC DEBUG APPROFONDI et toutes les méthodes Supabase possibles
     """
-    logger.info(f"🔐 [ConfirmReset] === DÉBUT CONFIRMATION RÉINITIALISATION ===")
-    logger.info(f"🔐 [ConfirmReset] Token reçu (premiers 50 char): {request.token[:50]}...")
-    logger.info(f"🔐 [ConfirmReset] Nouveau mot de passe fourni: {bool(request.new_password)}")
+    logger.info(f"🔍 [ConfirmReset] === DÉBUT CONFIRMATION RÉINITIALISATION ===")
+    logger.info(f"🔍 [ConfirmReset] Token reçu (premiers 50 char): {request.token[:50]}...")
+    logger.info(f"🔍 [ConfirmReset] Nouveau mot de passe fourni: {bool(request.new_password)}")
     
     if not SUPABASE_AVAILABLE:
         logger.error("❌ Supabase client non disponible")
@@ -896,7 +1009,8 @@ async def debug_jwt_config():
         "multi_secret_support": True,  # 🆕 Flag
         "main_secret_type": JWT_SECRETS[0][0] if JWT_SECRETS else "none",
         "register_endpoint_available": True,  # 🆕 Confirmation que register est disponible
-        "reset_password_endpoints_available": True  # 🆕 Confirmation que reset password est disponible
+        "reset_password_endpoints_available": True,  # 🆕 Confirmation que reset password est disponible
+        "change_password_endpoint_available": True  # 🆕 Confirmation que change password est disponible
     }
 
 # === 🆕 ENDPOINT DEBUG POUR RESET PASSWORD ===
