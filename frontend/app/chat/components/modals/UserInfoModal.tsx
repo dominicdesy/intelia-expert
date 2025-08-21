@@ -1,73 +1,4 @@
-// ✅ SOLUTION: Utiliser l'authentification backend uniquement
-      const getBackendAuthToken = async () => {
-        try {
-          // 1. Vérifier si on a déjà un token backend dans localStorage
-          const backendToken = localStorage.getItem('backend_auth_token') || 
-                              localStorage.getItem('auth_token') ||
-                              localStorage.getItem('access_token');
-          
-          if (backendToken) {
-            console.log('🔍 [Password] Token backend trouvé dans localStorage');
-            return backendToken;
-          }
-
-          // 2. Si pas de token, faire un login avec le backend en utilisant les credentials Supabase
-          console.log('🔍 [Password] Pas de token backend, tentative de login...');
-          
-          // Récupérer l'email de l'utilisateur connecté
-          if (!user?.email) {
-            throw new Error('Aucun utilisateur connecté');
-          }
-
-          // NOTE: Pour l'instant, on ne peut pas faire le login automatique 
-          // car on n'a pas le mot de passe en clair
-          // Il faut soit :
-          // 1. Demander à l'utilisateur de se reconnecter via le backend
-          // 2. Créer un endpoint de sync Supabase -> Backend
-          // 3. Utiliser un token Supabase validé côté backend
-          
-          throw new Error('Token backend manquant - reconnectez-vous');
-          
-        } catch (error) {
-          console.error('❌ [Password] Erreur récupération token backend:', error);
-          return null;
-        }
-      }
-      
-      const authToken = await getBackendAuthToken();
-      console.log('🔍 [Password] Token backend:', authToken ? `${authToken.substring(0, 50)}...` : 'null')
-      
-      if (!authToken) {
-        console.log('❌ [Password] Aucun token backend trouvé')
-        setPasswordErrors([
-          'Session expirée. Veuillez vous reconnecter.',
-          'Utilisez le login avec email/mot de passe pour accéder à cette fonctionnalité.'
-        ])
-        return
-      }      // 🔍 DEBUG: Diagnostic complet de l'authentification
-      const getSupabaseToken = () => {
-        // 1. Chercher tous les patterns de cookies possibles
-        const allCookies = document.cookie;
-        console.log('🔍 [Password] Tous les cookies:', allCookies);
-        
-        // Patterns à tester
-        const patterns = [
-          /sb-[^-]+-auth-token=([^;]+)/,           // Pattern standard
-          /sb-.*-auth-token=([^;]+)/,              // Pattern élargi
-          /supabase[^=]*=([^;]+)/,                 // Tout cookie supabase
-          /auth[^=]*=([^;]+)/,                     // Tout cookie auth
-          /token[^=]*=([^;]+)/                     // Tout cookie token
-        ];
-        
-        for (const pattern of patterns) {
-          const match = allCookies.match(pattern);
-          if (match) {
-            console.log('🔍 [Password] Cookie trouvé avec pattern:', pattern, match[1].substring(0, 50));
-            try {
-              // Essayer de décoder
-              const cookieValue = decodeURIComponent(match[1]);
-              if (cookieValue.startsWith('[') || cookieValue.startsWith('{')) {
-                constimport React, { useState } from 'react'
+import React, { useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { UserInfoModalProps } from '@/types'
@@ -173,7 +104,6 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         return
       }
 
-      // 🔧 CORRECTION: updateProfile retourne void, pas un objet
       try {
         await updateProfile(formData)
         alert(t('profile.title') + ' mis à jour avec succès!')
@@ -182,7 +112,7 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
         alert('Erreur lors de la mise à jour: ' + (error?.message || 'Erreur inconnue'))
       }
     } catch (error) {
-      console.error('❌ Erreur mise à jour profil (singleton):', error)
+      console.error('❌ Erreur mise à jour profil:', error)
       alert('Erreur lors de la mise à jour du profil')
     }
     setIsLoading(false)
@@ -217,45 +147,37 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
 
     setIsLoading(true)
     try {
-      console.log('🔐 [Password] Appel à l\'API backend pour changement mot de passe')
+      console.log('🔐 [Password] Login backend pour obtenir token...')
       
-      // 🔍 DEBUG: Récupérer le token depuis les cookies Supabase (solution validée)
-      const getSupabaseToken = () => {
-        // Chercher le cookie Supabase auth token
-        const cookieMatch = document.cookie.match(/sb-[^-]+-auth-token=([^;]+)/);
-        if (cookieMatch) {
-          try {
-            const cookieValue = decodeURIComponent(cookieMatch[1]);
-            const tokenArray = JSON.parse(cookieValue);
-            return tokenArray[0]; // Le JWT est le premier élément
-          } catch (e) {
-            console.error('Erreur parsing cookie Supabase:', e);
-            return null;
-          }
-        }
-        
-        // Fallback: chercher dans localStorage
-        return localStorage.getItem('auth_token') || 
-               localStorage.getItem('access_token') ||
-               localStorage.getItem('token');
-      }
-      
-      const authToken = getSupabaseToken();
-      console.log('🔍 [Password] Token trouvé:', authToken ? `${authToken.substring(0, 50)}...` : 'null')
-      console.log('🔍 [Password] Cookies disponibles:', document.cookie.split('; ').map(c => c.split('=')[0]))
-      
-      if (!authToken) {
-        console.log('❌ [Password] Aucun token trouvé')
-        setPasswordErrors(['Vous devez être connecté pour changer votre mot de passe'])
+      // 1. Login avec l'email de l'utilisateur connecté pour obtenir un token backend
+      const loginResponse = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user?.email,
+          password: passwordData.currentPassword
+        })
+      })
+
+      if (!loginResponse.ok) {
+        const loginError = await loginResponse.json()
+        console.log('❌ [Password] Échec login backend:', loginError.detail)
+        setPasswordErrors(['Le mot de passe actuel est incorrect'])
         return
       }
-      
-      // ✅ CORRECTION: Utiliser l'API backend au lieu de Supabase direct
+
+      const loginData = await loginResponse.json()
+      const backendToken = loginData.access_token
+      console.log('✅ [Password] Token backend obtenu')
+
+      // 2. Maintenant changer le mot de passe avec le token backend valide
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Authorization': `Bearer ${backendToken}`
         },
         body: JSON.stringify({
           current_password: passwordData.currentPassword,
