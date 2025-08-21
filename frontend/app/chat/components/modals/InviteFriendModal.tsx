@@ -36,17 +36,12 @@ const invitationService = {
 
       console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
       
-	  // ✅ CORRECTION URL : Éviter le double /api
-	  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
- 	  const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-	  
-	  // Vérifier si l'URL de base contient déjà /api
-	  const hasApiInBase = API_BASE_URL.includes('/api')
-	  const FULL_API_URL = hasApiInBase 
-	    ? `${API_BASE_URL}/${API_VERSION}` 
-	    : `${API_BASE_URL}/api/${API_VERSION}`
-	    
-	  console.log('📍 [InvitationService] URL construite:', FULL_API_URL)
+	        // ✅ URL CORRECTE SELON VOTRE CONFIGURATION DIGITALOCEAN
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+      const inviteUrl = `${baseUrl}/api/v1/invitations/send`
+      
+      console.log('📍 [InvitationService] URL finale:', inviteUrl)
+      console.log('📍 [InvitationService] Base URL env:', baseUrl)
       
       // Headers identiques à apiService
       const headers = {
@@ -55,7 +50,7 @@ const invitationService = {
         'Authorization': `Bearer ${session.access_token}` // ✅ MÊME TOKEN QUE LE CHAT
       }
       
-      const response = await fetch(`${FULL_API_URL}/invitations/send`, {		  
+      const response = await fetch(inviteUrl, {		  
         method: 'POST',
         headers,
         body: JSON.stringify({
