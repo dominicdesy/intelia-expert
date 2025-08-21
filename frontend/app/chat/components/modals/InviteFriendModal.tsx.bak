@@ -36,9 +36,17 @@ const invitationService = {
 
       console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
       
+	  // ✅ CORRECTION URL : Éviter le double /api
 	  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
  	  const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
-	  const FULL_API_URL = `${API_BASE_URL}/api/${API_VERSION}`
+	  
+	  // Vérifier si l'URL de base contient déjà /api
+	  const hasApiInBase = API_BASE_URL.includes('/api')
+	  const FULL_API_URL = hasApiInBase 
+	    ? `${API_BASE_URL}/${API_VERSION}` 
+	    : `${API_BASE_URL}/api/${API_VERSION}`
+	    
+	  console.log('📍 [InvitationService] URL construite:', FULL_API_URL)
       
       // Headers identiques à apiService
       const headers = {
@@ -396,7 +404,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                   Invitez vos collègues à découvrir Intelia Expert
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Invitations envoyées par <strong>{currentUser.name || currentUser.email}</strong>
+                  Invitations envoyées par <strong>{currentUser.name || currentUser.email?.split('@')[0] || 'Utilisateur'}</strong>
                 </p>
               </div>
 
