@@ -13,7 +13,7 @@ interface InviteFriendModalProps {
 const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
     try {
-      console.log('📧 [InvitationService] Envoi invitation avec auth Supabase (singleton):', { 
+      console.log('📧 [InvitationService] Envoi invitation avec nouveau domaine:', { 
         emails, 
         hasMessage: !!personalMessage,
         inviterEmail: inviterInfo.email 
@@ -36,15 +36,13 @@ const invitationService = {
 
       console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
       
-	        // ✅ CORRECTION FINALE : Votre variable DigitalOcean contient déjà /api
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
+      // ✅ NOUVEAU: Utiliser expert.intelia.com
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
       // Enlever /api s'il est présent, puis ajouter le chemin complet
       const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
       const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
       
-      console.log('📍 [InvitationService] Base URL env:', baseUrl)
-      console.log('📍 [InvitationService] Clean base URL:', cleanBaseUrl)
-      console.log('📍 [InvitationService] URL finale:', inviteUrl)
+      console.log('🔗 [InvitationService] URL API finale:', inviteUrl)
       
       // Headers identiques à apiService
       const headers = {
@@ -61,7 +59,9 @@ const invitationService = {
           personal_message: personalMessage,
           inviter_name: inviterInfo.name,
           inviter_email: inviterInfo.email,
-          language: inviterInfo.language || 'fr'
+          language: inviterInfo.language || 'fr',
+          // ✅ NOUVEAU: Spécifier l'URL de redirection
+          redirect_url: 'https://expert.intelia.com/auth/invitation'
         })
       })
 
@@ -88,7 +88,7 @@ const invitationService = {
       }
 
       const result = await response.json()
-      console.log('✅ [InvitationService] Invitations envoyées (singleton):', result)
+      console.log('✅ [InvitationService] Invitations envoyées vers expert.intelia.com:', result)
       return result
       
     } catch (error) {
