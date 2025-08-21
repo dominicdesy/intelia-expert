@@ -1,11 +1,11 @@
 'use client'
-// app/auth/callback/page.tsx - Page pour gérer les invitations Supabase (fragments #)
+// app/auth/invitation/page.tsx - Page pour gérer les invitations Supabase (fragments #)
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
-export default function AuthCallbackPage() {
+export default function InvitationAcceptPage() {
   const router = useRouter()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
@@ -14,32 +14,32 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔐 [AuthCallback] Début traitement callback')
+        console.log('🔐 [InvitationAccept] Début traitement invitation')
         
         const supabase = getSupabaseClient()
         
         // Vérifier s'il y a des fragments d'auth dans l'URL
         const hash = window.location.hash
-        console.log('🔍 [AuthCallback] Hash URL:', hash ? 'présent' : 'absent')
+        console.log('🔍 [InvitationAccept] Hash URL:', hash ? 'présent' : 'absent')
         
         if (hash && (hash.includes('access_token') || hash.includes('type=invite'))) {
-          console.log('📧 [AuthCallback] Invitation détectée dans URL')
+          console.log('📧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Finalisation de votre invitation...')
           
           // Supabase va automatiquement traiter les tokens du hash
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
           
           if (sessionError) {
-            console.error('❌ [AuthCallback] Erreur session:', sessionError)
+            console.error('❌ [InvitationAccept] Erreur session:', sessionError)
             throw new Error(`Erreur d'authentification: ${sessionError.message}`)
           }
           
           if (sessionData.session) {
-            console.log('✅ [AuthCallback] Session créée:', sessionData.session.user.email)
+            console.log('✅ [InvitationAccept] Session créée:', sessionData.session.user.email)
             
             // Extraire les métadonnées d'invitation
             const userMetadata = sessionData.session.user.user_metadata
-            console.log('📋 [AuthCallback] Métadonnées utilisateur:', userMetadata)
+            console.log('📋 [InvitationAccept] Métadonnées utilisateur:', userMetadata)
             
             setUserInfo({
               email: sessionData.session.user.email,
@@ -57,7 +57,7 @@ export default function AuthCallbackPage() {
             
             // Redirection vers le chat après 3 secondes
             setTimeout(() => {
-              console.log('🚀 [AuthCallback] Redirection vers chat')
+              console.log('🚀 [InvitationAccept] Redirection vers chat')
               router.push('/chat')
             }, 3000)
             
@@ -67,17 +67,17 @@ export default function AuthCallbackPage() {
           
         } else {
           // Pas de fragments d'auth, vérifier s'il y a une session existante
-          console.log('🔍 [AuthCallback] Pas d\'invitation, vérification session existante')
+          console.log('🔍 [InvitationAccept] Pas d\'invitation, vérification session existante')
           
           const { data: existingSession } = await supabase.auth.getSession()
           
           if (existingSession.session) {
-            console.log('✅ [AuthCallback] Session existante trouvée')
+            console.log('✅ [InvitationAccept] Session existante trouvée')
             setStatus('success')
             setMessage('Vous êtes déjà connecté !')
             setTimeout(() => router.push('/chat'), 1500)
           } else {
-            console.log('ℹ️ [AuthCallback] Aucune session, redirection vers login')
+            console.log('ℹ️ [InvitationAccept] Aucune session, redirection vers login')
             setStatus('error')
             setMessage('Aucune invitation trouvée')
             setTimeout(() => router.push('/auth/login'), 2000)
@@ -85,7 +85,7 @@ export default function AuthCallbackPage() {
         }
         
       } catch (error) {
-        console.error('❌ [AuthCallback] Erreur traitement:', error)
+        console.error('❌ [InvitationAccept] Erreur traitement:', error)
         setStatus('error')
         
         if (error instanceof Error) {
