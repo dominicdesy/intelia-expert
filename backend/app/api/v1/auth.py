@@ -121,6 +121,184 @@ class ChangePasswordResponse(BaseModel):
     success: bool
     message: str
 
+# === 🆕 FONCTIONS DÉPLACÉES AVANT LES ENDPOINTS ===
+
+# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
+async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
+    """
+    Récupère le profil utilisateur depuis la table Supabase users
+    """
+    try:
+        if not SUPABASE_AVAILABLE:
+            logger.warning("Supabase non disponible - rôle par défaut")
+            return {"user_type": "user"}
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            logger.warning("Config Supabase manquante - rôle par défaut")
+            return {"user_type": "user"}
+        
+        supabase = create_client(supabase_url, supabase_key)
+        
+        # Chercher par auth_user_id d'abord (si c'est comme ça que c'est lié)
+        response = supabase.table('users').select('*').eq('auth_user_id', user_id).execute()
+        
+        # Si pas trouvé par auth_user_id, essayer par email
+        if not response.data:
+            response = supabase.table('users').select('*').eq('email', email).execute()
+        
+        if response.data and len(response.data) > 0:
+            profile = response.data[0]
+            logger.debug(f"✅ Profil trouvé pour {email}: {profile.get('user_type', 'user')}")
+            return {
+                "user_type": profile.get('user_type', 'user'),
+                "full_name": profile.get('full_name'),
+                "preferences": profile.get('preferences', {}),
+                "profile_id": profile.get('id')
+            }
+        else:
+            logger.warning(f"⚠️ Aucun profil trouvé pour {email} - rôle par défaut")
+            return {"user_type": "user"}
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération profil Supabase: {e}")
+        return {"user_type": "user"}
+
+# === FONCTION get_current_user EXISTANTE (CONSERVÉE) ===
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    """
+    ✅ VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
+    """
+    token = credentials.credentials
+    
+    if not token or not isinstance(token, str):
+        logger.warning("⚠️ Token vide ou invalide")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
+    
+    # ✅ ESSAYER TOUS LES SECRETS CONFIGURÉS
+    for secret_name, secret_value in JWT_SECRETS:
+        if not secret_value:
+            continue
+            
+        try:
+            logger.debug(f"🔑 Tentative décodage avec {secret_name}")
+            
+            # ✅ DÉCODER AVEC PLUSIEURS OPTIONS
+            decode_options = [
+                {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
+                {"audience": "authenticated"},       # Standard Supabase
+                {}                                  # Sans options spéciales
+            ]
+            
+            payload = None
+            for option_set in decode_options:
+                try:
+                    if "options" in option_set:
+                        # Décoder sans vérifier l'audience
+                        payload = jwt.decode(
+                            token, 
+                            secret_value, 
+                            algorithms=[JWT_ALGORITHM],
+                            **option_set
+                        )
+                    elif "audience" in option_set:
+                        # Décoder avec audience
+                        payload = jwt.decode(
+                            token, 
+                            secret_value, 
+                            algorithms=[JWT_ALGORITHM],
+                            audience=option_set["audience"]
+                        )
+                    else:
+                        # Décoder simple
+                        payload = jwt.decode(
+                            token, 
+                            secret_value, 
+                            algorithms=[JWT_ALGORITHM]
+                        )
+                    break  # Si succès, sortir de la boucle des options
+                except jwt.InvalidAudienceError:
+                    continue  # Essayer sans audience
+                except Exception:
+                    continue  # Essayer l'option suivante
+            
+            if not payload:
+                continue  # Essayer le secret suivant
+            
+            logger.info(f"✅ Token décodé avec succès avec {secret_name}")
+            
+            # ✅ EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
+            # Support auth-temp ET Supabase
+            user_id = payload.get("sub") or payload.get("user_id")
+            email = payload.get("email")
+            
+            # Vérification de base
+            if not user_id:
+                logger.warning("⚠️ Token sans user_id valide")
+                continue
+                
+            if not email:
+                logger.warning("⚠️ Token sans email valide")
+                continue
+            
+            # 🆕 RÉCUPÉRER LE PROFIL UTILISATEUR depuis Supabase
+            try:
+                profile = await get_user_profile_from_supabase(user_id, email)
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur récupération profil: {e}")
+                profile = {"user_type": "user"}
+            
+            # 🆕 CONSTRUIRE LA RÉPONSE UNIFIÉE
+            user_data = {
+                "user_id": user_id,
+                "email": email,
+                "iss": payload.get("iss"),
+                "aud": payload.get("aud"),
+                "exp": payload.get("exp"),
+                "jwt_secret_used": secret_name,
+                
+                # Champs de rôles
+                "user_type": profile.get("user_type", "user"),
+                "full_name": profile.get("full_name"),
+                "preferences": profile.get("preferences", {}),
+                "profile_id": profile.get("profile_id"),
+                
+                # Rétrocompatibilité
+                "is_admin": profile.get("user_type") in ["admin", "super_admin"]
+            }
+            
+            logger.info(f"✅ Utilisateur authentifié: {email} (rôle: {user_data['user_type']}, secret: {secret_name})")
+            return user_data
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"⚠️ Token expiré (testé avec {secret_name})")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+            
+        except jwt.InvalidSignatureError:
+            logger.debug(f"⚠️ Signature invalide avec {secret_name}")
+            continue
+            
+        except jwt.InvalidTokenError as e:
+            logger.debug(f"⚠️ Token invalide avec {secret_name}: {e}")
+            continue
+            
+        except Exception as e:
+            logger.debug(f"⚠️ Erreur inattendue avec {secret_name}: {e}")
+            continue
+    
+    # Si aucun secret n'a fonctionné
+    logger.error("❌ Impossible de décoder le token avec tous les secrets disponibles")
+    logger.error(f"❌ Secrets essayés: {[s[0] for s in JWT_SECRETS]}")
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, 
+        detail="Invalid token - unable to verify signature"
+    )
+
+# === ENDPOINTS COMMENCENT ICI ===
+
 # === ENDPOINT LOGIN EXISTANT (CONSERVÉ) ===
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
@@ -160,18 +338,12 @@ async def login(request: LoginRequest):
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     request: ChangePasswordRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user)  # ✅ CORRIGÉ
 ):
     """
     🆕 Changer le mot de passe de l'utilisateur connecté
     Vérifie le mot de passe actuel puis met à jour avec le nouveau
     """
-    # Pour l'instant, récupérer current_user sera fait plus tard
-    # Simulons un utilisateur pour tester
-    if not current_user:
-        # Sera remplacé par la vraie fonction get_current_user
-        raise HTTPException(status_code=401, detail="Non authentifié")
-    
     logger.info(f"🔐 [ChangePassword] Demande de changement pour: {current_user.get('email', 'unknown')}")
     
     if not SUPABASE_AVAILABLE:
@@ -788,180 +960,6 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     raise HTTPException(
         status_code=400, 
         detail="Impossible de réinitialiser le mot de passe. Le token pourrait être invalide, expiré, ou incompatible avec cette version de Supabase. Demandez un nouveau lien de réinitialisation."
-    )
-
-# 🆕 NOUVELLE FONCTION : Récupération profil utilisateur depuis Supabase (CONSERVÉE)
-async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, Any]:
-    """
-    Récupère le profil utilisateur depuis la table Supabase users
-    """
-    try:
-        if not SUPABASE_AVAILABLE:
-            logger.warning("Supabase non disponible - rôle par défaut")
-            return {"user_type": "user"}
-        
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        
-        if not supabase_url or not supabase_key:
-            logger.warning("Config Supabase manquante - rôle par défaut")
-            return {"user_type": "user"}
-        
-        supabase = create_client(supabase_url, supabase_key)
-        
-        # Chercher par auth_user_id d'abord (si c'est comme ça que c'est lié)
-        response = supabase.table('users').select('*').eq('auth_user_id', user_id).execute()
-        
-        # Si pas trouvé par auth_user_id, essayer par email
-        if not response.data:
-            response = supabase.table('users').select('*').eq('email', email).execute()
-        
-        if response.data and len(response.data) > 0:
-            profile = response.data[0]
-            logger.debug(f"✅ Profil trouvé pour {email}: {profile.get('user_type', 'user')}")
-            return {
-                "user_type": profile.get('user_type', 'user'),
-                "full_name": profile.get('full_name'),
-                "preferences": profile.get('preferences', {}),
-                "profile_id": profile.get('id')
-            }
-        else:
-            logger.warning(f"⚠️ Aucun profil trouvé pour {email} - rôle par défaut")
-            return {"user_type": "user"}
-            
-    except Exception as e:
-        logger.error(f"❌ Erreur récupération profil Supabase: {e}")
-        return {"user_type": "user"}
-
-# === FONCTION get_current_user EXISTANTE (CONSERVÉE) ===
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
-    """
-    ✅ VERSION MULTI-COMPATIBLE : Decode JWT tokens auth-temp ET Supabase
-    """
-    token = credentials.credentials
-    
-    if not token or not isinstance(token, str):
-        logger.warning("⚠️ Token vide ou invalide")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing or invalid")
-    
-    # ✅ ESSAYER TOUS LES SECRETS CONFIGURÉS
-    for secret_name, secret_value in JWT_SECRETS:
-        if not secret_value:
-            continue
-            
-        try:
-            logger.debug(f"🔑 Tentative décodage avec {secret_name}")
-            
-            # ✅ DÉCODER AVEC PLUSIEURS OPTIONS
-            decode_options = [
-                {"options": {"verify_aud": False}},  # Sans vérifier audience (auth-temp)
-                {"audience": "authenticated"},       # Standard Supabase
-                {}                                  # Sans options spéciales
-            ]
-            
-            payload = None
-            for option_set in decode_options:
-                try:
-                    if "options" in option_set:
-                        # Décoder sans vérifier l'audience
-                        payload = jwt.decode(
-                            token, 
-                            secret_value, 
-                            algorithms=[JWT_ALGORITHM],
-                            **option_set
-                        )
-                    elif "audience" in option_set:
-                        # Décoder avec audience
-                        payload = jwt.decode(
-                            token, 
-                            secret_value, 
-                            algorithms=[JWT_ALGORITHM],
-                            audience=option_set["audience"]
-                        )
-                    else:
-                        # Décoder simple
-                        payload = jwt.decode(
-                            token, 
-                            secret_value, 
-                            algorithms=[JWT_ALGORITHM]
-                        )
-                    break  # Si succès, sortir de la boucle des options
-                except jwt.InvalidAudienceError:
-                    continue  # Essayer sans audience
-                except Exception:
-                    continue  # Essayer l'option suivante
-            
-            if not payload:
-                continue  # Essayer le secret suivant
-            
-            logger.info(f"✅ Token décodé avec succès avec {secret_name}")
-            
-            # ✅ EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
-            # Support auth-temp ET Supabase
-            user_id = payload.get("sub") or payload.get("user_id")
-            email = payload.get("email")
-            
-            # Vérification de base
-            if not user_id:
-                logger.warning("⚠️ Token sans user_id valide")
-                continue
-                
-            if not email:
-                logger.warning("⚠️ Token sans email valide")
-                continue
-            
-            # 🆕 RÉCUPÉRER LE PROFIL UTILISATEUR depuis Supabase
-            try:
-                profile = await get_user_profile_from_supabase(user_id, email)
-            except Exception as e:
-                logger.warning(f"⚠️ Erreur récupération profil: {e}")
-                profile = {"user_type": "user"}
-            
-            # 🆕 CONSTRUIRE LA RÉPONSE UNIFIÉE
-            user_data = {
-                "user_id": user_id,
-                "email": email,
-                "iss": payload.get("iss"),
-                "aud": payload.get("aud"),
-                "exp": payload.get("exp"),
-                "jwt_secret_used": secret_name,
-                
-                # Champs de rôles
-                "user_type": profile.get("user_type", "user"),
-                "full_name": profile.get("full_name"),
-                "preferences": profile.get("preferences", {}),
-                "profile_id": profile.get("profile_id"),
-                
-                # Rétrocompatibilité
-                "is_admin": profile.get("user_type") in ["admin", "super_admin"]
-            }
-            
-            logger.info(f"✅ Utilisateur authentifié: {email} (rôle: {user_data['user_type']}, secret: {secret_name})")
-            return user_data
-            
-        except jwt.ExpiredSignatureError:
-            logger.warning(f"⚠️ Token expiré (testé avec {secret_name})")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-            
-        except jwt.InvalidSignatureError:
-            logger.debug(f"⚠️ Signature invalide avec {secret_name}")
-            continue
-            
-        except jwt.InvalidTokenError as e:
-            logger.debug(f"⚠️ Token invalide avec {secret_name}: {e}")
-            continue
-            
-        except Exception as e:
-            logger.debug(f"⚠️ Erreur inattendue avec {secret_name}: {e}")
-            continue
-    
-    # Si aucun secret n'a fonctionné
-    logger.error("❌ Impossible de décoder le token avec tous les secrets disponibles")
-    logger.error(f"❌ Secrets essayés: {[s[0] for s in JWT_SECRETS]}")
-    
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, 
-        detail="Invalid token - unable to verify signature"
     )
 
 # === ENDPOINTS EXISTANTS (CONSERVÉS) ===
