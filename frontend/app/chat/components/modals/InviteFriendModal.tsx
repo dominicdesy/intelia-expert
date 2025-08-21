@@ -59,9 +59,8 @@ const invitationService = {
           personal_message: personalMessage,
           inviter_name: inviterInfo.name,
           inviter_email: inviterInfo.email,
-          language: inviterInfo.language || 'fr',
-          // ✅ NOUVEAU: Spécifier l'URL de redirection
-          redirect_url: 'https://expert.intelia.com/auth/invitation'
+          language: inviterInfo.language || 'fr'
+          // ✅ SUPPRIMÉ: redirect_url car Supabase utilise le Site URL
         })
       })
 

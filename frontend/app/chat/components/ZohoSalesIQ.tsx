@@ -31,6 +31,31 @@ const CONFIG = {
   DOM_OBSERVER_DELAY: 500
 } as const
 
+// 🛡️ NOUVELLE FONCTION UTILITAIRE SÉCURISÉE pour éviter l'erreur includes
+const hasZohoClass = (element: Element): boolean => {
+  try {
+    // Vérification sécurisée avec gestion d'erreurs
+    const classString = typeof element.className === 'string' 
+      ? element.className 
+      : element.className?.toString() || ''
+    
+    return classString.includes('zsiq') || classString.includes('siq-')
+  } catch (error) {
+    console.warn('⚠️ [ZohoSalesIQ] Erreur vérification classe:', error)
+    return false
+  }
+}
+
+// 🛡️ FONCTION UTILITAIRE pour vérifier les IDs Zoho
+const hasZohoId = (element: Element): boolean => {
+  try {
+    return element.id?.includes('zsiq') || false
+  } catch (error) {
+    console.warn('⚠️ [ZohoSalesIQ] Erreur vérification ID:', error)
+    return false
+  }
+}
+
 export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   // État centralisé du widget
   const widgetStateRef = useRef<WidgetState>({
@@ -135,7 +160,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
   const setGlobalSessionLanguage = useCallback((lang: string) => {
     if (typeof window !== 'undefined') {
       ;(window as any).ZOHO_SESSION_LANGUAGE = lang
-      console.log('🌍 [ZohoSalesIQ] Variable globale stockée:', lang)
+      console.log('🌐 [ZohoSalesIQ] Variable globale stockée:', lang)
     }
   }, [])
 
@@ -146,7 +171,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     try {
       const floatButton = document.querySelector('#zsiq_float') as HTMLElement
       if (floatButton && floatButton.classList.contains('zsiq-hide')) {
-        console.log('📌 [ZohoSalesIQ] Retrait classe zsiq-hide pour rendre visible')
+        console.log('🔌 [ZohoSalesIQ] Retrait classe zsiq-hide pour rendre visible')
         floatButton.classList.remove('zsiq-hide')
         console.log('✅ [ZohoSalesIQ] Bouton flottant maintenant visible')
         return true
@@ -249,15 +274,23 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       const interactiveElements = document.querySelectorAll('#zsiq_float [role="button"], .siqico-close, [class*="zsiq"][onclick]')
       interactiveElements.forEach(element => {
         if (!element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby')) {
-          const className = element.className
+          // 🛡️ CORRECTION : Utiliser la fonction sécurisée pour className
           let label = 'Élément interactif du chat'
           
-          if (className.includes('close')) {
-            label = 'Fermer le chat'
-          } else if (className.includes('minimize')) {
-            label = 'Réduire le chat'
-          } else if (className.includes('maximize')) {
-            label = 'Agrandir le chat'
+          try {
+            const classString = typeof element.className === 'string' 
+              ? element.className 
+              : element.className?.toString() || ''
+            
+            if (classString.includes('close')) {
+              label = 'Fermer le chat'
+            } else if (classString.includes('minimize')) {
+              label = 'Réduire le chat'
+            } else if (classString.includes('maximize')) {
+              label = 'Agrandir le chat'
+            }
+          } catch (error) {
+            console.warn('⚠️ [ZohoSalesIQ] Erreur détection classe bouton:', error)
           }
           
           element.setAttribute('aria-label', label)
@@ -494,39 +527,43 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     })
   }, [initializeZohoObject, createTimeout, configureWidget])
 
-  // Observer DOM optimisé avec throttling
+  // 🛡️ Observer DOM CORRIGÉ avec gestion sécurisée des className
   const setupDOMObserver = useCallback(() => {
     if (!isMountedRef.current || domObserverRef.current) return
 
     const observer = new MutationObserver((mutations) => {
       let shouldCheck = false
       
-      mutations.forEach((mutation) => {
-        // Vérifier si des éléments Zoho ont été ajoutés/modifiés
-        if (mutation.type === 'childList') {
-          const hasZohoElements = Array.from(mutation.addedNodes).some(node => 
-            node instanceof Element && (
-              node.id?.includes('zsiq') || 
-              node.className?.includes('zsiq') ||
-              node.className?.includes('siq-')
-            )
-          )
-          if (hasZohoElements) shouldCheck = true
-        }
-        
-        // Vérifier si des attributs ont changé sur des éléments Zoho
-        if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-          if (mutation.target.id?.includes('zsiq') || 
-              mutation.target.className?.includes('zsiq') ||
-              mutation.target.className?.includes('siq-')) {
-            shouldCheck = true
+      try {
+        mutations.forEach((mutation) => {
+          // Vérifier si des éléments Zoho ont été ajoutés/modifiés
+          if (mutation.type === 'childList') {
+            const hasZohoElements = Array.from(mutation.addedNodes).some(node => {
+              if (!(node instanceof Element)) return false
+              
+              // ✅ CORRECTION : Utiliser les fonctions sécurisées
+              return hasZohoId(node) || hasZohoClass(node)
+            })
+            
+            if (hasZohoElements) shouldCheck = true
           }
+          
+          // Vérifier si des attributs ont changé sur des éléments Zoho
+          if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+            // ✅ CORRECTION : Utiliser les fonctions sécurisées
+            if (hasZohoId(mutation.target) || hasZohoClass(mutation.target)) {
+              shouldCheck = true
+            }
+          }
+        })
+        
+        if (shouldCheck && isMountedRef.current) {
+          // Utiliser le debouncing pour éviter les appels trop fréquents
+          debouncedVerification()
         }
-      })
-      
-      if (shouldCheck && isMountedRef.current) {
-        // Utiliser le debouncing pour éviter les appels trop fréquents
-        debouncedVerification()
+      } catch (error) {
+        console.error('🚨 [ZohoSalesIQ] Erreur dans MutationObserver:', error)
+        // Ne pas faire planter l'observateur, juste logger l'erreur
       }
     })
 
@@ -538,7 +575,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
     })
 
     domObserverRef.current = observer
-    console.log('👁️ [ZohoSalesIQ] Observer DOM configuré avec debouncing')
+    console.log('👁️ [ZohoSalesIQ] Observer DOM configuré avec protection d\'erreurs')
   }, [debouncedVerification])
 
   // Processus d'initialisation principal optimisé
@@ -553,7 +590,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       // 1. Fixer la langue de session
       state.sessionLanguage = lang
       setGlobalSessionLanguage(lang)
-      console.log('📌 [ZohoSalesIQ] Langue de session fixée:', lang)
+      console.log('🔌 [ZohoSalesIQ] Langue de session fixée:', lang)
 
       // 2. Charger le script Zoho
       await loadZohoScript(lang)
@@ -582,7 +619,7 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
 
     if (state.sessionLanguage) {
       console.log('🚫 [ZohoSalesIQ] CHANGEMENT DE LANGUE IGNORÉ:', state.sessionLanguage, '→', newLang)
-      console.log('📌 [ZohoSalesIQ] Widget reste en:', state.sessionLanguage)
+      console.log('🔌 [ZohoSalesIQ] Widget reste en:', state.sessionLanguage)
       console.log('💡 [ZohoSalesIQ] Nouvelle langue sera effective à la prochaine session')
     }
   }, [])
