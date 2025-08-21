@@ -36,12 +36,15 @@ const invitationService = {
 
       console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
       
-	        // ✅ URL CORRECTE SELON VOTRE CONFIGURATION DIGITALOCEAN
+	        // ✅ CORRECTION FINALE : Votre variable DigitalOcean contient déjà /api
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert-app-cngws.ondigitalocean.app'
-      const inviteUrl = `${baseUrl}/api/v1/invitations/send`
+      // Enlever /api s'il est présent, puis ajouter le chemin complet
+      const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
+      const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
       
-      console.log('📍 [InvitationService] URL finale:', inviteUrl)
       console.log('📍 [InvitationService] Base URL env:', baseUrl)
+      console.log('📍 [InvitationService] Clean base URL:', cleanBaseUrl)
+      console.log('📍 [InvitationService] URL finale:', inviteUrl)
       
       // Headers identiques à apiService
       const headers = {
