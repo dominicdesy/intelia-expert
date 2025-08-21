@@ -92,7 +92,7 @@ const invitationService = {
   }
 }
 
-// ==================== MODAL INVITATION AMI CORRIGÉE ====================
+// ==================== MODAL INVITATION AMI AVEC POSITIONNEMENT CORRIGÉ ====================
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
   // ✅ CHANGEMENT 3: Utiliser useAuthStore comme dans UserMenuButton
@@ -287,174 +287,242 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   // CORRECTION 6: Affichage conditionnel si pas d'utilisateur
   if (!currentUser?.email) {
     return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Connexion requise
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Vous devez être connecté pour envoyer des invitations
-          </p>
-          <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-            <strong>Debug:</strong><br/>
-            user: {user ? JSON.stringify({email: user.email, name: user.name}) : 'null'}<br/>
-            localStorage auth: {typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? 'présent' : 'absent'}
-          </div>
-        </div>
+      <>
+        {/* Overlay - même style que UserInfoModal */}
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+          onClick={onClose}
+        />
         
-        <div className="flex justify-center">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+        {/* Modal Container - même style que UserInfoModal */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            Fermer
-          </button>
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Inviter des amis
+              </h2>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+                aria-label="Fermer la modal"
+                title="Fermer"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6">
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    Connexion requise
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Vous devez être connecté pour envoyer des invitations
+                  </p>
+                  <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                    <strong>Debug:</strong><br/>
+                    user: {user ? JSON.stringify({email: user.email, name: user.name}) : 'null'}<br/>
+                    localStorage auth: {typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? 'présent' : 'absent'}
+                  </div>
+                </div>
+                
+                <div className="flex justify-center">
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header avec icône */}
-      <div className="text-center">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          Invitez vos collègues à découvrir Intelia Expert
-        </h2>
-        <p className="text-sm text-gray-600">
-          Invitations envoyées par <strong>{currentUser.name || currentUser.email}</strong>
-        </p>
-      </div>
-
-      {/* Messages de succès */}
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-green-800 font-medium">{successMessage}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Messages d'erreur */}
-      {errors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="text-red-800">
-            <p className="font-medium mb-2 flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-              Erreur de validation
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {/* Section Email Addresses */}
-        <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Adresses Email
-            {getEmailCount() > 0 && (
-              <span className="ml-2 text-blue-600 font-normal">
-                ({getEmailCount()} destinataire{getEmailCount() > 1 ? 's' : ''})
-              </span>
-            )}
-          </label>
-          <textarea
-            value={emails}
-            onChange={(e) => setEmails(e.target.value)}
-            placeholder="nom1@exemple.com, nom2@exemple.com, nom3@exemple.com"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={3}
-            disabled={isLoading}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            💡 Séparez les adresses par des virgules. Maximum 10 invitations à la fois.
-          </p>
-        </div>
-
-        {/* Section Message Personnel */}
-        <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Ajouter un message personnel 
-            <span className="text-gray-500 font-normal">(optionnel)</span>
-          </label>
-          <textarea
-            value={personalMessage}
-            onChange={(e) => setPersonalMessage(e.target.value)}
-            placeholder="Expliquez à vos collègues pourquoi vous les invitez à découvrir Intelia Expert..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={4}
-            maxLength={500}
-            disabled={isLoading}
-          />
-          <div className="flex justify-between items-center mt-1">
-            <p className="text-xs text-gray-500">
-              💬 Votre message sera inclus dans l'email d'invitation
-            </p>
-            <span className="text-xs text-gray-400">
-              {personalMessage.length}/500
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Boutons d'action */}
-      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-        <button
-          onClick={onClose}
-          className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
-          disabled={isLoading}
+    <>
+      {/* Overlay - même style que UserInfoModal */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+        onClick={onClose}
+      />
+      
+      {/* Modal Container - même style que UserInfoModal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
         >
-          Annuler
-        </button>
-        <button
-          onClick={handleSendInvitations}
-          disabled={isLoading || getEmailCount() === 0}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center space-x-2"
-        >
-          {isLoading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Envoi en cours...</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-              <span>
-                Envoyer {getEmailCount() > 0 ? `(${getEmailCount()})` : ''}
-              </span>
-            </>
-          )}
-        </button>
-      </div>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Inviter des amis
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl"
+              aria-label="Fermer la modal"
+              title="Fermer"
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Content - contenu original inchangé */}
+          <div className="p-6">
+            <div className="space-y-6">
+              {/* Header avec icône */}
+              <div className="text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Invitez vos collègues à découvrir Intelia Expert
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Invitations envoyées par <strong>{currentUser.name || currentUser.email}</strong>
+                </p>
+              </div>
 
-      {/* Footer avec informations */}
-      <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-        🔒 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
-        <br />
-        Vos contacts recevront un lien pour créer leur compte Intelia Expert gratuitement.
+              {/* Messages de succès */}
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-green-800 font-medium">{successMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Messages d'erreur */}
+              {errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="text-red-800">
+                    <p className="font-medium mb-2 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                      </svg>
+                      Erreur de validation
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Section Email Addresses */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Adresses Email
+                    {getEmailCount() > 0 && (
+                      <span className="ml-2 text-blue-600 font-normal">
+                        ({getEmailCount()} destinataire{getEmailCount() > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </label>
+                  <textarea
+                    value={emails}
+                    onChange={(e) => setEmails(e.target.value)}
+                    placeholder="nom1@exemple.com, nom2@exemple.com, nom3@exemple.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={3}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Séparez les adresses par des virgules. Maximum 10 invitations à la fois.
+                  </p>
+                </div>
+
+                {/* Section Message Personnel */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Ajouter un message personnel 
+                    <span className="text-gray-500 font-normal">(optionnel)</span>
+                  </label>
+                  <textarea
+                    value={personalMessage}
+                    onChange={(e) => setPersonalMessage(e.target.value)}
+                    placeholder="Expliquez à vos collègues pourquoi vous les invitez à découvrir Intelia Expert..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={4}
+                    maxLength={500}
+                    disabled={isLoading}
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-gray-500">
+                      💬 Votre message sera inclus dans l'email d'invitation
+                    </p>
+                    <span className="text-xs text-gray-400">
+                      {personalMessage.length}/500
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                  disabled={isLoading}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSendInvitations}
+                  disabled={isLoading || getEmailCount() === 0}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center space-x-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Envoi en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                      </svg>
+                      <span>
+                        Envoyer {getEmailCount() > 0 ? `(${getEmailCount()})` : ''}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Footer avec informations */}
+              <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
+                🔒 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
+                <br />
+                Vos contacts recevront un lien pour créer leur compte Intelia Expert gratuitement.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
