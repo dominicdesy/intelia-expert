@@ -34,17 +34,12 @@ const CONFIG = {
 // 🛡️ NOUVELLE FONCTION UTILITAIRE SÉCURISÉE pour éviter l'erreur includes
 const hasZohoClass = (element: Element): boolean => {
   try {
-    // Vérification sécurisée avec gestion d'erreurs TypeScript
-    const className = element.className
+    // Approche plus simple et robuste pour TypeScript
     let classString = ''
     
-    if (typeof className === 'string') {
-      classString = className
-    } else if (className && typeof className === 'object' && 'toString' in className) {
-      classString = className.toString()
-    } else {
-      // Fallback pour les cas edge
-      classString = String(className || '')
+    if (element.className) {
+      // Cast en any pour éviter les problèmes TypeScript, puis String() pour sécurité
+      classString = String((element.className as any) || '')
     }
     
     return classString.includes('zsiq') || classString.includes('siq-')
@@ -286,16 +281,8 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
           let label = 'Élément interactif du chat'
           
           try {
-            const className = element.className
-            let classString = ''
-            
-            if (typeof className === 'string') {
-              classString = className
-            } else if (className && typeof className === 'object' && 'toString' in className) {
-              classString = className.toString()
-            } else {
-              classString = String(className || '')
-            }
+            // Approche simple et robuste pour TypeScript
+            const classString = element.className ? String((element.className as any) || '') : ''
             
             if (classString.includes('close')) {
               label = 'Fermer le chat'
