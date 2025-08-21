@@ -20,11 +20,22 @@ export const UserMenuButton = () => {
   const [showLanguageModal, setShowLanguageModal] = useState(false)
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false)
 
-  // ✅ CORRECTION: Fonction pour obtenir les initiales (identique à celle de page.tsx)
+  // ✅ CORRECTION: Fonction pour obtenir les initiales (corrigée pour gérer les emails)
   const getUserInitials = (user: any): string => {
     if (!user) return 'U'
 
-    // Essayer depuis le nom complet
+    // Vérifier si user.name est un email (contient @)
+    if (user.name && user.name.includes('@')) {
+      // Traiter comme un email
+      const emailPart = user.name.split('@')[0]
+      if (emailPart.includes('.')) {
+        const parts = emailPart.split('.')
+        return (parts[0][0] + parts[1][0]).toUpperCase()
+      }
+      return emailPart.substring(0, 2).toUpperCase()
+    }
+
+    // Essayer depuis le nom complet (si ce n'est pas un email)
     if (user.name) {
       const names = user.name.trim().split(' ')
       if (names.length >= 2) {
@@ -49,18 +60,21 @@ export const UserMenuButton = () => {
   const userInitials = getUserInitials(user)
   
   // DEBUG - à supprimer après diagnostic
-  console.log('DEBUG UserMenu:', {
-    user_name: user?.name,
-    user_email: user?.email,
-    calculated_initials: userInitials,
-    user_object: user,
-    // Test de la logique étape par étape
-    has_name: !!user?.name,
-    name_split: user?.name ? user.name.trim().split(' ') : null,
-    name_length: user?.name ? user.name.trim().split(' ').length : 0,
-    first_char: user?.name ? user.name.trim().split(' ')[0][0] : null,
-    last_char: user?.name && user.name.trim().split(' ').length >= 2 ? user.name.trim().split(' ')[user.name.trim().split(' ').length - 1][0] : null
-  })
+  console.log('=== DEBUG UserMenu ===')
+  console.log('user?.name:', user?.name)
+  console.log('user?.email:', user?.email)
+  console.log('calculated_initials:', userInitials)
+  console.log('has_name:', !!user?.name)
+  if (user?.name) {
+    const names = user.name.trim().split(' ')
+    console.log('name_split:', names)
+    console.log('name_length:', names.length)
+    console.log('first_char:', names[0][0])
+    if (names.length >= 2) {
+      console.log('last_char:', names[names.length - 1][0])
+    }
+  }
+  console.log('===================')
   
   // ✅ RESTAURÉ: Variables de plan
   const currentPlan = user?.plan || 'essential'
