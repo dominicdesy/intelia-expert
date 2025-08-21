@@ -150,12 +150,43 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
     try {
       console.log('🔐 [Password] Appel à l\'API backend pour changement mot de passe')
       
+      // 🔍 DEBUG: Récupérer le token depuis les cookies Supabase (solution validée)
+      const getSupabaseToken = () => {
+        // Chercher le cookie Supabase auth token
+        const cookieMatch = document.cookie.match(/sb-[^-]+-auth-token=([^;]+)/);
+        if (cookieMatch) {
+          try {
+            const cookieValue = decodeURIComponent(cookieMatch[1]);
+            const tokenArray = JSON.parse(cookieValue);
+            return tokenArray[0]; // Le JWT est le premier élément
+          } catch (e) {
+            console.error('Erreur parsing cookie Supabase:', e);
+            return null;
+          }
+        }
+        
+        // Fallback: chercher dans localStorage
+        return localStorage.getItem('auth_token') || 
+               localStorage.getItem('access_token') ||
+               localStorage.getItem('token');
+      }
+      
+      const authToken = getSupabaseToken();
+      console.log('🔍 [Password] Token trouvé:', authToken ? `${authToken.substring(0, 50)}...` : 'null')
+      console.log('🔍 [Password] Cookies disponibles:', document.cookie.split('; ').map(c => c.split('=')[0]))
+      
+      if (!authToken) {
+        console.log('❌ [Password] Aucun token trouvé')
+        setPasswordErrors(['Vous devez être connecté pour changer votre mot de passe'])
+        return
+      }
+      
       // ✅ CORRECTION: Utiliser l'API backend au lieu de Supabase direct
       const response = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           current_password: passwordData.currentPassword,
