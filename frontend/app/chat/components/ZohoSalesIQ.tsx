@@ -34,10 +34,18 @@ const CONFIG = {
 // 🛡️ NOUVELLE FONCTION UTILITAIRE SÉCURISÉE pour éviter l'erreur includes
 const hasZohoClass = (element: Element): boolean => {
   try {
-    // Vérification sécurisée avec gestion d'erreurs
-    const classString = typeof element.className === 'string' 
-      ? element.className 
-      : element.className?.toString() || ''
+    // Vérification sécurisée avec gestion d'erreurs TypeScript
+    const className = element.className
+    let classString = ''
+    
+    if (typeof className === 'string') {
+      classString = className
+    } else if (className && typeof className === 'object' && 'toString' in className) {
+      classString = className.toString()
+    } else {
+      // Fallback pour les cas edge
+      classString = String(className || '')
+    }
     
     return classString.includes('zsiq') || classString.includes('siq-')
   } catch (error) {
@@ -274,13 +282,20 @@ export const ZohoSalesIQ: React.FC<ZohoSalesIQProps> = ({ user, language }) => {
       const interactiveElements = document.querySelectorAll('#zsiq_float [role="button"], .siqico-close, [class*="zsiq"][onclick]')
       interactiveElements.forEach(element => {
         if (!element.getAttribute('aria-label') && !element.getAttribute('aria-labelledby')) {
-          // 🛡️ CORRECTION : Utiliser la fonction sécurisée pour className
+          // ✅ CORRECTION : Utiliser la fonction sécurisée pour className
           let label = 'Élément interactif du chat'
           
           try {
-            const classString = typeof element.className === 'string' 
-              ? element.className 
-              : element.className?.toString() || ''
+            const className = element.className
+            let classString = ''
+            
+            if (typeof className === 'string') {
+              classString = className
+            } else if (className && typeof className === 'object' && 'toString' in className) {
+              classString = className.toString()
+            } else {
+              classString = String(className || '')
+            }
             
             if (classString.includes('close')) {
               label = 'Fermer le chat'
