@@ -508,16 +508,6 @@ except ImportError as e:
         logger.info("✅ Invitations router ajouté")
     except ImportError as e:
         logger.warning(f"⚠️ Invitations router non disponible: {e}")
-
-
-# 🆕 NOUVEAU: Router auth invitations
-    try:
-        from app.api.v1.auth_invitations import router as auth_invitations_router
-        temp_v1_router.include_router(auth_invitations_router, tags=["auth-invitations"])
-        logger.info("✅ Auth invitations router ajouté")
-    except ImportError as e:
-        logger.warning(f"⚠️ Auth invitations router non disponible: {e}")
-
     
     try:
         from app.api.v1.logging import router as logging_router
