@@ -288,35 +288,81 @@ export const StatisticsPage: React.FC = () => {
     }
   }, [authStatus, activeTab])
 
-  // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE)
+  // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE AVEC COOKIES)
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
       console.log('🔐 getAuthHeaders: Début...')
-      // Changement: Utiliser le singleton au lieu de createClientComponentClient
-      const supabase = getSupabaseClient()
-      console.log('🔐 getAuthHeaders: Supabase client récupéré')
       
-      const { data: { session }, error } = await supabase.auth.getSession()
-      console.log('🔐 getAuthHeaders: Session récupérée:', { 
-        hasSession: !!session, 
-        hasError: !!error,
-        hasAccessToken: !!session?.access_token 
-      })
-      
-      if (error || !session) {
-        console.error('❌ Erreur recuperation session (singleton):', error)
-        return {}
+      // SOLUTION 1: Essayer Supabase getSession() d'abord
+      try {
+        const supabase = getSupabaseClient()
+        console.log('🔐 getAuthHeaders: Supabase client récupéré')
+        
+        console.log('🔐 getAuthHeaders: Tentative getSession()...')
+        const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('🔐 getAuthHeaders: Session récupérée:', { 
+          hasSession: !!session, 
+          hasError: !!error,
+          hasAccessToken: !!session?.access_token,
+          errorMessage: error?.message
+        })
+        
+        if (session?.access_token && !error) {
+          console.log('✅ Token trouvé via Supabase getSession()')
+          return {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      } catch (supabaseError) {
+        console.log('⚠️ Supabase getSession() échoué, essai cookies...')
       }
       
-      const headers = {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
+      // SOLUTION 2: Fallback vers les cookies (solution éprouvée)
+      console.log('🍪 Tentative récupération token depuis cookies...')
+      const cookieToken = getCookieToken()
+      if (cookieToken) {
+        console.log('✅ Token trouvé dans cookies')
+        return {
+          'Authorization': `Bearer ${cookieToken}`,
+          'Content-Type': 'application/json'
+        }
       }
-      console.log('✅ Headers construits avec succès')
-      return headers
-    } catch (error) {
-      console.error('❌ Erreur getAuthHeaders (singleton):', error)
+      
+      console.error('❌ Aucun token trouvé (ni Supabase ni cookies)')
       return {}
+      
+    } catch (error) {
+      console.error('❌ Erreur getAuthHeaders:', error)
+      return {}
+    }
+  }
+
+  // FONCTION HELPER POUR EXTRAIRE LE TOKEN DES COOKIES (de vos conversations précédentes)
+  const getCookieToken = (): string | null => {
+    try {
+      const cookies = document.cookie.split(';')
+      const sbCookie = cookies.find(cookie => 
+        cookie.trim().startsWith('sb-cdrmjshmkdfwwtsfdvbl-auth-token=')
+      )
+      
+      if (sbCookie) {
+        const cookieValue = sbCookie.split('=')[1]
+        const decodedValue = decodeURIComponent(cookieValue)
+        const parsed = JSON.parse(decodedValue)
+        
+        // Le token est dans parsed.access_token
+        if (parsed && parsed.access_token) {
+          console.log('🍪 Token extrait des cookies avec succès')
+          return parsed.access_token
+        }
+      }
+      
+      console.log('🍪 Pas de cookie Supabase trouvé')
+      return null
+    } catch (error) {
+      console.error('❌ Erreur parsing cookie:', error)
+      return null
     }
   }
 

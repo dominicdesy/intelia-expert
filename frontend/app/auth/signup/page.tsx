@@ -6,355 +6,28 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth'
 import type { Language, User } from '@/types'
 
-// ==================== GESTION DES PAYS AVEC FALLBACK ====================
-const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
-]
+// Import des hooks et utilitaires
+import { 
+  useCountries, 
+  useCountryCodeMap, 
+  translations, 
+  validateEmail, 
+  validatePassword, 
+  validatePhone, 
+  rememberMeUtils 
+} from './page_hooks'
 
-// Interface pour les pays
-interface Country {
-  value: string
-  label: string
-  phoneCode: string
-  flag?: string
-}
-
-// Hook personnalisé pour charger les pays avec fallback
-const useCountries = () => {
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(true) // Démarrer en fallback
-
-  useEffect(() => {
-    const fetchCountries = async () => {
-      try {
-        console.log('🌍 [Countries] Tentative de chargement depuis l\'API REST Countries...')
-        
-        // Essayer de charger depuis l'API REST Countries
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
-          headers: {
-            'Accept': 'application/json',
-          }
-        })
-        
-        if (!response.ok) {
-          throw new Error(`API indisponible: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
-        
-        const formattedCountries = data
-          .map((country: any) => ({
-            value: country.cca2,
-            label: country.translations?.fra?.common || country.name.common,
-            phoneCode: country.idd?.root + (country.idd?.suffixes?.[0] || ''),
-            flag: country.flag
-          }))
-          .filter((country: Country) => {
-            // ✅ VALIDATION ROBUSTE
-            const hasValidCode = country.phoneCode && 
-                                country.phoneCode !== 'undefined' && 
-                                country.phoneCode !== 'null' &&
-                                country.phoneCode.length > 1 &&
-                                country.phoneCode.startsWith('+')
-            return hasValidCode && country.value && country.label
-          })
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
-        
-        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
-        
-        // ✅ SEUIL DE QUALITÉ : Au moins 50 pays pour considérer l'API comme valide
-        if (formattedCountries.length >= 50) {
-          console.log('🌍 [Countries] API validée, utilisation des données')
-          setCountries(formattedCountries)
-          setUsingFallback(false)
-        } else {
-          throw new Error(`Pas assez de pays valides: ${formattedCountries.length}/50 minimum`)
-        }
-        
-      } catch (err) {
-        console.warn('⚠️ [Countries] Échec API, utilisation de la liste de fallback:', err)
-        setCountries(fallbackCountries)
-        setUsingFallback(true)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    const timer = setTimeout(fetchCountries, 100)
-    return () => clearTimeout(timer)
-  }, [])
-
-  return { countries, loading, usingFallback }
-}
-
-const translations = {
-  fr: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Mot de passe',
-    confirmPassword: 'Confirmer le mot de passe',
-    login: 'Se connecter',
-    signup: 'Créer un compte',
-    rememberMe: 'Se souvenir de mon email',
-    forgotPassword: 'Mot de passe oublié ?',
-    newToIntelia: 'Nouveau sur Intelia ?',
-    connecting: 'Connexion en cours...',
-    creating: 'Création en cours...',
-    loginError: 'Erreur de connexion',
-    signupError: 'Erreur de création',
-    emailRequired: 'L\'adresse email est requise',
-    emailInvalid: 'Veuillez entrer une adresse email valide',
-    passwordRequired: 'Le mot de passe est requis',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial',
-    passwordMismatch: 'Les mots de passe ne correspondent pas',
-    firstNameRequired: 'Le prénom est requis',
-    lastNameRequired: 'Le nom de famille est requis',
-    countryRequired: 'Le pays est requis',
-    phoneInvalid: 'Format de téléphone invalide',
-    terms: 'conditions d\'utilisation',
-    privacy: 'politique de confidentialité',
-    gdprNotice: 'En vous connectant, vous acceptez nos',
-    needHelp: 'Besoin d\'aide ?',
-    contactSupport: 'Contactez le support',
-    createAccount: 'Créer un compte',
-    backToLogin: 'Retour à la connexion',
-    confirmationSent: 'Email de confirmation envoyé ! Vérifiez votre boîte mail.',
-    accountCreated: 'Compte créé avec succès ! Vérifiez vos emails pour confirmer votre compte.',
-    personalInfo: 'Informations personnelles',
-    firstName: 'Prénom',
-    lastName: 'Nom de famille',
-    linkedinProfile: 'Profil LinkedIn personnel',
-    contact: 'Contact',
-    country: 'Pays',
-    countryCode: 'Indicatif pays',
-    areaCode: 'Indicatif régional',
-    phoneNumber: 'Numéro de téléphone',
-    company: 'Entreprise',
-    companyName: 'Nom de l\'entreprise',
-    companyWebsite: 'Site web de l\'entreprise',
-    companyLinkedin: 'Page LinkedIn de l\'entreprise',
-    optional: '(optionnel)',
-    required: '*',
-    close: 'Fermer',
-    alreadyHaveAccount: 'Déjà un compte ?',
-    authSuccess: 'Connexion réussie !',
-    authError: 'Erreur de connexion, veuillez réessayer.',
-    authIncomplete: 'Connexion incomplète, veuillez réessayer.',
-    sessionCleared: 'Session précédente effacée',
-    forceLogout: 'Déconnexion automatique',
-    loadingCountries: 'Chargement des pays...',
-    limitedCountryList: 'Liste de pays limitée (connexion internet limitée)',
-    selectCountry: 'Sélectionner un pays...'
-  },
-  en: {
-    title: 'Intelia Expert',
-    email: 'Email',
-    password: 'Password',
-    confirmPassword: 'Confirm password',
-    login: 'Sign in',
-    signup: 'Create account',
-    rememberMe: 'Remember my email',
-    forgotPassword: 'Forgot password?',
-    newToIntelia: 'New to Intelia?',
-    connecting: 'Connecting...',
-    creating: 'Creating...',
-    loginError: 'Login error',
-    signupError: 'Signup error',
-    emailRequired: 'Email address is required',
-    emailInvalid: 'Please enter a valid email address',
-    passwordRequired: 'Password is required',
-    passwordTooShort: 'Password must contain at least 8 characters, one uppercase, one lowercase, one number and one special character',
-    passwordMismatch: 'Passwords do not match',
-    firstNameRequired: 'First name is required',
-    lastNameRequired: 'Last name is required',
-    countryRequired: 'Country is required',
-    phoneInvalid: 'Invalid phone format',
-    terms: 'terms of service',
-    privacy: 'privacy policy',
-    gdprNotice: 'By signing in, you agree to our',
-    needHelp: 'Need help?',
-    contactSupport: 'Contact support',
-    createAccount: 'Create account',
-    backToLogin: 'Back to login',
-    confirmationSent: 'Confirmation email sent! Check your mailbox.',
-    accountCreated: 'Account created successfully! Check your emails to confirm your account.',
-    personalInfo: 'Personal information',
-    firstName: 'First name',
-    lastName: 'Last name',
-    linkedinProfile: 'Personal LinkedIn profile',
-    contact: 'Contact',
-    country: 'Country',
-    countryCode: 'Country code',
-    areaCode: 'Area code',
-    phoneNumber: 'Phone number',
-    company: 'Company',
-    companyName: 'Company name',
-    companyWebsite: 'Company website',
-    companyLinkedin: 'Company LinkedIn page',
-    optional: '(optional)',
-    required: '*',
-    close: 'Close',
-    alreadyHaveAccount: 'Already have an account?',
-    authSuccess: 'Login successful!',
-    authError: 'Login error, please try again.',
-    authIncomplete: 'Incomplete login, please try again.',
-    sessionCleared: 'Previous session cleared',
-    forceLogout: 'Automatic logout',
-    loadingCountries: 'Loading countries...',
-    limitedCountryList: 'Limited country list (limited internet connection)',
-    selectCountry: 'Select a country...'
-  }
-}
-
-const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
-  <img 
-    src="/images/favicon.png" 
-    alt="Intelia Logo" 
-    className={className}
-  />
-)
-
-const LanguageSelector = ({ onLanguageChange, currentLanguage }: { 
-  onLanguageChange: (lang: Language) => void
-  currentLanguage: Language 
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const languages = [
-    { code: 'fr' as Language, name: 'Français', flag: '🇫🇷' },
-    { code: 'en' as Language, name: 'English', flag: '🇺🇸' },
-    { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
-    { code: 'de' as Language, name: 'Deutsch', flag: '🇩🇪' }
-  ]
-
-  const currentLang = languages.find(lang => lang.code === currentLanguage)
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-      >
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-        </svg>
-        <span>{currentLang?.name}</span>
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => {
-                  onLanguageChange(lang.code)
-                  setIsOpen(false)
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
-                  lang.code === currentLanguage ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                } first:rounded-t-lg last:rounded-b-lg transition-colors`}
-              >
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-// Fonctions de validation
-const validateEmail = (email: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-// Validation mot de passe corrigée
-const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = []
-  
-  if (password.length < 8) {
-    errors.push('Au moins 8 caractères')
-  }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Une majuscule')
-  }
-  if (!/[a-z]/.test(password)) {
-    errors.push('Une minuscule')
-  }
-  if (!/[0-9]/.test(password)) {
-    errors.push('Un chiffre')
-  }
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Un caractère spécial')
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
-}
-
-// Validation téléphone améliorée
-const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
-  // Si tous les champs sont vides, c'est valide (optionnel)
-  if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
-    return true
-  }
-  
-  // Si au moins un champ est rempli, tous doivent être remplis et valides
-  if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
-    // Vérifier que tous les champs sont remplis
-    if (!countryCode.trim() || !areaCode.trim() || !phoneNumber.trim()) {
-      return false
-    }
-    
-    // Vérifier le format de chaque champ
-    if (!/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
-      return false
-    }
-    
-    if (!/^\d{3}$/.test(areaCode.trim())) {
-      return false
-    }
-    
-    if (!/^\d{7}$/.test(phoneNumber.trim())) {
-      return false
-    }
-  }
-  
-  return true
-}
+// Import des composants
+import { 
+  InteliaLogo, 
+  LanguageSelector, 
+  CountrySelector, 
+  AlertMessage, 
+  PasswordInput, 
+  PasswordMatchIndicator, 
+  LoadingSpinner, 
+  AuthFooter 
+} from './page_components'
 
 // Contenu principal de la page
 function PageContent() {
@@ -369,12 +42,7 @@ function PageContent() {
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
   
   // Créer le mapping des codes téléphoniques dynamiquement
-  const countryCodeMap = useMemo(() => {
-    return countries.reduce((acc, country) => {
-      acc[country.value] = country.phoneCode
-      return acc
-    }, {} as Record<string, string>)
-  }, [countries])
+  const countryCodeMap = useCountryCodeMap(countries)
 
   // Refs pour éviter les doubles appels
   const hasInitialized = useRef(false)
@@ -411,49 +79,6 @@ function PageContent() {
     companyLinkedin: ''
   })
 
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const passwordInputRef = useRef<HTMLInputElement>(null)
-
-  // Fonctions utilitaires
-  const rememberMeUtils = {
-    save: (email: string, remember: boolean) => {
-      try {
-        if (remember && email) {
-          localStorage.setItem('intelia_remember_email', email)
-          localStorage.setItem('intelia_remember_flag', 'true')
-          console.log('📄 [Init] Remember me sauvegardé:', { email, remember })
-        } else {
-          localStorage.removeItem('intelia_remember_email')
-          localStorage.removeItem('intelia_remember_flag')
-          console.log('📄 [Init] Remember me effacé')
-        }
-      } catch (error) {
-        console.warn('⚠️ [Init] Erreur sauvegarde remember me:', error)
-      }
-    },
-
-    load: () => {
-      try {
-        const savedEmail = localStorage.getItem('intelia_remember_email') || ''
-        const rememberFlag = localStorage.getItem('intelia_remember_flag') === 'true'
-        const hasRememberedEmail = !!(savedEmail && rememberFlag)
-        
-        const result = {
-          rememberMe: rememberFlag,
-          lastEmail: savedEmail,
-          hasRememberedEmail
-        }
-        
-        console.log('📄 [Init] Chargement remember me:', result)
-        return result
-      } catch (error) {
-        console.warn('⚠️ [Init] Erreur chargement remember me:', error)
-        return { rememberMe: false, lastEmail: '', hasRememberedEmail: false }
-      }
-    }
-  }
-
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current) {
       console.log('🔒 [Redirect] Redirection déjà en cours, skip')
@@ -483,6 +108,7 @@ function PageContent() {
       
       // Auto-remplir l'indicatif pays quand le pays change
       if (field === 'country' && value && countryCodeMap[value]) {
+        console.log('🏳️ [Country] Auto-remplissage code pays:', value, '->', countryCodeMap[value])
         newData.countryCode = countryCodeMap[value]
       }
       
@@ -535,7 +161,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📄 [Login] Tentative connexion...')
+      console.log('🔄 [Login] Tentative connexion...')
       
       await login(loginData.email, loginData.password)
       
@@ -569,7 +195,7 @@ function PageContent() {
     }
 
     try {
-      console.log('📄 [Signup] Tentative création compte...')
+      console.log('🔄 [Signup] Tentative création compte...')
       
       const userData = {
         email: signupData.email,
@@ -640,7 +266,7 @@ function PageContent() {
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
-      console.log('📄 [Session] Initialisation unique de la session')
+      console.log('🔄 [Session] Initialisation unique de la session')
       initializeSession()
     }
   }, [hasHydrated, initializeSession])
@@ -663,15 +289,7 @@ function PageContent() {
 
   // Affichage loading pendant l'hydratation
   if (!hasHydrated || isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
@@ -692,7 +310,7 @@ function PageContent() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
           
-          {/* Statut du chargement des pays - ✅ ALERTE CONDITIONNELLE */}
+          {/* Statut du chargement des pays */}
           {usingFallback && !countriesLoading && isSignupMode && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center space-x-2">
@@ -708,40 +326,19 @@ function PageContent() {
 
           {/* Messages d'erreur et succès */}
           {localError && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {isSignupMode ? t.signupError : t.loginError}
-                  </h3>
-                  <div className="mt-1 text-sm text-red-700">
-                    {localError}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AlertMessage 
+              type="error" 
+              title={isSignupMode ? t.signupError : t.loginError} 
+              message={localError} 
+            />
           )}
 
           {localSuccess && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm text-green-700">
-                    {localSuccess}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AlertMessage 
+              type="success" 
+              title="" 
+              message={localSuccess} 
+            />
           )}
 
           {/* FORMULAIRE DE CONNEXION */}
@@ -770,34 +367,15 @@ function PageContent() {
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                     {t.password}
                   </label>
-                  <div className="mt-1 relative">
-                    <input
+                  <div className="mt-1">
+                    <PasswordInput
                       id="password"
                       name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      required
-                      ref={passwordInputRef}
                       value={loginData.password}
                       onChange={(e) => handleLoginChange('password', e.target.value)}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      autoComplete="current-password"
+                      required
                     />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
                   </div>
                 </div>
 
@@ -904,33 +482,14 @@ function PageContent() {
                   </div>
 
                   {/* Sélection pays améliorée */}
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t.country} <span className="text-red-500">{t.required}</span>
-                    </label>
-                    {countriesLoading ? (
-                      <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-sm text-gray-600">{t.loadingCountries}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <select
-                        required
-                        value={signupData.country}
-                        onChange={(e) => handleSignupChange('country', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      >
-                        <option value="">{t.selectCountry}</option>
-                        {countries.map(country => (
-                          <option key={country.value} value={country.value}>
-                            {country.flag} {country.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                  <CountrySelector
+                    countries={countries}
+                    countriesLoading={countriesLoading}
+                    usingFallback={usingFallback}
+                    value={signupData.country}
+                    onChange={(value) => handleSignupChange('country', value)}
+                    t={t}
+                  />
 
                   {/* Téléphone optionnel */}
                   <div className="mt-4">
@@ -1021,30 +580,12 @@ function PageContent() {
                     <label className="block text-sm font-medium text-gray-700">
                       {t.password} <span className="text-red-500">{t.required}</span>
                     </label>
-                    <div className="mt-1 relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        required
+                    <div className="mt-1">
+                      <PasswordInput
                         value={signupData.password}
                         onChange={(e) => handleSignupChange('password', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        required
                       />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
                     </div>
                   </div>
 
@@ -1052,53 +593,20 @@ function PageContent() {
                     <label className="block text-sm font-medium text-gray-700">
                       {t.confirmPassword} <span className="text-red-500">{t.required}</span>
                     </label>
-                    <div className="mt-1 relative">
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        required
+                    <div className="mt-1">
+                      <PasswordInput
                         value={signupData.confirmPassword}
                         onChange={(e) => handleSignupChange('confirmPassword', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        required
                       />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? (
-                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
                     </div>
                   </div>
 
                   {/* Indicateur de correspondance des mots de passe */}
-                  {signupData.password && signupData.confirmPassword && (
-                    <div className="mt-2 text-xs">
-                      {signupData.confirmPassword === signupData.password ? (
-                        <span className="text-green-600 flex items-center">
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Les mots de passe correspondent
-                        </span>
-                      ) : (
-                        <span className="text-red-600 flex items-center">
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          Les mots de passe ne correspondent pas
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <PasswordMatchIndicator 
+                    password={signupData.password} 
+                    confirmPassword={signupData.confirmPassword} 
+                  />
                 </div>
 
                 <div>
@@ -1144,18 +652,7 @@ function PageContent() {
           </div>
 
           {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              {t.gdprNotice}{' '}
-              <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-                {t.terms}
-              </Link>
-              {' '}et notre{' '}
-              <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
-                {t.privacy}
-              </Link>
-            </p>
-          </div>
+          <AuthFooter t={t} />
         </div>
       </div>
     </div>
@@ -1165,19 +662,7 @@ function PageContent() {
 // Export principal avec Suspense
 export default function Page() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src="/images/favicon.png" 
-            alt="Intelia Logo" 
-            className="w-16 h-16 mx-auto mb-4"
-          />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
     </Suspense>
   )
