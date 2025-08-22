@@ -154,7 +154,7 @@ export default function ChatInterface() {
     }
   }
 
-  // FONCTION CORRIGÉE : Redirection intelligente vers login
+  // NOUVELLE FONCTION : Redirection intelligente vers login
   const handleRedirectToLogin = useCallback((reason: string = 'Session expirée') => {
     console.log('🔄 [Auth] Redirection vers login:', reason)
     
@@ -162,21 +162,11 @@ export default function ChatInterface() {
     if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current)
     if (authCheckTimeoutRef.current) clearTimeout(authCheckTimeoutRef.current)
     
-    // Méthode 1: Tentative avec Next.js router
+    // Utiliser router au lieu de window.location pour éviter les boucles
     try {
-      console.log('🔄 [Auth] Tentative redirection via router')
-      router.push('/')
-      
-      // Fallback de sécurité au cas où router.push ne fonctionne pas
-      setTimeout(() => {
-        if (window.location.pathname === '/chat') {
-          console.log('🔄 [Auth] Router.push a échoué, utilisation window.location')
-          window.location.href = '/'
-        }
-      }, 1000)
-      
+      router.replace('/') // Plus propre que window.location
     } catch (error) {
-      console.error('🔧 [Auth] Erreur redirection router, fallback immédiat')
+      console.error('🔧 [Auth] Erreur redirection router, fallback window.location')
       window.location.href = '/'
     }
   }, [router])
@@ -450,7 +440,7 @@ export default function ChatInterface() {
     }
   }
 
-  // ✅ NOUVEAU useEffect simplifié pour auth backend - CORRIGÉ POUR DÉCONNEXION
+  // ✅ NOUVEAU useEffect simplifiﾃｩ pour auth backend - CORRIGÉ POUR DÉCONNEXION
   useEffect(() => {
     // Initialiser la session une seule fois au montage
     const initAuth = async () => {

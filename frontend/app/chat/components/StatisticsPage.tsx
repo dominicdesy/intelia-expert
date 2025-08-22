@@ -291,21 +291,31 @@ export const StatisticsPage: React.FC = () => {
   // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE)
   const getAuthHeaders = async () => {
     try {
+      console.log('🔐 getAuthHeaders: Début...')
       // Changement: Utiliser le singleton au lieu de createClientComponentClient
       const supabase = getSupabaseClient()
+      console.log('🔐 getAuthHeaders: Supabase client récupéré')
+      
       const { data: { session }, error } = await supabase.auth.getSession()
+      console.log('🔐 getAuthHeaders: Session récupérée:', { 
+        hasSession: !!session, 
+        hasError: !!error,
+        hasAccessToken: !!session?.access_token 
+      })
       
       if (error || !session) {
-        console.error('Erreur recuperation session (singleton):', error)
+        console.error('❌ Erreur recuperation session (singleton):', error)
         return {}
       }
       
-      return {
+      const headers = {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
       }
+      console.log('✅ Headers construits avec succès')
+      return headers
     } catch (error) {
-      console.error('Erreur getAuthHeaders (singleton):', error)
+      console.error('❌ Erreur getAuthHeaders (singleton):', error)
       return {}
     }
   }
@@ -329,17 +339,20 @@ export const StatisticsPage: React.FC = () => {
       console.log('🔐 Headers récupérés:', Object.keys(headers)) // Ne pas logger le token complet
       
       if (!headers.Authorization) {
+        console.error('❌ Pas de token d\'authentification disponible')
         throw new Error('Pas de token d\'authentification disponible')
       }
 
       console.log('📡 Tentative fetch vers /api/v1/invitations/stats/global-enhanced')
-
+      
       // UTILISER LE NOUVEL ENDPOINT ENRICHI
       const enhancedStatsRes = await fetch('/api/v1/invitations/stats/global-enhanced', { headers })
       
       console.log('📡 Réponse reçue, status:', enhancedStatsRes.status)
+      console.log('📡 Réponse headers:', enhancedStatsRes.headers)
       
       if (!enhancedStatsRes.ok) {
+        console.log('⚠️ Endpoint enrichi échoué, tentative fallback...')
         // Fallback vers l'endpoint simple si l'enrichi n'existe pas encore
         console.log('Endpoint enrichi non disponible, utilisation endpoint simple...')
         const globalStatsRes = await fetch('/api/v1/invitations/stats/global', { headers })
@@ -347,6 +360,7 @@ export const StatisticsPage: React.FC = () => {
         console.log('📡 Fallback endpoint, status:', globalStatsRes.status)
         
         if (!globalStatsRes.ok) {
+          console.error('❌ Tous les endpoints échouent:', globalStatsRes.status)
           throw new Error(`Erreur stats globales: ${globalStatsRes.status}`)
         }
 

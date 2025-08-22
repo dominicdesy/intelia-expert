@@ -46,9 +46,7 @@ const useCountries = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        // ✅ OPTION 1: Essayer l'API REST Countries
-        // Note: Nécessite que restcountries.com soit autorisé dans la CSP
-        console.log('🌍 [Countries] Tentative de chargement via API REST Countries...')
+        console.log('🌍 [UserInfoModal Countries] Tentative de chargement via API REST Countries...')
         
         const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
           headers: {
@@ -61,7 +59,7 @@ const useCountries = () => {
         }
         
         const data = await response.json()
-        console.log('🌍 [Countries] Données reçues:', data.length, 'pays')
+        console.log('🌍 [UserInfoModal Countries] Données reçues:', data.length, 'pays')
         
         const formattedCountries = data
           .map((country: any) => {
@@ -84,23 +82,25 @@ const useCountries = () => {
           })
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
-        console.log('🌍 [Countries] Pays formatés:', formattedCountries.length, 'pays valides')
+        console.log('🌍 [UserInfoModal Countries] Pays formatés:', formattedCountries.length, 'pays valides')
         
-        if (formattedCountries.length >= 50) { // Au moins 50 pays pour considérer que l'API fonctionne bien
+        if (formattedCountries.length >= 50) {
+          console.log('✅ [UserInfoModal Countries] Mise à jour de la liste des pays...')
           setCountries(formattedCountries)
           setUsingFallback(false)
-          console.log('✅ [Countries] API REST Countries utilisée avec succès')
+          console.log('✅ [UserInfoModal Countries] API REST Countries utilisée avec succès')
         } else {
-          console.warn('⚠️ [Countries] Peu de pays reçus, utilisation du fallback')
+          console.warn('⚠️ [UserInfoModal Countries] Peu de pays reçus, utilisation du fallback')
           throw new Error('Données insuffisantes')
         }
         
       } catch (err) {
-        console.warn('⚠️ [Countries] API REST Countries bloquée par CSP, utilisation du fallback:', err)
-        console.info('💡 [Countries] Pour utiliser l\'API complète, ajoutez https://restcountries.com à votre CSP')
+        console.warn('⚠️ [UserInfoModal Countries] API REST Countries bloquée par CSP, utilisation du fallback:', err)
+        console.info('💡 [UserInfoModal Countries] Pour utiliser l\'API complète, ajoutez https://restcountries.com à votre CSP')
         setCountries(fallbackCountries)
         setUsingFallback(true)
       } finally {
+        console.log('🏁 [UserInfoModal Countries] Fin du chargement, setLoading(false)')
         setLoading(false)
       }
     }
@@ -499,18 +499,26 @@ export const UserInfoModal = ({ user, onClose }: UserInfoModalProps) => {
                           </div>
                         </div>
                       ) : (
-                        <select
-                          value={formData.country}
-                          onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        >
-                          <option value="">Sélectionner un pays</option>
-                          {countries.map(country => (
-                            <option key={country.value} value={country.value}>
-                              {country.flag} {country.label}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          {/* Debug info - peut être supprimé en production */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <div className="text-xs text-gray-500 mb-2">
+                              Debug: {countries.length} pays disponibles, Loading: {countriesLoading.toString()}, Fallback: {usingFallback.toString()}
+                            </div>
+                          )}
+                          <select
+                            value={formData.country}
+                            onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                          >
+                            <option value="">Sélectionner un pays</option>
+                            {countries.map(country => (
+                              <option key={country.value} value={country.value}>
+                                {country.flag} {country.label}
+                              </option>
+                            ))}
+                          </select>
+                        </>
                       )}
                     </div>
                   </div>

@@ -593,14 +593,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
               {/* Boutons d'action */}
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={onClose}
-                  className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
-                  disabled={isLoading}
-                >
-                  Annuler
-                </button>
-
                 {/* Bouton d'envoi (seulement si pas de résultats) */}
                 {!results && (
                   <button
