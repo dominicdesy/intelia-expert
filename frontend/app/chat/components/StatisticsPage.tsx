@@ -289,7 +289,7 @@ export const StatisticsPage: React.FC = () => {
   }, [authStatus, activeTab])
 
   // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE)
-  const getAuthHeaders = async () => {
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
       console.log('🔐 getAuthHeaders: Début...')
       // Changement: Utiliser le singleton au lieu de createClientComponentClient
@@ -338,7 +338,7 @@ export const StatisticsPage: React.FC = () => {
       const headers = await getAuthHeaders()
       console.log('🔐 Headers récupérés:', Object.keys(headers)) // Ne pas logger le token complet
       
-      if (!headers || !('Authorization' in headers)) {
+      if (!headers || !('Authorization' in headers) || !headers.Authorization) {
         console.error('❌ Pas de token d\'authentification disponible')
         throw new Error('Pas de token d\'authentification disponible')
       }
@@ -928,7 +928,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  const getFeedbackIcon = (feedback: number | null) => {
+  const getFeedbackIcon = (feedback: number | null): string => {
     if (feedback === 1) return '👍'
     if (feedback === -1) return '👎'
     return '❓'
