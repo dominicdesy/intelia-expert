@@ -46,7 +46,10 @@ const useCountries = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        // Essayer de charger depuis l'API REST Countries
+        // ✅ OPTION 1: Essayer l'API REST Countries
+        // Note: Nécessite que restcountries.com soit autorisé dans la CSP
+        console.log('🌍 [Countries] Tentative de chargement via API REST Countries...')
+        
         const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
           headers: {
             'Accept': 'application/json',
@@ -93,7 +96,8 @@ const useCountries = () => {
         }
         
       } catch (err) {
-        console.warn('⚠️ [Countries] Erreur API, utilisation du fallback:', err)
+        console.warn('⚠️ [Countries] API REST Countries bloquée par CSP, utilisation du fallback:', err)
+        console.info('💡 [Countries] Pour utiliser l\'API complète, ajoutez https://restcountries.com à votre CSP')
         setCountries(fallbackCountries)
         setUsingFallback(true)
       } finally {
@@ -513,13 +517,17 @@ function InvitationAcceptPageContent() {
   }
 
   const handleFormSubmit = async () => {
+    console.log('🔧 [InvitationAccept] Début handleFormSubmit')
+    
     const validationErrors = validateForm()
     
     if (validationErrors.length > 0) {
+      console.log('❌ [InvitationAccept] Erreurs de validation:', validationErrors)
       setErrors(validationErrors)
       return
     }
     
+    console.log('✅ [InvitationAccept] Validation formulaire passée')
     setIsProcessing(true)
     setErrors([])
     
@@ -529,6 +537,9 @@ function InvitationAcceptPageContent() {
       if (!userInfo?.accessToken) {
         throw new Error('Token d\'accès manquant')
       }
+      
+      console.log('🔍 [InvitationAccept] UserInfo présent:', !!userInfo)
+      console.log('🔍 [InvitationAccept] AccessToken présent:', !!userInfo.accessToken)
       
       // ✅ CORRIGÉ: Structure de données alignée avec le backend
       const requestBody = {
@@ -547,7 +558,7 @@ function InvitationAcceptPageContent() {
         password: formData.password
       }
       
-      console.log('🔧 [InvitationAccept] Envoi des données:', {
+      console.log('🔧 [InvitationAccept] Données à envoyer:', {
         ...requestBody,
         password: '[HIDDEN]',
         access_token: '[HIDDEN]'
@@ -555,6 +566,8 @@ function InvitationAcceptPageContent() {
       
       // ✅ CORRIGÉ: Utiliser les variables d'environnement
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL
+      console.log('🌐 [InvitationAccept] API_BASE_URL:', API_BASE_URL)
+      
       const completeResponse = await fetch(`${API_BASE_URL}/v1/auth/invitations/complete-profile`, {
         method: 'POST',
         headers: {
@@ -563,8 +576,11 @@ function InvitationAcceptPageContent() {
         body: JSON.stringify(requestBody)
       })
       
+      console.log('📡 [InvitationAccept] Réponse reçue:', completeResponse.status, completeResponse.statusText)
+      
       if (!completeResponse.ok) {
         const errorData = await completeResponse.json()
+        console.error('❌ [InvitationAccept] Erreur de réponse:', errorData)
         setProcessingResult({
           success: false,
           step: 'completion',
@@ -575,7 +591,7 @@ function InvitationAcceptPageContent() {
       }
       
       const completionResult = await completeResponse.json()
-      console.log('✅ [InvitationAccept] Profil finalisé avec succès')
+      console.log('✅ [InvitationAccept] Profil finalisé avec succès:', completionResult)
       
       setStatus('success')
       setMessage('Compte créé avec succès !')
@@ -1008,7 +1024,12 @@ function InvitationAcceptPageContent() {
 
                 <button
                   type="button"
-                  onClick={handleFormSubmit}
+                  onClick={() => {
+                    console.log('🖱️ [InvitationAccept] Bouton "Créer mon compte" cliqué')
+                    console.log('🔍 [InvitationAccept] isProcessing:', isProcessing)
+                    console.log('🔍 [InvitationAccept] isFormValid():', isFormValid())
+                    handleFormSubmit()
+                  }}
                   disabled={isProcessing || !isFormValid()}
                   className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
