@@ -1,10 +1,9 @@
-// page_components.tsx - Composants UI pour la page d'authentification avec debug
+// page_components.tsx - Composants UI pour la page d'authentification (nettoyé)
 'use client'
 
 import React, { useState } from 'react'
 import Link from 'next/link'
 import type { Language } from '@/types'
-import type { Country } from './page_hooks'
 
 // Logo Intelia
 export const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
@@ -70,99 +69,6 @@ export const LanguageSelector = ({ onLanguageChange, currentLanguage }: {
             ))}
           </div>
         </>
-      )}
-    </div>
-  )
-}
-
-// Sélecteur de pays amélioré avec debug complet
-export const CountrySelector = ({ 
-  countries, 
-  countriesLoading, 
-  usingFallback, 
-  value, 
-  onChange, 
-  t 
-}: {
-  countries: Country[]
-  countriesLoading: boolean
-  usingFallback: boolean
-  value: string
-  onChange: (value: string) => void
-  t: any
-}) => {
-  return (
-    <div className="mt-4">
-      <label className="block text-sm font-medium text-gray-700">
-        {t.country} <span className="text-red-500">{t.required}</span>
-      </label>
-      
-      {/* Boîte de debug en mode développement AMÉLIORÉE */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-1 mb-2 text-xs bg-blue-50 border border-blue-200 rounded p-3">
-          <div className="font-semibold text-blue-800 mb-2">🔧 Debug Countries API:</div>
-          <div className="grid grid-cols-2 gap-2 text-blue-700">
-            <div>📊 Pays chargés: <span className="font-mono bg-blue-100 px-1 rounded">{countries.length}</span></div>
-            <div>⏳ Loading: <span className="font-mono bg-blue-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
-            <div>🔄 Mode Fallback: <span className="font-mono bg-blue-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
-            <div>🎯 Source: <span className="font-mono bg-blue-100 px-1 rounded">{usingFallback ? 'Liste locale' : 'API REST Countries'}</span></div>
-          </div>
-          {countries.length > 0 && (
-            <div className="mt-2 p-2 bg-blue-100 rounded">
-              <div className="font-semibold text-blue-800">📋 Premier pays:</div>
-              <div className="font-mono text-xs text-blue-700">
-                {countries[0].flag} {countries[0].label} ({countries[0].value}) - {countries[0].phoneCode}
-              </div>
-            </div>
-          )}
-          <div className="mt-2 text-xs text-blue-600">
-            💡 Vérifiez la console pour les logs détaillés
-          </div>
-        </div>
-      )}
-      
-      {countriesLoading ? (
-        <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-gray-600">{t.loadingCountries}</span>
-          </div>
-        </div>
-      ) : (
-        <select
-          required
-          value={value}
-          onChange={(e) => {
-            console.log('🏳️ [Country] Sélection pays:', e.target.value)
-            onChange(e.target.value)
-          }}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-        >
-          <option value="">{t.selectCountry}</option>
-          {countries.length === 0 ? (
-            <option disabled>Aucun pays disponible</option>
-          ) : (
-            countries.map(country => (
-              <option key={country.value} value={country.value}>
-                {country.flag ? `${country.flag} ` : ''}{country.label} ({country.phoneCode})
-              </option>
-            ))
-          )}
-        </select>
-      )}
-      
-      {/* Message d'information si fallback AMÉLIORÉ */}
-      {!countriesLoading && usingFallback && (
-        <div className="mt-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-          ⚠️ Liste de pays limitée - L'API REST Countries n'est pas accessible. Utilisation de {countries.length} pays prédéfinis.
-        </div>
-      )}
-      
-      {/* Message de succès si API fonctionne */}
-      {!countriesLoading && !usingFallback && (
-        <div className="mt-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1">
-          ✅ API REST Countries active - {countries.length} pays chargés avec drapeaux et codes téléphoniques
-        </div>
       )}
     </div>
   )
