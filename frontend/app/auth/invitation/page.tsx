@@ -4,6 +4,27 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+// ==================== CONFIGURATION DES PAYS ====================
+const countries = [
+  { value: 'CA', label: 'Canada' },
+  { value: 'US', label: 'États-Unis' },
+  { value: 'FR', label: 'France' },
+  { value: 'BE', label: 'Belgique' },
+  { value: 'CH', label: 'Suisse' },
+  { value: 'MX', label: 'Mexique' },
+  { value: 'BR', label: 'Brésil' }
+]
+
+const countryCodeMap: { [key: string]: string } = {
+  'CA': '+1',
+  'US': '+1',
+  'FR': '+33',
+  'BE': '+32',
+  'CH': '+41',
+  'MX': '+52',
+  'BR': '+55'
+}
+
 // ==================== VALIDATION ====================
 const validatePassword = (password: string): string[] => {
   const errors: string[] = []
@@ -58,6 +79,77 @@ const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   />
 )
 
+// Interface pour les résultats de traitement
+interface ProcessingResult {
+  success: boolean
+  step: 'validation' | 'completion'
+  message: string
+  details?: any
+}
+
+const ProcessingStatus = ({ result }: { result: ProcessingResult }) => {
+  const getIcon = () => {
+    if (result.success) {
+      return (
+        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      )
+    } else {
+      return (
+        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+      )
+    }
+  }
+
+  const getStepText = () => {
+    switch (result.step) {
+      case 'validation':
+        return result.success ? 'Token d\'invitation validé' : 'Erreur de validation du token'
+      case 'completion':
+        return result.success ? 'Compte créé avec succès' : 'Erreur de création du compte'
+      default:
+        return 'Traitement en cours'
+    }
+  }
+
+  return (
+    <div className="text-center">
+      {getIcon()}
+      <h2 className={`text-lg font-semibold mb-4 ${result.success ? 'text-green-900' : 'text-red-900'}`}>
+        {getStepText()}
+      </h2>
+      
+      <div className={`text-sm mb-4 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
+        {result.message}
+      </div>
+
+      {result.success && result.step === 'completion' && (
+        <div className="text-sm text-gray-600">
+          <p>Redirection vers votre tableau de bord...</p>
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-green-600 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!result.success && (
+        <div className="text-xs text-gray-600">
+          Redirection vers la page de connexion...
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ==================== COMPOSANT PRINCIPAL ====================
 function InvitationAcceptPageContent() {
   const router = useRouter()
@@ -67,6 +159,7 @@ function InvitationAcceptPageContent() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [hasProcessedToken, setHasProcessedToken] = useState(false)
+  const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null)
   
   // États pour le formulaire complet
   const [formData, setFormData] = useState({
@@ -74,15 +167,20 @@ function InvitationAcceptPageContent() {
     password: '',
     confirmPassword: '',
     
-    // Informations personnelles (✅ CORRIGÉ: aligné avec le backend)
-    fullName: '',
-    company: '',
-    jobTitle: '',
+    // Informations personnelles
+    firstName: '',
+    lastName: '',
+    linkedinProfile: '',
     
     // Contact
-    phone: '',
+    email: '',
+    country: '',
+    countryCode: '',
+    areaCode: '',
+    phoneNumber: '',
     
     // Entreprise
+    companyName: '',
     companyWebsite: '',
     companyLinkedin: ''
   })
@@ -154,11 +252,25 @@ function InvitationAcceptPageContent() {
           
           if (!validateResponse.ok) {
             const errorData = await validateResponse.json()
+            setProcessingResult({
+              success: false,
+              step: 'validation',
+              message: errorData.detail || 'Erreur de validation du token',
+              details: errorData
+            })
             throw new Error(errorData.detail || 'Erreur de validation du token')
           }
           
           const validationResult = await validateResponse.json()
           console.log('✅ [InvitationAccept] Token validé:', validationResult.user_email)
+          
+          // Marquer la validation comme réussie
+          setProcessingResult({
+            success: true,
+            step: 'validation',
+            message: `Token d'invitation validé pour ${validationResult.user_email}`,
+            details: validationResult
+          })
           
           // ✅ CORRIGÉ: Structure de réponse alignée avec le backend
           setUserInfo({
@@ -169,6 +281,9 @@ function InvitationAcceptPageContent() {
             invitationDate: validationResult.invitation_data?.invitation_date,
             accessToken: accessToken // Stocker pour la finalisation
           })
+          
+          // Pré-remplir l'email depuis le token
+          setFormData(prev => ({ ...prev, email: validationResult.user_email }))
           
           console.log('🔧 [InvitationAccept] Passage au mode set-password')
           setStatus('set-password')
@@ -185,6 +300,11 @@ function InvitationAcceptPageContent() {
             console.log('🔍 [InvitationAccept] Pas d\'invitation trouvée')
             setStatus('error')
             setMessage('Aucune invitation trouvée dans cette URL')
+            setProcessingResult({
+              success: false,
+              step: 'validation',
+              message: 'Aucune invitation trouvée dans cette URL'
+            })
             setTimeout(() => router.push('/auth/login'), 2000)
           }
         }
@@ -213,7 +333,17 @@ function InvitationAcceptPageContent() {
   }, [router, searchParams, hasProcessedToken])
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value }
+      
+      // Auto-remplir l'indicatif pays quand le pays change
+      if (field === 'country' && value && countryCodeMap[value]) {
+        newData.countryCode = countryCodeMap[value]
+      }
+      
+      return newData
+    })
+    
     if (errors.length > 0) {
       setErrors([])
     }
@@ -238,17 +368,30 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Les mots de passe ne correspondent pas')
     }
     
-    // ✅ CORRIGÉ: Validation alignée avec les champs backend
-    if (!formData.fullName.trim()) {
-      validationErrors.push('Le nom complet est requis')
+    // Validation des informations personnelles
+    if (!formData.firstName.trim()) {
+      validationErrors.push('Le prénom est requis')
     }
     
-    if (!formData.company.trim()) {
-      validationErrors.push('L\'entreprise est requise')
+    if (!formData.lastName.trim()) {
+      validationErrors.push('Le nom de famille est requis')
     }
     
-    if (!formData.jobTitle.trim()) {
-      validationErrors.push('Le titre du poste est requis')
+    // Validation contact
+    if (!formData.email.trim()) {
+      validationErrors.push('L\'email est requis')
+    }
+    
+    if (!formData.country) {
+      validationErrors.push('Le pays est requis')
+    }
+    
+    // Validation téléphone (optionnel mais si fourni, doit être complet)
+    const hasAnyPhoneField = formData.countryCode.trim() || formData.areaCode.trim() || formData.phoneNumber.trim()
+    if (hasAnyPhoneField) {
+      if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
+        validationErrors.push('Format de téléphone invalide (tous les champs téléphone doivent être remplis)')
+      }
     }
     
     return validationErrors
@@ -275,10 +418,15 @@ function InvitationAcceptPageContent() {
       // ✅ CORRIGÉ: Structure de données alignée avec le backend
       const requestBody = {
         access_token: userInfo.accessToken,
-        fullName: formData.fullName,
-        company: formData.company,
-        jobTitle: formData.jobTitle,
-        phone: formData.phone || null,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        linkedinProfile: formData.linkedinProfile || null,
+        country: formData.country,
+        phone: formData.countryCode && formData.areaCode && formData.phoneNumber 
+          ? `${formData.countryCode} ${formData.areaCode}-${formData.phoneNumber}`
+          : null,
+        companyName: formData.companyName || null,
         companyWebsite: formData.companyWebsite || null,
         companyLinkedin: formData.companyLinkedin || null,
         password: formData.password
@@ -302,6 +450,12 @@ function InvitationAcceptPageContent() {
       
       if (!completeResponse.ok) {
         const errorData = await completeResponse.json()
+        setProcessingResult({
+          success: false,
+          step: 'completion',
+          message: errorData.detail || 'Erreur lors de la finalisation du profil',
+          details: errorData
+        })
         throw new Error(errorData.detail || 'Erreur lors de la finalisation du profil')
       }
       
@@ -310,6 +464,11 @@ function InvitationAcceptPageContent() {
       
       setStatus('success')
       setMessage('Compte créé avec succès !')
+      setProcessingResult({
+        success: true,
+        step: 'completion',
+        message: `Bienvenue ${formData.firstName} ! Votre compte Intelia Expert a été créé avec succès.`
+      })
       
       // Redirection vers le chat après 2 secondes
       setTimeout(() => {
@@ -331,9 +490,10 @@ function InvitationAcceptPageContent() {
       formData.confirmPassword &&
       formData.password === formData.confirmPassword &&
       validatePassword(formData.password).length === 0 &&
-      formData.fullName.trim() &&
-      formData.company.trim() &&
-      formData.jobTitle.trim()
+      formData.firstName.trim() &&
+      formData.lastName.trim() &&
+      formData.email.trim() &&
+      formData.country
     )
   }
 
@@ -371,6 +531,13 @@ function InvitationAcceptPageContent() {
                 <p>🔄 Validation via le backend...</p>
                 <p>⏳ Cela peut prendre quelques secondes</p>
               </div>
+
+              {/* Affichage du résultat de validation si disponible */}
+              {processingResult && processingResult.step === 'validation' && (
+                <div className="mt-6">
+                  <ProcessingStatus result={processingResult} />
+                </div>
+              )}
             </div>
           )}
 
@@ -383,7 +550,7 @@ function InvitationAcceptPageContent() {
               
               {userInfo && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h3 className="font-medium text-blue-900 mb-2">Informations de votre invitation</h3>
+                  <h3 className="font-medium text-blue-900 mb-2">✅ Invitation validée avec succès</h3>
                   <div className="text-sm text-blue-800 space-y-1">
                     <p><strong>Email :</strong> {userInfo.email}</p>
                     {userInfo.inviterName && (
@@ -402,47 +569,177 @@ function InvitationAcceptPageContent() {
               {/* Messages d'erreur */}
               {errors.length > 0 && (
                 <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="text-sm text-red-800">
-                    {errors.map((error, index) => (
-                      <div key={index} className="flex items-start space-x-2">
-                        <span className="text-red-500 font-bold">•</span>
-                        <span>{error}</span>
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Veuillez corriger les erreurs suivantes :
+                      </h3>
+                      <div className="mt-1 text-sm text-red-700">
+                        {errors.map((error, index) => (
+                          <div key={index} className="flex items-start space-x-2">
+                            <span className="text-red-500 font-bold">•</span>
+                            <span>{error}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               )}
               
               <div className="space-y-6">
                 
-                {/* Section Informations personnelles - ✅ CORRIGÉ */}
+                {/* Section Informations personnelles */}
                 <div className="border-b border-gray-200 pb-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Informations personnelles</h3>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Nom complet <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
-                      placeholder="Prénom Nom"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Prénom <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value)}
+                        placeholder="Prénom"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Nom de famille <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value)}
+                        placeholder="Nom de famille"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Entreprise <span className="text-red-500">*</span>
+                      Profil LinkedIn personnel (optionnel)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.linkedinProfile}
+                      onChange={(e) => handleInputChange('linkedinProfile', e.target.value)}
+                      placeholder="https://linkedin.com/in/votre-profil"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+                </div>
+
+                {/* Section Contact */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Contact</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="votre@email.com"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-gray-50"
+                      disabled={true}
+                      readOnly
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Email provenant de votre invitation</p>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Pays <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={formData.country}
+                      onChange={(e) => handleInputChange('country', e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    >
+                      <option value="">Sélectionner...</option>
+                      {countries.map(country => (
+                        <option key={country.value} value={country.value}>
+                          {country.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Téléphone (optionnel)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Indicatif pays</label>
+                        <input
+                          type="text"
+                          placeholder="+1"
+                          value={formData.countryCode}
+                          onChange={(e) => handleInputChange('countryCode', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isProcessing}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Indicatif régional</label>
+                        <input
+                          type="text"
+                          placeholder="514"
+                          value={formData.areaCode}
+                          onChange={(e) => handleInputChange('areaCode', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isProcessing}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Numéro de téléphone</label>
+                        <input
+                          type="text"
+                          placeholder="1234567"
+                          value={formData.phoneNumber}
+                          onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          disabled={isProcessing}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Entreprise */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Entreprise</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Nom de l'entreprise (optionnel)
                     </label>
                     <input
                       type="text"
-                      required
-                      value={formData.company}
-                      onChange={(e) => handleInputChange('company', e.target.value)}
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
                       placeholder="Nom de votre entreprise"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isProcessing}
@@ -451,46 +748,7 @@ function InvitationAcceptPageContent() {
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Titre du poste <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.jobTitle}
-                      onChange={(e) => handleInputChange('jobTitle', e.target.value)}
-                      placeholder="Votre titre ou fonction"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                </div>
-
-                {/* Section Contact - ✅ SIMPLIFIÉ */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Contact</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Numéro de téléphone (optionnel)
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      placeholder="+1 514 123-4567"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                </div>
-
-                {/* Section Entreprise - ✅ CORRIGÉ */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Entreprise (optionnel)</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Site web de l'entreprise
+                      Site web de l'entreprise (optionnel)
                     </label>
                     <input
                       type="url"
@@ -504,7 +762,7 @@ function InvitationAcceptPageContent() {
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Page LinkedIn de l'entreprise
+                      Page LinkedIn de l'entreprise (optionnel)
                     </label>
                     <input
                       type="url"
@@ -628,50 +886,9 @@ function InvitationAcceptPageContent() {
             </div>
           )}
 
-          {/* Statut Success */}
-          {status === 'success' && (
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              
-              <h2 className="text-lg font-semibold text-green-900 mb-4">
-                {message}
-              </h2>
-              
-              <div className="text-sm text-gray-600">
-                <p>Redirection vers votre tableau de bord...</p>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Statut Error */}
-          {status === 'error' && (
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                </svg>
-              </div>
-              
-              <h2 className="text-lg font-semibold text-red-900 mb-2">
-                Erreur de traitement
-              </h2>
-              <p className="text-sm text-red-700 mb-4">
-                {message}
-              </p>
-              
-              <div className="text-xs text-gray-600">
-                Redirection vers la page de connexion...
-              </div>
-            </div>
+          {/* Statut Success et Error avec interface améliorée */}
+          {(status === 'success' || status === 'error') && processingResult && (
+            <ProcessingStatus result={processingResult} />
           )}
 
           {/* Footer */}
