@@ -457,7 +457,7 @@ function InvitationAcceptPageContent() {
     }
   }
 
-  // ✅ VALIDATION FORMULAIRE MISE À JOUR
+// ✅ VALIDATION FORMULAIRE AVEC TÉLÉPHONE OPTIONNEL ET MOT DE PASSE CONFORME
   const validateForm = (): string[] => {
     const validationErrors: string[] = []
     
@@ -495,7 +495,7 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
-    // ✅ VALIDATION TÉLÉPHONE AMÉLIORÉE
+    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Messages d'erreur spécifiques
     if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
       const hasAnyPhoneField = formData.countryCode.trim() || formData.areaCode.trim() || formData.phoneNumber.trim()
       
@@ -506,7 +506,7 @@ function InvitationAcceptPageContent() {
         if (!formData.phoneNumber.trim()) missingFields.push('numéro')
         
         if (missingFields.length > 0) {
-          validationErrors.push(`Téléphone incomplet: veuillez remplir ${missingFields.join(', ')}`)
+          validationErrors.push(`Téléphone incomplet: veuillez remplir ${missingFields.join(', ')} ou laisser tous les champs téléphone vides`)
         } else {
           validationErrors.push('Format de téléphone invalide')
         }
@@ -845,6 +845,9 @@ function InvitationAcceptPageContent() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Téléphone (optionnel)
                     </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      💡 Si vous remplissez le téléphone, tous les champs sont requis. Sinon, laissez tous les champs vides.
+                    </p>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Indicatif pays</label>
@@ -965,6 +968,45 @@ function InvitationAcceptPageContent() {
                         )}
                       </button>
                     </div>
+                    
+                    {/* ✅ AJOUT: Exigences du mot de passe */}
+                    {formData.password && (
+                      <div className="mt-3 bg-gray-50 rounded-lg p-3">
+                        <h5 className="text-sm font-medium text-gray-900 mb-2">Exigences du mot de passe :</h5>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          <li className="flex items-center space-x-2">
+                            <span className={formData.password.length >= 8 ? 'text-green-600' : 'text-gray-400'}>
+                              {formData.password.length >= 8 ? '✓' : '○'}
+                            </span>
+                            <span>Au moins 8 caractères</span>
+                          </li>
+                          <li className="flex items-center space-x-2">
+                            <span className={/[A-Z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>
+                              {/[A-Z]/.test(formData.password) ? '✓' : '○'}
+                            </span>
+                            <span>Au moins une majuscule</span>
+                          </li>
+                          <li className="flex items-center space-x-2">
+                            <span className={/[a-z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>
+                              {/[a-z]/.test(formData.password) ? '✓' : '○'}
+                            </span>
+                            <span>Au moins une minuscule</span>
+                          </li>
+                          <li className="flex items-center space-x-2">
+                            <span className={/\d/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>
+                              {/\d/.test(formData.password) ? '✓' : '○'}
+                            </span>
+                            <span>Au moins un chiffre</span>
+                          </li>
+                          <li className="flex items-center space-x-2">
+                            <span className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>
+                              {/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? '✓' : '○'}
+                            </span>
+                            <span>Au moins un caractère spécial</span>
+                          </li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4">
