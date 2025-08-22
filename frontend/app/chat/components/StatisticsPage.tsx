@@ -338,7 +338,7 @@ export const StatisticsPage: React.FC = () => {
       const headers = await getAuthHeaders()
       console.log('🔐 Headers récupérés:', Object.keys(headers)) // Ne pas logger le token complet
       
-      if (!headers.Authorization) {
+      if (!headers || !('Authorization' in headers)) {
         console.error('❌ Pas de token d\'authentification disponible')
         throw new Error('Pas de token d\'authentification disponible')
       }
