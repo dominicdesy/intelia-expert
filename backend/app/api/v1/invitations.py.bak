@@ -1,7 +1,7 @@
-# app/api/v1/invitations.py - VERSION SUPABASE COMPLÈTE
+# app/api/v1/invitations_supabase.py - VERSION SUPABASE
 """
 Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE
-Utilise les invitations intégrées de Supabase Auth avec détection d'utilisateurs existants
+Utilise les invitations intégrées de Supabase Auth
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, validator
@@ -96,7 +96,6 @@ class InvitationRequest(BaseModel):
     inviter_name: str
     inviter_email: EmailStr
     language: str = "fr"
-    force_send: bool = False  # Nouveau : forcer l'envoi même si utilisateur existe
     
     @validator('emails')
     def validate_emails_count(cls, v):
@@ -106,21 +105,12 @@ class InvitationRequest(BaseModel):
             raise ValueError('Maximum 10 invitations à la fois')
         return v
 
-class InvitationResult(BaseModel):
-    email: str
-    success: bool
-    status: str  # 'sent', 'skipped', 'failed'
-    reason: Optional[str] = None
-    message: str
-    details: Dict[str, Any] = {}
-
 class InvitationResponse(BaseModel):
     success: bool
     sent_count: int
-    skipped_count: int
-    failed_count: int
+    failed_emails: List[str] = []
     message: str
-    results: List[InvitationResult] = []
+    invitation_details: List[Dict[str, Any]] = []
 
 class InvitationStatus(BaseModel):
     email: str
@@ -135,107 +125,6 @@ class SupabaseInvitationService:
         self.admin_client = get_supabase_client()  # Service role pour invitations
         self.anon_client = get_supabase_anon_client()  # Clé anon pour autres opérations
         self.frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
-    
-    async def check_user_exists(self, email: str) -> Dict[str, Any]:
-        """Vérifie si un utilisateur existe déjà dans Supabase Auth"""
-        try:
-            # Utiliser l'API admin pour vérifier l'existence de l'utilisateur
-            response = self.admin_client.auth.admin.list_users(
-                page=1,
-                per_page=1000  # Augmentez si vous avez plus de 1000 utilisateurs
-            )
-            
-            # Chercher l'email dans la liste des utilisateurs
-            existing_users = response.data if hasattr(response, 'data') else []
-            
-            for user in existing_users:
-                if user.email and user.email.lower() == email.lower():
-                    return {
-                        "exists": True,
-                        "user_id": user.id,
-                        "email": user.email,
-                        "created_at": user.created_at,
-                        "last_sign_in": user.last_sign_in_at,
-                        "email_confirmed": user.email_confirmed_at is not None
-                    }
-            
-            return {"exists": False}
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur vérification utilisateur {email}: {str(e)}")
-            # En cas d'erreur, on assume que l'utilisateur n'existe pas pour ne pas bloquer
-            return {"exists": False, "error": str(e)}
-    
-    async def check_existing_invitation(self, email: str, inviter_email: str) -> Dict[str, Any]:
-        """Vérifie si une invitation est déjà en cours pour cet email"""
-        try:
-            # Chercher les invitations pending pour cet email
-            result = self.anon_client.table("invitations").select("*").eq("email", email).eq("status", "pending").execute()
-            
-            if result.data:
-                # Il y a déjà une invitation en cours
-                latest_invitation = max(result.data, key=lambda x: x["invited_at"])
-                return {
-                    "has_pending": True,
-                    "invited_by": latest_invitation["inviter_email"],
-                    "invited_at": latest_invitation["invited_at"],
-                    "is_same_inviter": latest_invitation["inviter_email"].lower() == inviter_email.lower()
-                }
-            
-            return {"has_pending": False}
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur vérification invitation existante {email}: {str(e)}")
-            return {"has_pending": False, "error": str(e)}
-    
-    async def validate_email_before_invitation(self, email: str, inviter_email: str) -> Dict[str, Any]:
-        """Validation complète avant d'envoyer une invitation"""
-        
-        # 1. Vérifier si l'utilisateur existe déjà
-        user_check = await self.check_user_exists(email)
-        
-        if user_check["exists"]:
-            return {
-                "can_invite": False,
-                "reason": "user_exists",
-                "message": f"L'utilisateur {email} possède déjà un compte Intelia Expert",
-                "details": {
-                    "registered_since": user_check.get("created_at"),
-                    "last_login": user_check.get("last_sign_in"),
-                    "email_confirmed": user_check.get("email_confirmed", False)
-                }
-            }
-        
-        # 2. Vérifier les invitations en cours
-        invitation_check = await self.check_existing_invitation(email, inviter_email)
-        
-        if invitation_check["has_pending"]:
-            if invitation_check["is_same_inviter"]:
-                return {
-                    "can_invite": False,
-                    "reason": "already_invited_by_you",
-                    "message": f"Vous avez déjà envoyé une invitation à {email}",
-                    "details": {
-                        "invited_at": invitation_check["invited_at"]
-                    }
-                }
-            else:
-                return {
-                    "can_invite": False,
-                    "reason": "already_invited_by_other",
-                    "message": f"{email} a déjà reçu une invitation de {invitation_check['invited_by']}",
-                    "details": {
-                        "invited_by": invitation_check["invited_by"],
-                        "invited_at": invitation_check["invited_at"]
-                    }
-                }
-        
-        # 3. Validation OK
-        return {
-            "can_invite": True,
-            "reason": "valid",
-            "message": f"Invitation possible pour {email}"
-        }
     
     def get_invitation_template_data(self, language: str, inviter_name: str, personal_message: str = "") -> Dict[str, str]:
         """Prépare les données pour le template d'email"""
@@ -306,7 +195,7 @@ class SupabaseInvitationService:
             template_data = self.get_invitation_template_data(language, inviter_name, personal_message)
             
             # URL de redirection après inscription
-            redirect_to = f"{self.frontend_url}/auth/invitation"
+            redirect_to = f"{self.frontend_url}/welcome?invited_by={inviter_email}"
             
             # Envoyer l'invitation via Supabase Auth (nécessite service role)
             response = self.admin_client.auth.admin.invite_user_by_email(
@@ -332,8 +221,7 @@ class SupabaseInvitationService:
                 "success": True,
                 "email": email,
                 "invitation_id": response.user.id if response.user else None,
-                "status": "sent",
-                "message": "Invitation envoyée avec succès"
+                "status": "sent"
             }
             
         except Exception as e:
@@ -342,67 +230,24 @@ class SupabaseInvitationService:
                 "success": False,
                 "email": email,
                 "error": str(e),
-                "status": "failed",
-                "message": f"Échec de l'envoi: {str(e)}"
+                "status": "failed"
             }
-    
-    async def send_invitation_with_validation(self, email: str, inviter_name: str, inviter_email: str, 
-                                            personal_message: str = "", language: str = "fr", 
-                                            force: bool = False) -> Dict[str, Any]:
-        """Envoie une invitation avec validation préalable"""
-        
-        # Validation préalable (sauf si force=True)
-        if not force:
-            validation = await self.validate_email_before_invitation(email, inviter_email)
-            
-            if not validation["can_invite"]:
-                return {
-                    "success": False,
-                    "email": email,
-                    "status": "skipped",
-                    "reason": validation["reason"],
-                    "message": validation["message"],
-                    "details": validation.get("details", {})
-                }
-        
-        # Si validation OK ou force=True, envoyer l'invitation
-        return await self.send_invitation(email, inviter_name, inviter_email, personal_message, language)
     
     async def log_invitation(self, email: str, inviter_email: str, inviter_name: str, 
                            personal_message: str, language: str):
         """Enregistre l'invitation dans une table de tracking"""
         try:
-            # Données à insérer
-            invitation_data = {
+            self.anon_client.table("invitations").insert({
                 "email": email,
                 "inviter_email": inviter_email,
                 "inviter_name": inviter_name,
-                "personal_message": personal_message or "",
+                "personal_message": personal_message,
                 "language": language,
                 "status": "pending",
                 "invited_at": datetime.now().isoformat()
-            }
-            
-            # Insertion avec gestion d'erreur détaillée
-            result = self.anon_client.table("invitations").insert(invitation_data).execute()
-            
-            logger.info(f"✅ Invitation loggée avec succès: {email}")
-            return result.data[0] if result.data else None
-            
+            }).execute()
         except Exception as e:
-            # Log détaillé de l'erreur
-            logger.error(f"❌ Erreur détaillée enregistrement invitation:")
-            logger.error(f"   - Email: {email}")
-            logger.error(f"   - Inviter: {inviter_email}")
-            logger.error(f"   - Erreur: {str(e)}")
-            logger.error(f"   - Type erreur: {type(e).__name__}")
-            
-            # Si c'est une erreur de table inexistante, donner des instructions
-            if "404" in str(e) or "not found" in str(e).lower():
-                logger.error("⚠️  Table 'invitations' n'existe pas. Créez-la avec le script SQL fourni.")
-            
-            # Ne pas faire échouer l'invitation à cause du logging
-            return None
+            logger.warning(f"⚠️ Erreur enregistrement invitation: {e}")
     
     async def get_invitation_stats(self, user_email: str) -> Dict[str, Any]:
         """Récupère les statistiques d'invitations d'un utilisateur"""
@@ -439,9 +284,9 @@ async def send_invitations(
     request: InvitationRequest,
     current_user = Depends(get_current_user)
 ):
-    """Envoie des invitations avec vérification d'utilisateurs existants"""
+    """Envoie des invitations via Supabase Auth"""
     
-    logger.info(f"📧 [send_invitations] Demande d'invitation de {request.inviter_email} pour {len(request.emails)} destinataires")
+    logger.info(f"📧 [send_invitations] Demande d'invitation Supabase de {request.inviter_email} pour {len(request.emails)} destinataires")
     
     # Vérification et ajustement automatique de l'email inviteur
     if current_user.email.lower() != request.inviter_email.lower():
@@ -454,123 +299,42 @@ async def send_invitations(
     
     # Compteurs et résultats détaillés
     sent_count = 0
-    skipped_count = 0
-    failed_count = 0
-    results = []
+    failed_emails = []
+    invitation_details = []
     
-    # Traiter chaque email individuellement
+    # Envoyer les invitations une par une
     for email in request.emails:
-        try:
-            logger.info(f"🔍 [send_invitations] Traitement de {email}")
-            
-            # Envoyer l'invitation avec validation
-            result = await invitation_service.send_invitation_with_validation(
-                email=email,
-                inviter_name=request.inviter_name,
-                inviter_email=request.inviter_email,
-                personal_message=request.personal_message,
-                language=request.language,
-                force=request.force_send
-            )
-            
-            # Convertir le résultat en format standardisé
-            invitation_result = InvitationResult(
-                email=email,
-                success=result["success"],
-                status=result.get("status", "failed"),
-                reason=result.get("reason"),
-                message=result.get("message", ""),
-                details=result.get("details", {})
-            )
-            
-            results.append(invitation_result)
-            
-            # Mettre à jour les compteurs
-            if result["success"]:
-                sent_count += 1
-                logger.info(f"✅ [send_invitations] Invitation envoyée: {email}")
-            elif result.get("status") == "skipped":
-                skipped_count += 1
-                logger.info(f"⏭️ [send_invitations] Invitation ignorée: {email} - {result.get('reason')}")
-            else:
-                failed_count += 1
-                logger.error(f"❌ [send_invitations] Échec invitation: {email}")
-                
-        except Exception as e:
-            # Gestion d'erreur pour cet email spécifique
-            logger.error(f"❌ [send_invitations] Erreur inattendue pour {email}: {str(e)}")
-            
-            results.append(InvitationResult(
-                email=email,
-                success=False,
-                status="failed",
-                reason="unexpected_error",
-                message=f"Erreur inattendue: {str(e)}",
-                details={}
-            ))
-            failed_count += 1
+        result = await invitation_service.send_invitation(
+            email=email,
+            inviter_name=request.inviter_name,
+            inviter_email=request.inviter_email,
+            personal_message=request.personal_message,
+            language=request.language
+        )
+        
+        invitation_details.append(result)
+        
+        if result["success"]:
+            sent_count += 1
+        else:
+            failed_emails.append(email)
     
-    # Construire le message de résumé
-    total_processed = len(request.emails)
-    messages = []
+    # Construire la réponse
+    success = sent_count > 0
+    message = f"✅ {sent_count} invitation{'s' if sent_count > 1 else ''} envoyée{'s' if sent_count > 1 else ''} avec succès"
     
-    if sent_count > 0:
-        messages.append(f"✅ {sent_count} invitation{'s' if sent_count > 1 else ''} envoyée{'s' if sent_count > 1 else ''}")
+    if failed_emails:
+        message += f" - {len(failed_emails)} échec{'s' if len(failed_emails) > 1 else ''}"
     
-    if skipped_count > 0:
-        messages.append(f"⏭️ {skipped_count} ignorée{'s' if skipped_count > 1 else ''} (utilisateur{'s' if skipped_count > 1 else ''} existant{'s' if skipped_count > 1 else ''})")
-    
-    if failed_count > 0:
-        messages.append(f"❌ {failed_count} échec{'s' if failed_count > 1 else ''}")
-    
-    summary_message = " • ".join(messages) if messages else "Aucune invitation traitée"
-    
-    # Déterminer le succès global
-    overall_success = sent_count > 0 or (sent_count == 0 and skipped_count > 0 and failed_count == 0)
-    
-    logger.info(f"📊 [send_invitations] Résultat final: {sent_count} envoyées, {skipped_count} ignorées, {failed_count} échecs")
+    logger.info(f"📊 [send_invitations] Résultat Supabase: {sent_count} envoyées, {len(failed_emails)} échecs")
     
     return InvitationResponse(
-        success=overall_success,
+        success=success,
         sent_count=sent_count,
-        skipped_count=skipped_count,
-        failed_count=failed_count,
-        message=summary_message,
-        results=results
+        failed_emails=failed_emails,
+        message=message,
+        invitation_details=invitation_details
     )
-
-@router.post("/validate")
-async def validate_invitations(
-    emails: List[EmailStr],
-    current_user = Depends(get_current_user)
-):
-    """Valide une liste d'emails avant envoi d'invitations"""
-    
-    logger.info(f"🔍 [validate_invitations] Validation de {len(emails)} emails par {current_user.email}")
-    
-    invitation_service = SupabaseInvitationService()
-    validations = []
-    
-    for email in emails:
-        validation = await invitation_service.validate_email_before_invitation(email, current_user.email)
-        validations.append({
-            "email": email,
-            "can_invite": validation["can_invite"],
-            "reason": validation["reason"],
-            "message": validation["message"],
-            "details": validation.get("details", {})
-        })
-    
-    # Statistiques
-    can_invite_count = sum(1 for v in validations if v["can_invite"])
-    cannot_invite_count = len(validations) - can_invite_count
-    
-    return {
-        "total_emails": len(emails),
-        "can_invite": can_invite_count,
-        "cannot_invite": cannot_invite_count,
-        "validations": validations
-    }
 
 @router.get("/stats")
 async def get_invitation_stats(

@@ -401,7 +401,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                   Invitez vos collègues à découvrir Intelia Expert
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Invitations envoyées par <strong>{currentUser.name || currentUser.email?.split('@')[0] || 'Utilisateur'}</strong>
+                  Partagez la puissance d'Intelia Expert avec votre équipe
                 </p>
               </div>
 
