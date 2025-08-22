@@ -148,8 +148,8 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     "font-src 'self' https://fonts.gstatic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
     // ✅ IMG-SRC CORRIGÉ pour autoriser Zoho SalesIQ
     "img-src 'self' data: https: blob: https://salesiq.zohopublic.com https://*.zoho.com https://*.zohostatic.com https://*.zohocdn.com",
-    // ✅ CONNECT-SRC CORRIGÉ - URL WEBSOCKET CONSERVÉE + Supabase
-    "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com",
+    // ✅ CONNECT-SRC CORRIGÉ - AJOUT DE RESTCOUNTRIES.COM + conservation de tout le reste
+    "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com",
     // ✅ FRAME-SRC CONSERVÉ pour autoriser les iframes Zoho
     "frame-src 'self' https://salesiq.zohopublic.com https://*.zoho.com",
     // ✅ CHILD-SRC CONSERVÉ pour autoriser les pop-ups Zoho
