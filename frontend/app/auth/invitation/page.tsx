@@ -447,6 +447,10 @@ function InvitationAcceptPageContent() {
       // Auto-remplir l'indicatif pays quand le pays change
       if (field === 'country' && value && countryCodeMap[value]) {
         newData.countryCode = countryCodeMap[value]
+        // ✅ CORRECTION: Vider les autres champs téléphone quand on change de pays
+        // pour éviter la validation partielle
+        newData.areaCode = ''
+        newData.phoneNumber = ''
       }
       
       return newData
@@ -495,18 +499,18 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
-    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Messages d'erreur spécifiques
-    if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
-      const hasAnyPhoneField = formData.countryCode.trim() || formData.areaCode.trim() || formData.phoneNumber.trim()
+    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Prend en compte l'auto-remplissage
+    if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber, formData.country, countryCodeMap)) {
+      const hasUserEnteredPhoneData = formData.areaCode.trim() || formData.phoneNumber.trim()
       
-      if (hasAnyPhoneField) {
+      if (hasUserEnteredPhoneData) {
         const missingFields = []
         if (!formData.countryCode.trim()) missingFields.push('indicatif pays')
         if (!formData.areaCode.trim()) missingFields.push('indicatif régional')
         if (!formData.phoneNumber.trim()) missingFields.push('numéro')
         
         if (missingFields.length > 0) {
-          validationErrors.push(`Téléphone incomplet: veuillez remplir ${missingFields.join(', ')} ou laisser tous les champs téléphone vides`)
+          validationErrors.push(`Téléphone incomplet: veuillez remplir ${missingFields.join(', ')}`)
         } else {
           validationErrors.push('Format de téléphone invalide')
         }
@@ -544,18 +548,32 @@ function InvitationAcceptPageContent() {
       // ✅ CORRIGÉ: Structure de données alignée avec le backend
       const requestBody = {
         access_token: userInfo.accessToken,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        linkedinProfile: formData.linkedinProfile || null,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        linkedinProfile: formData.linkedinProfile.trim() || null,
         country: formData.country,
         phone: formData.countryCode && formData.areaCode && formData.phoneNumber 
           ? `${formData.countryCode} ${formData.areaCode}-${formData.phoneNumber}`
           : null,
-        companyName: formData.companyName || null,
-        companyWebsite: formData.companyWebsite || null,
-        companyLinkedin: formData.companyLinkedin || null,
+        companyName: formData.companyName.trim() || null,
+        companyWebsite: formData.companyWebsite.trim() || null,
+        companyLinkedin: formData.companyLinkedin.trim() || null,
         password: formData.password
+      }
+      
+      // ✅ AJOUT: Validation côté client avant envoi
+      const clientValidationErrors = []
+      if (!requestBody.firstName) clientValidationErrors.push('Prénom requis')
+      if (!requestBody.lastName) clientValidationErrors.push('Nom requis') 
+      if (!requestBody.email) clientValidationErrors.push('Email requis')
+      if (!requestBody.country) clientValidationErrors.push('Pays requis')
+      if (!requestBody.password) clientValidationErrors.push('Mot de passe requis')
+      if (!requestBody.access_token) clientValidationErrors.push('Token d\'accès requis')
+      
+      if (clientValidationErrors.length > 0) {
+        console.error('❌ [InvitationAccept] Erreurs validation client:', clientValidationErrors)
+        throw new Error(`Données invalides: ${clientValidationErrors.join(', ')}`)
       }
       
       console.log('🔧 [InvitationAccept] Données à envoyer:', {
@@ -578,16 +596,59 @@ function InvitationAcceptPageContent() {
       
       console.log('📡 [InvitationAccept] Réponse reçue:', completeResponse.status, completeResponse.statusText)
       
+      // ✅ AJOUT: Log des headers de réponse pour diagnostic
+      console.log('📋 [InvitationAccept] Headers de réponse:', Object.fromEntries(completeResponse.headers))
+      
       if (!completeResponse.ok) {
-        const errorData = await completeResponse.json()
-        console.error('❌ [InvitationAccept] Erreur de réponse:', errorData)
+        let errorData
+        const contentType = completeResponse.headers.get('content-type')
+        
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await completeResponse.json()
+          } else {
+            const textResponse = await completeResponse.text()
+            console.log('📝 [InvitationAccept] Réponse texte:', textResponse)
+            errorData = { detail: textResponse, rawResponse: textResponse }
+          }
+        } catch (parseError) {
+          console.error('❌ [InvitationAccept] Erreur parsing réponse:', parseError)
+          errorData = { detail: `Erreur ${completeResponse.status}: ${completeResponse.statusText}` }
+        }
+        console.error('❌ [InvitationAccept] Erreur de réponse complète:', errorData)
+        
+        // ✅ CORRECTION: Gestion d'erreur 422 améliorée
+        let errorMessage = 'Erreur lors de la finalisation du profil'
+        
+        if (errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            // Si c'est un tableau d'erreurs de validation
+            errorMessage = errorData.detail.map((err: any) => {
+              if (typeof err === 'string') return err
+              if (err.msg) return `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`
+              if (err.message) return err.message
+              return JSON.stringify(err)
+            }).join(', ')
+          } else if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (typeof errorData.detail === 'object') {
+            errorMessage = errorData.detail.message || JSON.stringify(errorData.detail)
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+        
+        console.log('🔍 [InvitationAccept] Message d\'erreur extrait:', errorMessage)
+        
         setProcessingResult({
           success: false,
           step: 'completion',
-          message: errorData.detail || 'Erreur lors de la finalisation du profil',
+          message: errorMessage,
           details: errorData
         })
-        throw new Error(errorData.detail || 'Erreur lors de la finalisation du profil')
+        throw new Error(errorMessage)
       }
       
       const completionResult = await completeResponse.json()
@@ -609,7 +670,20 @@ function InvitationAcceptPageContent() {
       
     } catch (error: any) {
       console.error('❌ [InvitationAccept] Erreur finalisation compte:', error)
-      setErrors([error.message || 'Erreur lors de la finalisation du compte'])
+      
+      // ✅ CORRECTION: Gestion d'erreur améliorée
+      let errorMessage = 'Erreur lors de la finalisation du compte'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        errorMessage = error.message || error.detail || JSON.stringify(error)
+      }
+      
+      console.log('🔍 [InvitationAccept] Message d\'erreur final:', errorMessage)
+      setErrors([errorMessage])
     } finally {
       setIsProcessing(false)
     }
@@ -846,7 +920,7 @@ function InvitationAcceptPageContent() {
                       Téléphone (optionnel)
                     </label>
                     <p className="text-xs text-gray-500 mb-2">
-                      💡 Si vous remplissez le téléphone, tous les champs sont requis. Sinon, laissez tous les champs vides.
+                      💡 L'indicatif pays se remplit automatiquement. Pour ajouter votre téléphone, remplissez l'indicatif régional et le numéro.
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
@@ -856,8 +930,9 @@ function InvitationAcceptPageContent() {
                           placeholder="+1"
                           value={formData.countryCode}
                           onChange={(e) => handleInputChange('countryCode', e.target.value)}
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-gray-50"
                           disabled={isProcessing}
+                          readOnly
                         />
                       </div>
                       <div>
