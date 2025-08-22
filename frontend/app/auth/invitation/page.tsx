@@ -499,7 +499,7 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
-    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Prend en compte l'auto-remplissage
+    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Appel avec les bons paramètres
     if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber, formData.country, countryCodeMap)) {
       const hasUserEnteredPhoneData = formData.areaCode.trim() || formData.phoneNumber.trim()
       
@@ -698,7 +698,8 @@ function InvitationAcceptPageContent() {
       formData.firstName.trim() &&
       formData.lastName.trim() &&
       formData.email.trim() &&
-      formData.country
+      formData.country &&
+      validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber, formData.country, countryCodeMap)
     )
   }
 
