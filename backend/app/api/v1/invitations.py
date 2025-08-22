@@ -1026,3 +1026,249 @@ async def debug_auth(
         "min_resend_delay_hours": int(os.getenv("MIN_RESEND_DELAY_HOURS", "24")),
         "timestamp": datetime.now().isoformat()
     }
+ 
+# 🆕 NOUVEAUX ENDPOINTS - À ajouter à la fin du fichier invitations.py (après le dernier endpoint existant)
+
+@router.get("/stats/global-enhanced")
+async def get_enhanced_global_stats(
+    current_user = Depends(get_current_user)
+):
+    """Obtient les statistiques globales enrichies avec top inviters par acceptations"""
+    
+    # Note: Ajoutez ici une vérification des permissions admin si nécessaire
+    # if not current_user.is_admin:
+    #     raise HTTPException(status_code=403, detail="Accès admin requis")
+    
+    try:
+        client = get_supabase_anon_client()
+        
+        # Toutes les invitations
+        all_invitations = client.table("invitations").select("*").execute()
+        
+        if not all_invitations.data:
+            return {
+                "total_invitations": 0,
+                "total_accepted": 0,
+                "total_pending": 0,
+                "global_acceptance_rate": 0,
+                "active_inviters": 0,
+                "unique_inviters": 0,
+                "top_inviters_by_sent": [],
+                "top_inviters_by_accepted": []
+            }
+        
+        total_invitations = len(all_invitations.data)
+        accepted_count = len([inv for inv in all_invitations.data if inv.get("status") == "accepted"])
+        pending_count = len([inv for inv in all_invitations.data if inv.get("status") == "pending"])
+        
+        # Calcul du taux d'acceptation global
+        global_acceptance_rate = (accepted_count / total_invitations * 100) if total_invitations > 0 else 0
+        
+        # Statistiques par inviteur
+        from collections import defaultdict
+        inviter_stats = defaultdict(lambda: {
+            "sent": 0, 
+            "accepted": 0, 
+            "pending": 0,
+            "inviter_name": "",
+            "latest_invitation": None
+        })
+        
+        for inv in all_invitations.data:
+            inviter_email = inv["inviter_email"]
+            inviter_stats[inviter_email]["sent"] += 1
+            inviter_stats[inviter_email]["inviter_name"] = inv.get("inviter_name", inviter_email.split('@')[0])
+            
+            if inv.get("status") == "accepted":
+                inviter_stats[inviter_email]["accepted"] += 1
+            elif inv.get("status") == "pending":
+                inviter_stats[inviter_email]["pending"] += 1
+            
+            # Garder la dernière invitation pour des infos supplémentaires
+            if not inviter_stats[inviter_email]["latest_invitation"] or inv["invited_at"] > inviter_stats[inviter_email]["latest_invitation"]["invited_at"]:
+                inviter_stats[inviter_email]["latest_invitation"] = inv
+        
+        # Top inviters par nombre d'invitations envoyées
+        top_inviters_by_sent = sorted(
+            [
+                {
+                    "inviter_email": email,
+                    "inviter_name": stats["inviter_name"],
+                    "invitations_sent": stats["sent"],
+                    "invitations_accepted": stats["accepted"],
+                    "invitations_pending": stats["pending"],
+                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                }
+                for email, stats in inviter_stats.items()
+            ],
+            key=lambda x: x["invitations_sent"],
+            reverse=True
+        )[:10]  # Top 10 pour avoir de la marge
+        
+        # Top inviters par nombre d'invitations acceptées
+        top_inviters_by_accepted = sorted(
+            [
+                {
+                    "inviter_email": email,
+                    "inviter_name": stats["inviter_name"],
+                    "invitations_sent": stats["sent"],
+                    "invitations_accepted": stats["accepted"],
+                    "invitations_pending": stats["pending"],
+                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                }
+                for email, stats in inviter_stats.items()
+                if stats["accepted"] > 0  # Seulement ceux qui ont au moins une acceptation
+            ],
+            key=lambda x: x["invitations_accepted"],
+            reverse=True
+        )[:10]  # Top 10 pour avoir de la marge
+        
+        active_inviters = len(inviter_stats)
+        unique_inviters = len(set(inv["inviter_email"] for inv in all_invitations.data))
+        
+        # Statistiques temporelles (bonus)
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        week_ago = (now - timedelta(days=7)).isoformat()
+        month_ago = (now - timedelta(days=30)).isoformat()
+        
+        invitations_this_week = len([inv for inv in all_invitations.data if inv["invited_at"] >= week_ago])
+        invitations_this_month = len([inv for inv in all_invitations.data if inv["invited_at"] >= month_ago])
+        accepted_this_week = len([inv for inv in all_invitations.data if inv.get("status") == "accepted" and inv.get("accepted_at", "") >= week_ago])
+        accepted_this_month = len([inv for inv in all_invitations.data if inv.get("status") == "accepted" and inv.get("accepted_at", "") >= month_ago])
+        
+        logger.info(f"📊 Statistiques globales enrichies calculées: {total_invitations} invitations, {accepted_count} acceptées, {active_inviters} inviteurs")
+        
+        return {
+            # Statistiques globales
+            "total_invitations": total_invitations,
+            "total_accepted": accepted_count,
+            "total_pending": pending_count,
+            "global_acceptance_rate": round(global_acceptance_rate, 1),
+            "active_inviters": active_inviters,
+            "unique_inviters": unique_inviters,
+            
+            # Top inviters
+            "top_inviters_by_sent": top_inviters_by_sent,
+            "top_inviters_by_accepted": top_inviters_by_accepted,
+            
+            # Statistiques temporelles
+            "this_week": {
+                "invitations_sent": invitations_this_week,
+                "invitations_accepted": accepted_this_week,
+                "acceptance_rate": round((accepted_this_week / invitations_this_week * 100) if invitations_this_week > 0 else 0, 1)
+            },
+            "this_month": {
+                "invitations_sent": invitations_this_month,
+                "invitations_accepted": accepted_this_month,
+                "acceptance_rate": round((accepted_this_month / invitations_this_month * 100) if invitations_this_month > 0 else 0, 1)
+            },
+            
+            # Métadonnées
+            "generated_at": datetime.now().isoformat(),
+            "data_source": "supabase",
+            "calculation_method": "real_time"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération stats globales enrichies: {e}")
+        raise HTTPException(status_code=500, detail="Erreur récupération statistiques globales enrichies")
+
+@router.get("/stats/summary-all")
+async def get_all_invitation_summary():
+    """Résumé rapide des invitations (endpoint public pour les stats générales)"""
+    try:
+        client = get_supabase_anon_client()
+        
+        # Requête optimisée - seulement les champs nécessaires
+        invitations = client.table("invitations").select("status,invited_at,accepted_at").execute()
+        
+        if not invitations.data:
+            return {
+                "total": 0,
+                "accepted": 0,
+                "pending": 0,
+                "acceptance_rate": 0
+            }
+        
+        total = len(invitations.data)
+        accepted = len([inv for inv in invitations.data if inv.get("status") == "accepted"])
+        pending = len([inv for inv in invitations.data if inv.get("status") == "pending"])
+        
+        return {
+            "total": total,
+            "accepted": accepted,
+            "pending": pending,
+            "acceptance_rate": round((accepted / total * 100) if total > 0 else 0, 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur résumé invitations: {e}")
+        return {
+            "total": 0,
+            "accepted": 0,
+            "pending": 0,
+            "acceptance_rate": 0
+        }
+
+@router.get("/stats/leaderboard")
+async def get_invitation_leaderboard(
+    limit: int = 10,
+    sort_by: str = "sent",  # "sent" ou "accepted"
+    current_user = Depends(get_current_user)
+):
+    """Obtient le leaderboard des inviteurs"""
+    
+    if sort_by not in ["sent", "accepted"]:
+        raise HTTPException(status_code=400, detail="sort_by doit être 'sent' ou 'accepted'")
+    
+    try:
+        client = get_supabase_anon_client()
+        
+        # Toutes les invitations avec les champs nécessaires
+        invitations = client.table("invitations").select("inviter_email,inviter_name,status").execute()
+        
+        if not invitations.data:
+            return {"leaderboard": [], "total_inviters": 0}
+        
+        # Grouper par inviteur
+        from collections import defaultdict
+        inviter_stats = defaultdict(lambda: {"sent": 0, "accepted": 0, "name": ""})
+        
+        for inv in invitations.data:
+            email = inv["inviter_email"]
+            inviter_stats[email]["sent"] += 1
+            inviter_stats[email]["name"] = inv.get("inviter_name", email.split('@')[0])
+            if inv.get("status") == "accepted":
+                inviter_stats[email]["accepted"] += 1
+        
+        # Trier selon le critère demandé
+        sort_key = "sent" if sort_by == "sent" else "accepted"
+        leaderboard = sorted(
+            [
+                {
+                    "inviter_email": email,
+                    "inviter_name": stats["name"],
+                    "invitations_sent": stats["sent"],
+                    "invitations_accepted": stats["accepted"],
+                    "acceptance_rate": round((stats["accepted"] / stats["sent"] * 100) if stats["sent"] > 0 else 0, 1)
+                }
+                for email, stats in inviter_stats.items()
+            ],
+            key=lambda x: x[f"invitations_{sort_key}"],
+            reverse=True
+        )[:limit]
+        
+        return {
+            "leaderboard": leaderboard,
+            "total_inviters": len(inviter_stats),
+            "sorted_by": sort_by,
+            "limit": limit
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur leaderboard invitations: {e}")
+        raise HTTPException(status_code=500, detail="Erreur récupération leaderboard")
+        
+    
+ 
