@@ -2,7 +2,7 @@
 // app/auth/invitation/page.tsx - Page pour gérer les invitations avec définition de mot de passe
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
 // ==================== VALIDATION MOT DE PASSE ====================
@@ -206,9 +206,10 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
   )
 }
 
-// ==================== COMPOSANT PRINCIPAL ====================
-export default function InvitationAcceptPage() {
+// ==================== COMPOSANT PRINCIPAL CORRIGÉ ====================
+function InvitationAcceptPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'set-password' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -228,16 +229,32 @@ export default function InvitationAcceptPage() {
         
         const supabase = getSupabaseClient()
         
-        // Vérifier s'il y a des fragments d'auth dans l'URL
+        // 🔧 CORRECTION MAJEURE : Vérifier AUSSI les query parameters
         const hash = window.location.hash
-        console.log('🔍 [InvitationAccept] Hash URL:', hash ? 'présent' : 'absent')
+        const token = searchParams.get('token')
+        const type = searchParams.get('type')
         
-        if (hash && (hash.includes('access_token') || hash.includes('type=invite'))) {
+        console.log('🔍 [InvitationAccept] Hash URL:', hash ? 'présent' : 'absent')
+        console.log('🔍 [InvitationAccept] Query token:', token ? 'présent' : 'absent')
+        console.log('🔍 [InvitationAccept] Query type:', type)
+        console.log('🔍 [InvitationAccept] URL complète:', window.location.href)
+        
+        // Détecter l'invitation dans hash OU query parameters
+        const hasInvitationInHash = hash && (hash.includes('access_token') || hash.includes('type=invite'))
+        const hasInvitationInQuery = token && type === 'invite'
+        
+        if (hasInvitationInHash || hasInvitationInQuery) {
           console.log('📧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Validation de votre invitation...')
           
-          // Supabase va automatiquement traiter les tokens du hash
+          // 🔧 CORRECTION : Laisser plus de temps à Supabase pour traiter
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          // Supabase va automatiquement traiter les tokens
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+          
+          console.log('📊 [InvitationAccept] Session data:', sessionData)
+          console.log('📊 [InvitationAccept] Session error:', sessionError)
           
           if (sessionError) {
             console.error('❌ [InvitationAccept] Erreur session:', sessionError)
@@ -260,17 +277,42 @@ export default function InvitationAcceptPage() {
               language: userMetadata?.language || 'fr'
             })
             
-            // CHANGEMENT MAJEUR: Vérifier si l'utilisateur a déjà un mot de passe
-            // Si c'est la première connexion, demander de définir le mot de passe
+            // Vérifier si l'utilisateur a déjà un mot de passe
             console.log('🔐 [InvitationAccept] Utilisateur créé récemment, demande de mot de passe')
             setStatus('set-password')
             setMessage('Définissez votre mot de passe')
             
-            // Nettoyer l'URL en supprimant les fragments
+            // Nettoyer l'URL
             window.history.replaceState({}, document.title, window.location.pathname)
             
           } else {
-            throw new Error('Aucune session créée après traitement de l\'invitation')
+            // 🔧 CORRECTION : Réessayer avec un délai plus long
+            console.log('⏳ [InvitationAccept] Pas de session immédiate, attente supplémentaire...')
+            setMessage('Finalisation de votre invitation...')
+            
+            await new Promise(resolve => setTimeout(resolve, 3000))
+            
+            const { data: retrySessionData } = await supabase.auth.getSession()
+            
+            if (retrySessionData.session) {
+              console.log('✅ [InvitationAccept] Session créée après retry')
+              const user = retrySessionData.session.user
+              const userMetadata = user.user_metadata
+              
+              setUserInfo({
+                email: user.email,
+                invitedBy: userMetadata?.inviter_name || userMetadata?.invited_by,
+                invitationDate: userMetadata?.invitation_date,
+                personalMessage: userMetadata?.personal_message,
+                language: userMetadata?.language || 'fr'
+              })
+              
+              setStatus('set-password')
+              setMessage('Définissez votre mot de passe')
+              window.history.replaceState({}, document.title, window.location.pathname)
+            } else {
+              throw new Error('Aucune session créée après traitement de l\'invitation')
+            }
           }
           
         } else {
@@ -311,10 +353,10 @@ export default function InvitationAcceptPage() {
       }
     }
 
-    // Délai pour laisser Supabase traiter les fragments
-    const timer = setTimeout(handleAuthCallback, 500)
+    // 🔧 CORRECTION : Délai réduit mais traitement plus robuste
+    const timer = setTimeout(handleAuthCallback, 1000)
     return () => clearTimeout(timer)
-  }, [router])
+  }, [router, searchParams])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -419,6 +461,12 @@ export default function InvitationAcceptPage() {
               <p className="text-sm text-gray-600">
                 {message || 'Finalisation de votre invitation'}
               </p>
+              
+              {/* 🆕 Indicateur de debug */}
+              <div className="mt-4 text-xs text-gray-400">
+                <p>🔄 Vérification des tokens d'invitation...</p>
+                <p>⏳ Cela peut prendre quelques secondes</p>
+              </div>
             </div>
           )}
 
@@ -559,5 +607,22 @@ export default function InvitationAcceptPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ==================== EXPORT AVEC SUSPENSE ====================
+export default function InvitationAcceptPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement de l'invitation...</p>
+        </div>
+      </div>
+    }>
+      <InvitationAcceptPageContent />
+    </React.Suspense>
   )
 }
