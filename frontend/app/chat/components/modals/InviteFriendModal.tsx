@@ -7,22 +7,45 @@ interface InviteFriendModalProps {
   onClose: () => void
 }
 
-// ==================== VOTRE SERVICE ORIGINAL (CONSERVÉ) ====================
-const originalInvitationService = {
+// Types pour les réponses API
+interface InvitationResult {
+  email: string;
+  success: boolean;
+  status: 'sent' | 'skipped' | 'failed';
+  reason?: string;
+  message: string;
+  details?: {
+    registered_since?: string;
+    last_login?: string;
+    invited_by?: string;
+    invited_at?: string;
+  };
+}
+
+interface InvitationResponse {
+  success: boolean;
+  sent_count: number;
+  skipped_count: number;
+  failed_count: number;
+  message: string;
+  results: InvitationResult[];
+}
+
+// ==================== SERVICE D'INVITATION ====================
+const invitationService = {
   async sendInvitation(emails: string[], personalMessage: string, inviterInfo: any) {
     try {
-      console.log('📧 [InvitationService] Envoi invitation avec nouveau domaine:', { 
+      console.log('📧 [InvitationService] Envoi invitation:', { 
         emails, 
         hasMessage: !!personalMessage,
         inviterEmail: inviterInfo.email 
       })
       
       const supabase = getSupabaseClient()
-      
-      // Récupérer la session Supabase comme dans apiService
       const { data, error } = await supabase.auth.getSession()
+      
       if (error) {
-        console.error('❌ [InvitationService] Erreur session Supabase (singleton):', error)
+        console.error('❌ [InvitationService] Erreur session:', error)
         throw new Error('Session expirée - reconnexion nécessaire')
       }
       
@@ -31,16 +54,13 @@ const originalInvitationService = {
         throw new Error('Session expirée - reconnexion nécessaire')
       }
 
-      console.log('✅ [InvitationService] Token Supabase récupéré (singleton), longueur:', session.access_token.length)
+      console.log('✅ [InvitationService] Token récupéré')
       
-      // URL API selon votre configuration existante
+      // URL selon votre configuration
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
       const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
       const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
       
-      console.log('🔗 [InvitationService] URL API finale:', inviteUrl)
-      
-      // Headers identiques à apiService
       const headers = {
         'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json',
@@ -55,13 +75,14 @@ const originalInvitationService = {
           personal_message: personalMessage,
           inviter_name: inviterInfo.name,
           inviter_email: inviterInfo.email,
-          language: inviterInfo.language || 'fr'
+          language: inviterInfo.language || 'fr',
+          force_send: false // Toujours false - pas de forçage
         })
       })
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ [InvitationService] Erreur HTTP (singleton):', response.status, errorText)
+        console.error('❌ [InvitationService] Erreur HTTP:', response.status, errorText)
         
         if (response.status === 401) {
           await supabase.auth.signOut()
@@ -81,103 +102,17 @@ const originalInvitationService = {
       }
 
       const result = await response.json()
-      console.log('✅ [InvitationService] Invitations envoyées vers expert.intelia.com:', result)
+      console.log('✅ [InvitationService] Invitations traitées:', result)
       return result
       
     } catch (error) {
-      console.error('❌ [InvitationService] Erreur envoi (singleton):', error)
+      console.error('❌ [InvitationService] Erreur envoi:', error)
       throw error
     }
   }
 }
 
-// ==================== NOUVEAU SERVICE AMÉLIORÉ (OPTIONNEL) ====================
-const enhancedInvitationService = {
-  // Fonction de validation préalable (nouvelle fonctionnalité)
-  async validateEmails(emails: string[]): Promise<any> {
-    try {
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase.auth.getSession()
-      if (error || !data.session?.access_token) {
-        throw new Error('Session expirée - reconnexion nécessaire')
-      }
-
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
-      const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
-      const validateUrl = `${cleanBaseUrl}/api/v1/invitations/validate`
-      
-      const response = await fetch(validateUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${data.session.access_token}`
-        },
-        body: JSON.stringify(emails)
-      })
-
-      if (!response.ok) {
-        // Si l'endpoint n'existe pas, on continue sans validation
-        if (response.status === 404) {
-          console.log('ℹ️ [EnhancedService] Endpoint de validation non disponible, mode basique')
-          return null
-        }
-        throw new Error('Erreur lors de la validation')
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.warn('⚠️ [EnhancedService] Validation échouée, mode basique:', error)
-      return null // Fallback silencieux vers le mode original
-    }
-  },
-
-  // Envoi avec nouvelles options (force_send, etc.)
-  async sendInvitationEnhanced(emails: string[], personalMessage: string, inviterInfo: any, forceSend: boolean = false) {
-    try {
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase.auth.getSession()
-      if (error || !data.session?.access_token) {
-        throw new Error('Session expirée - reconnexion nécessaire')
-      }
-
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://expert.intelia.com/api'
-      const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '')
-      const inviteUrl = `${cleanBaseUrl}/api/v1/invitations/send`
-      
-      const response = await fetch(inviteUrl, {		  
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${data.session.access_token}`
-        },
-        body: JSON.stringify({
-          emails,
-          personal_message: personalMessage,
-          inviter_name: inviterInfo.name,
-          inviter_email: inviterInfo.email,
-          language: inviterInfo.language || 'fr',
-          force_send: forceSend // Nouvelle option
-        })
-      })
-
-      if (!response.ok) {
-        // Fallback vers le service original si problème
-        console.warn('⚠️ [EnhancedService] Échec, fallback vers service original')
-        return await originalInvitationService.sendInvitation(emails, personalMessage, inviterInfo)
-      }
-
-      return await response.json()
-      
-    } catch (error) {
-      console.warn('⚠️ [EnhancedService] Échec, fallback vers service original')
-      return await originalInvitationService.sendInvitation(emails, personalMessage, inviterInfo)
-    }
-  }
-}
-
-// ==================== VOTRE MODAL ORIGINAL (100% CONSERVÉ) ====================
+// ==================== MODAL INVITATION SIMPLIFIÉE ====================
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { user } = useAuthStore() 
@@ -185,16 +120,9 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const [personalMessage, setPersonalMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
-  const [successMessage, setSuccessMessage] = useState('')
+  const [results, setResults] = useState<InvitationResponse | null>(null)
 
-  // 🆕 NOUVEAUX ÉTATS (n'affectent pas le fonctionnement original)
-  const [enhancedMode, setEnhancedMode] = useState(false) // Toggle pour les nouvelles fonctionnalités
-  const [showPreValidation, setShowPreValidation] = useState(false)
-  const [preValidationResults, setPreValidationResults] = useState<any>(null)
-  const [detailedResults, setDetailedResults] = useState<any>(null)
-  const [forceSend, setForceSend] = useState(false)
-
-  // VOTRE CODE ORIGINAL - currentUser calculation (100% conservé)
+  // Calcul de currentUser (votre code original conservé)
   const currentUser = useMemo(() => {
     if (user?.email) {
       return user
@@ -228,7 +156,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return null
   }, [user])
 
-  // VOTRE CODE ORIGINAL - useEffect (100% conservé)
   useEffect(() => {
     if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
@@ -237,7 +164,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }, [currentUser])
 
-  // VOTRE CODE ORIGINAL - validateEmails (100% conservé)
+  // Validation des emails (votre fonction originale conservée)
   const validateEmails = (emailString: string): { valid: string[], invalid: string[] } => {
     const emailList = emailString
       .split(',')
@@ -259,53 +186,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     return { valid, invalid }
   }
 
-  // 🆕 NOUVELLE FONCTION - Pré-validation (optionnelle)
-  const handlePreValidation = async () => {
-    if (!currentUser?.email) {
-      setErrors(['Vous devez être connecté pour valider les emails'])
-      return
-    }
-
-    const { valid, invalid } = validateEmails(emails)
-    
-    if (invalid.length > 0) {
-      setErrors([`Adresses email invalides : ${invalid.join(', ')}`])
-      return
-    }
-
-    if (valid.length === 0) {
-      setErrors(['Aucune adresse email valide trouvée'])
-      return
-    }
-
-    setIsLoading(true)
-    setErrors([])
-    
-    try {
-      const results = await enhancedInvitationService.validateEmails(valid)
-      if (results) {
-        setPreValidationResults(results)
-        setShowPreValidation(true)
-      } else {
-        // Si la validation n'est pas disponible, envoyer directement
-        setErrors(['La pré-validation n\'est pas disponible, envoi direct...'])
-        setTimeout(() => handleSendInvitations(), 1000)
-      }
-    } catch (error) {
-      console.error('Erreur pré-validation:', error)
-      setErrors(['Erreur lors de la validation, envoi direct possible'])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // VOTRE FONCTION ORIGINALE AMÉLIORÉE (avec fallback automatique)
   const handleSendInvitations = async () => {
     setErrors([])
-    setSuccessMessage('')
-    setDetailedResults(null)
+    setResults(null)
     
-    // VOTRE VALIDATION ORIGINALE (100% conservée)
     if (!currentUser?.email) {
       setErrors(['Vous devez être connecté pour envoyer des invitations'])
       return
@@ -337,16 +221,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
 
     setIsLoading(true)
-    setShowPreValidation(false)
     
     try {
       console.log('🚀 [InviteFriendModal] Début envoi invitations:', {
         emails: valid,
         userEmail: currentUser.email,
-        userName: currentUser.name,
-        userLanguage: currentUser.language,
-        enhancedMode,
-        forceSend
+        userName: currentUser.name
       })
       
       const inviterInfo = {
@@ -355,68 +235,18 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
         language: currentUser.language || 'fr'
       }
       
-      let result
-
-      // CHOIX INTELLIGENT : Essayer le mode amélioré puis fallback vers l'original
-      if (enhancedMode && (forceSend || preValidationResults)) {
-        console.log('📈 [InviteFriendModal] Mode amélioré activé')
-        result = await enhancedInvitationService.sendInvitationEnhanced(
-          valid, 
-          personalMessage.trim(), 
-          inviterInfo,
-          forceSend
-        )
-      } else {
-        console.log('📄 [InviteFriendModal] Mode original (stable)')
-        result = await originalInvitationService.sendInvitation(
-          valid, 
-          personalMessage.trim(), 
-          inviterInfo
-        )
-      }
+      const result = await invitationService.sendInvitation(
+        valid, 
+        personalMessage.trim(), 
+        inviterInfo
+      )
       
-      // GESTION DES RÉSULTATS (compatible avec les deux modes)
-      if (result.results && result.results.length > 0) {
-        // Mode amélioré avec résultats détaillés
-        setDetailedResults(result)
-        const messages = []
-        if (result.sent_count > 0) {
-          messages.push(`✅ ${result.sent_count} invitation${result.sent_count > 1 ? 's' : ''} envoyée${result.sent_count > 1 ? 's' : ''}`)
-        }
-        if (result.skipped_count > 0) {
-          messages.push(`⏭️ ${result.skipped_count} ignorée${result.skipped_count > 1 ? 's' : ''} (utilisateur${result.skipped_count > 1 ? 's' : ''} existant${result.skipped_count > 1 ? 's' : ''})`)
-        }
-        if (result.failed_count > 0) {
-          messages.push(`❌ ${result.failed_count} échec${result.failed_count > 1 ? 's' : ''}`)
-        }
-        setSuccessMessage(messages.join(' • '))
-      } else {
-        // VOTRE LOGIQUE ORIGINALE (100% conservée)
-        setSuccessMessage(
-          `✅ ${result.sent_count || valid.length} invitation${(result.sent_count || valid.length) > 1 ? 's' : ''} envoyée${(result.sent_count || valid.length) > 1 ? 's' : ''} avec succès !`
-        )
-        
-        if (result.failed_emails && result.failed_emails.length > 0) {
-          setErrors([
-            `Certaines invitations ont échoué : ${result.failed_emails.join(', ')}`
-          ])
-        }
-        
-        // VOTRE AUTO-FERMETURE ORIGINALE (100% conservée)
-        if (!result.failed_emails || result.failed_emails.length === 0) {
-          setTimeout(() => {
-            setEmails('')
-            setPersonalMessage('')
-            setSuccessMessage('')
-            onClose()
-          }, 3000)
-        }
-      }
+      // Afficher les résultats
+      setResults(result)
       
     } catch (error) {
       console.error('❌ [InviteFriendModal] Erreur envoi:', error)
       
-      // VOTRE GESTION D'ERREUR ORIGINALE (100% conservée)
       let errorMessage = 'Erreur lors de l\'envoi des invitations'
       
       if (error instanceof Error) {
@@ -444,13 +274,11 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
     }
   }
 
-  // VOTRE FONCTION ORIGINALE (100% conservée)
   const getEmailCount = () => {
     const { valid } = validateEmails(emails)
     return valid.length
   }
 
-  // 🆕 FONCTIONS UTILITAIRES POUR LE MODE AMÉLIORÉ
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleDateString('fr-FR', {
@@ -474,13 +302,40 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'sent': return 'bg-green-50 border-green-200 text-green-800'
-      case 'skipped': return 'bg-yellow-50 border-yellow-200 text-yellow-800'
+      case 'skipped': return 'bg-blue-50 border-blue-200 text-blue-800'
       case 'failed': return 'bg-red-50 border-red-200 text-red-800'
       default: return 'bg-gray-50 border-gray-200 text-gray-800'
     }
   }
 
-  // VOTRE AFFICHAGE CONDITIONNEL ORIGINAL (100% conservé)
+  // Fonction pour générer un message convivial
+  const getFriendlyMessage = (result: InvitationResult) => {
+    if (result.status === 'sent') {
+      return `Invitation envoyée avec succès à ${result.email} ! 🎉`
+    }
+    
+    if (result.status === 'skipped') {
+      if (result.reason === 'user_exists') {
+        return `Merci d'avoir pensé à inviter ${result.email}, mais cette personne utilise déjà Intelia Expert ! 😊`
+      }
+      
+      if (result.reason === 'already_invited_by_you') {
+        return `Vous avez déjà envoyé une invitation à ${result.email}. Patience, la personne n'a peut-être pas encore eu le temps de répondre ! ⏳`
+      }
+      
+      if (result.reason === 'already_invited_by_other') {
+        return `${result.email} a déjà reçu une invitation d'un autre collègue. Parfait, cette personne est très demandée ! 👥`
+      }
+    }
+    
+    if (result.status === 'failed') {
+      return `Oups ! Nous n'avons pas pu envoyer l'invitation à ${result.email}. Veuillez réessayer. 😅`
+    }
+    
+    return result.message
+  }
+
+  // Affichage conditionnel si pas d'utilisateur (votre code original conservé)
   if (!currentUser?.email) {
     return (
       <>
@@ -513,22 +368,22 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
   return (
     <>
-      {/* VOTRE OVERLAY ORIGINAL (100% conservé) */}
+      {/* Overlay */}
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={onClose} />
       
-      {/* VOTRE MODAL CONTAINER ORIGINAL (100% conservé) */}
+      {/* Modal Container */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-          {/* VOTRE HEADER ORIGINAL (100% conservé) */}
+          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Inviter des amis</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
           </div>
           
-          {/* CONTENU PRINCIPAL */}
+          {/* Content */}
           <div className="p-6">
             <div className="space-y-6">
-              {/* VOTRE HEADER AVEC ICÔNE ORIGINAL (100% conservé) */}
+              {/* Header avec icône */}
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -543,115 +398,88 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                 </p>
               </div>
 
-              {/* 🆕 TOGGLE MODE AMÉLIORÉ (discret, non intrusif) */}
-              <div className="flex items-center justify-center space-x-2 text-sm">
-                <span className="text-gray-600">Mode basique</span>
-                <button
-                  onClick={() => setEnhancedMode(!enhancedMode)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enhancedMode ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      enhancedMode ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className="text-gray-600">Mode avancé</span>
-              </div>
-
-              {/* VOTRE MESSAGES DE SUCCÈS ORIGINAL (conservé et amélioré) */}
-              {successMessage && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-green-800 font-medium">{successMessage}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* 🆕 RÉSULTATS DÉTAILLÉS (seulement en mode amélioré) */}
-              {enhancedMode && detailedResults && (
-                <div className="space-y-3">
-                  <h4 className="font-medium text-gray-900">📋 Détails par email :</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {detailedResults.results.map((result: any, index: number) => (
-                      <div key={index} className={`p-3 rounded-lg border ${getStatusColor(result.status)}`}>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(result.status, result.reason)}
-                          <span className="font-medium">{result.email}</span>
-                        </div>
-                        <p className="text-sm mt-1 opacity-75">{result.message}</p>
-                        
-                        {result.details && result.reason === 'user_exists' && (
-                          <div className="mt-2 p-2 bg-white bg-opacity-50 rounded text-xs">
-                            <p>👤 <strong>Inscrit le :</strong> {formatDate(result.details.registered_since)}</p>
-                            {result.details.last_login && (
-                              <p>🔄 <strong>Dernière connexion :</strong> {formatDate(result.details.last_login)}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 🆕 PRÉ-VALIDATION (seulement en mode amélioré) */}
-              {enhancedMode && showPreValidation && preValidationResults && (
+              {/* Résultats avec messages conviviaux */}
+              {results && (
                 <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-2">🔍 Résultats de la pré-validation</h3>
-                    <div className="text-sm text-blue-800">
-                      <p>📊 {preValidationResults.total_emails} emails analysés</p>
-                      <p>✅ {preValidationResults.can_invite} peuvent être invités</p>
-                      <p>⏭️ {preValidationResults.cannot_invite} ne peuvent pas être invités</p>
+                  {/* Résumé général */}
+                  <div className="bg-gradient-to-r from-blue-50 to-green-50 border rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                      📊 Résultats
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-green-600">{results.sent_count}</div>
+                        <div className="text-sm text-gray-600">Envoyées</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-blue-600">{results.skipped_count}</div>
+                        <div className="text-sm text-gray-600">Déjà membres</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-red-600">{results.failed_count}</div>
+                        <div className="text-sm text-gray-600">Échecs</div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {preValidationResults.validations.map((validation: any, index: number) => (
-                      <div key={index} className={`p-3 rounded-lg border ${validation.can_invite ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{validation.email}</span>
-                          {validation.can_invite ? (
-                            <span className="text-green-600">✅ Peut être invité</span>
-                          ) : (
-                            <span className="text-yellow-600">⏭️ {validation.reason === 'user_exists' ? 'Déjà inscrit' : 'Déjà invité'}</span>
-                          )}
+                  {/* Messages détaillés par email */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-gray-900">📋 Détails :</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {results.results.map((result, index) => (
+                        <div key={index} className={`p-4 rounded-lg border ${getStatusColor(result.status)}`}>
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-0.5">
+                              {getStatusIcon(result.status, result.reason)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium leading-relaxed">
+                                {getFriendlyMessage(result)}
+                              </p>
+                              
+                              {/* Informations supplémentaires pour utilisateurs existants */}
+                              {result.details && result.reason === 'user_exists' && (
+                                <div className="mt-2 text-xs opacity-75">
+                                  <p>Membre depuis le {formatDate(result.details.registered_since)}</p>
+                                </div>
+                              )}
+
+                              {/* Informations pour invitations en double */}
+                              {result.details && result.reason === 'already_invited_by_you' && (
+                                <div className="mt-2 text-xs opacity-75">
+                                  <p>Invitation envoyée le {formatDate(result.details.invited_at)}</p>
+                                </div>
+                              )}
+
+                              {result.details && result.reason === 'already_invited_by_other' && (
+                                <div className="mt-2 text-xs opacity-75">
+                                  <p>Invité par {result.details.invited_by} le {formatDate(result.details.invited_at)}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        {!validation.can_invite && (
-                          <p className="text-sm mt-1 opacity-75">{validation.message}</p>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="flex space-x-3">
+                  {/* Bouton nouvelle invitation */}
+                  <div className="flex justify-center pt-4">
                     <button
-                      onClick={() => setShowPreValidation(false)}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => {
+                        setResults(null)
+                        setEmails('')
+                        setPersonalMessage('')
+                      }}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      Modifier la liste
-                    </button>
-                    <button
-                      onClick={handleSendInvitations}
-                      disabled={preValidationResults.can_invite === 0 && !forceSend}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {forceSend ? 
-                        `Forcer l'envoi (${preValidationResults.total_emails})` : 
-                        `Envoyer (${preValidationResults.can_invite})`
-                      }
+                      ↩️ Inviter d'autres personnes
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* VOTRE MESSAGES D'ERREUR ORIGINAL (100% conservé) */}
+              {/* Messages d'erreur */}
               {errors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="text-red-800">
@@ -670,10 +498,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                 </div>
               )}
 
-              {/* VOTRE FORMULAIRE PRINCIPAL ORIGINAL (affiché si pas de résultats détaillés) */}
-              {!detailedResults && !showPreValidation && (
+              {/* Formulaire principal (si pas de résultats affichés) */}
+              {!results && (
                 <div className="space-y-6">
-                  {/* VOTRE SECTION EMAIL ADDRESSES ORIGINALE (100% conservée) */}
+                  {/* Section Email Addresses */}
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                       Adresses Email
@@ -702,7 +530,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                     </p>
                   </div>
 
-                  {/* VOTRE SECTION MESSAGE PERSONNEL ORIGINALE (100% conservée) */}
+                  {/* Section Message Personnel */}
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                       Ajouter un message personnel 
@@ -732,48 +560,21 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                       </span>
                     </div>
                   </div>
-
-                  {/* 🆕 OPTIONS AVANCÉES (seulement en mode amélioré) */}
-                  {enhancedMode && (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="forceSend"
-                        checked={forceSend}
-                        onChange={(e) => setForceSend(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor="forceSend" className="text-sm text-gray-700">
-                        Forcer l'envoi même pour les utilisateurs existants
-                      </label>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* VOTRE SECTION BOUTONS D'ACTION (améliorée mais conserve l'original) */}
+              {/* Boutons d'action */}
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={onClose}
                   className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
                   disabled={isLoading}
                 >
-                  {detailedResults ? 'Fermer' : 'Annuler'}
+                  {results ? 'Fermer' : 'Annuler'}
                 </button>
 
-                {/* 🆕 BOUTON PRÉ-VALIDATION (seulement en mode amélioré) */}
-                {enhancedMode && !detailedResults && !showPreValidation && (
-                  <button
-                    onClick={handlePreValidation}
-                    disabled={isLoading || getEmailCount() === 0}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    🔍 Pré-vérifier
-                  </button>
-                )}
-
-                {/* VOTRE BOUTON D'ENVOI ORIGINAL (100% conservé) */}
-                {!detailedResults && (
+                {/* Bouton d'envoi (seulement si pas de résultats) */}
+                {!results && (
                   <button
                     onClick={handleSendInvitations}
                     disabled={isLoading || getEmailCount() === 0}
@@ -796,25 +597,9 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                     )}
                   </button>
                 )}
-
-                {/* 🆕 BOUTON NOUVELLE INVITATION (après résultats détaillés) */}
-                {detailedResults && (
-                  <button
-                    onClick={() => {
-                      setDetailedResults(null)
-                      setEmails('')
-                      setPersonalMessage('')
-                      setSuccessMessage('')
-                      setForceSend(false)
-                    }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    ↩️ Nouvelle invitation
-                  </button>
-                )}
               </div>
 
-              {/* VOTRE FOOTER ORIGINAL (100% conservé) */}
+              {/* Footer avec informations */}
               <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
                 🔒 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
                 <br />
