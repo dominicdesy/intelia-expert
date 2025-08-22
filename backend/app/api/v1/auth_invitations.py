@@ -1,0 +1,313 @@
+# app/api/v1/auth_invitations.py - Endpoints pour gérer l'authentification d'invitations
+
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, EmailStr
+from typing import Optional, Dict, Any
+import logging
+import jwt
+import os
+from datetime import datetime
+
+# Import du service d'invitation existant
+try:
+    from .invitations import SupabaseInvitationService
+    SERVICE_AVAILABLE = True
+except ImportError:
+    SERVICE_AVAILABLE = False
+
+# Import Supabase
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    Client = None
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/auth/invitations", tags=["auth-invitations"])
+
+# ==================== MODÈLES PYDANTIC ====================
+class ValidateTokenRequest(BaseModel):
+    access_token: str
+
+class ValidateTokenResponse(BaseModel):
+    valid: bool
+    message: str
+    user_email: Optional[str] = None
+    inviter_name: Optional[str] = None
+    invitation_data: Optional[Dict[str, Any]] = None
+
+class CompleteProfileRequest(BaseModel):
+    access_token: str
+    fullName: str
+    company: str
+    jobTitle: str
+    phone: Optional[str] = None
+    companyWebsite: Optional[str] = None
+    companyLinkedin: Optional[str] = None
+    password: str
+
+class CompleteProfileResponse(BaseModel):
+    success: bool
+    message: str
+    redirect_url: Optional[str] = None
+
+# ==================== SERVICE D'AUTHENTIFICATION INVITATIONS ====================
+class BackendInvitationAuthService:
+    def __init__(self):
+        if not SUPABASE_AVAILABLE:
+            raise HTTPException(status_code=500, detail="Supabase non disponible")
+        
+        self.supabase_url = os.getenv("SUPABASE_URL")
+        self.service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not self.supabase_url or not self.service_role_key:
+            raise HTTPException(status_code=500, detail="Configuration Supabase manquante")
+        
+        # Client avec service role pour les opérations admin
+        self.admin_client = create_client(self.supabase_url, self.service_role_key)
+        
+        # Service d'invitation pour utiliser les méthodes existantes
+        if SERVICE_AVAILABLE:
+            self.invitation_service = SupabaseInvitationService()
+        else:
+            self.invitation_service = None
+    
+    def validate_invitation_token(self, access_token: str) -> Dict[str, Any]:
+        """Valide un token d'invitation reçu par email"""
+        try:
+            logger.info(f"🔍 [ValidateToken] Début validation token")
+            
+            # Décoder le token pour obtenir les informations utilisateur
+            payload = jwt.decode(access_token, options={"verify_signature": False})
+            
+            logger.info(f"🔍 [ValidateToken] Token décodé: {list(payload.keys())}")
+            
+            user_email = payload.get("email")
+            user_id = payload.get("sub")
+            
+            if not user_email or not user_id:
+                return {
+                    "valid": False,
+                    "error": "Token invalide - informations utilisateur manquantes"
+                }
+            
+            # Vérifier que l'utilisateur existe dans Supabase Auth
+            try:
+                user_result = self.admin_client.auth.admin.get_user_by_id(user_id)
+                
+                if not user_result.user:
+                    return {
+                        "valid": False,
+                        "error": "Utilisateur non trouvé"
+                    }
+                
+                # Récupérer les métadonnées d'invitation
+                user_metadata = user_result.user.user_metadata or {}
+                
+                logger.info(f"✅ [ValidateToken] Token valide pour {user_email}")
+                
+                return {
+                    "valid": True,
+                    "user_email": user_email,
+                    "user_id": user_id,
+                    "inviter_name": user_metadata.get("inviter_name"),
+                    "personal_message": user_metadata.get("personal_message"),
+                    "language": user_metadata.get("language", "fr"),
+                    "invitation_date": user_metadata.get("invitation_date"),
+                    "user_metadata": user_metadata
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ [ValidateToken] Erreur vérification utilisateur: {e}")
+                return {
+                    "valid": False,
+                    "error": f"Erreur validation: {str(e)}"
+                }
+            
+        except Exception as e:
+            logger.error(f"❌ [ValidateToken] Erreur décodage token: {e}")
+            return {
+                "valid": False,
+                "error": f"Token invalide: {str(e)}"
+            }
+    
+    async def complete_invitation_profile(self, access_token: str, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Complète le profil utilisateur après validation du token"""
+        try:
+            logger.info(f"🔄 [CompleteProfile] Début complétion profil")
+            
+            # Valider le token d'abord
+            token_validation = self.validate_invitation_token(access_token)
+            
+            if not token_validation.get("valid"):
+                return {
+                    "success": False,
+                    "error": token_validation.get("error", "Token invalide")
+                }
+            
+            user_id = token_validation["user_id"]
+            user_email = token_validation["user_email"]
+            
+            logger.info(f"🔄 [CompleteProfile] Token validé pour {user_email}")
+            
+            # Préparer les données de mise à jour
+            update_data = {
+                "user_metadata": {
+                    "full_name": profile_data.get("fullName"),
+                    "company": profile_data.get("company"),
+                    "job_title": profile_data.get("jobTitle"),
+                    "phone": profile_data.get("phone"),
+                    "company_website": profile_data.get("companyWebsite"),
+                    "company_linkedin": profile_data.get("companyLinkedin"),
+                    "profile_completed": True,
+                    "profile_completed_at": datetime.now().isoformat()
+                }
+            }
+            
+            # Ajouter le mot de passe si fourni
+            if profile_data.get("password"):
+                update_data["password"] = profile_data["password"]
+            
+            # Mettre à jour l'utilisateur via Supabase
+            try:
+                if self.invitation_service:
+                    # Utiliser le service existant
+                    update_result = self.invitation_service.update_user_by_id(user_id, update_data)
+                else:
+                    # Utiliser directement l'API admin
+                    update_result = self.admin_client.auth.admin.update_user_by_id(user_id, update_data)
+                    update_result = {
+                        "success": bool(update_result.user),
+                        "user": update_result.user
+                    }
+                
+                if not update_result["success"]:
+                    return {
+                        "success": False,
+                        "error": update_result.get("error", "Erreur mise à jour profil")
+                    }
+                
+                logger.info(f"✅ [CompleteProfile] Profil mis à jour pour {user_email}")
+                
+                # Marquer l'invitation comme acceptée si le service est disponible
+                if self.invitation_service:
+                    try:
+                        await self.invitation_service.mark_invitation_accepted(user_email, user_id)
+                        logger.info(f"✅ [CompleteProfile] Invitation marquée comme acceptée")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [CompleteProfile] Erreur marquage invitation: {e}")
+                
+                return {
+                    "success": True,
+                    "message": "Profil complété avec succès",
+                    "user": update_result["user"]
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ [CompleteProfile] Erreur mise à jour utilisateur: {e}")
+                return {
+                    "success": False,
+                    "error": f"Erreur mise à jour profil: {str(e)}"
+                }
+            
+        except Exception as e:
+            logger.error(f"❌ [CompleteProfile] Erreur inattendue: {e}")
+            return {
+                "success": False,
+                "error": f"Erreur inattendue: {str(e)}"
+            }
+
+# ==================== ENDPOINTS ====================
+@router.post("/validate-token", response_model=ValidateTokenResponse)
+async def validate_invitation_token(request: ValidateTokenRequest):
+    """Valide un token d'invitation reçu par email"""
+    
+    logger.info(f"🔍 [validate_invitation_token] Validation d'un token d'invitation")
+    
+    try:
+        service = BackendInvitationAuthService()
+        result = service.validate_invitation_token(request.access_token)
+        
+        if result.get("valid"):
+            return ValidateTokenResponse(
+                valid=True,
+                message="Token valide",
+                user_email=result.get("user_email"),
+                inviter_name=result.get("inviter_name"),
+                invitation_data={
+                    "personal_message": result.get("personal_message"),
+                    "language": result.get("language"),
+                    "invitation_date": result.get("invitation_date")
+                }
+            )
+        else:
+            return ValidateTokenResponse(
+                valid=False,
+                message=result.get("error", "Token invalide")
+            )
+    
+    except Exception as e:
+        logger.error(f"❌ [validate_invitation_token] Erreur: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur validation token: {str(e)}")
+
+@router.post("/complete-profile", response_model=CompleteProfileResponse)
+async def complete_invitation_profile(request: CompleteProfileRequest):
+    """Complète le profil utilisateur après acceptation d'invitation"""
+    
+    logger.info(f"🔄 [complete_invitation_profile] Complétion profil utilisateur")
+    
+    try:
+        service = BackendInvitationAuthService()
+        
+        # Préparer les données de profil
+        profile_data = {
+            "fullName": request.fullName,
+            "company": request.company,
+            "jobTitle": request.jobTitle,
+            "phone": request.phone,
+            "companyWebsite": request.companyWebsite,
+            "companyLinkedin": request.companyLinkedin,
+            "password": request.password
+        }
+        
+        result = await service.complete_invitation_profile(request.access_token, profile_data)
+        
+        if not result["success"]:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return CompleteProfileResponse(
+            success=True,
+            message="Profil complété avec succès",
+            redirect_url="/chat"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [complete_invitation_profile] Erreur: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur complétion profil: {str(e)}")
+
+@router.get("/debug/token/{token}")
+async def debug_invitation_token(token: str):
+    """Debug endpoint pour analyser un token d'invitation"""
+    
+    logger.info(f"🔍 [debug_invitation_token] Debug token")
+    
+    try:
+        service = BackendInvitationAuthService()
+        token_info = service.validate_invitation_token(token)
+        
+        return {
+            "token_valid": token_info.get("valid", False),
+            "token_info": token_info,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ [debug_invitation_token] Erreur: {e}")
+        return {
+            "token_valid": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
