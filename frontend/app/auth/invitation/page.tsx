@@ -305,7 +305,8 @@ function InvitationAcceptPageContent() {
     // Entreprise
     companyName: '',
     companyWebsite: '',
-    companyLinkedin: ''
+    companyLinkedin: '',
+    jobTitle: '' // ✅ AJOUT: Champ jobTitle requis par le backend
   })
   
   const [errors, setErrors] = useState<string[]>([])
@@ -514,6 +515,9 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
+    // Note: companyName et jobTitle sont optionnels côté frontend
+    // mais le backend recevra des valeurs par défaut ("Non spécifié")
+    
     // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Prend en compte l'auto-remplissage
     if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber, formData.country, countryCodeMap)) {
       const hasUserEnteredPhoneData = formData.areaCode.trim() || formData.phoneNumber.trim()
@@ -563,6 +567,8 @@ function InvitationAcceptPageContent() {
       // ✅ CORRIGÉ: Structure de données alignée avec le backend
       const requestBody = {
         access_token: userInfo.accessToken,
+        // ✅ CORRECTION: Le backend attend fullName au lieu de firstName/lastName séparés
+        fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
@@ -571,20 +577,26 @@ function InvitationAcceptPageContent() {
         phone: formData.countryCode && formData.areaCode && formData.phoneNumber 
           ? `${formData.countryCode} ${formData.areaCode}-${formData.phoneNumber}`
           : null,
+        // ✅ CORRECTION: Valeurs par défaut pour satisfaire le backend
+        company: formData.companyName.trim() || 'Non spécifié',
         companyName: formData.companyName.trim() || null,
         companyWebsite: formData.companyWebsite.trim() || null,
         companyLinkedin: formData.companyLinkedin.trim() || null,
+        // ✅ CORRECTION: Valeur par défaut pour satisfaire le backend
+        jobTitle: formData.jobTitle.trim() || 'Non spécifié',
         password: formData.password
       }
       
       // ✅ AJOUT: Validation côté client avant envoi
       const clientValidationErrors = []
       if (!requestBody.firstName) clientValidationErrors.push('Prénom requis')
-      if (!requestBody.lastName) clientValidationErrors.push('Nom requis') 
+      if (!requestBody.lastName) clientValidationErrors.push('Nom requis')
+      if (!requestBody.fullName) clientValidationErrors.push('Nom complet requis')
       if (!requestBody.email) clientValidationErrors.push('Email requis')
       if (!requestBody.country) clientValidationErrors.push('Pays requis')
       if (!requestBody.password) clientValidationErrors.push('Mot de passe requis')
       if (!requestBody.access_token) clientValidationErrors.push('Token d\'accès requis')
+      // Note: company et jobTitle peuvent être vides selon les erreurs du backend
       
       if (clientValidationErrors.length > 0) {
         console.error('❌ [InvitationAccept] Erreurs validation client:', clientValidationErrors)
@@ -1018,6 +1030,21 @@ function InvitationAcceptPageContent() {
                       value={formData.companyLinkedin}
                       onChange={(e) => handleInputChange('companyLinkedin', e.target.value)}
                       placeholder="https://linkedin.com/company/votre-entreprise"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  {/* ✅ Champ Titre du poste (optionnel côté frontend) */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Titre du poste (optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.jobTitle}
+                      onChange={(e) => handleInputChange('jobTitle', e.target.value)}
+                      placeholder="Votre titre de poste"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isProcessing}
                     />
