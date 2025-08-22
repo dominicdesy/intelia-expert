@@ -1,7 +1,7 @@
 'use client'
 // app/auth/invitation/page.tsx - Page pour gérer les invitations avec définition de mot de passe
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 
