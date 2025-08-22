@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/stores/auth' 
-// ? CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
+// Changement: Utiliser le singleton au lieu de createClientComponentClient
 import { getSupabaseClient } from '@/lib/supabase/singleton'
 import { StatisticsDashboard } from './StatisticsDashboard'
 import { QuestionsTab } from './QuestionsTab'
 import { InvitationStatsComponent } from './InvitationStats'
 
-// Types pour les données de statistiques
+// Types pour les donnees de statistiques
 interface SystemStats {
   system_health: {
     uptime_hours: number
@@ -87,7 +87,7 @@ interface PerformanceStats {
   cache_hit_rate: number
 }
 
-// ?? NOUVEAU: Interface pour les statistiques d'invitations
+// NOUVEAU: Interface pour les statistiques d'invitations
 interface InvitationStats {
   total_invitations_sent: number
   total_invitations_accepted: number
@@ -148,21 +148,21 @@ export const StatisticsPage: React.FC = () => {
   const [authStatus, setAuthStatus] = useState<'initializing' | 'checking' | 'ready' | 'unauthorized' | 'forbidden'>('initializing')
   const [statsLoading, setStatsLoading] = useState(false)
   const [questionsLoading, setQuestionsLoading] = useState(false)
-  const [invitationLoading, setInvitationLoading] = useState(false) // ?? NOUVEAU: Loading pour invitations
+  const [invitationLoading, setInvitationLoading] = useState(false) // NOUVEAU: Loading pour invitations
   const [error, setError] = useState<string | null>(null)
   
-  // États pour les données
+  // Etats pour les donnees
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null)
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null)
   const [billingStats, setBillingStats] = useState<BillingStats | null>(null)
   const [performanceStats, setPerformanceStats] = useState<PerformanceStats | null>(null)
-  const [invitationStats, setInvitationStats] = useState<InvitationStats | null>(null) // ?? NOUVEAU: Stats invitations
+  const [invitationStats, setInvitationStats] = useState<InvitationStats | null>(null) // NOUVEAU: Stats invitations
   const [questionLogs, setQuestionLogs] = useState<QuestionLog[]>([])
   const [totalQuestions, setTotalQuestions] = useState(0)
   
-  // États UI
+  // Etats UI
   const [selectedTimeRange, setSelectedTimeRange] = useState<'day' | 'week' | 'month' | 'year'>('month')
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'questions' | 'invitations'>('dashboard') // ?? NOUVEAU: Onglet invitations
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'questions' | 'invitations'>('dashboard') // NOUVEAU: Onglet invitations
   const [questionFilters, setQuestionFilters] = useState({
     search: '',
     source: 'all',
@@ -174,21 +174,21 @@ export const StatisticsPage: React.FC = () => {
   const [questionsPerPage] = useState(20)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(null)
   
-  // Référence pour éviter les vérifications multiples
+  // Reference pour eviter les verifications multiples
   const authCheckRef = useRef<boolean>(false)
   const stabilityCounterRef = useRef<number>(0)
 
-  // ?? LOGIQUE D'AUTHENTIFICATION OPTIMISÉE
+  // LOGIQUE D'AUTHENTIFICATION OPTIMISEE
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const performAuthCheck = () => {
-      // Éviter les vérifications multiples si déjà prêt
+      // Eviter les verifications multiples si deja pret
       if (authStatus === 'ready' && authCheckRef.current) {
         return
       }
 
-      console.log('?? [StatisticsPage] Auth check (singleton):', { 
+      console.log('[StatisticsPage] Auth check (singleton):', { 
         user: user === undefined ? 'undefined' : user === null ? 'null' : 'defined',
         email: user?.email,
         user_type: user?.user_type,
@@ -198,99 +198,99 @@ export const StatisticsPage: React.FC = () => {
 
       // Phase 1: Initialisation - attendre que user ne soit plus undefined
       if (user === undefined) {
-        console.log('? [StatisticsPage] Phase 1: Attente initialisation auth (singleton)...')
+        console.log('[StatisticsPage] Phase 1: Attente initialisation auth (singleton)...')
         setAuthStatus('initializing')
         stabilityCounterRef.current = 0
         return
       }
 
-      // Phase 2: Vérification - s'assurer que les données sont stables
+      // Phase 2: Verification - s'assurer que les donnees sont stables
       if (user !== null && (!user.email || !user.user_type)) {
-        console.log('? [StatisticsPage] Phase 2: Données utilisateur incomplètes, attente (singleton)...')
+        console.log('[StatisticsPage] Phase 2: Donnees utilisateur incompletes, attente (singleton)...')
         setAuthStatus('checking')
         stabilityCounterRef.current = 0
         return
       }
 
-      // Incrémenter le compteur de stabilité seulement si pas encore prêt
+      // Incrementer le compteur de stabilite seulement si pas encore pret
       if (authStatus !== 'ready') {
         stabilityCounterRef.current++
       }
 
-      // Attendre au moins 2 vérifications consécutives avec les mêmes données
+      // Attendre au moins 2 verifications consecutives avec les memes donnees
       if (stabilityCounterRef.current < 2 && authStatus !== 'ready') {
-        console.log(`? [StatisticsPage] Stabilisation (singleton)... (${stabilityCounterRef.current}/2)`)
+        console.log(`[StatisticsPage] Stabilisation (singleton)... (${stabilityCounterRef.current}/2)`)
         setAuthStatus('checking')
-        // Programmer une nouvelle vérification
+        // Programmer une nouvelle verification
         timeoutId = setTimeout(performAuthCheck, 150)
         return
       }
 
       // Phase 3: Validation finale
       if (user === null) {
-        console.log('? [StatisticsPage] Utilisateur non connecté (singleton)')
+        console.log('[StatisticsPage] Utilisateur non connecte (singleton)')
         setAuthStatus('unauthorized')
-        setError("Vous devez être connecté pour accéder à cette page")
+        setError("Vous devez etre connecte pour acceder a cette page")
         return
       }
 
       if (user.user_type !== 'super_admin') {
-        console.log('?? [StatisticsPage] Permissions insuffisantes (singleton):', user.user_type)
+        console.log('[StatisticsPage] Permissions insuffisantes (singleton):', user.user_type)
         setAuthStatus('forbidden')
-        setError("Accès refusé - Permissions super_admin requises")
+        setError("Acces refuse - Permissions super_admin requises")
         return
       }
 
-      // Phase 4: Succès ! (Une seule fois)
+      // Phase 4: Succes ! (Une seule fois)
       if (!authCheckRef.current) {
-        console.log('? [StatisticsPage] Authentification réussie (singleton):', user.email)
+        console.log('[StatisticsPage] Authentification reussie (singleton):', user.email)
         setAuthStatus('ready')
         setError(null)
         authCheckRef.current = true
       }
     }
 
-    // Démarrer la vérification avec un petit délai initial
+    // Demarrer la verification avec un petit delai initial
     timeoutId = setTimeout(performAuthCheck, 50)
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [user, authStatus]) // ?? AJOUTÉ: authStatus dans les dépendances pour éviter boucles
+  }, [user, authStatus])
 
-  // Charger les statistiques uniquement quand tout est prêt
+  // Charger les statistiques uniquement quand tout est pret
   useEffect(() => {
     if (authStatus === 'ready' && !statsLoading) {
-      console.log('?? [StatisticsPage] Lancement chargement des statistiques (singleton)')
+      console.log('[StatisticsPage] Lancement chargement des statistiques (singleton)')
       loadAllStatistics()
     }
-  }, [authStatus, selectedTimeRange]) // Retirer authStatus des deps pour éviter boucles
+  }, [authStatus, selectedTimeRange])
 
-  // Charger les questions si nécessaire
+  // Charger les questions si necessaire
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'questions' && !questionsLoading) {
-      console.log('?? [StatisticsPage] Lancement chargement des questions (singleton)')
+      console.log('[StatisticsPage] Lancement chargement des questions (singleton)')
       loadQuestionLogs()
     }
-  }, [authStatus, activeTab, currentPage]) // Garder authStatus pour sécurité
+  }, [authStatus, activeTab, currentPage])
 
-  // ?? NOUVEAU: Charger les invitations si nécessaire
+  // NOUVEAU: Charger les invitations si necessaire
   useEffect(() => {
     if (authStatus === 'ready' && activeTab === 'invitations' && !invitationLoading) {
-      console.log('?? [StatisticsPage] Lancement chargement des invitations (singleton)')
+      console.log('[StatisticsPage] Lancement chargement des invitations (singleton)')
       loadInvitationStats()
     }
   }, [authStatus, activeTab])
 
-  // ? FONCTION POUR RÉCUPÉRER LES HEADERS D'AUTHENTIFICATION (CORRIGÉE)
+  // FONCTION POUR RECUPERER LES HEADERS D'AUTHENTIFICATION (CORRIGEE)
   const getAuthHeaders = async () => {
     try {
-      // ? CHANGEMENT: Utiliser le singleton au lieu de createClientComponentClient
+      // Changement: Utiliser le singleton au lieu de createClientComponentClient
       const supabase = getSupabaseClient()
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error || !session) {
-        console.error('Erreur récupération session (singleton):', error)
+        console.error('Erreur recuperation session (singleton):', error)
         return {}
       }
       
@@ -304,23 +304,23 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // ?? NOUVELLE FONCTION: Charger les statistiques d'invitations
+  // NOUVELLE FONCTION: Charger les statistiques d'invitations
   const loadInvitationStats = async () => {
     if (invitationLoading) return
     
-    console.log('?? [StatisticsPage] Début chargement stats invitations (singleton)')
+    console.log('[StatisticsPage] Debut chargement stats invitations (singleton)')
     setInvitationLoading(true)
     setError(null)
 
     try {
       const headers = await getAuthHeaders()
 
-      // ?? UTILISER LE NOUVEL ENDPOINT ENRICHI
+      // UTILISER LE NOUVEL ENDPOINT ENRICHI
       const enhancedStatsRes = await fetch('/api/v1/invitations/stats/global-enhanced', { headers })
       
       if (!enhancedStatsRes.ok) {
         // Fallback vers l'endpoint simple si l'enrichi n'existe pas encore
-        console.log('?? Endpoint enrichi non disponible, utilisation endpoint simple...')
+        console.log('Endpoint enrichi non disponible, utilisation endpoint simple...')
         const globalStatsRes = await fetch('/api/v1/invitations/stats/global', { headers })
         
         if (!globalStatsRes.ok) {
@@ -328,9 +328,9 @@ export const StatisticsPage: React.FC = () => {
         }
 
         const globalData = await globalStatsRes.json()
-        console.log('? Stats globales simples récupérées (singleton):', globalData)
+        console.log('Stats globales simples recuperees (singleton):', globalData)
 
-        // Adapter les données simples
+        // Adapter les donnees simples
         const adaptedStats: InvitationStats = {
           total_invitations_sent: globalData.total_invitations || 0,
           total_invitations_accepted: globalData.total_accepted || 0,
@@ -360,34 +360,34 @@ export const StatisticsPage: React.FC = () => {
         }
 
         setInvitationStats(adaptedStats)
-        console.log('? [StatisticsPage] Stats invitations simples adaptées (singleton):', adaptedStats)
+        console.log('[StatisticsPage] Stats invitations simples adaptees (singleton):', adaptedStats)
         return
       }
 
-      // Utiliser les données enrichies
+      // Utiliser les donnees enrichies
       const enhancedData = await enhancedStatsRes.json()
-      console.log('? Stats globales enrichies récupérées (singleton):', enhancedData)
+      console.log('Stats globales enrichies recuperees (singleton):', enhancedData)
 
-      // Adapter les données enrichies pour l'interface
+      // Adapter les donnees enrichies pour l'interface
       const adaptedStats: InvitationStats = {
         total_invitations_sent: enhancedData.total_invitations || 0,
         total_invitations_accepted: enhancedData.total_accepted || 0,
         acceptance_rate: enhancedData.global_acceptance_rate || 0,
         unique_inviters: enhancedData.unique_inviters || 0,
         
-        // Utiliser les données séparées
+        // Utiliser les donnees separees
         top_inviters: enhancedData.top_inviters_by_sent || [],
         top_accepted: enhancedData.top_inviters_by_accepted || []
       }
 
       setInvitationStats(adaptedStats)
-      console.log('? [StatisticsPage] Stats invitations enrichies adaptées (singleton):', adaptedStats)
+      console.log('[StatisticsPage] Stats invitations enrichies adaptees (singleton):', adaptedStats)
 
     } catch (err) {
-      console.error('? [StatisticsPage] Erreur chargement stats invitations (singleton):', err)
+      console.error('[StatisticsPage] Erreur chargement stats invitations (singleton):', err)
       setError(`Erreur lors du chargement des statistiques d'invitations: ${err}`)
       
-      // Définir des stats par défaut en cas d'erreur
+      // Definir des stats par defaut en cas d'erreur
       setInvitationStats({
         total_invitations_sent: 0,
         total_invitations_accepted: 0,
@@ -402,102 +402,102 @@ export const StatisticsPage: React.FC = () => {
   }
 
   const loadAllStatistics = async () => {
-    if (statsLoading) return // Éviter les chargements multiples
+    if (statsLoading) return // Eviter les chargements multiples
     
-    console.log('?? [StatisticsPage] Début chargement statistiques (singleton)')
+    console.log('[StatisticsPage] Debut chargement statistiques (singleton)')
     setStatsLoading(true)
     setError(null)
 
     try {
       const headers = await getAuthHeaders()
 
-      // ?? CHARGER EN SÉQUENCE POUR ÉVITER RATE LIMITING
-      console.log('?? Chargement performance...')
+      // CHARGER EN SEQUENCE POUR EVITER RATE LIMITING
+      console.log('Chargement performance...')
       const performanceRes = await fetch('/api/v1/logging/analytics/performance?hours=24', { headers })
       
-      console.log('?? Chargement billing (peut être lent)...')
+      console.log('Chargement billing (peut etre lent)...')
       const billingRes = await fetch('/api/v1/logging/admin/stats', { headers })
       
-      console.log('?? Chargement dashboard...')
+      console.log('Chargement dashboard...')
       const dashboardRes = await fetch('/api/v1/logging/analytics/dashboard', { headers })
       
-      // ? COÛTS OPENAI OPTIMISÉS - Utiliser les nouveaux endpoints rapides
-      console.log('?? Chargement coûts OpenAI (optimisé)...')
+      // COUTS OPENAI OPTIMISES - Utiliser les nouveaux endpoints rapides
+      console.log('Chargement couts OpenAI (optimise)...')
       
-      // ?? PRIORISER les endpoints rapides dans l'ordre
+      // PRIORISER les endpoints rapides dans l'ordre
       const openaiEndpoints = [
-        '/api/v1/billing/openai-usage/last-week',        // ? RAPIDE - 7 jours
-        '/api/v1/billing/openai-usage/current-month-light', // ??? SÉCURISÉ - 10 jours max
-        '/api/v1/billing/openai-usage/fallback',         // ?? SECOURS - données simulées
-        '/api/v1/billing/openai-usage/current-month'     // ?? LEGACY - en dernier recours
+        '/api/v1/billing/openai-usage/last-week',        // RAPIDE - 7 jours
+        '/api/v1/billing/openai-usage/current-month-light', // SECURISE - 10 jours max
+        '/api/v1/billing/openai-usage/fallback',         // SECOURS - donnees simulees
+        '/api/v1/billing/openai-usage/current-month'     // LEGACY - en dernier recours
       ]
       
       let openaiCostsRes = null
       for (const endpoint of openaiEndpoints) {
         try {
-          console.log(`?? Tentative: ${endpoint}`)
+          console.log(`Tentative: ${endpoint}`)
           openaiCostsRes = await fetch(endpoint, { headers })
           if (openaiCostsRes.ok) {
-            console.log(`? Succès via: ${endpoint}`)
+            console.log(`Succes via: ${endpoint}`)
             break
           } else {
-            console.log(`? Échec ${endpoint}: ${openaiCostsRes.status}`)
+            console.log(`Echec ${endpoint}: ${openaiCostsRes.status}`)
           }
         } catch (error) {
-          console.log(`?? Erreur ${endpoint}:`, error)
+          console.log(`Erreur ${endpoint}:`, error)
         }
       }
       
-      console.log('?? Chargement health et métriques...')
+      console.log('Chargement health et metriques...')
       const systemHealthRes = await fetch('/api/v1/health/detailed', { headers })
       const billingPlansRes = await fetch('/api/v1/billing/plans', { headers })
       const systemMetricsRes = await fetch('/api/v1/system/metrics', { headers })
 
-      // Déclarer questionsData en dehors du try-catch pour l'utiliser plus tard
+      // Declarer questionsData en dehors du try-catch pour l'utiliser plus tard
       let questionsData: QuestionsApiResponse | null = null
       let backendData: BackendPerformanceStats | null = null
 
-      // Traitement des performances - RÉCUPÉRER LES VRAIES DONNÉES
+      // Traitement des performances - RECUPERER LES VRAIES DONNEES
       if (performanceRes.ok) {
         backendData = await performanceRes.json()
-        console.log('?? Données de performance reçues (singleton):', backendData)
+        console.log('Donnees de performance recues (singleton):', backendData)
         
-        // ?? RÉCUPÉRATION DES VRAIS COÛTS OPENAI avec endpoints optimisés
+        // RECUPERATION DES VRAIS COUTS OPENAI avec endpoints optimises
         let realOpenaiCosts = 6.30 // Valeur connue comme fallback
         
         if (openaiCostsRes && openaiCostsRes.ok) {
           try {
             const openaiData = await openaiCostsRes.json()
             realOpenaiCosts = openaiData.total_cost || openaiData.cost_usd || openaiData.total_usage || 6.30
-            console.log('?? Coûts OpenAI optimisés récupérés (singleton):', {
+            console.log('Couts OpenAI optimises recuperes (singleton):', {
               cost: realOpenaiCosts,
               source: openaiData.source || 'api',
               cached: openaiData.cached || false
             })
           } catch (parseError) {
-            console.log('?? Erreur parsing coûts OpenAI, utilisation fallback (singleton):', realOpenaiCosts)
+            console.log('Erreur parsing couts OpenAI, utilisation fallback (singleton):', realOpenaiCosts)
           }
         } else {
-          console.log('?? Tous les endpoints OpenAI ont échoué, utilisation fallback (singleton):', realOpenaiCosts)
+          console.log('Tous les endpoints OpenAI ont echoue, utilisation fallback (singleton):', realOpenaiCosts)
         }
         
-        // ?? UTILISER LES VRAIES DONNÉES DU BACKEND + CALCUL DEPUIS LES QUESTIONS
+        // UTILISER LES VRAIES DONNEES DU BACKEND + CALCUL DEPUIS LES QUESTIONS
         let realResponseTime = null
         
-        // D'abord essayer les données du backend performance
+        // D'abord essayer les donnees du backend performance
         if (backendData?.current_status?.avg_response_time_ms) {
           realResponseTime = backendData.current_status.avg_response_time_ms / 1000
         } else if (backendData?.averages?.avg_response_time_ms) {
           realResponseTime = backendData.averages.avg_response_time_ms / 1000
         }
         
-        // ?? CALCUL DU VRAI TEMPS depuis vos questions réelles (plus précis)
+        // CALCUL DU VRAI TEMPS depuis vos questions reelles (plus precis)
         let questionBasedMetrics = null
         if (questionsData && questionsData.questions) {
           const validTimes = questionsData.questions
             .map(q => q.response_time)
             .filter(t => t && t > 0)
-            .sort((a, b) => a - b) // Trier pour calculer la médiane
+            .sort((a, b) => a - b) // Trier pour calculer la mediane
           
           if (validTimes.length > 0) {
             const average = validTimes.reduce((a, b) => a + b, 0) / validTimes.length
@@ -515,7 +515,7 @@ export const StatisticsPage: React.FC = () => {
               count: validTimes.length
             }
             
-            console.log('?? Métriques temps de réponse calculées (singleton):', {
+            console.log('Metriques temps de reponse calculees (singleton):', {
               count: validTimes.length,
               average: average.toFixed(2) + 's',
               median: median.toFixed(2) + 's',
@@ -526,35 +526,35 @@ export const StatisticsPage: React.FC = () => {
           }
         }
         
-        // Prioriser le calcul depuis vos vraies questions (plus précis)
+        // Prioriser le calcul depuis vos vraies questions (plus precis)
         const finalResponseTime = questionBasedMetrics?.average || realResponseTime || 0
         
         const adaptedPerfStats: PerformanceStats = {
           avg_response_time: finalResponseTime,
-          median_response_time: questionBasedMetrics?.median || 0, // ?? MÉDIANE
-          min_response_time: questionBasedMetrics?.min || 0,       // ?? MINIMUM  
-          max_response_time: questionBasedMetrics?.max || 0,       // ?? MAXIMUM
-          response_time_count: questionBasedMetrics?.count || 0,   // ?? NOMBRE D'ÉCHANTILLONS
+          median_response_time: questionBasedMetrics?.median || 0, // NOUVEAU MEDIANE
+          min_response_time: questionBasedMetrics?.min || 0,       // NOUVEAU MINIMUM  
+          max_response_time: questionBasedMetrics?.max || 0,       // NOUVEAU MAXIMUM
+          response_time_count: questionBasedMetrics?.count || 0,   // NOUVEAU NOMBRE D'ECHANTILLONS
           openai_costs: realOpenaiCosts,
           error_count: backendData?.global_stats?.total_failures || 
                       backendData?.current_status?.total_errors || 0,
-          cache_hit_rate: 85.2 // TODO: À calculer depuis les vraies données quand disponible
+          cache_hit_rate: 85.2 // TODO: A calculer depuis les vraies donnees quand disponible
         }
         
         setPerformanceStats(adaptedPerfStats)
-        console.log('? Performance stats avec vraies données (singleton):', adaptedPerfStats)
+        console.log('Performance stats avec vraies donnees (singleton):', adaptedPerfStats)
       } else {
-        console.log('? Endpoint performance non disponible, récupération via endpoint alternatif (singleton)...')
+        console.log('Endpoint performance non disponible, recuperation via endpoint alternatif (singleton)...')
         
-        // ?? ESSAYER UN ENDPOINT ALTERNATIF POUR LES MÉTRIQUES
+        // ESSAYER UN ENDPOINT ALTERNATIF POUR LES METRIQUES
         try {
           const altResponse = await fetch('/api/v1/logging/analytics/health-check', { headers })
           if (altResponse.ok) {
             const healthData = await altResponse.json()
-            console.log('?? Données health-check (singleton):', healthData)
+            console.log('Donnees health-check (singleton):', healthData)
             
             setPerformanceStats({
-              avg_response_time: 0, // Sera affiché comme "Aucune donnée"
+              avg_response_time: 0, // Sera affiche comme "Aucune donnee"
               median_response_time: 0,
               min_response_time: 0,
               max_response_time: 0,
@@ -567,9 +567,9 @@ export const StatisticsPage: React.FC = () => {
             throw new Error('Health check failed')
           }
         } catch (healthError) {
-          console.log('? Aucun endpoint de performance disponible (singleton)')
+          console.log('Aucun endpoint de performance disponible (singleton)')
           setPerformanceStats({
-            avg_response_time: 0, // Sera affiché comme "Aucune donnée disponible"
+            avg_response_time: 0, // Sera affiche comme "Aucune donnee disponible"
             median_response_time: 0,
             min_response_time: 0,
             max_response_time: 0,
@@ -581,13 +581,13 @@ export const StatisticsPage: React.FC = () => {
         }
       }
 
-      // Traitement du billing avec VRAIES DONNÉES
+      // Traitement du billing avec VRAIES DONNEES
       let realBillingStats = null
       if (billingRes.ok) {
         realBillingStats = await billingRes.json()
-        console.log('? Billing stats réelles récupérées (singleton):', realBillingStats)
+        console.log('Billing stats reelles recuperees (singleton):', realBillingStats)
         
-        // ?? ADAPTER LES DONNÉES REÇUES - Format de votre endpoint
+        // ADAPTER LES DONNEES RECUES - Format de votre endpoint
         if (realBillingStats) {
           const adaptedBillingStats = {
             plans: realBillingStats.plans || {},
@@ -595,12 +595,12 @@ export const StatisticsPage: React.FC = () => {
             top_users: realBillingStats.top_users || []
           }
           setBillingStats(adaptedBillingStats)
-          console.log('?? Billing stats adaptées (singleton):', adaptedBillingStats)
+          console.log('Billing stats adaptees (singleton):', adaptedBillingStats)
         }
       } else {
-        console.log('?? Endpoint billing non disponible, calcul depuis les questions (singleton)...')
+        console.log('Endpoint billing non disponible, calcul depuis les questions (singleton)...')
         
-        // ?? CALCULER LES TOP USERS depuis les vraies questions
+        // CALCULER LES TOP USERS depuis les vraies questions
         try {
           const questionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=100', { headers })
           const questionsData = await questionsResponse.json()
@@ -608,7 +608,7 @@ export const StatisticsPage: React.FC = () => {
           if (questionsData && questionsData.questions) {
             const questions = questionsData.questions
             
-            // ?? CALCULER LES UTILISATEURS LES PLUS ACTIFS depuis les vraies données
+            // CALCULER LES UTILISATEURS LES PLUS ACTIFS depuis les vraies donnees
             const userStats = questions.reduce((acc: any, q: any) => {
               const email = q.user_email
               if (email && email.trim() !== '') {
@@ -616,7 +616,7 @@ export const StatisticsPage: React.FC = () => {
                   acc[email] = {
                     email: email,
                     question_count: 0,
-                    plan: 'free' // TODO: Récupérer le vrai plan depuis la base
+                    plan: 'free' // TODO: Recuperer le vrai plan depuis la base
                   }
                 }
                 acc[email].question_count++
@@ -629,7 +629,7 @@ export const StatisticsPage: React.FC = () => {
               .sort((a: any, b: any) => b.question_count - a.question_count)
               .slice(0, 5) as Array<{email: string, question_count: number, plan: string}>
             
-            console.log('?? Top users calculés depuis les questions (singleton):', {
+            console.log('Top users calcules depuis les questions (singleton):', {
               userStats,
               topUsers,
               totalUsers: Object.keys(userStats).length
@@ -642,7 +642,7 @@ export const StatisticsPage: React.FC = () => {
             })
           }
         } catch (topUsersError) {
-          console.error('? Erreur calcul top users (singleton):', topUsersError)
+          console.error('Erreur calcul top users (singleton):', topUsersError)
           setBillingStats({
             plans: {},
             total_revenue: 0,
@@ -654,12 +654,12 @@ export const StatisticsPage: React.FC = () => {
       // Dashboard/Usage stats  
       if (dashboardRes.ok) {
         const dashData = await dashboardRes.json()
-        console.log('? Dashboard data (singleton):', dashData)
+        console.log('Dashboard data (singleton):', dashData)
         
-        // ?? CALCULER LES VRAIES STATISTIQUES depuis les données réelles
-        // D'abord, récupérer TOUTES les vraies questions pour calculer les stats
+        // CALCULER LES VRAIES STATISTIQUES depuis les donnees reelles
+        // D'abord, recuperer TOUTES les vraies questions pour calculer les stats
         try {
-          // ?? RÉCUPÉRER TOUTES LES QUESTIONS avec le bon endpoint qui fonctionne !
+          // RECUPERER TOUTES LES QUESTIONS avec le bon endpoint qui fonctionne !
           const allQuestionsResponse = await fetch('/api/v1/logging/questions?page=1&limit=50', { headers })
           questionsData = await allQuestionsResponse.json()
           
@@ -667,9 +667,9 @@ export const StatisticsPage: React.FC = () => {
             const questions = questionsData.questions
             const totalFromPagination = questionsData.pagination?.total || questions.length
             
-            console.log(`?? Récupéré ${questions.length} questions sur ${totalFromPagination} total (singleton)`)
+            console.log(`Recupere ${questions.length} questions sur ${totalFromPagination} total (singleton)`)
             
-            // ?? FILTRER les utilisateurs avec email valide
+            // FILTRER les utilisateurs avec email valide
             const validUsers = new Set(
               questions
                 .map((q: any) => q.user_email)
@@ -680,17 +680,17 @@ export const StatisticsPage: React.FC = () => {
             const today = new Date().toDateString()
             const thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0')
             
-            // ?? CALCULER LES VRAIES SOURCES avec le bon total
+            // CALCULER LES VRAIES SOURCES avec le bon total
             const sourceStats = questions.reduce((acc: any, q: any) => {
               const source = q.response_source || 'unknown'
               acc[source] = (acc[source] || 0) + 1
               return acc
             }, {})
             
-            // Calculer le total des sources pour vérification
+            // Calculer le total des sources pour verification
             const totalFromSources = Object.values(sourceStats).reduce((sum: number, count: any) => sum + count, 0)
             
-            console.log('?? Distribution des sources (singleton):', {
+            console.log('Distribution des sources (singleton):', {
               sourceStats,
               totalFromSources,
               totalFromPagination,
@@ -707,17 +707,17 @@ export const StatisticsPage: React.FC = () => {
               q.timestamp.startsWith(thisMonth)
             ).length
             
-            // ?? AJUSTER les proportions si on n'a qu'un échantillon
+            // AJUSTER les proportions si on n'a qu'un echantillon
             let adjustedSourceStats = sourceStats
             if (questions.length < totalFromPagination) {
-              // Calculer le facteur d'échelle
+              // Calculer le facteur d'echelle
               const scaleFactor = totalFromPagination / questions.length
               adjustedSourceStats = Object.entries(sourceStats).reduce((acc: any, [source, count]: [string, any]) => {
                 acc[source] = Math.round(count * scaleFactor)
                 return acc
               }, {})
               
-              console.log('?? Sources ajustées pour le total réel (singleton):', {
+              console.log('Sources ajustees pour le total reel (singleton):', {
                 original: sourceStats,
                 scaled: adjustedSourceStats,
                 scaleFactor
@@ -736,12 +736,12 @@ export const StatisticsPage: React.FC = () => {
               },
               monthly_breakdown: {
                 [thisMonth]: questionsThisMonth,
-                "2025-07": 0, // TODO: Calculer les mois précédents
+                "2025-07": 0, // TODO: Calculer les mois precedents
                 "2025-06": 0
               }
             })
             
-            console.log('?? Stats finales calculées (singleton):', {
+            console.log('Stats finales calculees (singleton):', {
               uniqueUsers,
               totalQuestions: totalFromPagination,
               questionsToday,
@@ -751,8 +751,8 @@ export const StatisticsPage: React.FC = () => {
             })
           }
         } catch (questionsError) {
-          console.error('? Erreur récupération questions pour stats (singleton):', questionsError)
-          // Fallback aux données par défaut
+          console.error('Erreur recuperation questions pour stats (singleton):', questionsError)
+          // Fallback aux donnees par defaut
           setUsageStats({
             unique_users: 1, // Au minimum vous
             total_questions: totalQuestions || 0,
@@ -769,38 +769,38 @@ export const StatisticsPage: React.FC = () => {
           })
         }
 
-        // ?? RÉCUPÉRATION DES VRAIES DONNÉES SYSTÈME
+        // RECUPERATION DES VRAIES DONNEES SYSTEME
         let systemHealthData = null
         let systemMetricsData = null
         let realPlans = {}
 
         if (systemHealthRes.ok) {
           systemHealthData = await systemHealthRes.json()
-          console.log('? System health récupéré (singleton):', systemHealthData)
+          console.log('System health recupere (singleton):', systemHealthData)
         }
 
         if (systemMetricsRes.ok) {
           systemMetricsData = await systemMetricsRes.json()
-          console.log('? System metrics récupérés (singleton):', systemMetricsData)
+          console.log('System metrics recuperes (singleton):', systemMetricsData)
         }
 
-        // ?? RÉCUPÉRATION DES VRAIS PLANS
+        // RECUPERATION DES VRAIS PLANS
         if (billingPlansRes.ok) {
           const plansData = await billingPlansRes.json()
           realPlans = plansData.plans || {}
-          console.log('? Plans réels récupérés pour system stats (singleton):', realPlans)
+          console.log('Plans reels recuperes pour system stats (singleton):', realPlans)
         }
 
-        // ?? CONSTRUIRE LES VRAIES STATISTICS SYSTÈME
+        // CONSTRUIRE LES VRAIES STATISTICS SYSTEME
         setSystemStats({
           system_health: {
-            uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies métriques
-            total_requests: questionsData?.pagination?.total || 0, // ?? VRAIES DONNÉES - FIXED avec null check
+            uptime_hours: 24 * 7, // TODO: Calculer depuis les vraies metriques
+            total_requests: questionsData?.pagination?.total || 0, // VRAIES DONNEES - FIXED avec null check
             error_rate: Number(backendData?.current_status?.error_rate_percent) || 2.1, // Fix: Ensure it's a number
             rag_status: {
               global: systemHealthData?.rag_configured || true,
               broiler: systemHealthData?.openai_configured || true,
-              layer: true // TODO: Ajouter endpoint spécifique
+              layer: true // TODO: Ajouter endpoint specifique
             }
           },
           billing_stats: {
@@ -808,17 +808,17 @@ export const StatisticsPage: React.FC = () => {
             plan_names: Object.keys(realPlans).length > 0 ? Object.keys(realPlans) : ['free', 'basic', 'premium', 'enterprise']
           },
           features_enabled: {
-            analytics: true, // Prouvé par le fait qu'on récupère les données
+            analytics: true, // Prouve par le fait qu'on recupere les donnees
             billing: billingRes.ok,
-            authentication: true, // On est connecté
+            authentication: true, // On est connecte
             openai_fallback: systemHealthData?.openai_configured || true
           }
         })
       }
 
-      console.log('? [StatisticsPage] Statistiques chargées (singleton)')
+      console.log('[StatisticsPage] Statistiques chargees (singleton)')
     } catch (err) {
-      console.error('? [StatisticsPage] Erreur chargement statistiques (singleton):', err)
+      console.error('[StatisticsPage] Erreur chargement statistiques (singleton):', err)
       setError('Erreur lors du chargement des statistiques')
     } finally {
       setStatsLoading(false)
@@ -837,9 +837,9 @@ export const StatisticsPage: React.FC = () => {
         limit: questionsPerPage.toString()
       })
 
-      console.log('?? [StatisticsPage] Chargement questions (singleton):', { page: currentPage, limit: questionsPerPage })
+      console.log('[StatisticsPage] Chargement questions (singleton):', { page: currentPage, limit: questionsPerPage })
 
-      // ?? UTILISER LE BON ENDPOINT DES QUESTIONS QUI FONCTIONNE
+      // UTILISER LE BON ENDPOINT DES QUESTIONS QUI FONCTIONNE
       const response = await fetch(`/api/v1/logging/questions?${params}`, { headers })
       
       if (!response.ok) {
@@ -848,9 +848,9 @@ export const StatisticsPage: React.FC = () => {
       
       const data: QuestionsApiResponse = await response.json()
       
-      console.log('? Questions chargées (singleton):', data)
+      console.log('Questions chargees (singleton):', data)
       
-      // Adapter les données du backend pour l'UI
+      // Adapter les donnees du backend pour l'UI
       const adaptedQuestions: QuestionLog[] = data.questions.map(q => ({
         id: q.id,
         timestamp: q.timestamp,
@@ -871,7 +871,7 @@ export const StatisticsPage: React.FC = () => {
       setTotalQuestions(data.pagination.total)
       
     } catch (err) {
-      console.error('? Erreur chargement questions (singleton):', err)
+      console.error('Erreur chargement questions (singleton):', err)
       setError(`Erreur chargement questions: ${err}`)
       setQuestionLogs([])
     } finally {
@@ -879,7 +879,7 @@ export const StatisticsPage: React.FC = () => {
     }
   }
 
-  // Fonction helper pour mapper les sources de réponse
+  // Fonction helper pour mapper les sources de reponse
   const mapResponseSource = (source: string): QuestionLog['response_source'] => {
     switch (source) {
       case 'rag': return 'rag'
@@ -897,9 +897,9 @@ export const StatisticsPage: React.FC = () => {
     return '?'
   }
 
-  // ?? RENDU CONDITIONNEL ULTRA-SIMPLE - Style Compass
+  // RENDU CONDITIONNEL ULTRA-SIMPLE - Style Compass
   
-  // États de chargement/initialisation
+  // Etats de chargement/initialisation
   if (authStatus === 'initializing') {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -916,21 +916,21 @@ export const StatisticsPage: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Vérification des permissions (singleton)...</p>
-          <p className="text-xs text-gray-400 mt-2">Stabilisation des données d'authentification</p>
+          <p className="text-gray-600">Verification des permissions (singleton)...</p>
+          <p className="text-xs text-gray-400 mt-2">Stabilisation des donnees d'authentification</p>
         </div>
       </div>
     )
   }
 
-  // États d'erreur - Style Compass exact
+  // Etats d'erreur - Style Compass exact
   if (authStatus === 'unauthorized') {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
           <div className="text-red-600 text-6xl mb-4">??</div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Connexion requise</h2>
-          <p className="text-gray-600 mb-6">Vous devez être connecté pour accéder à cette page.</p>
+          <p className="text-gray-600 mb-6">Vous devez etre connecte pour acceder a cette page.</p>
           <div className="flex space-x-3">
             <button
               onClick={() => window.location.href = '/login'}
@@ -955,9 +955,9 @@ export const StatisticsPage: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white border border-gray-200 max-w-md w-full text-center p-8">
           <div className="text-red-600 text-6xl mb-4">??</div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Accès refusé</h2>
-          <p className="text-gray-600 mb-2">Cette page est réservée aux super administrateurs.</p>
-          <p className="text-sm text-gray-500 mb-6">Votre rôle actuel : <span className="font-medium">{user?.user_type || 'non défini'}</span></p>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Acces refuse</h2>
+          <p className="text-gray-600 mb-2">Cette page est reservee aux super administrateurs.</p>
+          <p className="text-sm text-gray-500 mb-6">Votre role actuel : <span className="font-medium">{user?.user_type || 'non defini'}</span></p>
           <button
             onClick={() => window.history.back()}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
@@ -969,7 +969,7 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // Chargement des données
+  // Chargement des donnees
   if (statsLoading && !systemStats) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -981,7 +981,7 @@ export const StatisticsPage: React.FC = () => {
     )
   }
 
-  // Erreur dans le chargement des données
+  // Erreur dans le chargement des donnees
   if (error && authStatus === 'ready' && !systemStats) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -993,14 +993,14 @@ export const StatisticsPage: React.FC = () => {
             onClick={loadAllStatistics}
             className="w-full bg-blue-600 text-white px-6 py-2 hover:bg-blue-700 transition-colors"
           >
-            Réessayer
+            Reessayer
           </button>
         </div>
       </div>
     )
   }
 
-  // ?? PAGE PRINCIPALE - Header sans info utilisateur
+  // PAGE PRINCIPALE - Header sans info utilisateur
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header - Logo + Navigation + Boutons */}
@@ -1038,7 +1038,7 @@ export const StatisticsPage: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Questions & Réponses
+                  Questions & Reponses
                 </button>
                 <button
                   onClick={() => setActiveTab('invitations')}
@@ -1122,7 +1122,7 @@ export const StatisticsPage: React.FC = () => {
             totalQuestions={totalQuestions}
           />
         ) : activeTab === 'invitations' ? (
-          // ?? NOUVEAU: Onglet Invitations
+          // NOUVEAU: Onglet Invitations
           <>
             {invitationLoading ? (
               <div className="bg-white border border-gray-200 p-8 text-center">
@@ -1135,7 +1135,7 @@ export const StatisticsPage: React.FC = () => {
           </>
         ) : null}
 
-        {/* Modal de détail de question - Style Compass */}
+        {/* Modal de detail de question - Style Compass */}
         {selectedQuestion && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
@@ -1144,7 +1144,7 @@ export const StatisticsPage: React.FC = () => {
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <h3 className="text-base font-medium text-gray-900">Détails de la Question</h3>
+                  <h3 className="text-base font-medium text-gray-900">Details de la Question</h3>
                 </div>
                 <button
                   onClick={() => setSelectedQuestion(null)}
@@ -1169,7 +1169,7 @@ export const StatisticsPage: React.FC = () => {
                   <div className="bg-gray-50 p-4 border border-gray-200">
                     <h4 className="font-medium text-gray-900 mb-2 flex items-center space-x-2">
                       <span>??</span>
-                      <span>Réponse:</span>
+                      <span>Reponse:</span>
                     </h4>
                     <div className="text-gray-700 whitespace-pre-wrap">{selectedQuestion.response}</div>
                   </div>
@@ -1178,7 +1178,7 @@ export const StatisticsPage: React.FC = () => {
                     <div className="bg-white p-4 border border-gray-200">
                       <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
                         <span>??</span>
-                        <span>Métadonnées:</span>
+                        <span>Metadonnees:</span>
                       </h4>
                       <table className="w-full text-sm">
                         <tbody className="space-y-2">
