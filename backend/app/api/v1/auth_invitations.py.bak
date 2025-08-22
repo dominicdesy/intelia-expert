@@ -24,7 +24,7 @@ except ImportError:
     Client = None
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/v1/auth/invitations", tags=["auth-invitations"])
+router = APIRouter(prefix="/auth/invitations", tags=["auth-invitations"])
 
 # ==================== MODÈLES PYDANTIC ====================
 class ValidateTokenRequest(BaseModel):
