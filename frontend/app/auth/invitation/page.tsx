@@ -1,31 +1,98 @@
 'use client'
 // app/auth/invitation/page.tsx - Page d'invitation utilisant UNIQUEMENT le backend
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-// ==================== CONFIGURATION DES PAYS ====================
-const countries = [
-  { value: 'CA', label: 'Canada' },
-  { value: 'US', label: 'États-Unis' },
-  { value: 'FR', label: 'France' },
-  { value: 'BE', label: 'Belgique' },
-  { value: 'CH', label: 'Suisse' },
-  { value: 'MX', label: 'Mexique' },
-  { value: 'BR', label: 'Brésil' }
+// ==================== CONFIGURATION DES PAYS AVEC FALLBACK ====================
+// Pays de fallback (les plus communs) en cas d'échec de l'API
+const fallbackCountries = [
+  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
+  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
+  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
+  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
+  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
+  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
+  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
+  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
+  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
+  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
+  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
+  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
+  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
+  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
+  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
+  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
+  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
+  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
+  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
+  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
 ]
 
-const countryCodeMap: { [key: string]: string } = {
-  'CA': '+1',
-  'US': '+1',
-  'FR': '+33',
-  'BE': '+32',
-  'CH': '+41',
-  'MX': '+52',
-  'BR': '+55'
+// Interface pour les pays
+interface Country {
+  value: string
+  label: string
+  phoneCode: string
+  flag?: string
 }
 
-// ==================== VALIDATION ====================
+// Hook personnalisé pour charger les pays avec fallback
+const useCountries = () => {
+  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const [loading, setLoading] = useState(true)
+  const [usingFallback, setUsingFallback] = useState(false)
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        // Essayer de charger depuis l'API REST Countries
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
+          headers: {
+            'Accept': 'application/json',
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error('API non disponible')
+        }
+        
+        const data = await response.json()
+        const formattedCountries = data
+          .map((country: any) => ({
+            value: country.cca2,
+            label: country.translations?.fra?.common || country.name.common,
+            phoneCode: country.idd?.root + (country.idd?.suffixes?.[0] || ''),
+            flag: country.flag
+          }))
+          .filter((country: Country) => country.phoneCode && country.phoneCode !== 'undefined') // Filtrer les pays sans code téléphone
+          .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
+        
+        if (formattedCountries.length > 0) {
+          setCountries(formattedCountries)
+          setUsingFallback(false)
+        } else {
+          throw new Error('Données vides')
+        }
+        
+      } catch (err) {
+        console.warn('Utilisation de la liste de fallback:', err)
+        setCountries(fallbackCountries)
+        setUsingFallback(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    // Délai pour éviter les appels trop fréquents
+    const timer = setTimeout(fetchCountries, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return { countries, loading, usingFallback }
+}
+
+// ==================== VALIDATION CORRIGÉE ====================
 const validatePassword = (password: string): string[] => {
   const errors: string[] = []
   
@@ -48,21 +115,30 @@ const validatePassword = (password: string): string[] => {
   return errors
 }
 
+// ✅ VALIDATION TÉLÉPHONE CORRIGÉE
 const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
+  // Si tous les champs sont vides, c'est valide (optionnel)
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
     return true
   }
   
+  // Si au moins un champ est rempli, tous doivent être remplis et valides
   if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
-    if (!countryCode.trim() || !/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
+    // Vérifier que tous les champs sont remplis
+    if (!countryCode.trim() || !areaCode.trim() || !phoneNumber.trim()) {
       return false
     }
     
-    if (!areaCode.trim() || !/^\d{3}$/.test(areaCode.trim())) {
+    // Vérifier le format de chaque champ
+    if (!/^\+[1-9]\d{0,3}$/.test(countryCode.trim())) {
       return false
     }
     
-    if (!phoneNumber.trim() || !/^\d{7}$/.test(phoneNumber.trim())) {
+    if (!/^\d{3}$/.test(areaCode.trim())) {
+      return false
+    }
+    
+    if (!/^\d{7}$/.test(phoneNumber.trim())) {
       return false
     }
   }
@@ -161,6 +237,17 @@ function InvitationAcceptPageContent() {
   const [hasProcessedToken, setHasProcessedToken] = useState(false)
   const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null)
   
+  // ✅ Hook pour charger les pays
+  const { countries, loading: countriesLoading, usingFallback } = useCountries()
+  
+  // ✅ Créer le mapping des codes téléphoniques dynamiquement
+  const countryCodeMap = useMemo(() => {
+    return countries.reduce((acc, country) => {
+      acc[country.value] = country.phoneCode
+      return acc
+    }, {} as Record<string, string>)
+  }, [countries])
+  
   // États pour le formulaire complet
   const [formData, setFormData] = useState({
     // Mot de passe
@@ -215,7 +302,7 @@ function InvitationAcceptPageContent() {
         const hasInvitationInQuery = token && type === 'invite'
         
         if (hasInvitationInHash || hasInvitationInQuery) {
-          console.log('📧 [InvitationAccept] Invitation détectée dans URL')
+          console.log('🔧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Validation de votre invitation...')
           
           // ✅ CORRECTION: Marquer comme traité AVANT le traitement
@@ -349,6 +436,7 @@ function InvitationAcceptPageContent() {
     }
   }
 
+  // ✅ VALIDATION FORMULAIRE MISE À JOUR
   const validateForm = (): string[] => {
     const validationErrors: string[] = []
     
@@ -386,11 +474,21 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
-    // Validation téléphone (optionnel mais si fourni, doit être complet)
-    const hasAnyPhoneField = formData.countryCode.trim() || formData.areaCode.trim() || formData.phoneNumber.trim()
-    if (hasAnyPhoneField) {
-      if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
-        validationErrors.push('Format de téléphone invalide (tous les champs téléphone doivent être remplis)')
+    // ✅ VALIDATION TÉLÉPHONE AMÉLIORÉE
+    if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
+      const hasAnyPhoneField = formData.countryCode.trim() || formData.areaCode.trim() || formData.phoneNumber.trim()
+      
+      if (hasAnyPhoneField) {
+        const missingFields = []
+        if (!formData.countryCode.trim()) missingFields.push('indicatif pays')
+        if (!formData.areaCode.trim()) missingFields.push('indicatif régional')
+        if (!formData.phoneNumber.trim()) missingFields.push('numéro')
+        
+        if (missingFields.length > 0) {
+          validationErrors.push(`Téléphone incomplet: veuillez remplir ${missingFields.join(', ')}`)
+        } else {
+          validationErrors.push('Format de téléphone invalide')
+        }
       }
     }
     
@@ -543,7 +641,7 @@ function InvitationAcceptPageContent() {
 
           {/* Formulaire de création de profil complet */}
           {status === 'set-password' && (
-            <div className="max-h-screen overflow-y-auto">
+            <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">
                 Bienvenue ! Complétez votre profil
               </h2>
@@ -562,6 +660,20 @@ function InvitationAcceptPageContent() {
                         <p className="text-sm italic">"{userInfo.personalMessage}"</p>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ STATUT DU CHARGEMENT DES PAYS */}
+              {usingFallback && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-sm text-yellow-800">
+                      Liste de pays limitée (connexion internet limitée)
+                    </span>
                   </div>
                 </div>
               )}
@@ -666,24 +778,34 @@ function InvitationAcceptPageContent() {
                     <p className="mt-1 text-xs text-gray-500">Email provenant de votre invitation</p>
                   </div>
 
+                  {/* ✅ SÉLECTION PAYS AMÉLIORÉE */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
                       Pays <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      required
-                      value={formData.country}
-                      onChange={(e) => handleInputChange('country', e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    >
-                      <option value="">Sélectionner...</option>
-                      {countries.map(country => (
-                        <option key={country.value} value={country.value}>
-                          {country.label}
-                        </option>
-                      ))}
-                    </select>
+                    {countriesLoading ? (
+                      <div className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-sm text-gray-600">Chargement des pays...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={formData.country}
+                        onChange={(e) => handleInputChange('country', e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                        disabled={isProcessing}
+                      >
+                        <option value="">Sélectionner un pays...</option>
+                        {countries.map(country => (
+                          <option key={country.value} value={country.value}>
+                            {country.flag} {country.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="mt-4">
