@@ -54,29 +54,46 @@ const useCountries = () => {
         })
         
         if (!response.ok) {
-          throw new Error('API non disponible')
+          throw new Error(`API Error: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
+        console.log('🌍 [Countries] Données reçues:', data.length, 'pays')
+        
         const formattedCountries = data
-          .map((country: any) => ({
-            value: country.cca2,
-            label: country.translations?.fra?.common || country.name.common,
-            phoneCode: country.idd?.root + (country.idd?.suffixes?.[0] || ''),
-            flag: country.flag
-          }))
-          .filter((country: Country) => country.phoneCode && country.phoneCode !== 'undefined') // Filtrer les pays sans code téléphone
+          .map((country: any) => {
+            const phoneCode = country.idd?.root + (country.idd?.suffixes?.[0] || '')
+            return {
+              value: country.cca2,
+              label: country.translations?.fra?.common || country.name.common,
+              phoneCode: phoneCode,
+              flag: country.flag
+            }
+          })
+          .filter((country: Country) => {
+            // Filtrer les pays sans code téléphone valide
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+')
+            return hasValidCode && country.value && country.label
+          })
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
-        if (formattedCountries.length > 0) {
+        console.log('🌍 [Countries] Pays formatés:', formattedCountries.length, 'pays valides')
+        
+        if (formattedCountries.length >= 50) { // Au moins 50 pays pour considérer que l'API fonctionne bien
           setCountries(formattedCountries)
           setUsingFallback(false)
+          console.log('✅ [Countries] API REST Countries utilisée avec succès')
         } else {
-          throw new Error('Données vides')
+          console.warn('⚠️ [Countries] Peu de pays reçus, utilisation du fallback')
+          throw new Error('Données insuffisantes')
         }
         
       } catch (err) {
-        console.warn('Utilisation de la liste de fallback:', err)
+        console.warn('⚠️ [Countries] Erreur API, utilisation du fallback:', err)
         setCountries(fallbackCountries)
         setUsingFallback(true)
       } finally {
@@ -664,15 +681,15 @@ function InvitationAcceptPageContent() {
                 </div>
               )}
 
-              {/* ✅ STATUT DU CHARGEMENT DES PAYS */}
-              {usingFallback && (
+              {/* ✅ STATUT DU CHARGEMENT DES PAYS - Seulement si vraiment en fallback */}
+              {usingFallback && !countriesLoading && (
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-center space-x-2">
                     <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                     <span className="text-sm text-yellow-800">
-                      Liste de pays limitée (connexion internet limitée)
+                      Liste de pays limitée (service externe temporairement indisponible)
                     </span>
                   </div>
                 </div>
