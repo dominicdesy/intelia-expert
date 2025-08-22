@@ -31,6 +31,8 @@ import {
 
 // Contenu principal de la page
 function PageContent() {
+  console.log('🚀 [PageContent] Composant PageContent rendu')
+  
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -38,8 +40,14 @@ function PageContent() {
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { login, register, initializeSession } = useAuthStore()
 
-  // Hook pour charger les pays
+  // ⭐ HOOK APPELÉ IMMÉDIATEMENT - PAS DE CONDITION
+  console.log('🎯 [PageContent] Appel du hook useCountries...')
   const { countries, loading: countriesLoading, usingFallback } = useCountries()
+  console.log('📊 [PageContent] Hook useCountries retourné:', { 
+    countriesLength: countries.length, 
+    loading: countriesLoading, 
+    usingFallback 
+  })
   
   // Créer le mapping des codes téléphoniques dynamiquement
   const countryCodeMap = useCountryCodeMap(countries)
@@ -53,7 +61,7 @@ function PageContent() {
   const [currentLanguage, setCurrentLanguage] = useState<Language>('fr')
   const t = useMemo(() => translations[currentLanguage], [currentLanguage])
   
-  const [isSignupMode, setIsSignupMode] = useState(false)
+  const [isSignupMode, setIsSignupMode] = useState(false) // ⭐ COMMENCER EN MODE LOGIN
   const [localError, setLocalError] = useState('')
   const [localSuccess, setLocalSuccess] = useState('')
   
@@ -78,6 +86,17 @@ function PageContent() {
     companyWebsite: '',
     companyLinkedin: ''
   })
+
+  // ⭐ FORCER LE MODE INSCRIPTION POUR DEBUG
+  useEffect(() => {
+    console.log('🧪 [Debug] Force le passage en mode inscription après 2 secondes pour tester les pays')
+    const timer = setTimeout(() => {
+      console.log('🧪 [Debug] Passage en mode inscription pour voir le sélecteur de pays')
+      setIsSignupMode(true)
+    }, 2000)
+    
+    return () => clearTimeout(timer)
+  }, [])
 
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current) {
@@ -161,7 +180,7 @@ function PageContent() {
     }
 
     try {
-      console.log('🔄 [Login] Tentative connexion...')
+      console.log('📄 [Login] Tentative connexion...')
       
       await login(loginData.email, loginData.password)
       
@@ -195,7 +214,7 @@ function PageContent() {
     }
 
     try {
-      console.log('🔄 [Signup] Tentative création compte...')
+      console.log('📄 [Signup] Tentative création compte...')
       
       const userData = {
         email: signupData.email,
@@ -239,6 +258,7 @@ function PageContent() {
   }
 
   const toggleMode = () => {
+    console.log('🔄 [UI] Basculement mode:', isSignupMode ? 'signup → login' : 'login → signup')
     setIsSignupMode(!isSignupMode)
     setLocalError('')
     setLocalSuccess('')
@@ -248,6 +268,7 @@ function PageContent() {
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true
+      console.log('📄 [Init] Initialisation unique')
       
       // Charger remember me
       const { rememberMe, lastEmail } = rememberMeUtils.load()
@@ -266,7 +287,7 @@ function PageContent() {
     
     if (!sessionInitialized.current) {
       sessionInitialized.current = true
-      console.log('🔄 [Session] Initialisation unique de la session')
+      console.log('📄 [Session] Initialisation unique de la session')
       initializeSession()
     }
   }, [hasHydrated, initializeSession])
@@ -289,11 +310,34 @@ function PageContent() {
 
   // Affichage loading pendant l'hydratation
   if (!hasHydrated || isLoading) {
+    console.log('⏳ [Render] Affichage du spinner de chargement')
     return <LoadingSpinner />
   }
 
+  console.log('🎨 [Render] Rendu de la page principale')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
+      
+      {/* ⭐ AJOUT D'UNE BOÎTE DE DEBUG GLOBALE */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-16 right-4 bg-purple-50 border border-purple-200 rounded-lg p-4 text-xs max-w-sm z-50">
+          <div className="font-semibold text-purple-800 mb-2">🧪 Debug Global</div>
+          <div className="space-y-1 text-purple-700">
+            <div>🔄 Mode: <span className="font-mono bg-purple-100 px-1 rounded">{isSignupMode ? 'Inscription' : 'Connexion'}</span></div>
+            <div>📊 Pays: <span className="font-mono bg-purple-100 px-1 rounded">{countries.length}</span></div>
+            <div>⏳ Loading: <span className="font-mono bg-purple-100 px-1 rounded">{countriesLoading ? 'Oui' : 'Non'}</span></div>
+            <div>🔄 Fallback: <span className="font-mono bg-purple-100 px-1 rounded">{usingFallback ? 'Oui' : 'Non'}</span></div>
+          </div>
+          <button 
+            onClick={toggleMode}
+            className="mt-2 text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded"
+          >
+            Basculer mode
+          </button>
+        </div>
+      )}
+      
       <div className="absolute top-4 right-4">
         <LanguageSelector onLanguageChange={setCurrentLanguage} currentLanguage={currentLanguage} />
       </div>
@@ -481,7 +525,7 @@ function PageContent() {
                     />
                   </div>
 
-                  {/* Sélection pays améliorée */}
+                  {/* ⭐ SÉLECTEUR DE PAYS TOUJOURS AFFICHÉ EN MODE INSCRIPTION */}
                   <CountrySelector
                     countries={countries}
                     countriesLoading={countriesLoading}
@@ -661,6 +705,7 @@ function PageContent() {
 
 // Export principal avec Suspense
 export default function Page() {
+  console.log('📄 [Page] Composant Page principal appelé')
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <PageContent />
