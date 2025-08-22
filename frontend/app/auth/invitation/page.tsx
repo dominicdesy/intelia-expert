@@ -130,8 +130,9 @@ function InvitationAcceptPageContent() {
           
           console.log('🔍 [InvitationAccept] Token extrait, validation via backend...')
           
-          // ✅ CORRIGÉ: Utiliser la structure de réponse correcte
-          const validateResponse = await fetch('/api/v1/auth/invitations/validate-token', {
+          // ✅ CORRIGÉ: Utiliser les variables d'environnement
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL
+          const validateResponse = await fetch(`${API_BASE_URL}/v1/auth/invitations/validate-token`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -274,8 +275,9 @@ function InvitationAcceptPageContent() {
         access_token: '[HIDDEN]'
       })
       
-      // Finaliser le profil via le backend
-      const completeResponse = await fetch('/api/v1/auth/invitations/complete-profile', {
+      // ✅ CORRIGÉ: Utiliser les variables d'environnement
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL
+      const completeResponse = await fetch(`${API_BASE_URL}/v1/auth/invitations/complete-profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
