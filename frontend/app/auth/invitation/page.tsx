@@ -66,6 +66,7 @@ function InvitationAcceptPageContent() {
   const [message, setMessage] = useState('')
   const [userInfo, setUserInfo] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [hasProcessedToken, setHasProcessedToken] = useState(false)
   
   // États pour le formulaire complet
   const [formData, setFormData] = useState({
@@ -93,6 +94,12 @@ function InvitationAcceptPageContent() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        // ✅ CORRECTION: Éviter le double traitement
+        if (hasProcessedToken) {
+          console.log('🔍 [InvitationAccept] Token déjà traité, ignorer')
+          return
+        }
+
         console.log('🔍 [InvitationAccept] Début traitement invitation')
         
         // Vérifier les paramètres d'URL
@@ -112,6 +119,9 @@ function InvitationAcceptPageContent() {
         if (hasInvitationInHash || hasInvitationInQuery) {
           console.log('📧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Validation de votre invitation...')
+          
+          // ✅ CORRECTION: Marquer comme traité AVANT le traitement
+          setHasProcessedToken(true)
           
           // 🔧 NOUVELLE APPROCHE : Extraire le token et valider via le backend
           let accessToken = ''
@@ -164,14 +174,19 @@ function InvitationAcceptPageContent() {
           setStatus('set-password')
           setMessage('Complétez votre profil')
           
-          // Nettoyer l'URL pour la sécurité
-          window.history.replaceState({}, document.title, window.location.pathname)
+          // ✅ CORRECTION: Nettoyer l'URL APRÈS avoir défini le statut
+          setTimeout(() => {
+            window.history.replaceState({}, document.title, window.location.pathname)
+          }, 100)
           
         } else {
-          console.log('🔍 [InvitationAccept] Pas d\'invitation trouvée')
-          setStatus('error')
-          setMessage('Aucune invitation trouvée dans cette URL')
-          setTimeout(() => router.push('/auth/login'), 2000)
+          // ✅ CORRECTION: Ne rediriger que si on n'a pas déjà traité un token
+          if (!hasProcessedToken) {
+            console.log('🔍 [InvitationAccept] Pas d\'invitation trouvée')
+            setStatus('error')
+            setMessage('Aucune invitation trouvée dans cette URL')
+            setTimeout(() => router.push('/auth/login'), 2000)
+          }
         }
         
       } catch (error) {
@@ -195,7 +210,7 @@ function InvitationAcceptPageContent() {
     // Démarrer le traitement après un délai court
     const timer = setTimeout(handleAuthCallback, 500)
     return () => clearTimeout(timer)
-  }, [router, searchParams])
+  }, [router, searchParams, hasProcessedToken])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
