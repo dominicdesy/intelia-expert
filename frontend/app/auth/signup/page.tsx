@@ -1,5 +1,3 @@
-// page.tsx
-
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, Suspense, useMemo } from 'react'
@@ -44,11 +42,13 @@ interface Country {
 const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(false)
+  const [usingFallback, setUsingFallback] = useState(true) // Démarrer en fallback
 
   useEffect(() => {
     const fetchCountries = async () => {
       try {
+        console.log('🌍 [Countries] Tentative de chargement depuis l\'API REST Countries...')
+        
         // Essayer de charger depuis l'API REST Countries
         const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
           headers: {
@@ -57,10 +57,12 @@ const useCountries = () => {
         })
         
         if (!response.ok) {
-          throw new Error('API non disponible')
+          throw new Error(`API indisponible: ${response.status}`)
         }
         
         const data = await response.json()
+        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
+        
         const formattedCountries = data
           .map((country: any) => ({
             value: country.cca2,
@@ -68,18 +70,30 @@ const useCountries = () => {
             phoneCode: country.idd?.root + (country.idd?.suffixes?.[0] || ''),
             flag: country.flag
           }))
-          .filter((country: Country) => country.phoneCode && country.phoneCode !== 'undefined')
+          .filter((country: Country) => {
+            // ✅ VALIDATION ROBUSTE
+            const hasValidCode = country.phoneCode && 
+                                country.phoneCode !== 'undefined' && 
+                                country.phoneCode !== 'null' &&
+                                country.phoneCode.length > 1 &&
+                                country.phoneCode.startsWith('+')
+            return hasValidCode && country.value && country.label
+          })
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label))
         
-        if (formattedCountries.length > 0) {
+        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
+        
+        // ✅ SEUIL DE QUALITÉ : Au moins 50 pays pour considérer l'API comme valide
+        if (formattedCountries.length >= 50) {
+          console.log('🌍 [Countries] API validée, utilisation des données')
           setCountries(formattedCountries)
           setUsingFallback(false)
         } else {
-          throw new Error('Données vides')
+          throw new Error(`Pas assez de pays valides: ${formattedCountries.length}/50 minimum`)
         }
         
       } catch (err) {
-        console.warn('Utilisation de la liste de fallback:', err)
+        console.warn('⚠️ [Countries] Échec API, utilisation de la liste de fallback:', err)
         setCountries(fallbackCountries)
         setUsingFallback(true)
       } finally {
@@ -91,6 +105,8 @@ const useCountries = () => {
     return () => clearTimeout(timer)
   }, [])
 
+  return { countries, loading, usingFallback }
+}
 
 const translations = {
   fr: {
@@ -208,6 +224,8 @@ const translations = {
     loadingCountries: 'Loading countries...',
     limitedCountryList: 'Limited country list (limited internet connection)',
     selectCountry: 'Select a country...'
+  }
+}
 
 const InteliaLogo = ({ className = "w-16 h-16" }: { className?: string }) => (
   <img 
@@ -335,6 +353,8 @@ const validatePhone = (countryCode: string, areaCode: string, phoneNumber: strin
     }
   }
   
+  return true
+}
 
 // Contenu principal de la page
 function PageContent() {
@@ -651,6 +671,8 @@ function PageContent() {
           <p className="text-gray-600">Chargement...</p>
         </div>
       </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex flex-col justify-center py-8 sm:px-6 lg:px-8 relative">
@@ -670,8 +692,8 @@ function PageContent() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 max-h-screen overflow-y-auto relative">
           
-          {/* Statut du chargement des pays */}
-          {usingFallback && isSignupMode && (
+          {/* Statut du chargement des pays - ✅ ALERTE CONDITIONNELLE */}
+          {usingFallback && !countriesLoading && isSignupMode && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center space-x-2">
                 <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -682,6 +704,137 @@ function PageContent() {
                 </span>
               </div>
             </div>
+          )}
+
+          {/* Messages d'erreur et succès */}
+          {localError && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    {isSignupMode ? t.signupError : t.loginError}
+                  </h3>
+                  <div className="mt-1 text-sm text-red-700">
+                    {localError}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {localSuccess && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <div className="text-sm text-green-700">
+                    {localSuccess}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FORMULAIRE DE CONNEXION */}
+          {!isSignupMode && (
+            <form onSubmit={handleLogin} onKeyPress={handleKeyPress}>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    {t.email}
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={loginData.email}
+                      onChange={(e) => handleLoginChange('email', e.target.value)}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    {t.password}
+                  </label>
+                  <div className="mt-1 relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      ref={passwordInputRef}
+                      value={loginData.password}
+                      onChange={(e) => handleLoginChange('password', e.target.value)}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      checked={loginData.rememberMe}
+                      onChange={(e) => handleLoginChange('rememberMe', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                      {t.rememberMe}
+                    </label>
+                  </div>
+
+                  <div className="text-sm">
+                    <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
+                      {t.forgotPassword}
+                    </Link>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? t.connecting : t.login}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
 
           {/* FORMULAIRE D'INSCRIPTION */}
           {isSignupMode && (
@@ -1029,133 +1182,3 @@ export default function Page() {
     </Suspense>
   )
 }
-
-          {/* Messages d'erreur et succès */}
-          {localError && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {isSignupMode ? t.signupError : t.loginError}
-                  </h3>
-                  <div className="mt-1 text-sm text-red-700">
-                    {localError}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {localSuccess && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm text-green-700">
-                    {localSuccess}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* FORMULAIRE DE CONNEXION */}
-          {!isSignupMode && (
-            <form onSubmit={handleLogin} onKeyPress={handleKeyPress}>
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    {t.email}
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={loginData.email}
-                      onChange={(e) => handleLoginChange('email', e.target.value)}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    {t.password}
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      required
-                      ref={passwordInputRef}
-                      value={loginData.password}
-                      onChange={(e) => handleLoginChange('password', e.target.value)}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      name="remember-me"
-                      type="checkbox"
-                      checked={loginData.rememberMe}
-                      onChange={(e) => handleLoginChange('rememberMe', e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                      {t.rememberMe}
-                    </label>
-                  </div>
-
-                  <div className="text-sm">
-                    <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
-                      {t.forgotPassword}
-                    </Link>
-                  </div>
-                </div>
-
-                <div>
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? t.connecting : t.login}
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
