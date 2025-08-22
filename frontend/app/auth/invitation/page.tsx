@@ -136,15 +136,30 @@ const validatePassword = (password: string): string[] => {
   return errors
 }
 
-// ✅ VALIDATION TÉLÉPHONE CORRIGÉE
-const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
+// ✅ VALIDATION TÉLÉPHONE CORRIGÉE - IGNORE L'AUTO-REMPLISSAGE DU PAYS
+const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string, selectedCountry: string, countryCodeMap: Record<string, string>): boolean => {
   // Si tous les champs sont vides, c'est valide (optionnel)
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
     return true
   }
   
-  // Si au moins un champ est rempli, tous doivent être remplis et valides
-  if (countryCode.trim() || areaCode.trim() || phoneNumber.trim()) {
+  // ✅ NOUVELLE LOGIQUE: Si seul l'indicatif pays est rempli ET qu'il correspond au pays sélectionné,
+  // considérer que c'est juste l'auto-remplissage et que l'utilisateur ne veut pas fournir de téléphone
+  const isAutoFilledCountryCodeOnly = 
+    countryCode.trim() && 
+    !areaCode.trim() && 
+    !phoneNumber.trim() && 
+    selectedCountry && 
+    countryCodeMap[selectedCountry] === countryCode.trim()
+  
+  if (isAutoFilledCountryCodeOnly) {
+    return true // Considérer comme valide (téléphone optionnel)
+  }
+  
+  // Si des champs sont remplis (au-delà de l'auto-remplissage), tous doivent être valides
+  const hasUserEnteredPhoneData = areaCode.trim() || phoneNumber.trim()
+  
+  if (hasUserEnteredPhoneData) {
     // Vérifier que tous les champs sont remplis
     if (!countryCode.trim() || !areaCode.trim() || !phoneNumber.trim()) {
       return false
@@ -499,7 +514,7 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Le pays est requis')
     }
     
-    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Appel avec les bons paramètres
+    // ✅ VALIDATION TÉLÉPHONE CORRIGÉE - Prend en compte l'auto-remplissage
     if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber, formData.country, countryCodeMap)) {
       const hasUserEnteredPhoneData = formData.areaCode.trim() || formData.phoneNumber.trim()
       
