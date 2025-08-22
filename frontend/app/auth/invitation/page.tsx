@@ -73,19 +73,15 @@ function InvitationAcceptPageContent() {
     password: '',
     confirmPassword: '',
     
-    // Informations personnelles
-    firstName: '',
-    lastName: '',
-    linkedinProfile: '',
+    // Informations personnelles (✅ CORRIGÉ: aligné avec le backend)
+    fullName: '',
+    company: '',
+    jobTitle: '',
     
     // Contact
-    country: '',
-    countryCode: '',
-    areaCode: '',
-    phoneNumber: '',
+    phone: '',
     
     // Entreprise
-    companyName: '',
     companyWebsite: '',
     companyLinkedin: ''
   })
@@ -93,17 +89,6 @@ function InvitationAcceptPageContent() {
   const [errors, setErrors] = useState<string[]>([])
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-
-  // Liste des pays
-  const countries = [
-    { value: 'CA', label: 'Canada' },
-    { value: 'US', label: 'États-Unis' },
-    { value: 'FR', label: 'France' },
-    { value: 'BE', label: 'Belgique' },
-    { value: 'CH', label: 'Suisse' },
-    { value: 'MX', label: 'Mexique' },
-    { value: 'BR', label: 'Brésil' }
-  ]
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -130,16 +115,13 @@ function InvitationAcceptPageContent() {
           
           // 🔧 NOUVELLE APPROCHE : Extraire le token et valider via le backend
           let accessToken = ''
-          let refreshToken = ''
           
           if (hasInvitationInHash) {
             // Extraire les tokens du hash
             const urlParams = new URLSearchParams(hash.substring(1))
             accessToken = urlParams.get('access_token') || ''
-            refreshToken = urlParams.get('refresh_token') || ''
           } else if (hasInvitationInQuery) {
             accessToken = token || ''
-            refreshToken = searchParams.get('refresh_token') || ''
           }
           
           if (!accessToken) {
@@ -148,15 +130,14 @@ function InvitationAcceptPageContent() {
           
           console.log('🔍 [InvitationAccept] Token extrait, validation via backend...')
           
-          // Valider le token via le backend
+          // ✅ CORRIGÉ: Utiliser la structure de réponse correcte
           const validateResponse = await fetch('/api/v1/auth/invitations/validate-token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              access_token: accessToken,
-              refresh_token: refreshToken
+              access_token: accessToken
             })
           })
           
@@ -166,16 +147,15 @@ function InvitationAcceptPageContent() {
           }
           
           const validationResult = await validateResponse.json()
-          console.log('✅ [InvitationAccept] Token validé:', validationResult.user.email)
+          console.log('✅ [InvitationAccept] Token validé:', validationResult.user_email)
           
-          // Stocker le token pour la finalisation
+          // ✅ CORRIGÉ: Structure de réponse alignée avec le backend
           setUserInfo({
-            email: validationResult.user.email,
-            invitedBy: validationResult.user.invitedBy,
-            inviterName: validationResult.user.inviterName,
-            invitationDate: validationResult.user.invitationDate,
-            personalMessage: validationResult.user.personalMessage,
-            language: validationResult.user.language,
+            email: validationResult.user_email,
+            inviterName: validationResult.inviter_name,
+            personalMessage: validationResult.invitation_data?.personal_message,
+            language: validationResult.invitation_data?.language,
+            invitationDate: validationResult.invitation_data?.invitation_date,
             accessToken: accessToken // Stocker pour la finalisation
           })
           
@@ -242,22 +222,17 @@ function InvitationAcceptPageContent() {
       validationErrors.push('Les mots de passe ne correspondent pas')
     }
     
-    // Validation informations personnelles
-    if (!formData.firstName.trim()) {
-      validationErrors.push('Le prénom est requis')
+    // ✅ CORRIGÉ: Validation alignée avec les champs backend
+    if (!formData.fullName.trim()) {
+      validationErrors.push('Le nom complet est requis')
     }
     
-    if (!formData.lastName.trim()) {
-      validationErrors.push('Le nom de famille est requis')
+    if (!formData.company.trim()) {
+      validationErrors.push('L\'entreprise est requise')
     }
     
-    if (!formData.country) {
-      validationErrors.push('Le pays est requis')
-    }
-    
-    // Validation téléphone (optionnel mais si rempli doit être valide)
-    if (!validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)) {
-      validationErrors.push('Format de téléphone invalide')
+    if (!formData.jobTitle.trim()) {
+      validationErrors.push('Le titre du poste est requis')
     }
     
     return validationErrors
@@ -281,26 +256,31 @@ function InvitationAcceptPageContent() {
         throw new Error('Token d\'accès manquant')
       }
       
+      // ✅ CORRIGÉ: Structure de données alignée avec le backend
+      const requestBody = {
+        access_token: userInfo.accessToken,
+        fullName: formData.fullName,
+        company: formData.company,
+        jobTitle: formData.jobTitle,
+        phone: formData.phone || null,
+        companyWebsite: formData.companyWebsite || null,
+        companyLinkedin: formData.companyLinkedin || null,
+        password: formData.password
+      }
+      
+      console.log('🔧 [InvitationAccept] Envoi des données:', {
+        ...requestBody,
+        password: '[HIDDEN]',
+        access_token: '[HIDDEN]'
+      })
+      
       // Finaliser le profil via le backend
       const completeResponse = await fetch('/api/v1/auth/invitations/complete-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          access_token: userInfo.accessToken,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          linkedinProfile: formData.linkedinProfile,
-          country: formData.country,
-          countryCode: formData.countryCode,
-          areaCode: formData.areaCode,
-          phoneNumber: formData.phoneNumber,
-          companyName: formData.companyName,
-          companyWebsite: formData.companyWebsite,
-          companyLinkedin: formData.companyLinkedin,
-          password: formData.password
-        })
+        body: JSON.stringify(requestBody)
       })
       
       if (!completeResponse.ok) {
@@ -317,7 +297,7 @@ function InvitationAcceptPageContent() {
       // Redirection vers le chat après 2 secondes
       setTimeout(() => {
         console.log('🚀 [InvitationAccept] Redirection vers chat')
-        router.push('/chat')
+        router.push(completionResult.redirect_url || '/chat')
       }, 2000)
       
     } catch (error: any) {
@@ -334,10 +314,9 @@ function InvitationAcceptPageContent() {
       formData.confirmPassword &&
       formData.password === formData.confirmPassword &&
       validatePassword(formData.password).length === 0 &&
-      formData.firstName.trim() &&
-      formData.lastName.trim() &&
-      formData.country &&
-      validatePhone(formData.countryCode, formData.areaCode, formData.phoneNumber)
+      formData.fullName.trim() &&
+      formData.company.trim() &&
+      formData.jobTitle.trim()
     )
   }
 
@@ -419,133 +398,82 @@ function InvitationAcceptPageContent() {
               
               <div className="space-y-6">
                 
-                {/* Section Informations personnelles */}
+                {/* Section Informations personnelles - ✅ CORRIGÉ */}
                 <div className="border-b border-gray-200 pb-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Informations personnelles</h3>
                   
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Prénom <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isProcessing}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Nom de famille <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isProcessing}
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Nom complet <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.fullName}
+                      onChange={(e) => handleInputChange('fullName', e.target.value)}
+                      placeholder="Prénom Nom"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
                   </div>
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Profil LinkedIn personnel (optionnel)
+                      Entreprise <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="url"
-                      value={formData.linkedinProfile}
-                      onChange={(e) => handleInputChange('linkedinProfile', e.target.value)}
-                      placeholder="https://linkedin.com/in/votre-profil"
+                      type="text"
+                      required
+                      value={formData.company}
+                      onChange={(e) => handleInputChange('company', e.target.value)}
+                      placeholder="Nom de votre entreprise"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Titre du poste <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.jobTitle}
+                      onChange={(e) => handleInputChange('jobTitle', e.target.value)}
+                      placeholder="Votre titre ou fonction"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isProcessing}
                     />
                   </div>
                 </div>
 
-                {/* Section Contact */}
+                {/* Section Contact - ✅ SIMPLIFIÉ */}
                 <div className="border-b border-gray-200 pb-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Contact</h3>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Pays <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      value={formData.country}
-                      onChange={(e) => handleInputChange('country', e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    >
-                      <option value="">Sélectionnez un pays</option>
-                      {countries.map(country => (
-                        <option key={country.value} value={country.value}>
-                          {country.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Téléphone optionnel */}
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Numéro de téléphone (optionnel)
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        placeholder="+1"
-                        value={formData.countryCode}
-                        onChange={(e) => handleInputChange('countryCode', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isProcessing}
-                      />
-                      <input
-                        type="text"
-                        placeholder="514"
-                        value={formData.areaCode}
-                        onChange={(e) => handleInputChange('areaCode', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isProcessing}
-                      />
-                      <input
-                        type="text"
-                        placeholder="1234567"
-                        value={formData.phoneNumber}
-                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                        disabled={isProcessing}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section Entreprise */}
-                <div className="border-b border-gray-200 pb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Entreprise</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Nom de l'entreprise (optionnel)
-                    </label>
                     <input
-                      type="text"
-                      value={formData.companyName}
-                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      placeholder="+1 514 123-4567"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isProcessing}
                     />
                   </div>
+                </div>
 
-                  <div className="mt-4">
+                {/* Section Entreprise - ✅ CORRIGÉ */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Entreprise (optionnel)</h3>
+                  
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Site web de l'entreprise (optionnel)
+                      Site web de l'entreprise
                     </label>
                     <input
                       type="url"
@@ -559,7 +487,7 @@ function InvitationAcceptPageContent() {
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Page LinkedIn de l'entreprise (optionnel)
+                      Page LinkedIn de l'entreprise
                     </label>
                     <input
                       type="url"
