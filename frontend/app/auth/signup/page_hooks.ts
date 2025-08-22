@@ -44,6 +44,7 @@ export const useCountries = () => {
 
   useEffect(() => {
     console.log('🎯 [Countries] Hook useCountries appelé!')
+    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
     
     const fetchCountries = async () => {
       try {
