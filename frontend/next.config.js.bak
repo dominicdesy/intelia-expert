@@ -31,7 +31,7 @@ const nextConfig = {
     unoptimized: process.env.NODE_ENV === 'production',
   },
 
-  // 🌐 Variables d'environnement
+  // 🌍 Variables d'environnement
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
@@ -42,7 +42,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
 
-  // 📝 Configuration ESLint
+  // 🔍 Configuration ESLint
   eslint: {
     ignoreDuringBuilds: false,
   },
@@ -72,22 +72,6 @@ const nextConfig = {
           {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
-          },
-          // ✅ AJOUT DE LA CSP POUR AUTORISER RESTCOUNTRIES.COM
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'none'",
-              "connect-src 'self' https://*.supabase.co https://expert-app-cngws.ondigitalocean.app https://salesiq.zohopublic.com https://*.zoho.com wss://*.zoho.com wss://vts.zohopublic.com wss://salesiq.zohopublic.com https://*.zohostatic.com https://restcountries.com"
-            ].join('; ')
           }
         ]
       },
@@ -106,7 +90,7 @@ const nextConfig = {
   // ⚙️ Configuration Webpack MINIMALISTE et SÉCURISÉE
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     
-    // 🛠 Mode développement - configurations de debug
+    // 🐛 Mode développement - configurations de debug
     if (dev) {
       config.devtool = 'cheap-module-source-map'
     }
@@ -196,7 +180,7 @@ const nextConfig = {
     return config
   },
 
-  // 📄 Redirections pour compatibilité
+  // 🔄 Redirections pour compatibilité
   async redirects() {
     return [
       // Exemple de redirection si nécessaire
