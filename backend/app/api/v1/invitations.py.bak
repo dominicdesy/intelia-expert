@@ -1,8 +1,7 @@
-# app/api/v1/invitations.py - VERSION SUPABASE COMPLÈTE MISE À JOUR
+# app/api/v1/invitations.py - VERSION SUPABASE COMPLÈTE
 """
 Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE
 Utilise les invitations intégrées de Supabase Auth avec détection d'utilisateurs existants
-MISE À JOUR : Support pour l'authentification d'invitations via backend
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, validator
@@ -523,54 +522,6 @@ class SupabaseInvitationService:
             logger.error(f"❌ Erreur marquage invitation acceptée pour {email}: {str(e)}")
             return None
     
-    # 🆕 NOUVELLE MÉTHODE : Récupérer utilisateur par ID
-    def get_user_by_id(self, user_id: str) -> Dict[str, Any]:
-        """Récupère un utilisateur Supabase par son ID (pour auth invitations)"""
-        try:
-            response = self.admin_client.auth.admin.get_user_by_id(user_id)
-            
-            if response.user:
-                return {
-                    "success": True,
-                    "user": response.user
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": "Utilisateur non trouvé"
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur récupération utilisateur {user_id}: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    # 🆕 NOUVELLE MÉTHODE : Mettre à jour utilisateur par ID
-    def update_user_by_id(self, user_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Met à jour un utilisateur Supabase par son ID (pour auth invitations)"""
-        try:
-            response = self.admin_client.auth.admin.update_user_by_id(user_id, update_data)
-            
-            if response.user:
-                return {
-                    "success": True,
-                    "user": response.user
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": "Échec mise à jour utilisateur"
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Erreur mise à jour utilisateur {user_id}: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
     async def get_invitation_stats(self, user_email: str) -> Dict[str, Any]:
         """Récupère les statistiques d'invitations d'un utilisateur"""
         try:
@@ -603,6 +554,7 @@ class SupabaseInvitationService:
                                      if inv.get("accepted_at", "").startswith(current_month)])
             
             # Invitations cette semaine
+            from datetime import timedelta
             week_ago = (datetime.now() - timedelta(days=7)).isoformat()
             this_week_sent = len([inv for inv in sent_invitations.data 
                                 if inv["invited_at"] >= week_ago])

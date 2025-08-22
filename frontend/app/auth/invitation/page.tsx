@@ -1,11 +1,10 @@
 'use client'
-// app/auth/invitation/page.tsx - Page pour gérer les invitations avec définition de mot de passe
+// app/auth/invitation/page.tsx - Page d'invitation utilisant UNIQUEMENT le backend
 
 import React, { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getSupabaseClient } from '@/lib/supabase/singleton'
 
-// ==================== VALIDATION MOT DE PASSE ====================
+// ==================== VALIDATION ====================
 const validatePassword = (password: string): string[] => {
   const errors: string[] = []
   
@@ -28,7 +27,6 @@ const validatePassword = (password: string): string[] => {
   return errors
 }
 
-// Validation téléphone
 const validatePhone = (countryCode: string, areaCode: string, phoneNumber: string): boolean => {
   if (!countryCode.trim() && !areaCode.trim() && !phoneNumber.trim()) {
     return true
@@ -51,7 +49,7 @@ const validatePhone = (countryCode: string, areaCode: string, phoneNumber: strin
   return true
 }
 
-// ==================== LOGO INTELIA ====================
+// ==================== COMPOSANTS ====================
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   <img 
     src="/images/favicon.png" 
@@ -112,8 +110,6 @@ function InvitationAcceptPageContent() {
       try {
         console.log('🔍 [InvitationAccept] Début traitement invitation')
         
-        const supabase = getSupabaseClient()
-        
         // Vérifier les paramètres d'URL
         const hash = window.location.hash
         const token = searchParams.get('token')
@@ -132,77 +128,69 @@ function InvitationAcceptPageContent() {
           console.log('📧 [InvitationAccept] Invitation détectée dans URL')
           setMessage('Validation de votre invitation...')
           
-          // 🔧 CORRECTION : Laisser Supabase traiter l'invitation automatiquement
-          console.log('⏳ [InvitationAccept] Attente du traitement Supabase...')
-          await new Promise(resolve => setTimeout(resolve, 3000))
+          // 🔧 NOUVELLE APPROCHE : Extraire le token et valider via le backend
+          let accessToken = ''
+          let refreshToken = ''
           
-          // Vérifier plusieurs fois la session
-          let sessionData = null
-          let attempts = 0
-          const maxAttempts = 5
-          
-          while (!sessionData?.session && attempts < maxAttempts) {
-            attempts++
-            console.log(`🔄 [InvitationAccept] Tentative ${attempts}/${maxAttempts} de récupération session`)
-            
-            const { data, error } = await supabase.auth.getSession()
-            
-            if (error) {
-              console.error('❌ [InvitationAccept] Erreur session:', error)
-              throw new Error(`Erreur d'authentification: ${error.message}`)
-            }
-            
-            sessionData = data
-            
-            if (!sessionData.session && attempts < maxAttempts) {
-              console.log('⏳ [InvitationAccept] Pas de session, attente...')
-              await new Promise(resolve => setTimeout(resolve, 2000))
-            }
+          if (hasInvitationInHash) {
+            // Extraire les tokens du hash
+            const urlParams = new URLSearchParams(hash.substring(1))
+            accessToken = urlParams.get('access_token') || ''
+            refreshToken = urlParams.get('refresh_token') || ''
+          } else if (hasInvitationInQuery) {
+            accessToken = token || ''
+            refreshToken = searchParams.get('refresh_token') || ''
           }
           
-          if (sessionData?.session) {
-            console.log('✅ [InvitationAccept] Session créée:', sessionData.session.user.email)
-            
-            // Extraire les métadonnées d'invitation
-            const user = sessionData.session.user
-            const userMetadata = user.user_metadata
-            console.log('📋 [InvitationAccept] Métadonnées utilisateur:', userMetadata)
-            
-            setUserInfo({
-              email: user.email,
-              invitedBy: userMetadata?.inviter_name || userMetadata?.invited_by,
-              invitationDate: userMetadata?.invitation_date,
-              personalMessage: userMetadata?.personal_message,
-              language: userMetadata?.language || 'fr'
+          if (!accessToken) {
+            throw new Error('Token d\'accès manquant dans l\'URL')
+          }
+          
+          console.log('🔍 [InvitationAccept] Token extrait, validation via backend...')
+          
+          // Valider le token via le backend
+          const validateResponse = await fetch('/api/v1/auth/invitations/validate-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: accessToken,
+              refresh_token: refreshToken
             })
-            
-            console.log('🔧 [InvitationAccept] Passage au mode set-password')
-            setStatus('set-password')
-            setMessage('Complétez votre profil')
-            
-            // Nettoyer l'URL
-            window.history.replaceState({}, document.title, window.location.pathname)
-            
-          } else {
-            throw new Error('Impossible de créer la session après plusieurs tentatives')
+          })
+          
+          if (!validateResponse.ok) {
+            const errorData = await validateResponse.json()
+            throw new Error(errorData.detail || 'Erreur de validation du token')
           }
+          
+          const validationResult = await validateResponse.json()
+          console.log('✅ [InvitationAccept] Token validé:', validationResult.user.email)
+          
+          // Stocker le token pour la finalisation
+          setUserInfo({
+            email: validationResult.user.email,
+            invitedBy: validationResult.user.invitedBy,
+            inviterName: validationResult.user.inviterName,
+            invitationDate: validationResult.user.invitationDate,
+            personalMessage: validationResult.user.personalMessage,
+            language: validationResult.user.language,
+            accessToken: accessToken // Stocker pour la finalisation
+          })
+          
+          console.log('🔧 [InvitationAccept] Passage au mode set-password')
+          setStatus('set-password')
+          setMessage('Complétez votre profil')
+          
+          // Nettoyer l'URL pour la sécurité
+          window.history.replaceState({}, document.title, window.location.pathname)
           
         } else {
-          console.log('🔍 [InvitationAccept] Pas d\'invitation, vérification session existante')
-          
-          const { data: existingSession } = await supabase.auth.getSession()
-          
-          if (existingSession.session) {
-            console.log('✅ [InvitationAccept] Session existante trouvée')
-            setStatus('success')
-            setMessage('Vous êtes déjà connecté !')
-            setTimeout(() => router.push('/chat'), 1500)
-          } else {
-            console.log('ℹ️ [InvitationAccept] Aucune session, redirection vers login')
-            setStatus('error')
-            setMessage('Aucune invitation trouvée')
-            setTimeout(() => router.push('/auth/login'), 2000)
-          }
+          console.log('🔍 [InvitationAccept] Pas d\'invitation trouvée')
+          setStatus('error')
+          setMessage('Aucune invitation trouvée dans cette URL')
+          setTimeout(() => router.push('/auth/login'), 2000)
         }
         
       } catch (error) {
@@ -223,7 +211,8 @@ function InvitationAcceptPageContent() {
       }
     }
 
-    const timer = setTimeout(handleAuthCallback, 1000)
+    // Démarrer le traitement après un délai court
+    const timer = setTimeout(handleAuthCallback, 500)
     return () => clearTimeout(timer)
   }, [router, searchParams])
 
@@ -286,22 +275,20 @@ function InvitationAcceptPageContent() {
     setErrors([])
     
     try {
-      console.log('🔧 [InvitationAccept] Finalisation du compte...')
+      console.log('🔧 [InvitationAccept] Finalisation du compte via backend...')
       
-      const supabase = getSupabaseClient()
-      
-      // 1. Mettre à jour le mot de passe
-      const { error: passwordError } = await supabase.auth.updateUser({
-        password: formData.password
-      })
-      
-      if (passwordError) {
-        throw passwordError
+      if (!userInfo?.accessToken) {
+        throw new Error('Token d\'accès manquant')
       }
       
-      // 2. Mettre à jour les métadonnées utilisateur avec les informations du formulaire
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: {
+      // Finaliser le profil via le backend
+      const completeResponse = await fetch('/api/v1/auth/invitations/complete-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: userInfo.accessToken,
           firstName: formData.firstName,
           lastName: formData.lastName,
           linkedinProfile: formData.linkedinProfile,
@@ -312,39 +299,18 @@ function InvitationAcceptPageContent() {
           companyName: formData.companyName,
           companyWebsite: formData.companyWebsite,
           companyLinkedin: formData.companyLinkedin,
-          profileCompleted: true,
-          completedAt: new Date().toISOString()
-        }
+          password: formData.password
+        })
       })
       
-      if (metadataError) {
-        throw metadataError
+      if (!completeResponse.ok) {
+        const errorData = await completeResponse.json()
+        throw new Error(errorData.detail || 'Erreur lors de la finalisation du profil')
       }
       
-      // 3. Optionnel : Marquer l'invitation comme acceptée dans votre système
-      try {
-        const response = await fetch('/api/v1/invitations/mark-accepted', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            email: userInfo?.email
-          })
-        })
-        
-        if (response.ok) {
-          console.log('✅ [InvitationAccept] Invitation marquée comme acceptée')
-        } else {
-          console.warn('⚠️ [InvitationAccept] Erreur marquage invitation acceptée')
-        }
-      } catch (apiError) {
-        console.warn('⚠️ [InvitationAccept] Erreur API marquage:', apiError)
-        // Ne pas faire échouer le processus pour cette erreur
-      }
+      const completionResult = await completeResponse.json()
+      console.log('✅ [InvitationAccept] Profil finalisé avec succès')
       
-      console.log('✅ [InvitationAccept] Compte finalisé avec succès')
       setStatus('success')
       setMessage('Compte créé avec succès !')
       
@@ -406,7 +372,7 @@ function InvitationAcceptPageContent() {
               </p>
               
               <div className="mt-4 text-xs text-gray-400">
-                <p>🔄 Vérification des tokens d'invitation...</p>
+                <p>🔄 Validation via le backend...</p>
                 <p>⏳ Cela peut prendre quelques secondes</p>
               </div>
             </div>
@@ -424,8 +390,8 @@ function InvitationAcceptPageContent() {
                   <h3 className="font-medium text-blue-900 mb-2">Informations de votre invitation</h3>
                   <div className="text-sm text-blue-800 space-y-1">
                     <p><strong>Email :</strong> {userInfo.email}</p>
-                    {userInfo.invitedBy && (
-                      <p><strong>Invité par :</strong> {userInfo.invitedBy}</p>
+                    {userInfo.inviterName && (
+                      <p><strong>Invité par :</strong> {userInfo.inviterName}</p>
                     )}
                     {userInfo.personalMessage && (
                       <div className="mt-2 p-2 bg-white rounded border">
