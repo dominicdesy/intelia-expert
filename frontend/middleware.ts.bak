@@ -19,6 +19,22 @@ export async function middleware(req: NextRequest) {
 
     const { pathname } = req.nextUrl
 
+    // 🆕 REDIRECTION /welcome → /auth/invitation (NOUVEAU)
+    if (pathname === '/welcome' || pathname === '/welcome/') {
+      console.log('🔄 [Middleware] Redirection /welcome → /auth/invitation')
+      
+      // Construire la nouvelle URL avec tous les paramètres préservés
+      const invitationUrl = new URL('/auth/invitation', req.url)
+      
+      // Copier les query parameters (?invited_by=...)
+      req.nextUrl.searchParams.forEach((value, key) => {
+        invitationUrl.searchParams.set(key, value)
+      })
+      
+      console.log('✅ [Middleware] Redirection vers:', invitationUrl.toString())
+      return NextResponse.redirect(invitationUrl)
+    }
+
     // 🚨 GESTION SPÉCIALE POUR DÉCONNEXION - CONSERVÉE
     if (pathname === '/auth/logout') {
       console.log('🚪 [Middleware] Route logout détectée - nettoyage forcé')
@@ -55,7 +71,7 @@ export async function middleware(req: NextRequest) {
       return logoutResponse
     }
 
-    // Routes publiques (conservé de votre logique)
+    // Routes publiques (conservé de votre logique + ajout invitation)
     const publicRoutes = [
       '/auth/login',
       '/auth/signup', 
@@ -63,6 +79,7 @@ export async function middleware(req: NextRequest) {
       '/auth/reset-password',
       '/auth/confirm',
       '/auth/callback', // 🆕 AJOUT: Route callback Supabase
+      '/auth/invitation', // 🆕 AJOUT: Route invitation
       '/privacy',
       '/terms',
       '/',  // Page d'accueil publique
@@ -105,7 +122,7 @@ export async function middleware(req: NextRequest) {
     }
 
     // 🆕 NOUVEAU: Redirection des pages d'auth vers chat si connecté
-    if (pathname.startsWith('/auth/') && session && pathname !== '/auth/callback') {
+    if (pathname.startsWith('/auth/') && session && pathname !== '/auth/callback' && pathname !== '/auth/invitation') {
       console.log('🔄 [Middleware] Utilisateur connecté sur page auth, redirection vers chat')
       return NextResponse.redirect(new URL('/chat', req.url))
     }
