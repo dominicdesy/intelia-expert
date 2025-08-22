@@ -205,7 +205,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
   const handleSendInvitations = async () => {
     console.log('🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué')
-    console.log('🔍 [InviteFriendModal] État initial:', {
+    console.log('📝 [InviteFriendModal] État initial:', {
       isLoading,
       emailsLength: emails.length,
       hasCurrentUser: !!currentUser?.email
@@ -598,7 +598,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
                   className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
                   disabled={isLoading}
                 >
-                  {results ? 'Fermer' : 'Annuler'}
+                  Annuler
                 </button>
 
                 {/* Bouton d'envoi (seulement si pas de résultats) */}
@@ -632,7 +632,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({ onClose })
 
               {/* Footer avec informations */}
               <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-                🔐 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
+                📧 Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.
                 <br />
                 Vos contacts recevront un lien pour créer leur compte Intelia Expert gratuitement.
               </div>
