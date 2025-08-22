@@ -1,215 +1,8 @@
-// page_hooks.ts - Hooks et utilitaires pour la page d'authentification avec corrections
+// page_hooks.ts - Hooks et utilitaires pour la page d'authentification (nettoyé)
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Language } from '@/types'
-
-// ==================== GESTION DES PAYS AVEC FALLBACK ====================
-export const fallbackCountries = [
-  { value: 'CA', label: 'Canada', phoneCode: '+1', flag: '🇨🇦' },
-  { value: 'US', label: 'États-Unis', phoneCode: '+1', flag: '🇺🇸' },
-  { value: 'FR', label: 'France', phoneCode: '+33', flag: '🇫🇷' },
-  { value: 'GB', label: 'Royaume-Uni', phoneCode: '+44', flag: '🇬🇧' },
-  { value: 'DE', label: 'Allemagne', phoneCode: '+49', flag: '🇩🇪' },
-  { value: 'IT', label: 'Italie', phoneCode: '+39', flag: '🇮🇹' },
-  { value: 'ES', label: 'Espagne', phoneCode: '+34', flag: '🇪🇸' },
-  { value: 'BE', label: 'Belgique', phoneCode: '+32', flag: '🇧🇪' },
-  { value: 'CH', label: 'Suisse', phoneCode: '+41', flag: '🇨🇭' },
-  { value: 'MX', label: 'Mexique', phoneCode: '+52', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brésil', phoneCode: '+55', flag: '🇧🇷' },
-  { value: 'AU', label: 'Australie', phoneCode: '+61', flag: '🇦🇺' },
-  { value: 'JP', label: 'Japon', phoneCode: '+81', flag: '🇯🇵' },
-  { value: 'CN', label: 'Chine', phoneCode: '+86', flag: '🇨🇳' },
-  { value: 'IN', label: 'Inde', phoneCode: '+91', flag: '🇮🇳' },
-  { value: 'NL', label: 'Pays-Bas', phoneCode: '+31', flag: '🇳🇱' },
-  { value: 'SE', label: 'Suède', phoneCode: '+46', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norvège', phoneCode: '+47', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danemark', phoneCode: '+45', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlande', phoneCode: '+358', flag: '🇫🇮' }
-]
-
-// Interface pour les pays
-export interface Country {
-  value: string
-  label: string
-  phoneCode: string
-  flag?: string
-}
-
-// Hook personnalisé pour charger les pays avec fallback amélioré et debug complet
-export const useCountries = () => {
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(true)
-
-  useEffect(() => {
-    console.log('🎯 [Countries] Hook useCountries appelé!')
-    console.log('🚀 [Countries] DÉMARRAGE du processus de chargement des pays')
-    
-    const fetchCountries = async () => {
-      try {
-        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
-        console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
-        
-        // Timeout pour éviter les appels trop longs (10 secondes)
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => {
-          console.log('⏱️ [Countries] Timeout atteint (10s), abandon de la requête')
-          controller.abort()
-        }, 10000)
-        
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
-            'Cache-Control': 'no-cache'
-          },
-          signal: controller.signal
-        })
-        
-        clearTimeout(timeoutId)
-        console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
-        
-        if (!response.ok) {
-          throw new Error(`API indisponible: ${response.status} ${response.statusText}`)
-        }
-        
-        const data = await response.json()
-        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
-        console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
-        
-        // Vérification que data est bien un array
-        if (!Array.isArray(data)) {
-          console.error('❌ [Countries] Format de données invalide - pas un array')
-          throw new Error('Format de données invalide - réponse API n\'est pas un tableau')
-        }
-        
-        const formattedCountries = data
-          .map((country: any, index: number) => {
-            // Construction du code téléphonique plus robuste
-            let phoneCode = ''
-            if (country.idd?.root) {
-              phoneCode = country.idd.root
-              if (country.idd.suffixes && country.idd.suffixes[0]) {
-                phoneCode += country.idd.suffixes[0]
-              }
-            }
-            
-            const formatted = {
-              value: country.cca2,
-              label: country.translations?.fra?.common || country.name?.common || country.cca2,
-              phoneCode: phoneCode,
-              flag: country.flag || ''
-            }
-            
-            // Log pour les 3 premiers pays
-            if (index < 3) {
-              console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
-            }
-            
-            return formatted
-          })
-          .filter((country: Country, index: number) => {
-            // ✅ VALIDATION ROBUSTE améliorée
-            const hasValidCode = country.phoneCode && 
-                                country.phoneCode !== 'undefined' && 
-                                country.phoneCode !== 'null' &&
-                                country.phoneCode.length > 1 &&
-                                country.phoneCode.startsWith('+') &&
-                                /^\+\d+$/.test(country.phoneCode) // Vérifie que c'est bien +suivi de chiffres
-            
-            const hasValidInfo = country.value && 
-                                country.value.length === 2 && // Code pays ISO valide
-                                country.label && 
-                                country.label.length > 1
-            
-            const isValid = hasValidCode && hasValidInfo
-            
-            // Log pour debug les rejets
-            if (!isValid && index < 5) {
-              console.log(`❌ [Countries] Pays rejeté:`, {
-                country: country.label,
-                code: country.value,
-                phoneCode: country.phoneCode,
-                hasValidCode,
-                hasValidInfo
-              })
-            }
-            
-            return isValid
-          })
-          .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
-        
-        console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
-        console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
-        
-        // ✅ SEUIL DE QUALITÉ : Au moins 50 pays pour considérer l'API comme valide
-        if (formattedCountries.length >= 50) {
-          console.log('🎉 [Countries] API validée! Utilisation des données complètes')
-          console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
-          setCountries(formattedCountries)
-          setUsingFallback(false)
-        } else {
-          console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50 minimum requis`)
-          throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays valides`)
-        }
-        
-      } catch (err: any) {
-        console.error('💥 [Countries] ERREUR lors du chargement:', err)
-        console.warn('🔄 [Countries] Passage en mode fallback avec liste prédéfinie')
-        
-        // Log spécifique selon le type d'erreur
-        if (err.name === 'AbortError') {
-          console.warn('⏱️ [Countries] Cause: Timeout de l\'API (10s dépassées)')
-        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-          console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
-        } else {
-          console.warn('🐛 [Countries] Cause:', err.message)
-        }
-        
-        // Retour au fallback
-        setCountries(fallbackCountries)
-        setUsingFallback(true)
-      } finally {
-        console.log('🏁 [Countries] Chargement terminé - passage en mode actif')
-        setLoading(false)
-      }
-    }
-
-    // Petit délai pour éviter les appels trop rapides
-    const timer = setTimeout(() => {
-      console.log('⏰ [Countries] Démarrage du chargement après délai de 100ms')
-      fetchCountries()
-    }, 100)
-    
-    return () => {
-      console.log('🧹 [Countries] Nettoyage du timer')
-      clearTimeout(timer)
-    }
-  }, [])
-
-  // Log à chaque render
-  console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
-
-  return { countries, loading, usingFallback }
-}
-
-// Hook pour créer le mapping des codes téléphoniques
-export const useCountryCodeMap = (countries: Country[]) => {
-  return useMemo(() => {
-    const mapping = countries.reduce((acc, country) => {
-      acc[country.value] = country.phoneCode
-      return acc
-    }, {} as Record<string, string>)
-    
-    console.log(`🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`)
-    if (Object.keys(mapping).length > 0) {
-      console.log('📋 [CountryCodeMap] Échantillon:', Object.entries(mapping).slice(0, 3))
-    }
-    
-    return mapping
-  }, [countries])
-}
 
 // Traductions
 export const translations = {
@@ -391,6 +184,18 @@ export const validatePhone = (countryCode: string, areaCode: string, phoneNumber
   }
   
   return true
+}
+
+// Validation LinkedIn
+export const validateLinkedIn = (url: string): boolean => {
+  if (!url.trim()) return true
+  return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[\w\-]+\/?$/.test(url)
+}
+
+// Validation site web
+export const validateWebsite = (url: string): boolean => {
+  if (!url.trim()) return true
+  return /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/.test(url)
 }
 
 // Utilitaires Remember Me
