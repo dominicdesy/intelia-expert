@@ -1,4 +1,4 @@
-// page_hooks.ts - Hooks et utilitaires pour la page d'authentification
+// page_hooks.ts - Hooks et utilitaires pour la page d'authentification avec corrections
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -36,45 +36,55 @@ export interface Country {
   flag?: string
 }
 
-// Hook personnalisé pour charger les pays avec fallback amélioré
+// Hook personnalisé pour charger les pays avec fallback amélioré et debug complet
 export const useCountries = () => {
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [loading, setLoading] = useState(true)
   const [usingFallback, setUsingFallback] = useState(true)
 
   useEffect(() => {
+    console.log('🎯 [Countries] Hook useCountries appelé!')
+    
     const fetchCountries = async () => {
       try {
-        console.log('🌍 [Countries] Tentative de chargement depuis l\'API REST Countries...')
+        console.log('🌍 [Countries] Début du chargement depuis l\'API REST Countries...')
+        console.log('📡 [Countries] URL: https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations')
         
-        // Timeout pour éviter les appels trop longs
+        // Timeout pour éviter les appels trop longs (10 secondes)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 secondes max
+        const timeoutId = setTimeout(() => {
+          console.log('⏱️ [Countries] Timeout atteint (10s), abandon de la requête')
+          controller.abort()
+        }, 10000)
         
         const response = await fetch('https://restcountries.com/v3.1/all?fields=cca2,name,idd,flag,translations', {
           headers: {
             'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)'
+            'User-Agent': 'Mozilla/5.0 (compatible; Intelia/1.0)',
+            'Cache-Control': 'no-cache'
           },
           signal: controller.signal
         })
         
         clearTimeout(timeoutId)
+        console.log(`📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`)
         
         if (!response.ok) {
-          throw new Error(`API indisponible: ${response.status}`)
+          throw new Error(`API indisponible: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
         console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`)
+        console.log('🔍 [Countries] Échantillon brut:', data.slice(0, 2))
         
         // Vérification que data est bien un array
         if (!Array.isArray(data)) {
-          throw new Error('Format de données invalide')
+          console.error('❌ [Countries] Format de données invalide - pas un array')
+          throw new Error('Format de données invalide - réponse API n\'est pas un tableau')
         }
         
         const formattedCountries = data
-          .map((country: any) => {
+          .map((country: any, index: number) => {
             // Construction du code téléphonique plus robuste
             let phoneCode = ''
             if (country.idd?.root) {
@@ -84,14 +94,21 @@ export const useCountries = () => {
               }
             }
             
-            return {
+            const formatted = {
               value: country.cca2,
               label: country.translations?.fra?.common || country.name?.common || country.cca2,
               phoneCode: phoneCode,
               flag: country.flag || ''
             }
+            
+            // Log pour les 3 premiers pays
+            if (index < 3) {
+              console.log(`🏳️ [Countries] Pays ${index + 1}:`, formatted)
+            }
+            
+            return formatted
           })
-          .filter((country: Country) => {
+          .filter((country: Country, index: number) => {
             // ✅ VALIDATION ROBUSTE améliorée
             const hasValidCode = country.phoneCode && 
                                 country.phoneCode !== 'undefined' && 
@@ -105,41 +122,73 @@ export const useCountries = () => {
                                 country.label && 
                                 country.label.length > 1
             
-            return hasValidCode && hasValidInfo
+            const isValid = hasValidCode && hasValidInfo
+            
+            // Log pour debug les rejets
+            if (!isValid && index < 5) {
+              console.log(`❌ [Countries] Pays rejeté:`, {
+                country: country.label,
+                code: country.value,
+                phoneCode: country.phoneCode,
+                hasValidCode,
+                hasValidInfo
+              })
+            }
+            
+            return isValid
           })
           .sort((a: Country, b: Country) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
         
         console.log(`✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`)
-        console.log('📋 [Countries] Échantillon:', formattedCountries.slice(0, 3))
+        console.log('📋 [Countries] Échantillon final:', formattedCountries.slice(0, 5))
         
         // ✅ SEUIL DE QUALITÉ : Au moins 50 pays pour considérer l'API comme valide
         if (formattedCountries.length >= 50) {
-          console.log('🌍 [Countries] API validée, utilisation des données')
+          console.log('🎉 [Countries] API validée! Utilisation des données complètes')
+          console.log(`📈 [Countries] Transition: fallback(${fallbackCountries.length}) → API(${formattedCountries.length})`)
           setCountries(formattedCountries)
           setUsingFallback(false)
         } else {
-          throw new Error(`Pas assez de pays valides: ${formattedCountries.length}/50 minimum`)
+          console.warn(`⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50 minimum requis`)
+          throw new Error(`Qualité insuffisante: ${formattedCountries.length}/50 pays valides`)
         }
         
       } catch (err: any) {
-        console.warn('⚠️ [Countries] Échec API, utilisation de la liste de fallback:', err.message)
+        console.error('💥 [Countries] ERREUR lors du chargement:', err)
+        console.warn('🔄 [Countries] Passage en mode fallback avec liste prédéfinie')
         
-        // Si c'est une erreur d'abort (timeout), on le mentionne spécifiquement
+        // Log spécifique selon le type d'erreur
         if (err.name === 'AbortError') {
-          console.warn('⏱️ [Countries] Timeout de l\'API (10s)')
+          console.warn('⏱️ [Countries] Cause: Timeout de l\'API (10s dépassées)')
+        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+          console.warn('🌐 [Countries] Cause: Problème de connexion réseau')
+        } else {
+          console.warn('🐛 [Countries] Cause:', err.message)
         }
         
+        // Retour au fallback
         setCountries(fallbackCountries)
         setUsingFallback(true)
       } finally {
+        console.log('🏁 [Countries] Chargement terminé - passage en mode actif')
         setLoading(false)
       }
     }
 
     // Petit délai pour éviter les appels trop rapides
-    const timer = setTimeout(fetchCountries, 100)
-    return () => clearTimeout(timer)
+    const timer = setTimeout(() => {
+      console.log('⏰ [Countries] Démarrage du chargement après délai de 100ms')
+      fetchCountries()
+    }, 100)
+    
+    return () => {
+      console.log('🧹 [Countries] Nettoyage du timer')
+      clearTimeout(timer)
+    }
   }, [])
+
+  // Log à chaque render
+  console.log(`🔄 [Countries] Render - ${countries.length} pays, loading:${loading}, fallback:${usingFallback}`)
 
   return { countries, loading, usingFallback }
 }
@@ -147,10 +196,17 @@ export const useCountries = () => {
 // Hook pour créer le mapping des codes téléphoniques
 export const useCountryCodeMap = (countries: Country[]) => {
   return useMemo(() => {
-    return countries.reduce((acc, country) => {
+    const mapping = countries.reduce((acc, country) => {
       acc[country.value] = country.phoneCode
       return acc
     }, {} as Record<string, string>)
+    
+    console.log(`🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`)
+    if (Object.keys(mapping).length > 0) {
+      console.log('📋 [CountryCodeMap] Échantillon:', Object.entries(mapping).slice(0, 3))
+    }
+    
+    return mapping
   }, [countries])
 }
 
@@ -211,7 +267,7 @@ export const translations = {
     sessionCleared: 'Session précédente effacée',
     forceLogout: 'Déconnexion automatique',
     loadingCountries: 'Chargement des pays...',
-    limitedCountryList: 'Liste de pays limitée (connexion internet limitée)',
+    limitedCountryList: 'Liste de pays limitée (connexion API limitée)',
     selectCountry: 'Sélectionner un pays...'
   },
   en: {
@@ -343,11 +399,11 @@ export const rememberMeUtils = {
       if (remember && email) {
         localStorage.setItem('intelia_remember_email', email)
         localStorage.setItem('intelia_remember_flag', 'true')
-        console.log('🔄 [Init] Remember me sauvegardé:', { email, remember })
+        console.log('📄 [Init] Remember me sauvegardé:', { email, remember })
       } else {
         localStorage.removeItem('intelia_remember_email')
         localStorage.removeItem('intelia_remember_flag')
-        console.log('🔄 [Init] Remember me effacé')
+        console.log('📄 [Init] Remember me effacé')
       }
     } catch (error) {
       console.warn('⚠️ [Init] Erreur sauvegarde remember me:', error)
@@ -366,7 +422,7 @@ export const rememberMeUtils = {
         hasRememberedEmail
       }
       
-      console.log('🔄 [Init] Chargement remember me:', result)
+      console.log('📄 [Init] Chargement remember me:', result)
       return result
     } catch (error) {
       console.warn('⚠️ [Init] Erreur chargement remember me:', error)
